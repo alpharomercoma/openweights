@@ -16,7 +16,6 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -56,11 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -78,9 +75,13 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AttachmentSheet(support: MediaSupport, onPicked: (Uri) -> Unit, onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val captureUri = remember { context.newCaptureUri() }
+fun AttachmentSheet(
+    support: MediaSupport,
+    newCaptureUri: () -> Uri,
+    onPicked: (Uri) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val captureUri = remember { newCaptureUri() }
 
     val pickMedia = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -271,18 +272,6 @@ private fun AttachmentThumbnail(attachment: MessagePart.File, size: Int) {
             overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-/**
- * A private file for the camera app to write into.
- *
- * Named by the clock rather than randomly so a capture that is never attached is obvious
- * in the folder and easy to sweep up.
- */
-private fun Context.newCaptureUri(): Uri {
-    val captures = File(filesDir, "captures").apply { mkdirs() }
-    val target = File(captures, "capture-${System.currentTimeMillis()}.jpg")
-    return FileProvider.getUriForFile(this, "$packageName.files", target)
 }
 
 /** The document types worth offering, given what the model can read. */

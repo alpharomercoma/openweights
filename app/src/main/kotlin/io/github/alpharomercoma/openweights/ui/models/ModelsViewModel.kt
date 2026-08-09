@@ -93,27 +93,41 @@ class ModelsViewModel @Inject constructor(
     }
 
     /**
-     * Starts a download, or does nothing if that file is already being fetched.
+     * Starts a download, or does nothing if that destination is already being fetched.
+     *
+     * Keyed by the file it writes rather than the remote path: two repositories can offer
+     * the same filename, and letting both run would have them overwrite each other's bytes
+     * in the same partial file.
      *
      * Downloads survive leaving the screen because they run in the view model scope; the
      * partial file on disk means even process death only costs the current chunk.
      */
-    /**
-     * Starts a download, or does nothing if that destination is already being fetched.
-     *
-     * Keyed by the file it writes rather than the remote path: two repositories can offer
-     * the same filename, and letting both run would have them overwrite each other's
-     * bytes in the same partial file.
-     */
     fun download(repoId: String, path: String, sizeBytes: Long, sha256: String?) {
-        val destination = File(modelStore.directory, path.substringAfterLast('/'))
+        val file = HubFile(path, sizeBytes, sha256)
+        start(repoId, file, File(modelStore.directory, file.fileName))
+    }
+
+    /**
+     * Fetches a model's projector, saved under a name derived from the model file.
+     *
+     * Renamed on the way in because upstream names only loosely relate to the model —
+     * different quantization, different capitalisation, sometimes a bare `mmproj-F16` —
+     * and a guess at load time means a wrong encoder loaded without complaint.
+     */
+    fun downloadProjector(repoId: String, projector: HubFile, modelFileName: String) {
+        start(repoId, projector, modelStore.projectorDestination(modelFileName))
+    }
+
+    private fun start(repoId: String, file: HubFile, destination: File) {
         val key = destination.name
         if (jobs.containsKey(key)) return
 
-        _uiState.update { it.copy(downloads = it.downloads + ActiveDownload(repoId, path, key)) }
+        _uiState.update {
+            it.copy(downloads = it.downloads + ActiveDownload(repoId, file.path, key))
+        }
 
         val job = viewModelScope.launch {
-            downloader.download(repoId, HubFile(path, sizeBytes, sha256), destination)
+            downloader.download(repoId, file, destination)
                 .catch { failure ->
                     updateDownload(key) { it.copy(error = failure.readableMessage()) }
                 }
@@ -138,27 +152,35 @@ class ModelsViewModel @Inject constructor(
         refresh()
     }
 
-    private fun apply(path: String, progress: DownloadProgress) {
+    /**
+     * Folds progress into the row it belongs to.
+     *
+     * Matched on the key — the file being written — and not on the remote path, which is
+     * merely equal to it when a repository keeps its GGUFs at the top level. A file in a
+     * subdirectory, or a projector saved under a name of our own, would otherwise report
+     * no progress and leave a finished download on screen forever.
+     */
+    private fun apply(key: String, progress: DownloadProgress) {
         when (progress) {
-            is DownloadProgress.Downloading -> updateDownload(path) {
+            is DownloadProgress.Downloading -> updateDownload(key) {
                 it.copy(bytesDone = progress.bytesDone, bytesTotal = progress.bytesTotal)
             }
 
-            DownloadProgress.Verifying -> updateDownload(path) { it.copy(isVerifying = true) }
+            DownloadProgress.Verifying -> updateDownload(key) { it.copy(isVerifying = true) }
 
             is DownloadProgress.Finished -> {
                 _uiState.update {
-                    it.copy(downloads = it.downloads.filterNot { d -> d.path == path })
+                    it.copy(downloads = it.downloads.filterNot { d -> d.key == key })
                 }
                 refresh()
             }
         }
     }
 
-    private fun updateDownload(path: String, transform: (ActiveDownload) -> ActiveDownload) {
+    private fun updateDownload(key: String, transform: (ActiveDownload) -> ActiveDownload) {
         _uiState.update { state ->
             state.copy(
-                downloads = state.downloads.map { if (it.path == path) transform(it) else it },
+                downloads = state.downloads.map { if (it.key == key) transform(it) else it },
             )
         }
     }

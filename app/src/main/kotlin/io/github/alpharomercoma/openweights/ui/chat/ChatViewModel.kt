@@ -508,7 +508,12 @@ class ChatViewModel @Inject constructor(
     /** Deletes a conversation; if it is the open one, the screen returns to a blank chat. */
     fun deleteConversation(id: Long) {
         viewModelScope.launch {
+            // Read before deleting: the rows are what says which files were attached, and
+            // once they are gone nothing else on disk remembers, so the photos would stay
+            // forever in a folder the user cannot see.
+            val orphaned = chats.messages(id).flatMap { it.attachments.decodeAttachments() }
             chats.deleteConversation(id)
+            attachments.discard(orphaned)
             if (conversationId == id) newChat()
         }
     }

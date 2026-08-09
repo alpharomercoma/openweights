@@ -209,7 +209,7 @@ private fun ModelDetail(
             }
         }
 
-        detail.pairedProjector()?.let { projector ->
+        detail.defaultProjector()?.let { projector ->
             item {
                 // Said before the download rather than discovered after it: the projector
                 // is a second file, it is counted in the fit report above, and on a small

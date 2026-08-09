@@ -173,7 +173,14 @@ public:
     int32_t     training_context_size() const;
     int32_t     layer_count() const;
     /** Number of tokens currently held in the KV cache. */
-    int32_t     context_used() const { return static_cast<int32_t>(cached_.size()); }
+    /**
+     * KV-cache positions in use.
+     *
+     * [n_past_] rather than the token record: a turn with an attachment fills positions
+     * with embeddings that no token describes, so the token count would read as empty
+     * while the cache is nearly full.
+     */
+    int32_t     context_used() const { return n_past_; }
 
 private:
     Session() = default;

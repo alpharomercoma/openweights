@@ -113,6 +113,7 @@ fun ChatScreen(
     onRemoveStaged: (MessagePart.File) -> Unit = {},
     onToggleReadAloud: (String) -> Unit = {},
     isSpeaking: Boolean = false,
+    newCaptureUri: () -> Uri = { Uri.EMPTY },
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -169,6 +170,7 @@ fun ChatScreen(
             onRemoveStaged = onRemoveStaged,
             onToggleReadAloud = onToggleReadAloud,
             isSpeaking = isSpeaking,
+            newCaptureUri = newCaptureUri,
             modifier = modifier,
         )
     }
@@ -196,6 +198,7 @@ private fun ChatContent(
     onRemoveStaged: (MessagePart.File) -> Unit,
     onToggleReadAloud: (String) -> Unit,
     isSpeaking: Boolean,
+    newCaptureUri: () -> Uri,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -317,6 +320,7 @@ private fun ChatContent(
     if (showAttachments) {
         AttachmentSheet(
             support = state.mediaSupport,
+            newCaptureUri = newCaptureUri,
             onPicked = onAttach,
             onDismiss = { showAttachments = false },
         )

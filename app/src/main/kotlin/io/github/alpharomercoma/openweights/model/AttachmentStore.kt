@@ -23,6 +23,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -63,7 +64,9 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         val displayName = displayName(uri)
 
         if (MediaKind.of(mediaType) == MediaKind.VIDEO) {
-            return@withContext sampleFrames(uri, displayName)
+            return@withContext runCatching { sampleFrames(uri, displayName) }
+                .onFailure { Log.w(TAG, "could not read frames from the chosen video", it) }
+                .getOrDefault(emptyList())
         }
 
         val target = File(directory, "${UUID.randomUUID()}${extensionFor(displayName, mediaType)}")
@@ -114,36 +117,37 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
                 ) ?: return@mapNotNull null
 
                 val target = File(directory, "${UUID.randomUUID()}.jpg")
-                target.outputStream().use { output ->
-                    frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+                try {
+                    target.outputStream().use { output ->
+                        frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+                    }
+                } finally {
+                    frame.recycle()
                 }
-                frame.recycle()
                 MessagePart.File(
                     path = target.absolutePath,
                     mediaType = "image/jpeg",
                     name = "${displayName ?: "Video"} · frame ${index + 1}",
                 )
             }
-        } catch (failure: RuntimeException) {
-            // MediaMetadataRetriever throws this for anything it cannot decode, which for
-            // a file the user picked is a normal outcome rather than a bug. Logged because
-            // "that file could not be read" is all the user is told, and the codec's own
-            // reason is the only way to tell a broken file from a missing codec.
-            Log.w(TAG, "could not read frames from the chosen video", failure)
-            emptyList()
         } finally {
             retriever.release()
         }
     }
 
-    /** Deletes the file behind an attachment the user removed before sending. */
-    suspend fun discard(attachment: MessagePart.File) = withContext(Dispatchers.IO) {
-        val file = File(attachment.path)
-        // Only ever delete inside our own folder: a path from an older build, or a test,
-        // could point anywhere, and this runs without confirmation.
-        if (file.parentFile == directory) file.delete()
-        Unit
+    /** Deletes the files behind attachments that are no longer referenced. */
+    suspend fun discard(attachments: List<MessagePart.File>) = withContext(Dispatchers.IO) {
+        val ours = directory
+        attachments.forEach { attachment ->
+            val file = File(attachment.path)
+            // Only ever delete inside our own folder: a path from an older build, or from a
+            // conversation exported elsewhere, could point anywhere, and this runs with no
+            // confirmation behind it.
+            if (file.parentFile == ours) file.delete()
+        }
     }
+
+    suspend fun discard(attachment: MessagePart.File) = discard(listOf(attachment))
 
     private fun copyVerbatim(uri: Uri, target: File): Boolean =
         context.contentResolver.openInputStream(uri)?.use { input ->
@@ -191,11 +195,17 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
             decoded
         }
 
-        target.outputStream().use { output ->
-            resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+        // Bitmaps are native allocations that the collector frees late. Releasing them in
+        // a finally block matters most on the failure path, which is exactly when memory
+        // is already scarce.
+        try {
+            target.outputStream().use { output ->
+                resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+            }
+        } finally {
+            if (resized !== decoded) resized.recycle()
+            decoded.recycle()
         }
-        if (resized !== decoded) resized.recycle()
-        decoded.recycle()
         return true
     }
 
@@ -220,8 +230,23 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         else -> ""
     }
 
+    /**
+     * A private file for the camera app to write into.
+     *
+     * Older captures are swept first. The camera writes here directly and [store] copies
+     * out of it, so without this the originals would accumulate — including the ones from
+     * captures the user cancelled, which nothing else would ever hear about.
+     */
+    fun newCaptureUri(): Uri {
+        val captures = File(context.filesDir, CAPTURES).apply { mkdirs() }
+        captures.listFiles()?.forEach { it.delete() }
+        val target = File(captures, "capture-${UUID.randomUUID()}.jpg")
+        return FileProvider.getUriForFile(context, "${context.packageName}.files", target)
+    }
+
     private companion object {
         const val TAG = "AttachmentStore"
+        const val CAPTURES = "captures"
         const val DIRECTORY = "attachments"
         const val FALLBACK_MEDIA_TYPE = "application/octet-stream"
 

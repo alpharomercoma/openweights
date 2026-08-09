@@ -26,6 +26,22 @@
 #include "chat.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
+
+#include <memory>
+#include <new>
+#include <sys/stat.h>
+
+namespace {
+/**
+ * Largest attachment handed to the projector.
+ *
+ * libmtmd reads the whole file into memory before it knows what it is, so an oversized
+ * one is an out-of-memory kill rather than an error message. Images and video frames are
+ * downscaled long before this; the cap is really about audio and about files that are not
+ * what their name claims.
+ */
+constexpr size_t MAX_ATTACHMENT_BYTES = 64u * 1024u * 1024u;
+}  // namespace
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
@@ -143,6 +159,13 @@ void load_best_cpu_backend() {
     ggml_backend_load(best_name);
 }
 
+/** Size of a file in bytes, or 0 when it cannot be read. */
+size_t file_size(const std::string & path) {
+    struct stat info {};
+    if (stat(path.c_str(), &info) != 0) return 0;
+    return static_cast<size_t>(info.st_size);
+}
+
 void init_backend() {
     std::call_once(g_backend_once, [] {
         llama_log_set(log_callback, nullptr);
@@ -228,16 +251,23 @@ Session * Session::load(
     ctx_params.n_threads_batch = n_threads_batch;
     ctx_params.no_perf         = true;
 
+    // Allocated before the context so that every native handle has an owner from the
+    // moment it exists: a throw between them would otherwise leak the model outright.
+    std::unique_ptr<Session> session(new (std::nothrow) Session());
+    if (session == nullptr) {
+        llama_model_free(model);
+        error = "out of memory";
+        return nullptr;
+    }
+    session->model_ = model;
+
     llama_context * ctx = llama_init_from_model(model, ctx_params);
     if (ctx == nullptr) {
-        llama_model_free(model);
         error = "failed to create llama context (context length may be too large for this device)";
         return nullptr;
     }
+    session->ctx_ = ctx;
 
-    auto * session = new Session();
-    session->model_ = model;
-    session->ctx_   = ctx;
     if (!mmproj_path.empty()) {
         mtmd_context_params mtmd_params = mtmd_context_params_default();
         mtmd_params.use_gpu = n_gpu_layers > 0;
@@ -246,7 +276,6 @@ Session * Session::load(
 
         session->mtmd_ = mtmd_init_from_file(mmproj_path.c_str(), model, mtmd_params);
         if (session->mtmd_ == nullptr) {
-            delete session;
             error = "could not load the multimodal projector at " + mmproj_path;
             return nullptr;
         }
@@ -258,11 +287,10 @@ Session * Session::load(
         // A model's chat template is untrusted data from someone else's repository. A
         // parse failure must surface as an error, not unwind through JNI and take the
         // process with it.
-        delete session;
         error = std::string("this model's chat template could not be read: ") + failure.what();
         return nullptr;
     }
-    return session;
+    return session.release();
 }
 
 void Session::set_threads(int32_t n_threads, int32_t n_threads_batch) {
@@ -295,15 +323,27 @@ int32_t Session::ingest_media_prompt(
 
     std::vector<mtmd_bitmap *> bitmaps;
     for (const auto & path : media_paths) {
-        // libmtmd decodes the file itself, so images, audio and video all arrive the
-        // same way and the projector decides what it can accept.
-        auto wrapper = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false);
-        if (wrapper.bitmap == nullptr) {
+        if (file_size(path) > MAX_ATTACHMENT_BYTES) {
+            for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
+            error = "that attachment is too large to process on this device";
+            return -1;
+        }
+        // libmtmd decodes the file itself, so images and audio arrive the same way and the
+        // projector decides what it can accept. It reads the whole file into memory and
+        // allocates from its dimensions, both of which are attacker-controlled for a file
+        // the user was handed — hence the size cap above and the catch below.
+        mtmd_bitmap * bitmap = nullptr;
+        try {
+            bitmap = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false).bitmap;
+        } catch (const std::exception &) {
+            bitmap = nullptr;
+        }
+        if (bitmap == nullptr) {
             for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
             error = "could not read the attached file: " + path;
             return -1;
         }
-        bitmaps.push_back(wrapper.bitmap);
+        bitmaps.push_back(bitmap);
     }
 
     mtmd_input_text input_text;
@@ -459,12 +499,16 @@ StopReason Session::generate(
         if (evaluated < 0) {
             return StopReason::ERROR;
         }
+        // Assigned before the length check: the cache is already full of these positions,
+        // and reporting zero would show an empty context meter over a full context.
+        n_past_ = evaluated;
+        stats.prompt_tokens = evaluated;
+        stats.context_used  = evaluated;
+        stats.context_size  = n_ctx;
         if (evaluated >= n_ctx) {
             error = "the conversation and its attachments are longer than the context window";
             return StopReason::CONTEXT_FULL;
         }
-        n_past_ = evaluated;
-        stats.prompt_tokens = evaluated;
     } else {
         // Tokenize the whole conversation, then reuse whatever prefix is already cached.
         //

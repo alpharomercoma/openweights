@@ -201,7 +201,7 @@ class DiscoverViewModel @Inject constructor(
             metadata = metadata,
             fileSizeBytes = file.sizeBytes,
             contextLength = contextLength,
-            projectorSizeBytes = _uiState.value.detail?.pairedProjector()?.sizeBytes ?: 0,
+            projectorSizeBytes = _uiState.value.detail?.pairedProjector(file)?.sizeBytes ?: 0,
         )
 
     private fun updateFile(path: String, transform: (InspectedFile) -> InspectedFile) {

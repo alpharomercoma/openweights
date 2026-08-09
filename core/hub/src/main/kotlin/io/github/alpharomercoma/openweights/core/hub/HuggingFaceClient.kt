@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.hub
 
+import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -68,7 +69,7 @@ data class HubFile(
      * language model at all. Every publisher names them `mmproj-…`, which is the only
      * signal available without downloading the header.
      */
-    val isProjector: Boolean get() = fileName.startsWith("mmproj", ignoreCase = true)
+    val isProjector: Boolean get() = GgufFileName.isProjector(fileName)
 }
 
 /** Everything the model detail screen needs about one repository. */
@@ -84,16 +85,32 @@ data class HubModelDetail(
     val trainingContextLength: Int?,
 ) {
     /**
-     * The projector to download alongside any model from this repository.
+     * The projector to download alongside [model].
      *
-     * The smallest one: projectors are published at a couple of precisions, the quality
-     * difference between them is slight, and the smaller file is both a shorter download
-     * and less memory held for the whole session.
+     * Matched to that specific file first, because a repository can hold several model
+     * families and the wrong encoder loads without complaint and then describes pictures
+     * it cannot see. Only when nothing matches by name does the single-projector case
+     * apply — which is the common one, and unambiguous precisely because there is one.
+     *
+     * Among equals, the smallest: projectors are published at a couple of precisions, the
+     * quality difference is slight, and the smaller file is both a shorter download and
+     * less memory held for the whole session.
      */
-    fun pairedProjector(): HubFile? = projectors.minByOrNull { it.sizeBytes }
+    fun pairedProjector(model: HubFile): HubFile? {
+        val identity = GgufFileName.modelIdentity(model.fileName)
+        val matching = projectors.filter { projector ->
+            val theirs = GgufFileName.modelIdentity(projector.fileName)
+            identity.isNotEmpty() && theirs.equals(identity, ignoreCase = true)
+        }
+        val candidates = matching.ifEmpty { projectors.takeIf { it.size == 1 }.orEmpty() }
+        return candidates.minByOrNull { it.sizeBytes }
+    }
 
     /** True when this repository ships a vision or audio encoder. */
     val isMultimodal: Boolean get() = projectors.isNotEmpty()
+
+    /** The projector for the file the user is most likely to take: the first listed. */
+    fun defaultProjector(): HubFile? = files.firstOrNull()?.let(::pairedProjector)
 }
 
 /** Raised when the Hub rejects a request in a way the user can act on. */

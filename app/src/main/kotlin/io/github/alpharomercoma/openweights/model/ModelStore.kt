@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.model
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,43 +44,35 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
     /**
      * The multimodal projector that belongs to [model], if it has been downloaded.
      *
-     * A projector is a separate GGUF holding the vision or audio encoder, published
-     * alongside the model as `mmproj-<model>-<quant>.gguf`. Matching is by the model's
-     * identity with its quantization suffix removed, because the two files are usually
-     * quantized differently — an F16 projector paired with a Q4 model is the normal case.
+     * Downloads are saved under a name derived from the model file, so the normal case is
+     * an exact lookup. The convention match behind it covers projectors put here by hand
+     * or by an older build, where the name is whatever the publisher chose.
      */
     fun projectorFor(model: File): File? {
-        val identity = model.nameWithoutExtension.modelIdentity()
+        val paired = File(directory, GgufFileName.projectorNameFor(model.name))
+        if (paired.isFile) return paired
+
+        val identity = GgufFileName.modelIdentity(model.name)
         if (identity.isEmpty()) return null
         return ggufFiles().firstOrNull { candidate ->
-            candidate.isProjector && candidate.nameWithoutExtension.contains(identity, true)
+            candidate.isProjector &&
+                GgufFileName.modelIdentity(candidate.name).equals(identity, ignoreCase = true)
         }
     }
+
+    /** Where a projector downloaded for [modelFileName] is saved. */
+    fun projectorDestination(modelFileName: String): File =
+        File(directory, GgufFileName.projectorNameFor(modelFileName))
 
     private fun ggufFiles(): List<File> =
         directory.listFiles { file -> file.isFile && file.name.endsWith(GGUF_EXTENSION) }
             ?.sortedByDescending { it.lastModified() }
             .orEmpty()
 
-    private val File.isProjector: Boolean get() = name.startsWith(PROJECTOR_PREFIX, true)
-
-    /**
-     * A model name with its quantization suffix removed.
-     *
-     * `LFM2.5-VL-1.6B-Q4_K_M` becomes `LFM2.5-VL-1.6B`, which is what the projector's own
-     * name contains.
-     */
-    private fun String.modelIdentity(): String {
-        val quantization = QUANTIZATION_SUFFIX.find(this) ?: return this
-        return substring(0, quantization.range.first)
-    }
+    private val File.isProjector: Boolean get() = GgufFileName.isProjector(name)
 
     private companion object {
         const val MODELS_DIRECTORY = "models"
-        const val GGUF_EXTENSION = ".gguf"
-        const val PROJECTOR_PREFIX = "mmproj"
-
-        /** `-Q4_K_M`, `-F16`, `-IQ3_XXS` and the rest of the GGUF quantization vocabulary. */
-        val QUANTIZATION_SUFFIX = Regex("""-(I?Q\d[\w_]*|BF?16|F32)$""", RegexOption.IGNORE_CASE)
+        const val GGUF_EXTENSION = GgufFileName.GGUF_SUFFIX
     }
 }

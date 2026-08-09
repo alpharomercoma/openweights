@@ -136,6 +136,15 @@ The contract, and the traps in it:
   which forces the next turn to re-evaluate from position zero.
 - `mtmd_helper_log_set` has to be called separately from `llama_log_set`, or projector
   failures go to stderr and vanish on Android.
+- `context_used()` must report `n_past_`, not the token count. After a media turn the token
+  record is deliberately empty while the cache is nearly full.
+- Attachments are untrusted files handed to third-party decoders that read the whole thing
+  into memory before knowing what it is. There is a 64 MB cap and a `catch` around the
+  bitmap load, because `std::bad_alloc` crossing JNI kills the process.
+
+Projectors are renamed to `mmproj-<model file name>.gguf` on download, so pairing at load
+time is a lookup rather than a guess. The convention match (equal model identity with the
+quantization suffix stripped) is kept as a fallback for files placed by hand over adb.
 
 Measured on the dev device with LFM2.5-VL-1.6B Q4_K_M + Q8_0 projector, 448x448 image:
 **13.4 s to first token** (that is the vision encode) then **32.2 tok/s** decode.

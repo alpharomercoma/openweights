@@ -51,7 +51,9 @@ class SpeechReader @Inject constructor(@param:ApplicationContext private val con
     private var pending: String? = null
 
     fun speak(text: String) {
-        val spoken = text.forSpeech()
+        // Truncated to what the engine accepts: past its limit `speak` returns ERROR and
+        // never calls back, which would leave the UI showing "Stop reading" forever.
+        val spoken = text.forSpeech().take(TextToSpeech.getMaxSpeechInputLength())
         if (spoken.isBlank()) return
 
         val current = engine
@@ -65,7 +67,9 @@ class SpeechReader @Inject constructor(@param:ApplicationContext private val con
             return
         }
         _isSpeaking.value = true
-        current.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        val queued = current.speak(spoken, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+        // No utterance means no progress callback, so nothing else would ever clear this.
+        if (queued != TextToSpeech.SUCCESS) _isSpeaking.value = false
     }
 
     fun stop() {

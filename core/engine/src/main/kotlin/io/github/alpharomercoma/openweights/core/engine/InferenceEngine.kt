@@ -1,0 +1,126 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.core.engine
+
+import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
+import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import kotlinx.coroutines.flow.Flow
+import java.io.File
+
+/** Thrown when the native engine fails to load a model or generate. */
+class LlamaException(message: String) : RuntimeException(message)
+
+/** Why a generation stopped. Ordinals must stay in sync with `StopReason` in the JNI layer. */
+enum class StopReason {
+    END_OF_TURN,
+    MAX_TOKENS,
+    CONTEXT_FULL,
+    CANCELLED,
+    ERROR,
+}
+
+/** Measured throughput for one generation. Nothing here is estimated. */
+data class GenerationStats(
+    val promptTokens: Int,
+    val generatedTokens: Int,
+    val prefillMs: Long,
+    val decodeMs: Long,
+    val timeToFirstTokenMs: Long,
+    val contextUsed: Int,
+    val contextSize: Int,
+) {
+    /** Prompt-processing throughput, or null when nothing needed decoding (full cache hit). */
+    val prefillTokensPerSecond: Double?
+        get() = if (prefillMs > 0 && promptTokens > 0) {
+            promptTokens * MILLIS_PER_SECOND / prefillMs
+        } else {
+            null
+        }
+
+    /** Generation throughput — the number users actually feel. */
+    val decodeTokensPerSecond: Double?
+        get() = if (decodeMs > 0 && generatedTokens > 1) {
+            (generatedTokens - 1) * MILLIS_PER_SECOND / decodeMs
+        } else {
+            null
+        }
+}
+
+private const val MILLIS_PER_SECOND = 1000.0
+
+/** What the engine emits while producing a reply. */
+sealed interface GenerationEvent {
+    /** A fragment of the reply. Fragments are not necessarily whole words. */
+    data class Token(val text: String) : GenerationEvent
+
+    /** Terminal event carrying why generation stopped and how fast it ran. */
+    data class Completed(val reason: StopReason, val stats: GenerationStats) : GenerationEvent
+}
+
+/** Static facts about the model currently loaded. */
+data class LoadedModelInfo(
+    val description: String,
+    val parameterCount: Long,
+    val sizeBytes: Long,
+    val contextSize: Int,
+    val trainingContextSize: Int,
+    val layerCount: Int,
+    val contextUsed: Int,
+)
+
+/**
+ * Runs a language model on this device.
+ *
+ * llama.cpp is the only implementation today. The interface exists so a second backend
+ * (ExecuTorch for NPU acceleration, for example) can be added without touching callers —
+ * see `docs/research/inference-engines.md` for why that is a live possibility.
+ *
+ * Implementations hold a single model at a time and are not safe for concurrent
+ * generation; [cancel] is the exception and may be called while [chat] is running.
+ */
+interface InferenceEngine {
+    /** The model currently loaded, or null. */
+    val loadedModel: LoadedModelInfo?
+
+    /** Loads [modelFile], replacing any previously loaded model. */
+    suspend fun load(modelFile: File, params: ModelLoadParams = ModelLoadParams())
+
+    /** Releases the model and its KV cache. Safe to call when nothing is loaded. */
+    suspend fun unload()
+
+    /**
+     * Generates a reply to [messages], streaming it as [GenerationEvent]s.
+     *
+     * The flow is cold: collection starts the generation and cancelling the collector
+     * stops it. Conversation prefixes already in the KV cache are reused automatically,
+     * so a follow-up turn only pays for the new tokens.
+     */
+    fun chat(
+        messages: List<ChatMessage>,
+        params: SamplerParams = SamplerParams(),
+    ): Flow<GenerationEvent>
+
+    /** Stops the running generation. Safe to call from any thread. */
+    fun cancel()
+
+    /** Clears the KV cache so the next [chat] starts from an empty context. */
+    suspend fun resetContext()
+
+    /** Description of the active ggml backends and detected CPU features. */
+    fun systemInfo(): String
+}

@@ -90,12 +90,34 @@ Single source of truth: `gradle/libs.versions.toml`.
 
 ## Phase status
 
+`docs/ROADMAP.md` holds the full plan, including the agent runtime work.
+
 - [x] **P0** Toolchain + scaffold — app installs and runs on the Poco
 - [x] **P1** llama.cpp JNI engine + streaming chat — real generation verified on-device
+- [x] **Chat UI** — follow-tail scroll, collapsed reasoning, Markdown with code blocks,
+      long-press actions, slash-command palette
+- [x] **Compaction** — folds older turns into a model-written summary before the context
+      window fills, so long conversations continue instead of dying
+- [~] **Compute backend choice** — engine enumerates ggml devices at runtime; GPU backends
+      not yet compiled in (see ROADMAP for why), Settings screen not built
 - [ ] **P2** HF Hub: token vault, search, GGUF parse, fit estimator, downloads
+- [ ] **Tool calling** — the foundation for the agent loop
 - [ ] **P3** Product: histories, usage ledger, dashboard, per-model params
 - [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
+
+## Working practice: independent review
+
+After each substantial change, run a second reviewer over the diff rather than trusting a
+self-review:
+
+```sh
+codex exec --sandbox read-only "Review the Kotlin and C++ in this repo (skip the vendored
+llama.cpp submodule). Focus on correctness, concurrency, resource leaks, code smells."
+```
+
+The first pass found ten real bugs, including one that silently disabled compaction
+entirely. Self-review did not catch it because the code read exactly as intended.
 
 ## Device measurements
 
@@ -108,7 +130,8 @@ Model: `LiquidAI/LFM2.5-2.6B-GGUF` Q4_K_M (1.67 GB, 2.697 B params, 30 layers, t
 | Same, 8 threads | 8 / 8 | 21.3 | 13.9 | 987 ms |
 | **Runtime-selected armv9.0_1 backend** | 4 / 4 | 55.3 | 16.8 | 381 ms |
 | Same, 8 threads | 8 / 8 | 69.5 | 12.8 | 303 ms |
-| **Shipping default (split threads)** | **4 / 8** | **68.2–76.9** | **16.2–16.4** | **274–309 ms** |
+| **Shipping default (split threads)** | **4 / 8** | **59.8–76.9** | **16.2–16.4** | **274–352 ms** |
+| Same, after removing false backpressure cancellation | 4 / 8 | 59.8 | **18.0** | 352 ms |
 
 Two findings worth keeping:
 

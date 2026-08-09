@@ -130,6 +130,14 @@ public:
     /** Drops the KV cache so the next generation starts from an empty context. */
     void reset();
 
+    /**
+     * Changes how many threads generation and prompt processing use.
+     *
+     * Runtime rather than load-time because the right answer moves: a throttled phone is
+     * measurably slower with more threads than with fewer.
+     */
+    void set_threads(int32_t n_threads, int32_t n_threads_batch);
+
     std::string model_description() const;
     uint64_t    parameter_count() const;
     uint64_t    model_size_bytes() const;

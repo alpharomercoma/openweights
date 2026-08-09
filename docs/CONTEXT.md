@@ -169,10 +169,13 @@ After a long run of inference tests, the same benchmark inverted:
 | 8 | **69.5** | **28.0** |
 
 On a cold device more threads win; on a throttled one they lose badly, and decode peaked
-at 5 threads instead of 4. The shipping defaults (4 generate / 8 batch) are tuned for a
-cold phone and are simply wrong once it heats up. This is why the roadmap says loops must
-pause when the device throttles, and it argues for the thread count becoming adaptive
-rather than fixed — measured, not assumed.
+at 5 threads instead of 4. A fixed thread count is therefore wrong roughly half the time.
+
+`ThermalPolicy` now re-plans the count before every reply from
+`PowerManager.getCurrentThermalStatus()`, and `llama_set_n_threads` applies it at runtime.
+At `THERMAL_STATUS_CRITICAL` and above it stops generating entirely and says so: Android is
+already shedding load to avoid shutting down, and sustained inference is among the heaviest
+things a phone can be asked to do.
 
 Two findings worth keeping:
 

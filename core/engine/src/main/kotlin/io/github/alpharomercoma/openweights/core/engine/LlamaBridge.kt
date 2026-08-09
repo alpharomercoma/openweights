@@ -57,6 +57,8 @@ internal class LlamaBridge {
 
     external fun nativeResetContext(handle: Long)
 
+    external fun nativeSetThreads(handle: Long, threads: Int, batchThreads: Int)
+
     /** Safe to call while [nativeGenerate] is running on another thread. */
     external fun nativeCancel(handle: Long)
 

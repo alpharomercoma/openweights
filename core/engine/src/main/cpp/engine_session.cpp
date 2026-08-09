@@ -242,6 +242,10 @@ Session * Session::load(
     return session;
 }
 
+void Session::set_threads(int32_t n_threads, int32_t n_threads_batch) {
+    llama_set_n_threads(ctx_, n_threads, n_threads_batch);
+}
+
 void Session::reset() {
     llama_memory_clear(llama_get_memory(ctx_), true);
     cached_.clear();

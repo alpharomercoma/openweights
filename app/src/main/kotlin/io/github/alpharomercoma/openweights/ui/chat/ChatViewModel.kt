@@ -29,6 +29,8 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
+import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
+import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -105,6 +107,8 @@ class ChatViewModel @Inject constructor(
     private val modelStore: ModelStore,
     private val chats: ChatRepository,
     private val modelPreferences: ModelPreferencesRepository,
+    private val thermalPolicy: ThermalPolicy,
+    private val profiler: DeviceProfiler,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -253,6 +257,23 @@ class ChatViewModel @Inject constructor(
             var reasoningEndedAt: Long? = null
 
             try {
+                // Re-planned per reply: the phone is a different machine hot than cold,
+                // and a count chosen at load time is wrong by the third long answer.
+                // Inside the try because it suspends, so Stop can land here too.
+                val plan = thermalPolicy.plan(profiler.profile().cpuCores)
+                if (plan.shouldPause) {
+                    _uiState.update {
+                        it.copy(
+                            isGenerating = false,
+                            error = "The phone is too hot to keep generating. It will work " +
+                                "again once it cools down.",
+                        )
+                    }
+                    updateLastEntry { it.copy(isStreaming = false) }
+                    return@launch
+                }
+                engine.setThreads(plan.generateThreads, plan.batchThreads)
+
                 engine.chat(conversation, state.preferences.toSamplerParams()).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {

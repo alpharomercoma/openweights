@@ -141,6 +141,14 @@ interface InferenceEngine : AutoCloseable {
     /** Clears the KV cache so the next [chat] starts from an empty context. */
     suspend fun resetContext()
 
+    /**
+     * Retunes how many threads the next generation uses.
+     *
+     * Exposed because the best count is not a property of the phone but of its current
+     * temperature: a throttled device is faster with fewer threads, measurably so.
+     */
+    suspend fun setThreads(generateThreads: Int, batchThreads: Int)
+
     /** Description of the active ggml backends and detected CPU features. */
     fun systemInfo(): String
 

@@ -220,6 +220,18 @@ class LlamaCppEngine internal constructor(
         engineExecutor.shutdown()
     }
 
+    override suspend fun setThreads(generateThreads: Int, batchThreads: Int) {
+        require(generateThreads > 0 && batchThreads > 0) {
+            "thread counts must be positive, got $generateThreads and $batchThreads"
+        }
+        withContext(engineThread) {
+            val activeHandle = handle.get()
+            if (activeHandle != 0L) {
+                bridge.nativeSetThreads(activeHandle, generateThreads, batchThreads)
+            }
+        }
+    }
+
     override fun systemInfo(): String = bridge.nativeSystemInfo()
 
     override fun computeDevices(): List<ComputeDevice> =

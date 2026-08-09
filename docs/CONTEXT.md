@@ -103,7 +103,8 @@ Single source of truth: `gradle/libs.versions.toml`.
 - [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
       requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
 - [ ] **Tool calling** — the foundation for the agent loop
-- [ ] **P3** Product: histories, usage ledger, dashboard, per-model params
+- [~] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard
+      built; per-model hyperparameter editing and a conversation list are still to come
 - [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
 

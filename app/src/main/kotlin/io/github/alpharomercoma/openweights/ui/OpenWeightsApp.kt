@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.InsertChart
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material3.Icon
@@ -44,6 +45,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
+import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
+import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverViewModel
 import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
@@ -56,6 +59,7 @@ private enum class Destination(val route: String, val label: String, val icon: I
     CHAT("chat", "Chat", Icons.Rounded.Chat),
     DISCOVER("discover", "Discover", Icons.Rounded.Explore),
     MODELS("models", "Models", Icons.Rounded.Storage),
+    USAGE("usage", "Usage", Icons.Rounded.InsertChart),
     SETTINGS("settings", "Settings", Icons.Rounded.Settings),
 }
 
@@ -154,6 +158,13 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onDelete = modelsViewModel::delete,
                     onCancelDownload = modelsViewModel::cancel,
                 )
+            }
+
+            composable(Destination.USAGE.route) {
+                val viewModel: DashboardViewModel = hiltViewModel()
+                val summary by viewModel.uiState.collectAsStateWithLifecycle()
+
+                DashboardScreen(summary = summary)
             }
 
             composable(Destination.SETTINGS.route) {

@@ -26,6 +26,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
+import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -87,12 +88,16 @@ class ChatViewModel @Inject constructor(
     private val engine: InferenceEngine,
     private val compactor: ConversationCompactor,
     private val modelStore: ModelStore,
+    private val chats: ChatRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
     private var nextEntryId = 0L
+
+    /** The row this conversation is being written to, created lazily on the first message. */
+    private var conversationId: Long? = null
 
     /**
      * True once a model has been loaded or is loading, so the screen can ask for the
@@ -117,6 +122,7 @@ class ChatViewModel @Inject constructor(
             runCatching {
                 engine.load(modelFile, ModelLoadParams(contextLength = contextLength))
             }.onSuccess {
+                conversationId = null
                 val info = engine.loadedModel
                 _uiState.update {
                     it.copy(
@@ -140,6 +146,13 @@ class ChatViewModel @Inject constructor(
 
         _uiState.update { state ->
             state.copy(transcript = state.transcript + entry(ChatRole.USER, text), error = null)
+        }
+
+        viewModelScope.launch {
+            val id = conversationId
+                ?: chats.startConversation(text, _uiState.value.modelName)
+                    .also { conversationId = it }
+            chats.addMessage(id, ChatRole.USER.wireName, text)
         }
         generate()
     }
@@ -253,6 +266,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             stop()
             engine.resetContext()
+            conversationId = null
             _uiState.update {
                 it.copy(
                     transcript = emptyList(),
@@ -279,6 +293,7 @@ class ChatViewModel @Inject constructor(
     fun dismissError() = _uiState.update { it.copy(error = null) }
 
     private fun applyCompletion(event: GenerationEvent.Completed) {
+        persistReply(event)
         updateLastEntry {
             it.copy(
                 isStreaming = false,
@@ -293,6 +308,36 @@ class ChatViewModel @Inject constructor(
                 contextUsed = event.stats.contextUsed,
                 contextSize = event.stats.contextSize,
                 error = event.reason.warning(),
+            )
+        }
+    }
+
+    /**
+     * Writes the finished reply and folds it into the lifetime ledger.
+     *
+     * Two writes on purpose: the message carries this reply's own numbers, and the ledger
+     * carries the totals, so deleting the chat later does not un-count the work.
+     */
+    private fun persistReply(event: GenerationEvent.Completed) {
+        val id = conversationId ?: return
+        val reply = _uiState.value.transcript.lastOrNull() ?: return
+        val model = _uiState.value.modelName ?: return
+
+        viewModelScope.launch {
+            chats.addMessage(
+                conversationId = id,
+                role = ChatRole.ASSISTANT.wireName,
+                text = reply.text,
+                tokensPerSecond = event.stats.decodeTokensPerSecond,
+                timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
+                generatedTokens = event.stats.generatedTokens,
+                reasoningMs = reply.reasoningMs,
+            )
+            chats.recordUsage(
+                modelName = model,
+                promptTokens = event.stats.promptTokens,
+                generatedTokens = event.stats.generatedTokens,
+                inferenceMs = event.stats.prefillMs + event.stats.decodeMs,
             )
         }
     }

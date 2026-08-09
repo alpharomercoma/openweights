@@ -32,7 +32,7 @@ import javax.inject.Inject
  *
  * Separate from the view model because it is the one piece of the chat flow with real
  * policy in it, and because summarizing with the same model that is mid-conversation has a
- * subtlety worth isolating: the summarization prompt shares no prefix with the chat, so it
+ * subtlety to isolate: the summarization prompt shares no prefix with the chat, so it
  * evicts the KV cache and the cache must be reset afterwards.
  */
 class ConversationCompactor @Inject constructor(

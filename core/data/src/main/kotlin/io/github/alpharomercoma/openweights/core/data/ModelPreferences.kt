@@ -34,7 +34,7 @@ import javax.inject.Singleton
 /**
  * Settings saved against one model.
  *
- * Per-model rather than global because the right values genuinely differ: a 1 B model
+ * Per-model rather than global because the right values differ: a 1 B model
  * needs a much more explicit system prompt than a 7 B one, model cards recommend
  * particular temperatures, and the context length a phone can afford depends on the file.
  */

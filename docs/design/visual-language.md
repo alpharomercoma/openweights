@@ -9,7 +9,7 @@ the middle of the screen instead of sitting where the eye expects it.
 OpenWeights is an instrument you own. You chose the file, it runs on your silicon, and you
 can watch how fast. The palette is **brass on graphite**. The colours of a precision
 instrument rather than a consumer assistant. Warm enough to read for an hour, technical
-enough to be honest about what it is.
+enough to state what it is.
 
 This also keeps us out of a crowded room: ChatGPT is neutral monochrome, Claude is
 terracotta on cream, Gemini is Google blue, Qwen is violet. Nobody is warm-amber-on-graphite.
@@ -61,8 +61,8 @@ for reusing one hue in two jobs, and it recreated exactly the failure it was mea
 the old palette used one teal for both "fast" and "tap me", so neither reading was reliable.
 A brass rail beside an answer would read as *selected* before it read as *12 tok/s*.
 
-Grey also happens to be the honest middle. Most readings are unremarkable, so a rail that is
-actually green or red is worth a glance, and the screen stays quiet the rest of the time.
+Grey also happens to be the right middle. Most readings are unremarkable, so a rail that is
+actually green or red stands out, and the screen stays quiet the rest of the time.
 
 **Colour is never the only signal.** Every telemetry colour sits beside the number it
 describes, the rail under a measured rate, the meter under a token count, and carries its

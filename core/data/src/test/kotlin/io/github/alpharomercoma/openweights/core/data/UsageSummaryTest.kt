@@ -23,7 +23,7 @@ class UsageSummaryTest {
     @Test
     fun `average speed is total tokens over total time, not a mean of means`() {
         // A slow 1000-token reply and a fast 10-token one must not average to "fast".
-        // Weighting by work done is the only figure that describes the device honestly.
+        // Weighting by work done is the only figure that describes the device .
         val summary = UsageSummary(
             lifetimeGeneratedTokens = 1010,
             lifetimeInferenceMs = 101_000,

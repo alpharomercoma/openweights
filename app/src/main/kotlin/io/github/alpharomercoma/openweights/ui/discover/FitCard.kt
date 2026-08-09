@@ -51,7 +51,7 @@ import java.util.Locale
  * One downloadable file, and a straight answer about whether it runs here.
  *
  * Every on-device app can list models. Saying "this one will not load, and here is the
- * arithmetic" before someone spends a gigabyte of mobile data is the part that is worth
+ * arithmetic" before someone spends a gigabyte of mobile data is the part that matters
  * building, so the verdict leads and the numbers behind it are right underneath.
  */
 @Composable
@@ -149,7 +149,7 @@ private fun FitReport.memoryLine(): String =
 private const val BYTES_PER_MIB = 1024.0 * 1024.0
 private const val BYTES_PER_GIB = BYTES_PER_MIB * 1024.0
 
-/** Sizes here are always storage or memory, so binary units are the honest ones. */
+/** Sizes here are always storage or memory, so binary units are the correct ones. */
 internal fun formatBytes(bytes: Long): String {
     val locale = Locale.getDefault()
     val gigabytes = bytes / BYTES_PER_GIB

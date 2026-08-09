@@ -34,7 +34,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Proves the projector path actually reads the picture.
+ * Proves the projector path reads the picture.
  *
  * The failure this guards against is subtle: an image that never reaches the model still
  * produces a fluent, confident answer, because the language model happily describes an

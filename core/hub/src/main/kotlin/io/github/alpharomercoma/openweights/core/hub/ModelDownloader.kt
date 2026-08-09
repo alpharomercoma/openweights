@@ -186,7 +186,7 @@ class ModelDownloader @Inject constructor(
      * Checks the finished file against the Hub's checksum.
      *
      * A silently truncated GGUF fails much later as an unexplained load error, so it is
-     * worth the hashing to fail here instead, with a message that says what to do.
+     * better to fail here on the hash, with a message that says what to do.
      */
     private suspend fun FlowCollector<DownloadProgress>.verify(file: HubFile, partial: File) {
         val expected = file.sha256 ?: return

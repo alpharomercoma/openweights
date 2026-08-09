@@ -140,7 +140,7 @@ fun ParameterSheet(
             Setting(
                 label = "Repeat penalty",
                 explanation = "Discourages repeating itself. Too high and it avoids words " +
-                    "it genuinely needs.",
+                    "it needs.",
                 value = String.format(Locale.getDefault(), "%.2f", draft.repeatPenalty),
             ) {
                 Slider(

@@ -65,7 +65,7 @@ data class GgufMetadata(
  * The quantization a GGUF file was written with.
  *
  * Values match llama.cpp's `llama_ftype`; unknown values keep their number so a model
- * quantized with something newer than this build still displays honestly.
+ * quantized with something newer than this build still displays .
  */
 enum class GgufFileType(val id: Int, val label: String) {
     F32(0, "F32"),

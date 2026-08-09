@@ -29,7 +29,7 @@ enum class ChatRole(val wireName: String) {
  * Modelled on the Vercel AI SDK's message parts: text and files, where a file carries its
  * IANA media type rather than being split into separate image and audio types. That shape
  * has become the de facto interchange format for multimodal chat, and it is also the
- * honest one here. Llama.cpp's projector inspects the bytes and decides what it can do
+ * right one here. Llama.cpp's projector inspects the bytes and decides what it can do
  * with them, so an image part is a claim about the file, not about the model.
  */
 sealed interface MessagePart {

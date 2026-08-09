@@ -27,7 +27,7 @@ data class ParsedToolCalls(val text: String, val calls: List<ToolCall>)
  * `<|tool_call_start|>` markers, which parse as ordinary prose and would otherwise be
  * shown to the user as if the model had answered.
  *
- * Kept deliberately small and format-specific rather than clever. A parser that guesses
+ * Kept small and format-specific rather than clever. A parser that guesses
  * at unknown syntax produces confident nonsense; one that recognises named formats and
  * gives up otherwise is safe to fall back on.
  */

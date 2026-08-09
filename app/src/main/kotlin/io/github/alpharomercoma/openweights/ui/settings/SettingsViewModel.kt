@@ -102,7 +102,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * A rejected token is worth deleting; an unreachable Hub is not.
+     * A rejected token should be deleted; an unreachable Hub is not.
      *
      * Throwing away a credential the user just typed because their train went into a
      * tunnel is worse than keeping one that might be wrong.

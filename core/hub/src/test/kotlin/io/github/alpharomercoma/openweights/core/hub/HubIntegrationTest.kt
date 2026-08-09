@@ -92,7 +92,7 @@ class HubIntegrationTest {
         assertThat(metadata.keyValueHeadsPerLayer.count { it > 0 })
             .isLessThan(metadata.blockCount)
 
-        // The whole point: a 1.7 GB file inspected for the price of a small web page.
+        // A 1.7 GB file inspected for the price of a small web page.
         assertThat(counting.bytesRead).isLessThan(MAX_INSPECTION_BYTES)
     }
 

@@ -60,7 +60,7 @@ verbatim after **557 ms of prefill**. Audio is far cheaper than vision: a whole 
 sentence costs less prompt processing than a single 448 px image.
 
 Note what the repository also ships and llama.cpp does not use: `vocoder-` and `tokenizer-`
-GGUFs. LFM2.5-Audio is genuinely speech-to-speech, but libmtmd implements the understanding
+GGUFs. LFM2.5-Audio is speech-to-speech, but libmtmd implements the understanding
 half only. Downloading the vocoder would buy nothing today.
 
 ## Dictation is a different thing from audio input
@@ -90,7 +90,7 @@ Everything else is a second model.
 
 ### On "any-to-any"
 
-Qwen3-Omni and Qwen3.5-Omni genuinely accept text, image, audio and video and emit text and
+Qwen3-Omni and Qwen3.5-Omni accept text, image, audio and video and emit text and
 speech. They are also 30B-class mixture-of-experts models. Quantized to 4 bits the weights
 alone exceed what a 12 GB phone can spare, and llama.cpp implements their *understanding*
 path, not their speech decoder. Any-to-any is real, and it is a server capability.
@@ -100,7 +100,7 @@ path, not their speech decoder. Any-to-any is real, and it is a server capabilit
 The AI SDK converged on a `parts` array per message, where a file part carries an IANA
 `mediaType` alongside its data, and the older image-specific part is deprecated. It is worth
 copying because it is the shape every provider now normalises to, and because it is
-honest about a thing our engine also needs: what a file *is* is a property of its bytes, not
+clear about a thing our engine also needs: what a file *is* is a property of its bytes, not
 of which field it arrived in.
 
 `MessagePart` mirrors it, with one deliberate divergence. The AI SDK carries a URL or base64

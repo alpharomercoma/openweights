@@ -75,7 +75,7 @@ data class MessageEntity(
 /**
  * Lifetime usage, one row per day per model.
  *
- * Deliberately append-only and separate from the conversations: a user who deletes a chat
+ * Append-only and separate from the conversations: a user who deletes a chat
  * has not un-generated those tokens, and a dashboard that shrinks when you tidy up is
  * lying. Day-bucketed keeps it tiny, a year of heavy use is a few hundred rows, and
  * makes the per-day chart a straight read.

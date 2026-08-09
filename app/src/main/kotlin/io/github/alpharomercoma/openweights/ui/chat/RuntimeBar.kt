@@ -94,7 +94,7 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
  * The busy line: a dot in the state's own colour, then the state's name.
  *
  * The dot breathes while work is in flight. The one animation in the app tied to something
- * genuinely ongoing rather than to a value that has already settled. Colour is never alone
+ * ongoing rather than to a value that has already settled. Colour is never alone
  * here; the label says the same thing in words.
  */
 @Composable
@@ -143,7 +143,7 @@ private fun Box(color: androidx.compose.ui.graphics.Color, alpha: Float) {
 /**
  * The bar as one sentence, for a screen reader.
  *
- * Merged deliberately: read out as separate nodes this is a model name followed by three
+ * Merged: read out as separate nodes this is a model name followed by three
  * unexplained fragments, which is worse than not reading it at all.
  */
 private fun ChatUiState.spoken(): String {

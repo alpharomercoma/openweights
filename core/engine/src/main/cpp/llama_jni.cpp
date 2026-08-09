@@ -167,7 +167,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSetThrea
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeCancel(
     JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
-    // Deliberately callable while nativeGenerate is running on another thread.
+    // Callable while nativeGenerate is running on another thread.
     as_session(handle)->cancel();
 }
 

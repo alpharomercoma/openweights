@@ -29,7 +29,7 @@ import androidx.compose.animation.core.tween
  * long as a token is a tab switch that feels broken.
  *
  * Compose Navigation defaults to 700 ms fades and Material's own components lean slow.
- * Both are overridden deliberately rather than left at defaults.
+ * Both are overridden rather than left at defaults.
  */
 object Motion {
     // Reduced motion needs no special path here. Compose reads the platform's animator

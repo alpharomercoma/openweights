@@ -79,14 +79,14 @@ struct ReasoningConfig {
 
 /** Sampler configuration for a single generation. Mirrors SamplerParams on the Kotlin side. */
 struct SamplerConfig {
-    float    temperature   = 0.8f;
-    int32_t  top_k         = 40;
-    float    top_p         = 0.95f;
-    float    min_p         = 0.05f;
-    float    repeat_penalty = 1.1f;
-    int32_t  repeat_last_n = 64;
+    float temperature   = 0.8f;
+    int32_t top_k         = 40;
+    float top_p         = 0.95f;
+    float min_p         = 0.05f;
+    float repeat_penalty = 1.1f;
+    int32_t repeat_last_n = 64;
     uint32_t seed          = LLAMA_DEFAULT_SEED;
-    int32_t  max_tokens    = 0;  // 0 = until EOG or context is full
+    int32_t max_tokens    = 0;  // 0 = until EOG or context is full
 };
 
 /** How a generation ended. */
@@ -121,7 +121,7 @@ struct GenerationStats {
  *
  * One Session is one conversation: it remembers the tokens already in the KV cache so a
  * follow-up turn only has to decode the new suffix. Sessions are not thread-safe except
- * for `cancel()`, which is deliberately callable from another thread.
+ * for `cancel()`, which is callable from another thread.
  */
 class Session {
 public:
@@ -133,7 +133,7 @@ public:
     /**
      * What kinds of media the loaded projector can accept.
      *
-     * Video is absent deliberately: libmtmd's video path extracts frames by shelling out
+     * Video is absent: libmtmd's video path extracts frames by shelling out
      * to an `ffmpeg` binary in PATH, which an Android app has no way to provide. Frames
      * are sampled on the Kotlin side and sent as images instead.
      */
@@ -193,11 +193,11 @@ public:
     std::string media_marker() const;
 
     std::string model_description() const;
-    uint64_t    parameter_count() const;
-    uint64_t    model_size_bytes() const;
-    int32_t     context_size() const;
-    int32_t     training_context_size() const;
-    int32_t     layer_count() const;
+    uint64_t parameter_count() const;
+    uint64_t model_size_bytes() const;
+    int32_t context_size() const;
+    int32_t training_context_size() const;
+    int32_t layer_count() const;
     /** Number of tokens currently held in the KV cache. */
     /**
      * KV-cache positions in use.
@@ -206,7 +206,7 @@ public:
      * with embeddings that no token describes, so the token count would read as empty
      * while the cache is nearly full.
      */
-    int32_t     context_used() const { return n_past_; }
+    int32_t context_used() const { return n_past_; }
 
 private:
     Session() = default;
@@ -283,8 +283,8 @@ std::string system_info();
 struct ComputeDevice {
     std::string id;           // ggml device name, stable enough to persist as a setting
     std::string description;  // what to show the user
-    int32_t     type;         // mirrors ggml_backend_dev_type
-    uint64_t    total_memory;
+    int32_t type;         // mirrors ggml_backend_dev_type
+    uint64_t total_memory;
 };
 
 /**

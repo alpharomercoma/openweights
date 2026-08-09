@@ -53,7 +53,7 @@ which is why `InferenceEngine` is an interface rather than a class.
 
 ### MLC-LLM: rejected
 
-Compiles each model through Apache TVM to native code per target. Genuinely fast on GPU,
+Compiles each model through Apache TVM to native code per target. Fast on GPU,
 but the catalog is whatever has been compiled; adding a model is a build-system task, not
 a download. Same catalog problem.
 

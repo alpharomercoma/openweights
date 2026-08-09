@@ -245,7 +245,7 @@ private fun ChatContent(
             )
             // Only once something has scrolled under it. A permanent rule draws a line
             // across an empty screen; an absent one lets a thumbnail collide with the
-            // model name. Appearing on demand is the honest version of both.
+            // model name. Appearing on demand is the right behaviour for both.
             if (listState.canScrollBackward) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }

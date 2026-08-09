@@ -119,7 +119,7 @@ class HubException(message: String, val isAuthFailure: Boolean = false) : Except
 /**
  * Reads the Hugging Face Hub.
  *
- * Deliberately read-only and scoped to model discovery: this app never uploads, and the
+ * Read-only and scoped to model discovery: this app never uploads, and the
  * token it holds is only ever attached to requests to the Hub's own host.
  */
 @Singleton

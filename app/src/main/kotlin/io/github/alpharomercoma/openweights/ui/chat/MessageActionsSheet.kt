@@ -49,7 +49,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 /**
  * Actions for one message, opened by long-pressing it.
  *
- * Copy is the action people reach for constantly and the one worth optimising; regenerate
+ * Copy is the action people reach for constantly and the one to optimise; regenerate
  * only makes sense on a model reply, and only when nothing is currently generating.
  */
 @OptIn(ExperimentalMaterial3Api::class)

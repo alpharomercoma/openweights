@@ -275,7 +275,7 @@ private fun AttachmentThumbnail(attachment: MessagePart.File, size: Int) {
     }
 }
 
-/** The document types worth offering, given what the model can read. */
+/** The document types to offer, given what the model can read. */
 private fun MediaSupport.acceptedMimeTypes(): Array<String> = buildList {
     if (vision) add("image/*")
     if (audio) add("audio/*")

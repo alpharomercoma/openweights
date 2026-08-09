@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.lerp
  *    tab, focus, selection. The previous palette used the same teal for "fast" and for
  *    "tap me", so neither reading was reliable.
  * 2. **Measurement is a separate language.** The [signalColor] scale runs jade → slate →
- *    rust and deliberately never passes through the accent. Grey in the middle is the
+ *    rust and never passes through the accent. Grey in the middle is the
  *    point: most readings are unremarkable, so a coloured one means something.
  * 3. **Colour is never the only signal.** Every telemetry colour sits beside the number it
  *    describes. Hue is the glance; the digits are the answer.
@@ -58,7 +58,7 @@ object OpenWeightsColors {
     /** Interactive boundaries. Passes 3:1 on every surface it can sit against. */
     val Outline = Color(0xFF6A7783)
 
-    /** Decorative rules between rows. Deliberately quiet; never the only boundary. */
+    /** Decorative rules between rows. Quiet; never the only boundary. */
     val Divider = Color(0xFF20262C)
 
     val Text = Color(0xFFECF1F4)
@@ -102,8 +102,8 @@ object OpenWeightsColors {
  * Maps a normalised measurement onto the signal scale.
  *
  * Grey through the middle rather than amber: the accent already owns amber, and most
- * readings are ordinary. A rail that is only coloured when something is genuinely fast or
- * genuinely struggling is a rail worth glancing at.
+ * readings are ordinary. A rail that is only coloured when something is fast or
+ * struggling is a rail easy to notice.
  *
  * These values come from constants rather than the colour scheme, so wallpaper-derived
  * dynamic colour cannot redefine what a measurement looks like.

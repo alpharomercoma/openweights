@@ -75,7 +75,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
             letterSpacing = (-0.02).em,
         ),
         // The one number a screen is built around. The lifetime token count, and nothing
-        // else so far. Deliberately the only style above 24 sp.
+        // else so far. The only style above 24 sp.
         displaySmall = base.displaySmall.copy(
             fontFamily = PlexSans,
             fontWeight = FontWeight.SemiBold,

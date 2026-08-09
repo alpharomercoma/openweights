@@ -120,7 +120,7 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
         return SkippedArray(elementType, count)
     }
 
-    /** Placeholder for an array deliberately not read, so callers can tell it apart from absent. */
+    /** Placeholder for an array not read, so callers can tell it apart from absent. */
     data class SkippedArray(val elementType: Int, val count: Long)
 
     private fun ByteArray.toLittleEndianLong(byteCount: Int): Long {

@@ -77,7 +77,7 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
      * True when this device can transcribe without a network.
      *
      * The API to ask only exists from Android 13. Below that the on-device recogniser can
-     * be constructed but not interrogated, so the honest answer is to try.
+     * be constructed but not interrogated, so the only answer is to try.
      */
     val isAvailable: Boolean by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -205,7 +205,7 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
         this?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
     /**
-     * The recogniser's error codes as something worth reading.
+     * The recogniser's error codes as readable text.
      *
      * "No match" and the timeouts are not failures. They are what happens when someone
      * taps the mic and then says nothing, so they are worded as the non-events they are.

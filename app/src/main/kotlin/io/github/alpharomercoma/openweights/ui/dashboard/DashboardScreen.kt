@@ -158,7 +158,7 @@ private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
 /**
  * Tokens per day.
  *
- * Deliberately a bare bar chart with no axes: the shape of the habit is the information,
+ * A bare bar chart with no axes: the shape of the habit is the information,
  * and gridlines on a phone-width chart cost more space than they explain.
  */
 @Composable

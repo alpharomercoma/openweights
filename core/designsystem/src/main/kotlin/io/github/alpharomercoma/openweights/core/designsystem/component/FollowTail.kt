@@ -104,7 +104,7 @@ fun rememberFollowTailState(
  * Scrolls to the very end of the content, including the tail of an item taller than the
  * viewport, which a long streamed reply usually is.
  *
- * The two cases are genuinely different and conflating them is what made streaming
+ * The two cases are different and conflating them is what made streaming
  * unreadable. When the last item is already on screen, all that is needed is a nudge by
  * whatever hangs below the fold. Calling `scrollToItem` there instead, as this first did,
  * snaps the viewport to the *start* of a reply that is taller than the screen, and the

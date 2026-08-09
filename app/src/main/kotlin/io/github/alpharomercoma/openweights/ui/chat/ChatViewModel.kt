@@ -106,7 +106,7 @@ enum class RuntimeState(val label: String) {
     THROTTLED("cooling down"),
     ;
 
-    /** True while the runtime is busy, which is when the state is worth showing at all. */
+    /** True while the runtime is busy, which is when the state means anything. */
     val isBusy: Boolean get() = this != READY && this != NO_MODEL
 }
 
@@ -585,7 +585,7 @@ class ChatViewModel @Inject constructor(
      *
      * The KV cache holds whichever conversation was last generated, so it is cleared: the
      * engine's prefix matching would otherwise find no common prefix and silently
-     * re-decode anyway, but clearing makes the state honest rather than accidental.
+     * re-decode anyway, but clearing makes the state defined rather than accidental.
      */
     fun openConversation(id: Long) {
         viewModelScope.launch {
@@ -823,7 +823,7 @@ internal fun MessagePart.File.describe(): String = name ?: when (kind) {
 private fun Throwable.userMessage(): String =
     message ?: "Generation failed (${this::class.simpleName})."
 
-/** Some stop reasons are worth surfacing; a normal end of turn is not. */
+/** Some stop reasons need surfacing; a normal end of turn is not. */
 private fun StopReason.warning(): String? = when (this) {
     StopReason.CONTEXT_FULL ->
         "The context window is full. Start a new chat, or raise the context length in " +

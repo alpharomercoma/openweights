@@ -57,7 +57,7 @@ class CompactionPolicy(
     }
 
     /**
-     * The range of entries to fold, or null when there is nothing worth folding.
+     * The range of entries to fold, or null when there is nothing to fold.
      *
      * @param alreadyFoldedThrough index of the last entry a previous compaction covered,
      *   or -1 if this is the first one.

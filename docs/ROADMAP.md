@@ -19,8 +19,8 @@ Measured 76.9 tok/s prefill / 16.2 tok/s decode on a MediaTek MT6991. See
 ## 2. Compute backend choice: *in progress*
 
 Google AI Edge lets you pick CPU or GPU; people expect that control, and on mobile the
-right answer genuinely varies by chip. The engine already loads backends dynamically, so
-this is a matter of offering the choice honestly rather than guessing.
+right answer varies by chip. The engine already loads backends dynamically, so
+this is a matter of offering the choice rather than guessing.
 
 - **CPU**, always available, and today the fastest path on most phones.
 - **GPU (Vulkan)**. One API present on essentially every modern Android device. Frequently
@@ -50,7 +50,7 @@ The token is stored encrypted with a hardware-backed Android Keystore key, sent 
 ## 4. Agent runtime: planned
 
 This is the part that turns a chat app into something that does work. Four layers, and
-they are genuinely different concerns:
+they are different concerns:
 
 **Prompt engineering**: how a single message is worded. Per-model system prompts and
 saved presets, because a 2 B local model needs much more explicit instruction than a

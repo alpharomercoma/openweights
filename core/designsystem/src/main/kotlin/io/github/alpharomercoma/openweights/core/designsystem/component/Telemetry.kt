@@ -56,7 +56,7 @@ private const val FAST_TOKENS_PER_SECOND = 25.0
  *
  * The colour is never the only signal. The measured rate is printed above every finished
  * reply, and the rail carries its own description for screen readers. Grey is the ordinary
- * case, so a rail that is actually green or red is worth a glance.
+ * case, so a rail that is actually green or red stands out.
  *
  * @param tokensPerSecond measured decode throughput, or null while generation is still
  *   warming up, in which case the rail is drawn neutral.

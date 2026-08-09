@@ -41,7 +41,7 @@ class GgufParseException(message: String) : Exception(message)
  * `tokenizer.` key, which on a real 2.6 B model means reading about 1.3 KB instead of 8 MB.
  *
  * The one thing that costs is `general.file_type`: llama.cpp writes it after the
- * tokenizer, so it is usually absent here and [GgufFileType.UNKNOWN] is the honest answer.
+ * tokenizer, so it is usually absent here and [GgufFileType.UNKNOWN] is the accurate answer.
  * The quantization is in the filename, which is where callers should read it.
  *
  * Format reference: GGUF v3, little-endian throughout.

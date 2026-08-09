@@ -40,7 +40,7 @@ Fully open source under **Apache-2.0**, aimed at a developer audience.
 ro.product.model      = 2602BPC18G        (ro.product.device = dash)
 ro.build.version      = Android 16 (SDK 36)
 ro.soc.model          = MT6991
-abilist               = arm64-v8a         cores = 8
+abilist               = arm64-v8a cores = 8
 MemTotal              = 11 539 612 kB (~11.0 GiB); MemAvailable ~5.2 GiB at rest
 /data free            = 382 GB of 478 GB
 cpuinfo Features      = … asimddp sve sve2 svei8mm svebf16 i8mm bf16 fphp asimdhp …
@@ -137,7 +137,7 @@ The contract, and the traps in it:
 - `mtmd_helper_log_set` has to be called separately from `llama_log_set`, or projector
   failures go to stderr and vanish on Android.
 - `context_used()` must report `n_past_`, not the token count. After a media turn the token
-  record is deliberately empty while the cache is nearly full.
+  record is empty while the cache is nearly full.
 - Attachments are untrusted files handed to third-party decoders that read the whole thing
   into memory before knowing what it is. There is a 64 MB cap and a `catch` around the
   bitmap load, because `std::bad_alloc` crossing JNI kills the process.
@@ -220,7 +220,7 @@ a *per-layer array* on hybrid architectures like LFM2, where attention runs in o
 third of the blocks; treating it as uniform overstates the KV cache almost fourfold and
 would turn fits into refusals.
 
-One consequence worth remembering: `general.file_type` is written *after* the tokenizer,
+One consequence: `general.file_type` is written *after* the tokenizer,
 so it is normally absent from a cheap parse. The quantization label comes from the
 filename instead, which is where people read it anyway.
 
@@ -257,9 +257,9 @@ At `THERMAL_STATUS_CRITICAL` and above it stops generating entirely and says so:
 already shedding load to avoid shutting down, and sustained inference is among the heaviest
 things a phone can be asked to do.
 
-Two findings worth keeping:
+Two findings:
 
-1. **Compiling the right CPU backend is worth ~4.5× on prefill.** Without
+1. **Compiling the right CPU backend gains about 4.5x on prefill.** Without
    `GGML_CPU_ALL_VARIANTS`, ggml falls back to plain armv8-a with no dotprod or i8mm.
 2. **Generation and prompt processing want different thread counts.** Decode is
    bandwidth-bound and peaks at roughly the big-core count (4 here, and gets *worse* at 8);
@@ -278,7 +278,7 @@ Every screen exercised on the Poco with the screen kept awake:
 - Discover searches the live Hub and lists results.
 - Opening `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF` parsed each file's header over range
   requests and reported **"Will not run at this context length: needs 8.08 GB of 7.15 GB
-  usable · KV cache 192 MB"**. The honest refusal path works on real data.
+  usable · KV cache 192 MB"**. The refusal path works on real data.
 - Settings accepted an access token, encrypted it, and verified it: **"Signed in as
   alpharomercoma"**.
 - Models lists the local GGUF; tapping it loads the model and returns to Chat.
@@ -350,7 +350,7 @@ and verifying the Play-delivered download size is a P5 task.
 
 Prompts are now rendered by llama.cpp's `common_chat`, which knows how to write tool
 definitions into each model family's own syntax. That is a large amount of per-model
-knowledge worth borrowing rather than reimplementing.
+knowledge to borrow rather than reimplement.
 
 Its *parser* does not cover everything. LFM2.5 emits
 `<|tool_call_start|>[get_weather(city='Manila')]<|tool_call_end|>`: Python call syntax,
@@ -360,7 +360,7 @@ recognises named formats and gives up on anything else. A parser that guesses at
 syntax produces confident nonsense; one that recognises formats it knows is safe to fall
 back on.
 
-Two traps found while wiring this up, both worth remembering:
+Two traps found while wiring this up:
 
 - `common_chat_params.prompt` **already ends with** whatever opens the assistant turn.
   `generation_prompt` is the same text kept separately for the parser. Appending it

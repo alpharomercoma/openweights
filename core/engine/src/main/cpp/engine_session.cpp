@@ -735,9 +735,9 @@ std::string Session::model_description() const {
 
 uint64_t Session::parameter_count() const { return llama_model_n_params(model_); }
 uint64_t Session::model_size_bytes() const { return llama_model_size(model_); }
-int32_t  Session::context_size() const { return static_cast<int32_t>(llama_n_ctx(ctx_)); }
-int32_t  Session::training_context_size() const { return llama_model_n_ctx_train(model_); }
-int32_t  Session::layer_count() const { return llama_model_n_layer(model_); }
+int32_t Session::context_size() const { return static_cast<int32_t>(llama_n_ctx(ctx_)); }
+int32_t Session::training_context_size() const { return llama_model_n_ctx_train(model_); }
+int32_t Session::layer_count() const { return llama_model_n_layer(model_); }
 
 }  // namespace openweights
 

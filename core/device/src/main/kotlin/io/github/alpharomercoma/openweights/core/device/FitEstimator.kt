@@ -56,9 +56,9 @@ data class FitReport(
 /**
  * Decides whether a model runs on this device, and how fast.
  *
- * The honesty of this is the product. Every on-device app can list models; the useful
+ * This is the product. Every on-device app can list models; the useful
  * thing is saying "this one will not load" before someone spends a gigabyte of mobile data
- * finding out. So the estimate is deliberately conservative, and throughput is only
+ * finding out. So the estimate is conservative, and throughput is only
  * reported when there is a real measurement to extrapolate from.
  */
 class FitEstimator @Inject constructor() {
@@ -146,7 +146,7 @@ class FitEstimator @Inject constructor() {
  * A measurement of how fast this device actually decoded a model of a known size.
  *
  * Decode is bandwidth-bound: throughput scales roughly with the reciprocal of the bytes
- * touched per token, so one honest measurement predicts other model sizes far better
+ * touched per token, so one measurement predicts other model sizes far better
  * than any table of chip names would.
  */
 data class ThroughputCalibration(val measuredBytes: Long, val measuredTokensPerSecond: Double) {

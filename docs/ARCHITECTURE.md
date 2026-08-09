@@ -4,13 +4,13 @@ OpenWeights is a multi-module Gradle project. Every module has one job, a small 
 surface, and no knowledge of the UI above it.
 
 ```
-:app            Compose UI, navigation, ViewModels
- ├── :core:designsystem   theme, tokens, telemetry components
- ├── :core:engine         InferenceEngine + llama.cpp JNI
- ├── :core:hub            Hugging Face client, GGUF parser, downloader   (P2)
- ├── :core:data           Room, DataStore, token vault, usage ledger     (P3)
- ├── :core:device         device profiling, model fit estimation         (P2)
- └── :core:common         shared domain models
+:app Compose UI, navigation, ViewModels
+ ├── :core:designsystem theme, tokens, telemetry components
+ ├── :core:engine InferenceEngine + llama.cpp JNI
+ ├── :core:hub Hugging Face client, GGUF parser, downloader   (P2)
+ ├── :core:data Room, DataStore, token vault, usage ledger     (P3)
+ ├── :core:device device profiling, model fit estimation         (P2)
+ └── :core:common shared domain models
 ```
 
 Build configuration lives in `build-logic/convention` as Gradle convention plugins
@@ -43,7 +43,7 @@ UI testable without a 1.7 GB model.
   chat template, reuses the cached prefix across turns, decodes, samples, and measures.
 - `llama_jni.cpp`. The JNI surface. Nothing but marshalling and error translation.
 
-Two design points worth knowing:
+Two design points:
 
 **Everything runs on one thread.** llama.cpp contexts are not thread-safe, and running
 generation on a single dedicated thread also means the `JNIEnv` passed into
@@ -68,7 +68,7 @@ by soname through the app's linker namespace, so `load_best_cpu_backend()` dlope
 candidate, asks for its score, and hands the winner to `ggml_backend_load`.
 
 The result is one APK that uses i8mm matmuls on a 2025 flagship and still starts on a 2018
-phone. See `docs/research/inference-engines.md` for what this is worth in tokens/second.
+phone. See `docs/research/inference-engines.md` for the measured tokens per second.
 
 ## Design system
 

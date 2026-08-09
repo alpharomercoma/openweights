@@ -105,8 +105,8 @@ Single source of truth: `gradle/libs.versions.toml`.
 - [x] **Tool calling** — tools are rendered into each model's own syntax and calls are
       parsed back; verified on-device with LFM2.5 emitting
       `get_weather(city='Manila')`. Execution and permission prompts are still to come.
-- [~] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard
-      built; per-model hyperparameter editing and a conversation list are still to come
+- [x] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard,
+      a conversation drawer for reopening past chats, and per-model hyperparameters
 - [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
 

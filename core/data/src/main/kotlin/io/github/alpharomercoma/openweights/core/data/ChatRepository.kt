@@ -37,6 +37,9 @@ class ChatRepository @Inject constructor(
 
     suspend fun conversation(id: Long): ConversationEntity? = database.conversations().byId(id)
 
+    suspend fun messages(conversationId: Long): List<MessageEntity> =
+        database.messages().forConversation(conversationId)
+
     /**
      * Starts a conversation.
      *

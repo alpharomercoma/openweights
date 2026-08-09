@@ -24,10 +24,11 @@ import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
-import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
+import io.github.alpharomercoma.openweights.core.data.ModelPreferences
+import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -66,6 +67,14 @@ data class TranscriptEntry(
     val compactionNote: String? = null,
 )
 
+/** A past conversation, as shown in the drawer. */
+data class ConversationSummary(
+    val id: Long,
+    val title: String,
+    val modelName: String?,
+    val updatedAt: Long,
+)
+
 /** Everything the chat screen renders. */
 data class ChatUiState(
     val modelName: String? = null,
@@ -78,6 +87,9 @@ data class ChatUiState(
     val error: String? = null,
     val isCompacting: Boolean = false,
     val compaction: Compaction? = null,
+    val conversations: List<ConversationSummary> = emptyList(),
+    val activeConversationId: Long? = null,
+    val preferences: ModelPreferences = ModelPreferences(),
 ) {
     val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
 
@@ -92,6 +104,7 @@ class ChatViewModel @Inject constructor(
     private val compactor: ConversationCompactor,
     private val modelStore: ModelStore,
     private val chats: ChatRepository,
+    private val modelPreferences: ModelPreferencesRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -99,8 +112,34 @@ class ChatViewModel @Inject constructor(
     private var generationJob: Job? = null
     private var nextEntryId = 0L
 
+    /**
+     * The filename settings are stored against.
+     *
+     * The full name, not the stem: two repositories can both ship `model.gguf`, and
+     * sharing one system prompt between them would be silent cross-contamination.
+     */
+    private var preferencesKey: String? = null
+
     /** The row this conversation is being written to, created lazily on the first message. */
     private var conversationId: Long? = null
+        set(value) {
+            field = value
+            _uiState.update { it.copy(activeConversationId = value) }
+        }
+
+    init {
+        viewModelScope.launch {
+            chats.observeConversations().collect { rows ->
+                _uiState.update { state ->
+                    state.copy(
+                        conversations = rows.map {
+                            ConversationSummary(it.id, it.title, it.modelName, it.updatedAt)
+                        },
+                    )
+                }
+            }
+        }
+    }
 
     /**
      * True once a model has been loaded or is loading, so the screen can ask for the
@@ -115,17 +154,23 @@ class ChatViewModel @Inject constructor(
     }
 
     /** Loads a GGUF file from disk. */
-    fun loadModel(modelFile: File, contextLength: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH) {
+    fun loadModel(modelFile: File, contextLength: Int? = null) {
         // A generation in flight writes into the transcript we are about to replace, so it
         // has to be finished before the new model is loaded, not merely asked to stop.
         stop()
         viewModelScope.launch {
             generationJob?.join()
             _uiState.update { it.copy(isLoadingModel = true, error = null) }
+            val preferences = modelPreferences.current(modelFile.name)
+            val loadParams = contextLength
+                ?.let { ModelLoadParams(contextLength = it) }
+                ?: preferences.toLoadParams()
+
             runCatching {
-                engine.load(modelFile, ModelLoadParams(contextLength = contextLength))
+                engine.load(modelFile, loadParams)
             }.onSuccess {
                 conversationId = null
+                preferencesKey = modelFile.name
                 val info = engine.loadedModel
                 _uiState.update {
                     it.copy(
@@ -134,6 +179,7 @@ class ChatViewModel @Inject constructor(
                         modelQuantization = info?.description,
                         contextSize = info?.contextSize ?: 0,
                         contextUsed = info?.contextUsed ?: 0,
+                        preferences = preferences,
                         transcript = emptyList(),
                     )
                 }
@@ -147,8 +193,14 @@ class ChatViewModel @Inject constructor(
         val text = prompt.trim()
         if (text.isEmpty() || !_uiState.value.canSend) return
 
+        // isGenerating is claimed here, before any suspending work: two quick taps would
+        // otherwise both pass canSend, create two conversations, and race the engine.
         _uiState.update { state ->
-            state.copy(transcript = state.transcript + entry(ChatRole.USER, text), error = null)
+            state.copy(
+                transcript = state.transcript + entry(ChatRole.USER, text),
+                isGenerating = true,
+                error = null,
+            )
         }
 
         // Awaited before generating: a fast reply could otherwise finish before the row
@@ -183,7 +235,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun generate() {
-        val conversation = _uiState.value.engineMessages()
+        val state = _uiState.value
+        val conversation = state.engineMessages()
         if (conversation.isEmpty()) return
 
         _uiState.update { state ->
@@ -200,7 +253,7 @@ class ChatViewModel @Inject constructor(
             var reasoningEndedAt: Long? = null
 
             try {
-                engine.chat(conversation, SamplerParams()).collect { event ->
+                engine.chat(conversation, state.preferences.toSamplerParams()).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
                             reply.append(event.text)
@@ -246,6 +299,14 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isCompacting = true) }
         val compaction = compactor.compact(state)
 
+        if (compaction != null) {
+            // Without this a compacted chat reopens with no summary and re-sends the whole
+            // transcript, which walks straight back into the context wall it just escaped.
+            conversationId?.let { id ->
+                chats.saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
+            }
+        }
+
         _uiState.update { current ->
             if (compaction == null) {
                 current.copy(isCompacting = false)
@@ -287,6 +348,95 @@ class ChatViewModel @Inject constructor(
     fun compactNow() {
         if (_uiState.value.isGenerating || _uiState.value.isCompacting) return
         viewModelScope.launch { compactIfNeeded(force = true) }
+    }
+
+    /**
+     * Reopens a past conversation.
+     *
+     * The KV cache holds whichever conversation was last generated, so it is cleared: the
+     * engine's prefix matching would otherwise find no common prefix and silently
+     * re-decode anyway, but clearing makes the state honest rather than accidental.
+     */
+    fun openConversation(id: Long) {
+        viewModelScope.launch {
+            stop()
+            generationJob?.join()
+            engine.resetContext()
+
+            val conversation = chats.conversation(id)
+            if (conversation == null) {
+                // Deleted between the tap and this read; adopting the id would make the
+                // next message violate the foreign key.
+                newChat()
+                return@launch
+            }
+
+            val messages = chats.messages(id)
+            conversationId = id
+            nextEntryId = 0
+
+            // A conversation continued under a different model would mix two models'
+            // voices in one transcript, and the history would not say which said what.
+            val currentModel = _uiState.value.modelName
+            val mismatch = conversation.modelName != null &&
+                currentModel != null &&
+                conversation.modelName != currentModel
+
+            _uiState.update { state ->
+                state.copy(
+                    transcript = messages.map { message ->
+                        val parsed = parseAssistantReply(message.text)
+                        TranscriptEntry(
+                            id = nextEntryId++,
+                            role = ChatRole.entries.firstOrNull { it.wireName == message.role }
+                                ?: ChatRole.ASSISTANT,
+                            text = message.text,
+                            reasoning = parsed.reasoning,
+                            answer = parsed.answer,
+                            tokensPerSecond = message.tokensPerSecond,
+                            timeToFirstTokenMs = message.timeToFirstTokenMs,
+                            generatedTokens = message.generatedTokens,
+                            reasoningMs = message.reasoningMs,
+                        )
+                    },
+                    compaction = conversation.compactionSummary?.let {
+                        Compaction(it, conversation.compactionThroughIndex, 0)
+                    },
+                    contextUsed = 0,
+                    error = if (mismatch) {
+                        "This chat was written by ${conversation.modelName}. Replies will " +
+                            "now come from $currentModel."
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+    }
+
+    /** Saves settings for the loaded model. Context length applies at the next load. */
+    fun savePreferences(preferences: ModelPreferences) {
+        val model = preferencesKey ?: return
+        viewModelScope.launch {
+            modelPreferences.save(model, preferences)
+            _uiState.update { it.copy(preferences = preferences) }
+        }
+    }
+
+    fun resetPreferences() {
+        val model = preferencesKey ?: return
+        viewModelScope.launch {
+            modelPreferences.reset(model)
+            _uiState.update { it.copy(preferences = ModelPreferences()) }
+        }
+    }
+
+    /** Deletes a conversation; if it is the open one, the screen returns to a blank chat. */
+    fun deleteConversation(id: Long) {
+        viewModelScope.launch {
+            chats.deleteConversation(id)
+            if (conversationId == id) newChat()
+        }
     }
 
     /** Stops the running generation, keeping whatever has been produced so far. */
@@ -392,13 +542,19 @@ private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make
  * turns that were not folded into it.
  */
 internal fun ChatUiState.engineMessages(): List<ChatMessage> {
-    val compaction = compaction ?: return transcript.map { ChatMessage.text(it.role, it.text) }
+    val system = preferences.systemPrompt
+        .takeIf { it.isNotBlank() }
+        ?.let { listOf(ChatMessage.text(ChatRole.SYSTEM, it)) }
+        .orEmpty()
+
+    val compaction = compaction
+        ?: return system + transcript.map { ChatMessage.text(it.role, it.text) }
     val summary = ChatMessage.text(
         ChatRole.SYSTEM,
         "Summary of the earlier conversation:\n" + compaction.summary,
     )
     val remaining = transcript.drop(compaction.foldedThroughIndex + 1)
-    return listOf(summary) + remaining.map { ChatMessage.text(it.role, it.text) }
+    return system + summary + remaining.map { ChatMessage.text(it.role, it.text) }
 }
 
 /** Turns engine failures into something a person can act on. */

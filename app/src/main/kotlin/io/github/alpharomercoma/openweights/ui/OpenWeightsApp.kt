@@ -122,6 +122,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onNewChat = chatViewModel::newChat,
                     onCompact = chatViewModel::compactNow,
                     onOpenModels = { navController.navigate(Destination.MODELS.route) },
+                    onOpenConversation = chatViewModel::openConversation,
+                    onDeleteConversation = chatViewModel::deleteConversation,
+                    onSavePreferences = chatViewModel::savePreferences,
+                    onResetPreferences = chatViewModel::resetPreferences,
                 )
             }
 

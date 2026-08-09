@@ -2,6 +2,7 @@ plugins {
     id("openweights.android.library")
     id("openweights.android.hilt")
     alias(libs.plugins.room)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -17,6 +18,7 @@ dependencies {
     api(project(":core:common"))
 
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.room.runtime)

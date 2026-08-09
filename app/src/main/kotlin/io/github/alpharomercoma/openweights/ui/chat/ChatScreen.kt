@@ -45,14 +45,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
@@ -60,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +79,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -80,10 +87,12 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Reasonin
 import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 fun ChatScreen(
     state: ChatUiState,
     onSend: (String) -> Unit,
@@ -93,9 +102,14 @@ fun ChatScreen(
     onCompact: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenModels: () -> Unit = {},
+    onOpenConversation: (Long) -> Unit = {},
+    onDeleteConversation: (Long) -> Unit = {},
+    onSavePreferences: (ModelPreferences) -> Unit = {},
+    onResetPreferences: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     // The whole last entry, not just its text: finishing a reply adds a throughput line
     // and a reasoning header above the answer, which grows the item after the final token.
@@ -109,7 +123,68 @@ fun ChatScreen(
     // Hold the id, not the entry: streaming replaces entries on every token, and a
     // captured copy would have Copy putting a half-finished reply on the clipboard.
     var actionsForId by remember { mutableStateOf<Long?>(null) }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ConversationDrawer(
+                conversations = state.conversations,
+                activeId = state.activeConversationId,
+                onOpen = {
+                    onOpenConversation(it)
+                    scope.launch { drawerState.close() }
+                },
+                onDelete = onDeleteConversation,
+                onNewChat = {
+                    onNewChat()
+                    scope.launch { drawerState.close() }
+                },
+                nowMillis = System.currentTimeMillis(),
+            )
+        },
+    ) {
+        ChatContent(
+            state = state,
+            listState = listState,
+            followTail = followTail,
+            actionsForId = actionsForId,
+            onActionsForId = { actionsForId = it },
+            onSend = onSend,
+            onStop = onStop,
+            onRegenerate = onRegenerate,
+            onNewChat = onNewChat,
+            onCompact = onCompact,
+            onOpenModels = onOpenModels,
+            onOpenHistory = { scope.launch { drawerState.open() } },
+            onSavePreferences = onSavePreferences,
+            onResetPreferences = onResetPreferences,
+            modifier = modifier,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+@Suppress("LongParameterList")
+private fun ChatContent(
+    state: ChatUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    followTail: io.github.alpharomercoma.openweights.core.designsystem.component.FollowTailState,
+    actionsForId: Long?,
+    onActionsForId: (Long?) -> Unit,
+    onSend: (String) -> Unit,
+    onStop: () -> Unit,
+    onRegenerate: () -> Unit,
+    onNewChat: () -> Unit,
+    onCompact: () -> Unit,
+    onOpenModels: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onSavePreferences: (ModelPreferences) -> Unit,
+    onResetPreferences: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
+    var showParameters by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -117,6 +192,18 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = { ModelChip(state = state, onClick = onOpenModels) },
+                navigationIcon = {
+                    IconButton(onClick = onOpenHistory) {
+                        Icon(Icons.Rounded.Menu, contentDescription = "Past chats")
+                    }
+                },
+                actions = {
+                    if (state.modelName != null) {
+                        IconButton(onClick = { showParameters = true }) {
+                            Icon(Icons.Rounded.Tune, contentDescription = "Model settings")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -149,12 +236,12 @@ fun ChatScreen(
                             when (entry.role) {
                                 ChatRole.USER -> UserTurn(
                                     entry = entry,
-                                    onLongPress = { actionsForId = entry.id },
+                                    onLongPress = { onActionsForId(entry.id) },
                                 )
 
                                 else -> AssistantTurn(
                                     entry = entry,
-                                    onLongPress = { actionsForId = entry.id },
+                                    onLongPress = { onActionsForId(entry.id) },
                                 )
                             }
                         }
@@ -206,15 +293,56 @@ fun ChatScreen(
         }
     }
 
+    ChatSheets(
+        state = state,
+        actionsFor = actionsFor,
+        showParameters = showParameters,
+        onDismissParameters = { showParameters = false },
+        onSavePreferences = onSavePreferences,
+        onResetPreferences = onResetPreferences,
+        onRegenerate = onRegenerate,
+        onDismissActions = { onActionsForId(null) },
+    )
+}
+
+/** The modal sheets the chat screen can raise: model settings and message actions. */
+@Composable
+@Suppress("LongParameterList")
+private fun ChatSheets(
+    state: ChatUiState,
+    actionsFor: TranscriptEntry?,
+    showParameters: Boolean,
+    onDismissParameters: () -> Unit,
+    onSavePreferences: (ModelPreferences) -> Unit,
+    onResetPreferences: () -> Unit,
+    onRegenerate: () -> Unit,
+    onDismissActions: () -> Unit,
+) {
+    if (showParameters && state.modelName != null) {
+        ParameterSheet(
+            modelName = state.modelName,
+            preferences = state.preferences,
+            onSave = {
+                onSavePreferences(it)
+                onDismissParameters()
+            },
+            onReset = {
+                onResetPreferences()
+                onDismissParameters()
+            },
+            onDismiss = onDismissParameters,
+        )
+    }
+
     actionsFor?.let { entry ->
         MessageActionsSheet(
             entry = entry,
             canRegenerate = entry.role == ChatRole.ASSISTANT && !state.isGenerating,
             onRegenerate = {
                 onRegenerate()
-                actionsForId = null
+                onDismissActions()
             },
-            onDismiss = { actionsForId = null },
+            onDismiss = onDismissActions,
         )
     }
 }

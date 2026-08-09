@@ -133,7 +133,13 @@ data class ChatUiState(
     val isAttaching: Boolean = false,
     /** The compute device the engine is actually running on, e.g. `CPU`. */
     val backend: String? = null,
-    /** True while the phone is hot enough that the thread plan has been cut back. */
+    /**
+     * True while the phone is hot enough that the thread plan has been cut back.
+     *
+     * Only meaningful while generating. A device cools while idle, and the reading is only
+     * taken around a reply, so claiming "cooling down" on an idle screen would be showing
+     * a measurement minutes out of date.
+     */
     val isThrottled: Boolean = false,
 ) {
     /**
@@ -144,7 +150,7 @@ data class ChatUiState(
      */
     val runtimeState: RuntimeState
         get() = when {
-            isThrottled -> RuntimeState.THROTTLED
+            isThrottled && isGenerating -> RuntimeState.THROTTLED
             isLoadingModel -> RuntimeState.LOADING
             modelName == null -> RuntimeState.NO_MODEL
             isCompacting -> RuntimeState.COMPACTING
@@ -247,6 +253,19 @@ class ChatViewModel @Inject constructor(
 
             val projector = modelStore.projectorFor(modelFile)
 
+            // Cleared before the attempt: the engine frees whatever it held before it loads,
+            // so from here on the old identity describes nothing.
+            _uiState.update {
+                it.copy(
+                    modelName = null,
+                    modelQuantization = null,
+                    backend = null,
+                    contextSize = 0,
+                    contextUsed = 0,
+                    mediaSupport = MediaSupport(),
+                )
+            }
+
             runCatching {
                 engine.load(modelFile, loadParams, projector)
             }.onSuccess {
@@ -315,16 +334,17 @@ class ChatViewModel @Inject constructor(
     fun attach(uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(isAttaching = true) }
-            val stored = attachments.store(uri)
+            // In a finally: a throw here would otherwise leave the attach button spinning
+            // with no way back to it.
+            val stored = try {
+                attachments.store(uri)
+            } finally {
+                _uiState.update { it.copy(isAttaching = false) }
+            }
             _uiState.update { state ->
                 state.copy(
-                    isAttaching = false,
                     staged = state.staged + stored,
-                    error = if (stored.isEmpty()) {
-                        "That file could not be read."
-                    } else {
-                        state.error
-                    },
+                    error = if (stored.isEmpty()) "That file could not be read." else state.error,
                 )
             }
         }
@@ -454,23 +474,35 @@ class ChatViewModel @Inject constructor(
         if (state.isCompacting) return
         if (!force && !compactor.shouldCompact(state)) return
 
+        // Captured before suspending: compaction runs the model, which takes long enough for
+        // the user to open another chat. Applying chat A's summary to chat B would corrupt
+        // both, so the result is discarded unless it still belongs where it started.
+        val startedIn = conversationId
+
         _uiState.update { it.copy(isCompacting = true) }
-        val compaction = compactor.compact(state)
+        val compaction = try {
+            compactor.compact(state)
+        } finally {
+            // In a finally: a model that fails mid-summary would otherwise leave "folding
+            // earlier turns" on screen forever, and block every later compaction.
+            _uiState.update { it.copy(isCompacting = false) }
+        }
+
+        if (startedIn != conversationId) return
 
         if (compaction != null) {
             // Without this a compacted chat reopens with no summary and re-sends the whole
             // transcript, which walks straight back into the context wall it just escaped.
-            conversationId?.let { id ->
+            startedIn?.let { id ->
                 chats.saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
             }
         }
 
         _uiState.update { current ->
             if (compaction == null) {
-                current.copy(isCompacting = false)
+                current
             } else {
                 current.copy(
-                    isCompacting = false,
                     compaction = compaction,
                     transcript = current.transcript.mapIndexed { index, entry ->
                         if (index == compaction.foldedThroughIndex + 1) {
@@ -487,8 +519,12 @@ class ChatViewModel @Inject constructor(
 
     /** Clears the conversation and the model's KV cache, keeping the model loaded. */
     fun newChat() {
+        stop()
         viewModelScope.launch {
-            stop()
+            // Awaited, not merely cancelled: a generation still unwinding writes into the
+            // transcript this is about to replace, and would do so after the engine cache
+            // has already been reset underneath it.
+            generationJob?.join()
             engine.resetContext()
             conversationId = null
             _uiState.update {

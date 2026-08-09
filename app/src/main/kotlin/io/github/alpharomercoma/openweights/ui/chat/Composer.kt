@@ -51,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -125,6 +126,11 @@ fun Composer(
         label = "composer border",
     )
 
+    // Dictation lives in an application-scoped object, so leaving this screen while it is
+    // listening would hold the microphone and deliver a transcript into a composer that is
+    // no longer on screen.
+    DisposableEffect(Unit) { onDispose { if (isListening) onDictate {} } }
+
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
         if (commands != null) {
             SlashCommandPalette(
@@ -198,48 +204,93 @@ fun Composer(
                 },
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (canAttach) {
-                    IconButton(onClick = onAttach, enabled = enabled && !isAttaching) {
-                        if (isAttaching) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Add,
-                                contentDescription = "Attach a file",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+            ComposerActions(
+                enabled = enabled,
+                isGenerating = isGenerating,
+                canAttach = canAttach,
+                isAttaching = isAttaching,
+                canDictate = canDictate,
+                isListening = isListening,
+                onAttach = onAttach,
+                onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
+                onSend = {
+                    onSend(draft)
+                    draft = ""
+                },
+                onStop = onStop,
+                hasSomethingToSend = hasSomethingToSend,
+            )
+        }
+    }
+}
+
+/**
+ * The row beneath the text: attach on one side, dictate and send on the other.
+ *
+ * Its own composable because the bar's controls and the bar's text have nothing to say to
+ * each other, and because keeping them together made a single function that branched on
+ * every capability the model and device happen to have.
+ */
+@Composable
+@Suppress("LongParameterList")
+private fun ComposerActions(
+    enabled: Boolean,
+    isGenerating: Boolean,
+    canAttach: Boolean,
+    isAttaching: Boolean,
+    canDictate: Boolean,
+    isListening: Boolean,
+    hasSomethingToSend: Boolean,
+    onAttach: () -> Unit,
+    onDictate: () -> Unit,
+    onSend: () -> Unit,
+    onStop: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (canAttach) {
+            AttachButton(
+                enabled = enabled && !isAttaching,
+                isAttaching = isAttaching,
+                onClick = onAttach,
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        if (canDictate) {
+            DictateButton(isListening = isListening, enabled = enabled, onDictate = onDictate)
+        }
+        SendButton(
+            isGenerating = isGenerating,
+            enabled = isGenerating || (enabled && hasSomethingToSend),
+            onClick = {
+                if (isGenerating) {
+                    onStop()
+                } else if (hasSomethingToSend) {
+                    onSend()
                 }
-                Spacer(Modifier.weight(1f))
-                if (canDictate) {
-                    DictateButton(
-                        isListening = isListening,
-                        enabled = enabled,
-                        onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
-                    )
-                }
-                SendButton(
-                    isGenerating = isGenerating,
-                    enabled = isGenerating || (enabled && hasSomethingToSend),
-                    onClick = {
-                        if (isGenerating) {
-                            onStop()
-                        } else if (hasSomethingToSend) {
-                            onSend(draft)
-                            draft = ""
-                        }
-                    },
-                )
-            }
+            },
+        )
+    }
+}
+
+/** Attach, or the spinner that replaces it while a picked file is being copied in. */
+@Composable
+private fun AttachButton(enabled: Boolean, isAttaching: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, enabled = enabled) {
+        if (isAttaching) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "Attach a file",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -273,11 +324,14 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
         label = "send content",
     )
 
-    Box(
-        modifier = Modifier.size(SEND_SIZE.dp).clip(CircleShape).background(container),
-        contentAlignment = Alignment.Center,
-    ) {
-        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(SEND_SIZE.dp)) {
+    // A 36 dp circle inside a 48 dp target: the visual weight the bar wants, and the touch
+    // area a thumb needs. Sizing the button itself to 36 dp, as this first did, shrinks the
+    // hit region to match the paint.
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(TOUCH_TARGET.dp)) {
+        Box(
+            modifier = Modifier.size(SEND_SIZE.dp).clip(CircleShape).background(container),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(
                 imageVector = if (isGenerating) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
                 contentDescription = if (isGenerating) "Stop generating" else "Send message",
@@ -303,15 +357,17 @@ private fun DictateButton(isListening: Boolean, enabled: Boolean, onDictate: () 
         ActivityResultContracts.RequestPermission(),
     ) { granted -> if (granted) onDictate() }
 
+    // Stopping never asks for permission. Checking first meant that a permission revoked
+    // mid-session turned the stop button into another request, leaving the user unable to
+    // stop something the interface said was still listening.
     IconButton(
         enabled = enabled,
         onClick = {
             val granted =
                 ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
-            if (granted == PackageManager.PERMISSION_GRANTED) {
-                onDictate()
-            } else {
-                microphone.launch(Manifest.permission.RECORD_AUDIO)
+            when {
+                isListening || granted == PackageManager.PERMISSION_GRANTED -> onDictate()
+                else -> microphone.launch(Manifest.permission.RECORD_AUDIO)
             }
         },
     ) {
@@ -333,8 +389,11 @@ private fun String.appended(heard: String): String = if (isEmpty()) heard else "
 /** Six lines of draft before it scrolls: past that the composer eats the conversation. */
 private const val MAX_LINES = 6
 
-/** Comfortably past the 48 dp touch minimum without dominating the bar. */
+/** The painted circle. Sized for the bar, not for the thumb. */
 private const val SEND_SIZE = 36
+
+/** The thumb's share, which Android asks to be at least this. */
+private const val TOUCH_TARGET = 48
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0F11)
 @Composable

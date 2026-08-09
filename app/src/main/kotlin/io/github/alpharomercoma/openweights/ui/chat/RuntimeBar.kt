@@ -26,6 +26,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -38,6 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -64,8 +68,11 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
-            .combinedClickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, role = Role.Button)
+            .semantics { contentDescription = "Choose a model. ${state.spoken()}" }
+            .heightIn(min = TOUCH_TARGET.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = state.modelName ?: "Choose a model",
@@ -132,6 +139,21 @@ private fun Box(color: androidx.compose.ui.graphics.Color, alpha: Float) {
             .background(color),
     )
 }
+
+/**
+ * The bar as one sentence, for a screen reader.
+ *
+ * Merged deliberately: read out as separate nodes this is a model name followed by three
+ * unexplained fragments, which is worse than not reading it at all.
+ */
+private fun ChatUiState.spoken(): String {
+    val what = modelName ?: "No model loaded"
+    val doing = if (runtimeState.isBusy) runtimeState.label else runtimeIdentity
+    return listOf(what, doing).filter { it.isNotEmpty() }.joinToString(", ")
+}
+
+/** Android asks interactive targets to be at least this tall. */
+private const val TOUCH_TARGET = 48
 
 /** Slow enough to read as breathing rather than blinking. */
 private const val PULSE_MS = 900

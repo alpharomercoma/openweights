@@ -20,9 +20,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,18 +60,32 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
 
     private var recognizer: SpeechRecognizer? = null
 
+    /** Destroying a recogniser from inside its own callback crashes on some devices. */
+    private val mainThread = Handler(Looper.getMainLooper())
+
+    /**
+     * Which listening session is current.
+     *
+     * A recogniser can deliver results after it has been asked to stop, and this class is
+     * an application singleton, so a callback from a session the user already abandoned can
+     * arrive while a newer one is running. Every callback checks its token first, and a
+     * stale one is dropped rather than writing over live state.
+     */
+    private var session = 0
+
     /**
      * True when this device can transcribe without a network.
      *
      * The API to ask only exists from Android 13. Below that the on-device recogniser can
      * be constructed but not interrogated, so the honest answer is to try.
      */
-    val isAvailable: Boolean
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    val isAvailable: Boolean by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
         } else {
             true
         }
+    }
 
     /**
      * Starts listening. Must be called on the main thread — [SpeechRecognizer] requires it.
@@ -76,6 +93,9 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
      * @param onFinal called once with the finished transcript.
      */
     fun start(onFinal: (String) -> Unit) {
+        check(Looper.myLooper() == Looper.getMainLooper()) {
+            "SpeechRecognizer is main-thread only"
+        }
         if (_state.value.isListening) return
         if (!isAvailable) {
             _state.value = DictationState(
@@ -86,31 +106,58 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
         }
 
         stop()
-        val speech = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        recognizer = speech
-        speech.setRecognitionListener(listener(onFinal))
-        _state.value = DictationState(isListening = true)
+        val token = ++session
 
-        speech.startListening(
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+        // Permission can be revoked between the check the UI made and this call, and a
+        // recogniser can simply fail to start. Either would otherwise leave the microphone
+        // looking permanently live with no way back.
+        val speech = runCatching {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(context).also { speech ->
+                speech.setRecognitionListener(listener(token, onFinal))
+                speech.startListening(
+                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(
+                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                        )
+                        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    },
                 )
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            },
-        )
+            }
+        }.getOrElse { failure ->
+            Log.w(TAG, "could not start dictation", failure)
+            _state.value = DictationState(error = "Dictation could not start.")
+            return
+        }
+
+        recognizer = speech
+        _state.value = DictationState(isListening = true)
     }
 
-    /** Stops listening and releases the recogniser. Safe to call when idle. */
+    /**
+     * Stops listening and releases the recogniser. Safe to call when idle.
+     *
+     * The release is posted rather than immediate because this is usually called from
+     * inside a [RecognitionListener] callback, and destroying a recogniser while it is
+     * still dispatching to you crashes on several devices. Posting lets the callback
+     * return first.
+     */
     fun stop() {
-        recognizer?.apply {
-            stopListening()
-            destroy()
-        }
+        session++
+        val speech = recognizer
         recognizer = null
-        if (_state.value.isListening) {
-            _state.value = _state.value.copy(isListening = false)
+        speech?.let {
+            mainThread.post {
+                runCatching {
+                    it.stopListening()
+                    it.destroy()
+                }
+            }
+        }
+        // A clean idle state, not a copy: leaving the last partial transcript behind would
+        // put stale words in the composer's placeholder the next time it is empty.
+        if (_state.value.isListening || _state.value.partial.isNotEmpty()) {
+            _state.value = DictationState(error = _state.value.error)
         }
     }
 
@@ -118,23 +165,28 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
         _state.value = _state.value.copy(error = null)
     }
 
-    private fun listener(onFinal: (String) -> Unit) = object : RecognitionListener {
+    private fun listener(token: Int, onFinal: (String) -> Unit) = object : RecognitionListener {
         override fun onPartialResults(results: Bundle?) {
+            if (token != session) return
             results.firstTranscript()?.let { heard ->
                 _state.value = _state.value.copy(partial = heard)
             }
         }
 
         override fun onResults(results: Bundle?) {
+            if (token != session) return
             val heard = results.firstTranscript().orEmpty()
+            // Released before the callback runs: it may start a new session, and stopping
+            // afterwards would tear down that one instead of this.
+            stop()
             _state.value = DictationState()
             if (heard.isNotBlank()) onFinal(heard)
-            stop()
         }
 
         override fun onError(error: Int) {
-            _state.value = DictationState(error = readableError(error))
+            if (token != session) return
             stop()
+            _state.value = DictationState(error = readableError(error))
         }
 
         override fun onReadyForSpeech(params: Bundle?) = Unit
@@ -143,6 +195,10 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() = Unit
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
+    }
+
+    private companion object {
+        const val TAG = "Dictation"
     }
 
     private fun Bundle?.firstTranscript(): String? =

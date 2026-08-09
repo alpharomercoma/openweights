@@ -169,6 +169,31 @@ Two findings worth keeping:
   The chat UI must render reasoning collapsed by default (P3), or replies look like the
   model is talking to itself.
 
+## Verified on the device (2026-08-10)
+
+Every screen exercised on the Poco with the screen kept awake:
+
+- Discover searches the live Hub and lists results.
+- Opening `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF` parsed each file's header over range
+  requests and reported **"Will not run at this context length — needs 8.08 GB of 7.15 GB
+  usable · KV cache 192 MB"**. The honest refusal path works on real data.
+- Settings accepted an access token, encrypted it, and verified it: **"Signed in as
+  alpharomercoma"**.
+- Models lists the local GGUF; tapping it loads the model and returns to Chat.
+- Chat generated at **16.1 tok/s, 0.55 s to first token, 961 tokens**, with reasoning
+  collapsed to "Thought for 50.0s", markdown rendered, and a syntax-highlighted Kotlin
+  block with a copy button.
+
+Two defects found by looking at it, both fixed: the transcript did not end up scrolled to
+the bottom (finishing a reply adds a stats line and reasoning header *above* the answer,
+which grows the item after the last token, so the follow-tail signal had to include the
+whole entry rather than just its text), and the model detail kept the search field and
+sort chips on screen instead of behaving like its own screen.
+
+One environment note: a model file placed with `adb` lands as `shell:ext_data_rw` mode 660
+and the app cannot read it — `chmod 666` fixes it. Files the app downloads itself are
+unaffected.
+
 ## Development device access
 
 Poco X8 Pro Max over **wireless debugging**. Ports change every time the pairing dialog is

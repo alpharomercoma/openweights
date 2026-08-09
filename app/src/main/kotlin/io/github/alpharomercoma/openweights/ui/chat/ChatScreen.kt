@@ -97,11 +97,12 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // The streamed text changes on every token, which is exactly the signal the tail
-    // follower needs to know there is new content.
+    // The whole last entry, not just its text: finishing a reply adds a throughput line
+    // and a reasoning header above the answer, which grows the item after the final token.
+    // Keying on text alone would leave the reader looking at the middle of the reply.
     val followTail = rememberFollowTailState(
         listState = listState,
-        contentSignal = state.transcript.lastOrNull()?.text to state.transcript.size,
+        contentSignal = state.transcript.lastOrNull() to state.transcript.size,
         scope = scope,
     )
 

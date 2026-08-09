@@ -29,6 +29,15 @@ internal class LlamaBridge {
         fun onToken(text: String): Boolean
     }
 
+    /**
+     * Receives the finished reply after llama.cpp has parsed it for this model's format.
+     *
+     * @param toolCalls flattened `[id, name, argumentsJson]` triples.
+     */
+    internal fun interface ReplySink {
+        fun onReply(content: String, reasoning: String, toolCalls: Array<String>)
+    }
+
     external fun nativeSystemInfo(): String
 
     /** Flattened `[id, description, type, totalMemoryBytes]` per compute device. */
@@ -78,7 +87,11 @@ internal class LlamaBridge {
         repeatLastN: Int,
         seed: Int,
         maxTokens: Int,
+        toolNames: Array<String>,
+        toolDescriptions: Array<String>,
+        toolSchemas: Array<String>,
         sink: TokenSink,
+        replySink: ReplySink,
     ): LongArray?
 
     companion object {

@@ -23,6 +23,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "chat.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
@@ -177,6 +178,9 @@ std::vector<ComputeDevice> compute_devices() {
 }
 
 Session::~Session() {
+    if (chat_templates_ != nullptr) {
+        common_chat_templates_free(static_cast<common_chat_templates *>(chat_templates_));
+    }
     if (ctx_ != nullptr) {
         llama_free(ctx_);
     }
@@ -225,6 +229,16 @@ Session * Session::load(
     auto * session = new Session();
     session->model_ = model;
     session->ctx_   = ctx;
+    try {
+        session->chat_templates_ = common_chat_templates_init(model, "").release();
+    } catch (const std::exception & failure) {
+        // A model's chat template is untrusted data from someone else's repository. A
+        // parse failure must surface as an error, not unwind through JNI and take the
+        // process with it.
+        delete session;
+        error = std::string("this model's chat template could not be read: ") + failure.what();
+        return nullptr;
+    }
     return session;
 }
 
@@ -235,35 +249,54 @@ void Session::reset() {
 
 bool Session::render_prompt(
     const std::vector<ChatMessage> & messages,
+    const std::vector<ToolDefinition> & tools,
     std::string & out,
-    std::string & error) const {
-    const char * tmpl = llama_model_chat_template(model_, nullptr);
-    if (tmpl == nullptr) {
+    std::string & error) {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    if (templates == nullptr) {
         error = "model has no chat template; it cannot be used for chat";
         return false;
     }
 
-    std::vector<llama_chat_message> chat;
-    chat.reserve(messages.size());
+    common_chat_templates_inputs inputs;
+    inputs.add_generation_prompt = true;
+    inputs.use_jinja = true;
+    // Ask the template to keep thinking separable; the parser then hands it back as
+    // reasoning_content instead of leaving tags in the answer.
+    inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
+    inputs.enable_thinking = true;
+
     for (const auto & message : messages) {
-        chat.push_back({message.role.c_str(), message.content.c_str()});
+        common_chat_msg msg;
+        msg.role = message.role;
+        msg.content = message.content;
+        if (!message.tool_call_id.empty()) {
+            msg.tool_call_id = message.tool_call_id;
+        }
+        inputs.messages.push_back(msg);
     }
 
-    std::vector<char> buffer(4096);
-    int32_t needed = llama_chat_apply_template(
-        tmpl, chat.data(), chat.size(), /*add_ass=*/true, buffer.data(), buffer.size());
-    if (needed > static_cast<int32_t>(buffer.size())) {
-        buffer.resize(needed);
-        needed = llama_chat_apply_template(
-            tmpl, chat.data(), chat.size(), /*add_ass=*/true, buffer.data(), buffer.size());
+    for (const auto & tool : tools) {
+        inputs.tools.push_back({tool.name, tool.description, tool.parameters_json});
     }
-    if (needed < 0) {
-        error = "failed to apply the model's chat template";
+
+    try {
+        const common_chat_params params = common_chat_templates_apply(templates, inputs);
+        // params.prompt already ends with whatever opens the assistant turn — for LFM2.5
+        // that is "<|im_start|>assistant\n<think>", the template pre-filling the thinking
+        // block. params.generation_prompt is the same text, kept separately so the parser
+        // can account for it; appending it here would duplicate the turn header.
+        out = params.prompt;
+        // The reply has to be parsed with the same format it was rendered in, so both are
+        // remembered here rather than recomputed later from a guess.
+        last_format_ = static_cast<int>(params.format);
+        last_generation_prompt_ = params.generation_prompt;
+        // The prompt contains the user's conversation, so it is never logged.
+        return true;
+    } catch (const std::exception & failure) {
+        error = std::string("failed to apply the model's chat template: ") + failure.what();
         return false;
     }
-
-    out.assign(buffer.data(), needed);
-    return true;
 }
 
 bool Session::ingest_prompt(
@@ -288,14 +321,16 @@ bool Session::ingest_prompt(
 
 StopReason Session::generate(
     const std::vector<ChatMessage> & messages,
+    const std::vector<ToolDefinition> & tools,
     const SamplerConfig & sampler_config,
     const TokenCallback & on_token,
     GenerationStats & stats,
+    ParsedReply & reply,
     std::string & error) {
     cancelled_.store(false, std::memory_order_relaxed);
 
     std::string prompt;
-    if (!render_prompt(messages, prompt, error)) {
+    if (!render_prompt(messages, tools, prompt, error)) {
         return StopReason::ERROR;
     }
 
@@ -358,6 +393,8 @@ StopReason Session::generate(
     int64_t first_token_ms = 0;
 
     char piece_buffer[512];
+    std::string raw_reply;
+    bool return_parsed_content = false;
     while (true) {
         if (cancelled_.load(std::memory_order_relaxed)) {
             reason = StopReason::CANCELLED;
@@ -393,6 +430,7 @@ StopReason Session::generate(
         ++stats.generated_tokens;
 
         const std::string piece(piece_buffer, piece_len);
+        raw_reply += piece;
         if (!on_token(piece.c_str())) {
             reason = StopReason::CANCELLED;
             break;
@@ -412,6 +450,39 @@ StopReason Session::generate(
     }
 
     llama_sampler_free(sampler);
+
+    // Parse with the format the prompt was rendered in. This is where tool calls come
+    // from, and where reasoning is separated for models whose thinking is not <think>.
+    try {
+        common_chat_parser_params parser_params;
+        parser_params.format = static_cast<common_chat_format>(last_format_);
+        parser_params.generation_prompt = last_generation_prompt_;
+        parser_params.parse_tool_calls = true;
+        parser_params.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
+
+        const common_chat_msg parsed =
+            common_chat_parse(raw_reply, /*is_partial=*/false, parser_params);
+        for (const auto & call : parsed.tool_calls) {
+            reply.tool_calls.push_back({call.id, call.name, call.arguments});
+        }
+        // Only trust the cleaned text when the parser actually recognised something.
+        // Otherwise it returns the input unchanged plus the generation prompt, which is
+        // worse than the raw text the Kotlin parser can still handle.
+        if (!reply.tool_calls.empty()) {
+            reply.content = parsed.content;
+            reply.reasoning = parsed.reasoning_content;
+            return_parsed_content = true;
+        }
+    } catch (const std::exception &) {
+        // A parser failure must not lose tool calls silently; the Kotlin fallback covers
+        // formats llama.cpp does not know, so there is nothing to do here.
+    }
+
+    if (!return_parsed_content) {
+        // The raw text crosses the boundary and Kotlin splits it, where the logic is
+        // unit-tested against output captured from real models.
+        reply.content = raw_reply;
+    }
 
     const int64_t decode_end = now_ms();
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;

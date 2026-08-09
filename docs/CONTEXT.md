@@ -102,7 +102,9 @@ Single source of truth: `gradle/libs.versions.toml`.
       not yet compiled in (see ROADMAP for why), Settings screen not built
 - [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
       requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
-- [ ] **Tool calling** — the foundation for the agent loop
+- [x] **Tool calling** — tools are rendered into each model's own syntax and calls are
+      parsed back; verified on-device with LFM2.5 emitting
+      `get_weather(city='Manila')`. Execution and permission prompts are still to come.
 - [~] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard
       built; per-model hyperparameter editing and a conversation list are still to come
 - [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
@@ -155,6 +157,22 @@ Model: `LiquidAI/LFM2.5-2.6B-GGUF` Q4_K_M (1.67 GB, 2.697 B params, 30 layers, t
 | Same, 8 threads | 8 / 8 | 69.5 | 12.8 | 303 ms |
 | **Shipping default (split threads)** | **4 / 8** | **59.8–76.9** | **16.2–16.4** | **274–352 ms** |
 | Same, after removing false backpressure cancellation | 4 / 8 | 59.8 | **18.0** | 352 ms |
+
+### Thermal state changes the right answer (2026-08-10)
+
+After a long run of inference tests, the same benchmark inverted:
+
+| Threads | Prefill (cold) | Prefill (hot) |
+|---|---|---|
+| 2 | — | 73.6 |
+| 4 | 55.3 | 55.6 |
+| 8 | **69.5** | **28.0** |
+
+On a cold device more threads win; on a throttled one they lose badly, and decode peaked
+at 5 threads instead of 4. The shipping defaults (4 generate / 8 batch) are tuned for a
+cold phone and are simply wrong once it heats up. This is why the roadmap says loops must
+pause when the device throttles, and it argues for the thread count becoming adaptive
+rather than fixed — measured, not assumed.
 
 Two findings worth keeping:
 
@@ -244,6 +262,29 @@ Release AAB **26.7 MB**, of which the native libraries are the bulk: `libllama.s
 seven CPU backend variants. The debug APK is 144 MB because debug builds keep unstripped
 native symbols — do not quote that number as the app's size. Trimming native debug symbols
 and verifying the Play-delivered download size is a P5 task.
+
+## Tool calling, and where llama.cpp stops helping
+
+Prompts are now rendered by llama.cpp's `common_chat`, which knows how to write tool
+definitions into each model family's own syntax — that is a large amount of per-model
+knowledge worth borrowing rather than reimplementing.
+
+Its *parser* does not cover everything. LFM2.5 emits
+`<|tool_call_start|>[get_weather(city='Manila')]<|tool_call_end|>` — Python call syntax,
+not JSON — which llama.cpp's parser returns as ordinary prose. So the engine tries
+llama.cpp first and falls back to `ToolCallParser`, a small unit-tested Kotlin parser that
+recognises named formats and gives up on anything else. A parser that guesses at unknown
+syntax produces confident nonsense; one that recognises formats it knows is safe to fall
+back on.
+
+Two traps found while wiring this up, both worth remembering:
+
+- `common_chat_params.prompt` **already ends with** whatever opens the assistant turn.
+  `generation_prompt` is the same text kept separately for the parser. Appending it
+  duplicates the turn header and the model then answers itself.
+- A reasoning model needs a real token budget before it ever reaches a tool call. LFM2.5
+  thinks for 50+ seconds; a 256-token budget truncates mid-thought and looks exactly like
+  a parser bug.
 
 ## Open questions
 

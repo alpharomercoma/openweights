@@ -19,6 +19,8 @@ package io.github.alpharomercoma.openweights.core.engine
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
@@ -68,8 +70,21 @@ sealed interface GenerationEvent {
     /** A fragment of the reply. Fragments are not necessarily whole words. */
     data class Token(val text: String) : GenerationEvent
 
-    /** Terminal event carrying why generation stopped and how fast it ran. */
-    data class Completed(val reason: StopReason, val stats: GenerationStats) : GenerationEvent
+    /**
+     * Terminal event carrying why generation stopped, how fast it ran, and the reply as
+     * llama.cpp parsed it for this model's format.
+     *
+     * @param content the answer with reasoning and tool syntax removed.
+     * @param reasoning the model's thinking, when the format separates it.
+     * @param toolCalls what the model asked the app to run, if anything.
+     */
+    data class Completed(
+        val reason: StopReason,
+        val stats: GenerationStats,
+        val content: String = "",
+        val reasoning: String = "",
+        val toolCalls: List<ToolCall> = emptyList(),
+    ) : GenerationEvent
 }
 
 /** Static facts about the model currently loaded. */
@@ -113,6 +128,11 @@ interface InferenceEngine : AutoCloseable {
     fun chat(
         messages: List<ChatMessage>,
         params: SamplerParams = SamplerParams(),
+        /**
+         * Tools the model may call. The engine renders these into the loaded model's own
+         * tool syntax, so the same definitions work across models.
+         */
+        tools: List<ToolDefinition> = emptyList(),
     ): Flow<GenerationEvent>
 
     /** Stops the running generation. Safe to call from any thread. */

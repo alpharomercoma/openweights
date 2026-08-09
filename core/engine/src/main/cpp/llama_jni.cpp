@@ -23,6 +23,8 @@
 
 using openweights::ChatMessage;
 using openweights::GenerationStats;
+using openweights::ParsedReply;
+using openweights::ToolDefinition;
 using openweights::SamplerConfig;
 using openweights::Session;
 using openweights::StopReason;
@@ -190,7 +192,11 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jint repeat_last_n,
     jint seed,
     jint max_tokens,
-    jobject token_sink) {
+    jobjectArray tool_names,
+    jobjectArray tool_descriptions,
+    jobjectArray tool_schemas,
+    jobject token_sink,
+    jobject reply_sink) {
     Session * session = as_session(handle);
 
     const jsize message_count = env->GetArrayLength(roles);
@@ -199,9 +205,22 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     for (jsize i = 0; i < message_count; ++i) {
         auto role = static_cast<jstring>(env->GetObjectArrayElement(roles, i));
         auto content = static_cast<jstring>(env->GetObjectArrayElement(contents, i));
-        messages.push_back({to_utf8(env, role), to_utf8(env, content)});
+        messages.push_back({to_utf8(env, role), to_utf8(env, content), ""});
         env->DeleteLocalRef(role);
         env->DeleteLocalRef(content);
+    }
+
+    const jsize tool_count = tool_names != nullptr ? env->GetArrayLength(tool_names) : 0;
+    std::vector<ToolDefinition> tools;
+    tools.reserve(tool_count);
+    for (jsize i = 0; i < tool_count; ++i) {
+        auto name = static_cast<jstring>(env->GetObjectArrayElement(tool_names, i));
+        auto description = static_cast<jstring>(env->GetObjectArrayElement(tool_descriptions, i));
+        auto schema = static_cast<jstring>(env->GetObjectArrayElement(tool_schemas, i));
+        tools.push_back({to_utf8(env, name), to_utf8(env, description), to_utf8(env, schema)});
+        env->DeleteLocalRef(name);
+        env->DeleteLocalRef(description);
+        env->DeleteLocalRef(schema);
     }
 
     SamplerConfig sampler;
@@ -221,10 +240,19 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
         return nullptr;
     }
 
+    jclass reply_class = env->GetObjectClass(reply_sink);
+    jmethodID on_reply = env->GetMethodID(
+        reply_class, "onReply", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V");
+    if (on_reply == nullptr) {
+        throw_engine_exception(env, "ReplySink.onReply not found");
+        return nullptr;
+    }
+
     GenerationStats stats;
+    ParsedReply reply;
     std::string error;
     const StopReason reason = session->generate(
-        messages, sampler,
+        messages, tools, sampler,
         [&](const char * piece) -> bool {
             jstring text = env->NewStringUTF(piece);
             const jboolean keep_going = env->CallBooleanMethod(token_sink, on_token, text);
@@ -235,11 +263,36 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
             }
             return keep_going == JNI_TRUE;
         },
-        stats, error);
+        stats, reply, error);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         return nullptr;
     }
+
+    // Tool calls flattened as [id, name, argumentsJson] triples, so the reply crosses JNI
+    // without a bespoke object type on either side.
+    jclass string_class = env->FindClass("java/lang/String");
+    jobjectArray calls = env->NewObjectArray(
+        static_cast<jsize>(reply.tool_calls.size() * 3), string_class, nullptr);
+    for (size_t i = 0; i < reply.tool_calls.size(); ++i) {
+        const std::string fields[3] = {
+            reply.tool_calls[i].id,
+            reply.tool_calls[i].name,
+            reply.tool_calls[i].arguments_json,
+        };
+        for (jsize field = 0; field < 3; ++field) {
+            jstring value = env->NewStringUTF(fields[field].c_str());
+            env->SetObjectArrayElement(calls, static_cast<jsize>(i) * 3 + field, value);
+            env->DeleteLocalRef(value);
+        }
+    }
+
+    jstring content = env->NewStringUTF(reply.content.c_str());
+    jstring reasoning = env->NewStringUTF(reply.reasoning.c_str());
+    env->CallVoidMethod(reply_sink, on_reply, content, reasoning, calls);
+    env->DeleteLocalRef(content);
+    env->DeleteLocalRef(reasoning);
+    env->DeleteLocalRef(calls);
     if (reason == StopReason::ERROR) {
         throw_engine_exception(env, error);
         return nullptr;

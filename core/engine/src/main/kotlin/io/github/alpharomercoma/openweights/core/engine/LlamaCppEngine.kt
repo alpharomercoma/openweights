@@ -18,7 +18,11 @@ package io.github.alpharomercoma.openweights.core.engine
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.ParsedToolCalls
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
@@ -33,6 +37,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit.SECONDS
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
 
@@ -103,59 +108,81 @@ class LlamaCppEngine internal constructor(
         }
     }
 
-    override fun chat(messages: List<ChatMessage>, params: SamplerParams): Flow<GenerationEvent> =
-        callbackFlow {
-            val activeHandle = handle.get()
-            check(activeHandle != 0L) { "no model is loaded" }
-            require(messages.isNotEmpty()) { "cannot generate a reply to an empty conversation" }
+    override fun chat(
+        messages: List<ChatMessage>,
+        params: SamplerParams,
+        tools: List<ToolDefinition>,
+    ): Flow<GenerationEvent> = callbackFlow {
+        val activeHandle = handle.get()
+        check(activeHandle != 0L) { "no model is loaded" }
+        require(messages.isNotEmpty()) { "cannot generate a reply to an empty conversation" }
 
-            val stats = bridge.nativeGenerate(
-                handle = activeHandle,
-                roles = messages.map { it.role.wireName }.toTypedArray(),
-                contents = messages.map { it.text }.toTypedArray(),
-                temperature = params.temperature,
-                topK = params.topK,
-                topP = params.topP,
-                minP = params.minP,
-                repeatPenalty = params.repeatPenalty,
-                repeatLastN = params.repeatLastN,
-                seed = params.seed ?: Random.nextInt(),
-                maxTokens = params.maxTokens,
-                sink = { text ->
-                    // trySend fails once the collector is gone, which stops generation.
-                    trySend(GenerationEvent.Token(text)).isSuccess
-                },
-            )
+        var parsed = ParsedReply()
 
-            if (stats != null) {
-                send(
-                    GenerationEvent.Completed(
-                        reason = STOP_REASONS.getOrElse(stats[0].toInt()) { StopReason.ERROR },
-                        stats = GenerationStats(
-                            promptTokens = stats[1].toInt(),
-                            generatedTokens = stats[2].toInt(),
-                            prefillMs = stats[3],
-                            decodeMs = stats[4],
-                            timeToFirstTokenMs = stats[5],
-                            contextUsed = stats[6].toInt(),
-                            contextSize = stats[7].toInt(),
-                        ),
+        val stats = bridge.nativeGenerate(
+            handle = activeHandle,
+            roles = messages.map { it.role.wireName }.toTypedArray(),
+            contents = messages.map { it.text }.toTypedArray(),
+            temperature = params.temperature,
+            topK = params.topK,
+            topP = params.topP,
+            minP = params.minP,
+            repeatPenalty = params.repeatPenalty,
+            repeatLastN = params.repeatLastN,
+            seed = params.seed ?: Random.nextInt(),
+            maxTokens = params.maxTokens,
+            toolNames = tools.map { it.name }.toTypedArray(),
+            toolDescriptions = tools.map { it.description }.toTypedArray(),
+            toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
+            sink = { text ->
+                // trySend fails once the collector is gone, which stops generation.
+                trySend(GenerationEvent.Token(text)).isSuccess
+            },
+            replySink = { content, reasoning, calls ->
+                // llama.cpp knows several tool formats; where it recognises none, the
+                // Kotlin parser covers the ones it does not, such as LFM2's.
+                val nativeCalls = calls.toToolCalls()
+                val fallback = if (nativeCalls.isEmpty()) {
+                    ToolCallParser.parse(content)
+                } else {
+                    ParsedToolCalls(content, nativeCalls)
+                }
+                parsed = ParsedReply(fallback.text, reasoning, fallback.calls)
+            },
+        )
+
+        if (stats != null) {
+            send(
+                GenerationEvent.Completed(
+                    reason = STOP_REASONS.getOrElse(stats[0].toInt()) { StopReason.ERROR },
+                    content = parsed.content,
+                    reasoning = parsed.reasoning,
+                    toolCalls = parsed.toolCalls,
+                    stats = GenerationStats(
+                        promptTokens = stats[1].toInt(),
+                        generatedTokens = stats[2].toInt(),
+                        prefillMs = stats[3],
+                        decodeMs = stats[4],
+                        timeToFirstTokenMs = stats[5],
+                        contextUsed = stats[6].toInt(),
+                        contextSize = stats[7].toInt(),
                     ),
-                )
-                currentModel = currentModel?.copy(contextUsed = stats[6].toInt())
-            }
-            close()
-            // nativeGenerate has already returned by this point, but a collector that walks
-            // away mid-stream is handled inside the sink above: trySend fails and the native
-            // loop stops. This is the belt-and-braces path for any other unwind.
-            awaitClose { this@LlamaCppEngine.cancel() }
+                ),
+            )
+            currentModel = currentModel?.copy(contextUsed = stats[6].toInt())
         }
-            // Tokens arrive faster than a Compose collector redraws. Without an unbounded
-            // buffer, trySend fails on backpressure and the sink reads that as "the
-            // collector left", silently truncating the reply. With it, a failed trySend
-            // means the channel is closed, which is the only case that should stop us.
-            .buffer(Channel.UNLIMITED)
-            .flowOn(engineThread)
+        close()
+        // nativeGenerate has already returned by this point, but a collector that walks
+        // away mid-stream is handled inside the sink above: trySend fails and the native
+        // loop stops. This is the belt-and-braces path for any other unwind.
+        awaitClose { this@LlamaCppEngine.cancel() }
+    }
+        // Tokens arrive faster than a Compose collector redraws. Without an unbounded
+        // buffer, trySend fails on backpressure and the sink reads that as "the
+        // collector left", silently truncating the reply. With it, a failed trySend
+        // means the channel is closed, which is the only case that should stop us.
+        .buffer(Channel.UNLIMITED)
+        .flowOn(engineThread)
 
     override fun cancel() = synchronized(handleLock) {
         val activeHandle = handle.get()
@@ -182,7 +209,14 @@ class LlamaCppEngine internal constructor(
      * a thread.
      */
     override fun close() {
-        freeCurrentHandle()
+        // Generation runs on engineExecutor and does not hold handleLock while it is in
+        // the native call, so freeing here directly could delete a session mid-decode.
+        // Cancelling first and then freeing *on that thread* guarantees the native call
+        // has returned before the memory goes away.
+        cancel()
+        runCatching {
+            engineExecutor.submit { freeCurrentHandle() }.get(SHUTDOWN_TIMEOUT_SECONDS, SECONDS)
+        }
         engineExecutor.shutdown()
     }
 
@@ -212,8 +246,25 @@ class LlamaCppEngine internal constructor(
         )
     }
 
+    /** The reply as the native parser produced it, filled in before the flow completes. */
+    private data class ParsedReply(
+        val content: String = "",
+        val reasoning: String = "",
+        val toolCalls: List<ToolCall> = emptyList(),
+    )
+
     private companion object {
+        /** Tool calls cross JNI flattened as [id, name, argumentsJson]. */
+        const val TOOL_CALL_FIELDS = 3
+
+        /** Long enough for a cancelled decode step to return; short enough not to hang. */
+        const val SHUTDOWN_TIMEOUT_SECONDS = 10L
+
         val STOP_REASONS = StopReason.entries
+
+        fun Array<String>.toToolCalls(): List<ToolCall> = toList().chunked(TOOL_CALL_FIELDS)
+            .filter { it.size == TOOL_CALL_FIELDS }
+            .map { ToolCall(id = it[0], name = it[1], argumentsJson = it[2]) }
 
         const val MIN_THREADS = 2
         const val MAX_GEN_THREADS = 6

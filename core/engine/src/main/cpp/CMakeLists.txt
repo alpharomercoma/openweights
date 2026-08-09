@@ -25,6 +25,7 @@ target_include_directories(openweights_llama PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/ggml/include
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/vendor
 )
 
 find_library(ANDROID_LOG_LIB log)
@@ -33,5 +34,9 @@ target_link_libraries(openweights_llama
     PRIVATE
     llama
     ggml
+    # llama-common carries llama.cpp's chat-template engine: it renders tool definitions
+    # into each model's own tool syntax and parses the calls back out again, which is a
+    # large amount of per-model knowledge not worth reimplementing.
+    llama-common
     ${ANDROID_LOG_LIB}
 )

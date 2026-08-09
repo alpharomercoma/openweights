@@ -35,7 +35,7 @@ android {
                     // makes the GPU option appear in Settings with no other code change.
                     // "-DGGML_VULKAN=ON", "-DVulkan_GLSLC_EXECUTABLE=" + glslcPath,
                     "-DLLAMA_CURL=OFF",
-                    "-DLLAMA_BUILD_COMMON=OFF",
+                    "-DLLAMA_BUILD_COMMON=ON",
                     "-DLLAMA_BUILD_TESTS=OFF",
                     "-DLLAMA_BUILD_EXAMPLES=OFF",
                     "-DLLAMA_BUILD_TOOLS=OFF",

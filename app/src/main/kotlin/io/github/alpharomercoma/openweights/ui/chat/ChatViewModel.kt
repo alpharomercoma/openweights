@@ -25,6 +25,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
@@ -59,6 +60,8 @@ data class TranscriptEntry(
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
     val isStreaming: Boolean = false,
+    /** Tools the model asked for. Shown as steps; execution is not wired up yet. */
+    val toolCalls: List<ToolCall> = emptyList(),
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
 )
@@ -148,13 +151,15 @@ class ChatViewModel @Inject constructor(
             state.copy(transcript = state.transcript + entry(ChatRole.USER, text), error = null)
         }
 
+        // Awaited before generating: a fast reply could otherwise finish before the row
+        // exists and be dropped, taking its usage record with it.
         viewModelScope.launch {
             val id = conversationId
                 ?: chats.startConversation(text, _uiState.value.modelName)
                     .also { conversationId = it }
             chats.addMessage(id, ChatRole.USER.wireName, text)
+            generate()
         }
-        generate()
     }
 
     /**
@@ -295,7 +300,13 @@ class ChatViewModel @Inject constructor(
     private fun applyCompletion(event: GenerationEvent.Completed) {
         persistReply(event)
         updateLastEntry {
+            // The engine has already lifted any tool call out of the text, so the answer
+            // shown never contains the raw invocation syntax.
+            val parsed = parseAssistantReply(event.content.ifEmpty { it.text })
             it.copy(
+                answer = parsed.answer,
+                reasoning = parsed.reasoning ?: it.reasoning,
+                toolCalls = event.toolCalls,
                 isStreaming = false,
                 isReasoningInProgress = false,
                 tokensPerSecond = event.stats.decodeTokensPerSecond,

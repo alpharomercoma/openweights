@@ -311,8 +311,16 @@ private fun AssistantTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
                     durationMs = entry.reasoningMs,
                 )
             }
+            entry.toolCalls.forEach { call ->
+                // A tool call is a step the model took, not prose. Showing the arguments
+                // verbatim is the point: an agent whose actions you cannot inspect is one
+                // you cannot trust on your own phone.
+                Metric("→ ${call.name}(${call.argumentsJson})")
+            }
+
             when {
                 entry.answer.isNotEmpty() -> MarkdownText(entry.answer)
+                entry.toolCalls.isNotEmpty() -> Unit
                 entry.isReasoningInProgress -> Unit // the reasoning header is the status
                 else -> Text(
                     text = "…",

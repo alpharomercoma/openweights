@@ -29,6 +29,23 @@ namespace openweights {
 struct ChatMessage {
     std::string role;
     std::string content;
+    /** Set on a `tool` message: which call this is the result of. */
+    std::string tool_call_id;
+};
+
+/** A tool the model may call, described the way the OpenAI-style schema does. */
+struct ToolDefinition {
+    std::string name;
+    std::string description;
+    /** JSON Schema for the arguments object. */
+    std::string parameters_json;
+};
+
+/** A call the model asked for. */
+struct ToolCall {
+    std::string id;
+    std::string name;
+    std::string arguments_json;
 };
 
 /** Sampler configuration for a single generation. Mirrors SamplerParams on the Kotlin side. */
@@ -50,6 +67,13 @@ enum class StopReason {
     CONTEXT_FULL,     // no room left in the KV cache
     CANCELLED,        // cancel() was called from another thread
     ERROR,            // decode failed; see `error`
+};
+
+/** A model reply, already split by llama.cpp's per-model parser. */
+struct ParsedReply {
+    std::string content;
+    std::string reasoning;
+    std::vector<ToolCall> tool_calls;
 };
 
 /** Throughput numbers for one generation, measured by us rather than inferred. */
@@ -93,9 +117,11 @@ public:
      */
     StopReason generate(
         const std::vector<ChatMessage> & messages,
+        const std::vector<ToolDefinition> & tools,
         const SamplerConfig & sampler,
         const TokenCallback & on_token,
         GenerationStats & stats,
+        ParsedReply & reply,
         std::string & error);
 
     /** Signals the running generation to stop. Safe to call from any thread. */
@@ -116,17 +142,30 @@ public:
 private:
     Session() = default;
 
-    /** Applies the model's chat template, growing the buffer as needed. */
+    /** Renders the conversation and any tools into this model's own prompt format. */
     bool render_prompt(
         const std::vector<ChatMessage> & messages,
+        const std::vector<ToolDefinition> & tools,
         std::string & out,
-        std::string & error) const;
+        std::string & error);
 
     /** Decodes `tokens[from..]`, reusing whatever prefix is already cached. */
     bool ingest_prompt(const std::vector<llama_token> & tokens, size_t from, std::string & error);
 
     llama_model   * model_ = nullptr;
     llama_context * ctx_   = nullptr;
+
+    /**
+     * The model's chat templates, parsed once at load.
+     *
+     * Held as an opaque pointer so this header does not drag llama.cpp's common layer
+     * into every translation unit that talks to the engine.
+     */
+    void * chat_templates_ = nullptr;
+
+    /** How the last prompt was rendered, which is what the reply must be parsed against. */
+    int last_format_ = 0;
+    std::string last_generation_prompt_;
 
     /** Tokens currently represented in the KV cache, in order. */
     std::vector<llama_token> cached_;

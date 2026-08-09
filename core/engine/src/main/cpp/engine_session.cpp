@@ -158,6 +158,24 @@ std::string system_info() {
     return info;
 }
 
+std::vector<ComputeDevice> compute_devices() {
+    init_backend();
+    std::vector<ComputeDevice> devices;
+    for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        ggml_backend_dev_t device = ggml_backend_dev_get(i);
+        size_t free_memory = 0;
+        size_t total_memory = 0;
+        ggml_backend_dev_memory(device, &free_memory, &total_memory);
+        devices.push_back({
+            ggml_backend_dev_name(device),
+            ggml_backend_dev_description(device),
+            static_cast<int32_t>(ggml_backend_dev_type(device)),
+            static_cast<uint64_t>(total_memory),
+        });
+    }
+    return devices;
+}
+
 Session::~Session() {
     if (ctx_ != nullptr) {
         llama_free(ctx_);

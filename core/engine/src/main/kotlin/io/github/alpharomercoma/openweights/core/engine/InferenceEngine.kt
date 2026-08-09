@@ -123,4 +123,13 @@ interface InferenceEngine {
 
     /** Description of the active ggml backends and detected CPU features. */
     fun systemInfo(): String
+
+    /**
+     * Compute devices this phone can run layers on.
+     *
+     * Always includes the CPU. GPU entries appear only when a GPU backend is compiled in
+     * *and* this device supports it, so Settings can offer exactly the real choices
+     * instead of a disabled toggle that explains nothing.
+     */
+    fun computeDevices(): List<ComputeDevice>
 }

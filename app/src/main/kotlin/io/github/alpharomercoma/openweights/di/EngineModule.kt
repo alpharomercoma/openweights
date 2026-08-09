@@ -20,6 +20,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import javax.inject.Singleton
@@ -34,4 +35,8 @@ object EngineModule {
     @Provides
     @Singleton
     fun provideInferenceEngine(): InferenceEngine = LlamaCppEngine()
+
+    /** Defaults are tuned for phone-sized context windows; see the policy's documentation. */
+    @Provides
+    fun provideCompactionPolicy(): CompactionPolicy = CompactionPolicy()
 }

@@ -37,6 +37,10 @@ complexity:
     ignoreAnnotated: ['Composable']
   TooManyFunctions:
     ignoreAnnotated: ['Composable']
+    # A view model that owns one screen ends up with one function per user action plus a
+    # few private helpers. Splitting that to satisfy a counter scatters cohesive logic.
+    thresholdInClasses: 15
+    ignorePrivate: true
 
 exceptions:
   TooGenericExceptionCaught:

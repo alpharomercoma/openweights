@@ -155,6 +155,9 @@ class LlamaCppEngine internal constructor(
 
     override fun systemInfo(): String = bridge.nativeSystemInfo()
 
+    override fun computeDevices(): List<ComputeDevice> =
+        ComputeDevice.parse(bridge.nativeComputeDevices())
+
     private fun freeCurrentHandle() {
         val previous = handle.getAndSet(0)
         if (previous != 0L) {

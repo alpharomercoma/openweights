@@ -140,4 +140,20 @@ void init_backend();
 /** Human-readable description of the active ggml backends and CPU features. */
 std::string system_info();
 
+/** One compute device ggml can run on, as reported by the loaded backends. */
+struct ComputeDevice {
+    std::string id;           // ggml device name, stable enough to persist as a setting
+    std::string description;  // what to show the user
+    int32_t     type;         // mirrors ggml_backend_dev_type
+    uint64_t    total_memory;
+};
+
+/**
+ * Every compute device available on this phone.
+ *
+ * Today that is the CPU backend chosen by [init_backend]; when a GPU backend is compiled
+ * in it appears here too, which is how Settings learns what it may offer.
+ */
+std::vector<ComputeDevice> compute_devices();
+
 }  // namespace openweights

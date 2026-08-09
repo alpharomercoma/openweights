@@ -73,6 +73,36 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSystemIn
     return env->NewStringUTF(openweights::system_info().c_str());
 }
 
+/**
+ * Compute devices this phone offers, flattened as
+ * `[id, description, type, totalMemoryBytes]` per device so Settings can list them
+ * without a second JNI type.
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeComputeDevices(
+    JNIEnv * env, jobject /*thiz*/) {
+    const auto devices = openweights::compute_devices();
+    jclass string_class = env->FindClass("java/lang/String");
+    jobjectArray result =
+        env->NewObjectArray(static_cast<jsize>(devices.size() * 4), string_class, nullptr);
+
+    for (size_t i = 0; i < devices.size(); ++i) {
+        const auto & device = devices[i];
+        const std::string fields[4] = {
+            device.id,
+            device.description,
+            std::to_string(device.type),
+            std::to_string(device.total_memory),
+        };
+        for (jsize field = 0; field < 4; ++field) {
+            jstring value = env->NewStringUTF(fields[field].c_str());
+            env->SetObjectArrayElement(result, static_cast<jsize>(i) * 4 + field, value);
+            env->DeleteLocalRef(value);
+        }
+    }
+    return result;
+}
+
 JNIEXPORT jlong JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadModel(
     JNIEnv * env,

@@ -10,4 +10,8 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    api(libs.markdown.renderer)
+    api(libs.markdown.renderer.m3)
+    api(libs.markdown.renderer.code)
 }

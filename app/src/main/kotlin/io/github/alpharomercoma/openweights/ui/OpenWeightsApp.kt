@@ -47,6 +47,9 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         state = state,
         onSend = viewModel::send,
         onStop = viewModel::stop,
+        onRegenerate = viewModel::regenerate,
+        onNewChat = viewModel::newChat,
+        onCompact = viewModel::compactNow,
         modifier = modifier,
     )
 }

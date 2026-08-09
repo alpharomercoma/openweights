@@ -28,6 +28,12 @@ android {
                     "-DGGML_OPENMP=OFF",
                     "-DGGML_LLAMAFILE=OFF",
                     "-DGGML_CPU_KLEIDIAI=ON",
+                    // GPU backends are deliberately not built yet. ggml's Vulkan target
+                    // needs vendored SPIRV-Headers and a host shader compiler, and on the
+                    // Mali-class GPUs we have measured it loses to the tuned CPU path.
+                    // The engine enumerates backends at runtime, so turning this on later
+                    // makes the GPU option appear in Settings with no other code change.
+                    // "-DGGML_VULKAN=ON", "-DVulkan_GLSLC_EXECUTABLE=" + glslcPath,
                     "-DLLAMA_CURL=OFF",
                     "-DLLAMA_BUILD_COMMON=OFF",
                     "-DLLAMA_BUILD_TESTS=OFF",

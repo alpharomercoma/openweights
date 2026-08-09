@@ -31,6 +31,9 @@ internal class LlamaBridge {
 
     external fun nativeSystemInfo(): String
 
+    /** Flattened `[id, description, type, totalMemoryBytes]` per compute device. */
+    external fun nativeComputeDevices(): Array<String>
+
     /** @return an opaque session handle. Throws [LlamaException] if the model cannot load. */
     external fun nativeLoadModel(
         modelPath: String,

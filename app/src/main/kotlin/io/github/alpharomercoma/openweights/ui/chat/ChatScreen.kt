@@ -16,11 +16,18 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,33 +35,36 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,8 +74,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
+import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
 import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
+import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import java.util.Locale
 
@@ -75,33 +88,31 @@ fun ChatScreen(
     state: ChatUiState,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onRegenerate: () -> Unit,
+    onNewChat: () -> Unit,
+    onCompact: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenModels: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
-    // Follow the stream: keep the newest token in view while the model is writing.
-    LaunchedEffect(state.transcript.size, state.transcript.lastOrNull()?.text) {
-        if (state.transcript.isNotEmpty()) {
-            listState.animateScrollToItem(state.transcript.lastIndex)
-        }
-    }
+    // The streamed text changes on every token, which is exactly the signal the tail
+    // follower needs to know there is new content.
+    val followTail = rememberFollowTailState(
+        listState = listState,
+        contentSignal = state.transcript.lastOrNull()?.text to state.transcript.size,
+        scope = scope,
+    )
+
+    var actionsFor by remember { mutableStateOf<TranscriptEntry?>(null) }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = state.modelName ?: "No model loaded",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        state.modelQuantization?.let { quant ->
-                            Metric(quant)
-                        }
-                    }
-                },
+                title = { ModelChip(state = state, onClick = onOpenModels) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -124,20 +135,35 @@ fun ChatScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 12.dp,
-                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
-                        items(state.transcript) { entry ->
+                        items(state.transcript, key = { it.id }) { entry ->
+                            entry.compactionNote?.let { note ->
+                                CompactionMarker(note)
+                            }
                             when (entry.role) {
-                                ChatRole.USER -> UserTurn(entry)
-                                else -> AssistantTurn(entry)
+                                ChatRole.USER -> UserTurn(
+                                    entry = entry,
+                                    onLongPress = { actionsFor = entry },
+                                )
+
+                                else -> AssistantTurn(
+                                    entry = entry,
+                                    onLongPress = { actionsFor = entry },
+                                )
                             }
                         }
                     }
                 }
+
+                JumpToLatestButton(
+                    visible = followTail.isDetached && state.transcript.isNotEmpty(),
+                    onClick = followTail::jumpToLatest,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 12.dp),
+                )
             }
 
             state.error?.let { message ->
@@ -151,6 +177,13 @@ fun ChatScreen(
                 )
             }
 
+            if (state.isCompacting) {
+                Metric(
+                    text = "Folding earlier turns into a summary…",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
+
             ContextMeter(used = state.contextUsed, total = state.contextSize)
 
             Composer(
@@ -158,38 +191,100 @@ fun ChatScreen(
                 isGenerating = state.isGenerating,
                 onSend = onSend,
                 onStop = onStop,
+                onCommand = { command ->
+                    when (command) {
+                        SlashCommand.NEW_CHAT -> onNewChat()
+                        SlashCommand.COMPACT -> onCompact()
+                        SlashCommand.REGENERATE -> onRegenerate()
+                    }
+                },
             )
         }
     }
-}
 
-@Composable
-private fun UserTurn(entry: TranscriptEntry) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
-    ) {
-        SelectionContainer {
-            Text(
-                text = entry.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
-        }
+    actionsFor?.let { entry ->
+        MessageActionsSheet(
+            entry = entry,
+            canRegenerate = entry.role == ChatRole.ASSISTANT && !state.isGenerating,
+            onRegenerate = {
+                onRegenerate()
+                actionsFor = null
+            },
+            onDismiss = { actionsFor = null },
+        )
     }
 }
 
 /**
- * A model reply: full-bleed text beside a rail whose colour encodes how fast this reply was
- * produced. The reply is the artifact, so it is not boxed into a bubble.
+ * Only offered when it is useful: the reader has scrolled away from live output. Tapping it
+ * re-attaches, matching every other chat app.
  */
 @Composable
-private fun AssistantTurn(entry: TranscriptEntry) {
+private fun JumpToLatestButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(initialScale = 0.8f),
+        exit = fadeOut() + scaleOut(targetScale = 0.8f),
+        modifier = modifier,
+    ) {
+        SmallFloatingActionButton(
+            onClick = onClick,
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.ArrowDownward,
+                contentDescription = "Jump to the latest message",
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModelChip(state: ChatUiState, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .combinedClickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = state.modelName ?: "Choose a model",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        state.modelQuantization?.let { quantization -> Metric(quantization) }
+    }
+}
+
+@Composable
+private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        Text(
+            text = entry.text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .widthIn(max = 300.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+    }
+}
+
+/**
+ * A model reply: reasoning collapsed above, markdown answer below, both beside a rail
+ * coloured by how fast this reply was produced. The reply is the artifact, so it is not
+ * boxed into a bubble the way the user's own message is.
+ */
+@Composable
+private fun AssistantTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
     // Intrinsic height lets the rail match the exact height of the reply beside it.
     Row(
         modifier = Modifier
@@ -197,15 +292,28 @@ private fun AssistantTurn(entry: TranscriptEntry) {
             .height(IntrinsicSize.Min),
     ) {
         SpeedRail(tokensPerSecond = entry.tokensPerSecond)
-        Column(modifier = Modifier.padding(start = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .combinedClickable(onClick = {}, onLongClick = onLongPress),
+        ) {
             if (!entry.isStreaming && entry.tokensPerSecond != null) {
                 Metric(entry.readout())
             }
-            SelectionContainer {
-                Text(
-                    text = entry.text.ifEmpty { "…" },
+            entry.reasoning?.let { reasoning ->
+                ReasoningBlock(
+                    reasoning = reasoning,
+                    isInProgress = entry.isReasoningInProgress,
+                    durationMs = entry.reasoningMs,
+                )
+            }
+            when {
+                entry.answer.isNotEmpty() -> MarkdownText(entry.answer)
+                entry.isReasoningInProgress -> Unit // the reasoning header is the status
+                else -> Text(
+                    text = "…",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -236,7 +344,7 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
         when {
             isLoadingModel -> {
                 CircularProgressIndicator(
-                    modifier = Modifier.width(28.dp),
+                    modifier = Modifier.size(28.dp),
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
@@ -253,12 +361,34 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
                 textAlign = TextAlign.Center,
             )
 
-            else -> Text(
-                "No model loaded.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            else -> {
+                Text("No model yet.", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Find one on Hugging Face and OpenWeights will tell you whether it " +
+                        "runs on this phone before you download it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
+    }
+}
+
+/**
+ * Marks where older turns were folded away, so the jump in the conversation is explained
+ * rather than mysterious. The turns themselves are still above it.
+ */
+@Composable
+private fun CompactionMarker(note: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f))
+        Metric(note)
+        HorizontalDivider(modifier = Modifier.weight(1f))
     }
 }
 
@@ -268,8 +398,21 @@ private fun Composer(
     isGenerating: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
+    onCommand: (SlashCommand) -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
+    val commands = SlashCommand.match(draft)
+
+    if (commands != null) {
+        SlashCommandPalette(
+            commands = commands,
+            onSelect = { command ->
+                draft = ""
+                onCommand(command)
+            },
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+    }
 
     Row(
         modifier = Modifier
@@ -283,9 +426,7 @@ private fun Composer(
             value = draft,
             onValueChange = { draft = it },
             modifier = Modifier.weight(1f),
-            placeholder = {
-                Text("Message", style = MaterialTheme.typography.bodyLarge)
-            },
+            placeholder = { Text("Message", style = MaterialTheme.typography.bodyLarge) },
             textStyle = MaterialTheme.typography.bodyLarge,
             maxLines = 6,
             shape = RoundedCornerShape(20.dp),
@@ -331,20 +472,24 @@ private fun ChatScreenPreview() {
                 contextUsed = 1204,
                 contextSize = 4096,
                 transcript = listOf(
-                    TranscriptEntry(ChatRole.USER, "What is a KV cache?"),
+                    TranscriptEntry(id = 1, role = ChatRole.USER, text = "What is a KV cache?"),
                     TranscriptEntry(
+                        id = 2,
                         role = ChatRole.ASSISTANT,
-                        text = "It stores the key and value tensors already computed for " +
-                            "previous tokens, so each new token only attends over them " +
-                            "instead of recomputing the whole sequence.",
-                        tokensPerSecond = 27.4,
-                        timeToFirstTokenMs = 412,
+                        text = "<think>Keep it to one sentence.</think>It stores the key " +
+                            "and value tensors already computed for previous tokens.",
+                        tokensPerSecond = 16.4,
+                        timeToFirstTokenMs = 274,
                         generatedTokens = 38,
+                        reasoningMs = 1400,
                     ),
                 ),
             ),
             onSend = {},
             onStop = {},
+            onRegenerate = {},
+            onNewChat = {},
+            onCompact = {},
         )
     }
 }

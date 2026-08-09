@@ -247,7 +247,7 @@ private fun Long.asDuration(): String {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun DashboardScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

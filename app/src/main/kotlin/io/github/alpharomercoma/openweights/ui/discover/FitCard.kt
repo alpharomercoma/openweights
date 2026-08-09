@@ -160,7 +160,7 @@ internal fun formatBytes(bytes: Long): String {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun FitCardPreview() {
     OpenWeightsTheme(dynamicColor = false) {

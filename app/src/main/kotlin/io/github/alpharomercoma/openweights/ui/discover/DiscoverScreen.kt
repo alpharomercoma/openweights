@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -139,6 +140,19 @@ fun DiscoverScreen(
                         selected = state.sort == sort,
                         onClick = { onSortChange(sort) },
                         label = { Text(sort.label, style = MaterialTheme.typography.labelMedium) },
+                        // Selection is one of the accent's three jobs, and a chip whose
+                        // only selected state is a slightly different grey is a chip whose
+                        // state has to be worked out rather than seen.
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = state.sort == sort,
+                            borderColor = MaterialTheme.colorScheme.outline,
+                            selectedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
                     )
                 }
             }
@@ -268,7 +282,7 @@ private const val MIN_CONTEXT = 1024f
 private const val MAX_CONTEXT = 32_768f
 private const val CONTEXT_STEPS = 30
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun DiscoverScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

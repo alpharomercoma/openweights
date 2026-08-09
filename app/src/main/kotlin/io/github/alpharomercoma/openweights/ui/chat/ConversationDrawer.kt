@@ -180,7 +180,7 @@ private const val MINUTES_PER_HOUR = 60
 private const val HOURS_PER_DAY = 24
 private const val DAYS_PER_WEEK = 7
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun ConversationDrawerPreview() {
     OpenWeightsTheme(dynamicColor = false) {

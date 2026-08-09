@@ -16,29 +16,31 @@
 
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
-import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import kotlin.math.roundToInt
@@ -69,9 +71,9 @@ fun SpeedRail(tokensPerSecond: Double?, modifier: Modifier = Modifier) {
             dark = dark,
         )
     }
-    // Short: this describes a number that has already settled, and a rail still drifting
-    // towards its colour half a second later suggests a measurement still being taken.
-    val color by animateColorAsState(target, Motion.quick(), label = "railColor")
+    // Not animated. This describes a number that has already settled, and a rail drifting
+    // towards its colour afterwards suggests a measurement still being taken.
+    val color = target
     val description = tokensPerSecond
         ?.let { "Generated at ${it.roundToInt()} tokens per second" }
         ?: "Generating"
@@ -98,27 +100,38 @@ private val RAIL_WIDTH = 2.dp
 @Composable
 fun ContextMeter(used: Int, total: Int, modifier: Modifier = Modifier) {
     val fraction = if (total > 0) (used.toFloat() / total).coerceIn(0f, 1f) else 0f
-    val animated by animateFloatAsState(fraction, Motion.quick(), label = "contextFill")
     val dark = LocalIsDarkTheme.current
     // Headroom, not fill, drives the colour: a nearly full context is the hot end.
     val color = signalColor(1f - fraction, dark)
     val percent = (fraction * 100).roundToInt()
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(METER_HEIGHT)
-            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-            .semantics {
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .semantics(mergeDescendants = true) {
                 contentDescription = "Context $percent percent full, $used of $total tokens"
             },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(animated)
-                .fillMaxHeight()
-                .background(color),
-        )
+                .weight(1f)
+                .height(METER_HEIGHT)
+                .clip(RoundedCornerShape(METER_HEIGHT / 2))
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .fillMaxHeight()
+                    .background(color),
+            )
+        }
+        // Printed, not only announced: a colour bar with no digits makes hue the only
+        // thing a sighted user has to go on.
+        Metric(text = "$percent%", color = color, maxLines = 1)
     }
 }
 
@@ -132,13 +145,21 @@ fun Metric(
     text: String,
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    maxLines: Int = Int.MAX_VALUE,
 ) {
-    Text(text = text, style = MetricTextStyle, color = color, modifier = modifier)
+    Text(
+        text = text,
+        style = MetricTextStyle,
+        color = color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
 }
 
 private val METER_HEIGHT = 2.dp
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun TelemetryPreview() {
     OpenWeightsTheme(dynamicColor = false) {

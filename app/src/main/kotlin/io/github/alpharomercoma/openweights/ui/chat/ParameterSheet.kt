@@ -214,7 +214,7 @@ private const val MIN_CONTEXT = 1024f
 private const val MAX_CONTEXT = 32_768f
 private const val CONTEXT_STEPS = 30
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun ParameterSheetPreview() {
     OpenWeightsTheme(dynamicColor = false) {

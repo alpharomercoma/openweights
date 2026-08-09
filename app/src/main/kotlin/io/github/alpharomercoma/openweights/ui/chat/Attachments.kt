@@ -286,7 +286,7 @@ private fun MediaSupport.acceptedMimeTypes(): Array<String> = buildList {
 private const val STAGED_SIZE = 64
 private const val SENT_SIZE = 76
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun StagedAttachmentsPreview() {
     OpenWeightsTheme(dynamicColor = false) {

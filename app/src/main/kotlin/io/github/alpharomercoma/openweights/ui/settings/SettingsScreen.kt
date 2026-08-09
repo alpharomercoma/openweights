@@ -205,7 +205,7 @@ private fun DeviceSection(state: SettingsUiState) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun SettingsScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

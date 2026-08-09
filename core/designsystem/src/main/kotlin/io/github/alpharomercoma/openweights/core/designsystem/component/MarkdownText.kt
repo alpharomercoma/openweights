@@ -89,7 +89,7 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun MarkdownTextPreview() {
     OpenWeightsTheme(dynamicColor = false) {

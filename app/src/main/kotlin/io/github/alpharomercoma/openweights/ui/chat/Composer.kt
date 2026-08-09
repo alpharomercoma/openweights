@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -50,12 +49,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -78,6 +80,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 @Composable
 @Suppress("LongParameterList")
 fun Composer(
+    conversationKey: Long?,
     enabled: Boolean,
     isGenerating: Boolean,
     staged: List<MessagePart.File>,
@@ -90,7 +93,11 @@ fun Composer(
     onCommand: (SlashCommand) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var draft by remember { mutableStateOf("") }
+    // Saveable, and keyed to the conversation. Saveable because a half-written message is
+    // the one piece of state here the user cannot get back; keyed because a draft belongs
+    // to the chat it was written in, and carrying it into another one would send it to a
+    // model that never saw the conversation it was answering.
+    var draft by rememberSaveable(conversationKey) { mutableStateOf("") }
     var isFocused by remember { mutableStateOf(false) }
     val commands = SlashCommand.match(draft)
     val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty()
@@ -143,11 +150,15 @@ fun Composer(
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it },
+                // maxLines rather than a height cap: a fixed dp ceiling is six lines at the
+                // default font scale and barely three at 200%, which quietly punishes the
+                // people who need the room most.
+                maxLines = MAX_LINES,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = MAX_FIELD_HEIGHT.dp)
                     .padding(horizontal = 18.dp, vertical = 10.dp)
-                    .onFocusChanged { isFocused = it.isFocused },
+                    .onFocusChanged { isFocused = it.isFocused }
+                    .semantics { contentDescription = "Message" },
                 textStyle = MaterialTheme.typography.bodyLarge
                     .copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -255,7 +266,7 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
 }
 
 /** Six lines of draft before it scrolls: past that the composer eats the conversation. */
-private const val MAX_FIELD_HEIGHT = 156
+private const val MAX_LINES = 6
 
 /** Comfortably past the 48 dp touch minimum without dominating the bar. */
 private const val SEND_SIZE = 36
@@ -266,6 +277,7 @@ private fun ComposerPreview() {
     OpenWeightsTheme(dynamicColor = false) {
         CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyLarge) {
             Composer(
+                conversationKey = null,
                 enabled = true,
                 isGenerating = false,
                 staged = emptyList(),

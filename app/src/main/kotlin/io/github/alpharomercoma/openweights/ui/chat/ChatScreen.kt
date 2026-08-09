@@ -71,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -82,6 +83,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
 import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import kotlinx.coroutines.launch
@@ -292,6 +294,7 @@ private fun ChatContent(
             }
 
             Composer(
+                conversationKey = state.activeConversationId,
                 enabled = state.canSend,
                 isGenerating = state.isGenerating,
                 staged = state.staged,
@@ -418,7 +421,11 @@ private fun ChatSheets(
     actionsFor?.let { entry ->
         MessageActionsSheet(
             entry = entry,
-            canRegenerate = entry.role == ChatRole.ASSISTANT && !state.isGenerating,
+            // Same rule as the inline action: regenerating an earlier reply would
+            // silently discard every turn that came after it.
+            canRegenerate = entry.role == ChatRole.ASSISTANT &&
+                !state.isGenerating &&
+                entry.id == state.transcript.lastOrNull()?.id,
             isSpeaking = isSpeaking,
             onToggleReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
             onRegenerate = {
@@ -438,8 +445,8 @@ private fun ChatSheets(
 private fun JumpToLatestButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + scaleIn(initialScale = 0.8f),
-        exit = fadeOut() + scaleOut(targetScale = 0.8f),
+        enter = fadeIn(Motion.quick()) + scaleIn(Motion.quick(), initialScale = 0.8f),
+        exit = fadeOut(Motion.instant()) + scaleOut(Motion.instant(), targetScale = 0.8f),
         modifier = modifier,
     ) {
         SmallFloatingActionButton(
@@ -468,8 +475,12 @@ private fun ModelChip(state: ChatUiState, onClick: () -> Unit) {
         Text(
             text = state.modelName ?: "Choose a model",
             style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        state.modelQuantization?.let { quantization -> Metric(quantization) }
+        state.modelQuantization?.let { quantization ->
+            Metric(quantization, maxLines = 1)
+        }
     }
 }
 
@@ -597,7 +608,7 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
             isLoadingModel -> {
                 CircularProgressIndicator(
                     modifier = Modifier.size(28.dp),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     "Loading the model into memory",
@@ -644,7 +655,7 @@ private fun CompactionMarker(note: String) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun ChatScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

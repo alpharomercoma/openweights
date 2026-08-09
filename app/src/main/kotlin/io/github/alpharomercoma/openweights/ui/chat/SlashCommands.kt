@@ -100,7 +100,7 @@ fun SlashCommandPalette(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun SlashCommandPalettePreview() {
     OpenWeightsTheme(dynamicColor = false) {

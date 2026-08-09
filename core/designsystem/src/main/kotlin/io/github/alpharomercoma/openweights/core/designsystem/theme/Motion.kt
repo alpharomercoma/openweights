@@ -32,6 +32,11 @@ import androidx.compose.animation.core.tween
  * Both are overridden deliberately rather than left at defaults.
  */
 object Motion {
+    // Reduced motion needs no special path here. Compose reads the platform's animator
+    // duration scale through MotionDurationScale on the UI dispatcher, so a device with
+    // animations turned off completes every one of these immediately. A hand-rolled check
+    // would only be a second, less accurate copy of that.
+
     /** Icon swaps, colour changes, anything the eye should not have time to track. */
     const val INSTANT_MS = 90
 

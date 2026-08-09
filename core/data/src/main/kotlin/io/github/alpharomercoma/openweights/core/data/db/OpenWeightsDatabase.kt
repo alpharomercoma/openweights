@@ -18,11 +18,13 @@ package io.github.alpharomercoma.openweights.core.data.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Everything the app remembers. Never leaves the device and is excluded from backups. */
 @Database(
     entities = [ConversationEntity::class, MessageEntity::class, UsageEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -32,5 +34,18 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "openweights.db"
+
+        /**
+         * Adds attachments to messages.
+         *
+         * Written out rather than destroying and recreating: conversations are the whole
+         * point of the app, and losing them to a schema change would be unforgivable for
+         * data that exists nowhere else.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN attachments TEXT")
+            }
+        }
     }
 }

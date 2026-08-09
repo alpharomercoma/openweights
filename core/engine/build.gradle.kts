@@ -39,6 +39,9 @@ android {
                     "-DLLAMA_BUILD_TESTS=OFF",
                     "-DLLAMA_BUILD_EXAMPLES=OFF",
                     "-DLLAMA_BUILD_TOOLS=OFF",
+                    // libmtmd: the multimodal projector runtime. It turns images, audio
+                    // and video frames into embeddings the language model can attend over.
+                    "-DLLAMA_BUILD_MTMD=ON",
                     "-DLLAMA_BUILD_SERVER=OFF",
                 )
             }

@@ -24,6 +24,8 @@
 #include <mutex>
 
 #include "chat.h"
+#include "mtmd.h"
+#include "mtmd-helper.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
@@ -144,6 +146,9 @@ void load_best_cpu_backend() {
 void init_backend() {
     std::call_once(g_backend_once, [] {
         llama_log_set(log_callback, nullptr);
+        // The projector logs through its own channel; without this its failures go to
+        // stderr, which on Android means nowhere.
+        mtmd_helper_log_set(log_callback, nullptr);
         load_best_cpu_backend();
         llama_backend_init();
     });
@@ -178,6 +183,9 @@ std::vector<ComputeDevice> compute_devices() {
 }
 
 Session::~Session() {
+    if (mtmd_ != nullptr) {
+        mtmd_free(static_cast<mtmd_context *>(mtmd_));
+    }
     if (chat_templates_ != nullptr) {
         common_chat_templates_free(static_cast<common_chat_templates *>(chat_templates_));
     }
@@ -191,6 +199,7 @@ Session::~Session() {
 
 Session * Session::load(
     const std::string & model_path,
+    const std::string & mmproj_path,
     int32_t n_ctx,
     int32_t n_threads,
     int32_t n_threads_batch,
@@ -229,6 +238,20 @@ Session * Session::load(
     auto * session = new Session();
     session->model_ = model;
     session->ctx_   = ctx;
+    if (!mmproj_path.empty()) {
+        mtmd_context_params mtmd_params = mtmd_context_params_default();
+        mtmd_params.use_gpu = n_gpu_layers > 0;
+        mtmd_params.n_threads = n_threads;
+        mtmd_params.print_timings = false;
+
+        session->mtmd_ = mtmd_init_from_file(mmproj_path.c_str(), model, mtmd_params);
+        if (session->mtmd_ == nullptr) {
+            delete session;
+            error = "could not load the multimodal projector at " + mmproj_path;
+            return nullptr;
+        }
+    }
+
     try {
         session->chat_templates_ = common_chat_templates_init(model, "").release();
     } catch (const std::exception & failure) {
@@ -249,6 +272,79 @@ void Session::set_threads(int32_t n_threads, int32_t n_threads_batch) {
 void Session::reset() {
     llama_memory_clear(llama_get_memory(ctx_), true);
     cached_.clear();
+    n_past_ = 0;
+    cached_covers_context_ = true;
+}
+
+Session::MediaSupport Session::media_support() const {
+    if (mtmd_ == nullptr) return {};
+    auto * ctx = static_cast<mtmd_context *>(mtmd_);
+    return { mtmd_support_vision(ctx), mtmd_support_audio(ctx) };
+}
+
+std::string Session::media_marker() const {
+    if (mtmd_ == nullptr) return mtmd_default_marker();
+    return mtmd_get_marker(static_cast<mtmd_context *>(mtmd_));
+}
+
+int32_t Session::ingest_media_prompt(
+    const std::string & prompt,
+    const std::vector<std::string> & media_paths,
+    std::string & error) {
+    auto * ctx = static_cast<mtmd_context *>(mtmd_);
+
+    std::vector<mtmd_bitmap *> bitmaps;
+    for (const auto & path : media_paths) {
+        // libmtmd decodes the file itself, so images, audio and video all arrive the
+        // same way and the projector decides what it can accept.
+        auto wrapper = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false);
+        if (wrapper.bitmap == nullptr) {
+            for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
+            error = "could not read the attached file: " + path;
+            return -1;
+        }
+        bitmaps.push_back(wrapper.bitmap);
+    }
+
+    mtmd_input_text input_text;
+    input_text.text          = prompt.c_str();
+    input_text.text_len      = prompt.size();
+    input_text.add_special   = true;
+    input_text.parse_special = true;
+
+    mtmd_input_chunks * chunks = mtmd_input_chunks_init();
+    const int32_t tokenized = mtmd_tokenize(
+        ctx, chunks, &input_text,
+        const_cast<const mtmd_bitmap **>(bitmaps.data()), bitmaps.size());
+
+    for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
+
+    if (tokenized != 0) {
+        mtmd_input_chunks_free(chunks);
+        error = tokenized == 1
+            ? "the number of attachments does not match the prompt"
+            : "an attachment could not be prepared for this model";
+        return -1;
+    }
+
+    // Media becomes embeddings rather than tokens, so there is nothing to compare a
+    // prefix against. The context is rebuilt from scratch for these turns.
+    llama_memory_clear(llama_get_memory(ctx_), true);
+    cached_.clear();
+    cached_covers_context_ = false;
+
+    llama_pos new_n_past = 0;
+    const int32_t evaluated = mtmd_helper_eval_chunks(
+        ctx, ctx_, chunks, /*n_past=*/0, /*seq_id=*/0,
+        static_cast<int32_t>(llama_n_batch(ctx_)), /*logits_last=*/true, &new_n_past);
+
+    mtmd_input_chunks_free(chunks);
+
+    if (evaluated != 0) {
+        error = "the model could not process the attachment";
+        return -1;
+    }
+    return static_cast<int32_t>(new_n_past);
 }
 
 bool Session::render_prompt(
@@ -341,56 +437,93 @@ StopReason Session::generate(
     const llama_vocab * vocab = llama_model_get_vocab(model_);
     const int32_t n_ctx = static_cast<int32_t>(llama_n_ctx(ctx_));
 
-    // Tokenize the whole conversation, then reuse whatever prefix is already cached.
-    //
-    // add_special is unconditionally true: we re-render the entire conversation every turn,
-    // so the token sequence must be built identically each time or the prefix comparison
-    // below finds no match and every turn re-decodes from scratch. Whether a BOS is
-    // actually inserted is the vocab's decision (models whose template already emits one
-    // set add_bos_token = false), so this cannot double up.
-    const bool add_special = true;
-    const int32_t n_tokens_needed = -llama_tokenize(
-        vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()), nullptr, 0, add_special, true);
-    std::vector<llama_token> prompt_tokens(n_tokens_needed);
-    if (llama_tokenize(
-            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-            prompt_tokens.data(), static_cast<int32_t>(prompt_tokens.size()),
-            add_special, true) < 0) {
-        error = "failed to tokenize the prompt";
+    // Attachments, in the order their markers appear across the whole conversation. The
+    // projector matches them to markers positionally, so this order is what makes the
+    // right image line up with the right turn.
+    std::vector<std::string> media_paths;
+    for (const auto & message : messages) {
+        media_paths.insert(
+            media_paths.end(), message.media_paths.begin(), message.media_paths.end());
+    }
+    if (!media_paths.empty() && mtmd_ == nullptr) {
+        error = "this model cannot read attachments: it was loaded without a projector";
         return StopReason::ERROR;
-    }
-
-    if (static_cast<int32_t>(prompt_tokens.size()) >= n_ctx) {
-        error = "prompt is longer than the context window (" +
-                std::to_string(prompt_tokens.size()) + " > " + std::to_string(n_ctx) + " tokens)";
-        return StopReason::CONTEXT_FULL;
-    }
-
-    size_t reusable = 0;
-    while (reusable < cached_.size() && reusable < prompt_tokens.size() &&
-           cached_[reusable] == prompt_tokens[reusable]) {
-        ++reusable;
-    }
-    // Never reuse the entire prompt: at least one token must be decoded to produce logits.
-    if (reusable == prompt_tokens.size() && reusable > 0) {
-        --reusable;
-    }
-    if (reusable < cached_.size()) {
-        llama_memory_seq_rm(llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
-        cached_.resize(reusable);
     }
 
     const int64_t prefill_start = now_ms();
-    if (!ingest_prompt(prompt_tokens, reusable, error)) {
-        return StopReason::ERROR;
+
+    if (!media_paths.empty()) {
+        // Media becomes embeddings, which cannot be compared against cached tokens, so a
+        // turn with an attachment re-evaluates the conversation from the start.
+        const int32_t evaluated = ingest_media_prompt(prompt, media_paths, error);
+        if (evaluated < 0) {
+            return StopReason::ERROR;
+        }
+        if (evaluated >= n_ctx) {
+            error = "the conversation and its attachments are longer than the context window";
+            return StopReason::CONTEXT_FULL;
+        }
+        n_past_ = evaluated;
+        stats.prompt_tokens = evaluated;
+    } else {
+        // Tokenize the whole conversation, then reuse whatever prefix is already cached.
+        //
+        // add_special is unconditionally true: we re-render the entire conversation every
+        // turn, so the token sequence must be built identically each time or the prefix
+        // comparison below finds no match and every turn re-decodes from scratch. Whether a
+        // BOS is actually inserted is the vocab's decision (models whose template already
+        // emits one set add_bos_token = false), so this cannot double up.
+        const bool add_special = true;
+        const int32_t n_tokens_needed = -llama_tokenize(
+            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+            nullptr, 0, add_special, true);
+        std::vector<llama_token> prompt_tokens(n_tokens_needed);
+        if (llama_tokenize(
+                vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+                prompt_tokens.data(), static_cast<int32_t>(prompt_tokens.size()),
+                add_special, true) < 0) {
+            error = "failed to tokenize the prompt";
+            return StopReason::ERROR;
+        }
+
+        if (static_cast<int32_t>(prompt_tokens.size()) >= n_ctx) {
+            error = "prompt is longer than the context window (" +
+                    std::to_string(prompt_tokens.size()) + " > " +
+                    std::to_string(n_ctx) + " tokens)";
+            return StopReason::CONTEXT_FULL;
+        }
+
+        size_t reusable = 0;
+        while (cached_covers_context_ && reusable < cached_.size() &&
+               reusable < prompt_tokens.size() &&
+               cached_[reusable] == prompt_tokens[reusable]) {
+            ++reusable;
+        }
+        // Never reuse the entire prompt: at least one token must be decoded for logits.
+        if (reusable == prompt_tokens.size() && reusable > 0) {
+            --reusable;
+        }
+        // Compared against the cache position rather than the token count, because a
+        // previous turn with an attachment leaves positions filled that no token describes.
+        if (static_cast<int32_t>(reusable) < n_past_) {
+            llama_memory_seq_rm(llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
+        }
+        cached_.resize(reusable);
+        n_past_ = static_cast<int32_t>(reusable);
+
+        if (!ingest_prompt(prompt_tokens, reusable, error)) {
+            return StopReason::ERROR;
+        }
+
+        stats.prompt_tokens = static_cast<int32_t>(prompt_tokens.size() - reusable);
+        cached_ = prompt_tokens;
+        n_past_ = static_cast<int32_t>(prompt_tokens.size());
+        cached_covers_context_ = true;
     }
+
     const int64_t prefill_end = now_ms();
-
-    cached_ = prompt_tokens;
-
-    stats.prompt_tokens = static_cast<int32_t>(prompt_tokens.size() - reusable);
-    stats.prefill_ms    = prefill_end - prefill_start;
-    stats.context_size  = n_ctx;
+    stats.prefill_ms   = prefill_end - prefill_start;
+    stats.context_size = n_ctx;
 
     llama_sampler * sampler = build_sampler(sampler_config, vocab);
     StopReason reason = StopReason::END_OF_TURN;
@@ -408,7 +541,7 @@ StopReason Session::generate(
             reason = StopReason::MAX_TOKENS;
             break;
         }
-        if (static_cast<int32_t>(cached_.size()) >= n_ctx) {
+        if (n_past_ >= n_ctx) {
             reason = StopReason::CONTEXT_FULL;
             break;
         }
@@ -440,16 +573,19 @@ StopReason Session::generate(
             break;
         }
 
-        cached_.push_back(token);
-        llama_batch batch = llama_batch_get_one(&cached_.back(), 1);
+        llama_token committed = token;
+        llama_batch batch = llama_batch_get_one(&committed, 1);
         const int ret = llama_decode(ctx_, batch);
         if (ret != 0) {
-            // The token was sampled but could not be committed; drop it so the cache stays
-            // an accurate record of what the KV cache actually holds.
-            cached_.pop_back();
             error = "failed to decode (llama_decode returned " + std::to_string(ret) + ")";
             reason = StopReason::ERROR;
             break;
+        }
+        ++n_past_;
+        // Recorded only once the decode succeeded, so the cache stays an accurate record
+        // of what the KV cache actually holds.
+        if (cached_covers_context_) {
+            cached_.push_back(token);
         }
     }
 
@@ -490,7 +626,7 @@ StopReason Session::generate(
 
     const int64_t decode_end = now_ms();
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;
-    stats.context_used = static_cast<int32_t>(cached_.size());
+    stats.context_used = n_past_;
     return reason;
 }
 

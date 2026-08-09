@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Only the camera hand-off folder is shared. Models, conversations and the token vault
+     are deliberately not reachable through the provider.
+-->
+<paths>
+    <files-path name="captures" path="captures/" />
+</paths>

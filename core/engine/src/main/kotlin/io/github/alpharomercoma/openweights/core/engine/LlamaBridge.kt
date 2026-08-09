@@ -46,6 +46,7 @@ internal class LlamaBridge {
     /** @return an opaque session handle. Throws [LlamaException] if the model cannot load. */
     external fun nativeLoadModel(
         modelPath: String,
+        mmprojPath: String?,
         contextLength: Int,
         threadCount: Int,
         batchThreadCount: Int,
@@ -70,6 +71,12 @@ internal class LlamaBridge {
 
     external fun nativeModelDescription(handle: Long): String
 
+    /** `[vision, audio]` — what the loaded projector accepts. Both false without one. */
+    external fun nativeMediaSupport(handle: Long): BooleanArray
+
+    /** The marker the projector expects where an attachment belongs in the prompt. */
+    external fun nativeMediaMarker(handle: Long): String
+
     /**
      * Blocks until generation finishes, calling [sink] on the calling thread for each token.
      *
@@ -81,6 +88,8 @@ internal class LlamaBridge {
         handle: Long,
         roles: Array<String>,
         contents: Array<String>,
+        mediaPaths: Array<String>,
+        mediaCounts: IntArray,
         temperature: Float,
         topK: Int,
         topP: Float,

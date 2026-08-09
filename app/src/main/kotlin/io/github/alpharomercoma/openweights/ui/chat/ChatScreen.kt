@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -43,6 +44,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Menu
@@ -79,6 +81,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
@@ -106,6 +109,10 @@ fun ChatScreen(
     onDeleteConversation: (Long) -> Unit = {},
     onSavePreferences: (ModelPreferences) -> Unit = {},
     onResetPreferences: () -> Unit = {},
+    onAttach: (Uri) -> Unit = {},
+    onRemoveStaged: (MessagePart.File) -> Unit = {},
+    onToggleReadAloud: (String) -> Unit = {},
+    isSpeaking: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -158,6 +165,10 @@ fun ChatScreen(
             onOpenHistory = { scope.launch { drawerState.open() } },
             onSavePreferences = onSavePreferences,
             onResetPreferences = onResetPreferences,
+            onAttach = onAttach,
+            onRemoveStaged = onRemoveStaged,
+            onToggleReadAloud = onToggleReadAloud,
+            isSpeaking = isSpeaking,
             modifier = modifier,
         )
     }
@@ -181,10 +192,15 @@ private fun ChatContent(
     onOpenHistory: () -> Unit,
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
+    onAttach: (Uri) -> Unit,
+    onRemoveStaged: (MessagePart.File) -> Unit,
+    onToggleReadAloud: (String) -> Unit,
+    isSpeaking: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
     var showParameters by remember { mutableStateOf(false) }
+    var showAttachments by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -280,6 +296,11 @@ private fun ChatContent(
             Composer(
                 enabled = state.canSend,
                 isGenerating = state.isGenerating,
+                staged = state.staged,
+                canAttach = state.mediaSupport.any,
+                isAttaching = state.isAttaching,
+                onAttach = { showAttachments = true },
+                onRemoveStaged = onRemoveStaged,
                 onSend = onSend,
                 onStop = onStop,
                 onCommand = { command ->
@@ -293,6 +314,14 @@ private fun ChatContent(
         }
     }
 
+    if (showAttachments) {
+        AttachmentSheet(
+            support = state.mediaSupport,
+            onPicked = onAttach,
+            onDismiss = { showAttachments = false },
+        )
+    }
+
     ChatSheets(
         state = state,
         actionsFor = actionsFor,
@@ -301,6 +330,8 @@ private fun ChatContent(
         onSavePreferences = onSavePreferences,
         onResetPreferences = onResetPreferences,
         onRegenerate = onRegenerate,
+        onToggleReadAloud = onToggleReadAloud,
+        isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
     )
 }
@@ -316,6 +347,8 @@ private fun ChatSheets(
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
     onRegenerate: () -> Unit,
+    onToggleReadAloud: (String) -> Unit,
+    isSpeaking: Boolean,
     onDismissActions: () -> Unit,
 ) {
     if (showParameters && state.modelName != null) {
@@ -338,6 +371,8 @@ private fun ChatSheets(
         MessageActionsSheet(
             entry = entry,
             canRegenerate = entry.role == ChatRole.ASSISTANT && !state.isGenerating,
+            isSpeaking = isSpeaking,
+            onToggleReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
             onRegenerate = {
                 onRegenerate()
                 onDismissActions()
@@ -392,21 +427,28 @@ private fun ModelChip(state: ChatUiState, onClick: () -> Unit) {
 
 @Composable
 private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text(
-            text = entry.text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .widthIn(max = 300.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .combinedClickable(onClick = {}, onLongClick = onLongPress)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        )
+        if (entry.attachments.isNotEmpty()) {
+            SentAttachments(entry.attachments)
+        }
+        // A message can be attachments alone, in which case there is no bubble to draw.
+        if (entry.text.isNotBlank()) {
+            Text(
+                text = entry.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            )
+        }
     }
 }
 
@@ -533,15 +575,23 @@ private fun CompactionMarker(note: String) {
 }
 
 @Composable
+@Suppress("LongParameterList")
 private fun Composer(
     enabled: Boolean,
     isGenerating: Boolean,
+    staged: List<MessagePart.File>,
+    canAttach: Boolean,
+    isAttaching: Boolean,
+    onAttach: () -> Unit,
+    onRemoveStaged: (MessagePart.File) -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
     val commands = SlashCommand.match(draft)
+    // An attachment alone is a complete message, so the send button lights up for it.
+    val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty()
 
     if (commands != null) {
         SlashCommandPalette(
@@ -554,6 +604,14 @@ private fun Composer(
         )
     }
 
+    if (staged.isNotEmpty()) {
+        StagedAttachments(
+            attachments = staged,
+            onRemove = onRemoveStaged,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -562,6 +620,30 @@ private fun Composer(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Left of the field, where every other chat app puts it. Present only when the
+        // loaded model can read attachments, so it never promises something that fails.
+        if (canAttach) {
+            IconButton(
+                onClick = onAttach,
+                enabled = enabled && !isAttaching,
+                modifier = Modifier.padding(bottom = 4.dp),
+            ) {
+                if (isAttaching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Attach a file",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it },
@@ -582,12 +664,12 @@ private fun Composer(
             onClick = {
                 if (isGenerating) {
                     onStop()
-                } else if (draft.isNotBlank()) {
+                } else if (hasSomethingToSend) {
                     onSend(draft)
                     draft = ""
                 }
             },
-            enabled = isGenerating || (enabled && draft.isNotBlank()),
+            enabled = isGenerating || (enabled && hasSomethingToSend),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,

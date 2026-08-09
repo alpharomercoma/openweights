@@ -209,6 +209,19 @@ private fun ModelDetail(
             }
         }
 
+        detail.pairedProjector()?.let { projector ->
+            item {
+                // Said before the download rather than discovered after it: the projector
+                // is a second file, it is counted in the fit report above, and on a small
+                // vision model it can be larger than the model itself.
+                Callout(
+                    "This model can read images. Its ${formatBytes(projector.sizeBytes)} " +
+                        "vision encoder downloads with it, and the estimates below already " +
+                        "count it.",
+                )
+            }
+        }
+
         item {
             Column {
                 // The slider is the point: KV cache scales with context, so the same file
@@ -228,6 +241,21 @@ private fun ModelDetail(
             FitCard(inspected = inspected, onDownload = { onDownload(inspected.file.path) })
         }
     }
+}
+
+/** A short standing fact about the repository, distinct from the per-file fit cards. */
+@Composable
+private fun Callout(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(12.dp),
+    )
 }
 
 private const val MIN_CONTEXT = 1024f

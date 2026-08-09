@@ -63,6 +63,13 @@ data class MessageEntity(
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
     val reasoningMs: Long? = null,
+    /**
+     * Files sent with this message, as JSON.
+     *
+     * A column rather than a table: attachments are only ever read with their message and
+     * never queried across conversations, so a join would buy nothing.
+     */
+    val attachments: String? = null,
 )
 
 /**

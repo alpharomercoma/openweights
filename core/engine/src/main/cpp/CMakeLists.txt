@@ -25,6 +25,7 @@ target_include_directories(openweights_llama PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/ggml/include
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/tools/mtmd
     ${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/vendor
 )
 
@@ -38,5 +39,7 @@ target_link_libraries(openweights_llama
     # into each model's own tool syntax and parses the calls back out again, which is a
     # large amount of per-model knowledge not worth reimplementing.
     llama-common
+    # Multimodal projector runtime: image, audio and video inputs.
+    mtmd
     ${ANDROID_LOG_LIB}
 )

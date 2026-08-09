@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
@@ -66,6 +67,7 @@ class ChatRepository @Inject constructor(
         timeToFirstTokenMs: Long? = null,
         generatedTokens: Int? = null,
         reasoningMs: Long? = null,
+        attachments: List<MessagePart.File> = emptyList(),
     ): Long {
         touch(conversationId)
         return database.messages().insert(
@@ -78,6 +80,7 @@ class ChatRepository @Inject constructor(
                 timeToFirstTokenMs = timeToFirstTokenMs,
                 generatedTokens = generatedTokens,
                 reasoningMs = reasoningMs,
+                attachments = attachments.encodeAttachments(),
             ),
         )
     }

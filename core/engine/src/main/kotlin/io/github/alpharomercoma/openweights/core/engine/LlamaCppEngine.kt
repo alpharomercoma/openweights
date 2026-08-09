@@ -83,13 +83,17 @@ class LlamaCppEngine internal constructor(
 
     override val loadedModel: LoadedModelInfo? get() = currentModel
 
-    override suspend fun load(modelFile: File, params: ModelLoadParams) {
+    override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
         require(modelFile.isFile) { "model file does not exist: ${modelFile.path}" }
+        require(projectorFile == null || projectorFile.isFile) {
+            "projector file does not exist: ${projectorFile?.path}"
+        }
         lifecycleLock.withLock {
             withContext(engineThread) {
                 freeCurrentHandle()
                 val newHandle = bridge.nativeLoadModel(
                     modelPath = modelFile.absolutePath,
+                    mmprojPath = projectorFile?.absolutePath,
                     contextLength = params.contextLength,
                     threadCount = params.threadCount ?: defaultThreadCount,
                     batchThreadCount = params.batchThreadCount ?: defaultBatchThreadCount,
@@ -118,11 +122,14 @@ class LlamaCppEngine internal constructor(
         require(messages.isNotEmpty()) { "cannot generate a reply to an empty conversation" }
 
         var parsed = ParsedReply()
+        val prompt = renderPrompt(activeHandle, messages)
 
         val stats = bridge.nativeGenerate(
             handle = activeHandle,
             roles = messages.map { it.role.wireName }.toTypedArray(),
-            contents = messages.map { it.text }.toTypedArray(),
+            contents = prompt.contents,
+            mediaPaths = prompt.mediaPaths,
+            mediaCounts = prompt.mediaCounts,
             temperature = params.temperature,
             topK = params.topK,
             topP = params.topP,
@@ -152,24 +159,8 @@ class LlamaCppEngine internal constructor(
         )
 
         if (stats != null) {
-            send(
-                GenerationEvent.Completed(
-                    reason = STOP_REASONS.getOrElse(stats[0].toInt()) { StopReason.ERROR },
-                    content = parsed.content,
-                    reasoning = parsed.reasoning,
-                    toolCalls = parsed.toolCalls,
-                    stats = GenerationStats(
-                        promptTokens = stats[1].toInt(),
-                        generatedTokens = stats[2].toInt(),
-                        prefillMs = stats[3],
-                        decodeMs = stats[4],
-                        timeToFirstTokenMs = stats[5],
-                        contextUsed = stats[6].toInt(),
-                        contextSize = stats[7].toInt(),
-                    ),
-                ),
-            )
-            currentModel = currentModel?.copy(contextUsed = stats[6].toInt())
+            send(completionEvent(stats, parsed))
+            currentModel = currentModel?.copy(contextUsed = stats[CONTEXT_USED].toInt())
         }
         close()
         // nativeGenerate has already returned by this point, but a collector that walks
@@ -245,6 +236,59 @@ class LlamaCppEngine internal constructor(
         currentModel = null
     }
 
+    /** The terminal event, read out of the flat array the native layer returns. */
+    private fun completionEvent(stats: LongArray, parsed: ParsedReply) = GenerationEvent.Completed(
+        reason = STOP_REASONS.getOrElse(stats[0].toInt()) { StopReason.ERROR },
+        content = parsed.content,
+        reasoning = parsed.reasoning,
+        toolCalls = parsed.toolCalls,
+        stats = GenerationStats(
+            promptTokens = stats[1].toInt(),
+            generatedTokens = stats[2].toInt(),
+            prefillMs = stats[3],
+            decodeMs = stats[4],
+            timeToFirstTokenMs = stats[5],
+            contextUsed = stats[CONTEXT_USED].toInt(),
+            contextSize = stats[7].toInt(),
+        ),
+    )
+
+    /** The conversation as arrays the native layer can take, media markers included. */
+    private class RenderedPrompt(
+        val contents: Array<String>,
+        val mediaPaths: Array<String>,
+        val mediaCounts: IntArray,
+    )
+
+    /**
+     * Prepares the conversation for the native layer.
+     *
+     * The projector needs its own marker in the text wherever an attachment belongs, and
+     * only it knows what that marker is — it varies per model. Without a projector loaded,
+     * attachments are dropped rather than described: a text-only model handed a marker
+     * would read it as literal text and answer about a picture it cannot see.
+     */
+    private fun renderPrompt(activeHandle: Long, messages: List<ChatMessage>): RenderedPrompt {
+        val marker = if (currentModel?.mediaSupport?.any == true) {
+            bridge.nativeMediaMarker(activeHandle)
+        } else {
+            null
+        }
+        val files = messages.map { if (marker == null) emptyList() else it.files }
+
+        return RenderedPrompt(
+            contents = messages.mapIndexed { index, message ->
+                if (marker == null || files[index].isEmpty()) {
+                    message.text
+                } else {
+                    message.withMediaMarkers(marker)
+                }
+            }.toTypedArray(),
+            mediaPaths = files.flatten().map { it.path }.toTypedArray(),
+            mediaCounts = files.map { it.size }.toIntArray(),
+        )
+    }
+
     private fun readModelInfo(activeHandle: Long): LoadedModelInfo {
         val info = bridge.nativeModelInfo(activeHandle)
         return LoadedModelInfo(
@@ -255,6 +299,9 @@ class LlamaCppEngine internal constructor(
             trainingContextSize = info[3].toInt(),
             layerCount = info[4].toInt(),
             contextUsed = info[5].toInt(),
+            mediaSupport = bridge.nativeMediaSupport(activeHandle).let { support ->
+                MediaSupport(vision = support[0], audio = support[1])
+            },
         )
     }
 
@@ -268,6 +315,9 @@ class LlamaCppEngine internal constructor(
     private companion object {
         /** Tool calls cross JNI flattened as [id, name, argumentsJson]. */
         const val TOOL_CALL_FIELDS = 3
+
+        /** Index of the context-used field in the stats array the native layer returns. */
+        const val CONTEXT_USED = 6
 
         /** Long enough for a cancelled decode step to return; short enough not to hang. */
         const val SHUTDOWN_TIMEOUT_SECONDS = 10L

@@ -155,7 +155,14 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
-            Metric(formatBytes(model.sizeBytes))
+            Metric(
+                listOfNotNull(
+                    formatBytes(model.sizeBytes),
+                    // Named rather than iconified: "reads images" is the answer to the
+                    // question someone actually has when picking a model to attach to.
+                    "reads images".takeIf { model.isMultimodal },
+                ).joinToString(" · "),
+            )
         }
         TextButton(onClick = onDelete) { Text("Delete") }
     }

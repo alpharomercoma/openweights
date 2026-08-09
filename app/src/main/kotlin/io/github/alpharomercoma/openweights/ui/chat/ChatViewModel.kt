@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,17 +24,21 @@ import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MediaKind
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
-import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
+import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
+import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -67,6 +72,8 @@ data class TranscriptEntry(
     val toolCalls: List<ToolCall> = emptyList(),
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
+    /** Files sent with this turn, shown above its text. */
+    val attachments: List<MessagePart.File> = emptyList(),
 )
 
 /** A past conversation, as shown in the drawer. */
@@ -92,6 +99,12 @@ data class ChatUiState(
     val conversations: List<ConversationSummary> = emptyList(),
     val activeConversationId: Long? = null,
     val preferences: ModelPreferences = ModelPreferences(),
+    /** What the loaded model can read. All false without a projector. */
+    val mediaSupport: MediaSupport = MediaSupport(),
+    /** Attachments staged in the composer, not yet sent. */
+    val staged: List<MessagePart.File> = emptyList(),
+    /** True while a picked file is being copied in. */
+    val isAttaching: Boolean = false,
 ) {
     val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
 
@@ -105,10 +118,10 @@ class ChatViewModel @Inject constructor(
     private val engine: InferenceEngine,
     private val compactor: ConversationCompactor,
     private val modelStore: ModelStore,
+    private val attachments: AttachmentStore,
     private val chats: ChatRepository,
     private val modelPreferences: ModelPreferencesRepository,
     private val thermalPolicy: ThermalPolicy,
-    private val profiler: DeviceProfiler,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -170,8 +183,10 @@ class ChatViewModel @Inject constructor(
                 ?.let { ModelLoadParams(contextLength = it) }
                 ?: preferences.toLoadParams()
 
+            val projector = modelStore.projectorFor(modelFile)
+
             runCatching {
-                engine.load(modelFile, loadParams)
+                engine.load(modelFile, loadParams, projector)
             }.onSuccess {
                 conversationId = null
                 preferencesKey = modelFile.name
@@ -185,6 +200,8 @@ class ChatViewModel @Inject constructor(
                         contextUsed = info?.contextUsed ?: 0,
                         preferences = preferences,
                         transcript = emptyList(),
+                        mediaSupport = info?.mediaSupport ?: MediaSupport(),
+                        staged = emptyList(),
                     )
                 }
             }.onFailure { failure ->
@@ -195,14 +212,18 @@ class ChatViewModel @Inject constructor(
 
     fun send(prompt: String) {
         val text = prompt.trim()
-        if (text.isEmpty() || !_uiState.value.canSend) return
+        val staged = _uiState.value.staged
+        // An attachment on its own is a complete message: "what is this?" is implied.
+        if ((text.isEmpty() && staged.isEmpty()) || !_uiState.value.canSend) return
 
         // isGenerating is claimed here, before any suspending work: two quick taps would
         // otherwise both pass canSend, create two conversations, and race the engine.
         _uiState.update { state ->
             state.copy(
-                transcript = state.transcript + entry(ChatRole.USER, text),
+                transcript = state.transcript +
+                    entry(ChatRole.USER, text).copy(attachments = staged),
                 isGenerating = true,
+                staged = emptyList(),
                 error = null,
             )
         }
@@ -210,12 +231,43 @@ class ChatViewModel @Inject constructor(
         // Awaited before generating: a fast reply could otherwise finish before the row
         // exists and be dropped, taking its usage record with it.
         viewModelScope.launch {
+            val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
             val id = conversationId
-                ?: chats.startConversation(text, _uiState.value.modelName)
+                ?: chats.startConversation(title, _uiState.value.modelName)
                     .also { conversationId = it }
-            chats.addMessage(id, ChatRole.USER.wireName, text)
+            chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
             generate()
         }
+    }
+
+    /**
+     * Stages a picked file for the next message.
+     *
+     * Copied in immediately rather than at send time, so the thumbnail appears at once and
+     * the picker's read permission is used while it is still granted.
+     */
+    fun attach(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAttaching = true) }
+            val stored = attachments.store(uri)
+            _uiState.update { state ->
+                state.copy(
+                    isAttaching = false,
+                    staged = state.staged + stored,
+                    error = if (stored.isEmpty()) {
+                        "That file could not be read."
+                    } else {
+                        state.error
+                    },
+                )
+            }
+        }
+    }
+
+    /** Removes a staged attachment and deletes the copy that was made of it. */
+    fun removeStaged(attachment: MessagePart.File) {
+        _uiState.update { it.copy(staged = it.staged - attachment) }
+        viewModelScope.launch { attachments.discard(attachment) }
     }
 
     /**
@@ -260,7 +312,7 @@ class ChatViewModel @Inject constructor(
                 // Re-planned per reply: the phone is a different machine hot than cold,
                 // and a count chosen at load time is wrong by the third long answer.
                 // Inside the try because it suspends, so Stop can land here too.
-                val plan = thermalPolicy.plan(profiler.profile().cpuCores)
+                val plan = thermalPolicy.plan()
                 if (plan.shouldPause) {
                     _uiState.update {
                         it.copy(
@@ -418,6 +470,7 @@ class ChatViewModel @Inject constructor(
                             timeToFirstTokenMs = message.timeToFirstTokenMs,
                             generatedTokens = message.generatedTokens,
                             reasoningMs = message.reasoningMs,
+                            attachments = message.attachments.decodeAttachments(),
                         )
                     },
                     compaction = conversation.compactionSummary?.let {
@@ -465,8 +518,6 @@ class ChatViewModel @Inject constructor(
         engine.cancel()
         generationJob?.cancel()
     }
-
-    fun dismissError() = _uiState.update { it.copy(error = null) }
 
     private fun applyCompletion(event: GenerationEvent.Completed) {
         persistReply(event)
@@ -569,13 +620,32 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         .orEmpty()
 
     val compaction = compaction
-        ?: return system + transcript.map { ChatMessage.text(it.role, it.text) }
+        ?: return system + transcript.map { it.toChatMessage() }
     val summary = ChatMessage.text(
         ChatRole.SYSTEM,
         "Summary of the earlier conversation:\n" + compaction.summary,
     )
     val remaining = transcript.drop(compaction.foldedThroughIndex + 1)
-    return system + summary + remaining.map { ChatMessage.text(it.role, it.text) }
+    return system + summary + remaining.map { it.toChatMessage() }
+}
+
+/**
+ * A transcript entry as the engine sees it.
+ *
+ * Attachments come first: a question about a picture reads better after the picture, and
+ * models are trained on that order.
+ */
+private fun TranscriptEntry.toChatMessage(): ChatMessage = ChatMessage(
+    role = role,
+    parts = attachments + MessagePart.Text(text),
+)
+
+/** A short human label for an attachment, used where there is no text to go on. */
+internal fun MessagePart.File.describe(): String = name ?: when (kind) {
+    MediaKind.IMAGE -> "Image"
+    MediaKind.AUDIO -> "Audio"
+    MediaKind.VIDEO -> "Video"
+    MediaKind.OTHER -> "File"
 }
 
 /** Turns engine failures into something a person can act on. */

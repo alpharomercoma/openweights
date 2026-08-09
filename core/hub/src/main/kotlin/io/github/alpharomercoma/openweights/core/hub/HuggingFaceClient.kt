@@ -54,20 +54,47 @@ data class HubFile(
      * the Hub carries the quantization in its name, which is also where people look.
      */
     val quantizationLabel: String
-        get() = path.substringAfterLast('/')
+        get() = fileName
             .removeSuffix(".gguf")
             .substringAfterLast('-')
+
+    val fileName: String get() = path.substringAfterLast('/')
+
+    /**
+     * True for a multimodal projector rather than a chat model.
+     *
+     * Projectors are published in the same repository and end in `.gguf` like everything
+     * else, but loading one as a model fails: it holds a vision or audio encoder and no
+     * language model at all. Every publisher names them `mmproj-…`, which is the only
+     * signal available without downloading the header.
+     */
+    val isProjector: Boolean get() = fileName.startsWith("mmproj", ignoreCase = true)
 }
 
 /** Everything the model detail screen needs about one repository. */
 data class HubModelDetail(
     val model: HubModel,
+    /** Chat models only. Projectors are in [projectors]. */
     val files: List<HubFile>,
+    /** Multimodal projectors offered by this repository, smallest first. */
+    val projectors: List<HubFile>,
     val license: String?,
     val architecture: String?,
     val parameterCount: Long?,
     val trainingContextLength: Int?,
-)
+) {
+    /**
+     * The projector to download alongside any model from this repository.
+     *
+     * The smallest one: projectors are published at a couple of precisions, the quality
+     * difference between them is slight, and the smaller file is both a shorter download
+     * and less memory held for the whole session.
+     */
+    fun pairedProjector(): HubFile? = projectors.minByOrNull { it.sizeBytes }
+
+    /** True when this repository ships a vision or audio encoder. */
+    val isMultimodal: Boolean get() = projectors.isNotEmpty()
+}
 
 /** Raised when the Hub rejects a request in a way the user can act on. */
 class HubException(message: String, val isAuthFailure: Boolean = false) : Exception(message)
@@ -117,18 +144,21 @@ class HuggingFaceClient @Inject constructor(
             .build()
         val payload = json.decodeFromString<DetailEntry>(get(url))
 
+        val gguf = payload.siblings.orEmpty()
+            .filter { it.rfilename.endsWith(GGUF_SUFFIX, ignoreCase = true) }
+            .map { sibling ->
+                HubFile(
+                    path = sibling.rfilename,
+                    sizeBytes = sibling.lfs?.size ?: sibling.size ?: 0L,
+                    sha256 = sibling.lfs?.sha256,
+                )
+            }
+            .sortedBy { it.sizeBytes }
+
         return HubModelDetail(
             model = payload.toModel(),
-            files = payload.siblings.orEmpty()
-                .filter { it.rfilename.endsWith(GGUF_SUFFIX, ignoreCase = true) }
-                .map { sibling ->
-                    HubFile(
-                        path = sibling.rfilename,
-                        sizeBytes = sibling.lfs?.size ?: sibling.size ?: 0L,
-                        sha256 = sibling.lfs?.sha256,
-                    )
-                }
-                .sortedBy { it.sizeBytes },
+            files = gguf.filterNot { it.isProjector },
+            projectors = gguf.filter { it.isProjector },
             license = payload.cardData?.license,
             architecture = payload.gguf?.architecture,
             parameterCount = payload.gguf?.total,

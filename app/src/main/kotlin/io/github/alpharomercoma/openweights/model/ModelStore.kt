@@ -35,16 +35,51 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         get() = File(context.getExternalFilesDir(null) ?: context.filesDir, MODELS_DIRECTORY)
             .apply { mkdirs() }
 
-    /** Every GGUF currently on disk, newest first. */
-    fun availableModels(): List<File> =
+    /** Every GGUF currently on disk, newest first. Projectors are not models. */
+    fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
+
+    fun firstAvailableModel(): File? = availableModels().firstOrNull()
+
+    /**
+     * The multimodal projector that belongs to [model], if it has been downloaded.
+     *
+     * A projector is a separate GGUF holding the vision or audio encoder, published
+     * alongside the model as `mmproj-<model>-<quant>.gguf`. Matching is by the model's
+     * identity with its quantization suffix removed, because the two files are usually
+     * quantized differently — an F16 projector paired with a Q4 model is the normal case.
+     */
+    fun projectorFor(model: File): File? {
+        val identity = model.nameWithoutExtension.modelIdentity()
+        if (identity.isEmpty()) return null
+        return ggufFiles().firstOrNull { candidate ->
+            candidate.isProjector && candidate.nameWithoutExtension.contains(identity, true)
+        }
+    }
+
+    private fun ggufFiles(): List<File> =
         directory.listFiles { file -> file.isFile && file.name.endsWith(GGUF_EXTENSION) }
             ?.sortedByDescending { it.lastModified() }
             .orEmpty()
 
-    fun firstAvailableModel(): File? = availableModels().firstOrNull()
+    private val File.isProjector: Boolean get() = name.startsWith(PROJECTOR_PREFIX, true)
+
+    /**
+     * A model name with its quantization suffix removed.
+     *
+     * `LFM2.5-VL-1.6B-Q4_K_M` becomes `LFM2.5-VL-1.6B`, which is what the projector's own
+     * name contains.
+     */
+    private fun String.modelIdentity(): String {
+        val quantization = QUANTIZATION_SUFFIX.find(this) ?: return this
+        return substring(0, quantization.range.first)
+    }
 
     private companion object {
         const val MODELS_DIRECTORY = "models"
         const val GGUF_EXTENSION = ".gguf"
+        const val PROJECTOR_PREFIX = "mmproj"
+
+        /** `-Q4_K_M`, `-F16`, `-IQ3_XXS` and the rest of the GGUF quantization vocabulary. */
+        val QUANTIZATION_SUFFIX = Regex("""-(I?Q\d[\w_]*|BF?16|F32)$""", RegexOption.IGNORE_CASE)
     }
 }

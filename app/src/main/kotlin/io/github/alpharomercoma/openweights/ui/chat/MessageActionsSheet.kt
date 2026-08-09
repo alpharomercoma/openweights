@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 
 /**
  * Actions for one message, opened by long-pressing it.
@@ -54,7 +57,9 @@ import androidx.compose.ui.unit.dp
 fun MessageActionsSheet(
     entry: TranscriptEntry,
     canRegenerate: Boolean,
+    isSpeaking: Boolean,
     onRegenerate: () -> Unit,
+    onToggleReadAloud: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -75,6 +80,22 @@ fun MessageActionsSheet(
                     onDismiss()
                 },
             )
+            if (entry.role == ChatRole.ASSISTANT) {
+                // The one output modality a local model can add beyond text: the phone's
+                // own synthesiser reading what it wrote, with nothing leaving the device.
+                ActionRow(
+                    icon = if (isSpeaking) {
+                        Icons.Rounded.StopCircle
+                    } else {
+                        Icons.AutoMirrored.Rounded.VolumeUp
+                    },
+                    label = if (isSpeaking) "Stop reading" else "Read aloud",
+                    onClick = {
+                        onToggleReadAloud()
+                        onDismiss()
+                    },
+                )
+            }
             if (canRegenerate) {
                 ActionRow(
                     icon = Icons.Rounded.Refresh,

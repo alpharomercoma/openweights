@@ -31,6 +31,13 @@ struct ChatMessage {
     std::string content;
     /** Set on a `tool` message: which call this is the result of. */
     std::string tool_call_id;
+    /**
+     * Files attached to this message, in the order their markers appear in [content].
+     *
+     * Images, audio and video are all just files here; libmtmd decides what each one is
+     * from its contents, and the loaded projector decides what the model can accept.
+     */
+    std::vector<std::string> media_paths;
 };
 
 /** A tool the model may call, described the way the OpenAI-style schema does. */
@@ -101,9 +108,22 @@ public:
 
     ~Session();
 
+    /**
+     * What kinds of media the loaded projector can accept.
+     *
+     * Video is absent deliberately: libmtmd's video path extracts frames by shelling out
+     * to an `ffmpeg` binary in PATH, which an Android app has no way to provide. Frames
+     * are sampled on the Kotlin side and sent as images instead.
+     */
+    struct MediaSupport {
+        bool vision = false;
+        bool audio = false;
+    };
+
     /** Loads a model. Returns nullptr on failure and fills `error`. */
     static Session * load(
         const std::string & model_path,
+        const std::string & mmproj_path,
         int32_t n_ctx,
         int32_t n_threads,
         int32_t n_threads_batch,
@@ -138,6 +158,14 @@ public:
      */
     void set_threads(int32_t n_threads, int32_t n_threads_batch);
 
+    /** True when a multimodal projector was loaded alongside the model. */
+    bool is_multimodal() const { return mtmd_ != nullptr; }
+
+    MediaSupport media_support() const;
+
+    /** The marker the projector expects where a file belongs in the prompt. */
+    std::string media_marker() const;
+
     std::string model_description() const;
     uint64_t    parameter_count() const;
     uint64_t    model_size_bytes() const;
@@ -160,6 +188,16 @@ private:
     /** Decodes `tokens[from..]`, reusing whatever prefix is already cached. */
     bool ingest_prompt(const std::vector<llama_token> & tokens, size_t from, std::string & error);
 
+    /**
+     * Encodes a prompt containing media and evaluates it into the KV cache.
+     *
+     * Returns the new position, or -1 on failure.
+     */
+    int32_t ingest_media_prompt(
+        const std::string & prompt,
+        const std::vector<std::string> & media_paths,
+        std::string & error);
+
     llama_model   * model_ = nullptr;
     llama_context * ctx_   = nullptr;
 
@@ -175,8 +213,28 @@ private:
     int last_format_ = 0;
     std::string last_generation_prompt_;
 
+    /** The multimodal projector, or null for a text-only model. */
+    void * mtmd_ = nullptr;
+
     /** Tokens currently represented in the KV cache, in order. */
     std::vector<llama_token> cached_;
+
+    /**
+     * Position of the next token in the KV cache.
+     *
+     * Tracked separately from [cached_] because a media chunk occupies positions without
+     * corresponding to tokens we can compare, so prefix reuse does not apply to it.
+     */
+    int32_t n_past_ = 0;
+
+    /**
+     * True while [cached_] describes every position in the KV cache.
+     *
+     * Goes false for a turn with an attachment, whose positions hold image or audio
+     * embeddings. Comparing a prompt against those would match tokens that are not there,
+     * so the next turn re-evaluates from the start instead.
+     */
+    bool cached_covers_context_ = true;
 
     std::atomic<bool> cancelled_{false};
 };

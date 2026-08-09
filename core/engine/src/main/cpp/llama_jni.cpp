@@ -110,6 +110,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     JNIEnv * env,
     jobject /*thiz*/,
     jstring model_path,
+    jstring mmproj_path,
     jint context_length,
     jint thread_count,
     jint batch_thread_count,
@@ -117,7 +118,9 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     jboolean use_mmap) {
     std::string error;
     Session * session = Session::load(
-        to_utf8(env, model_path), context_length, thread_count, batch_thread_count,
+        to_utf8(env, model_path),
+        mmproj_path == nullptr ? std::string() : to_utf8(env, mmproj_path),
+        context_length, thread_count, batch_thread_count,
         gpu_layers, use_mmap == JNI_TRUE, error);
     if (session == nullptr) {
         throw_engine_exception(env, error);
@@ -174,6 +177,26 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelDes
     return env->NewStringUTF(as_session(handle)->model_description().c_str());
 }
 
+/** Returns [vision, audio] — what the loaded projector can accept. */
+JNIEXPORT jbooleanArray JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSupport(
+    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    const auto support = as_session(handle)->media_support();
+    jboolean values[2] = {
+        static_cast<jboolean>(support.vision),
+        static_cast<jboolean>(support.audio),
+    };
+    jbooleanArray result = env->NewBooleanArray(2);
+    env->SetBooleanArrayRegion(result, 0, 2, values);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaMarker(
+    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    return env->NewStringUTF(as_session(handle)->media_marker().c_str());
+}
+
 /**
  * Runs one generation, calling back into Kotlin for every token.
  *
@@ -190,6 +213,8 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jlong handle,
     jobjectArray roles,
     jobjectArray contents,
+    jobjectArray media_paths,
+    jintArray media_counts,
     jfloat temperature,
     jint top_k,
     jfloat top_p,
@@ -206,12 +231,30 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     Session * session = as_session(handle);
 
     const jsize message_count = env->GetArrayLength(roles);
+
+    // Attachments arrive as one flat array plus a per-message count, which keeps the JNI
+    // surface to plain arrays instead of an array of arrays.
+    std::vector<jint> counts(message_count, 0);
+    if (media_counts != nullptr) {
+        env->GetIntArrayRegion(media_counts, 0, message_count, counts.data());
+    }
+
     std::vector<ChatMessage> messages;
     messages.reserve(message_count);
+    jsize media_cursor = 0;
     for (jsize i = 0; i < message_count; ++i) {
         auto role = static_cast<jstring>(env->GetObjectArrayElement(roles, i));
         auto content = static_cast<jstring>(env->GetObjectArrayElement(contents, i));
-        messages.push_back({to_utf8(env, role), to_utf8(env, content), ""});
+
+        std::vector<std::string> attachments;
+        for (jint media = 0; media < counts[i]; ++media, ++media_cursor) {
+            auto path = static_cast<jstring>(
+                env->GetObjectArrayElement(media_paths, media_cursor));
+            attachments.push_back(to_utf8(env, path));
+            env->DeleteLocalRef(path);
+        }
+
+        messages.push_back({to_utf8(env, role), to_utf8(env, content), "", attachments});
         env->DeleteLocalRef(role);
         env->DeleteLocalRef(content);
     }

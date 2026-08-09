@@ -1,0 +1,101 @@
+# Multimodality on a phone: what is possible, and what is marketing
+
+Research behind the multimodal work in OpenWeights. The question is narrow: for a phone
+running open-weight GGUF models with no server behind it, **which modalities can actually
+go in, and which can actually come out?**
+
+## The short answer
+
+| Direction | Modality | Status in OpenWeights | Why |
+|---|---|---|---|
+| **In** | Text | Shipped | — |
+| **In** | Image | Shipped | libmtmd vision projector; verified on-device |
+| **In** | Audio | Supported by the same path | Needs an audio projector (Ultravox, Voxtral, LFM2-Audio); untested for lack of a phone-sized one |
+| **In** | Video | Shipped as sampled frames | libmtmd's own video path shells out to `ffmpeg`; we decode frames with Android's `MediaMetadataRetriever` instead |
+| **In** | Live video | Not shipped | Same mechanism as video, but prefill cost makes it dishonest to offer — see below |
+| **Out** | Text | Shipped | — |
+| **Out** | Speech | Shipped | Android `TextToSpeech`, on-device, no network |
+| **Out** | Image | Not shipped | Needs a diffusion runtime; llama.cpp does not do this |
+| **Out** | Video | Not shipped | Not plausible on a phone at any quality worth having |
+
+## Input: llama.cpp's libmtmd is the whole story
+
+llama.cpp handles multimodal input through **libmtmd** (`tools/mtmd`), which loads a
+separate GGUF — the **projector**, published as `mmproj-<model>-<quant>.gguf` — and turns
+media into embeddings the language model attends over. One runtime covers every supported
+family: LFM2-VL, Qwen3-VL, Gemma 3, MiniCPM-V, InternVL, SmolVLM, Pixtral, GLM-4V and
+others for vision; Ultravox, Voxtral and Qwen2-Audio for audio.
+
+That mattered for the engine decision. The alternative was a second runtime per modality,
+which would have doubled the native surface for no gain — the whole point of choosing
+llama.cpp was that any GGUF on the Hub loads without a conversion step, and projectors
+inherit that property.
+
+### Video is where the documentation oversells
+
+`mtmd_helper_support_video()` exists and the API accepts video files. Reading
+`tools/mtmd/CMakeLists.txt` shows what that costs: `MTMD_VIDEO` requires `LLAMA_SUBPROCESS`
+and **an `ffmpeg` binary in `PATH`**, because frame extraction is done by shelling out.
+Neither is available to an Android app — there is no ffmpeg on the device, and shipping and
+executing one is both a packaging problem and a Play policy problem.
+
+So OpenWeights samples frames itself with `MediaMetadataRetriever` and attaches them as
+images. That is what the ffmpeg path does anyway, and it keeps the work inside the app.
+
+The honest limit is arithmetic, not API support. On the dev device a single 448×448 image
+costs **13.4 s of prefill**. Eight frames is roughly two minutes before the first token.
+Frame count is therefore a deliberate, visible choice rather than something hidden behind a
+"video supported" checkbox — and *live* video, which needs this to happen continuously, is
+not something a phone-sized model can do today. Claiming otherwise would be the kind of
+demo that works once on stage.
+
+## Output: text is what a language model produces
+
+This is the part most "any-to-any" messaging obscures. A GGUF language model emits tokens.
+Everything else is a second model.
+
+- **Speech out.** True speech-generating open models exist — Qwen3-Omni talks, and
+  LFM2-Audio does speech-to-speech — but llama.cpp does not implement their audio decoders,
+  and Qwen3-Omni is a 30B MoE, far past what a phone can hold. Android's own
+  `TextToSpeech` runs on-device, needs no network, and gives the user the thing they
+  actually wanted: the reply read aloud. That is what OpenWeights ships.
+- **Image out.** Would need a diffusion runtime — `stable-diffusion.cpp` or MNN — as a
+  second engine with its own weights, its own memory budget and its own UI. Defensible
+  later; out of scope for a chat app whose promise is running *language* models.
+- **Video out.** Not plausible on a phone.
+
+### On "any-to-any"
+
+Qwen3-Omni and Qwen3.5-Omni genuinely accept text, image, audio and video and emit text and
+speech. They are also 30B-class mixture-of-experts models. Quantized to 4 bits the weights
+alone exceed what a 12 GB phone can spare, and llama.cpp implements their *understanding*
+path, not their speech decoder. Any-to-any is real, and it is a server capability.
+
+## The message shape: following the Vercel AI SDK
+
+The AI SDK converged on a `parts` array per message, where a file part carries an IANA
+`mediaType` alongside its data, and the older image-specific part is deprecated. It is worth
+copying because it is the shape every provider now normalises to, and because it is
+honest about a thing our engine also needs: what a file *is* is a property of its bytes, not
+of which field it arrived in.
+
+`MessagePart` mirrors it, with one deliberate divergence. The AI SDK carries a URL or base64
+data; ours carries a **local filesystem path**, because libmtmd reads the file directly and
+base64 in a message would mean holding every attachment in memory and in the database. The
+app copies attachments into its own storage on the way in, which also makes them survive the
+picker's read permission being revoked.
+
+## What this cost, concretely
+
+The projector is a second download and a second resident allocation. For LFM2.5-VL-1.6B it
+is 583 MB against a 731 MB model — nearly half again as much. The fit estimator counts it,
+Discover says so before the download starts, and deleting the model deletes it. A vision app
+that reported only the model size would call a model comfortable and then run the phone out
+of memory.
+
+## Sources
+
+- `tools/mtmd/mtmd.h`, `mtmd-helper.h`, `mtmd-image.cpp`, `CMakeLists.txt` in llama.cpp b10333
+- llama.cpp `docs/multimodal.md` for the supported-model list
+- Vercel AI SDK message-part reference (`FilePart`, `mediaType`, deprecated `ImagePart`)
+- Qwen3-Omni model card for the any-to-any claim and its parameter count

@@ -35,6 +35,7 @@ object DataModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): OpenWeightsDatabase =
         Room.databaseBuilder(context, OpenWeightsDatabase::class.java, OpenWeightsDatabase.NAME)
+            .addMigrations(OpenWeightsDatabase.MIGRATION_1_2)
             .build()
 
     @Provides

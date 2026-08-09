@@ -71,13 +71,22 @@ class FitEstimator @Inject constructor() {
         contextLength: Int,
         /** Measured decode throughput for a model of known size on this device, if any. */
         calibration: ThroughputCalibration? = null,
+        /**
+         * The multimodal projector downloaded alongside this model, if any.
+         *
+         * Counted in full because it is loaded in full: for a small vision model the
+         * projector can be most of the weights again, and a fit report that ignored it
+         * would call a model comfortable and then run the phone out of memory.
+         */
+        projectorSizeBytes: Long = 0,
     ): FitReport {
         val kvCache = metadata.kvCacheBytes(contextLength)
-        val required = fileSizeBytes + kvCache + RUNTIME_OVERHEAD_BYTES
+        val weights = fileSizeBytes + projectorSizeBytes
+        val required = weights + kvCache + RUNTIME_OVERHEAD_BYTES
         val usable = device.usableMemoryBytes
 
         val verdict = when {
-            device.freeStorageBytes < fileSizeBytes + STORAGE_MARGIN_BYTES ->
+            device.freeStorageBytes < weights + STORAGE_MARGIN_BYTES ->
                 FitVerdict.NO_ROOM_TO_DOWNLOAD
 
             required > usable -> FitVerdict.WONT_RUN
@@ -97,7 +106,7 @@ class FitEstimator @Inject constructor() {
             usableMemoryBytes = usable,
             kvCacheBytes = kvCache,
             estimatedDecodeTokensPerSecond = calibration?.predictFor(fileSizeBytes),
-            maxContextLength = maxContextLength(device, metadata, fileSizeBytes),
+            maxContextLength = maxContextLength(device, metadata, weights),
         )
     }
 

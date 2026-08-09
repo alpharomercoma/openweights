@@ -107,8 +107,61 @@ Single source of truth: `gradle/libs.versions.toml`.
       `get_weather(city='Manila')`. Execution and permission prompts are still to come.
 - [x] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard,
       a conversation drawer for reopening past chats, and per-model hyperparameters
-- [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
+- [x] **P4** Multimodal in: libmtmd is compiled in and wired through the engine, the
+      message model, storage and the UI. Verified on-device — LFM2.5-VL-1.6B describes a
+      real image attached from the photo picker. Audio input works through the same path
+      with an audio projector (none tested yet); video needs `MTMD_VIDEO=ON`, which the
+      vendored tag does not enable. Multimodal out is text plus Android TTS read-aloud;
+      dictation is still to come.
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
+
+## Multimodal: what libmtmd gives us, and what it does not
+
+`GGML_BUILD_MTMD=ON` builds `libmtmd.so` (1.2 MB), which turns an image, an audio clip or
+a video frame into embeddings the language model attends over. It needs a second GGUF —
+the **projector**, published as `mmproj-<model>-<quant>.gguf` next to the model.
+
+The contract, and the traps in it:
+
+- The prompt must contain one **media marker** per attachment, at the position the
+  attachment belongs, and the bitmap count must match the marker count exactly. The marker
+  is `mtmd_get_marker(ctx)` — do not hardcode `<__media__>`.
+- `mtmd_input_text` has a `text_len` field. **Leaving it uninitialised** makes mtmd build a
+  `std::string` of garbage length and throw `std::bad_alloc`, surfacing as the useless
+  message "image preprocessing error". This cost an hour; it is the single easiest mistake
+  to make against this API.
+- Media occupies KV-cache positions that no token describes, so the token-prefix reuse that
+  makes text follow-ups cheap **cannot** apply to a turn with an attachment. `Session`
+  tracks `n_past_` separately from `cached_` and flips `cached_covers_context_` to false,
+  which forces the next turn to re-evaluate from position zero.
+- `mtmd_helper_log_set` has to be called separately from `llama_log_set`, or projector
+  failures go to stderr and vanish on Android.
+
+Measured on the dev device with LFM2.5-VL-1.6B Q4_K_M + Q8_0 projector, 448x448 image:
+**13.4 s to first token** (that is the vision encode) then **32.2 tok/s** decode.
+Attachments are downscaled to a 1024 px longest edge before they reach the projector —
+a full-resolution phone photo tiles into many more patches and turns seconds into minutes.
+
+## Debugging native code without installing anything
+
+HyperOS intermittently blocks installing *new* packages, which kills instrumentation runs
+(reinstalling an existing package still works). A standalone native probe sidesteps it
+entirely and has a far faster edit-run loop:
+
+```sh
+NDK=$ANDROID_HOME/ndk/29.0.14206865
+CXX=$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android31-clang++
+SRC=core/engine/src/main/cpp
+LIBS=$(dirname $(find core/engine/build/intermediates/cxx -name libmtmd.so | head -1))
+$CXX -std=c++17 -O2 -I$SRC -I$SRC/llama.cpp/include -I$SRC/llama.cpp/ggml/include \
+  -I$SRC/llama.cpp/common -I$SRC/llama.cpp/tools/mtmd -I$SRC/llama.cpp/vendor \
+  probe/main.cpp $SRC/engine_session.cpp \
+  -L$LIBS -lllama -lggml -lggml-base -lllama-common -lmtmd -llog -o probe/engine_probe
+adb push $LIBS/*.so probe/engine_probe /data/local/tmp/probe/
+adb shell "cd /data/local/tmp/probe && LD_LIBRARY_PATH=. ./engine_probe model.gguf mmproj.gguf image.png"
+```
+
+It links the real `Session`, so it tests our code and not just llama.cpp's.
 
 ## Working practice: independent review
 

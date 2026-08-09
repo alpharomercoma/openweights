@@ -45,6 +45,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
+import io.github.alpharomercoma.openweights.ui.chat.ReadAloudViewModel
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
@@ -72,6 +73,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
     // Chat and Models get one view model each, hoisted above the NavHost, so a download
     // keeps running and a loaded model stays loaded while the user moves around the app.
     val chatViewModel: ChatViewModel = hiltViewModel()
+    val readAloudViewModel: ReadAloudViewModel = hiltViewModel()
     val modelsViewModel: ModelsViewModel = hiltViewModel()
 
     Scaffold(
@@ -107,6 +109,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         ) {
             composable(Destination.CHAT.route) {
                 val state by chatViewModel.uiState.collectAsStateWithLifecycle()
+                val isSpeaking by readAloudViewModel.isSpeaking.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
                     // The view model outlives the composition, so returning to this tab
@@ -126,6 +129,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onDeleteConversation = chatViewModel::deleteConversation,
                     onSavePreferences = chatViewModel::savePreferences,
                     onResetPreferences = chatViewModel::resetPreferences,
+                    onAttach = chatViewModel::attach,
+                    onRemoveStaged = chatViewModel::removeStaged,
+                    onToggleReadAloud = readAloudViewModel::toggle,
+                    isSpeaking = isSpeaking,
                 )
             }
 
@@ -144,6 +151,17 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onDownload = { repoId, path ->
                         state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
                             modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)
+                            // The projector is not optional for a multimodal model: without
+                            // it the weights load but every attachment is refused, which
+                            // reads as a broken app rather than a missing file.
+                            state.detail?.pairedProjector()?.let { projector ->
+                                modelsViewModel.download(
+                                    repoId,
+                                    projector.path,
+                                    projector.sizeBytes,
+                                    projector.sha256,
+                                )
+                            }
                             navController.navigate(Destination.MODELS.route)
                         }
                     },

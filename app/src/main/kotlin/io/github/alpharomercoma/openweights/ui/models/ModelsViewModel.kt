@@ -35,9 +35,18 @@ import java.io.File
 import javax.inject.Inject
 
 /** A model file on disk. */
-data class LocalModel(val file: File) {
+data class LocalModel(
+    val file: File,
+    /** The projector paired with this model, when one has been downloaded. */
+    val projector: File? = null,
+) {
     val name: String get() = file.nameWithoutExtension
-    val sizeBytes: Long get() = file.length()
+
+    /** What this model occupies in total, projector included. */
+    val sizeBytes: Long get() = file.length() + (projector?.length() ?: 0)
+
+    /** True when this model can read attachments on this device. */
+    val isMultimodal: Boolean get() = projector != null
 }
 
 /** A download in flight, keyed by the file it is fetching. */
@@ -75,7 +84,9 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        val models = modelStore.availableModels().map(::LocalModel)
+        val models = modelStore.availableModels().map { file ->
+            LocalModel(file, modelStore.projectorFor(file))
+        }
         _uiState.update {
             it.copy(models = models, storageUsedBytes = models.sumOf { model -> model.sizeBytes })
         }
@@ -121,6 +132,9 @@ class ModelsViewModel @Inject constructor(
 
     fun delete(model: LocalModel) {
         model.file.delete()
+        // The projector is useless without its model and is often the larger of the two,
+        // so leaving it behind would quietly keep hundreds of megabytes.
+        model.projector?.delete()
         refresh()
     }
 

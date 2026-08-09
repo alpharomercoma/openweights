@@ -46,8 +46,19 @@ data class ThreadPlan(
  * Sustained inference on a phone is a thermal problem as much as a compute one.
  */
 @Singleton
-class ThermalPolicy @Inject constructor(@param:ApplicationContext private val context: Context) {
-    fun plan(cores: Int): ThreadPlan {
+class ThermalPolicy @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    private val profiler: DeviceProfiler,
+) {
+    /**
+     * How many threads the next generation should use.
+     *
+     * The core count is read here rather than passed in: it is an input to the policy, not
+     * a decision the caller makes, and asking every caller to assemble it invited them to
+     * assemble it differently.
+     */
+    fun plan(): ThreadPlan {
+        val cores = profiler.profile().cpuCores
         val generate = (cores / 2).coerceIn(MIN_THREADS, MAX_GENERATE_THREADS)
         val batch = cores.coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
 

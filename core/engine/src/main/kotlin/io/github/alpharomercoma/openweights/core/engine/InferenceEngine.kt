@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.engine
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
+import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -87,6 +88,34 @@ sealed interface GenerationEvent {
     ) : GenerationEvent
 }
 
+/**
+ * What kinds of attachment the loaded model can read.
+ *
+ * All false for a text-only model, and for a multimodal model loaded without its
+ * projector file. The UI uses this to decide what the attachment button offers, so an
+ * unusable option is never shown rather than shown and then rejected.
+ */
+data class MediaSupport(val vision: Boolean = false, val audio: Boolean = false) {
+    /**
+     * True when a video can be sent to this model.
+     *
+     * Derived from [vision] rather than asked of the projector: libmtmd decodes video by
+     * shelling out to an `ffmpeg` binary in PATH, which no Android app can provide, so the
+     * app samples frames itself and sends them as images. Any model that can read a
+     * picture can therefore read a video, at the cost of one prefill per frame.
+     */
+    val video: Boolean get() = vision
+
+    val any: Boolean get() = vision || audio
+
+    fun accepts(kind: MediaKind): Boolean = when (kind) {
+        MediaKind.IMAGE -> vision
+        MediaKind.AUDIO -> audio
+        MediaKind.VIDEO -> video
+        MediaKind.OTHER -> false
+    }
+}
+
 /** Static facts about the model currently loaded. */
 data class LoadedModelInfo(
     val description: String,
@@ -96,6 +125,7 @@ data class LoadedModelInfo(
     val trainingContextSize: Int,
     val layerCount: Int,
     val contextUsed: Int,
+    val mediaSupport: MediaSupport = MediaSupport(),
 )
 
 /**
@@ -112,8 +142,17 @@ interface InferenceEngine : AutoCloseable {
     /** The model currently loaded, or null. */
     val loadedModel: LoadedModelInfo?
 
-    /** Loads [modelFile], replacing any previously loaded model. */
-    suspend fun load(modelFile: File, params: ModelLoadParams = ModelLoadParams())
+    /**
+     * Loads [modelFile], replacing any previously loaded model.
+     *
+     * @param projectorFile the model's `mmproj` GGUF, which is what makes it able to read
+     * images, audio or video. Optional, and ignored by text-only models.
+     */
+    suspend fun load(
+        modelFile: File,
+        params: ModelLoadParams = ModelLoadParams(),
+        projectorFile: File? = null,
+    )
 
     /** Releases the model and its KV cache. Safe to call when nothing is loaded. */
     suspend fun unload()

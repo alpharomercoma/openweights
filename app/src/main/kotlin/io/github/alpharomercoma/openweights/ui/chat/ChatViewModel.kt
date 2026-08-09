@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,9 +92,20 @@ class ChatViewModel @Inject constructor(
     private var generationJob: Job? = null
     private var nextEntryId = 0L
 
+    /**
+     * True once a model has been loaded or is loading, so the screen can ask for the
+     * default model on first composition without reloading it after a rotation.
+     */
+    val hasModel: Boolean
+        get() = _uiState.value.modelName != null || _uiState.value.isLoadingModel
+
     /** Loads a GGUF file from disk. */
     fun loadModel(modelFile: File, contextLength: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH) {
+        // A generation in flight writes into the transcript we are about to replace, so it
+        // has to be finished before the new model is loaded, not merely asked to stop.
+        stop()
         viewModelScope.launch {
+            generationJob?.join()
             _uiState.update { it.copy(isLoadingModel = true, error = null) }
             runCatching {
                 engine.load(modelFile, ModelLoadParams(contextLength = contextLength))
@@ -162,7 +174,7 @@ class ChatViewModel @Inject constructor(
             val startedAt = System.currentTimeMillis()
             var reasoningEndedAt: Long? = null
 
-            runCatching {
+            try {
                 engine.chat(conversation, SamplerParams()).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
@@ -177,27 +189,15 @@ class ChatViewModel @Inject constructor(
                             applyStreamedText(reply.toString(), parsed, reasoningEndedAt, startedAt)
                         }
 
-                        is GenerationEvent.Completed -> {
-                            updateLastEntry {
-                                it.copy(
-                                    isStreaming = false,
-                                    isReasoningInProgress = false,
-                                    tokensPerSecond = event.stats.decodeTokensPerSecond,
-                                    timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
-                                    generatedTokens = event.stats.generatedTokens,
-                                )
-                            }
-                            _uiState.update {
-                                it.copy(
-                                    contextUsed = event.stats.contextUsed,
-                                    contextSize = event.stats.contextSize,
-                                    error = event.reason.warning(),
-                                )
-                            }
-                        }
+                        is GenerationEvent.Completed -> applyCompletion(event)
                     }
                 }
-            }.onFailure { failure ->
+            } catch (cancellation: CancellationException) {
+                // Stop was pressed. Keep what was produced and do not report it as an error.
+                updateLastEntry { it.copy(isStreaming = false, isReasoningInProgress = false) }
+                _uiState.update { it.copy(isGenerating = false) }
+                throw cancellation
+            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
                 updateLastEntry { it.copy(isStreaming = false, isReasoningInProgress = false) }
                 _uiState.update { it.copy(error = failure.userMessage()) }
             }
@@ -215,6 +215,7 @@ class ChatViewModel @Inject constructor(
      */
     private suspend fun compactIfNeeded(force: Boolean = false) {
         val state = _uiState.value
+        if (state.isCompacting) return
         if (!force && !compactor.shouldCompact(state)) return
 
         _uiState.update { it.copy(isCompacting = true) }
@@ -258,6 +259,7 @@ class ChatViewModel @Inject constructor(
 
     /** Folds earlier turns immediately, rather than waiting for the context to fill. */
     fun compactNow() {
+        if (_uiState.value.isGenerating || _uiState.value.isCompacting) return
         viewModelScope.launch { compactIfNeeded(force = true) }
     }
 
@@ -268,6 +270,25 @@ class ChatViewModel @Inject constructor(
     }
 
     fun dismissError() = _uiState.update { it.copy(error = null) }
+
+    private fun applyCompletion(event: GenerationEvent.Completed) {
+        updateLastEntry {
+            it.copy(
+                isStreaming = false,
+                isReasoningInProgress = false,
+                tokensPerSecond = event.stats.decodeTokensPerSecond,
+                timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
+                generatedTokens = event.stats.generatedTokens,
+            )
+        }
+        _uiState.update {
+            it.copy(
+                contextUsed = event.stats.contextUsed,
+                contextSize = event.stats.contextSize,
+                error = event.reason.warning(),
+            )
+        }
+    }
 
     private fun applyStreamedText(
         raw: String,
@@ -307,11 +328,11 @@ private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make
  * What actually gets sent to the model: the compaction summary, if any, followed by the
  * turns that were not folded into it.
  */
-private fun ChatUiState.engineMessages(): List<ChatMessage> {
+internal fun ChatUiState.engineMessages(): List<ChatMessage> {
     val compaction = compaction ?: return transcript.map { ChatMessage.text(it.role, it.text) }
     val summary = ChatMessage.text(
         ChatRole.SYSTEM,
-        "Summary of the earlier conversation:\n${'$'}{compaction.summary}",
+        "Summary of the earlier conversation:\n" + compaction.summary,
     )
     val remaining = transcript.drop(compaction.foldedThroughIndex + 1)
     return listOf(summary) + remaining.map { ChatMessage.text(it.role, it.text) }

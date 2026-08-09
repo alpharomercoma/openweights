@@ -51,12 +51,19 @@ class ConversationCompactor @Inject constructor(
      * fold or the model produced no usable summary.
      */
     suspend fun compact(state: ChatUiState): Compaction? {
+        check(!state.isGenerating) { "compaction would reset the context mid-generation" }
         val range = policy.foldRange(
             entryCount = state.transcript.size,
             alreadyFoldedThrough = state.compaction?.foldedThroughIndex ?: -1,
         ) ?: return null
 
-        val summary = summarize(state.transcript.slice(range))
+        // Feed the previous summary back in, or a second compaction would produce a
+        // summary covering only the newly folded turns while claiming to cover everything
+        // before them.
+        val summary = summarize(
+            previousSummary = state.compaction?.summary,
+            entries = state.transcript.slice(range),
+        )
 
         // The summarization call has replaced the conversation in the KV cache. Clear it
         // rather than let the next turn discover the mismatch and silently re-decode.
@@ -70,9 +77,17 @@ class ConversationCompactor @Inject constructor(
         )
     }
 
-    private suspend fun summarize(entries: List<TranscriptEntry>): String? {
-        val transcript = entries.joinToString("\n\n") { entry ->
+    private suspend fun summarize(
+        previousSummary: String?,
+        entries: List<TranscriptEntry>,
+    ): String? {
+        val turns = entries.joinToString("\n\n") { entry ->
             "${entry.role.wireName}: ${entry.answer.ifEmpty { entry.text }}"
+        }
+        val transcript = if (previousSummary.isNullOrBlank()) {
+            turns
+        } else {
+            "Summary so far:\n$previousSummary\n\nContinued conversation:\n$turns"
         }
         val request = listOf(ChatMessage.text(ChatRole.USER, compactionPrompt(transcript)))
 

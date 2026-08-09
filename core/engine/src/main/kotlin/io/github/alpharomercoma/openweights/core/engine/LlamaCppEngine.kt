@@ -21,14 +21,17 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.random.Random
@@ -47,15 +50,27 @@ class LlamaCppEngine internal constructor(
 ) : InferenceEngine {
     constructor() : this(LlamaBridge(), recommendedThreadCount(), recommendedBatchThreadCount())
 
-    private val engineThread: CoroutineDispatcher =
+    private val engineExecutor: ExecutorService =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "openweights-inference").apply { isDaemon = true }
-        }.asCoroutineDispatcher()
+        }
+
+    private val engineThread: CoroutineDispatcher = engineExecutor.asCoroutineDispatcher()
 
     /** Guards load/unload against a concurrent generation. */
     private val lifecycleLock = Mutex()
 
-    /** 0 when no model is loaded. Read from other threads by [cancel], hence atomic. */
+    /**
+     * Held while the native handle is used or freed.
+     *
+     * [cancel] runs on whatever thread the caller is on, so without this it could read a
+     * handle that [freeCurrentHandle] deletes a moment later and hand a dangling pointer
+     * to the native layer. Cancelling only flips an atomic flag natively, so holding a
+     * lock across it costs nothing.
+     */
+    private val handleLock = Any()
+
+    /** 0 when no model is loaded. Guarded by [handleLock] for cross-thread reads. */
     private val handle = AtomicLong(0)
 
     @Volatile
@@ -134,9 +149,15 @@ class LlamaCppEngine internal constructor(
             // away mid-stream is handled inside the sink above: trySend fails and the native
             // loop stops. This is the belt-and-braces path for any other unwind.
             awaitClose { this@LlamaCppEngine.cancel() }
-        }.flowOn(engineThread)
+        }
+            // Tokens arrive faster than a Compose collector redraws. Without an unbounded
+            // buffer, trySend fails on backpressure and the sink reads that as "the
+            // collector left", silently truncating the reply. With it, a failed trySend
+            // means the channel is closed, which is the only case that should stop us.
+            .buffer(Channel.UNLIMITED)
+            .flowOn(engineThread)
 
-    override fun cancel() {
+    override fun cancel() = synchronized(handleLock) {
         val activeHandle = handle.get()
         if (activeHandle != 0L) {
             bridge.nativeCancel(activeHandle)
@@ -153,12 +174,24 @@ class LlamaCppEngine internal constructor(
         }
     }
 
+    /**
+     * Frees the model and shuts down the engine thread.
+     *
+     * The application holds one engine for its whole lifetime, so this exists for tests
+     * and for anything that creates a short-lived engine: without it each instance leaks
+     * a thread.
+     */
+    override fun close() {
+        freeCurrentHandle()
+        engineExecutor.shutdown()
+    }
+
     override fun systemInfo(): String = bridge.nativeSystemInfo()
 
     override fun computeDevices(): List<ComputeDevice> =
         ComputeDevice.parse(bridge.nativeComputeDevices())
 
-    private fun freeCurrentHandle() {
+    private fun freeCurrentHandle() = synchronized(handleLock) {
         val previous = handle.getAndSet(0)
         if (previous != 0L) {
             bridge.nativeFreeModel(previous)

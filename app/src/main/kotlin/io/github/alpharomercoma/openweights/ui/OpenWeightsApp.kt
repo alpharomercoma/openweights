@@ -40,7 +40,11 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        ModelStore(context).firstAvailableModel()?.let(viewModel::loadModel)
+        // The view model outlives the composition, so a rotation must not reload the model
+        // and wipe the conversation.
+        if (!viewModel.hasModel) {
+            ModelStore(context).firstAvailableModel()?.let(viewModel::loadModel)
+        }
     }
 
     ChatScreen(

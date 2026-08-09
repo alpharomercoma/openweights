@@ -93,7 +93,7 @@ data class LoadedModelInfo(
  * Implementations hold a single model at a time and are not safe for concurrent
  * generation; [cancel] is the exception and may be called while [chat] is running.
  */
-interface InferenceEngine {
+interface InferenceEngine : AutoCloseable {
     /** The model currently loaded, or null. */
     val loadedModel: LoadedModelInfo?
 
@@ -132,4 +132,12 @@ interface InferenceEngine {
      * instead of a disabled toggle that explains nothing.
      */
     fun computeDevices(): List<ComputeDevice>
+
+    /**
+     * Releases the model and any thread the implementation owns.
+     *
+     * The app keeps one engine for its lifetime; this exists so tests and short-lived
+     * engines do not leak.
+     */
+    override fun close()
 }

@@ -105,7 +105,10 @@ fun ChatScreen(
         scope = scope,
     )
 
-    var actionsFor by remember { mutableStateOf<TranscriptEntry?>(null) }
+    // Hold the id, not the entry: streaming replaces entries on every token, and a
+    // captured copy would have Copy putting a half-finished reply on the clipboard.
+    var actionsForId by remember { mutableStateOf<Long?>(null) }
+    val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
 
     Scaffold(
         modifier = modifier,
@@ -145,12 +148,12 @@ fun ChatScreen(
                             when (entry.role) {
                                 ChatRole.USER -> UserTurn(
                                     entry = entry,
-                                    onLongPress = { actionsFor = entry },
+                                    onLongPress = { actionsForId = entry.id },
                                 )
 
                                 else -> AssistantTurn(
                                     entry = entry,
-                                    onLongPress = { actionsFor = entry },
+                                    onLongPress = { actionsForId = entry.id },
                                 )
                             }
                         }
@@ -208,9 +211,9 @@ fun ChatScreen(
             canRegenerate = entry.role == ChatRole.ASSISTANT && !state.isGenerating,
             onRegenerate = {
                 onRegenerate()
-                actionsFor = null
+                actionsForId = null
             },
-            onDismiss = { actionsFor = null },
+            onDismiss = { actionsForId = null },
         )
     }
 }

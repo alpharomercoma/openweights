@@ -109,9 +109,13 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
                 // Sampled at the midpoint of each equal slice, so the first frame is not
                 // the black one videos so often open on.
                 val atMs = durationMs * (2 * index + 1) / (2 * VIDEO_FRAMES)
+                // OPTION_CLOSEST, not OPTION_CLOSEST_SYNC: sync frames are keyframes, and a
+                // short clip can have exactly one, which makes every request return the
+                // same picture. Decoding to the requested time costs more and is the only
+                // way the frames actually differ.
                 val frame = retriever.getScaledFrameAtTime(
                     atMs * MICROS_PER_MILLI,
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    MediaMetadataRetriever.OPTION_CLOSEST,
                     MAX_IMAGE_EDGE,
                     MAX_IMAGE_EDGE,
                 ) ?: return@mapNotNull null

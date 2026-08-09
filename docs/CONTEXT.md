@@ -146,8 +146,14 @@ Projectors are renamed to `mmproj-<model file name>.gguf` on download, so pairin
 time is a lookup rather than a guess. The convention match (equal model identity with the
 quantization suffix stripped) is kept as a fallback for files placed by hand over adb.
 
-Measured on the dev device with LFM2.5-VL-1.6B Q4_K_M + Q8_0 projector, 448x448 image:
-**13.4 s to first token** (that is the vision encode) then **32.2 tok/s** decode.
+Video is sampled into four frames with `MediaMetadataRetriever` and sent as images. Use
+`OPTION_CLOSEST`, never `OPTION_CLOSEST_SYNC`: sync frames are keyframes, a short clip can
+have exactly one, and the sampler then returns the same picture four times — which looks
+like working video support right up until you check the thumbnails.
+
+Measured on the dev device with LFM2.5-VL-1.6B Q4_K_M + Q8_0 projector:
+**13.4 s to first token** for one 448x448 image, **69.8 s** for four video frames, then
+**29–32 tok/s** decode either way.
 Attachments are downscaled to a 1024 px longest edge before they reach the projector —
 a full-resolution phone photo tiles into many more patches and turns seconds into minutes.
 

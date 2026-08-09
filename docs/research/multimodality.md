@@ -11,7 +11,7 @@ go in, and which can actually come out?**
 | **In** | Text | Shipped | — |
 | **In** | Image | Shipped | libmtmd vision projector; verified on-device |
 | **In** | Audio | Supported by the same path | Needs an audio projector (Ultravox, Voxtral, LFM2-Audio); untested for lack of a phone-sized one |
-| **In** | Video | Shipped as sampled frames | libmtmd's own video path shells out to `ffmpeg`; we decode frames with Android's `MediaMetadataRetriever` instead |
+| **In** | Video | Shipped as sampled frames | libmtmd's own video path shells out to `ffmpeg`; we decode four frames with Android's `MediaMetadataRetriever` instead. Verified on-device |
 | **In** | Live video | Not shipped | Same mechanism as video, but prefill cost makes it dishonest to offer — see below |
 | **Out** | Text | Shipped | — |
 | **Out** | Speech | Shipped | Android `TextToSpeech`, on-device, no network |
@@ -43,7 +43,8 @@ So OpenWeights samples frames itself with `MediaMetadataRetriever` and attaches 
 images. That is what the ffmpeg path does anyway, and it keeps the work inside the app.
 
 The honest limit is arithmetic, not API support. On the dev device a single 448×448 image
-costs **13.4 s of prefill**. Eight frames is roughly two minutes before the first token.
+costs **13.4 s of prefill**, and four sampled frames cost **69.8 s**. Eight would be over
+two minutes before the first token.
 Frame count is therefore a deliberate, visible choice rather than something hidden behind a
 "video supported" checkbox — and *live* video, which needs this to happen continuously, is
 not something a phone-sized model can do today. Claiming otherwise would be the kind of

@@ -1,0 +1,43 @@
+# Project overrides on top of detekt's default config.
+#
+# The theme here is Compose: detekt's defaults predate it and flag idiomatic Compose as
+# violations. Everything switched off below is switched off because the rule is wrong for
+# this codebase, not because the code needs fixing.
+
+naming:
+  FunctionNaming:
+    # Composables are PascalCase by convention, and Android Studio tooling depends on it.
+    ignoreAnnotated: ['Composable']
+  MatchingDeclarationName:
+    # Theme.kt legitimately holds ThemeMode, the theme composable, and its CompositionLocal.
+    active: false
+
+style:
+  MagicNumber:
+    # Colour literals, dp/sp sizes, and animation durations are the numbers. Naming each
+    # one produces a wall of constants that says less than the call site did.
+    ignoreAnnotated: ['Composable', 'Preview']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreNamedArgument: true
+  UnusedPrivateMember:
+    # @Preview functions are entry points for tooling, never called from code.
+    ignoreAnnotated: ['Preview', 'Composable']
+  ReturnCount:
+    max: 4
+
+complexity:
+  LongParameterList:
+    # The JNI bridge mirrors native signatures one-to-one; bundling them into objects would
+    # mean marshalling those objects across JNI, which is slower and more code.
+    functionThreshold: 12
+    constructorThreshold: 8
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    ignoreAnnotated: ['Composable']
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false

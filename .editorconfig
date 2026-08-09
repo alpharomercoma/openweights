@@ -1,0 +1,32 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+max_line_length = 100
+# ktlint_official reformats `class Foo @Inject constructor(...)` by indenting the entire
+# class body an extra level, which fights every other Android codebase. intellij_idea is
+# the style the Kotlin and Android docs use.
+ktlint_code_style = intellij_idea
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+# Composables are PascalCase by convention; ktlint's default naming rule disagrees.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# These two fire constantly on Compose builder syntax and Gradle DSL chains without
+# making anything easier to read.
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+
+[*.{yml,yaml,json,xml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

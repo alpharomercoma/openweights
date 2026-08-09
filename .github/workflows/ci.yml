@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # llama.cpp is a pinned submodule; the native build needs it present.
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install NDK
+        # r29+ aligns native segments to 16 KB, which Google Play requires.
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;29.0.14206865" "cmake;4.1.2"
+
+      - name: Lint
+        run: ./gradlew ktlintCheck detekt
+
+      - name: Unit tests
+        run: ./gradlew test
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openweights-debug
+          path: app/build/outputs/apk/debug/*.apk

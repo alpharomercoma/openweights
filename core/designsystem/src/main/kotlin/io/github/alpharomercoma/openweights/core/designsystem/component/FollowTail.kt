@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -79,11 +79,14 @@ fun rememberFollowTailState(
         }
     }
 
-    // Any touch-initiated scroll detaches; if it ends up at the bottom anyway, the effect
-    // below re-attaches, so dragging within the last screenful behaves as expected.
+    // Only a real drag detaches. Watching isScrollInProgress instead, as this first did,
+    // also fires for the scroll this component performs itself — so following the tail
+    // switched following off, the check below switched it back on, and the two fought each
+    // other for every token of a streamed reply.
     LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }
-            .collect { scrolling -> if (scrolling) state.isFollowing = false }
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) state.isFollowing = false
+        }
     }
 
     LaunchedEffect(isAtBottom) {
@@ -100,12 +103,28 @@ fun rememberFollowTailState(
 /**
  * Scrolls to the very end of the content, including the tail of an item taller than the
  * viewport — which a long streamed reply usually is.
+ *
+ * The two cases are genuinely different and conflating them is what made streaming
+ * unreadable. When the last item is already on screen, all that is needed is a nudge by
+ * whatever hangs below the fold. Calling `scrollToItem` there instead — as this first did —
+ * snaps the viewport to the *start* of a reply that is taller than the screen, and the
+ * following `scrollBy` yanks it back to the end. Once per token, that is a page-height
+ * flash on every word.
  */
 internal suspend fun LazyListState.scrollToBottom() {
-    val lastIndex = layoutInfo.totalItemsCount - 1
+    val layout = layoutInfo
+    val lastIndex = layout.totalItemsCount - 1
     if (lastIndex < 0) return
+
+    val last = layout.visibleItemsInfo.lastOrNull()
+    if (last != null && last.index == lastIndex) {
+        val below = last.offset + last.size - layout.viewportEndOffset
+        if (below > 0) scrollBy(below.toFloat())
+        return
+    }
+
+    // Not showing the final item at all: this is a jump, and a jump is allowed to jump.
     scrollToItem(lastIndex)
-    // scrollToItem lands on the item's start; scrollBy clamps at the end of the list.
     scrollBy(OVERSCROLL_PX)
 }
 

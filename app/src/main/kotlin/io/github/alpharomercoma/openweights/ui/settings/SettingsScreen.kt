@@ -34,6 +34,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -59,6 +63,7 @@ import io.github.alpharomercoma.openweights.ui.discover.formatBytes
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
+    onSelectTheme: (ThemeChoice) -> Unit,
     onSaveToken: (String) -> Unit,
     onClearToken: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,6 +92,9 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            AppearanceSection(selected = state.theme, onSelect = onSelectTheme)
+
+            HorizontalDivider()
             TokenSection(state = state, onSave = onSaveToken, onClear = onClearToken)
 
             HorizontalDivider()
@@ -97,6 +105,46 @@ fun SettingsScreen(
         }
     }
 }
+
+/**
+ * Light, dark, or whatever the phone is doing.
+ *
+ * A segmented control rather than a switch, because "follow the system" is a real third
+ * answer and the one most people want — a two-state toggle would have to drop it or hide
+ * it behind a long press.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AppearanceSection(selected: ThemeChoice, onSelect: (ThemeChoice) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Appearance", style = MaterialTheme.typography.titleSmall)
+
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            ThemeChoice.entries.forEachIndexed { index, choice ->
+                SegmentedButton(
+                    selected = choice == selected,
+                    onClick = { onSelect(choice) },
+                    shape = SegmentedButtonDefaults.itemShape(index, ThemeChoice.entries.size),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        activeBorderColor = MaterialTheme.colorScheme.primary,
+                        inactiveBorderColor = MaterialTheme.colorScheme.outline,
+                    ),
+                    label = { Text(choice.label, maxLines = 1) },
+                )
+            }
+        }
+    }
+}
+
+/** Sentence case, because these are choices in a sentence rather than constants. */
+private val ThemeChoice.label: String
+    get() = when (this) {
+        ThemeChoice.SYSTEM -> "System"
+        ThemeChoice.LIGHT -> "Light"
+        ThemeChoice.DARK -> "Dark"
+    }
 
 @Composable
 private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onClear: () -> Unit) {
@@ -209,6 +257,11 @@ private fun DeviceSection(state: SettingsUiState) {
 @Composable
 private fun SettingsScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {
-        SettingsScreen(state = SettingsUiState(), onSaveToken = {}, onClearToken = {})
+        SettingsScreen(
+            state = SettingsUiState(),
+            onSelectTheme = {},
+            onSaveToken = {},
+            onClearToken = {},
+        )
     }
 }

@@ -19,6 +19,8 @@ package io.github.alpharomercoma.openweights.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.alpharomercoma.openweights.core.data.AppearanceRepository
+import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.data.TokenVault
 import io.github.alpharomercoma.openweights.core.device.DeviceProfile
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
@@ -43,6 +45,7 @@ data class SettingsUiState(
     val computeDevices: List<ComputeDevice> = emptyList(),
     val device: DeviceProfile? = null,
     val engineInfo: String = "",
+    val theme: ThemeChoice = ThemeChoice.SYSTEM,
 )
 
 @HiltViewModel
@@ -51,12 +54,18 @@ class SettingsViewModel @Inject constructor(
     private val client: HuggingFaceClient,
     private val engine: InferenceEngine,
     private val profiler: DeviceProfiler,
+    private val appearance: AppearanceRepository,
 ) : ViewModel() {
     private val tokenMutex = Mutex()
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            appearance.themeChoice.collect { choice ->
+                _uiState.update { it.copy(theme = choice) }
+            }
+        }
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -116,6 +125,11 @@ class SettingsViewModel @Inject constructor(
         _uiState.update {
             it.copy(isCheckingToken = false, hasToken = hasToken, tokenStatus = status)
         }
+    }
+
+    /** Applies immediately: the whole app is inside the theme this chooses. */
+    fun setTheme(choice: ThemeChoice) {
+        viewModelScope.launch { appearance.setThemeChoice(choice) }
     }
 
     fun clearToken() {

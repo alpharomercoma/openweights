@@ -165,9 +165,11 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
             Metric(
                 listOfNotNull(
                     formatBytes(model.sizeBytes),
-                    // Named rather than iconified: "reads images" is the answer to the
-                    // question someone actually has when picking a model to attach to.
-                    "reads images".takeIf { model.isMultimodal },
+                    // "attachments" rather than "images": all this knows is that a
+                    // projector was downloaded beside the model, and an audio projector
+                    // reads sound. Saying which would mean parsing the projector's header,
+                    // and claiming the wrong one is worse than being general.
+                    "reads attachments".takeIf { model.isMultimodal },
                 ).joinToString(" · "),
             )
         }

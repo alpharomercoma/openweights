@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -139,7 +140,16 @@ fun DiscoverScreen(
                     FilterChip(
                         selected = state.sort == sort,
                         onClick = { onSortChange(sort) },
-                        label = { Text(sort.label, style = MaterialTheme.typography.labelMedium) },
+                        label = {
+                            Text(
+                                text = sort.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                // A chip that wraps is a chip taller than the ones beside
+                                // it, which is what made this row ragged at any font scale.
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                         // Selection is one of the accent's three jobs, and a chip whose
                         // only selected state is a slightly different grey is a chip whose
                         // state has to be worked out rather than seen.

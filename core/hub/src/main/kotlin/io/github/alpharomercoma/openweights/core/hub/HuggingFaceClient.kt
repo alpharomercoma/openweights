@@ -225,8 +225,16 @@ class HuggingFaceClient @Inject constructor(
 }
 
 /** How search results are ordered. */
+/**
+ * How search results are ordered.
+ *
+ * The labels are single words because they sit side by side in a row of chips: "Recently
+ * updated" wrapped to a second line while its neighbours did not, which left the row
+ * visibly ragged. A sort control does not need a sentence — the chips are read together,
+ * and together they read as one choice.
+ */
 enum class HubSort(val parameter: String, val label: String) {
-    DOWNLOADS("downloads", "Most downloaded"),
-    LIKES("likes", "Most liked"),
-    RECENT("lastModified", "Recently updated"),
+    DOWNLOADS("downloads", "Downloads"),
+    LIKES("likes", "Likes"),
+    RECENT("lastModified", "Recent"),
 }

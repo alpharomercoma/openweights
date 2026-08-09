@@ -236,6 +236,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     state = state,
                     onSaveToken = viewModel::saveToken,
                     onClearToken = viewModel::clearToken,
+                    onSelectTheme = viewModel::setTheme,
                 )
             }
         }

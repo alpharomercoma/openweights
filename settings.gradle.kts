@@ -27,5 +27,6 @@ include(":app")
 include(":core:common")
 include(":core:designsystem")
 include(":core:engine")
-// Modules added as their phase lands: :core:hub + :core:device (P2), :core:data (P3).
-// See docs/CONTEXT.md for phase status.
+include(":core:hub")
+include(":core:device")
+include(":core:data")

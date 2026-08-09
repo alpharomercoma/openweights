@@ -20,6 +20,9 @@ style:
     ignorePropertyDeclaration: true
     ignoreCompanionObjectPropertyDeclaration: true
     ignoreNamedArgument: true
+    # An enum entry's arguments are the definition of the constant, not a magic use of
+    # one — GgufFileType's ids are llama.cpp's own ftype numbers.
+    ignoreEnums: true
   UnusedPrivateMember:
     # @Preview functions are entry points for tooling, never called from code.
     ignoreAnnotated: ['Preview', 'Composable']

@@ -100,7 +100,8 @@ Single source of truth: `gradle/libs.versions.toml`.
       window fills, so long conversations continue instead of dying
 - [~] **Compute backend choice** — engine enumerates ggml devices at runtime; GPU backends
       not yet compiled in (see ROADMAP for why), Settings screen not built
-- [ ] **P2** HF Hub: token vault, search, GGUF parse, fit estimator, downloads
+- [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
+      requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
 - [ ] **Tool calling** — the foundation for the agent loop
 - [ ] **P3** Product: histories, usage ledger, dashboard, per-model params
 - [ ] **P4** Multimodal: libmtmd vision/audio, dictation, TTS
@@ -118,6 +119,27 @@ llama.cpp submodule). Focus on correctness, concurrency, resource leaks, code sm
 
 The first pass found ten real bugs, including one that silently disabled compaction
 entirely. Self-review did not catch it because the code read exactly as intended.
+
+## What inspecting a model costs
+
+Reading a GGUF header over HTTP range requests, measured against the real Hub:
+
+```
+parsed lfm2: 30 blocks, kv heads [0,0,8,0,0,8,0,0,0,8,...], read 131072 bytes in 1 request
+KV cache at 4096 tokens: 64 MB across 8 attending blocks, versus 240 MB if every block
+were charged
+```
+
+Two things make this work. llama.cpp writes `general.*` and the architecture's own keys
+before the tokenizer, so parsing can stop at the first `tokenizer.` key and skip the
+vocabulary — 1.3 KB of useful metadata instead of 8 MB. And `attention.head_count_kv` is
+a *per-layer array* on hybrid architectures like LFM2, where attention runs in only a
+third of the blocks; treating it as uniform overstates the KV cache almost fourfold and
+would turn fits into refusals.
+
+One consequence worth remembering: `general.file_type` is written *after* the tokenizer,
+so it is normally absent from a cheap parse. The quantization label comes from the
+filename instead, which is where people read it anyway.
 
 ## Device measurements
 

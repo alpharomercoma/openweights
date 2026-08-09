@@ -17,7 +17,10 @@
 package io.github.alpharomercoma.openweights.model
 
 import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Where downloaded models live on disk.
@@ -26,7 +29,8 @@ import java.io.File
  * permission, is removed when the app is uninstalled, and stays reachable over ADB during
  * development. Phase 2 replaces the folder scan with a real catalog backed by the database.
  */
-class ModelStore(private val context: Context) {
+@Singleton
+class ModelStore @Inject constructor(@ApplicationContext private val context: Context) {
     val directory: File
         get() = File(context.getExternalFilesDir(null) ?: context.filesDir, MODELS_DIRECTORY)
             .apply { mkdirs() }

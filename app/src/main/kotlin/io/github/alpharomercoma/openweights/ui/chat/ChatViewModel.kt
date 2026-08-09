@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,6 +86,7 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val engine: InferenceEngine,
     private val compactor: ConversationCompactor,
+    private val modelStore: ModelStore,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -98,6 +100,11 @@ class ChatViewModel @Inject constructor(
      */
     val hasModel: Boolean
         get() = _uiState.value.modelName != null || _uiState.value.isLoadingModel
+
+    /** Loads whichever model is already on disk, if any. */
+    fun loadDefaultModel() {
+        modelStore.firstAvailableModel()?.let(::loadModel)
+    }
 
     /** Loads a GGUF file from disk. */
     fun loadModel(modelFile: File, contextLength: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH) {

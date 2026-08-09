@@ -21,8 +21,8 @@ package io.github.alpharomercoma.openweights.core.common.model
  *
  * Filenames are the only thing available before a download, and the only thing shared
  * between a model and its projector. Publishers are consistent enough about the convention
- * — `<model>-<quantization>.gguf`, with projectors as `mmproj-<model>-<quantization>.gguf`
- * — that it carries real information, but it is a convention and not a guarantee, which is
+ *: `<model>-<quantization>.gguf`, with projectors as `mmproj-<model>-<quantization>.gguf`
+ *. That it carries real information, but it is a convention and not a guarantee, which is
  * why every rule here fails closed rather than guessing.
  */
 object GgufFileName {

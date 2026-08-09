@@ -49,7 +49,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
  * every desktop client uses, has no mobile equivalent at all. The long-press sheet stays
  * for the rarer things.
  *
- * @param onRetry null when this is not the last reply, or while one is being generated —
+ * @param onRetry null when this is not the last reply, or while one is being generated
  *   regenerating anything other than the last turn would silently discard what came after.
  */
 @Composable

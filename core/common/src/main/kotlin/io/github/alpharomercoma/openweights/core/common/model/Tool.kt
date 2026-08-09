@@ -20,8 +20,8 @@ package io.github.alpharomercoma.openweights.core.common.model
  * Something the model can ask the app to do.
  *
  * Described with a JSON Schema because that is what instruction-tuned models were trained
- * on. The engine renders it into whichever tool syntax the loaded model actually uses —
- * Hermes, Llama 3.x, Functionary and the rest all differ — so callers describe the tool
+ * on. The engine renders it into whichever tool syntax the loaded model actually uses
+ * Hermes, Llama 3.x, Functionary and the rest all differ, so callers describe the tool
  * once and it works across models.
  */
 data class ToolDefinition(

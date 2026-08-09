@@ -21,6 +21,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -47,8 +48,14 @@ data class ModelPreferences(
     val maxTokens: Int = 0,
     val contextLength: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH,
     val systemPrompt: String = "",
+    /** Whether the model may think before answering, where its template allows it. */
+    val thinking: Boolean = true,
+    /** Stored by name so an unknown value from a newer build falls back to the default. */
+    val reasoningEffort: String = ReasoningEffort.DEFAULT.name,
 ) {
     fun toSamplerParams() = SamplerParams(
+        thinking = thinking,
+        reasoningEffort = ReasoningEffort.fromName(reasoningEffort),
         temperature = temperature,
         topK = topK,
         topP = topP,

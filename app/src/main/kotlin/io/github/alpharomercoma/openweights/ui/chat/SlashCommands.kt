@@ -53,7 +53,7 @@ enum class SlashCommand(val trigger: String, val description: String) {
         /**
          * Commands matching what has been typed, or null when the draft is not a command.
          *
-         * A draft only counts as a command while it is a single `/`-prefixed word — once
+         * A draft only counts as a command while it is a single `/`-prefixed word, once
          * there is a space, the user is writing a message that happens to start with a
          * slash, and hijacking their input would be wrong.
          */

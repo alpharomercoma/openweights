@@ -38,7 +38,7 @@ class GenerationStatsTest {
 
     @Test
     fun `prefill throughput is unknown when the whole prompt was cached`() {
-        // A fully cached prompt decodes nothing, so there is no rate to report — showing
+        // A fully cached prompt decodes nothing, so there is no rate to report: showing
         // "0 tok/s" would read as "the device is slow" rather than "there was no work".
         val stats = stats(promptTokens = 0, prefillMs = 0)
 

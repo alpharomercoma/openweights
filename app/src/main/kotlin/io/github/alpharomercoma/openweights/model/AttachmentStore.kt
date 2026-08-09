@@ -89,7 +89,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * Turns a video into a handful of stills.
      *
      * libmtmd can nominally read video, but only by shelling out to an `ffmpeg` binary in
-     * PATH — something an Android app cannot provide — so the frames are extracted here
+     * PATH, something an Android app cannot provide, so the frames are extracted here
      * instead and sent as ordinary pictures.
      *
      * The frame count is the whole design. Each frame is a full vision encode, which on a
@@ -163,7 +163,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * Copies an image, shrinking it to something a phone can actually encode.
      *
      * A 12-megapixel photo is split into hundreds of patches by the vision encoder, and
-     * prompt processing is the slowest part of a local reply — a full-resolution photo can
+     * prompt processing is the slowest part of a local reply. A full-resolution photo can
      * take minutes where a downscaled one takes seconds. Models are trained on inputs
      * around this size anyway, so the detail being dropped is detail the encoder would have
      * discarded itself.
@@ -223,7 +223,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * The extension to save under.
      *
      * Downscaled images are re-encoded as JPEG, so their original extension would be a lie
-     * — and libmtmd sniffs the contents rather than trusting the name, so a wrong one would
+     *, and libmtmd sniffs the contents rather than trusting the name, so a wrong one would
      * be confusing without being harmful.
      */
     private fun extensionFor(displayName: String?, mediaType: String): String = when {
@@ -238,7 +238,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * A private file for the camera app to write into.
      *
      * Older captures are swept first. The camera writes here directly and [store] copies
-     * out of it, so without this the originals would accumulate — including the ones from
+     * out of it, so without this the originals would accumulate: including the ones from
      * captures the user cancelled, which nothing else would ever hear about.
      */
     fun newCaptureUri(): Uri {
@@ -261,7 +261,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         /**
          * Frames taken from a video.
          *
-         * Four, because each one costs a full vision encode — around thirteen seconds on
+         * Four, because each one costs a full vision encode: around thirteen seconds on
          * the dev device. Eight would double the wait for a marginal gain in coverage.
          */
         const val VIDEO_FRAMES = 4

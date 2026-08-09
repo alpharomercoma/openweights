@@ -85,7 +85,7 @@ class DiscoverViewModel @Inject constructor(
      * Everything belonging to the repository currently open.
      *
      * Opening B while A is still loading must not let A's late reply overwrite B, and A's
-     * per-file inspections must stop rather than write into B's list — filenames repeat
+     * per-file inspections must stop rather than write into B's list: filenames repeat
      * across repositories, so they would land on the wrong rows.
      */
     private var detailJob: Job? = null

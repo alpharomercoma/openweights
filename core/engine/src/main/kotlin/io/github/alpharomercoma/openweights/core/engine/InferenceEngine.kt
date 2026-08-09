@@ -55,7 +55,7 @@ data class GenerationStats(
             null
         }
 
-    /** Generation throughput — the number users actually feel. */
+    /** Generation throughput. The number users actually feel. */
     val decodeTokensPerSecond: Double?
         get() = if (decodeMs > 0 && generatedTokens > 1) {
             (generatedTokens - 1) * MILLIS_PER_SECOND / decodeMs
@@ -126,13 +126,15 @@ data class LoadedModelInfo(
     val layerCount: Int,
     val contextUsed: Int,
     val mediaSupport: MediaSupport = MediaSupport(),
+    /** True when this model's chat template understands being told whether to think. */
+    val supportsThinking: Boolean = false,
 )
 
 /**
  * Runs a language model on this device.
  *
  * llama.cpp is the only implementation today. The interface exists so a second backend
- * (ExecuTorch for NPU acceleration, for example) can be added without touching callers —
+ * (ExecuTorch for NPU acceleration, for example) can be added without touching callers
  * see `docs/research/inference-engines.md` for why that is a live possibility.
  *
  * Implementations hold a single model at a time and are not safe for concurrent

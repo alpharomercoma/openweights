@@ -90,7 +90,7 @@ data class HubModelDetail(
      * Matched to that specific file first, because a repository can hold several model
      * families and the wrong encoder loads without complaint and then describes pictures
      * it cannot see. Only when nothing matches by name does the single-projector case
-     * apply — which is the common one, and unambiguous precisely because there is one.
+     * apply, which is the common one, and unambiguous precisely because there is one.
      *
      * Among equals, the smallest: projectors are published at a couple of precisions, the
      * quality difference is slight, and the smaller file is both a shorter download and
@@ -230,7 +230,7 @@ class HuggingFaceClient @Inject constructor(
  *
  * The labels are single words because they sit side by side in a row of chips: "Recently
  * updated" wrapped to a second line while its neighbours did not, which left the row
- * visibly ragged. A sort control does not need a sentence — the chips are read together,
+ * visibly ragged. A sort control does not need a sentence. The chips are read together,
  * and together they read as one choice.
  */
 enum class HubSort(val parameter: String, val label: String) {

@@ -19,7 +19,7 @@ package io.github.alpharomercoma.openweights.core.hub.gguf
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 
-/** Supplies bytes from an arbitrary offset — an HTTP range request, or a local file. */
+/** Supplies bytes from an arbitrary offset. An HTTP range request, or a local file. */
 fun interface ByteWindowSource {
     /**
      * Reads up to [length] bytes starting at [offset]. May return fewer bytes at the end

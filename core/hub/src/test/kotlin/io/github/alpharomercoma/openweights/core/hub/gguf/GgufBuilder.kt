@@ -22,7 +22,7 @@ import java.io.ByteArrayOutputStream
  * Writes syntactically real GGUF headers for tests.
  *
  * Building the bytes by hand keeps the parser tests offline and lets them cover shapes
- * that are awkward to find in the wild — hybrid per-layer head counts, absent keys,
+ * that are awkward to find in the wild: hybrid per-layer head counts, absent keys,
  * truncated files.
  */
 internal class GgufBuilder {
@@ -44,7 +44,7 @@ internal class GgufBuilder {
         }
     }
 
-    /** A vocabulary-sized string array — the thing the parser must never read. */
+    /** A vocabulary-sized string array. The thing the parser must never read. */
     fun hugeStringArray(key: String, count: Int) = apply {
         entries += buildEntry(key, TYPE_ARRAY) {
             writeUInt32(TYPE_STRING)

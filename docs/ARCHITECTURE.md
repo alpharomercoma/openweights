@@ -15,7 +15,7 @@ surface, and no knowledge of the UI above it.
 
 Build configuration lives in `build-logic/convention` as Gradle convention plugins
 (`openweights.android.application`, `.library`, `.compose`, `.hilt`), so SDK levels, Java
-and Kotlin targets, and the ABI filter are declared once. AGP 9 compiles Kotlin itself —
+and Kotlin targets, and the ABI filter are declared once. AGP 9 compiles Kotlin itself 
 `org.jetbrains.kotlin.android` must not be applied.
 
 ## The inference engine
@@ -31,29 +31,29 @@ suspend fun unload()
 ```
 
 `LlamaCppEngine` is the only implementation. The interface exists because a second backend
-is a live possibility — ExecuTorch has a MediaTek NPU delegate — and because it keeps the
+is a live possibility, ExecuTorch has a MediaTek NPU delegate, and because it keeps the
 UI testable without a 1.7 GB model.
 
 ### Native layer
 
 `src/main/cpp` holds two files plus a pinned llama.cpp submodule:
 
-- `engine_session.{h,cpp}` — a `Session` is one loaded model, one context, one KV cache,
+- `engine_session.{h,cpp}`. A `Session` is one loaded model, one context, one KV cache,
   and the token history that cache represents. It renders prompts with the model's own
   chat template, reuses the cached prefix across turns, decodes, samples, and measures.
-- `llama_jni.cpp` — the JNI surface. Nothing but marshalling and error translation.
+- `llama_jni.cpp`. The JNI surface. Nothing but marshalling and error translation.
 
 Two design points worth knowing:
 
 **Everything runs on one thread.** llama.cpp contexts are not thread-safe, and running
 generation on a single dedicated thread also means the `JNIEnv` passed into
-`nativeGenerate` stays valid for the per-token callbacks — no thread attachment needed.
+`nativeGenerate` stays valid for the per-token callbacks. No thread attachment needed.
 `cancel()` is the deliberate exception: it flips an atomic that the generation loop checks.
 
 **Prefix reuse is explicit.** Every turn renders the *entire* conversation and tokenizes it
 identically, then compares against the tokens already in the KV cache and only decodes the
 difference. Re-sending an identical conversation therefore decodes exactly one token.
-This is why `add_special` is unconditionally true — making it conditional produced token
+This is why `add_special` is unconditionally true: making it conditional produced token
 sequences that differed at position 0 and silently defeated all reuse.
 
 ### Choosing a CPU backend at runtime
@@ -77,7 +77,7 @@ measurements visible. The palette's accent is a **signal scale** rather than a f
 colour: `signalColor(fraction)` maps a normalised measurement onto a hot-to-cool ramp, and
 both `SpeedRail` (beside each reply, coloured by that reply's throughput) and
 `ContextMeter` (the hairline above the composer) read from it. Colour carries data here,
-which is why dynamic colour is off by default — a wallpaper-derived accent would compete
+which is why dynamic colour is off by default. A wallpaper-derived accent would compete
 with it.
 
 Typography is IBM Plex: Sans for the interface, Mono for every number, model id, and

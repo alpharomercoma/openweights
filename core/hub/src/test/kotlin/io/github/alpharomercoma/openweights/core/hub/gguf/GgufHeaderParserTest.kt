@@ -64,7 +64,7 @@ class GgufHeaderParserTest {
     @Test
     fun `keeps per-layer kv head counts for hybrid architectures`() = runTest {
         // LFM2 runs attention in only a third of its blocks. Treating the count as uniform
-        // would overstate the KV cache — and therefore the RAM needed — about threefold.
+        // would overstate the KV cache, and therefore the RAM needed, about threefold.
         val header = GgufBuilder()
             .string("general.architecture", "lfm2")
             .uint32("lfm2.block_count", 6)

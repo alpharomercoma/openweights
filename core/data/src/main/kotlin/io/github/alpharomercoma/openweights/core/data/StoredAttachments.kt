@@ -46,7 +46,7 @@ internal fun List<MessagePart.File>.encodeAttachments(): String? = if (isEmpty()
  * Reads attachments back.
  *
  * Returns an empty list for anything unreadable. A row written by a future version must
- * not stop an old build opening the conversation — losing a thumbnail is recoverable,
+ * not stop an old build opening the conversation: losing a thumbnail is recoverable,
  * losing the conversation is not.
  */
 fun String?.decodeAttachments(): List<MessagePart.File> {

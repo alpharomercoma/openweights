@@ -67,7 +67,7 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
-        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -85,7 +85,7 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Nothing generated yet. Once you chat, this is where the totals live — " +
+                    "Nothing generated yet. Once you chat, this is where the totals live: " +
                         "and they stay here, on the phone.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -131,7 +131,7 @@ private fun Headline(summary: UsageSummary) {
             label = "Average speed",
             value = summary.averageTokensPerSecond
                 ?.let { String.format(Locale.getDefault(), "%.1f tok/s", it) }
-                ?: "—",
+                ?: " ",
             modifier = Modifier.weight(1f),
         )
         Stat(

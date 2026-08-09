@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 /**
  * One corner scale, four steps.
  *
- * The build had drifted to five arbitrary radii — 10, 12, 14, 20 — chosen a component at a
+ * The build had drifted to five arbitrary radii, 10, 12, 14, 20, chosen a component at a
  * time, which is exactly how an interface stops looking designed. These four are picked to
  * be distinguishable from each other at arm's length and to sit in the middle the product
  * needs: tighter than the 28 dp-plus that reads as a toy, looser than the 4 dp that reads
@@ -39,7 +39,7 @@ object Radius {
     /** Cards, list rows, message bubbles, dialogs. The default. */
     val md = 16.dp
 
-    /** The composer and bottom sheets — the two surfaces that own the bottom edge. */
+    /** The composer and bottom sheets. The two surfaces that own the bottom edge. */
     val lg = 24.dp
 }
 

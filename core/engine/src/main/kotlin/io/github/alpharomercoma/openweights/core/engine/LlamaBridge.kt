@@ -71,8 +71,11 @@ internal class LlamaBridge {
 
     external fun nativeModelDescription(handle: Long): String
 
-    /** `[vision, audio]` — what the loaded projector accepts. Both false without one. */
+    /** `[vision, audio]`: what the loaded projector accepts. Both false without one. */
     external fun nativeMediaSupport(handle: Long): BooleanArray
+
+    /** True when the loaded chat template understands being told whether to think. */
+    external fun nativeSupportsThinking(handle: Long): Boolean
 
     /** The marker the projector expects where an attachment belongs in the prompt. */
     external fun nativeMediaMarker(handle: Long): String
@@ -101,6 +104,8 @@ internal class LlamaBridge {
         toolNames: Array<String>,
         toolDescriptions: Array<String>,
         toolSchemas: Array<String>,
+        enableThinking: Boolean,
+        reasoningEffort: String?,
         sink: TokenSink,
         replySink: ReplySink,
     ): LongArray?

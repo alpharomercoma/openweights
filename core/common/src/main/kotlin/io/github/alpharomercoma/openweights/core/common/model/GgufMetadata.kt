@@ -23,7 +23,7 @@ package io.github.alpharomercoma.openweights.core.common.model
  * matter are per-file and the card does not carry them.
  *
  * @param keyValueHeadsPerLayer attention key/value heads for each block. This is a list,
- *   not a single number, because hybrid architectures vary it per layer — LFM2 runs
+ *   not a single number, because hybrid architectures vary it per layer: LFM2 runs
  *   convolution in most blocks and attention in only a third of them, so treating it as
  *   uniform overstates the KV cache by roughly three times.
  */
@@ -44,7 +44,7 @@ data class GgufMetadata(
     val headDimension: Int
         get() = if (headCount > 0) embeddingLength / headCount else 0
 
-    /** Total key/value heads across every block — what the KV cache is actually sized by. */
+    /** Total key/value heads across every block: what the KV cache is actually sized by. */
     val totalKeyValueHeads: Int get() = keyValueHeadsPerLayer.sum()
 
     /**

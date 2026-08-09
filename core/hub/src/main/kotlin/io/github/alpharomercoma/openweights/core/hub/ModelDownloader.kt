@@ -85,7 +85,7 @@ class ModelDownloader @Inject constructor(
         if (file.sizeBytes > 0 && partial.length() != file.sizeBytes) {
             throw DownloadException(
                 "The download ended early: got ${partial.length()} bytes of ${file.sizeBytes}. " +
-                    "Try again — it will resume from where it stopped.",
+                    "Try again. It will resume from where it stopped.",
             )
         }
         verify(file, partial)

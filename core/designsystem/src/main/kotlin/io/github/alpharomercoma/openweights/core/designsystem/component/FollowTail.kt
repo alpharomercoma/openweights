@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  * Scroll behaviour for a list that grows while you are reading it.
  *
  * The rule every chat app converged on: follow the newest content only while the reader is
- * already at the bottom. The moment they scroll up, stop — they are reading something and
+ * already at the bottom. The moment they scroll up, stop. They are reading something and
  * yanking them back down makes streaming output unreadable. Offer a way back, and resume
  * following when they take it or scroll back down themselves.
  */
@@ -58,7 +58,7 @@ class FollowTailState internal constructor(
 /**
  * Remembers follow-tail behaviour for [listState] and drives it from [contentSignal].
  *
- * @param contentSignal any value that changes when new content is appended — the streamed
+ * @param contentSignal any value that changes when new content is appended. The streamed
  *   text itself works well, since it changes on every token.
  */
 @Composable
@@ -80,7 +80,7 @@ fun rememberFollowTailState(
     }
 
     // Only a real drag detaches. Watching isScrollInProgress instead, as this first did,
-    // also fires for the scroll this component performs itself — so following the tail
+    // also fires for the scroll this component performs itself, so following the tail
     // switched following off, the check below switched it back on, and the two fought each
     // other for every token of a streamed reply.
     LaunchedEffect(listState) {
@@ -102,11 +102,11 @@ fun rememberFollowTailState(
 
 /**
  * Scrolls to the very end of the content, including the tail of an item taller than the
- * viewport — which a long streamed reply usually is.
+ * viewport, which a long streamed reply usually is.
  *
  * The two cases are genuinely different and conflating them is what made streaming
  * unreadable. When the last item is already on screen, all that is needed is a nudge by
- * whatever hangs below the fold. Calling `scrollToItem` there instead — as this first did —
+ * whatever hangs below the fold. Calling `scrollToItem` there instead, as this first did,
  * snaps the viewport to the *start* of a reply that is taller than the screen, and the
  * following `scrollBy` yanks it back to the end. Once per token, that is a page-height
  * flash on every word.

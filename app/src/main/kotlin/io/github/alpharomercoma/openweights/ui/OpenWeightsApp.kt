@@ -213,7 +213,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 ModelsScreen(
                     state = state,
                     onUse = { model ->
-                        chatViewModel.loadModel(model.file)
+                        // Keeps whatever chat is open. Switching model is a normal thing to
+                        // do partway through a conversation, and throwing the conversation
+                        // away to do it is not a trade anyone would choose.
+                        chatViewModel.loadModel(model.file, keepConversation = true)
                         navController.navigate(Destination.CHAT.route)
                     },
                     onDelete = modelsViewModel::delete,

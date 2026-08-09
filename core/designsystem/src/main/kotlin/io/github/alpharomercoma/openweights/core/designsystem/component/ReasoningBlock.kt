@@ -49,8 +49,8 @@ import java.util.Locale
  * A model's chain of thought, collapsed by default.
  *
  * Reasoning models emit far more thinking than answer, and an expanded block pushes the
- * actual reply off the screen. Every assistant that ships a reasoning model — ChatGPT,
- * Claude, Gemini — collapses it behind a one-line summary for the same reason. The block
+ * actual reply off the screen. Every assistant that ships a reasoning model: ChatGPT,
+ * Claude, Gemini: collapses it behind a one-line summary for the same reason. The block
  * stays available because for a local model the thinking is often the interesting part.
  *
  * @param reasoning the text of the thought so far.

@@ -58,7 +58,7 @@ int64_t now_ms() {
 }
 
 void log_callback(ggml_log_level level, const char * text, void * /*user_data*/) {
-    // GGML_LOG_LEVEL_CONT (5) marks a continuation of the previous line, not a severity —
+    // GGML_LOG_LEVEL_CONT (5) marks a continuation of the previous line, not a severity 
     // matching on >= ERROR would log llama.cpp's progress dots as errors.
     switch (level) {
         case GGML_LOG_LEVEL_ERROR:
@@ -114,7 +114,7 @@ llama_sampler * build_sampler(const SamplerConfig & cfg, const llama_vocab * voc
  *
  * A token is a sequence of bytes, not a character. "Belém" and every emoji span several
  * tokens, so a single piece routinely ends halfway through a multi-byte character. Handing
- * that half to JNI's NewStringUTF does not throw — it aborts the process — so the tail is
+ * that half to JNI's NewStringUTF does not throw, it aborts the process, so the tail is
  * held back until the bytes that finish it arrive.
  */
 size_t complete_utf8_prefix(const std::string & text) {
@@ -362,7 +362,7 @@ int32_t Session::ingest_media_prompt(
         // libmtmd decodes the file itself, so images and audio arrive the same way and the
         // projector decides what it can accept. It reads the whole file into memory and
         // allocates from its dimensions, both of which are attacker-controlled for a file
-        // the user was handed — hence the size cap above and the catch below.
+        // the user was handed: hence the size cap above and the catch below.
         mtmd_bitmap * bitmap = nullptr;
         try {
             bitmap = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false).bitmap;
@@ -418,9 +418,15 @@ int32_t Session::ingest_media_prompt(
     return static_cast<int32_t>(new_n_past);
 }
 
+bool Session::supports_thinking() const {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    return templates != nullptr && common_chat_templates_support_enable_thinking(templates);
+}
+
 bool Session::render_prompt(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
+    const ReasoningConfig & reasoning,
     std::string & out,
     std::string & error) {
     auto * templates = static_cast<common_chat_templates *>(chat_templates_);
@@ -435,7 +441,12 @@ bool Session::render_prompt(
     // Ask the template to keep thinking separable; the parser then hands it back as
     // reasoning_content instead of leaving tags in the answer.
     inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
-    inputs.enable_thinking = true;
+    inputs.enable_thinking = reasoning.enabled;
+    if (!reasoning.effort.empty()) {
+        // A template argument rather than a field, because only some models read it. The
+        // rest ignore the extra key.
+        inputs.chat_template_kwargs["reasoning_effort"] = "\"" + reasoning.effort + "\"";
+    }
 
     for (const auto & message : messages) {
         common_chat_msg msg;
@@ -453,7 +464,7 @@ bool Session::render_prompt(
 
     try {
         const common_chat_params params = common_chat_templates_apply(templates, inputs);
-        // params.prompt already ends with whatever opens the assistant turn — for LFM2.5
+        // params.prompt already ends with whatever opens the assistant turn, for LFM2.5
         // that is "<|im_start|>assistant\n<think>", the template pre-filling the thinking
         // block. params.generation_prompt is the same text, kept separately so the parser
         // can account for it; appending it here would duplicate the turn header.
@@ -494,6 +505,7 @@ StopReason Session::generate(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
     const SamplerConfig & sampler_config,
+    const ReasoningConfig & reasoning,
     const TokenCallback & on_token,
     GenerationStats & stats,
     ParsedReply & reply,
@@ -501,7 +513,7 @@ StopReason Session::generate(
     cancelled_.store(false, std::memory_order_relaxed);
 
     std::string prompt;
-    if (!render_prompt(messages, tools, prompt, error)) {
+    if (!render_prompt(messages, tools, reasoning, prompt, error)) {
         return StopReason::ERROR;
     }
 

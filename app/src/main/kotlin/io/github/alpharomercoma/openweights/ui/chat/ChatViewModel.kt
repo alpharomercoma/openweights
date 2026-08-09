@@ -127,6 +127,8 @@ data class ChatUiState(
     val preferences: ModelPreferences = ModelPreferences(),
     /** What the loaded model can read. All false without a projector. */
     val mediaSupport: MediaSupport = MediaSupport(),
+    /** True when this model's chat template understands being told whether to think. */
+    val supportsThinking: Boolean = false,
     /** Attachments staged in the composer, not yet sent. */
     val staged: List<MessagePart.File> = emptyList(),
     /** True while a picked file is being copied in. */
@@ -154,7 +156,7 @@ data class ChatUiState(
             isLoadingModel -> RuntimeState.LOADING
             modelName == null -> RuntimeState.NO_MODEL
             isCompacting -> RuntimeState.COMPACTING
-            // No text yet means the prompt is still being read — which with an attachment
+            // No text yet means the prompt is still being read, which with an attachment
             // is most of the wait, and is the one part a spinner cannot explain.
             isGenerating && transcript.lastOrNull()?.text.isNullOrEmpty() -> RuntimeState.READING
             isGenerating -> RuntimeState.GENERATING
@@ -169,7 +171,8 @@ data class ChatUiState(
      */
     val runtimeIdentity: String
         get() = listOfNotNull(
-            modelQuantization,
+            // Not the quantization: it is already the tail of the model name directly
+            // above, and repeating it wastes the only line that can say something new.
             backend,
             contextSize.takeIf { it > 0 }?.let { "$it ctx" },
         ).joinToString(" · ")
@@ -239,9 +242,16 @@ class ChatViewModel @Inject constructor(
     }
 
     /** Loads a GGUF file from disk. */
-    fun loadModel(modelFile: File, contextLength: Int? = null) {
-        // A generation in flight writes into the transcript we are about to replace, so it
-        // has to be finished before the new model is loaded, not merely asked to stop.
+    /**
+     * Loads a model.
+     *
+     * @param keepConversation carry the open chat over to the new model instead of
+     * starting a fresh one. The transcript is text, so it survives the swap; the KV cache
+     * does not, and is rebuilt from that text on the next reply.
+     */
+    fun loadModel(modelFile: File, contextLength: Int? = null, keepConversation: Boolean = false) {
+        // A generation in flight writes into the transcript, so it has to finish before the
+        // model under it is replaced, not merely be asked to stop.
         stop()
         viewModelScope.launch {
             generationJob?.join()
@@ -269,7 +279,10 @@ class ChatViewModel @Inject constructor(
             runCatching {
                 engine.load(modelFile, loadParams, projector)
             }.onSuccess {
-                conversationId = null
+                // The cache belonged to the old weights. Clearing it makes the next reply
+                // re-read the transcript, which is what carries the conversation across.
+                engine.resetContext()
+                if (!keepConversation) conversationId = null
                 preferencesKey = modelFile.name
                 val info = engine.loadedModel
                 _uiState.update {
@@ -284,10 +297,17 @@ class ChatViewModel @Inject constructor(
                         contextSize = info?.contextSize ?: 0,
                         contextUsed = info?.contextUsed ?: 0,
                         preferences = preferences,
-                        transcript = emptyList(),
+                        transcript = if (keepConversation) it.transcript else emptyList(),
+                        compaction = if (keepConversation) it.compaction else null,
                         mediaSupport = info?.mediaSupport ?: MediaSupport(),
+                        supportsThinking = info?.supportsThinking == true,
+                        // Dropped either way: an attachment staged for a model that could
+                        // read it may be one the new model cannot.
                         staged = emptyList(),
                     )
+                }
+                if (keepConversation) {
+                    conversationId?.let { id -> chats.setModel(id, modelFile.nameWithoutExtension) }
                 }
             }.onFailure { failure ->
                 _uiState.update { it.copy(isLoadingModel = false, error = failure.userMessage()) }
@@ -752,8 +772,8 @@ class ChatViewModel @Inject constructor(
 /**
  * How often streamed text reaches the screen, in milliseconds.
  *
- * Two frames at 60 Hz. Below this the work per update — re-parse, recompose, re-measure,
- * re-scroll — starts to overlap itself and the transcript visibly judders; above it the
+ * Two frames at 60 Hz. Below this the work per update: re-parse, recompose, re-measure,
+ * re-scroll: starts to overlap itself and the transcript visibly judders; above it the
  * text arrives in visible chunks.
  */
 private const val STREAM_FRAME_MS = 33L

@@ -110,8 +110,8 @@ class ModelsViewModel @Inject constructor(
     /**
      * Fetches a model's projector, saved under a name derived from the model file.
      *
-     * Renamed on the way in because upstream names only loosely relate to the model —
-     * different quantization, different capitalisation, sometimes a bare `mmproj-F16` —
+     * Renamed on the way in because upstream names only loosely relate to the model
+     * different quantization, different capitalisation, sometimes a bare `mmproj-F16`
      * and a guess at load time means a wrong encoder loaded without complaint.
      */
     fun downloadProjector(repoId: String, projector: HubFile, modelFileName: String) {
@@ -155,7 +155,7 @@ class ModelsViewModel @Inject constructor(
     /**
      * Folds progress into the row it belongs to.
      *
-     * Matched on the key — the file being written — and not on the remote path, which is
+     * Matched on the key, the file being written, and not on the remote path, which is
      * merely equal to it when a repository keeps its GGUFs at the top level. A file in a
      * subdirectory, or a projector saved under a name of our own, would otherwise report
      * no progress and leave a finished download on screen forever.

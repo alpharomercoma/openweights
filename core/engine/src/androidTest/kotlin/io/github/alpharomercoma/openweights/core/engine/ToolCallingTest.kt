@@ -126,7 +126,7 @@ class ToolCallingTest {
         const val CONTEXT = 4096
 
         /**
-         * Reasoning models think for a long time before answering — LFM2.5 spends tens of
+         * Reasoning models think for a long time before answering: LFM2.5 spends tens of
          * seconds on it. A budget that truncates mid-thought produces an unterminated
          * block the parser cannot make sense of, which looks like a parser bug but is a
          * budget bug.

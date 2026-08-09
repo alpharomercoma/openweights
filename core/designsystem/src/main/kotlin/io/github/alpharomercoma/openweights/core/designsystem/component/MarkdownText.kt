@@ -28,6 +28,7 @@ import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.rememberMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.CodeTextStyle
@@ -36,8 +37,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
 /**
  * Renders a model reply as Markdown.
  *
- * Local models produce the same Markdown that hosted ones do — headings, lists, tables,
- * and above all fenced code — so rendering it is not a nicety. Code blocks get a header
+ * Local models produce the same Markdown that hosted ones do: headings, lists, tables,
+ * and above all fenced code, so rendering it is not a nicety. Code blocks get a header
  * with the language and a copy button, which is the one interaction people reliably want
  * from a model's output.
  */
@@ -48,8 +49,14 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
         Highlights.Builder().theme(SyntaxThemes.atom(darkMode = darkTheme))
     }
 
+    // retainState keeps the last render on screen while the next parse runs. The default
+    // is false, which swaps the whole reply for an empty loading slot every time the text
+    // changes. During streaming the text changes constantly, so the reply blanked and
+    // reappeared on every update. That was the flicker.
+    val state = rememberMarkdownState(content = content, retainState = true)
+
     Markdown(
-        content = content,
+        state,
         modifier = modifier,
         colors = markdownColor(
             text = MaterialTheme.colorScheme.onBackground,

@@ -26,12 +26,12 @@ import androidx.compose.ui.graphics.lerp
  *
  * OpenWeights is an instrument you own: you chose the file, it runs on your silicon, and
  * you can watch how fast. Warm brass against a cool graphite carries that better than the
- * blue-white every assistant uses, and it keeps us out of a crowded room — ChatGPT is
+ * blue-white every assistant uses, and it keeps us out of a crowded room: ChatGPT is
  * monochrome, Claude is terracotta on cream, Gemini is Google blue, Qwen is violet.
  *
  * Three rules hold the palette together:
  *
- * 1. **One accent.** [Brass] means "you can act here" and nothing else — send, the active
+ * 1. **One accent.** [Brass] means "you can act here" and nothing else: send, the active
  *    tab, focus, selection. The previous palette used the same teal for "fast" and for
  *    "tap me", so neither reading was reliable.
  * 2. **Measurement is a separate language.** The [signalColor] scale runs jade → slate →
@@ -41,16 +41,16 @@ import androidx.compose.ui.graphics.lerp
  *    describes. Hue is the glance; the digits are the answer.
  *
  * Every pair below was checked against WCAG 2.2: body text and accents clear 4.5:1 on the
- * surfaces they appear on, and [Outline] clears 3:1 — the non-text threshold — against
+ * surfaces they appear on, and [Outline] clears 3:1, the non-text threshold, against
  * canvas, raised and raised-high alike, because a border is often the only thing that says
  * where a control begins.
  */
 object OpenWeightsColors {
-    // 60% — the canvas. Near-black with a cool graphite bias, not pure black: OLED-friendly
+    // 60%. The canvas. Near-black with a cool graphite bias, not pure black: OLED-friendly
     // without the flatness that makes every panel edge disappear.
     val Canvas = Color(0xFF0B0D0F)
 
-    // 30% — raised surfaces. The step from canvas is small by design, so [Outline] rather
+    // 30%: raised surfaces. The step from canvas is small by design, so [Outline] rather
     // than fill is what makes a control's boundary legible.
     val Raised = Color(0xFF181C21)
     val RaisedHigh = Color(0xFF242A31)
@@ -64,7 +64,7 @@ object OpenWeightsColors {
     val Text = Color(0xFFECF1F4)
     val TextDim = Color(0xFF9AA6AF)
 
-    // 10% — the accent, and only ever for action.
+    // 10%. The accent, and only ever for action.
     val Brass = Color(0xFFF0A93B)
 
     /** Text and icons drawn on top of a [Brass] fill. Near-black, 9.6:1. */

@@ -39,7 +39,7 @@ object ToolCallParser {
         return ParsedToolCalls(raw, emptyList())
     }
 
-    /** `<|tool_call_start|>[name(arg='value', other=2)]<|tool_call_end|>` — LFM2. */
+    /** `<|tool_call_start|>[name(arg='value', other=2)]<|tool_call_end|>`: LFM2. */
     private fun parseLfmStyle(raw: String): ParsedToolCalls? {
         val start = raw.indexOf(LFM_START)
         if (start < 0) return null
@@ -55,7 +55,7 @@ object ToolCallParser {
         return ParsedToolCalls(text, calls)
     }
 
-    /** `<tool_call>{"name": "...", "arguments": {...}}</tool_call>` — Hermes and friends. */
+    /** `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`: Hermes and friends. */
     private fun parseTaggedJson(raw: String): ParsedToolCalls? {
         val start = raw.indexOf(JSON_START)
         if (start < 0) return null
@@ -110,7 +110,7 @@ object ToolCallParser {
      * Quotes a value as JSON.
      *
      * Escaping only quotes would produce invalid JSON the moment a model passes a Windows
-     * path or a newline — `path='C:\tmp'` is perfectly reasonable output.
+     * path or a newline: `path='C:\tmp'` is perfectly reasonable output.
      */
     private fun String.asJsonString(): String = buildString {
         append('"')
@@ -137,7 +137,7 @@ object ToolCallParser {
 
     /**
      * Splits argument lists without breaking on separators that are inside a string or a
-     * nested structure — `note(text='Manila, Philippines')` is one argument, not two.
+     * nested structure: `note(text='Manila, Philippines')` is one argument, not two.
      */
     private class TopLevelSplitter(private val separator: Char) {
         private val parts = mutableListOf<String>()

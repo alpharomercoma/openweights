@@ -30,7 +30,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -40,9 +44,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -63,6 +69,7 @@ import kotlin.math.roundToInt
 fun ParameterSheet(
     modelName: String,
     preferences: ModelPreferences,
+    supportsThinking: Boolean,
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
@@ -84,6 +91,13 @@ fun ParameterSheet(
         ) {
             Text(modelName, style = MaterialTheme.typography.titleMedium)
             Metric("settings saved for this model only")
+
+            if (supportsThinking) {
+                ThinkingSetting(
+                    draft = draft,
+                    onChange = { draft = it },
+                )
+            }
 
             Setting(
                 label = "Temperature",
@@ -181,6 +195,62 @@ fun ParameterSheet(
     }
 }
 
+/**
+ * Thinking, and how much of it.
+ *
+ * Only shown when the loaded chat template understands the flag, which llama.cpp can tell
+ * us. Reasoning costs tens of seconds a reply on a phone, so this is a speed control as
+ * much as a quality one. The effort level is passed to the template for the models that
+ * read one and ignored by the rest, so it stays available whenever thinking is on.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Thinking", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "Work through the problem before answering. Slower, and better " +
+                        "on anything with steps in it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = draft.thinking,
+                onCheckedChange = { onChange(draft.copy(thinking = it)) },
+            )
+        }
+
+        if (draft.thinking) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                ReasoningEffort.entries.forEachIndexed { index, effort ->
+                    SegmentedButton(
+                        selected = draft.reasoningEffort == effort.name,
+                        onClick = { onChange(draft.copy(reasoningEffort = effort.name)) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index,
+                            ReasoningEffort.entries.size,
+                        ),
+                        colors = SegmentedButtonDefaults.colors(
+                            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            activeBorderColor = MaterialTheme.colorScheme.primary,
+                            inactiveBorderColor = MaterialTheme.colorScheme.outline,
+                        ),
+                        label = { Text(effort.label, maxLines = 1) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Setting(
     label: String,
@@ -221,6 +291,7 @@ private fun ParameterSheetPreview() {
         ParameterSheet(
             modelName = "LFM2.5-2.6B-Q4_K_M",
             preferences = ModelPreferences(),
+            supportsThinking = true,
             onSave = {},
             onReset = {},
             onDismiss = {},

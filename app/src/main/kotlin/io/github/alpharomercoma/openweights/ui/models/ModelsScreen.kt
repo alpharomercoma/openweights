@@ -63,7 +63,7 @@ fun ModelsScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
-        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -87,7 +87,7 @@ fun ModelsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "No models yet. Find one in Discover — it will tell you whether it " +
+                    "No models yet. Find one in Discover. It will tell you whether it " +
                         "runs on this phone before you download it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

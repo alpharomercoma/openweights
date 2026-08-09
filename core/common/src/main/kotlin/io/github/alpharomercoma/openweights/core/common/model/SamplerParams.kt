@@ -23,6 +23,10 @@ package io.github.alpharomercoma.openweights.core.common.model
  * models; individual model cards often recommend better values.
  */
 data class SamplerParams(
+    /** Whether the model is allowed to think before answering, where it can. */
+    val thinking: Boolean = true,
+    /** How much thinking, for the models whose template reads an effort level. */
+    val reasoningEffort: ReasoningEffort = ReasoningEffort.DEFAULT,
     val temperature: Float = DEFAULT_TEMPERATURE,
     val topK: Int = DEFAULT_TOP_K,
     val topP: Float = DEFAULT_TOP_P,
@@ -49,6 +53,27 @@ data class SamplerParams(
         const val DEFAULT_MIN_P = 0.05f
         const val DEFAULT_REPEAT_PENALTY = 1.1f
         const val DEFAULT_REPEAT_LAST_N = 64
+    }
+}
+
+/**
+ * How hard the model should think, for models whose chat template offers the choice.
+ *
+ * Reasoning models spend tokens before answering. On a phone that time is measured in
+ * tens of seconds, so being able to turn it down is a throughput control as much as a
+ * quality one.
+ */
+enum class ReasoningEffort(val wireName: String?, val label: String) {
+    /** Leave the template's own default alone. */
+    DEFAULT(null, "Default"),
+    LOW("low", "Low"),
+    MEDIUM("medium", "Medium"),
+    HIGH("high", "High"),
+    ;
+
+    companion object {
+        fun fromName(name: String?): ReasoningEffort =
+            entries.firstOrNull { it.name == name } ?: DEFAULT
     }
 }
 

@@ -45,7 +45,7 @@ data class DictationState(
  * Speech to text, on this device only.
  *
  * Android's default recogniser streams audio to Google. This app's entire promise is that
- * nothing leaves the phone, so it uses the on-device recogniser and nothing else — if the
+ * nothing leaves the phone, so it uses the on-device recogniser and nothing else: if the
  * offline language pack is missing, dictation says so rather than quietly opening a network
  * connection the user was told would never happen.
  *
@@ -88,7 +88,7 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
     }
 
     /**
-     * Starts listening. Must be called on the main thread — [SpeechRecognizer] requires it.
+     * Starts listening. Must be called on the main thread: [SpeechRecognizer] requires it.
      *
      * @param onFinal called once with the finished transcript.
      */
@@ -207,8 +207,8 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
     /**
      * The recogniser's error codes as something worth reading.
      *
-     * "No match" and the timeouts are not failures — they are what happens when someone
-     * taps the mic and then says nothing — so they are worded as the non-events they are.
+     * "No match" and the timeouts are not failures. They are what happens when someone
+     * taps the mic and then says nothing, so they are worded as the non-events they are.
      */
     private fun readableError(code: Int): String? = when (code) {
         SpeechRecognizer.ERROR_NO_MATCH,

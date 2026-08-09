@@ -54,7 +54,7 @@ class GgufFileNameTest {
         val projector = GgufFileName.modelIdentity("mmproj-LFM2.5-VL-1.6b-Q8_0.gguf")
 
         // Publishers do not agree with themselves about capitalisation, so matching has to
-        // be case-insensitive — the real LiquidAI repository spells it both ways.
+        // be case-insensitive. The real LiquidAI repository spells it both ways.
         assertThat(projector).isEqualTo("LFM2.5-VL-1.6b")
         assertThat(projector).isNotEqualTo(model)
         assertThat(projector.equals(model, ignoreCase = true)).isTrue()

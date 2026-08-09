@@ -93,7 +93,7 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
 /**
  * The busy line: a dot in the state's own colour, then the state's name.
  *
- * The dot breathes while work is in flight — the one animation in the app tied to something
+ * The dot breathes while work is in flight. The one animation in the app tied to something
  * genuinely ongoing rather than to a value that has already settled. Colour is never alone
  * here; the label says the same thing in words.
  */

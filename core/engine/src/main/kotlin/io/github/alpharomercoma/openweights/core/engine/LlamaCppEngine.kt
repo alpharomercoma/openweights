@@ -141,6 +141,8 @@ class LlamaCppEngine internal constructor(
             toolNames = tools.map { it.name }.toTypedArray(),
             toolDescriptions = tools.map { it.description }.toTypedArray(),
             toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
+            enableThinking = params.thinking,
+            reasoningEffort = params.reasoningEffort.wireName,
             sink = { text ->
                 // trySend fails once the collector is gone, which stops generation.
                 trySend(GenerationEvent.Token(text)).isSuccess
@@ -264,7 +266,7 @@ class LlamaCppEngine internal constructor(
      * Prepares the conversation for the native layer.
      *
      * The projector needs its own marker in the text wherever an attachment belongs, and
-     * only it knows what that marker is — it varies per model. Without a projector loaded,
+     * only it knows what that marker is. It varies per model. Without a projector loaded,
      * attachments are dropped rather than described: a text-only model handed a marker
      * would read it as literal text and answer about a picture it cannot see.
      */
@@ -302,6 +304,7 @@ class LlamaCppEngine internal constructor(
             mediaSupport = bridge.nativeMediaSupport(activeHandle).let { support ->
                 MediaSupport(vision = support[0], audio = support[1])
             },
+            supportsThinking = bridge.nativeSupportsThinking(activeHandle),
         )
     }
 
@@ -344,7 +347,7 @@ class LlamaCppEngine internal constructor(
             (Runtime.getRuntime().availableProcessors() / 2).coerceIn(MIN_THREADS, MAX_GEN_THREADS)
 
         /**
-         * Prompt processing is compute-bound and keeps scaling to every core — on the same
+         * Prompt processing is compute-bound and keeps scaling to every core, on the same
          * device, 8 threads gave 69.5 tok/s prefill versus 55.3 at 4.
          */
         fun recommendedBatchThreadCount(): Int =

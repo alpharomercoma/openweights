@@ -82,7 +82,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
  * same reason: the bar has to stay calm when empty and grow to hold thumbnails, chips and
  * a multi-line draft without the controls jumping around the screen.
  *
- * Docked to the bottom edge above the navigation bar — never floating over the last
+ * Docked to the bottom edge above the navigation bar, never floating over the last
  * message, which is the single most common mobile chat layout mistake.
  */
 @Composable
@@ -300,7 +300,7 @@ private fun AttachButton(enabled: Boolean, isAttaching: Boolean, onClick: () -> 
  *
  * One button in two states rather than two buttons, because they are never both useful and
  * a control that appears mid-conversation is a control the thumb has to hunt for. It fills
- * with the accent only when there is something to do — the rest of the time it is a hint,
+ * with the accent only when there is something to do. The rest of the time it is a hint,
  * not an invitation.
  */
 @Composable
@@ -347,7 +347,7 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
  *
  * The permission is requested on the first tap and never at launch: an app that asks for
  * the microphone before you have asked it for anything has not earned the answer. Denial
- * is silent by design — the system dialog already said what happened, and a second message
+ * is silent by design. The system dialog already said what happened, and a second message
  * repeating it is the app arguing with the user.
  */
 @Composable

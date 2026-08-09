@@ -48,7 +48,7 @@ std::string to_utf8(JNIEnv * env, jstring value) {
 /**
  * A Java string from bytes that may not be valid UTF-8.
  *
- * `NewStringUTF` does not reject bad input, it aborts the process — a JNI check failure
+ * `NewStringUTF` does not reject bad input, it aborts the process. A JNI check failure
  * takes the whole app down with SIGABRT and no catchable exception. Model output, GGUF
  * metadata and error messages all originate outside this app, so every one of them is
  * truncated to its valid prefix on the way across rather than trusted.
@@ -194,7 +194,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelDes
     return to_jstring(env, as_session(handle)->model_description());
 }
 
-/** Returns [vision, audio] — what the loaded projector can accept. */
+/** Returns [vision, audio]: what the loaded projector can accept. */
 JNIEXPORT jbooleanArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSupport(
     JNIEnv * env, jobject /*thiz*/, jlong handle) {
@@ -206,6 +206,13 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSup
     jbooleanArray result = env->NewBooleanArray(2);
     env->SetBooleanArrayRegion(result, 0, 2, values);
     return result;
+}
+
+/** True when the loaded chat template understands being told whether to think. */
+JNIEXPORT jboolean JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsThinking(
+    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    return as_session(handle)->supports_thinking() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jstring JNICALL
@@ -243,6 +250,8 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jobjectArray tool_names,
     jobjectArray tool_descriptions,
     jobjectArray tool_schemas,
+    jboolean enable_thinking,
+    jstring reasoning_effort,
     jobject token_sink,
     jobject reply_sink) {
     Session * session = as_session(handle);
@@ -317,8 +326,13 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     GenerationStats stats;
     ParsedReply reply;
     std::string error;
+    openweights::ReasoningConfig thinking;
+    thinking.enabled = enable_thinking == JNI_TRUE;
+    thinking.effort =
+        reasoning_effort == nullptr ? std::string() : to_utf8(env, reasoning_effort);
+
     const StopReason reason = session->generate(
-        messages, tools, sampler,
+        messages, tools, sampler, thinking,
         [&](const char * piece) -> bool {
             jstring text = to_jstring(env, piece);
             const jboolean keep_going = env->CallBooleanMethod(token_sink, on_token, text);

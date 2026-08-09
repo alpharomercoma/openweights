@@ -22,8 +22,8 @@ import org.junit.Test
 /**
  * What a reply sounds like.
  *
- * Markdown read literally is unbearable — a synthesiser says "asterisk asterisk" and
- * spells out every character of a code block — so the visual furniture is stripped before
+ * Markdown read literally is unbearable. A synthesiser says "asterisk asterisk" and
+ * spells out every character of a code block, so the visual furniture is stripped before
  * the words reach the engine.
  */
 class SpeechTextTest {

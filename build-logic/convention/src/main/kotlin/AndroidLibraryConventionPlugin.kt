@@ -34,6 +34,11 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             add("testImplementation", libs.findLibrary("truth").get())
             add("testImplementation", libs.findLibrary("kotlinx-coroutines-test").get())
             add("testImplementation", libs.findLibrary("turbine").get())
+            // Robolectric so Room, DataStore and view models can be exercised on the host.
+            // The device tier still exists for the engine, but nothing that can be checked
+            // without hardware should need hardware.
+            add("testImplementation", libs.findLibrary("robolectric").get())
+            add("testImplementation", libs.findLibrary("androidx-test-ext-junit").get())
         }
     }
 }

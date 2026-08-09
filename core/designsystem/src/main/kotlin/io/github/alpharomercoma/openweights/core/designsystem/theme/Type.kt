@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import io.github.alpharomercoma.openweights.core.designsystem.R
 
 /**
- * IBM Plex, chosen because it was drawn for machines and their readouts — the same job this
+ * IBM Plex, chosen because it was drawn for machines and their readouts. The same job this
  * app has. Plex Sans carries the interface; Plex Mono carries every number, model id, and
  * quantization tag, so measurements are visually separable from prose at a glance.
  */
@@ -52,7 +52,7 @@ val PlexMono = FontFamily(
  * The scale.
  *
  * Written out rather than inherited, because Material's defaults are tuned for nothing in
- * particular — `displaySmall` arrives at 36 sp, which no phone screen in this app has a use
+ * particular: `displaySmall` arrives at 36 sp, which no phone screen in this app has a use
  * for. Sizes step by roughly a fifth so adjacent roles are visibly different, and titles
  * carry negative tracking so a heading reads as a label rather than as a sentence.
  *
@@ -61,7 +61,20 @@ val PlexMono = FontFamily(
  */
 internal val OpenWeightsTypography = Typography().let { base ->
     Typography(
-        // The one number a screen is built around — the lifetime token count, and nothing
+        // Every role is set, including the ones nothing uses yet. A role left at its
+        // default falls back to the platform font, which would quietly put a third family
+        // on screen the first time anything reached for it.
+        displayLarge = base.displayLarge.copy(
+            fontFamily = PlexSans,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.02).em,
+        ),
+        displayMedium = base.displayMedium.copy(
+            fontFamily = PlexSans,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.02).em,
+        ),
+        // The one number a screen is built around. The lifetime token count, and nothing
         // else so far. Deliberately the only style above 24 sp.
         displaySmall = base.displaySmall.copy(
             fontFamily = PlexSans,
@@ -115,7 +128,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
             lineHeight = 20.sp,
             letterSpacing = (-0.005).em,
         ),
-        // Chat replies are read for minutes at a time, so the leading earns its space —
+        // Chat replies are read for minutes at a time, so the leading earns its space
         // but 1.6 was bloating long answers, and 1.5 holds the paragraph together better.
         bodyLarge = base.bodyLarge.copy(
             fontFamily = PlexSans,

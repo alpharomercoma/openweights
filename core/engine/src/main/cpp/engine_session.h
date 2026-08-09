@@ -63,6 +63,20 @@ struct ToolCall {
     std::string arguments_json;
 };
 
+/**
+ * How the model should think, when its template offers the choice.
+ *
+ * llama.cpp exposes two separate things. `enable_thinking` is a flag the chat template
+ * itself understands, and `common_chat_templates_support_enable_thinking` says whether the
+ * loaded template does. `effort` is passed through as a template argument for the models
+ * that read one, and ignored by the ones that do not.
+ */
+struct ReasoningConfig {
+    bool enabled = true;
+    /** `low`, `medium` or `high`. Empty leaves the template's own default alone. */
+    std::string effort;
+};
+
 /** Sampler configuration for a single generation. Mirrors SamplerParams on the Kotlin side. */
 struct SamplerConfig {
     float    temperature   = 0.8f;
@@ -147,10 +161,14 @@ public:
         const std::vector<ChatMessage> & messages,
         const std::vector<ToolDefinition> & tools,
         const SamplerConfig & sampler,
+        const ReasoningConfig & reasoning,
         const TokenCallback & on_token,
         GenerationStats & stats,
         ParsedReply & reply,
         std::string & error);
+
+    /** True when the loaded chat template understands being told whether to think. */
+    bool supports_thinking() const;
 
     /** Signals the running generation to stop. Safe to call from any thread. */
     void cancel() { cancelled_.store(true, std::memory_order_relaxed); }
@@ -197,6 +215,7 @@ private:
     bool render_prompt(
         const std::vector<ChatMessage> & messages,
         const std::vector<ToolDefinition> & tools,
+        const ReasoningConfig & reasoning,
         std::string & out,
         std::string & error);
 

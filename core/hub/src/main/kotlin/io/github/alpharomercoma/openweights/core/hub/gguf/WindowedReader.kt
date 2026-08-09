@@ -110,7 +110,7 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
             // Strings have no fixed width, so they must be walked one at a time.
             return List(count.toInt().coerceAtMost(MAX_ARRAY_ELEMENTS)) { readValue(elementType) }
         }
-        // Small integer arrays carry real information — per-layer KV head counts, for one —
+        // Small integer arrays carry real information, per-layer KV head counts, for one,
         // so read them. Anything larger is vocabulary-sized and irrelevant here: skip it,
         // which costs no bytes at all.
         if (count <= MAX_ARRAY_ELEMENTS) {

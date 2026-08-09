@@ -1,4 +1,4 @@
-# OpenWeights — Working Context
+# OpenWeights: Working Context
 
 > Living state file. Update at every milestone so no information is lost across sessions
 > or context compaction. Newest facts win; keep it accurate rather than exhaustive.
@@ -8,7 +8,7 @@ Last updated: 2026-08-10 (end of Phase 1)
 ## What this project is
 
 A native Android app that runs open-weight LLMs from Hugging Face entirely on-device.
-The ChatGPT / Claude / Gemini experience — chat, histories, multimodal input, voice —
+The ChatGPT / Claude / Gemini experience, chat, histories, multimodal input, voice, 
 but for local GGUF models, with no account, no cloud, and no telemetry.
 
 Distribution target: **Google Play Store**. Sideloading over ADB is only for development.
@@ -71,7 +71,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 
 ## Build & dependency versions
 
-AGP 9.3.1 · Kotlin 2.3.20 (AGP 9 compiles Kotlin itself — do **not** apply
+AGP 9.3.1 · Kotlin 2.3.20 (AGP 9 compiles Kotlin itself: do **not** apply
 `org.jetbrains.kotlin.android`) · KSP 2.3.11 · Hilt 2.60.1 · Compose BOM 2026.06.01 ·
 Material3 1.4.0 · OkHttp 5.4.0 · llama.cpp pinned at tag **b10333** (submodule).
 Single source of truth: `gradle/libs.versions.toml`.
@@ -92,23 +92,23 @@ Single source of truth: `gradle/libs.versions.toml`.
 
 `docs/ROADMAP.md` holds the full plan, including the agent runtime work.
 
-- [x] **P0** Toolchain + scaffold — app installs and runs on the Poco
-- [x] **P1** llama.cpp JNI engine + streaming chat — real generation verified on-device
-- [x] **Chat UI** — follow-tail scroll, collapsed reasoning, Markdown with code blocks,
+- [x] **P0** Toolchain + scaffold: app installs and runs on the Poco
+- [x] **P1** llama.cpp JNI engine + streaming chat: real generation verified on-device
+- [x] **Chat UI**: follow-tail scroll, collapsed reasoning, Markdown with code blocks,
       long-press actions, slash-command palette
-- [x] **Compaction** — folds older turns into a model-written summary before the context
+- [x] **Compaction**: folds older turns into a model-written summary before the context
       window fills, so long conversations continue instead of dying
-- [~] **Compute backend choice** — engine enumerates ggml devices at runtime; GPU backends
+- [~] **Compute backend choice**: engine enumerates ggml devices at runtime; GPU backends
       not yet compiled in (see ROADMAP for why), Settings screen not built
 - [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
       requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
-- [x] **Tool calling** — tools are rendered into each model's own syntax and calls are
+- [x] **Tool calling**: tools are rendered into each model's own syntax and calls are
       parsed back; verified on-device with LFM2.5 emitting
       `get_weather(city='Manila')`. Execution and permission prompts are still to come.
 - [x] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard,
       a conversation drawer for reopening past chats, and per-model hyperparameters
 - [x] **P4** Multimodal in: libmtmd is compiled in and wired through the engine, the
-      message model, storage and the UI. Verified on-device — LFM2.5-VL-1.6B describes a
+      message model, storage and the UI. Verified on-device: LFM2.5-VL-1.6B describes a
       real image attached from the photo picker. Audio input works through the same path
       with an audio projector (none tested yet); video needs `MTMD_VIDEO=ON`, which the
       vendored tag does not enable. Multimodal out is text plus Android TTS read-aloud;
@@ -118,14 +118,14 @@ Single source of truth: `gradle/libs.versions.toml`.
 ## Multimodal: what libmtmd gives us, and what it does not
 
 `GGML_BUILD_MTMD=ON` builds `libmtmd.so` (1.2 MB), which turns an image, an audio clip or
-a video frame into embeddings the language model attends over. It needs a second GGUF —
+a video frame into embeddings the language model attends over. It needs a second GGUF 
 the **projector**, published as `mmproj-<model>-<quant>.gguf` next to the model.
 
 The contract, and the traps in it:
 
 - The prompt must contain one **media marker** per attachment, at the position the
   attachment belongs, and the bitmap count must match the marker count exactly. The marker
-  is `mtmd_get_marker(ctx)` — do not hardcode `<__media__>`.
+  is `mtmd_get_marker(ctx)`: do not hardcode `<__media__>`.
 - `mtmd_input_text` has a `text_len` field. **Leaving it uninitialised** makes mtmd build a
   `std::string` of garbage length and throw `std::bad_alloc`, surfacing as the useless
   message "image preprocessing error". This cost an hour; it is the single easiest mistake
@@ -148,13 +148,13 @@ quantization suffix stripped) is kept as a fallback for files placed by hand ove
 
 Video is sampled into four frames with `MediaMetadataRetriever` and sent as images. Use
 `OPTION_CLOSEST`, never `OPTION_CLOSEST_SYNC`: sync frames are keyframes, a short clip can
-have exactly one, and the sampler then returns the same picture four times — which looks
+have exactly one, and the sampler then returns the same picture four times, which looks
 like working video support right up until you check the thumbnails.
 
 Measured on the dev device with LFM2.5-VL-1.6B Q4_K_M + Q8_0 projector:
 **13.4 s to first token** for one 448x448 image, **69.8 s** for four video frames, then
-**29–32 tok/s** decode either way.
-Attachments are downscaled to a 1024 px longest edge before they reach the projector —
+**29 to 32 tok/s** decode either way.
+Attachments are downscaled to a 1024 px longest edge before they reach the projector 
 a full-resolution phone photo tiles into many more patches and turns seconds into minutes.
 
 ## Debugging native code without installing anything
@@ -181,13 +181,13 @@ It links the real `Session`, so it tests our code and not just llama.cpp's.
 ## The top bar is the runtime readout
 
 Every other chat app can put a product name there because the thing behind it never
-changes. Here it changes with every download, so the bar carries the runtime's identity —
-quantization, compute device, context window — and swaps to a named state while it is busy:
+changes. Here it changes with every download, so the bar carries the runtime's identity 
+quantization, compute device, context window, and swaps to a named state while it is busy:
 loading weights, reading the prompt, generating, folding earlier turns, cooling down.
 
 "Reading the prompt" earns its place: with four video frames attached that state lasts 70
 seconds, and a spinner cannot say what the wait is for. "Cooling down" comes from
-`ThermalPolicy.isThrottling()` — a generation that has quietly halved its thread count looks
+`ThermalPolicy.isThrottling()`. A generation that has quietly halved its thread count looks
 exactly like a slow model otherwise.
 
 ## Working practice: independent review
@@ -215,7 +215,7 @@ were charged
 
 Two things make this work. llama.cpp writes `general.*` and the architecture's own keys
 before the tokenizer, so parsing can stop at the first `tokenizer.` key and skip the
-vocabulary — 1.3 KB of useful metadata instead of 8 MB. And `attention.head_count_kv` is
+vocabulary: 1.3 KB of useful metadata instead of 8 MB. And `attention.head_count_kv` is
 a *per-layer array* on hybrid architectures like LFM2, where attention runs in only a
 third of the blocks; treating it as uniform overstates the KV cache almost fourfold and
 would turn fits into refusals.
@@ -235,7 +235,7 @@ Model: `LiquidAI/LFM2.5-2.6B-GGUF` Q4_K_M (1.67 GB, 2.697 B params, 30 layers, t
 | Same, 8 threads | 8 / 8 | 21.3 | 13.9 | 987 ms |
 | **Runtime-selected armv9.0_1 backend** | 4 / 4 | 55.3 | 16.8 | 381 ms |
 | Same, 8 threads | 8 / 8 | 69.5 | 12.8 | 303 ms |
-| **Shipping default (split threads)** | **4 / 8** | **59.8–76.9** | **16.2–16.4** | **274–352 ms** |
+| **Shipping default (split threads)** | **4 / 8** | **59.8, 76.9** | **16.2, 16.4** | **274, 352 ms** |
 | Same, after removing false backpressure cancellation | 4 / 8 | 59.8 | **18.0** | 352 ms |
 
 ### Thermal state changes the right answer (2026-08-10)
@@ -244,7 +244,7 @@ After a long run of inference tests, the same benchmark inverted:
 
 | Threads | Prefill (cold) | Prefill (hot) |
 |---|---|---|
-| 2 | — | 73.6 |
+| 2 |: | 73.6 |
 | 4 | 55.3 | 55.6 |
 | 8 | **69.5** | **28.0** |
 
@@ -277,7 +277,7 @@ Every screen exercised on the Poco with the screen kept awake:
 
 - Discover searches the live Hub and lists results.
 - Opening `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF` parsed each file's header over range
-  requests and reported **"Will not run at this context length — needs 8.08 GB of 7.15 GB
+  requests and reported **"Will not run at this context length: needs 8.08 GB of 7.15 GB
   usable · KV cache 192 MB"**. The honest refusal path works on real data.
 - Settings accepted an access token, encrypted it, and verified it: **"Signed in as
   alpharomercoma"**.
@@ -293,7 +293,7 @@ whole entry rather than just its text), and the model detail kept the search fie
 sort chips on screen instead of behaving like its own screen.
 
 One environment note: a model file placed with `adb` lands as `shell:ext_data_rw` mode 660
-and the app cannot read it — `chmod 666` fixes it. Files the app downloads itself are
+and the app cannot read it: `chmod 666` fixes it. Files the app downloads itself are
 unaffected.
 
 ## Development device access
@@ -343,18 +343,18 @@ Note the class name has no `.test` suffix even though the APK's application id d
 
 Release AAB **26.7 MB**, of which the native libraries are the bulk: `libllama.so` plus
 seven CPU backend variants. The debug APK is 144 MB because debug builds keep unstripped
-native symbols — do not quote that number as the app's size. Trimming native debug symbols
+native symbols: do not quote that number as the app's size. Trimming native debug symbols
 and verifying the Play-delivered download size is a P5 task.
 
 ## Tool calling, and where llama.cpp stops helping
 
 Prompts are now rendered by llama.cpp's `common_chat`, which knows how to write tool
-definitions into each model family's own syntax — that is a large amount of per-model
+definitions into each model family's own syntax. That is a large amount of per-model
 knowledge worth borrowing rather than reimplementing.
 
 Its *parser* does not cover everything. LFM2.5 emits
-`<|tool_call_start|>[get_weather(city='Manila')]<|tool_call_end|>` — Python call syntax,
-not JSON — which llama.cpp's parser returns as ordinary prose. So the engine tries
+`<|tool_call_start|>[get_weather(city='Manila')]<|tool_call_end|>`: Python call syntax,
+not JSON, which llama.cpp's parser returns as ordinary prose. So the engine tries
 llama.cpp first and falls back to `ToolCallParser`, a small unit-tested Kotlin parser that
 recognises named formats and gives up on anything else. A parser that guesses at unknown
 syntax produces confident nonsense; one that recognises formats it knows is safe to fall

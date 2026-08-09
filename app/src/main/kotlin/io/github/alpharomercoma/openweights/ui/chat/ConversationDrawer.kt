@@ -53,7 +53,7 @@ import java.util.concurrent.TimeUnit
  * Past conversations, reached by swiping from the left edge.
  *
  * The drawer is where every chat app puts history, so it is where people look. Titles come
- * from the first thing you said, which is what makes the list scannable — the alternative
+ * from the first thing you said, which is what makes the list scannable. The alternative
  * is a column of identical dates.
  */
 @Composable

@@ -38,8 +38,8 @@ import java.io.File
  *
  * The failure this guards against is subtle: an image that never reaches the model still
  * produces a fluent, confident answer, because the language model happily describes an
- * imaginary picture. So the assertion is on a detail only visible in the file — the colour
- * and shape drawn into it — rather than on the reply merely existing.
+ * imaginary picture. So the assertion is on a detail only visible in the file. The colour
+ * and shape drawn into it: rather than on the reply merely existing.
  */
 @RunWith(AndroidJUnit4::class)
 class MultimodalTest {

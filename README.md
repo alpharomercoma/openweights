@@ -5,7 +5,7 @@ no telemetry.**
 
 OpenWeights is a native Android app for local LLM inference. Search Hugging Face, see
 whether a model will actually fit *your* device before you download it, pull it, and chat
-— with histories, per-model hyperparameters, image and voice input, and a dashboard of
+ with histories, per-model hyperparameters, image and voice input, and a dashboard of
 your own usage. Everything runs on-device via [llama.cpp](https://github.com/ggml-org/llama.cpp).
 
 > Status: **early development.** See [`docs/CONTEXT.md`](docs/CONTEXT.md) for what works today.
@@ -13,7 +13,7 @@ your own usage. Everything runs on-device via [llama.cpp](https://github.com/ggm
 ## Why
 
 Existing on-device apps hand you a curated catalog. OpenWeights hands you Hugging Face.
-If someone published a GGUF an hour ago, you can run it — no vendor pipeline, no
+If someone published a GGUF an hour ago, you can run it. No vendor pipeline, no
 per-model export step, no waiting for a first-party blessing.
 
 ## What makes it different
@@ -23,9 +23,9 @@ per-model export step, no waiting for a first-party blessing.
   range requests and tells you the RAM it needs at your chosen context length, the
   throughput to expect, and whether it will run at all on your phone.
 - **Real numbers, surfaced.** Tokens/sec, time-to-first-token, and context fill are shown
-  while you chat — not hidden the way consumer assistants hide them.
+  while you chat, not hidden the way consumer assistants hide them.
 - **Per-model hyperparameters.** Temperature, top-k/top-p/min-p, repeat penalty, context
-  length, system prompt, threads — saved per model, with named presets.
+  length, system prompt, threads: saved per model, with named presets.
 - **Multimodal.** Image and audio input through llama.cpp's `libmtmd` for models that
   ship an `mmproj` projector.
 - **Private by construction.** No accounts, no analytics, no backups off the device. Your
@@ -35,7 +35,7 @@ per-model export step, no waiting for a first-party blessing.
 ## Requirements
 
 - Android 12 (API 31) or newer, `arm64-v8a`
-- Enough RAM for the model you pick — the app tells you before you download
+- Enough RAM for the model you pick. The app tells you before you download
 
 ## Build
 
@@ -73,7 +73,7 @@ choosing llama.cpp over ExecuTorch, MLC-LLM, MNN, and MediaPipe is written up in
 
 ## Contributing
 
-Issues and pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+Issues and pull requests are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 

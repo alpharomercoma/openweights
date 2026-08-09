@@ -54,8 +54,8 @@ private const val FAST_TOKENS_PER_SECOND = 25.0
  * Scrolling back through a conversation, the rail makes performance history visible: which
  * answers came quickly and which ones crawled, without reading a single number.
  *
- * The colour is never the only signal — the measured rate is printed above every finished
- * reply — and the rail carries its own description for screen readers. Grey is the ordinary
+ * The colour is never the only signal. The measured rate is printed above every finished
+ * reply, and the rail carries its own description for screen readers. Grey is the ordinary
  * case, so a rail that is actually green or red is worth a glance.
  *
  * @param tokensPerSecond measured decode throughput, or null while generation is still
@@ -92,7 +92,7 @@ private val RAIL_WIDTH = 2.dp
 
 /**
  * How full the model's context window is, drawn as a hairline that spans the screen just
- * above the composer — the place you are already looking while typing.
+ * above the composer. The place you are already looking while typing.
  *
  * @param used tokens currently held in the KV cache.
  * @param total the context length the model was loaded with.

@@ -221,7 +221,7 @@ private fun ChatContent(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
-        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -338,8 +338,8 @@ private fun ChatContent(
 /**
  * The narrow band between the transcript and the composer.
  *
- * Everything here is transient — an error, a compaction in progress, how full the context
- * is — and all of it belongs next to the composer rather than in the transcript, because
+ * Everything here is transient. An error, a compaction in progress, how full the context
+ * is, and all of it belongs next to the composer rather than in the transcript, because
  * none of it is something the model said.
  */
 @Composable
@@ -370,7 +370,7 @@ private fun StatusStrip(state: ChatUiState, dictationError: String?) {
 /**
  * The conversation itself.
  *
- * Split out from the screen because the screen is a layout — chrome, composer, sheets —
+ * Split out from the screen because the screen is a layout, chrome, composer, sheets,
  * and this is the content. Keeping them apart is also what lets the transcript be reasoned
  * about on its own when scroll behaviour needs attention.
  */
@@ -435,6 +435,7 @@ private fun ChatSheets(
         ParameterSheet(
             modelName = state.modelName,
             preferences = state.preferences,
+            supportsThinking = state.supportsThinking,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()
@@ -590,7 +591,7 @@ private const val MILLIS_PER_SECOND = 1000.0
  * Paints the throughput rail down the leading edge of whatever it modifies.
  *
  * A modifier rather than a sibling composable. Laying the rail out beside the reply meant
- * asking the row for IntrinsicSize.Min, which measures the reply twice — once to discover
+ * asking the row for IntrinsicSize.Min, which measures the reply twice, once to discover
  * its height and once to use it. Doing that to a growing markdown tree on every frame of a
  * stream is what made the transcript judder. drawBehind runs after measurement is already
  * done, so it costs a rectangle.
@@ -658,7 +659,7 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
             }
 
             hasModel -> Text(
-                "Ready. Ask it anything — nothing leaves this device.",
+                "Ready. Ask it anything. Nothing leaves this device.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

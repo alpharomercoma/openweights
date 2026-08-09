@@ -72,7 +72,7 @@ fun SettingsScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
-        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -110,7 +110,7 @@ fun SettingsScreen(
  * Light, dark, or whatever the phone is doing.
  *
  * A segmented control rather than a switch, because "follow the system" is a real third
- * answer and the one most people want — a two-state toggle would have to drop it or hide
+ * answer and the one most people want. A two-state toggle would have to drop it or hide
  * it behind a long press.
  */
 @OptIn(ExperimentalMaterial3Api::class)

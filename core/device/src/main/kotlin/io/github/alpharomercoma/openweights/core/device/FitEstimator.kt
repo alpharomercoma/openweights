@@ -112,7 +112,7 @@ class FitEstimator @Inject constructor() {
 
     /**
      * The longest context this device can hold for this model, capped by what the model
-     * was trained for — offering more than that produces gibberish, not a longer memory.
+     * was trained for: offering more than that produces gibberish, not a longer memory.
      */
     fun maxContextLength(device: DeviceProfile, metadata: GgufMetadata, fileSizeBytes: Long): Int {
         val spare = device.usableMemoryBytes - fileSizeBytes - RUNTIME_OVERHEAD_BYTES
@@ -145,8 +145,8 @@ class FitEstimator @Inject constructor() {
 /**
  * A measurement of how fast this device actually decoded a model of a known size.
  *
- * Decode is bandwidth-bound — throughput scales roughly with the reciprocal of the bytes
- * touched per token — so one honest measurement predicts other model sizes far better
+ * Decode is bandwidth-bound: throughput scales roughly with the reciprocal of the bytes
+ * touched per token, so one honest measurement predicts other model sizes far better
  * than any table of chip names would.
  */
 data class ThroughputCalibration(val measuredBytes: Long, val measuredTokensPerSecond: Double) {

@@ -90,13 +90,26 @@ class ChatRepository @Inject constructor(
         touch(message.conversationId)
     }
 
-    /** Drops a message and everything after it — what regenerating a reply needs. */
+    /** Drops a message and everything after it: what regenerating a reply needs. */
     suspend fun deleteFrom(conversationId: Long, messageId: Long) {
         database.messages().deleteFrom(conversationId, messageId)
         touch(conversationId)
     }
 
     suspend fun deleteConversation(id: Long) = database.conversations().delete(id)
+
+    /**
+     * Records which model a conversation is now running under.
+     *
+     * Chats can change model partway through, and the drawer shows the model beside each
+     * one. Without this the list keeps naming whichever model happened to start it.
+     */
+    suspend fun setModel(id: Long, modelName: String?) {
+        val conversation = database.conversations().byId(id) ?: return
+        database.conversations().upsert(
+            conversation.copy(modelName = modelName, updatedAt = clock.nowMillis()),
+        )
+    }
 
     suspend fun saveCompaction(conversationId: Long, summary: String, throughIndex: Int) {
         val conversation = database.conversations().byId(conversationId) ?: return

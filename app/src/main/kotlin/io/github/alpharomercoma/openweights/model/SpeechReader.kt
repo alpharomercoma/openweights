@@ -33,7 +33,7 @@ import javax.inject.Singleton
  * Open-weight models that generate speech directly are far too large for a phone, so
  * spoken output comes from Android's own synthesiser instead. That keeps the promise the
  * rest of the app makes: the text was produced on this device, and so is the voice reading
- * it — nothing is sent anywhere to be spoken.
+ * it. Nothing is sent anywhere to be spoken.
  */
 @Singleton
 class SpeechReader @Inject constructor(@param:ApplicationContext private val context: Context) {

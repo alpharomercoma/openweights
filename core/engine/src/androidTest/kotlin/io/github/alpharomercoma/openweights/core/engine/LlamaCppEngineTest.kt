@@ -35,7 +35,7 @@ import java.io.File
 /**
  * Exercises the real native engine against a real GGUF on a real device.
  *
- * The model is not committed — push one first:
+ * The model is not committed: push one first:
  * ```
  * adb shell mkdir -p /data/local/tmp/openweights
  * adb push LFM2.5-2.6B-Q4_K_M.gguf /data/local/tmp/openweights/model.gguf

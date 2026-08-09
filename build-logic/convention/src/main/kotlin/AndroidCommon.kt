@@ -51,6 +51,12 @@ internal fun Project.configureAndroidCommon(extension: CommonExtension) {
     extension.compileOptions.sourceCompatibility = BuildConfig.JAVA_VERSION
     extension.compileOptions.targetCompatibility = BuildConfig.JAVA_VERSION
 
+    // Robolectric reads the merged manifest and resources, so unit tests can drive real
+    // Android objects. Returning defaults instead of throwing keeps a stubbed framework
+    // call from failing a test that is not about that call.
+    extension.testOptions.unitTests.isIncludeAndroidResources = true
+    extension.testOptions.unitTests.isReturnDefaultValues = true
+
     extensions.getByType<KotlinAndroidProjectExtension>().compilerOptions {
         jvmTarget.set(BuildConfig.JVM_TARGET)
         freeCompilerArgs.addAll("-Xconsistent-data-class-copy-visibility")

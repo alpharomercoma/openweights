@@ -13,7 +13,7 @@ cd openweights
 
 You need JDK 21, the Android SDK with platform 37, NDK r29 or newer (older NDKs do not
 align native segments to 16 KB, which Google Play requires), and CMake 3.22+. The
-llama.cpp source is a pinned submodule — if you cloned without `--recurse-submodules`, run
+llama.cpp source is a pinned submodule: if you cloned without `--recurse-submodules`, run
 `git submodule update --init --depth 1`.
 
 `docs/ARCHITECTURE.md` explains how the modules fit together;

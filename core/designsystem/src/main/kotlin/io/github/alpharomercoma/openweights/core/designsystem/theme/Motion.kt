@@ -43,7 +43,7 @@ object Motion {
     /** Tab switches, list changes, the composer growing a line. The common case. */
     const val QUICK_MS = 160
 
-    /** Sheets, the drawer, dialogs — the only things given room to arrive. */
+    /** Sheets, the drawer, dialogs. The only things given room to arrive. */
     const val STANDARD_MS = 220
 
     /**

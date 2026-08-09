@@ -114,7 +114,7 @@ private fun VerdictLine(fit: FitReport) {
                 signal(OpenWeightsColors.SignalGood, OpenWeightsColors.PaperSignalGood, dark)
 
         FitVerdict.TIGHT ->
-            "Runs, but tight — other apps may be closed" to
+            "Runs, but tight: other apps may be closed" to
                 signal(OpenWeightsColors.SignalPlain, OpenWeightsColors.PaperSignalPlain, dark)
 
         FitVerdict.WONT_RUN ->

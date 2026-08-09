@@ -1,0 +1,350 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.ui.chat
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
+import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreen(
+    state: ChatUiState,
+    onSend: (String) -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+
+    // Follow the stream: keep the newest token in view while the model is writing.
+    LaunchedEffect(state.transcript.size, state.transcript.lastOrNull()?.text) {
+        if (state.transcript.isNotEmpty()) {
+            listState.animateScrollToItem(state.transcript.lastIndex)
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = state.modelName ?: "No model loaded",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        state.modelQuantization?.let { quant ->
+                            Metric(quant)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .imePadding(),
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                if (state.transcript.isEmpty()) {
+                    EmptyState(
+                        isLoadingModel = state.isLoadingModel,
+                        hasModel = state.modelName != null,
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            horizontal = 16.dp,
+                            vertical = 12.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        items(state.transcript) { entry ->
+                            when (entry.role) {
+                                ChatRole.USER -> UserTurn(entry)
+                                else -> AssistantTurn(entry)
+                            }
+                        }
+                    }
+                }
+            }
+
+            state.error?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
+            ContextMeter(used = state.contextUsed, total = state.contextSize)
+
+            Composer(
+                enabled = state.canSend,
+                isGenerating = state.isGenerating,
+                onSend = onSend,
+                onStop = onStop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserTurn(entry: TranscriptEntry) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        SelectionContainer {
+            Text(
+                text = entry.text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .widthIn(max = 300.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/**
+ * A model reply: full-bleed text beside a rail whose colour encodes how fast this reply was
+ * produced. The reply is the artifact, so it is not boxed into a bubble.
+ */
+@Composable
+private fun AssistantTurn(entry: TranscriptEntry) {
+    // Intrinsic height lets the rail match the exact height of the reply beside it.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+    ) {
+        SpeedRail(tokensPerSecond = entry.tokensPerSecond)
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            if (!entry.isStreaming && entry.tokensPerSecond != null) {
+                Metric(entry.readout())
+            }
+            SelectionContainer {
+                Text(
+                    text = entry.text.ifEmpty { "…" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+        }
+    }
+}
+
+private const val MILLIS_PER_SECOND = 1000.0
+
+private fun TranscriptEntry.readout(): String {
+    val locale = Locale.getDefault()
+    val speed = tokensPerSecond?.let { String.format(locale, "%.1f tok/s", it) }
+    val ttft = timeToFirstTokenMs?.let {
+        String.format(locale, "%.2fs to first token", it / MILLIS_PER_SECOND)
+    }
+    val tokens = generatedTokens?.let { "$it tokens" }
+    return listOfNotNull(speed, ttft, tokens).joinToString(" · ")
+}
+
+@Composable
+private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        when {
+            isLoadingModel -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.width(28.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "Loading the model into memory",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            hasModel -> Text(
+                "Ready. Ask it anything — nothing leaves this device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            else -> Text(
+                "No model loaded.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun Composer(
+    enabled: Boolean,
+    isGenerating: Boolean,
+    onSend: (String) -> Unit,
+    onStop: () -> Unit,
+) {
+    var draft by remember { mutableStateOf("") }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            modifier = Modifier.weight(1f),
+            placeholder = {
+                Text("Message", style = MaterialTheme.typography.bodyLarge)
+            },
+            textStyle = MaterialTheme.typography.bodyLarge,
+            maxLines = 6,
+            shape = RoundedCornerShape(20.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
+            ),
+        )
+
+        FilledIconButton(
+            onClick = {
+                if (isGenerating) {
+                    onStop()
+                } else if (draft.isNotBlank()) {
+                    onSend(draft)
+                    draft = ""
+                }
+            },
+            enabled = isGenerating || (enabled && draft.isNotBlank()),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        ) {
+            Icon(
+                imageVector = if (isGenerating) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
+                contentDescription = if (isGenerating) "Stop generating" else "Send message",
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
+@Composable
+private fun ChatScreenPreview() {
+    OpenWeightsTheme(dynamicColor = false) {
+        ChatScreen(
+            state = ChatUiState(
+                modelName = "LFM2.5-2.6B-Q4_K_M",
+                modelQuantization = "lfm2 2.6B Q4_K - Medium",
+                contextUsed = 1204,
+                contextSize = 4096,
+                transcript = listOf(
+                    TranscriptEntry(ChatRole.USER, "What is a KV cache?"),
+                    TranscriptEntry(
+                        role = ChatRole.ASSISTANT,
+                        text = "It stores the key and value tensors already computed for " +
+                            "previous tokens, so each new token only attends over them " +
+                            "instead of recomputing the whole sequence.",
+                        tokensPerSecond = 27.4,
+                        timeToFirstTokenMs = 412,
+                        generatedTokens = 38,
+                    ),
+                ),
+            ),
+            onSend = {},
+            onStop = {},
+        )
+    }
+}

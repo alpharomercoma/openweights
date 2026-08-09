@@ -133,6 +133,38 @@ class MultimodalTest {
         assertThat(second.content).contains("4")
     }
 
+    @Test
+    fun anAudioModelHearsWhatWasSaid() = runBlocking {
+        assumeTrue("no audio model at ${AUDIO_MODEL.path}", AUDIO_MODEL.isFile)
+        assumeTrue("no audio projector at ${AUDIO_PROJECTOR.path}", AUDIO_PROJECTOR.isFile)
+        assumeTrue("no test recording at ${RECORDING.path}", RECORDING.isFile)
+
+        engine.load(AUDIO_MODEL, ModelLoadParams(contextLength = CONTEXT), AUDIO_PROJECTOR)
+        assertThat(engine.loadedModel?.mediaSupport?.audio).isTrue()
+
+        val completed = engine.chat(
+            messages = listOf(
+                ChatMessage(
+                    role = ChatRole.USER,
+                    parts = listOf(
+                        MessagePart.File(RECORDING.absolutePath, "audio/wav"),
+                        MessagePart.Text("Transcribe what you just heard, word for word."),
+                    ),
+                ),
+            ),
+            params = SamplerParams(temperature = 0.1f, maxTokens = BUDGET, seed = 7),
+        ).toList().filterIsInstance<GenerationEvent.Completed>().single()
+
+        Log.i(TAG, "heard=${completed.content}")
+
+        // The recording says "The capital of Portugal is Lisbon, and the year was 1984."
+        // Asserting on facts only present in the audio: a model that never heard it would
+        // still answer fluently, just about nothing.
+        val heard = completed.content.lowercase()
+        assertThat(heard).contains("lisbon")
+        assertThat(heard).contains("1984")
+    }
+
     private companion object {
         const val TAG = "OpenWeightsMultimodal"
         const val CONTEXT = 4096
@@ -143,5 +175,9 @@ class MultimodalTest {
         val MODEL = File("/data/local/tmp/openweights/vl.gguf")
         val PROJECTOR = File("/data/local/tmp/openweights/mmproj.gguf")
         val IMAGE = File("/data/local/tmp/openweights/test-image.png")
+
+        val AUDIO_MODEL = File("/data/local/tmp/openweights/audio.gguf")
+        val AUDIO_PROJECTOR = File("/data/local/tmp/openweights/audio-mmproj.gguf")
+        val RECORDING = File("/data/local/tmp/openweights/test-audio.wav")
     }
 }

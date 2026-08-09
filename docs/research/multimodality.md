@@ -10,11 +10,12 @@ go in, and which can actually come out?**
 |---|---|---|---|
 | **In** | Text | Shipped | — |
 | **In** | Image | Shipped | libmtmd vision projector; verified on-device |
-| **In** | Audio | Supported by the same path | Needs an audio projector (Ultravox, Voxtral, LFM2-Audio); untested for lack of a phone-sized one |
+| **In** | Audio | Shipped | libmtmd audio projector; verified on-device with LFM2.5-Audio-1.5B |
 | **In** | Video | Shipped as sampled frames | libmtmd's own video path shells out to `ffmpeg`; we decode four frames with Android's `MediaMetadataRetriever` instead. Verified on-device |
 | **In** | Live video | Not shipped | Same mechanism as video, but prefill cost makes it dishonest to offer — see below |
 | **Out** | Text | Shipped | — |
 | **Out** | Speech | Shipped | Android `TextToSpeech`, on-device, no network |
+| **In** | Dictation | Shipped | Android's *on-device* recogniser only — never the online one |
 | **Out** | Image | Not shipped | Needs a diffusion runtime; llama.cpp does not do this |
 | **Out** | Video | Not shipped | Not plausible on a phone at any quality worth having |
 
@@ -49,6 +50,28 @@ Frame count is therefore a deliberate, visible choice rather than something hidd
 "video supported" checkbox — and *live* video, which needs this to happen continuously, is
 not something a phone-sized model can do today. Claiming otherwise would be the kind of
 demo that works once on stage.
+
+### Audio input, measured
+
+LFM2.5-Audio-1.5B at Q4_0 is 696 MB with a 220 MB projector — comfortably phone-sized, and
+the smallest audio-capable pair on the Hub worth using. Handed a four-second recording of
+"The capital of Portugal is Lisbon, and the year was 1984", it returns that sentence
+verbatim after **557 ms of prefill**. Audio is far cheaper than vision: a whole spoken
+sentence costs less prompt processing than a single 448 px image.
+
+Note what the repository also ships and llama.cpp does not use: `vocoder-` and `tokenizer-`
+GGUFs. LFM2.5-Audio is genuinely speech-to-speech, but libmtmd implements the understanding
+half only. Downloading the vocoder would buy nothing today.
+
+## Dictation is a different thing from audio input
+
+Audio input is the model listening. Dictation is the phone transcribing so you can type
+with your voice — and Android's default recogniser streams that audio to Google.
+
+OpenWeights uses `createOnDeviceSpeechRecognizer` and nothing else. Where the offline
+language pack is missing, dictation says so and stops, rather than quietly opening the
+network connection the user was told would never happen. That costs availability on some
+devices; the alternative makes the app's central claim untrue for one button.
 
 ## Output: text is what a language model produces
 

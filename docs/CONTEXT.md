@@ -178,6 +178,18 @@ adb shell "cd /data/local/tmp/probe && LD_LIBRARY_PATH=. ./engine_probe model.gg
 
 It links the real `Session`, so it tests our code and not just llama.cpp's.
 
+## The top bar is the runtime readout
+
+Every other chat app can put a product name there because the thing behind it never
+changes. Here it changes with every download, so the bar carries the runtime's identity —
+quantization, compute device, context window — and swaps to a named state while it is busy:
+loading weights, reading the prompt, generating, folding earlier turns, cooling down.
+
+"Reading the prompt" earns its place: with four video frames attached that state lasts 70
+seconds, and a spinner cannot say what the wait is for. "Cooling down" comes from
+`ThermalPolicy.isThrottling()` — a generation that has quietly halved its thread count looks
+exactly like a slow model otherwise.
+
 ## Working practice: independent review
 
 After each substantial change, run a second reviewer over the diff rather than trusting a

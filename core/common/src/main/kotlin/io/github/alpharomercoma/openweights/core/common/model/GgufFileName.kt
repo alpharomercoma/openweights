@@ -48,6 +48,19 @@ object GgufFileName {
     }
 
     /**
+     * The quantization a file was published at, or null when the name does not say.
+     *
+     * The complement of [modelIdentity]: together they account for the whole stem. Read
+     * from the name rather than the header because llama.cpp writes `general.file_type`
+     * after the tokenizer, and reading past the tokenizer costs megabytes.
+     */
+    fun quantization(fileName: String): String? {
+        val stem = fileName.removeSuffix(GGUF_SUFFIX).removePrefix(PROJECTOR_PREFIX).trim('-')
+        if (QUANTIZATION.matches(stem)) return stem
+        return QUANTIZATION_SUFFIX.find(stem)?.groupValues?.get(1)
+    }
+
+    /**
      * The name a projector is saved under locally.
      *
      * Derived from the model file rather than kept from the repository, because the two are

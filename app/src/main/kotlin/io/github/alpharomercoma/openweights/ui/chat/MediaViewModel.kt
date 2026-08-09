@@ -20,6 +20,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.model.AttachmentStore
+import io.github.alpharomercoma.openweights.model.Dictation
+import io.github.alpharomercoma.openweights.model.DictationState
 import io.github.alpharomercoma.openweights.model.SpeechReader
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
@@ -35,11 +37,25 @@ import javax.inject.Inject
 @HiltViewModel
 class MediaViewModel @Inject constructor(
     private val speech: SpeechReader,
+    private val dictation: Dictation,
     private val attachments: AttachmentStore,
 ) : ViewModel() {
 
     /** A private file for the camera app to write a photo into. */
     fun newCaptureUri(): Uri = attachments.newCaptureUri()
+
+    /** What dictation is hearing, if anything. */
+    val dictationState: StateFlow<DictationState> = dictation.state
+
+    /** True when this device can transcribe without a network. */
+    val canDictate: Boolean get() = dictation.isAvailable
+
+    /** Starts or stops dictation. [onFinal] receives the finished transcript. */
+    fun toggleDictation(onFinal: (String) -> Unit) {
+        if (dictation.state.value.isListening) dictation.stop() else dictation.start(onFinal)
+    }
+
+    fun dismissDictationError() = dictation.dismissError()
 
     val isSpeaking: StateFlow<Boolean> = speech.isSpeaking
 
@@ -54,6 +70,7 @@ class MediaViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        dictation.stop()
         speech.release()
         super.onCleared()
     }

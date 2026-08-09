@@ -3,6 +3,19 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Dictation only. Requested the first time the mic is tapped, never at launch. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
+         Package visibility for the on-device recogniser. Without this the system will not
+         tell us whether offline speech recognition exists, and the app would have to choose
+         between guessing and falling back to the online kind it has promised not to use.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".OpenWeightsApplication"

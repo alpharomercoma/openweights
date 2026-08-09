@@ -71,7 +71,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -86,6 +85,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.remember
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.model.DictationState
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -110,6 +110,9 @@ fun ChatScreen(
     onToggleReadAloud: (String) -> Unit = {},
     isSpeaking: Boolean = false,
     newCaptureUri: () -> Uri = { Uri.EMPTY },
+    dictation: DictationState = DictationState(),
+    canDictate: Boolean = false,
+    onDictate: ((String) -> Unit) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -167,6 +170,9 @@ fun ChatScreen(
             onToggleReadAloud = onToggleReadAloud,
             isSpeaking = isSpeaking,
             newCaptureUri = newCaptureUri,
+            dictation = dictation,
+            canDictate = canDictate,
+            onDictate = onDictate,
             modifier = modifier,
         )
     }
@@ -195,6 +201,9 @@ private fun ChatContent(
     onToggleReadAloud: (String) -> Unit,
     isSpeaking: Boolean,
     newCaptureUri: () -> Uri,
+    dictation: DictationState,
+    canDictate: Boolean,
+    onDictate: ((String) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -211,7 +220,7 @@ private fun ChatContent(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { ModelChip(state = state, onClick = onOpenModels) },
+                title = { RuntimeBar(state = state, onClick = onOpenModels) },
                 navigationIcon = {
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Rounded.Menu, contentDescription = "Past chats")
@@ -269,29 +278,7 @@ private fun ChatContent(
                 )
             }
 
-            state.error?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-
-            if (state.isCompacting) {
-                Metric(
-                    text = "Folding earlier turns into a summary…",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
-
-            // Only once there is something to report. An empty meter is a hairline that
-            // reads as a stray divider above the composer.
-            if (state.contextUsed > 0 && state.contextSize > 0) {
-                ContextMeter(used = state.contextUsed, total = state.contextSize)
-            }
+            StatusStrip(state = state, dictationError = dictation.error)
 
             Composer(
                 conversationKey = state.activeConversationId,
@@ -300,8 +287,12 @@ private fun ChatContent(
                 staged = state.staged,
                 canAttach = state.mediaSupport.any,
                 isAttaching = state.isAttaching,
+                canDictate = canDictate,
+                isListening = dictation.isListening,
+                heard = dictation.partial,
                 onAttach = { showAttachments = true },
                 onRemoveStaged = onRemoveStaged,
+                onDictate = onDictate,
                 onSend = onSend,
                 onStop = onStop,
                 onCommand = { command ->
@@ -336,6 +327,38 @@ private fun ChatContent(
         isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
     )
+}
+
+/**
+ * The narrow band between the transcript and the composer.
+ *
+ * Everything here is transient — an error, a compaction in progress, how full the context
+ * is — and all of it belongs next to the composer rather than in the transcript, because
+ * none of it is something the model said.
+ */
+@Composable
+private fun StatusStrip(state: ChatUiState, dictationError: String?) {
+    (state.error ?: dictationError)?.let { message ->
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+
+    if (state.isCompacting) {
+        Metric(
+            text = "Folding earlier turns into a summary…",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+    }
+
+    // Only once there is something to report. An empty meter is a hairline that reads as a
+    // stray divider above the composer.
+    if (state.contextUsed > 0 && state.contextSize > 0) {
+        ContextMeter(used = state.contextUsed, total = state.contextSize)
+    }
 }
 
 /**
@@ -460,26 +483,6 @@ private fun JumpToLatestButton(visible: Boolean, onClick: () -> Unit, modifier: 
                 contentDescription = "Jump to the latest message",
                 modifier = Modifier.size(18.dp),
             )
-        }
-    }
-}
-
-@Composable
-private fun ModelChip(state: ChatUiState, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(Radius.sm))
-            .combinedClickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = state.modelName ?: "Choose a model",
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        state.modelQuantization?.let { quantization ->
-            Metric(quantization, maxLines = 1)
         }
     }
 }

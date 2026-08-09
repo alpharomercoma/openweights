@@ -125,8 +125,8 @@ Output is text plus `TextToSpeech` read-aloud. Speech-generating open models exi
 30B-class and llama.cpp does not implement their audio decoders; image generation would be a
 second engine. `docs/research/multimodality.md` has the full reasoning and the numbers.
 
-Still to come: dictation via `SpeechRecognizer`, and an audio model small enough to prove
-the audio path on a phone.
+Dictation uses Android's on-device recogniser only, so the "nothing leaves this device"
+promise holds for the microphone too. Audio input is proven with LFM2.5-Audio-1.5B.
 
 ## 9. Play Store production — planned
 

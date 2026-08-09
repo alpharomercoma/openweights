@@ -81,6 +81,15 @@ class ThermalPolicy @Inject constructor(
         }
     }
 
+    /**
+     * True when the phone is hot enough that the thread plan has been cut back.
+     *
+     * Exposed so the UI can say so. A generation that has quietly halved its thread count
+     * looks identical to a slow model, and "the phone is warm" is the difference between a
+     * user thinking the app is broken and knowing to put it down for a minute.
+     */
+    fun isThrottling(): Boolean = throttleLevel() != ThrottleLevel.NONE
+
     private fun throttleLevel(): ThrottleLevel {
         val status = context.getSystemService<PowerManager>()?.currentThermalStatus
             ?: PowerManager.THERMAL_STATUS_NONE

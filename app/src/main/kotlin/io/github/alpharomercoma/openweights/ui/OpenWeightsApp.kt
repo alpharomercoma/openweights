@@ -149,6 +149,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             composable(Destination.CHAT.route) {
                 val state by chatViewModel.uiState.collectAsStateWithLifecycle()
                 val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
+                val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
                     // The view model outlives the composition, so returning to this tab
@@ -173,6 +174,9 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onToggleReadAloud = mediaViewModel::toggleReadAloud,
                     isSpeaking = isSpeaking,
                     newCaptureUri = mediaViewModel::newCaptureUri,
+                    dictation = dictation,
+                    canDictate = mediaViewModel.canDictate,
+                    onDictate = mediaViewModel::toggleDictation,
                 )
             }
 

@@ -69,6 +69,14 @@ class GgufFileNameTest {
     }
 
     @Test
+    fun `the quantization is the part the identity leaves behind`() {
+        assertThat(GgufFileName.quantization("LFM2.5-VL-1.6B-Q4_K_M.gguf")).isEqualTo("Q4_K_M")
+        assertThat(GgufFileName.quantization("gemma-3-4b-it-BF16.gguf")).isEqualTo("BF16")
+        assertThat(GgufFileName.quantization("mmproj-F16.gguf")).isEqualTo("F16")
+        assertThat(GgufFileName.quantization("some-model.gguf")).isNull()
+    }
+
+    @Test
     fun `a projector is saved under a name derived from its model`() {
         assertThat(GgufFileName.projectorNameFor("LFM2.5-VL-1.6B-Q4_K_M.gguf"))
             .isEqualTo("mmproj-LFM2.5-VL-1.6B-Q4_K_M.gguf")

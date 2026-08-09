@@ -16,6 +16,10 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
@@ -37,6 +41,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -56,11 +61,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -86,8 +93,12 @@ fun Composer(
     staged: List<MessagePart.File>,
     canAttach: Boolean,
     isAttaching: Boolean,
+    canDictate: Boolean,
+    isListening: Boolean,
+    heard: String,
     onAttach: () -> Unit,
     onRemoveStaged: (MessagePart.File) -> Unit,
+    onDictate: ((String) -> Unit) -> Unit,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
@@ -172,7 +183,12 @@ fun Composer(
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (draft.isEmpty()) {
                             Text(
-                                text = "Message",
+                                // While listening the placeholder carries what has been
+                                // heard so far, so the words appear where they will land
+                                // rather than in a separate panel.
+                                text = heard.ifEmpty {
+                                    if (isListening) "Listening…" else "Message"
+                                },
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -204,6 +220,13 @@ fun Composer(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                if (canDictate) {
+                    DictateButton(
+                        isListening = isListening,
+                        enabled = enabled,
+                        onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
+                    )
+                }
                 SendButton(
                     isGenerating = isGenerating,
                     enabled = isGenerating || (enabled && hasSomethingToSend),
@@ -265,6 +288,48 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
     }
 }
 
+/**
+ * The microphone, and the permission it needs.
+ *
+ * The permission is requested on the first tap and never at launch: an app that asks for
+ * the microphone before you have asked it for anything has not earned the answer. Denial
+ * is silent by design — the system dialog already said what happened, and a second message
+ * repeating it is the app arguing with the user.
+ */
+@Composable
+private fun DictateButton(isListening: Boolean, enabled: Boolean, onDictate: () -> Unit) {
+    val context = LocalContext.current
+    val microphone = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) onDictate() }
+
+    IconButton(
+        enabled = enabled,
+        onClick = {
+            val granted =
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+            if (granted == PackageManager.PERMISSION_GRANTED) {
+                onDictate()
+            } else {
+                microphone.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        },
+    ) {
+        Icon(
+            imageVector = if (isListening) Icons.Rounded.Stop else Icons.Rounded.Mic,
+            contentDescription = if (isListening) "Stop dictation" else "Dictate a message",
+            tint = if (isListening) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
+/** Appends dictated words to whatever was already typed, with a space where one is due. */
+private fun String.appended(heard: String): String = if (isEmpty()) heard else "${trimEnd()} $heard"
+
 /** Six lines of draft before it scrolls: past that the composer eats the conversation. */
 private const val MAX_LINES = 6
 
@@ -283,8 +348,12 @@ private fun ComposerPreview() {
                 staged = emptyList(),
                 canAttach = true,
                 isAttaching = false,
+                canDictate = true,
+                isListening = false,
+                heard = "",
                 onAttach = {},
                 onRemoveStaged = {},
+                onDictate = {},
                 onSend = {},
                 onStop = {},
                 onCommand = {},

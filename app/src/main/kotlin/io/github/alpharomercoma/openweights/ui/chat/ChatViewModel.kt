@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
@@ -84,6 +85,31 @@ data class ConversationSummary(
     val updatedAt: Long,
 )
 
+/**
+ * What the runtime is doing.
+ *
+ * Named states rather than a spinner, because on a phone these are minutes apart and they
+ * mean different things: reading a prompt with four video frames in it is not the same
+ * wait as generating, and a phone that has quietly halved its thread count looks exactly
+ * like a slow model unless something says so.
+ *
+ * This is the part of the interface no cloud assistant has, because no cloud assistant is
+ * running on hardware the user can feel getting warm.
+ */
+enum class RuntimeState(val label: String) {
+    NO_MODEL("no model"),
+    LOADING("loading weights"),
+    READY("ready"),
+    READING("reading the prompt"),
+    GENERATING("generating"),
+    COMPACTING("folding earlier turns"),
+    THROTTLED("cooling down"),
+    ;
+
+    /** True while the runtime is busy, which is when the state is worth showing at all. */
+    val isBusy: Boolean get() = this != READY && this != NO_MODEL
+}
+
 /** Everything the chat screen renders. */
 data class ChatUiState(
     val modelName: String? = null,
@@ -105,7 +131,43 @@ data class ChatUiState(
     val staged: List<MessagePart.File> = emptyList(),
     /** True while a picked file is being copied in. */
     val isAttaching: Boolean = false,
+    /** The compute device the engine is actually running on, e.g. `CPU`. */
+    val backend: String? = null,
+    /** True while the phone is hot enough that the thread plan has been cut back. */
+    val isThrottled: Boolean = false,
 ) {
+    /**
+     * The runtime's current state, in the order it matters.
+     *
+     * Throttling outranks everything: it explains a slowness the other states cannot, and
+     * a user who does not know the phone is hot has no reason to put it down.
+     */
+    val runtimeState: RuntimeState
+        get() = when {
+            isThrottled -> RuntimeState.THROTTLED
+            isLoadingModel -> RuntimeState.LOADING
+            modelName == null -> RuntimeState.NO_MODEL
+            isCompacting -> RuntimeState.COMPACTING
+            // No text yet means the prompt is still being read — which with an attachment
+            // is most of the wait, and is the one part a spinner cannot explain.
+            isGenerating && transcript.lastOrNull()?.text.isNullOrEmpty() -> RuntimeState.READING
+            isGenerating -> RuntimeState.GENERATING
+            else -> RuntimeState.READY
+        }
+
+    /**
+     * What is loaded, in one line: quantization, compute device, context window.
+     *
+     * Shown whenever the runtime is idle. It is the answer to "what am I actually talking
+     * to", which for this app changes with every download and is otherwise invisible.
+     */
+    val runtimeIdentity: String
+        get() = listOfNotNull(
+            modelQuantization,
+            backend,
+            contextSize.takeIf { it > 0 }?.let { "$it ctx" },
+        ).joinToString(" · ")
+
     val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
 
     /** How full the model's context window is, as a fraction. */
@@ -194,8 +256,12 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
+                        backend = engine.computeDevices().firstOrNull()?.id?.uppercase(),
                         modelName = modelFile.nameWithoutExtension,
-                        modelQuantization = info?.description,
+                        // The filename's own quantization, not llama's verbose description:
+                        // "Q4_K_M" beside the compute device and context window reads as a
+                        // spec line, "lfm2 1.2B Q4_K - Medium" reads as a sentence.
+                        modelQuantization = GgufFileName.quantization(modelFile.name),
                         contextSize = info?.contextSize ?: 0,
                         contextUsed = info?.contextUsed ?: 0,
                         preferences = preferences,
@@ -312,19 +378,7 @@ class ChatViewModel @Inject constructor(
                 // Re-planned per reply: the phone is a different machine hot than cold,
                 // and a count chosen at load time is wrong by the third long answer.
                 // Inside the try because it suspends, so Stop can land here too.
-                val plan = thermalPolicy.plan()
-                if (plan.shouldPause) {
-                    _uiState.update {
-                        it.copy(
-                            isGenerating = false,
-                            error = "The phone is too hot to keep generating. It will work " +
-                                "again once it cools down.",
-                        )
-                    }
-                    updateLastEntry { it.copy(isStreaming = false) }
-                    return@launch
-                }
-                engine.setThreads(plan.generateThreads, plan.batchThreads)
+                if (!applyThreadPlan()) return@launch
 
                 engine.chat(conversation, state.preferences.toSamplerParams()).collect { event ->
                     when (event) {
@@ -352,9 +406,40 @@ class ChatViewModel @Inject constructor(
                 updateLastEntry { it.copy(isStreaming = false, isReasoningInProgress = false) }
                 _uiState.update { it.copy(error = failure.userMessage()) }
             }
-            _uiState.update { it.copy(isGenerating = false) }
+            // Re-read rather than leave the last reading standing: a phone that has cooled
+            // between replies should stop claiming it is hot.
+            _uiState.update {
+                it.copy(isGenerating = false, isThrottled = thermalPolicy.isThrottling())
+            }
             compactIfNeeded()
         }
+    }
+
+    /**
+     * Re-plans the thread count for this reply, and says whether to go ahead.
+     *
+     * Re-planned per reply because the phone is a different machine hot than cold, and a
+     * count chosen at load time is wrong by the third long answer. Returns false when the
+     * device is hot enough that the right move is to stop rather than to stop slightly
+     * less: sustained inference is among the heaviest things this hardware can do.
+     */
+    private suspend fun applyThreadPlan(): Boolean {
+        val plan = thermalPolicy.plan()
+        _uiState.update { it.copy(isThrottled = thermalPolicy.isThrottling()) }
+
+        if (plan.shouldPause) {
+            _uiState.update {
+                it.copy(
+                    isGenerating = false,
+                    error = "The phone is too hot to keep generating. It will work again " +
+                        "once it cools down.",
+                )
+            }
+            updateLastEntry { it.copy(isStreaming = false) }
+            return false
+        }
+        engine.setThreads(plan.generateThreads, plan.batchThreads)
+        return true
     }
 
     /**

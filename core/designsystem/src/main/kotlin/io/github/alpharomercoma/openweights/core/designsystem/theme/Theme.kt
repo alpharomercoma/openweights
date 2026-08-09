@@ -79,6 +79,7 @@ fun OpenWeightsTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = OpenWeightsTypography,
+            shapes = OpenWeightsShapes,
             content = content,
         )
     }

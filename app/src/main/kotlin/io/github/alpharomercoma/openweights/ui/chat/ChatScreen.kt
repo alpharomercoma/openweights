@@ -30,11 +30,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -44,27 +44,20 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
-import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Menu
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -90,6 +83,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Reasonin
 import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -204,10 +198,15 @@ private fun ChatContent(
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
     var showParameters by remember { mutableStateOf(false) }
     var showAttachments by remember { mutableStateOf(false) }
+    val clipboard = rememberMessageClipboard()
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The top bar applies the status-bar inset itself and the app's navigation bar owns
+        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // chrome floating away from the edges it belongs to.
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { ModelChip(state = state, onClick = onOpenModels) },
@@ -227,6 +226,12 @@ private fun ChatContent(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
             )
+            // Only once something has scrolled under it. A permanent rule draws a line
+            // across an empty screen; an absent one lets a thumbnail collide with the
+            // model name. Appearing on demand is the honest version of both.
+            if (listState.canScrollBackward) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
         },
     ) { innerPadding ->
         Column(
@@ -242,29 +247,15 @@ private fun ChatContent(
                         hasModel = state.modelName != null,
                     )
                 } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        items(state.transcript, key = { it.id }) { entry ->
-                            entry.compactionNote?.let { note ->
-                                CompactionMarker(note)
-                            }
-                            when (entry.role) {
-                                ChatRole.USER -> UserTurn(
-                                    entry = entry,
-                                    onLongPress = { onActionsForId(entry.id) },
-                                )
-
-                                else -> AssistantTurn(
-                                    entry = entry,
-                                    onLongPress = { onActionsForId(entry.id) },
-                                )
-                            }
-                        }
-                    }
+                    Transcript(
+                        state = state,
+                        listState = listState,
+                        isSpeaking = isSpeaking,
+                        clipboard = clipboard,
+                        onActionsForId = onActionsForId,
+                        onToggleReadAloud = onToggleReadAloud,
+                        onRegenerate = onRegenerate,
+                    )
                 }
 
                 JumpToLatestButton(
@@ -294,7 +285,11 @@ private fun ChatContent(
                 )
             }
 
-            ContextMeter(used = state.contextUsed, total = state.contextSize)
+            // Only once there is something to report. An empty meter is a hairline that
+            // reads as a stray divider above the composer.
+            if (state.contextUsed > 0 && state.contextSize > 0) {
+                ContextMeter(used = state.contextUsed, total = state.contextSize)
+            }
 
             Composer(
                 enabled = state.canSend,
@@ -338,6 +333,55 @@ private fun ChatContent(
         isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
     )
+}
+
+/**
+ * The conversation itself.
+ *
+ * Split out from the screen because the screen is a layout — chrome, composer, sheets —
+ * and this is the content. Keeping them apart is also what lets the transcript be reasoned
+ * about on its own when scroll behaviour needs attention.
+ */
+@Composable
+@Suppress("LongParameterList")
+private fun Transcript(
+    state: ChatUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    isSpeaking: Boolean,
+    clipboard: MessageClipboard,
+    onActionsForId: (Long?) -> Unit,
+    onToggleReadAloud: (String) -> Unit,
+    onRegenerate: () -> Unit,
+) {
+    val lastId = state.transcript.lastOrNull()?.id
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        items(state.transcript, key = { it.id }) { entry ->
+            entry.compactionNote?.let { note -> CompactionMarker(note) }
+            when (entry.role) {
+                ChatRole.USER -> UserTurn(
+                    entry = entry,
+                    onLongPress = { onActionsForId(entry.id) },
+                )
+
+                else -> AssistantTurn(
+                    entry = entry,
+                    isSpeaking = isSpeaking,
+                    onLongPress = { onActionsForId(entry.id) },
+                    onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
+                    onReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
+                    // Only the last reply can be retried: regenerating an earlier one would
+                    // silently discard everything said after it.
+                    onRetry = onRegenerate.takeIf { entry.id == lastId && !state.isGenerating },
+                )
+            }
+        }
+    }
 }
 
 /** The modal sheets the chat screen can raise: model settings and message actions. */
@@ -417,7 +461,7 @@ private fun JumpToLatestButton(visible: Boolean, onClick: () -> Unit, modifier: 
 private fun ModelChip(state: ChatUiState, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .combinedClickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
@@ -447,7 +491,7 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(Radius.md))
                     .combinedClickable(onClick = {}, onLongClick = onLongPress)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -462,7 +506,15 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
  * boxed into a bubble the way the user's own message is.
  */
 @Composable
-private fun AssistantTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
+@Suppress("LongParameterList")
+private fun AssistantTurn(
+    entry: TranscriptEntry,
+    isSpeaking: Boolean,
+    onLongPress: () -> Unit,
+    onCopy: () -> Unit,
+    onReadAloud: () -> Unit,
+    onRetry: (() -> Unit)?,
+) {
     // Intrinsic height lets the rail match the exact height of the reply beside it.
     Row(
         modifier = Modifier
@@ -502,6 +554,18 @@ private fun AssistantTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            // Only once the reply has finished: actions on a half-written answer copy half
+            // an answer, and a retry mid-stream is a stop the user did not ask for.
+            if (!entry.isStreaming && entry.answer.isNotEmpty()) {
+                MessageActions(
+                    isSpeaking = isSpeaking,
+                    onCopy = onCopy,
+                    onReadAloud = onReadAloud,
+                    onRetry = onRetry,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }
@@ -511,10 +575,12 @@ private const val MILLIS_PER_SECOND = 1000.0
 private fun TranscriptEntry.readout(): String {
     val locale = Locale.getDefault()
     val speed = tokensPerSecond?.let { String.format(locale, "%.1f tok/s", it) }
+    // Abbreviated so the line survives one phone width at the metric size: three readouts
+    // that wrap are harder to compare than three that do not.
     val ttft = timeToFirstTokenMs?.let {
-        String.format(locale, "%.2fs to first token", it / MILLIS_PER_SECOND)
+        String.format(locale, "%.1fs first token", it / MILLIS_PER_SECOND)
     }
-    val tokens = generatedTokens?.let { "$it tokens" }
+    val tokens = generatedTokens?.let { "$it tok" }
     return listOfNotNull(speed, ttft, tokens).joinToString(" · ")
 }
 
@@ -575,115 +641,6 @@ private fun CompactionMarker(note: String) {
         HorizontalDivider(modifier = Modifier.weight(1f))
         Metric(note)
         HorizontalDivider(modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-@Suppress("LongParameterList")
-private fun Composer(
-    enabled: Boolean,
-    isGenerating: Boolean,
-    staged: List<MessagePart.File>,
-    canAttach: Boolean,
-    isAttaching: Boolean,
-    onAttach: () -> Unit,
-    onRemoveStaged: (MessagePart.File) -> Unit,
-    onSend: (String) -> Unit,
-    onStop: () -> Unit,
-    onCommand: (SlashCommand) -> Unit,
-) {
-    var draft by remember { mutableStateOf("") }
-    val commands = SlashCommand.match(draft)
-    // An attachment alone is a complete message, so the send button lights up for it.
-    val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty()
-
-    if (commands != null) {
-        SlashCommandPalette(
-            commands = commands,
-            onSelect = { command ->
-                draft = ""
-                onCommand(command)
-            },
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-    }
-
-    if (staged.isNotEmpty()) {
-        StagedAttachments(
-            attachments = staged,
-            onRemove = onRemoveStaged,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Left of the field, where every other chat app puts it. Present only when the
-        // loaded model can read attachments, so it never promises something that fails.
-        if (canAttach) {
-            IconButton(
-                onClick = onAttach,
-                enabled = enabled && !isAttaching,
-                modifier = Modifier.padding(bottom = 4.dp),
-            ) {
-                if (isAttaching) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = "Attach a file",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text("Message", style = MaterialTheme.typography.bodyLarge) },
-            textStyle = MaterialTheme.typography.bodyLarge,
-            maxLines = 6,
-            shape = RoundedCornerShape(20.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
-            ),
-        )
-
-        FilledIconButton(
-            onClick = {
-                if (isGenerating) {
-                    onStop()
-                } else if (hasSomethingToSend) {
-                    onSend(draft)
-                    draft = ""
-                }
-            },
-            enabled = isGenerating || (enabled && hasSomethingToSend),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-        ) {
-            Icon(
-                imageVector = if (isGenerating) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
-                contentDescription = if (isGenerating) "Stop generating" else "Send message",
-            )
-        }
     }
 }
 

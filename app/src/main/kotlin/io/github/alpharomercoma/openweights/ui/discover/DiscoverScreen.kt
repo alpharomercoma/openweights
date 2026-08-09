@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -51,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import kotlin.math.roundToInt
@@ -71,6 +73,10 @@ fun DiscoverScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The top bar applies the status-bar inset itself and the app's navigation bar owns
+        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // chrome floating away from the edges it belongs to.
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -111,7 +117,7 @@ fun DiscoverScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 placeholder = { Text("Search Hugging Face") },
                 singleLine = true,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(Radius.md),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = ImeAction.Search,
                 ),
@@ -167,7 +173,7 @@ private fun ModelRow(model: HubModel, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .clickable(onClick = onClick)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(14.dp),
@@ -252,7 +258,7 @@ private fun Callout(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(12.dp),
     )

@@ -62,6 +62,7 @@ import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import java.io.File
 
@@ -234,7 +235,7 @@ fun SentAttachments(attachments: List<MessagePart.File>, modifier: Modifier = Mo
  */
 @Composable
 private fun AttachmentThumbnail(attachment: MessagePart.File, size: Int) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(Radius.sm)
     if (attachment.kind == MediaKind.IMAGE) {
         AsyncImage(
             model = File(attachment.path),
@@ -283,7 +284,7 @@ private fun MediaSupport.acceptedMimeTypes(): Array<String> = buildList {
 }.toTypedArray()
 
 private const val STAGED_SIZE = 64
-private const val SENT_SIZE = 96
+private const val SENT_SIZE = 76
 
 @Preview(showBackground = true, backgroundColor = 0xFF0A0E11)
 @Composable

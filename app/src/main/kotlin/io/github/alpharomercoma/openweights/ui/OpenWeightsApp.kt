@@ -16,6 +16,11 @@
 
 package io.github.alpharomercoma.openweights.ui
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -28,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +49,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
 import io.github.alpharomercoma.openweights.ui.chat.MediaViewModel
@@ -64,6 +71,9 @@ private enum class Destination(val route: String, val label: String, val icon: I
     SETTINGS("settings", "Settings", Icons.Rounded.Settings),
 }
 
+/** A twelfth of the screen: enough rise to read as arrival, small enough to stay quick. */
+private const val TAB_SLIDE = 12
+
 @Composable
 fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -79,6 +89,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The navigation bar handles the gesture inset itself, and each screen handles the
+        // status bar. Letting this scaffold apply system insets too padded everything
+        // twice, which is what left the top bar and the composer floating mid-screen.
+        contentWindowInsets = WindowInsets(0),
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Destination.entries.forEach { destination ->
@@ -97,6 +111,13 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         },
                         icon = { Icon(destination.icon, contentDescription = null) },
                         label = { Text(destination.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                     )
                 }
             }
@@ -105,7 +126,25 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         NavHost(
             navController = navController,
             startDestination = Destination.CHAT.route,
-            modifier = Modifier.fillMaxSize().padding(padding),
+            // Consuming what has just been applied is what lets a screen's imePadding()
+            // add only the difference. Without it the keyboard pushes the composer up by
+            // its full height while the navigation bar's reserved space stays behind it,
+            // leaving a band of dead screen between the two.
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding),
+            // Compose Navigation defaults to 700 ms fades, which reads as the app thinking
+            // when it is only switching tabs. A tab switch should feel like it already
+            // happened; the slight rise gives it direction without costing time.
+            enterTransition = {
+                fadeIn(Motion.quick()) + slideInVertically(Motion.quick()) { it / TAB_SLIDE }
+            },
+            exitTransition = { fadeOut(Motion.instant()) },
+            popEnterTransition = {
+                fadeIn(Motion.quick()) + slideInVertically(Motion.quick()) { it / TAB_SLIDE }
+            },
+            popExitTransition = { fadeOut(Motion.instant()) },
         ) {
             composable(Destination.CHAT.route) {
                 val state by chatViewModel.uiState.collectAsStateWithLifecycle()

@@ -18,7 +18,6 @@ package io.github.alpharomercoma.openweights.core.designsystem.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -39,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import kotlin.math.roundToInt
@@ -51,6 +51,10 @@ private const val FAST_TOKENS_PER_SECOND = 25.0
  *
  * Scrolling back through a conversation, the rail makes performance history visible: which
  * answers came quickly and which ones crawled, without reading a single number.
+ *
+ * The colour is never the only signal — the measured rate is printed above every finished
+ * reply — and the rail carries its own description for screen readers. Grey is the ordinary
+ * case, so a rail that is actually green or red is worth a glance.
  *
  * @param tokensPerSecond measured decode throughput, or null while generation is still
  *   warming up, in which case the rail is drawn neutral.
@@ -65,14 +69,20 @@ fun SpeedRail(tokensPerSecond: Double?, modifier: Modifier = Modifier) {
             dark = dark,
         )
     }
-    val color by animateColorAsState(target, tween(durationMillis = 600), label = "railColor")
+    // Short: this describes a number that has already settled, and a rail still drifting
+    // towards its colour half a second later suggests a measurement still being taken.
+    val color by animateColorAsState(target, Motion.quick(), label = "railColor")
+    val description = tokensPerSecond
+        ?.let { "Generated at ${it.roundToInt()} tokens per second" }
+        ?: "Generating"
 
     Box(
         modifier = modifier
             .width(RAIL_WIDTH)
             .fillMaxHeight()
             .clip(RoundedCornerShape(RAIL_WIDTH / 2))
-            .background(color),
+            .background(color)
+            .semantics { contentDescription = description },
     )
 }
 
@@ -88,7 +98,7 @@ private val RAIL_WIDTH = 2.dp
 @Composable
 fun ContextMeter(used: Int, total: Int, modifier: Modifier = Modifier) {
     val fraction = if (total > 0) (used.toFloat() / total).coerceIn(0f, 1f) else 0f
-    val animated by animateFloatAsState(fraction, tween(400), label = "contextFill")
+    val animated by animateFloatAsState(fraction, Motion.quick(), label = "contextFill")
     val dark = LocalIsDarkTheme.current
     // Headroom, not fill, drives the colour: a nearly full context is the hot end.
     val color = signalColor(1f - fraction, dark)

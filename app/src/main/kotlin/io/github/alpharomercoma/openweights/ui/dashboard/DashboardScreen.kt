@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +49,7 @@ import io.github.alpharomercoma.openweights.core.data.UsageSummary
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import java.util.Locale
 
@@ -64,6 +66,10 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The top bar applies the status-bar inset itself and the app's navigation bar owns
+        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // chrome floating away from the edges it belongs to.
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("Usage", style = MaterialTheme.typography.titleMedium) },
@@ -140,7 +146,7 @@ private fun Headline(summary: UsageSummary) {
 private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(12.dp),
     ) {
@@ -192,19 +198,29 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("By model", style = MaterialTheme.typography.titleSmall)
 
+        val dark = LocalIsDarkTheme.current
+
         models.forEach { model ->
             Column {
                 Text(model.modelName, style = MaterialTheme.typography.bodyMedium)
-                Metric(
-                    buildString {
-                        append("${model.generatedTokens.grouped()} tokens")
-                        append(" · ${(model.generatedTokens * 100 / total)}%")
-                        append(" · ${model.replies} replies")
-                        model.averageTokensPerSecond?.let {
-                            append(String.format(Locale.getDefault(), " · %.1f tok/s", it))
-                        }
-                    },
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Metric(
+                        buildString {
+                            append("${model.generatedTokens.grouped()} tokens")
+                            append(" · ${(model.generatedTokens * 100 / total)}%")
+                            append(" · ${model.replies} replies")
+                        },
+                    )
+                    // The one measurement on this screen, so the one thing that earns the
+                    // data scale. Token counts are volume, not health: colouring those by
+                    // size would say a busy day was a fast one.
+                    model.averageTokensPerSecond?.let { rate ->
+                        Metric(
+                            text = String.format(Locale.getDefault(), "· %.1f tok/s", rate),
+                            color = signalColor((rate / FAST_TOKENS_PER_SECOND).toFloat(), dark),
+                        )
+                    }
+                }
             }
         }
     }
@@ -214,6 +230,9 @@ private const val BAR_FILL = 0.7f
 private const val MILLIS_PER_SECOND = 1000
 private const val SECONDS_PER_MINUTE = 60
 private const val MINUTES_PER_HOUR = 60
+
+/** Matches the rail in chat, so the same number means the same colour in both places. */
+private const val FAST_TOKENS_PER_SECOND = 25.0
 
 private fun Long.grouped(): String = String.format(Locale.getDefault(), "%,d", this)
 

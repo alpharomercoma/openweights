@@ -41,6 +41,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.device.FitReport
 import io.github.alpharomercoma.openweights.core.device.FitVerdict
 import io.github.alpharomercoma.openweights.core.hub.HubFile
@@ -58,7 +59,7 @@ fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -110,19 +111,19 @@ private fun VerdictLine(fit: FitReport) {
     val (label, color) = when (fit.verdict) {
         FitVerdict.COMFORTABLE ->
             "Runs comfortably" to
-                signal(OpenWeightsColors.SignalFast, OpenWeightsColors.SignalFastOnLight, dark)
+                signal(OpenWeightsColors.SignalGood, OpenWeightsColors.PaperSignalGood, dark)
 
         FitVerdict.TIGHT ->
             "Runs, but tight — other apps may be closed" to
-                signal(OpenWeightsColors.SignalMid, OpenWeightsColors.SignalMidOnLight, dark)
+                signal(OpenWeightsColors.SignalPlain, OpenWeightsColors.PaperSignalPlain, dark)
 
         FitVerdict.WONT_RUN ->
             "Will not run at this context length" to
-                signal(OpenWeightsColors.SignalHot, OpenWeightsColors.SignalHotOnLight, dark)
+                signal(OpenWeightsColors.SignalPoor, OpenWeightsColors.PaperSignalPoor, dark)
 
         FitVerdict.NO_ROOM_TO_DOWNLOAD ->
             "Not enough free storage to download" to
-                signal(OpenWeightsColors.SignalHot, OpenWeightsColors.SignalHotOnLight, dark)
+                signal(OpenWeightsColors.SignalPoor, OpenWeightsColors.PaperSignalPoor, dark)
     }
 
     Text(text = label, style = MaterialTheme.typography.bodyMedium, color = color)

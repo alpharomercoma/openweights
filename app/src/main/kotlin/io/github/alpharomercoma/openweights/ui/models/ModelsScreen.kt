@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.ui.discover.formatBytes
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,6 +62,10 @@ fun ModelsScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The top bar applies the status-bar inset itself and the app's navigation bar owns
+        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // chrome floating away from the edges it belongs to.
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -110,7 +117,7 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -146,7 +153,7 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .clickable(onClick = onUse)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(14.dp),
@@ -164,7 +171,14 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
                 ).joinToString(" · "),
             )
         }
-        TextButton(onClick = onDelete) { Text("Delete") }
+        TextButton(
+            onClick = onDelete,
+            // The accent means "this is the thing to do". Deleting is not, so it
+            // takes the error colour: still reachable, never the default read.
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+        ) { Text("Delete") }
     }
 }
 

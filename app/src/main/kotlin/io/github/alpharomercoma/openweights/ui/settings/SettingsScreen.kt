@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +51,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
 import io.github.alpharomercoma.openweights.ui.discover.formatBytes
 
@@ -63,6 +66,10 @@ fun SettingsScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        // The top bar applies the status-bar inset itself and the app's navigation bar owns
+        // the bottom one, so this scaffold must not add either — doing both is what left the
+        // chrome floating away from the edges it belongs to.
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = { Text("Settings", style = MaterialTheme.typography.titleMedium) },
@@ -113,7 +120,7 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(Radius.sm),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -131,7 +138,14 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
                 Text(if (state.isCheckingToken) "Checking…" else "Save and verify")
             }
             if (state.hasToken) {
-                TextButton(onClick = onClear) { Text("Remove") }
+                TextButton(
+                    onClick = onClear,
+                    // The accent means "this is the thing to do". Deleting is not, so it
+                    // takes the error colour: still reachable, never the default read.
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text("Remove") }
             }
         }
 

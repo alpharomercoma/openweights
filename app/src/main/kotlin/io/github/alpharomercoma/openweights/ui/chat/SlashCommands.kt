@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 
 /**
  * Something the user can do to the conversation rather than say to the model.
@@ -75,7 +76,7 @@ fun SlashCommandPalette(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         items(commands, key = { it.trigger }) { command ->

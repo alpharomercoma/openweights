@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -164,7 +165,7 @@ fun ParameterSheet(
                     placeholder = { Text("Optional") },
                     minLines = 2,
                     maxLines = 5,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(Radius.sm),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

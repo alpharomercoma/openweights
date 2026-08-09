@@ -400,10 +400,22 @@ class ChatViewModel @Inject constructor(
                 // Inside the try because it suspends, so Stop can land here too.
                 if (!applyThreadPlan()) return@launch
 
+                var lastFrameAt = 0L
+
                 engine.chat(conversation, state.preferences.toSamplerParams()).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
                             reply.append(event.text)
+
+                            // Not every token: re-parsing the whole reply and rebuilding
+                            // its markdown tree costs more than a frame, so publishing per
+                            // token on a phone that is also running the model means the
+                            // list never settles between updates. Coalescing to roughly
+                            // every other frame is still faster than anyone reads.
+                            val now = System.currentTimeMillis()
+                            if (now - lastFrameAt < STREAM_FRAME_MS) return@collect
+                            lastFrameAt = now
+
                             val parsed = parseAssistantReply(reply.toString())
                             if (reasoningEndedAt == null &&
                                 parsed.reasoning != null &&
@@ -414,7 +426,11 @@ class ChatViewModel @Inject constructor(
                             applyStreamedText(reply.toString(), parsed, reasoningEndedAt, startedAt)
                         }
 
-                        is GenerationEvent.Completed -> applyCompletion(event)
+                        is GenerationEvent.Completed -> {
+                            // The coalescing above can have skipped the last few tokens,
+                            // so the finished reply is applied in full regardless.
+                            applyCompletion(event)
+                        }
                     }
                 }
             } catch (cancellation: CancellationException) {
@@ -732,6 +748,15 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
     }
 }
+
+/**
+ * How often streamed text reaches the screen, in milliseconds.
+ *
+ * Two frames at 60 Hz. Below this the work per update — re-parse, recompose, re-measure,
+ * re-scroll — starts to overlap itself and the transcript visibly judders; above it the
+ * text arrives in visible chunks.
+ */
+private const val STREAM_FRAME_MS = 33L
 
 private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."
 

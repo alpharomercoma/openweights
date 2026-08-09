@@ -45,11 +45,28 @@ std::string to_utf8(JNIEnv * env, jstring value) {
     return result;
 }
 
+/**
+ * A Java string from bytes that may not be valid UTF-8.
+ *
+ * `NewStringUTF` does not reject bad input, it aborts the process — a JNI check failure
+ * takes the whole app down with SIGABRT and no catchable exception. Model output, GGUF
+ * metadata and error messages all originate outside this app, so every one of them is
+ * truncated to its valid prefix on the way across rather than trusted.
+ */
+jstring to_jstring(JNIEnv * env, const std::string & text) {
+    const size_t valid = openweights::complete_utf8_prefix(text);
+    return valid == text.size()
+        ? env->NewStringUTF(text.c_str())
+        : env->NewStringUTF(text.substr(0, valid).c_str());
+}
+
 void throw_engine_exception(JNIEnv * env, const std::string & message) {
     jclass clazz = env->FindClass("io/github/alpharomercoma/openweights/core/engine/LlamaException");
-    if (clazz != nullptr) {
-        env->ThrowNew(clazz, message.c_str());
-    }
+    if (clazz == nullptr) return;
+    // ThrowNew takes modified UTF-8 too, and error messages carry file names and model
+    // metadata that came from somewhere else.
+    const size_t valid = openweights::complete_utf8_prefix(message);
+    env->ThrowNew(clazz, message.substr(0, valid).c_str());
 }
 
 /** Maps the native stop reason onto the ordinal of Kotlin's StopReason enum. */
@@ -72,7 +89,7 @@ JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSystemInfo(
     JNIEnv * env, jobject /*thiz*/) {
     openweights::init_backend();
-    return env->NewStringUTF(openweights::system_info().c_str());
+    return to_jstring(env, openweights::system_info());
 }
 
 /**
@@ -97,7 +114,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeComputeD
             std::to_string(device.total_memory),
         };
         for (jsize field = 0; field < 4; ++field) {
-            jstring value = env->NewStringUTF(fields[field].c_str());
+            jstring value = to_jstring(env, fields[field]);
             env->SetObjectArrayElement(result, static_cast<jsize>(i) * 4 + field, value);
             env->DeleteLocalRef(value);
         }
@@ -174,7 +191,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelInf
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelDescription(
     JNIEnv * env, jobject /*thiz*/, jlong handle) {
-    return env->NewStringUTF(as_session(handle)->model_description().c_str());
+    return to_jstring(env, as_session(handle)->model_description());
 }
 
 /** Returns [vision, audio] — what the loaded projector can accept. */
@@ -194,7 +211,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSup
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaMarker(
     JNIEnv * env, jobject /*thiz*/, jlong handle) {
-    return env->NewStringUTF(as_session(handle)->media_marker().c_str());
+    return to_jstring(env, as_session(handle)->media_marker());
 }
 
 /**
@@ -303,7 +320,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     const StopReason reason = session->generate(
         messages, tools, sampler,
         [&](const char * piece) -> bool {
-            jstring text = env->NewStringUTF(piece);
+            jstring text = to_jstring(env, piece);
             const jboolean keep_going = env->CallBooleanMethod(token_sink, on_token, text);
             env->DeleteLocalRef(text);
             // A Kotlin-side exception must stop generation immediately.
@@ -330,14 +347,14 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
             reply.tool_calls[i].arguments_json,
         };
         for (jsize field = 0; field < 3; ++field) {
-            jstring value = env->NewStringUTF(fields[field].c_str());
+            jstring value = to_jstring(env, fields[field]);
             env->SetObjectArrayElement(calls, static_cast<jsize>(i) * 3 + field, value);
             env->DeleteLocalRef(value);
         }
     }
 
-    jstring content = env->NewStringUTF(reply.content.c_str());
-    jstring reasoning = env->NewStringUTF(reply.reasoning.c_str());
+    jstring content = to_jstring(env, reply.content);
+    jstring reasoning = to_jstring(env, reply.reasoning);
     env->CallVoidMethod(reply_sink, on_reply, content, reasoning, calls);
     env->DeleteLocalRef(content);
     env->DeleteLocalRef(reasoning);

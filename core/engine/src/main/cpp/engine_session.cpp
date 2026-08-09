@@ -110,6 +110,37 @@ llama_sampler * build_sampler(const SamplerConfig & cfg, const llama_vocab * voc
 }  // namespace
 
 /**
+ * The length of the longest prefix of [text] that is complete UTF-8.
+ *
+ * A token is a sequence of bytes, not a character. "Belém" and every emoji span several
+ * tokens, so a single piece routinely ends halfway through a multi-byte character. Handing
+ * that half to JNI's NewStringUTF does not throw — it aborts the process — so the tail is
+ * held back until the bytes that finish it arrive.
+ */
+size_t complete_utf8_prefix(const std::string & text) {
+    size_t index = text.size();
+    // A character is at most four bytes, so a lead byte is within four of the end.
+    for (int examined = 0; index > 0 && examined < 4; ++examined) {
+        const auto byte = static_cast<unsigned char>(text[index - 1]);
+        if ((byte & 0xC0) == 0x80) {
+            --index;  // continuation byte: keep walking back for its lead
+            continue;
+        }
+
+        size_t needed = 0;
+        if ((byte & 0x80) == 0x00) needed = 1;
+        else if ((byte & 0xE0) == 0xC0) needed = 2;
+        else if ((byte & 0xF0) == 0xE0) needed = 3;
+        else if ((byte & 0xF8) == 0xF0) needed = 4;
+        else return index - 1;  // not a lead byte at all; drop it rather than pass it on
+
+        const size_t available = text.size() - (index - 1);
+        return available >= needed ? text.size() : index - 1;
+    }
+    return index;
+}
+
+/**
  * The CPU backend variants built by GGML_CPU_ALL_VARIANTS, best instruction set first.
  * Each exports `ggml_backend_score()`, which inspects the running CPU and returns 0 when
  * the variant's instructions are unavailable.
@@ -575,6 +606,9 @@ StopReason Session::generate(
 
     char piece_buffer[512];
     std::string raw_reply;
+    // Bytes seen but not yet emitted, because they are the start of a character whose
+    // remaining bytes are still to come.
+    std::string pending;
     bool return_parsed_content = false;
     while (true) {
         if (cancelled_.load(std::memory_order_relaxed)) {
@@ -612,9 +646,16 @@ StopReason Session::generate(
 
         const std::string piece(piece_buffer, piece_len);
         raw_reply += piece;
-        if (!on_token(piece.c_str())) {
-            reason = StopReason::CANCELLED;
-            break;
+
+        pending += piece;
+        const size_t complete = complete_utf8_prefix(pending);
+        if (complete > 0) {
+            const std::string emit = pending.substr(0, complete);
+            pending.erase(0, complete);
+            if (!on_token(emit.c_str())) {
+                reason = StopReason::CANCELLED;
+                break;
+            }
         }
 
         llama_token committed = token;
@@ -687,3 +728,5 @@ int32_t  Session::training_context_size() const { return llama_model_n_ctx_train
 int32_t  Session::layer_count() const { return llama_model_n_layer(model_); }
 
 }  // namespace openweights
+
+

@@ -25,6 +25,14 @@
 
 namespace openweights {
 
+/**
+ * The length of the longest prefix of [text] that is complete UTF-8.
+ *
+ * Exposed because the JNI layer needs the same answer: anything crossing into Java has to
+ * be valid modified UTF-8 or the runtime aborts the process rather than throwing.
+ */
+size_t complete_utf8_prefix(const std::string & text);
+
 /** One message in a conversation, as handed to the chat template. */
 struct ChatMessage {
     std::string role;

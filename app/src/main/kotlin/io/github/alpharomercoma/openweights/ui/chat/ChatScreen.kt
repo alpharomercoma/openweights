@@ -27,7 +27,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -70,6 +69,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -80,14 +84,16 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.ContextM
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
-import io.github.alpharomercoma.openweights.core.designsystem.component.SpeedRail
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
+import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import io.github.alpharomercoma.openweights.model.DictationState
 import kotlinx.coroutines.launch
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -529,16 +535,10 @@ private fun AssistantTurn(
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
-    // Intrinsic height lets the rail match the exact height of the reply beside it.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-    ) {
-        SpeedRail(tokensPerSecond = entry.tokensPerSecond)
+    Column(modifier = Modifier.fillMaxWidth().speedRail(entry.tokensPerSecond)) {
         Column(
             modifier = Modifier
-                .padding(start = 12.dp)
+                .padding(start = RAIL_GUTTER.dp)
                 .combinedClickable(onClick = {}, onLongClick = onLongPress),
         ) {
             if (!entry.isStreaming && entry.tokensPerSecond != null) {
@@ -585,6 +585,43 @@ private fun AssistantTurn(
 }
 
 private const val MILLIS_PER_SECOND = 1000.0
+
+/**
+ * Paints the throughput rail down the leading edge of whatever it modifies.
+ *
+ * A modifier rather than a sibling composable. Laying the rail out beside the reply meant
+ * asking the row for IntrinsicSize.Min, which measures the reply twice — once to discover
+ * its height and once to use it. Doing that to a growing markdown tree on every frame of a
+ * stream is what made the transcript judder. drawBehind runs after measurement is already
+ * done, so it costs a rectangle.
+ */
+@Composable
+private fun Modifier.speedRail(tokensPerSecond: Double?): Modifier {
+    val dark = LocalIsDarkTheme.current
+    val color = tokensPerSecond
+        ?.let { signalColor((it / FAST_TOKENS_PER_SECOND).toFloat(), dark) }
+        ?: MaterialTheme.colorScheme.outline
+    val description = tokensPerSecond
+        ?.let { "Generated at ${it.roundToInt()} tokens per second" }
+        ?: "Generating"
+
+    return drawBehind {
+        drawRoundRect(
+            color = color,
+            size = Size(RAIL_WIDTH.dp.toPx(), size.height),
+            cornerRadius = CornerRadius(RAIL_WIDTH.dp.toPx() / 2),
+        )
+    }.semantics { contentDescription = description }
+}
+
+/** Matches the rail the design system draws elsewhere. */
+private const val RAIL_WIDTH = 2
+
+/** Clear of the rail, with the same gap the old layout had. */
+private const val RAIL_GUTTER = 14
+
+/** Decode speed at or above this reads as comfortably fast on a phone. */
+private const val FAST_TOKENS_PER_SECOND = 25.0
 
 private fun TranscriptEntry.readout(): String {
     val locale = Locale.getDefault()

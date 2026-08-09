@@ -113,11 +113,20 @@ Conversations in Room, with per-message stats. Lifetime usage lives in a separat
 append-only day-bucketed ledger so deleting a chat never falsifies your totals: tokens
 generated, tokens per day, per-model share, average throughput trend, total inference time.
 
-## 8. Multimodal — planned
+## 8. Multimodal — done, except dictation
 
-llama.cpp's `libmtmd` handles image, audio, and video through per-model `mmproj` projectors,
-so this stays inside one engine. Plus dictation via `SpeechRecognizer` and read-aloud via
-`TextToSpeech`.
+llama.cpp's `libmtmd` keeps every input modality inside the one engine: a model paired with
+its `mmproj` projector reads images and audio, and video is sampled into frames on the
+Android side because libmtmd's own video path needs an `ffmpeg` binary no app can ship.
+Attachments reach the composer through a button beside the message field, and the button
+only appears when the loaded model can actually read something.
+
+Output is text plus `TextToSpeech` read-aloud. Speech-generating open models exist but are
+30B-class and llama.cpp does not implement their audio decoders; image generation would be a
+second engine. `docs/research/multimodality.md` has the full reasoning and the numbers.
+
+Still to come: dictation via `SpeechRecognizer`, and an audio model small enough to prove
+the audio path on a phone.
 
 ## 9. Play Store production — planned
 

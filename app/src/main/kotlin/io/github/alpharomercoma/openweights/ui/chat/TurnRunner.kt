@@ -106,6 +106,14 @@ class TurnRunner @Inject constructor(
         val agent = AgentRunner(active)
         val budget = ToolBudget(engine.loadedModel?.contextSize ?: 0)
 
+        // Said once per turn, because "why did it not search" has three possible answers
+        // and the per-pass line only ever showed the conclusion. withTools is the template
+        // and the switches together; active is what survived the switches.
+        Log.i(
+            "OpenWeights",
+            "turn withTools=$withTools tools=${active.all.map { it.definition.name }} mode=$mode",
+        )
+
         var messages = conversation
         var round = 0
         var lastRaw = ""

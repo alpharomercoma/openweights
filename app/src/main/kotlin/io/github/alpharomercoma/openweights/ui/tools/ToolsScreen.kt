@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -65,6 +68,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 fun ToolsScreen(
     state: ToolsUiState,
     onToggle: (String, Boolean) -> Unit,
+    onSearxUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -105,6 +109,8 @@ fun ToolsScreen(
                 )
             }
 
+            item { SearchBackend(url = state.searxUrl, onUrl = onSearxUrl) }
+
             item {
                 // Said plainly rather than shown as a disabled row, because an empty
                 // "Add" affordance that does nothing is worse than an honest sentence.
@@ -117,6 +123,53 @@ fun ToolsScreen(
                     modifier = Modifier.padding(top = 16.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Where web search actually goes.
+ *
+ * Left blank it uses the built in scraper, which needs no setup and is the right default
+ * for one person asking one question. It is also the weakest link in the app: it reads a
+ * search engine's HTML, so it breaks when that HTML changes, and it is rate limited by
+ * address, which is a wall you hit quickly if anything asks it questions in parallel.
+ *
+ * A SearXNG instance you run yourself is the way past both. It has no index of its own, so
+ * it does not make the web more searchable, but it moves the blocking to a machine you
+ * control, where the JSON API can be switched on and the limiter switched off. The field
+ * was in the code before this and had no control anywhere, so nobody could ever set it.
+ */
+@Composable
+private fun SearchBackend(url: String, onUrl: (String) -> Unit) {
+    Column(
+        modifier = Modifier.padding(top = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Search backend", style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = "Leave this empty to use the built in search, which needs no setup. " +
+                "Point it at a SearXNG instance you run to get faster and more reliable " +
+                "results, and to stop sharing a rate limit with everyone else.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = url,
+            onValueChange = onUrl,
+            singleLine = true,
+            placeholder = { Text("https://searx.example.com") },
+            label = { Text("SearXNG address") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (url.isNotBlank()) {
+            Text(
+                text = "Must be https unless it is on this phone, and the instance needs json in " +
+                    "its search formats or it answers 403.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -174,6 +227,7 @@ private fun ToolsScreenPreview() {
                 ),
             ),
             onToggle = { _, _ -> },
+            onSearxUrl = {},
         )
     }
 }

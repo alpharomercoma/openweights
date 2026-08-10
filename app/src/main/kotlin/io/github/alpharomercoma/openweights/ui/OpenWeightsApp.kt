@@ -298,7 +298,11 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 val viewModel: ToolsViewModel = hiltViewModel()
                 val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-                ToolsScreen(state = state, onToggle = viewModel::setEnabled)
+                ToolsScreen(
+                    state = state,
+                    onToggle = viewModel::setEnabled,
+                    onSearxUrl = viewModel::setSearxUrl,
+                )
             }
 
             composable(Destination.USAGE.route) {

@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.engine
 
+import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ParsedToolCalls
@@ -307,7 +308,19 @@ class LlamaCppEngine internal constructor(
             },
             supportsThinking = bridge.nativeSupportsThinking(activeHandle),
             supportsTools = bridge.nativeSupportsTools(activeHandle),
-        )
+            supportsReasoningEffort = bridge.nativeSupportsReasoningEffort(activeHandle),
+        ).also {
+            // What the chat template can actually do, asked of the template at load. Logged
+            // because every "why did it not search" question starts here and the answer is
+            // otherwise invisible from outside the process.
+            Log.i(
+                "OpenWeights",
+                "loaded: tools=${it.supportsTools} thinking=${it.supportsThinking} " +
+                    "effort=${it.supportsReasoningEffort} " +
+                    "vision=${it.mediaSupport.vision} audio=${it.mediaSupport.audio} " +
+                    "ctx=${it.contextSize}",
+            )
+        }
     }
 
     /** The reply as the native parser produced it, filled in before the flow completes. */

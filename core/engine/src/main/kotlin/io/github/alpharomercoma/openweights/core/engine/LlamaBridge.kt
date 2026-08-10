@@ -79,6 +79,9 @@ internal class LlamaBridge {
 
     external fun nativeSupportsTools(handle: Long): Boolean
 
+    /** True when the chat template renders `reasoning_effort` into the prompt. */
+    external fun nativeSupportsReasoningEffort(handle: Long): Boolean
+
     /** The marker the projector expects where an attachment belongs in the prompt. */
     external fun nativeMediaMarker(handle: Long): String
 

@@ -48,6 +48,16 @@ interface Tool {
     val alwaysAsk: Boolean get() = false
 
     /**
+     * Whether this is the tool to reach for when the model says it does not know something.
+     *
+     * One tool answers "what is this thing I have never heard of", and the turn loop needs
+     * to name it without knowing which tools exist. Marked on the tool rather than matched
+     * by name in the caller, so adding a second search provider does not mean editing a
+     * string in the UI layer.
+     */
+    val isLookup: Boolean get() = false
+
+    /**
      * Runs the call and returns what the model should be told.
      *
      * Failures come back as text rather than exceptions, because a model that is told
@@ -55,6 +65,17 @@ interface Tool {
      * and tells the user nothing they can act on.
      */
     suspend fun run(call: ToolCall): String
+
+    /**
+     * The call this tool would make to answer [question] on its own, or null if it cannot
+     * be sensibly built without the model's help.
+     *
+     * Exists because a model that names a tool in prose has decided to use it and only
+     * failed to say so in the right syntax. Each tool builds its own arguments: only the
+     * tool knows what its schema means, and a search's argument is the question itself
+     * while a fetch's is a URL that has to come from somewhere.
+     */
+    fun callFor(question: String): ToolCall? = null
 }
 
 /** What the model is allowed to reach for, and how it is found by name. */

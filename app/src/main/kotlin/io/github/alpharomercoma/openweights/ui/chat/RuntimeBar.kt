@@ -81,10 +81,11 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
             overflow = TextOverflow.Ellipsis,
         )
 
-        val runtime = state.runtimeState
-        if (runtime.isBusy) {
-            RuntimeStateLine(runtime)
-        } else if (state.runtimeIdentity.isNotEmpty()) {
+        // What the model is, not what it is doing. There is one place that says work is
+        // in flight and it is next to the text being written, where the eye already is;
+        // saying it twice made the top bar flicker between an identity and a status while
+        // the answer scrolled underneath.
+        if (state.runtimeIdentity.isNotEmpty()) {
             Metric(state.runtimeIdentity, maxLines = 1)
         }
     }

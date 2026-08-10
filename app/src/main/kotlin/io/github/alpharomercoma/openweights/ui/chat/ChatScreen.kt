@@ -18,6 +18,12 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -60,13 +66,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
@@ -91,10 +100,13 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
+import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.model.DictationState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -314,6 +326,19 @@ private fun ChatContent(
                 isListening = dictation.isListening,
                 heard = dictation.partial,
                 onAttach = { showAttachments = true },
+                thinking = {
+                    ThinkingControl(
+                        supportsEffort = state.supportsReasoningEffort,
+                        supportsThinking = state.supportsThinking,
+                        effort = state.preferences.toSamplerParams().reasoningEffort,
+                        thinking = state.preferences.thinking,
+                        enabled = state.canSend,
+                        onEffort = {
+                            onSavePreferences(state.preferences.copy(reasoningEffort = it.name))
+                        },
+                        onThinking = { onSavePreferences(state.preferences.copy(thinking = it)) },
+                    )
+                },
                 onRemoveStaged = onRemoveStaged,
                 onDictate = onDictate,
                 onSend = onSend,
@@ -424,6 +449,12 @@ private fun Transcript(
 
                 else -> AssistantTurn(
                     entry = entry,
+                    // Only the reply being written says what the runtime is doing. On an
+                    // older one it would be describing work for a different message.
+                    activity = state.runtimeState.takeIf {
+                        entry.id == lastId && entry.isStreaming
+                    },
+                    thermal = state.thermal,
                     isSpeaking = isSpeaking,
                     onLongPress = { onActionsForId(entry.id) },
                     onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
@@ -570,6 +601,8 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
 @Suppress("LongParameterList")
 private fun AssistantTurn(
     entry: TranscriptEntry,
+    activity: RuntimeState?,
+    thermal: ThermalLevel,
     isSpeaking: Boolean,
     onLongPress: () -> Unit,
     onCopy: () -> Unit,
@@ -588,20 +621,21 @@ private fun AssistantTurn(
                 )
             }
             // In the order they happened, between the thinking that led to them and the
-            // answer they fed. Steps outlive a pass; toolCalls is cleared by the next one,
+            // answer they fed. These outlive a pass; toolCalls is cleared by the next one,
             // which is why nothing was visible before.
-            entry.steps.forEach { step -> ToolStepBlock(step) }
-
-            when {
-                entry.answer.isNotEmpty() -> MarkdownText(entry.answer)
-                entry.toolCalls.isNotEmpty() -> Unit
-                entry.isReasoningInProgress -> Unit // the reasoning header is the status
-                else -> Text(
-                    text = "…",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            entry.blocks.forEach { block ->
+                when (block) {
+                    is TurnBlock.Step -> ToolStepBlock(block.step)
+                    is TurnBlock.Said -> IntermediateText(block.text)
+                }
             }
+
+            if (entry.answer.isNotEmpty()) MarkdownText(entry.answer)
+
+            // Last, under whatever has been written so far, because that is where the eye
+            // already is while waiting. The top bar says the same thing, but a status two
+            // hundred pixels above the text being read is a status nobody sees.
+            activity?.takeIf { it.isBusy }?.let { ActivityLine(it, thermal) }
 
             // Only once the reply has finished: actions on a half-written answer copy half
             // an answer, and a retry mid-stream is a stop the user did not ask for.
@@ -629,6 +663,103 @@ private const val MILLIS_PER_SECOND = 1000.0
  * that this line already says in words. Colour now lands on the number it describes, which
  * is where it was always most useful.
  */
+/**
+ * Something the model said between tool calls.
+ *
+ * Dimmed rather than hidden. It is real output and it is what explains why the next call
+ * was the one it made, but it was written before the results came back, so presenting it
+ * with the same weight as the answer would give equal standing to a guess and a finding.
+ */
+/**
+ * What the runtime is doing right now, at the end of the reply being written.
+ *
+ * Reading a prompt and writing an answer look identical from outside: both are a screen
+ * that has not changed. They are also the two halves whose cost is completely different on
+ * a phone, and after a tool returns the model re-reads everything, which is the longest
+ * silence in a turn and the one that reads as a hang.
+ *
+ * A pulse rather than a spinner, and the elapsed seconds, which is the number that tells
+ * someone whether to keep waiting. Timed from when the phase started, so it restarts when
+ * the phase does rather than counting the whole turn.
+ */
+@Composable
+private fun ActivityLine(
+    state: RuntimeState,
+    thermal: ThermalLevel,
+    modifier: Modifier = Modifier,
+) {
+    var seconds by remember(state) { mutableIntStateOf(0) }
+    LaunchedEffect(state) {
+        while (true) {
+            delay(1.seconds)
+            seconds++
+        }
+    }
+
+    val pulse = rememberInfiniteTransition(label = "activity")
+    val alpha by pulse.animateFloat(
+        initialValue = PULSE_DIM,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(PULSE_MS, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "pulse",
+    )
+
+    Row(
+        modifier = modifier.padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .alpha(alpha)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Text(
+            text = state.label.replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (seconds > 0) {
+            Text(
+                text = "${seconds}s",
+                style = MetricTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Only once it is worth saying. A phone that is cool while working is the normal
+        // case and does not need a word for itself, but one that is slowing down does,
+        // because otherwise a hot phone is indistinguishable from a slow model.
+        if (thermal.isWarm) {
+            Text(
+                text = "· ${thermal.label}",
+                style = MetricTextStyle,
+                color = if (thermal == ThermalLevel.NONE) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.error
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun IntermediateText(text: String, modifier: Modifier = Modifier) {
+    // Alpha rather than a colour, so the markdown renderer keeps styling its own code
+    // spans and links and only the whole block recedes.
+    MarkdownText(
+        content = text,
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .alpha(INTERMEDIATE_ALPHA),
+    )
+}
+
 @Composable
 private fun Measurements(entry: TranscriptEntry) {
     val dark = LocalIsDarkTheme.current
@@ -752,3 +883,12 @@ private fun ChatScreenPreview() {
         )
     }
 }
+
+/** Enough to read as said-on-the-way rather than as the answer. */
+private const val INTERMEDIATE_ALPHA = 0.72f
+
+/** Dim enough to read as a pulse, bright enough to stay visible on a light background. */
+private const val PULSE_DIM = 0.25f
+
+/** One breath, roughly. Faster reads as urgency, slower reads as stalled. */
+private const val PULSE_MS = 700

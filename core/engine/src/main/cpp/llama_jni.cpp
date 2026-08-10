@@ -221,6 +221,12 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupports
     return as_session(handle)->supports_tools() ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsReasoningEffort(
+    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    return as_session(handle)->supports_reasoning_effort() ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaMarker(
     JNIEnv * env, jobject /*thiz*/, jlong handle) {

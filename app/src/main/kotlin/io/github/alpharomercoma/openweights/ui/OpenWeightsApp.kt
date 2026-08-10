@@ -24,8 +24,8 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Chat
-import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.InsertChart
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storage
@@ -59,15 +59,31 @@ import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverViewModel
 import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
+import io.github.alpharomercoma.openweights.ui.models.ModelsTab
+import io.github.alpharomercoma.openweights.ui.models.ModelsTabs
 import io.github.alpharomercoma.openweights.ui.models.ModelsViewModel
+import io.github.alpharomercoma.openweights.ui.models.rememberModelsTab
 import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
 import io.github.alpharomercoma.openweights.ui.settings.SettingsViewModel
+import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
+import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
 
-/** The app's four destinations. */
+/**
+ * The app's five destinations, which is the most a bottom bar can hold.
+ *
+ * Discover is not among them any more: it is half of Models, reached by a tab there, since
+ * finding a model and using one are two steps of the same job. That freed the slot for
+ * Tools, which had nowhere to live and is the screen that says what the model can actually
+ * do besides talk.
+ *
+ * Called Tools rather than Capabilities or Context. Capabilities is long enough to wrap on
+ * a narrow phone next to four short words, and Context already means the context window,
+ * shown as a percentage two screens away.
+ */
 private enum class Destination(val route: String, val label: String, val icon: ImageVector) {
     CHAT("chat", "Chat", Icons.Rounded.Chat),
-    DISCOVER("discover", "Discover", Icons.Rounded.Explore),
     MODELS("models", "Models", Icons.Rounded.Storage),
+    TOOLS("tools", "Tools", Icons.Rounded.Build),
     USAGE("usage", "Usage", Icons.Rounded.InsertChart),
     SETTINGS("settings", "Settings", Icons.Rounded.Settings),
 }
@@ -192,51 +208,83 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 )
             }
 
-            composable(Destination.DISCOVER.route) {
-                val viewModel: DiscoverViewModel = hiltViewModel()
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
+            composable(Destination.MODELS.route) {
+                val tab = rememberModelsTab()
+                val tabs: @Composable () -> Unit =
+                    { ModelsTabs(selected = tab.selected, onSelect = tab.select) }
 
-                DiscoverScreen(
-                    state = state,
-                    onQueryChange = viewModel::onQueryChange,
-                    onSearch = { viewModel.search() },
-                    onSortChange = viewModel::onSortChange,
-                    onFiltersChange = viewModel::onQueryChange,
-                    onPhoneSizedChange = viewModel::onPhoneSizedChange,
-                    onClearFilters = viewModel::clearFilters,
-                    onOpenModel = viewModel::openModel,
-                    onCloseModel = viewModel::closeModel,
-                    onContextLengthChange = viewModel::onContextLengthChange,
-                    onDownload = { repoId, path ->
-                        state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
-                            modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)
-                            // The projector is not optional for a multimodal model: without
-                            // it the weights load but every attachment is refused, which
-                            // reads as a broken app rather than a missing file.
-                            state.detail?.pairedProjector(file)?.let { projector ->
-                                modelsViewModel.downloadProjector(repoId, projector, file.fileName)
-                            }
-                            navController.navigate(Destination.MODELS.route)
-                        }
-                    },
-                )
+                when (tab.selected) {
+                    ModelsTab.INSTALLED -> {
+                        val state by modelsViewModel.uiState.collectAsStateWithLifecycle()
+
+                        ModelsScreen(
+                            state = state,
+                            onUse = { model ->
+                                // Keeps whatever chat is open. Switching model partway
+                                // through a conversation is a normal thing to do, and
+                                // throwing the conversation away to do it is not a trade
+                                // anyone would choose.
+                                chatViewModel.loadModel(model.file, keepConversation = true)
+                                navController.navigate(Destination.CHAT.route)
+                            },
+                            onDelete = modelsViewModel::delete,
+                            onCancelDownload = modelsViewModel::cancel,
+                            tabs = tabs,
+                        )
+                    }
+
+                    ModelsTab.DISCOVER -> {
+                        val viewModel: DiscoverViewModel = hiltViewModel()
+                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+                        DiscoverScreen(
+                            state = state,
+                            onQueryChange = viewModel::onQueryChange,
+                            onSearch = { viewModel.search() },
+                            onSortChange = viewModel::onSortChange,
+                            onFiltersChange = viewModel::onQueryChange,
+                            onPhoneSizedChange = viewModel::onPhoneSizedChange,
+                            onClearFilters = viewModel::clearFilters,
+                            onOpenModel = viewModel::openModel,
+                            onCloseModel = viewModel::closeModel,
+                            onContextLengthChange = viewModel::onContextLengthChange,
+                            onDownload = { repoId, path ->
+                                state.files.firstOrNull {
+                                    it.file.path == path
+                                }?.file?.let { file ->
+                                    modelsViewModel.download(
+                                        repoId,
+                                        path,
+                                        file.sizeBytes,
+                                        file.sha256,
+                                    )
+                                    // The projector is not optional for a multimodal model:
+                                    // without it the weights load but every attachment is
+                                    // refused, which reads as a broken app rather than a
+                                    // missing file.
+                                    state.detail?.pairedProjector(file)?.let { projector ->
+                                        modelsViewModel.downloadProjector(
+                                            repoId,
+                                            projector,
+                                            file.fileName,
+                                        )
+                                    }
+                                    // Back to Installed, which is where the download it has
+                                    // just started shows its progress.
+                                    tab.select(ModelsTab.INSTALLED)
+                                }
+                            },
+                            tabs = tabs,
+                        )
+                    }
+                }
             }
 
-            composable(Destination.MODELS.route) {
-                val state by modelsViewModel.uiState.collectAsStateWithLifecycle()
+            composable(Destination.TOOLS.route) {
+                val viewModel: ToolsViewModel = hiltViewModel()
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-                ModelsScreen(
-                    state = state,
-                    onUse = { model ->
-                        // Keeps whatever chat is open. Switching model is a normal thing to
-                        // do partway through a conversation, and throwing the conversation
-                        // away to do it is not a trade anyone would choose.
-                        chatViewModel.loadModel(model.file, keepConversation = true)
-                        navController.navigate(Destination.CHAT.route)
-                    },
-                    onDelete = modelsViewModel::delete,
-                    onCancelDownload = modelsViewModel::cancel,
-                )
+                ToolsScreen(state = state, onToggle = viewModel::setEnabled)
             }
 
             composable(Destination.USAGE.route) {

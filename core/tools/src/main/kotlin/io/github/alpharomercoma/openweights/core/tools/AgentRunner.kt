@@ -144,9 +144,15 @@ class AgentRunner(
          * How many rounds of tools one question may take.
          *
          * Every round is a full prefill of a growing conversation on a phone, so this is a
-         * budget of seconds as much as of steps. Four is enough for search, read, search
-         * again, read again, which covers most of what anyone asks.
+         * budget of seconds as much as of steps: two rounds is search then answer, which
+         * is what a question needs when it needs anything.
+         *
+         * It was four, which measured at five minutes for "gojo vs sukuna": search, read a
+         * page, search again, read again, each round adding thousands of characters to a
+         * prompt that then had to be re-read. A hosted assistant answers that from memory
+         * in seconds. The budget is not what makes an agent good; knowing it does not need
+         * one is, and a small ceiling forces the question.
          */
-        const val DEFAULT_MAX_ROUNDS = 4
+        const val DEFAULT_MAX_ROUNDS = 2
     }
 }

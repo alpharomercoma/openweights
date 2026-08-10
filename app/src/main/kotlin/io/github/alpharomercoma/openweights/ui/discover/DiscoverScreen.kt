@@ -78,6 +78,8 @@ fun DiscoverScreen(
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    /** The Installed/Discover switch, drawn under this screen's own title. */
+    tabs: @Composable () -> Unit = {},
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -89,27 +91,33 @@ fun DiscoverScreen(
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = state.detail?.model?.name ?: "Discover",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                },
-                navigationIcon = {
-                    if (state.detail != null) {
-                        IconButton(onClick = onCloseModel) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back to search results",
-                            )
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = state.detail?.model?.name ?: "Discover",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    },
+                    navigationIcon = {
+                        if (state.detail != null) {
+                            IconButton(onClick = onCloseModel) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back to search results",
+                                )
+                            }
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
+                )
+                // Hidden while a model's detail page is open: that page has its own back
+                // arrow, and a tab row there would offer to leave a screen the user is
+                // halfway through reading.
+                if (state.detail == null) tabs()
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {

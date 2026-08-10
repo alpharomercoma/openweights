@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
+import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
@@ -40,9 +41,12 @@ import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.model.AttachmentStore
+import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,7 +82,8 @@ data class TranscriptEntry(
     /** Files sent with this turn, shown above its text. */
     val attachments: List<MessagePart.File> = emptyList(),
     /** What the agent did while producing this reply, in order. */
-    val steps: List<AgentStep> = emptyList(),
+    /** Everything the model said and did before the answer, in order. */
+    val blocks: List<TurnBlock> = emptyList(),
     /** Wall clock from send to finished, which is what the wait actually felt like. */
     val totalMillis: Long? = null,
 )
@@ -135,6 +140,32 @@ data class ChatUiState(
     val mediaSupport: MediaSupport = MediaSupport(),
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,
+    /**
+     * True when this model's chat template renders tool definitions.
+     *
+     * A template that does not drops them silently, so the model is told it has tools it
+     * has no way to call and answers "I should use the search tool" forever. Asked of the
+     * template at load, not guessed from the name.
+     */
+    val supportsTools: Boolean = false,
+    /**
+     * True when this model's chat template does something with the effort setting.
+     *
+     * Measured at load by rendering the template twice, so the control appears only where
+     * moving it changes the prompt.
+     */
+    val supportsReasoningEffort: Boolean = false,
+    /** True when at least one tool is switched on in Tools. */
+    val toolsAvailable: Boolean = false,
+    /**
+     * How hot the device is, sampled while a reply is being written.
+     *
+     * The one number no hosted assistant can show, because on a hosted assistant the
+     * hardware getting warm is somebody else's. Android reports a level rather than a
+     * temperature: degrees need a privileged API, and the level is what the scheduler is
+     * acting on anyway when the phone slows down.
+     */
+    val thermal: ThermalLevel = ThermalLevel.NONE,
     /** Attachments staged in the composer, not yet sent. */
     val staged: List<MessagePart.File> = emptyList(),
     /** True while a picked file is being copied in. */
@@ -209,6 +240,7 @@ class ChatViewModel @Inject constructor(
     private val attachments: AttachmentStore,
     private val chats: ChatRepository,
     private val turns: TurnRunner,
+    private val notifier: ReplyNotifier,
 ) : ViewModel() {
     /** Completed by the approval buttons, so the agent can wait on a human. */
     private var approval: CompletableDeferred<Boolean>? = null
@@ -216,6 +248,7 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+    private var thermalJob: Job? = null
     private var nextEntryId = 0L
 
     /** Held for the length of a load, so two of them cannot interleave. */
@@ -271,9 +304,9 @@ class ChatViewModel @Inject constructor(
     val hasModel: Boolean
         get() = _uiState.value.modelName != null || _uiState.value.isLoadingModel
 
-    /** Loads whichever model is already on disk, if any. */
+    /** Loads the model last chosen, or whichever is on disk if there is no choice yet. */
     fun loadDefaultModel() {
-        runtime.firstAvailableModel()?.let(::loadModel)
+        runtime.preferredModel()?.let(::loadModel)
     }
 
     /** Loads a GGUF file from disk. */
@@ -304,6 +337,33 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Drops everything that described the model being replaced.
+     *
+     * Before the attempt, not after: the engine frees what it held as it loads, so from
+     * that moment the old name, context size and capabilities describe nothing. The staged
+     * attachments go too, whether the load succeeds or fails, because they were picked for
+     * a model that is no longer there.
+     */
+    private suspend fun forgetLoadedModel() {
+        val abandoned = _uiState.value.staged
+        _uiState.update {
+            it.copy(
+                modelName = null,
+                modelQuantization = null,
+                backend = null,
+                contextSize = 0,
+                contextUsed = 0,
+                mediaSupport = MediaSupport(),
+                supportsThinking = false,
+                supportsTools = false,
+                supportsReasoningEffort = false,
+                staged = emptyList(),
+            )
+        }
+        if (abandoned.isNotEmpty()) attachments.discard(abandoned)
+    }
+
     private suspend fun performLoad(
         modelFile: File,
         contextLength: Int?,
@@ -317,23 +377,7 @@ class ChatViewModel @Inject constructor(
 
         val projector = runtime.projectorFor(modelFile)
 
-        // Cleared before the attempt: the engine frees whatever it held before it loads, so
-        // from here on the old identity describes nothing. The staged files go with it,
-        // succeed or fail, because they were picked for a model that is no longer loaded.
-        val abandoned = _uiState.value.staged
-        _uiState.update {
-            it.copy(
-                modelName = null,
-                modelQuantization = null,
-                backend = null,
-                contextSize = 0,
-                contextUsed = 0,
-                mediaSupport = MediaSupport(),
-                supportsThinking = false,
-                staged = emptyList(),
-            )
-        }
-        if (abandoned.isNotEmpty()) attachments.discard(abandoned)
+        forgetLoadedModel()
 
         runCatching {
             runtime.load(modelFile, loadParams, projector)
@@ -341,6 +385,7 @@ class ChatViewModel @Inject constructor(
             // The cache belonged to the old weights. Clearing it makes the next reply
             // re-read the transcript, which is what carries the conversation across.
             runtime.resetContext()
+            runtime.rememberChoice(modelFile)
             if (!keepConversation) conversationId = null
             preferencesKey = modelFile.name
             val info = runtime.loadedModel
@@ -361,6 +406,8 @@ class ChatViewModel @Inject constructor(
                     compaction = if (keepConversation) it.compaction else null,
                     mediaSupport = support,
                     supportsThinking = info?.supportsThinking == true,
+                    supportsTools = info?.supportsTools == true,
+                    supportsReasoningEffort = info?.supportsReasoningEffort == true,
                     error = if (keepConversation) {
                         it.transcript.unreadableWarning(support)
                     } else {
@@ -489,25 +536,63 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Keeps the thermal reading current for as long as a reply is being written.
+     *
+     * Sampled while working rather than once at the end: a phone warms up over the course
+     * of a long answer, and a reading taken when it finishes describes a device that has
+     * already begun cooling.
+     *
+     * Off the main dispatcher, so the wait between readings is a real wait. On the main one
+     * it is whatever dispatcher the caller installed, and under a test scheduler a delay
+     * costs nothing and takes no time: a loop of them is an infinite loop that always has
+     * one more task ready, so `advanceUntilIdle` never returns. That is not a hypothetical.
+     * It hung the suite for an hour at a time, and each run that was killed left a worker
+     * behind spinning a core, which is why every build on this machine got slower until the
+     * cause was found. Reading a hardware sensor was never main-thread work anyway.
+     */
+    private fun startThermalSampling() {
+        thermalJob?.cancel()
+        thermalJob = viewModelScope.launch(Dispatchers.Default) {
+            while (true) {
+                val level = runtime.thermalLevel()
+                _uiState.update { it.copy(thermal = level) }
+                delay(THERMAL_SAMPLE_MS)
+            }
+        }
+    }
+
     private fun generate() {
-        val state = _uiState.value
-        val conversation = state.engineMessages()
-        if (conversation.isEmpty()) {
-            // Callers claim the busy state before this point to close the double-tap
-            // window, so nothing to send has to give it back.
-            _uiState.update { it.copy(isGenerating = false) }
-            return
-        }
+        startThermalSampling()
 
-        _uiState.update { state ->
-            state.copy(
-                transcript = state.transcript +
-                    entry(ChatRole.ASSISTANT, "").copy(isStreaming = true),
-                isGenerating = true,
-            )
-        }
+        val job = viewModelScope.launch {
+            // Folded before the turn as well as after it. Compaction only ever ran at the
+            // end, so a conversation already past the threshold started its next turn
+            // against the wall, and what the user saw was the turn failing rather than the
+            // history being folded. Cheap when there is nothing to fold.
+            compactIfNeeded()
 
-        generationJob = viewModelScope.launch {
+            // Read here rather than held: the user can switch a tool off in another tab
+            // between one question and the next, and the instruction has to follow.
+            _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
+
+            val state = _uiState.value
+            val conversation = state.engineMessages()
+            if (conversation.isEmpty()) {
+                // Callers claim the busy state before this point to close the double-tap
+                // window, so nothing to send has to give it back.
+                _uiState.update { it.copy(isGenerating = false) }
+                return@launch
+            }
+
+            _uiState.update { current ->
+                current.copy(
+                    transcript = current.transcript +
+                        entry(ChatRole.ASSISTANT, "").copy(isStreaming = true),
+                    isGenerating = true,
+                )
+            }
+
             val turnStartedAt = System.currentTimeMillis()
             var lastFrameAt = 0L
             var reasoningEndedAt: Long? = null
@@ -537,7 +622,10 @@ class ChatViewModel @Inject constructor(
                     applyCompletion(event, raw)
 
                 override fun onSteps(steps: List<AgentStep>) =
-                    updateLastEntry { it.copy(steps = it.steps + steps) }
+                    updateLastEntry { it.copy(blocks = it.blocks + steps.map(TurnBlock::Step)) }
+
+                override fun onIntermediate(text: String) =
+                    updateLastEntry { it.copy(blocks = it.blocks + TurnBlock.Said(text)) }
 
                 override fun onNextPass() {
                     // Room for the next pass under the same entry, which is what makes a
@@ -560,6 +648,10 @@ class ChatViewModel @Inject constructor(
                     conversation = conversation,
                     params = state.preferences.toSamplerParams(),
                     mode = _uiState.value.mode,
+                    // Offering a tool to a template that cannot render one wastes the
+                    // context it takes up and leaves the model describing what it would
+                    // do if it could.
+                    withTools = state.supportsTools && state.toolsAvailable,
                     listener = listener,
                 )
             } catch (cancellation: CancellationException) {
@@ -570,6 +662,11 @@ class ChatViewModel @Inject constructor(
                 throw cancellation
             } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
                 finishInterrupted(raw)
+                // The cache is whatever the failed decode left behind, and the next turn
+                // would be built on top of it and fail the same way. Clearing it costs one
+                // re-read of the transcript, which is the text still on screen, so nothing
+                // the user can see is lost by it.
+                runCatching { runtime.resetContext() }
                 _uiState.update { it.copy(error = failure.userMessage()) }
             }
 
@@ -589,7 +686,14 @@ class ChatViewModel @Inject constructor(
                 )
             }
             compactIfNeeded()
+            notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
         }
+        generationJob = job
+        // Tied to the job ending rather than to the last line of it, because two of the
+        // three ways a turn ends never reach that line: Stop rethrows the cancellation,
+        // and a failed decode returns through the catch. Either one left the sampler
+        // reading the thermal API every few seconds for the rest of the process.
+        job.invokeOnCompletion { thermalJob?.cancel() }
     }
 
     /**
@@ -989,13 +1093,36 @@ private const val STREAM_FRAME_MS = 33L
 private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."
 
 /**
+ * How long an answer should be.
+ *
+ * Always sent, with or without tools, because length is the thing that decides what a reply
+ * costs here. Asked "Gojo vs Sukuna" this model wrote two thousand nine hundred tokens,
+ * seventy-one percent of the window, and took five minutes and thirty-nine seconds over it.
+ * None of that was searching: it was one pass with no tools and no calls. It restated the
+ * question, numbered seven sections, argued with itself in the open with thinking switched
+ * off, and reached "Refine the Argument" without ever having given an answer.
+ *
+ * A hosted assistant answers that in a paragraph. The difference is not the hardware, it is
+ * that nothing here had ever told the model when to stop. On a phone at seven tokens a
+ * second, every hundred words it does not write is fourteen seconds the user does not wait.
+ */
+private const val ANSWER_STYLE: String =
+    "Answer the question directly and then stop. Your first sentence is the answer " +
+        "itself, not a preamble: never open with \"Let me think about this\" or \"Here is " +
+        "what I know\". A few sentences is usually right. Use a list only when the answer " +
+        "really is a list. Do not restate the question, do not write headings like " +
+        "Analysis or Conclusion, do not outline your approach, and do not reason out loud " +
+        "on the page. Give the answer, not the working."
+
+/**
  * What actually gets sent to the model: the compaction summary, if any, followed by the
  * turns that were not folded into it.
  */
 internal fun ChatUiState.engineMessages(): List<ChatMessage> {
     val instructions = listOfNotNull(
+        ANSWER_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
-        toolInstruction(mode, preferences.toolPrompt),
+        toolInstruction(mode, preferences.toolPrompt).takeIf { supportsTools && toolsAvailable },
     ).joinToString("\n\n")
 
     val system = instructions
@@ -1101,8 +1228,19 @@ internal fun MessagePart.File.describe(): String = name ?: when (kind) {
 }
 
 /** Turns engine failures into something a person can act on. */
-private fun Throwable.userMessage(): String =
-    message ?: "Generation failed (${this::class.simpleName})."
+private fun Throwable.userMessage(): String = when {
+    // What llama.cpp says when the KV cache has no slot left for the batch. The words it
+    // uses name an internal return code, and the thing to do about it is not "decode"
+    // anything, so it is translated rather than passed through.
+    message?.contains(NO_KV_SLOT) == true ->
+        "This turn outgrew the context window, usually because a page it read was long. " +
+            "The conversation is still here. Ask again, or raise the context length in " +
+            "model settings."
+
+    else -> message ?: "Generation failed (${this::class.simpleName})."
+}
+
+private const val NO_KV_SLOT = "failed to decode prompt"
 
 /** Some stop reasons need surfacing; a normal end of turn is not. */
 private fun StopReason.warning(): String? = when (this) {
@@ -1112,3 +1250,11 @@ private fun StopReason.warning(): String? = when (this) {
 
     StopReason.END_OF_TURN, StopReason.MAX_TOKENS, StopReason.CANCELLED, StopReason.ERROR -> null
 }
+
+/**
+ * How often the device's thermal level is re-read while a reply is being written.
+ *
+ * Often enough to catch a phone heating up mid-answer, rarely enough that the reading
+ * itself is not part of the load it is measuring.
+ */
+private const val THERMAL_SAMPLE_MS = 4_000L

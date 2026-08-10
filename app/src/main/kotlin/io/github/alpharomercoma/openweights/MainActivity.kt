@@ -16,11 +16,16 @@
 
 package io.github.alpharomercoma.openweights
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.alpharomercoma.openweights.core.data.AppearanceRepository
@@ -40,9 +45,20 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appearance: AppearanceRepository
 
+    /**
+     * Registered as a field because that is the only place it is allowed.
+     *
+     * The result is not acted on: [ReplyNotifier] re-checks the permission every time it
+     * posts, so declining just means the app stays quiet.
+     */
+    private val requestNotifications =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        askForNotifications()
+
         setContent {
             // SYSTEM until the stored value arrives, which is one frame at most and is the
             // same thing the app did before anyone could choose.
@@ -52,6 +68,22 @@ class MainActivity : ComponentActivity() {
                 OpenWeightsApp()
             }
         }
+    }
+
+    /**
+     * Asks once, on first launch, for permission to say when an answer is ready.
+     *
+     * At startup rather than when a reply finishes: by then the phone is usually back in a
+     * pocket, which is the worst moment for a permission dialog and the exact moment the
+     * notification was for.
+     */
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 

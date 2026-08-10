@@ -27,6 +27,15 @@ subprojects {
         buildUponDefaultConfig = true
         parallel = true
     }
+
+    // A deadline, because a hung test is worse than a failing one. A sampler that looped
+    // forever under a virtual-time scheduler turned four `verify` runs into an hour each,
+    // and every run that was killed left its worker behind spinning a core, so the machine
+    // got slower with each attempt until nothing on it was quick. Five minutes is far more
+    // than the whole suite needs and far less than it takes to notice by hand.
+    tasks.withType<Test>().configureEach {
+        timeout.set(java.time.Duration.ofMinutes(5))
+    }
 }
 
 /**

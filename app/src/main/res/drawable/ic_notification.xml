@@ -1,0 +1,17 @@
+<!--
+     The notification icon.
+
+     A single flat silhouette on transparency, which is all Android renders: it masks the
+     shape and tints it, so anything with colour or detail arrives as a white blob. A
+     speech bubble, because what the notification is about is a reply.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M20,2H4C2.9,2 2,2.9 2,4v18l4,-4h14c1.1,0 2,-0.9 2,-2V4C22,2.9 21.1,2 20,2z" />
+</vector>

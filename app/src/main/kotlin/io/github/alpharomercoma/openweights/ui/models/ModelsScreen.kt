@@ -58,6 +58,13 @@ fun ModelsScreen(
     onDelete: (LocalModel) -> Unit,
     onCancelDownload: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * The Installed/Discover switch, drawn under this screen's own title.
+     *
+     * A slot rather than a parent wrapper because the top bar applies the status-bar
+     * inset itself: anything stacked above it would have that inset applied twice.
+     */
+    tabs: @Composable () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -67,17 +74,20 @@ fun ModelsScreen(
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Models", style = MaterialTheme.typography.titleMedium)
-                        Metric("${formatBytes(state.storageUsedBytes)} on this device")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
-            )
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Models", style = MaterialTheme.typography.titleMedium)
+                            Metric("${formatBytes(state.storageUsedBytes)} on this device")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
+                )
+                tabs()
+            }
         },
     ) { padding ->
         if (state.models.isEmpty() && state.downloads.isEmpty()) {
@@ -87,8 +97,8 @@ fun ModelsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "No models yet. Find one in Discover. It will tell you whether it " +
-                        "runs on this phone before you download it.",
+                    "No models yet. Open Discover above. It will tell you whether a " +
+                        "model runs on this phone before you download it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

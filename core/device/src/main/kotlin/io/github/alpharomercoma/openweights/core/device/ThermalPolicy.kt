@@ -46,6 +46,22 @@ data class ThreadPlan(
  * Sustained inference on a phone is a thermal problem as much as a compute one.
  */
 @Singleton
+/**
+ * How hot the device is, in the four steps Android reports.
+ *
+ * Named for what the user would say rather than for the constant: nobody thinks "my phone
+ * is at thermal status severe".
+ */
+enum class ThermalLevel(val label: String) {
+    NONE("cool"),
+    LIGHT("warm"),
+    HEAVY("hot"),
+    CRITICAL("very hot"),
+    ;
+
+    val isWarm: Boolean get() = this != NONE
+}
+
 class ThermalPolicy @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val profiler: DeviceProfiler,
@@ -62,22 +78,22 @@ class ThermalPolicy @Inject constructor(
         val generate = (cores / 2).coerceIn(MIN_THREADS, MAX_GENERATE_THREADS)
         val batch = cores.coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
 
-        return when (throttleLevel()) {
-            ThrottleLevel.NONE -> ThreadPlan(generate, batch)
+        return when (level()) {
+            ThermalLevel.NONE -> ThreadPlan(generate, batch)
 
             // Backing off early keeps throughput up and slows further heating, which is
             // what actually gets a long conversation finished.
-            ThrottleLevel.LIGHT -> ThreadPlan(
+            ThermalLevel.LIGHT -> ThreadPlan(
                 generateThreads = (generate - 1).coerceAtLeast(MIN_THREADS),
                 batchThreads = (batch / 2).coerceAtLeast(MIN_THREADS),
             )
 
-            ThrottleLevel.HEAVY -> ThreadPlan(MIN_THREADS, MIN_THREADS)
+            ThermalLevel.HEAVY -> ThreadPlan(MIN_THREADS, MIN_THREADS)
 
             // At critical and above Android is already shedding load to avoid shutting
             // down. Sustained inference is among the heaviest things this device can do,
             // so the right move is to stop, not to stop slightly less.
-            ThrottleLevel.CRITICAL -> ThreadPlan(MIN_THREADS, MIN_THREADS, shouldPause = true)
+            ThermalLevel.CRITICAL -> ThreadPlan(MIN_THREADS, MIN_THREADS, shouldPause = true)
         }
     }
 
@@ -88,21 +104,27 @@ class ThermalPolicy @Inject constructor(
      * looks identical to a slow model, and "the phone is warm" is the difference between a
      * user thinking the app is broken and knowing to put it down for a minute.
      */
-    fun isThrottling(): Boolean = throttleLevel() != ThrottleLevel.NONE
+    fun isThrottling(): Boolean = level().isWarm
 
-    private fun throttleLevel(): ThrottleLevel {
+    /**
+     * How hot the system says the device is.
+     *
+     * The operating system's own assessment, which is the only thermal reading an ordinary
+     * app can have: a temperature in degrees needs HardwarePropertiesManager, which is
+     * privileged, and `/sys/class/thermal` is not readable under SELinux on any recent
+     * Android. What this gives instead is better for the purpose anyway, because it is the
+     * same signal the scheduler is acting on when the phone slows down.
+     */
+    fun level(): ThermalLevel {
         val status = context.getSystemService<PowerManager>()?.currentThermalStatus
             ?: PowerManager.THERMAL_STATUS_NONE
-
         return when {
-            status >= PowerManager.THERMAL_STATUS_CRITICAL -> ThrottleLevel.CRITICAL
-            status >= PowerManager.THERMAL_STATUS_SEVERE -> ThrottleLevel.HEAVY
-            status >= PowerManager.THERMAL_STATUS_LIGHT -> ThrottleLevel.LIGHT
-            else -> ThrottleLevel.NONE
+            status >= PowerManager.THERMAL_STATUS_CRITICAL -> ThermalLevel.CRITICAL
+            status >= PowerManager.THERMAL_STATUS_SEVERE -> ThermalLevel.HEAVY
+            status >= PowerManager.THERMAL_STATUS_LIGHT -> ThermalLevel.LIGHT
+            else -> ThermalLevel.NONE
         }
     }
-
-    private enum class ThrottleLevel { NONE, LIGHT, HEAVY, CRITICAL }
 
     private companion object {
         const val MIN_THREADS = 2

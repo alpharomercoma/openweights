@@ -136,6 +136,15 @@ data class LoadedModelInfo(
      * setting on a model that cannot act on it.
      */
     val supportsTools: Boolean = false,
+    /**
+     * True when the chat template does something with `reasoning_effort`.
+     *
+     * Measured by rendering the template twice with different values and comparing the
+     * result, because no template declares this. A template that ignores the argument
+     * produces identical prompts, and a control that provably changes nothing should not
+     * be on screen.
+     */
+    val supportsReasoningEffort: Boolean = false,
 )
 
 /**

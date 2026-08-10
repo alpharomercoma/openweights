@@ -36,6 +36,7 @@ object ToolCallParser {
     fun parse(raw: String): ParsedToolCalls {
         parseLfmStyle(raw)?.let { return it }
         parseTaggedJson(raw)?.let { return it }
+        parseTaggedXml(raw)?.let { return it }
         return ParsedToolCalls(raw, emptyList())
     }
 
@@ -70,6 +71,51 @@ object ToolCallParser {
         return ParsedToolCalls(
             text,
             listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
+        )
+    }
+
+    /**
+     * The XML form of the same tags, which several models emit instead of JSON:
+     *
+     * ```
+     * <tool_call>
+     * <function=fetch_url>
+     * <parameter=url>https://example.com</parameter>
+     * </function>
+     * </tool_call>
+     * ```
+     *
+     * Worth its own branch because the failure was silent and expensive: the tags parsed
+     * as neither JSON nor prose, so the call never ran and the markup was shown to the
+     * user as the model's answer.
+     */
+    private fun parseTaggedXml(raw: String): ParsedToolCalls? {
+        val start = raw.indexOf(JSON_START)
+        if (start < 0) return null
+        val end = raw.indexOf(JSON_END, start)
+        if (end < 0) return null
+
+        val body = raw.substring(start + JSON_START.length, end)
+        val name = FUNCTION_TAG.find(body)?.groupValues?.get(1)?.trim() ?: return null
+
+        val arguments = PARAMETER_TAG.findAll(body).mapNotNull { match ->
+            val key = match.groupValues[1].trim()
+            // Trimmed because the value is usually on its own line between the tags, and a
+            // URL with a newline in it is not a URL.
+            val value = match.groupValues[2].trim()
+            if (key.isEmpty()) null else "\"$key\": ${value.asJsonString()}"
+        }.toList()
+
+        val text = (raw.take(start) + raw.substring(end + JSON_END.length)).trim()
+        return ParsedToolCalls(
+            text,
+            listOf(
+                ToolCall(
+                    id = name,
+                    name = name,
+                    argumentsJson = "{${arguments.joinToString(", ")}}",
+                ),
+            ),
         )
     }
 
@@ -232,4 +278,8 @@ object ToolCallParser {
     private const val LFM_END = "<|tool_call_end|>"
     private const val JSON_START = "<tool_call>"
     private const val JSON_END = "</tool_call>"
+
+    private val FUNCTION_TAG = Regex("""<function=([^>]+)>""")
+    private val PARAMETER_TAG =
+        Regex("""<parameter=([^>]+)>(.*?)</parameter>""", RegexOption.DOT_MATCHES_ALL)
 }

@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
+import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
@@ -44,8 +45,11 @@ class ModelRuntime @Inject constructor(
 ) {
     val loadedModel: LoadedModelInfo? get() = engine.loadedModel
 
-    /** Whichever model is already on disk, if any. */
-    fun firstAvailableModel(): File? = modelStore.firstAvailableModel()
+    /** The model to open with: the one last chosen, or any that is on disk. */
+    fun preferredModel(): File? = modelStore.preferredModel()
+
+    /** Records the choice, so the next launch opens the same model. */
+    fun rememberChoice(model: File) = modelStore.rememberChoice(model)
 
     fun projectorFor(model: File): File? = modelStore.projectorFor(model)
 
@@ -70,6 +74,9 @@ class ModelRuntime @Inject constructor(
     fun backendName(): String? = engine.computeDevices().firstOrNull()?.id?.uppercase()
 
     fun isThrottling(): Boolean = thermal.isThrottling()
+
+    /** How hot the system says the device is, for the line that says so while working. */
+    fun thermalLevel(): ThermalLevel = thermal.level()
 
     /**
      * Re-plans the thread count for the next reply.

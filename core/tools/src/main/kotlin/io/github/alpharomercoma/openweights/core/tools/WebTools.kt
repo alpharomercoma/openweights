@@ -21,9 +21,11 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.inject.Inject
@@ -70,12 +72,21 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
  * mean the feature does not work until they find one.
  */
 @Singleton
-class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : Tool {
+class WebSearchTool @Inject constructor(
+    private val httpClient: OkHttpClient,
+    private val settings: SearchSettings,
+) : Tool {
+    override val isLookup: Boolean = true
+
     override val definition = ToolDefinition(
-        name = "search_wikipedia",
-        description = "Search Wikipedia and return the opening of each matching article. " +
-            "Use it for people, places, organisations, history, science and definitions. " +
-            "It will not have this week's news, prices, or anything very recent.",
+        name = "web_search",
+        // Named for what it does, not for where it looks. The name is the strongest hint a
+        // model gets: while this was called search_wikipedia, replies said "Wikipedia" for
+        // questions that had nothing to do with an encyclopedia, and the model wrote as
+        // though the rest of the web were out of reach.
+        description = "Search the web and return the best matching pages with a summary " +
+            "of each. Use it whenever an answer depends on a fact you do not already " +
+            "have: people, places, organisations, products, events, definitions.",
         parametersJson = """
             {
               "type": "object",
@@ -92,92 +103,57 @@ class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : 
 
     override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
         val query = call.argument("query", "q", "search", "input", "topic")
-            ?: return@withContext "No query was given. Call search_wikipedia again with a query."
+            ?: return@withContext "No query was given. Call web_search again with a query."
 
-        val url = "https://en.wikipedia.org/w/api.php".toHttpUrl().newBuilder()
-            .addQueryParameter("action", "query")
-            .addQueryParameter("format", "json")
-            // generator=search with prop=extracts is what makes this one round trip: the
-            // hits and the text to answer from arrive together.
-            .addQueryParameter("generator", "search")
-            .addQueryParameter("gsrsearch", query)
-            .addQueryParameter("gsrlimit", MAX_RESULTS.toString())
-            .addQueryParameter("prop", "extracts")
-            .addQueryParameter("exintro", "1")
-            .addQueryParameter("explaintext", "1")
-            .addQueryParameter("exlimit", MAX_RESULTS.toString())
-            .build()
-
-        val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
-
-        val body = runCatching {
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
-                response.body.string()
-            }
-        }.getOrNull()
-            ?: return@withContext "Wikipedia could not be reached. The device may be offline."
-
-        val results = parseResults(body)
-        if (results.isEmpty()) {
-            return@withContext "Wikipedia has no article matching \"$query\"."
+        val providers = settings.providers(httpClient)
+        // Each in turn until one answers. A provider returns null when it could not answer
+        // rather than an empty list, so being rate limited moves on to the next one instead
+        // of telling the model the web has nothing on the subject.
+        val answered = providers.firstNotNullOfOrNull { provider ->
+            provider.search(query, MAX_RESULTS)?.takeIf { it.isNotEmpty() }?.let { provider to it }
         }
 
-        results.joinToString("\n\n") { result ->
-            "${result.title}\n${result.extract}\n${result.url}"
+        val (provider, results) = answered
+            ?: return@withContext "No search provider could answer. The device may be " +
+                "offline, or the search may be rate limited. Say so rather than guessing."
+
+        // Framed as material, not as a menu. A small model handed three bare titles reads
+        // them as options and asks which one to open, which is how "what is the Eiffel
+        // Tower" came back as "how about I fetch the page for Gustave Eiffel". The first
+        // result is the best match and saying so is what stops it picking the third.
+        buildString {
+            append("Results for \"").append(query).append("\" from ").append(provider.label)
+            append(", best match first. Answer the question using these. ")
+            append("Do not ask which one to read.\n")
+            results.forEachIndexed { index, result ->
+                append("\n[").append(index + 1).append("] ").append(result.title).append('\n')
+                append(result.snippet.take(MAX_EXTRACT_CHARS)).append('\n')
+                append(result.url).append('\n')
+            }
         }
     }
 
-    internal data class Result(val title: String, val extract: String, val url: String)
+    override fun callFor(question: String): ToolCall? {
+        if (question.isBlank()) return null
+        val arguments = buildJsonObject { put("query", JsonPrimitive(question)) }
+        return ToolCall(id = "", name = definition.name, argumentsJson = arguments.toString())
+    }
 
     internal companion object {
-        /** Wikimedia asks for a descriptive agent that identifies the client. */
-        const val USER_AGENT = "OpenWeights/0.1 (https://github.com/alpharomercoma/openweights)"
-
-        /** Three articles is enough to answer from and small enough for a phone's context. */
+        /** Three results is enough to answer from and small enough for a phone's context. */
         const val MAX_RESULTS = 3
 
         /** Long enough to answer from, short enough that three of them still fit. */
         const val MAX_EXTRACT_CHARS = 900
-
-        fun parseResults(payload: String): List<Result> {
-            val pages = runCatching {
-                Json.parseToJsonElement(payload)
-                    .jsonObject["query"]?.jsonObject
-                    ?.get("pages")?.jsonObject
-            }.getOrNull() ?: return emptyList()
-
-            return pages.values.mapNotNull { page ->
-                val fields = page.jsonObject
-                val title =
-                    fields["title"]?.jsonPrimitive?.contentOrNull() ?: return@mapNotNull null
-                val extract = fields["extract"]?.jsonPrimitive?.contentOrNull().orEmpty()
-                if (extract.isBlank()) return@mapNotNull null
-                Result(
-                    title = title,
-                    extract = extract.take(MAX_EXTRACT_CHARS),
-                    url = "https://en.wikipedia.org/wiki/" + title.replace(' ', '_'),
-                )
-            }
-        }
     }
 }
 
-/**
- * Reads one page.
- *
- * Search gives a model titles and a sentence each; this is how it reads the thing it found.
- * Markup is stripped rather than rendered, because a phone-sized context window cannot
- * afford navigation menus, and truncated hard, because one long page can fill the whole
- * window and leave no room for the answer.
- */
-@Singleton
 class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : Tool {
     override val definition = ToolDefinition(
         name = "fetch_url",
         description = "Fetch a public web page and return its readable text. Use it to " +
             "read a page whose address you already have, for example one that " +
-            "search_wikipedia returned.",
+            "web_search returned.",
         parametersJson = """
             {
               "type": "object",
@@ -202,9 +178,10 @@ class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : T
             return@withContext "Only https addresses can be read. Got: $url"
         }
 
-        val request = Request.Builder().url(
-            url,
-        ).header("User-Agent", WebSearchTool.USER_AGENT).build()
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", SEARCH_USER_AGENT)
+            .build()
 
         val body = runCatching {
             httpClient.newCall(request).execute().use { response ->

@@ -121,4 +121,49 @@ class ToolCallParserTest {
         assertThat(parsed.calls).isEmpty()
         assertThat(parsed.text).isEqualTo(raw)
     }
+
+    @Test
+    fun `the xml form of the hermes tags is a call, not prose`() {
+        // Seen on a phone: the model asked to read a page in this form, no parser knew it,
+        // so nothing ran and the markup was shown as the answer.
+        val raw = """
+            Let me read one of these pages.</think>
+
+            <tool_call>
+            <function=fetch_url>
+            <parameter=url>
+            https://example.com/a
+            </parameter>
+            </function>
+            </tool_call>
+        """.trimIndent()
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls).hasSize(1)
+        assertThat(parsed.calls.single().name).isEqualTo("fetch_url")
+        // The value sits on its own line between the tags; a URL with a newline is not one.
+        assertThat(parsed.calls.single().argumentsJson)
+            .isEqualTo("""{"url": "https://example.com/a"}""")
+        assertThat(parsed.text).doesNotContain("<tool_call>")
+        assertThat(parsed.text).doesNotContain("<function=")
+    }
+
+    @Test
+    fun `the json form still wins over the xml one`() {
+        val raw = """<tool_call>{"name": "web_search", "arguments": {"query": "a"}}</tool_call>"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.single().name).isEqualTo("web_search")
+        assertThat(parsed.calls.single().argumentsJson).contains("query")
+    }
+
+    @Test
+    fun `tags with neither json nor a function tag stay prose`() {
+        // Better to show text we did not understand than to invent a call from it.
+        val raw = "<tool_call>something unrecognised</tool_call>"
+
+        assertThat(ToolCallParser.parse(raw).calls).isEmpty()
+    }
 }

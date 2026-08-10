@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
@@ -26,7 +27,9 @@ import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
+import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,6 +43,14 @@ interface TurnListener {
 
     /** Tools ran, were declined, or were refused. */
     fun onSteps(steps: List<AgentStep>)
+
+    /**
+     * What the model said before asking for those tools.
+     *
+     * Kept because it is the only thing that explains why one call followed another. It
+     * arrives already stripped of reasoning, which belongs to the thinking block above.
+     */
+    fun onIntermediate(text: String)
 
     /** A new pass is about to start, so the entry should be cleared for it. */
     fun onNextPass()
@@ -64,8 +75,18 @@ interface TurnListener {
 class TurnRunner @Inject constructor(
     private val engine: InferenceEngine,
     private val tools: ToolRegistry,
+    private val switches: ToolSwitches,
 ) {
-    private val agent = AgentRunner(tools)
+
+    /**
+     * True when at least one tool is switched on.
+     *
+     * Asked before the turn is built, because the instruction that tells the model it can
+     * look things up has to go in or stay out together with the tools themselves. With all
+     * of them off it was still going in, so the model was told it could search, could not,
+     * and said so.
+     */
+    fun hasEnabledTools(): Boolean = tools.all.any { switches.isEnabled(it.definition.name) }
 
     /**
      * Runs until the model stops asking for tools, or the budget runs out.
@@ -76,40 +97,86 @@ class TurnRunner @Inject constructor(
         conversation: List<ChatMessage>,
         params: SamplerParams,
         mode: AgentMode,
+        withTools: Boolean,
         listener: TurnListener,
     ): String {
+        // Read once per turn, not once per app start: a tool switched off mid-conversation
+        // should be off for the next thing asked, and a registry captured at construction
+        // would keep offering it until the process died.
+        val active = tools.enabled(switches.enabled(tools.all.map { it.definition.name }))
+        val agent = AgentRunner(active)
+        val budget = ToolBudget(engine.loadedModel?.contextSize ?: 0)
+
+        // The tool to reach for when the model says it does not know something. Whether one
+        // exists decides how the turn starts: with a way to ask for a lookup in one line,
+        // the first pass is asked to answer and given no tools at all.
+        val lookup = if (withTools) active.all.firstOrNull(Tool::isLookup) else null
+
         var messages = conversation
         var round = 0
         var lastRaw = ""
 
         while (true) {
-            val offerTools = round < AgentRunner.DEFAULT_MAX_ROUNDS
-            val pass = streamOnce(messages, params, offerTools, listener) { lastRaw = it }
-                ?: return lastRaw
+            // The first pass gets no tools. A small model handed a toolbox uses it, and
+            // most questions do not need one: "gojo vs sukuna" took five minutes of
+            // searching to answer something the weights already knew. So the opening pass
+            // is a question, not a menu, and the model's own three-token answer to "do you
+            // know this" is what decides whether anything is fetched. When there is nothing
+            // to look up with there is no decision to route, and tools are offered as
+            // before from the first pass.
+            val routing = lookup != null && round == 0
+            val offerTools = withTools &&
+                !routing &&
+                round < AgentRunner.DEFAULT_MAX_ROUNDS &&
+                budget.hasRoom
+            val pass = streamOnce(messages, params, active, offerTools, lookup != null, listener) {
+                lastRaw = it
+            } ?: return lastRaw.withoutLookup()
 
-            val calls = pass.event.toolCalls
-            if (calls.isEmpty()) return lastRaw
+            val requested = pass.raw.lookupQuery()
+                ?.let { query -> lookup?.callFor(query.ifBlank { conversation.lastQuestion() }) }
+                ?.takeIf { budget.hasRoom }
+            val calls = listOfNotNull(requested)
+                .ifEmpty { pass.event.toolCalls }
+                .ifEmpty { pass.raw.salvagedCall(active, conversation) }
+            // Sanitised on the way out, because a model that asked for a lookup we could not
+            // run must not have its syntax shown to the user as though it were the answer.
+            if (calls.isEmpty()) return lastRaw.withoutLookup()
+
+            // Said first, then the steps, so the transcript reads in the order it happened.
+            // The parser's content, not the raw stream: raw still carries the call itself,
+            // and showing "<|tool_call_start|>[web_search(query='...')]" above a chip that
+            // already says web_search is the same thing twice, once unreadably.
+            pass.spoken().takeIf { it.isNotEmpty() }?.let(listener::onIntermediate)
 
             val decision = agent.step(calls, round, mode, listener::onApproval)
             listener.onSteps(decision.steps())
 
             val results = (decision as? AgentDecision.Continue)?.messages.orEmpty()
-            if (results.isEmpty()) return lastRaw
+                .map(budget::fit)
+            if (results.isEmpty()) return lastRaw.withoutLookup()
 
             // The assistant turn that asked goes back too, or the model is handed results
-            // for a question it cannot see itself having asked.
-            messages = messages + ChatMessage.text(ChatRole.ASSISTANT, pass.raw) + results
+            // for a question it cannot see itself having asked. Its thinking does not:
+            // reasoning is scratch work, and replaying it as an assistant turn hands the
+            // model a literal <think> block inside its own history, which for a template
+            // that opens one itself is nonsense it then tries to continue.
+            val asked = ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning())
+            messages = messages + asked + results
             round++
             listener.onNextPass()
         }
     }
 
-    private class Pass(val raw: String, val event: GenerationEvent.Completed)
+    internal class Pass(val raw: String, val event: GenerationEvent.Completed)
 
+    @Suppress("LongParameterList")
     private suspend fun streamOnce(
         messages: List<ChatMessage>,
         params: SamplerParams,
+        active: ToolRegistry,
         offerTools: Boolean,
+        mayLookUp: Boolean,
         listener: TurnListener,
         publishRaw: (String) -> Unit,
     ): Pass? {
@@ -123,16 +190,28 @@ class TurnRunner @Inject constructor(
             // not a plan. Withdrawn on the last pass, so a model that has used its whole
             // budget is made to answer from what it collected rather than asking again and
             // leaving the user with tool syntax and no reply.
-            tools = if (offerTools) tools.definitions else emptyList(),
+            tools = if (offerTools) active.definitions else emptyList(),
         ).collect { event ->
             when (event) {
                 is GenerationEvent.Token -> {
                     reply.append(event.text)
-                    publishRaw(reply.toString())
-                    listener.onText(reply.toString())
+                    val raw = reply.toString()
+                    publishRaw(raw)
+                    // Withheld only while the reply could still turn out to be a request to
+                    // search. One character usually decides it, so an ordinary answer is
+                    // released on its first token and is no slower for this, while a lookup
+                    // never reaches the screen as syntax the user has to read past.
+                    if (!mayLookUp || !raw.mayBeLookup()) listener.onText(raw)
                 }
 
                 is GenerationEvent.Completed -> {
+                    // Counts only. Every "why did it not search" question is answered by
+                    // whether tools were offered and how many calls came back, and the
+                    // reply itself is the user's conversation, which is never logged.
+                    Log.i(
+                        "OpenWeights",
+                        "pass offered=$offerTools calls=${event.toolCalls.size}",
+                    )
                     listener.onPass(event, reply.toString())
                     completed = event
                 }
@@ -142,9 +221,167 @@ class TurnRunner @Inject constructor(
     }
 }
 
+/**
+ * The call a model meant to make, when it named a tool in prose instead of calling it.
+ *
+ * Small models do this however the prompt is worded: they write the tool's own name, then
+ * ask permission. Naming it is the decision; the syntax is the only part they got wrong,
+ * so the call is made for them from the question they were asked.
+ *
+ * Constraining generation to the call grammar was tried first and was worse in both
+ * directions: the grammar has to be checked against the whole vocabulary for every token,
+ * which cost more than the search it was trying to produce, and a model pushed into a
+ * shape it was not going to choose kept generating past the call.
+ *
+ * Empty unless exactly one tool is named, because two names is a model weighing options
+ * rather than deciding, and empty for anything with side effects the user should see
+ * coming, which is what [Tool.alwaysAsk] already marks.
+ */
+private fun String.salvagedCall(
+    tools: ToolRegistry,
+    conversation: List<ChatMessage>,
+): List<ToolCall> {
+    val named = tools.all.filter { contains(it.definition.name, ignoreCase = true) }
+    val tool = named.singleOrNull()?.takeUnless { it.alwaysAsk } ?: return emptyList()
+    return listOfNotNull(tool.callFor(conversation.lastQuestion()))
+}
+
+/** The question this turn is answering, for tools that take it as their argument. */
+private fun List<ChatMessage>.lastQuestion(): String =
+    lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
+
+/**
+ * The one line a model writes instead of an answer when it does not know something.
+ *
+ * Plain text rather than a tool call, because the point is to ask the question before the
+ * model has been shown any tools: a tool call needs the tool schemas in the prompt, and it
+ * is exactly having them there that makes a small model search for things it already knows.
+ * Three tokens is the whole cost of the decision, and a model that does know the answer
+ * pays none of it.
+ */
+private const val LOOKUP = "LOOKUP:"
+
+/**
+ * What to search for, or null when this is an ordinary answer.
+ *
+ * Reasoning is stripped first: a thinking model opens with a block that is displayed
+ * separately, and the request, if it comes, comes after it.
+ */
+private fun String.lookupQuery(): String? {
+    val said = withoutReasoning().trimStart()
+    if (!said.startsWith(LOOKUP, ignoreCase = true)) return null
+    return said.substring(LOOKUP.length).trim().lineSequence().firstOrNull()?.trim().orEmpty()
+}
+
+/**
+ * True while the text so far is still consistent with being a lookup request.
+ *
+ * The test is a prefix, not a match, so it answers before the line is finished and the
+ * first token of a real answer clears it. While the model is inside its reasoning block
+ * there is nothing to decide yet, and that block is the user's to watch.
+ */
+private fun String.mayBeLookup(): Boolean {
+    if (contains("<think>") && !contains("</think>")) return false
+    val head = withoutReasoning().trimStart().take(LOOKUP.length)
+    return head.isNotEmpty() && LOOKUP.startsWith(head, ignoreCase = true)
+}
+
+/** The text with an unanswered lookup request taken off the front of it. */
+private fun String.withoutLookup(): String {
+    if (lookupQuery() == null) return this
+    val said = withoutReasoning().trimStart()
+    return said.substringAfter('\n', "").trim()
+}
+
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
 private fun AgentDecision.steps(): List<AgentStep> = when (this) {
     is AgentDecision.Continue -> steps
     is AgentDecision.Exhausted -> steps
     AgentDecision.Finished -> emptyList()
+}
+
+/**
+ * How much of the context window a turn may spend on what tools returned.
+ *
+ * A page and three search results are a few thousand characters each, and four rounds of
+ * them do not fit in 4096 tokens beside the conversation that asked for them. What that
+ * looked like was `llama_decode returned 1`, which is the KV cache saying it has no slot
+ * left, arriving after several minutes of work and taking the answer with it.
+ *
+ * So results are trimmed to what is left rather than sent whole, and once the budget is
+ * gone no further tools are offered: the model is made to answer from what it already has,
+ * which is a worse answer than it wanted and a far better one than an error.
+ */
+private class ToolBudget(contextSize: Int) {
+    /**
+     * A third of the window, in characters.
+     *
+     * The other two thirds are the conversation, the system prompt and the answer being
+     * written, all of which have to fit alongside. Four characters to a token is the usual
+     * English approximation and is deliberately pessimistic here: overestimating the
+     * budget is what produces the error this exists to avoid.
+     */
+    private var remaining =
+        if (contextSize > 0) contextSize * CHARS_PER_TOKEN / TOOL_SHARE else DEFAULT_BUDGET
+
+    val hasRoom: Boolean get() = remaining > MINIMUM_USEFUL
+
+    /** The message, shortened to what is left, and the budget reduced by what it took. */
+    fun fit(message: ChatMessage): ChatMessage {
+        val text = message.text
+        if (text.length <= remaining) {
+            remaining -= text.length
+            return message
+        }
+        val kept = text.take(remaining.coerceAtLeast(0))
+        remaining = 0
+        // Said in the text rather than trimmed silently, so the model knows the page ran
+        // out rather than believing it read all of it.
+        return ChatMessage.text(ChatRole.TOOL, "$kept\n[cut short: no context left]")
+            .copy(toolCallId = message.toolCallId)
+    }
+
+    private companion object {
+        const val CHARS_PER_TOKEN = 4
+        const val TOOL_SHARE = 3
+        const val MINIMUM_USEFUL = 400
+        const val DEFAULT_BUDGET = 4_000
+    }
+}
+
+/**
+ * What the model said, as opposed to what it asked for.
+ *
+ * The engine's parser has already separated the two, so its content is used when there is
+ * any. The fallback matters when the native parser did not recognise the format and the
+ * Kotlin one found the calls instead: then the raw text is all there is, and it still has
+ * the call in it.
+ */
+private fun TurnRunner.Pass.spoken(): String =
+    event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.withoutLookup().trim()
+
+/**
+ * The text with any tool call taken out of it.
+ *
+ * A safety net for the fallback path, covering the two delimiter families models actually
+ * emit. Anything else is left alone: a parser that guesses at unknown syntax deletes real
+ * answers, and showing markup is a smaller failure than showing a truncated reply.
+ */
+private fun String.withoutToolMarkup(): String =
+    TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }.trim()
+
+private val TOOL_MARKUP = listOf(
+    Regex("""<\|tool_call_start\|>.*?<\|tool_call_end\|>""", RegexOption.DOT_MATCHES_ALL),
+    Regex("""<tool_call>.*?</tool_call>""", RegexOption.DOT_MATCHES_ALL),
+)
+
+/**
+ * The reply without its thinking.
+ *
+ * Only the closing tag is looked for, because templates commonly pre-fill the opening one,
+ * so a reply can arrive with a close and no open.
+ */
+private fun String.withoutReasoning(): String {
+    val end = indexOf("</think>")
+    return if (end < 0) this else substring(end + "</think>".length).trimStart()
 }

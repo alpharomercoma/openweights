@@ -103,6 +103,8 @@ fun Composer(
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
+    /** The thinking control, drawn beside Attach. Empty when the model offers no choice. */
+    thinking: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Saveable, and keyed to the conversation. Saveable because a half-written message is
@@ -208,6 +210,7 @@ fun Composer(
                 enabled = enabled,
                 isGenerating = isGenerating,
                 canAttach = canAttach,
+                thinking = thinking,
                 isAttaching = isAttaching,
                 canDictate = canDictate,
                 isListening = isListening,
@@ -237,6 +240,7 @@ private fun ComposerActions(
     enabled: Boolean,
     isGenerating: Boolean,
     canAttach: Boolean,
+    thinking: @Composable () -> Unit,
     isAttaching: Boolean,
     canDictate: Boolean,
     isListening: Boolean,
@@ -257,6 +261,9 @@ private fun ComposerActions(
                 onClick = onAttach,
             )
         }
+        // Left of the spacer, with Attach: both answer "what goes into this message",
+        // while the right-hand side is for sending it.
+        thinking()
         Spacer(Modifier.weight(1f))
         if (canDictate) {
             DictateButton(isListening = isListening, enabled = enabled, onDictate = onDictate)

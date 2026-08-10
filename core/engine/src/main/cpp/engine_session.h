@@ -49,6 +49,22 @@ struct ChatMessage {
 };
 
 /** A tool the model may call, described the way the OpenAI-style schema does. */
+/**
+ * The grammar the chat template asked for, so the sampler can be constrained by it.
+ *
+ * Rendering tools produces both a prompt and a grammar describing what a call to one
+ * looks like. Taking only the prompt, which is what this did first, leaves the model free
+ * to write "I could use the search tool, shall I?" instead of a call, which is exactly
+ * what it did.
+ */
+struct GrammarSpec {
+    std::string grammar;
+    /** When true the grammar only binds after a trigger appears, leaving prose free. */
+    bool lazy = false;
+    std::vector<std::string> trigger_patterns;
+    std::vector<llama_token> trigger_tokens;
+};
+
 struct ToolDefinition {
     std::string name;
     std::string description;
@@ -173,6 +189,9 @@ public:
     /** True when this model's chat template renders tool definitions. */
     bool supports_tools() const;
 
+    /** True when this model's chat template does something with `reasoning_effort`. */
+    bool supports_reasoning_effort() const;
+
     /** Signals the running generation to stop. Safe to call from any thread. */
     void cancel() { cancelled_.store(true, std::memory_order_relaxed); }
 
@@ -249,6 +268,8 @@ private:
     /** How the last prompt was rendered, which is what the reply must be parsed against. */
     int last_format_ = 0;
     std::string last_generation_prompt_;
+
+    GrammarSpec last_grammar_;
 
     /** The multimodal projector, or null for a text-only model. */
     void * mtmd_ = nullptr;

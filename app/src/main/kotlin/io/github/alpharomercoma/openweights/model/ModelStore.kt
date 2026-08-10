@@ -39,7 +39,27 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
     /** Every GGUF currently on disk, newest first. Projectors are not models. */
     fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
 
-    fun firstAvailableModel(): File? = availableModels().firstOrNull()
+    /**
+     * The model to open with: the one last chosen, or any that is present.
+     *
+     * Falling back to whatever came first in the directory listing was what it did before,
+     * and on a phone with three models installed that meant choosing a model, closing the
+     * app, and finding a different one loaded. Which model is loaded decides whether tools
+     * work at all, so getting this wrong looked like the agent being broken.
+     */
+    fun preferredModel(): File? {
+        val installed = availableModels()
+        val chosen = store.getString(KEY_LAST_MODEL, null)
+        return installed.firstOrNull { it.name == chosen } ?: installed.firstOrNull()
+    }
+
+    /** Records the choice, so the next launch opens the same model. */
+    fun rememberChoice(model: File) {
+        store.edit().putString(KEY_LAST_MODEL, model.name).apply()
+    }
+
+    private val store =
+        context.getSharedPreferences("model_store", Context.MODE_PRIVATE)
 
     /**
      * The multimodal projector that belongs to [model], if it has been downloaded.
@@ -72,6 +92,7 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
     private val File.isProjector: Boolean get() = GgufFileName.isProjector(name)
 
     private companion object {
+        const val KEY_LAST_MODEL = "last_model"
         const val MODELS_DIRECTORY = "models"
         const val GGUF_EXTENSION = GgufFileName.GGUF_SUFFIX
     }

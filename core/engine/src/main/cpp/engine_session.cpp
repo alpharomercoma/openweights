@@ -24,6 +24,7 @@
 #include <mutex>
 
 #include "chat.h"
+#include "common.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 
@@ -74,11 +75,59 @@ void log_callback(ggml_log_level level, const char * text, void * /*user_data*/)
 
 std::once_flag g_backend_once;
 
-/** Builds the sampler chain. Order matters: penalties and truncation before temperature. */
-llama_sampler * build_sampler(const SamplerConfig & cfg, const llama_vocab * vocab) {
+/**
+ * The grammar sampler for a rendered tool call, or nullptr when the template asked for
+ * no grammar.
+ *
+ * Mirrors what llama.cpp's own sampling code does with the same fields, because the
+ * triggers come back in four shapes and only one of them is a literal word.
+ */
+llama_sampler * build_grammar(
+    const GrammarSpec & spec,
+    const llama_vocab * vocab) {
+    // Lazy only. A lazy grammar costs nothing until the model starts a call and then
+    // guarantees the rest of it parses, which is the whole benefit. A non-lazy one has to
+    // be checked against every token in the vocabulary from the first position, which on
+    // this hardware costs more than the tool call is worth, and forces a shape out of a
+    // model that was not going to choose it. Measured on a phone: seconds per token, and
+    // a reply that ran on well past the call.
+    if (spec.grammar.empty() || !spec.lazy) {
+        return nullptr;
+    }
+    std::vector<const char *> patterns;
+    patterns.reserve(spec.trigger_patterns.size());
+    for (const auto & pattern : spec.trigger_patterns) {
+        patterns.push_back(pattern.c_str());
+    }
+    return llama_sampler_init_grammar_lazy_patterns(
+        vocab,
+        spec.grammar.c_str(),
+        "root",
+        patterns.data(),
+        patterns.size(),
+        spec.trigger_tokens.data(),
+        spec.trigger_tokens.size());
+}
+
+/**
+ * Builds the sampler chain. Order matters: penalties and truncation before temperature.
+ *
+ * The grammar goes first when there is one. It masks every token that cannot continue a
+ * valid tool call, and it has to do that against the full distribution: behind top_k it
+ * would be choosing from a shortlist that the truncation samplers had already picked
+ * without knowing which tokens were legal.
+ */
+llama_sampler * build_sampler(
+    const SamplerConfig & cfg,
+    const llama_vocab * vocab,
+    llama_sampler * grammar) {
     auto params = llama_sampler_chain_default_params();
     params.no_perf = true;
     llama_sampler * chain = llama_sampler_chain_init(params);
+
+    if (grammar != nullptr) {
+        llama_sampler_chain_add(chain, grammar);
+    }
 
     if (cfg.repeat_penalty != 1.0f && cfg.repeat_last_n != 0) {
         llama_sampler_chain_add(
@@ -501,6 +550,40 @@ bool Session::supports_tools() const {
     }
 }
 
+bool Session::supports_reasoning_effort() const {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    if (templates == nullptr) {
+        return false;
+    }
+
+    // Rendered twice and compared, because there is no flag to ask. A template that reads
+    // reasoning_effort puts something different in the prompt for "low" than for "high";
+    // one that ignores the argument produces the same bytes both times, and offering the
+    // user a control that changes nothing is worse than not offering it.
+    auto render = [&](const char * effort) -> std::string {
+        common_chat_templates_inputs inputs;
+        inputs.add_generation_prompt = true;
+        inputs.use_jinja = true;
+        inputs.enable_thinking = true;
+        inputs.chat_template_kwargs["reasoning_effort"] = std::string("\"") + effort + "\"";
+
+        common_chat_msg msg;
+        msg.role = "user";
+        msg.content = "probe";
+        inputs.messages.push_back(msg);
+
+        try {
+            return common_chat_templates_apply(templates, inputs).prompt;
+        } catch (const std::exception &) {
+            return std::string();
+        }
+    };
+
+    const std::string low = render("low");
+    const std::string high = render("high");
+    return !low.empty() && low != high;
+}
+
 bool Session::render_prompt(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
@@ -551,6 +634,36 @@ bool Session::render_prompt(
         // remembered here rather than recomputed later from a guess.
         last_format_ = static_cast<int>(params.format);
         last_generation_prompt_ = params.generation_prompt;
+        last_grammar_ = GrammarSpec{};
+        last_grammar_.grammar = params.grammar;
+        last_grammar_.lazy = params.grammar_lazy;
+        for (const auto & trigger : params.grammar_triggers) {
+            switch (trigger.type) {
+                case COMMON_GRAMMAR_TRIGGER_TYPE_WORD:
+                    last_grammar_.trigger_patterns.push_back(regex_escape(trigger.value));
+                    break;
+                case COMMON_GRAMMAR_TRIGGER_TYPE_PATTERN:
+                    last_grammar_.trigger_patterns.push_back(trigger.value);
+                    break;
+                case COMMON_GRAMMAR_TRIGGER_TYPE_PATTERN_FULL: {
+                    // Anchored, because a full-match trigger means the whole output so far
+                    // has to match, not merely contain, the pattern.
+                    const std::string & pattern = trigger.value;
+                    std::string anchored = "^$";
+                    if (!pattern.empty()) {
+                        anchored = (pattern.front() != '^' ? "^" : "") + pattern +
+                            (pattern.back() != '$' ? "$" : "");
+                    }
+                    last_grammar_.trigger_patterns.push_back(anchored);
+                    break;
+                }
+                case COMMON_GRAMMAR_TRIGGER_TYPE_TOKEN:
+                    last_grammar_.trigger_tokens.push_back(trigger.token);
+                    break;
+                default:
+                    break;
+            }
+        }
         // The prompt contains the user's conversation, so it is never logged.
         return true;
     } catch (const std::exception & failure) {
@@ -690,7 +803,13 @@ StopReason Session::generate(
     stats.prefill_ms   = prefill_end - prefill_start;
     stats.context_size = n_ctx;
 
-    llama_sampler * sampler = build_sampler(sampler_config, vocab);
+    llama_sampler * grammar = build_grammar(last_grammar_, vocab);
+    if (grammar == nullptr && !last_grammar_.grammar.empty()) {
+        error = "failed to parse the tool-call grammar the chat template produced";
+        return StopReason::ERROR;
+    }
+    // Owned by the chain from here: llama_sampler_free on the chain frees its children.
+    llama_sampler * sampler = build_sampler(sampler_config, vocab, grammar);
     StopReason reason = StopReason::END_OF_TURN;
     int64_t first_token_ms = 0;
 

@@ -30,8 +30,10 @@ import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
+import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
+import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -87,7 +89,8 @@ class ChatViewModelTest {
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             attachments = AttachmentStore(context),
             chats = chats,
-            turns = TurnRunner(engine, registry),
+            turns = TurnRunner(engine, registry, ToolSwitches(context)),
+            notifier = ReplyNotifier(context),
         )
     }
 

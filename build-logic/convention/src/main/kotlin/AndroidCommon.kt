@@ -35,6 +35,9 @@ object BuildConfig {
     /** The only ABI we ship: 32-bit ARM is irrelevant for LLM inference. */
     const val ABI = "arm64-v8a"
 
+    /** r29 aligns native segments to 16 KB by default, which Play requires. */
+    const val NDK_VERSION = "29.0.14206865"
+
     val JAVA_VERSION: JavaVersion = JavaVersion.VERSION_17
     val JVM_TARGET: JvmTarget = JvmTarget.JVM_17
 }
@@ -47,6 +50,12 @@ internal fun Project.configureAndroidCommon(extension: CommonExtension) {
     extension.compileSdk = BuildConfig.COMPILE_SDK
     extension.defaultConfig.minSdk = BuildConfig.MIN_SDK
     extension.defaultConfig.ndk.abiFilters += BuildConfig.ABI
+    // Every module, not just the one that compiles C++. A module without an NDK cannot
+    // find the strip tool, and its strip task then copies the libraries through with
+    // their symbols intact. The app is exactly that module: the engine stripped
+    // libllama-common.so to 4.3 MB, the app repackaged the 65.3 MB original, and the
+    // release build carried 105 MB of symbol tables nobody can read on a phone.
+    extension.ndkVersion = BuildConfig.NDK_VERSION
 
     extension.compileOptions.sourceCompatibility = BuildConfig.JAVA_VERSION
     extension.compileOptions.targetCompatibility = BuildConfig.JAVA_VERSION

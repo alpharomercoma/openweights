@@ -64,8 +64,6 @@ android {
         }
     }
 
-    ndkVersion = "29.0.14206865"
-
     packaging {
         jniLibs.useLegacyPackaging = false
         // Khronos's ICD loader is a link target, not a runtime one. Qualcomm lists

@@ -460,10 +460,31 @@ Note the class name has no `.test` suffix even though the APK's application id d
 
 ## Artifact sizes (2026-08-10)
 
-Release AAB **26.7 MB**, of which the native libraries are the bulk: `libllama.so` plus
-seven CPU backend variants. The debug APK is 144 MB because debug builds keep unstripped
-native symbols: do not quote that number as the app's size. Trimming native debug symbols
-and verifying the Play-delivered download size is a P5 task.
+| artifact | size |
+|---|---:|
+| Release AAB | **20.9 MB** |
+| Release APK | **23.7 MB** |
+| Debug APK | 231 MB |
+
+The app ships **no model**. Weights are downloaded by the user, which is the whole point:
+the catalogue is Hugging Face, not a list someone curated for them.
+
+The release build carried 105 MB of unreadable symbol tables until 2026-08-10.
+`libllama-common.so` alone was 65.3 MB and strips to 4.3 MB. The cause is worth
+remembering: AGP's strip task needs the NDK to find `llvm-strip`, and a module that does
+not compile C++ has no `ndkVersion`, so its strip task copies the libraries through
+untouched. `:core:engine` stripped correctly and `:app` then repackaged the originals from
+the merged output. `ndkVersion` is now set for every module in the convention plugin, not
+just the one with CMake.
+
+The debug APK stays large on purpose: debug builds keep symbols, skip R8, and are never
+what a user installs.
+
+For scale, the assistants we are measured against: ChatGPT 169.6 MB, Gemini 148.3 MB to
+download and 212 MB installed, Claude 58.6 MB. All three are thin clients around a network
+API. We are smaller than all of them while carrying an inference engine, seven CPU backend
+variants and a GPU backend, because the part that is actually large is the model, and the
+model is not ours to ship.
 
 ## Tool calling, and where llama.cpp stops helping
 

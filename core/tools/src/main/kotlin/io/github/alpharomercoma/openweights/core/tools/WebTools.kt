@@ -23,9 +23,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.net.URLDecoder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,28 +50,39 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
     runCatching { content }.getOrNull()
 
 /**
- * Searches the web.
+ * Searches an encyclopedia.
  *
- * DuckDuckGo's HTML endpoint, because it needs no key and no account. That is the whole
- * reason: a keyed search API would mean either shipping our key, which is a giveaway, or
- * asking every user to get one before the feature works at all. The cost is that this
- * parses a page rather than an API, so it can break when the page changes, and the tool
- * says so plainly when it finds nothing rather than pretending the web is empty.
+ * Wikipedia's own API, and not a search engine, after measuring both. Scraping
+ * DuckDuckGo's keyless HTML endpoint worked in a first test and then returned nothing for
+ * ten consecutive requests once it had seen a burst from one address: it rate limits by
+ * serving a page with no results rather than an error, so the tool cannot tell "nothing
+ * matched" from "you have been blocked" and would quietly tell the model the web is empty.
+ * A search that fails silently is worse than no search.
+ *
+ * Wikipedia answered five out of five, in under a second, and returns article intros in
+ * the same call, so one round trip is enough to answer from. What it costs is breadth:
+ * this is the wrong tool for prices, news and anything from this week, and the description
+ * says so, because a model that knows a tool's limits asks for it less often when it will
+ * not help.
+ *
+ * General web search needs a key. The seam for one is [SearchProvider]; nothing keyed
+ * ships, because shipping our key would be giving it away and demanding the user's would
+ * mean the feature does not work until they find one.
  */
 @Singleton
 class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : Tool {
     override val definition = ToolDefinition(
-        name = "web_search",
-        description = "Search the web and return the top results with titles, URLs and " +
-            "short snippets. Use it for anything current, anything specific, or anything " +
-            "you are not sure about.",
+        name = "search_wikipedia",
+        description = "Search Wikipedia and return the opening of each matching article. " +
+            "Use it for people, places, organisations, history, science and definitions. " +
+            "It will not have this week's news, prices, or anything very recent.",
         parametersJson = """
             {
               "type": "object",
               "properties": {
                 "query": {
                   "type": "string",
-                  "description": "What to search for, as you would type it into a search box"
+                  "description": "What to look up, as you would type it into a search box"
                 }
               },
               "required": ["query"]
@@ -80,17 +91,24 @@ class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : 
     )
 
     override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
-        val query = call.argument("query", "q", "search", "input")
-            ?: return@withContext "No query was given. Call web_search again with a query."
+        val query = call.argument("query", "q", "search", "input", "topic")
+            ?: return@withContext "No query was given. Call search_wikipedia again with a query."
 
-        val request = Request.Builder()
-            .url(
-                "https://lite.duckduckgo.com/lite/?q=" + java.net.URLEncoder.encode(query, "UTF-8"),
-            )
-            // A desktop agent string: the mobile page returns a different layout and this
-            // parser is written against one of them.
-            .header("User-Agent", USER_AGENT)
+        val url = "https://en.wikipedia.org/w/api.php".toHttpUrl().newBuilder()
+            .addQueryParameter("action", "query")
+            .addQueryParameter("format", "json")
+            // generator=search with prop=extracts is what makes this one round trip: the
+            // hits and the text to answer from arrive together.
+            .addQueryParameter("generator", "search")
+            .addQueryParameter("gsrsearch", query)
+            .addQueryParameter("gsrlimit", MAX_RESULTS.toString())
+            .addQueryParameter("prop", "extracts")
+            .addQueryParameter("exintro", "1")
+            .addQueryParameter("explaintext", "1")
+            .addQueryParameter("exlimit", MAX_RESULTS.toString())
             .build()
+
+        val request = Request.Builder().url(url).header("User-Agent", USER_AGENT).build()
 
         val body = runCatching {
             httpClient.newCall(request).execute().use { response ->
@@ -98,58 +116,49 @@ class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : 
                 response.body.string()
             }
         }.getOrNull()
-            ?: return@withContext "The search could not be reached. The device may be offline."
+            ?: return@withContext "Wikipedia could not be reached. The device may be offline."
 
-        val results = parseResults(body).take(MAX_RESULTS)
+        val results = parseResults(body)
         if (results.isEmpty()) {
-            return@withContext "No results were found for \"$query\"."
+            return@withContext "Wikipedia has no article matching \"$query\"."
         }
 
-        results.mapIndexed { index, result ->
-            "${index + 1}. ${result.title}\n   ${result.url}\n   ${result.snippet}"
-        }.joinToString("\n")
+        results.joinToString("\n\n") { result ->
+            "${result.title}\n${result.extract}\n${result.url}"
+        }
     }
 
-    internal data class Result(val title: String, val url: String, val snippet: String)
+    internal data class Result(val title: String, val extract: String, val url: String)
 
     internal companion object {
-        const val USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) OpenWeights"
-        const val MAX_RESULTS = 5
+        /** Wikimedia asks for a descriptive agent that identifies the client. */
+        const val USER_AGENT = "OpenWeights/0.1 (https://github.com/alpharomercoma/openweights)"
 
-        private val LINK = Regex(
-            """<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>(.*?)</a>""",
-            RegexOption.DOT_MATCHES_ALL,
-        )
-        private val SNIPPET = Regex(
-            """<td[^>]*class="result-snippet"[^>]*>(.*?)</td>""",
-            RegexOption.DOT_MATCHES_ALL,
-        )
+        /** Three articles is enough to answer from and small enough for a phone's context. */
+        const val MAX_RESULTS = 3
 
-        /**
-         * Pulls results out of the page.
-         *
-         * Links come back wrapped in a redirect with the real address in a `uddg`
-         * parameter, so they are unwrapped: a model handed a redirect cannot tell which
-         * site it is about to read.
-         */
-        fun parseResults(html: String): List<Result> {
-            val links = LINK.findAll(html).toList()
-            val snippets = SNIPPET.findAll(html).map { it.groupValues[1].stripTags() }.toList()
-            return links.mapIndexed { index, match ->
+        /** Long enough to answer from, short enough that three of them still fit. */
+        const val MAX_EXTRACT_CHARS = 900
+
+        fun parseResults(payload: String): List<Result> {
+            val pages = runCatching {
+                Json.parseToJsonElement(payload)
+                    .jsonObject["query"]?.jsonObject
+                    ?.get("pages")?.jsonObject
+            }.getOrNull() ?: return emptyList()
+
+            return pages.values.mapNotNull { page ->
+                val fields = page.jsonObject
+                val title =
+                    fields["title"]?.jsonPrimitive?.contentOrNull() ?: return@mapNotNull null
+                val extract = fields["extract"]?.jsonPrimitive?.contentOrNull().orEmpty()
+                if (extract.isBlank()) return@mapNotNull null
                 Result(
-                    title = match.groupValues[2].stripTags(),
-                    url = unwrap(match.groupValues[1]),
-                    snippet = snippets.getOrElse(index) { "" },
+                    title = title,
+                    extract = extract.take(MAX_EXTRACT_CHARS),
+                    url = "https://en.wikipedia.org/wiki/" + title.replace(' ', '_'),
                 )
-            }.filter { it.title.isNotBlank() && it.url.isNotBlank() }
-        }
-
-        private fun unwrap(href: String): String {
-            val marker = "uddg="
-            val start = href.indexOf(marker)
-            if (start < 0) return href.trim()
-            val raw = href.substring(start + marker.length).substringBefore("&")
-            return runCatching { URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw).trim()
+            }
         }
     }
 }

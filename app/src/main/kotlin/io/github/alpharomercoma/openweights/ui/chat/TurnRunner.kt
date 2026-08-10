@@ -83,7 +83,9 @@ class TurnRunner @Inject constructor(
         var lastRaw = ""
 
         while (true) {
-            val pass = streamOnce(messages, params, listener) { lastRaw = it } ?: return lastRaw
+            val offerTools = round < AgentRunner.DEFAULT_MAX_ROUNDS
+            val pass = streamOnce(messages, params, offerTools, listener) { lastRaw = it }
+                ?: return lastRaw
 
             val calls = pass.event.toolCalls
             if (calls.isEmpty()) return lastRaw
@@ -107,6 +109,7 @@ class TurnRunner @Inject constructor(
     private suspend fun streamOnce(
         messages: List<ChatMessage>,
         params: SamplerParams,
+        offerTools: Boolean,
         listener: TurnListener,
         publishRaw: (String) -> Unit,
     ): Pass? {
@@ -117,8 +120,10 @@ class TurnRunner @Inject constructor(
             messages = messages,
             params = params,
             // Offered even in plan mode: a plan that cannot name the tools it would use is
-            // not a plan.
-            tools = tools.definitions,
+            // not a plan. Withdrawn on the last pass, so a model that has used its whole
+            // budget is made to answer from what it collected rather than asking again and
+            // leaving the user with tool syntax and no reply.
+            tools = if (offerTools) tools.definitions else emptyList(),
         ).collect { event ->
             when (event) {
                 is GenerationEvent.Token -> {

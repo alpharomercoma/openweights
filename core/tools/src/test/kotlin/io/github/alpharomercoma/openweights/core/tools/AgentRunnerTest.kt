@@ -20,6 +20,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -194,6 +195,60 @@ class AgentRunnerTest {
 
         assertThat(ran).isEmpty()
         assertThat(decision).isInstanceOf(AgentDecision.Exhausted::class.java)
+    }
+
+    @Test
+    fun `auto still asks about a tool whose reach the model chooses`() = runTest {
+        var asked = false
+        val open = object : Tool {
+            override val definition = ToolDefinition("fetch", "Fetches anything", "{}")
+            override val alwaysAsk = true
+            override suspend fun run(call: ToolCall): String {
+                ran += call.name
+                return "fetched"
+            }
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(open)))
+
+        runner.step(
+            calls = listOf(call("fetch")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = {
+                asked = true
+                false
+            },
+        )
+
+        // Auto removes pointless taps. It does not remove the only check on a primitive
+        // pointed wherever the model decided.
+        assertThat(asked).isTrue()
+        assertThat(ran).isEmpty()
+    }
+
+    @Test
+    fun `stopping during a tool stops the turn instead of becoming a tool failure`() = runTest {
+        val slow = object : Tool {
+            override val definition = ToolDefinition("slow", "Never returns", "{}")
+            override suspend fun run(call: ToolCall): String =
+                throw CancellationException("stopped")
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(slow)))
+
+        // runCatching used to swallow this, so Stop during a slow request became a failed
+        // tool result and the agent carried on from it.
+        var cancelled = false
+        try {
+            runner.step(
+                calls = listOf(call("slow")),
+                round = 0,
+                mode = AgentMode.AUTO,
+                approve = { true },
+            )
+        } catch (expected: CancellationException) {
+            cancelled = true
+        }
+        assertThat(cancelled).isTrue()
     }
 
     @Test

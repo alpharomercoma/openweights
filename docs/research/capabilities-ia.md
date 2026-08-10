@@ -15,15 +15,18 @@ they are not, and the axis they differ on is one the user cares about.
 | **Skills** | Nowhere. They are instructions | Nothing, but they steer the model | Instructions yes, `scripts/` never |
 | **MCP** | A server, somewhere else | Network, usually auth, and the privacy promise | Remote servers only |
 
-Two hard limits, both permanent rather than "not yet":
+Two limits. Both are product decisions rather than laws of the platform, and the first
+draft of this document overstated them as impossible:
 
-- **A skill's `scripts/` cannot run.** Android gives an app no shell, and giving one to a
-  model on a phone would be a different and much worse product. The Agent Skills spec puts
-  executable code in `scripts/`; we can honour the frontmatter and the instructions and
-  never that directory.
-- **MCP stdio servers cannot run.** They are local processes, and an app cannot spawn
-  them. Only remote HTTP servers are reachable, which means the network and usually a
-  token, which is the one thing this app tells users it does not do.
+- **We will not run a skill's `scripts/`.** Android is Linux and an app can ship its own
+  binaries, so "never" was wrong. What is true is that there is no general interpreter for
+  arbitrary downloaded Python or Node, and building a sandbox that could safely run code a
+  model chose from a registry is a different product from a chat app. So: the frontmatter
+  and the instructions, never that directory.
+- **We will not spawn local MCP servers.** Also possible in principle and also not worth
+  it: a stdio server is somebody else's binary, which is the same problem again. Remote
+  HTTP servers are reachable, which means the network and usually a token, which is the
+  one thing this app tells users it does not do.
 
 Presenting the three as peer tabs would say they are interchangeable. They are not, and
 the difference is exactly what someone deciding whether to switch one on needs to know.
@@ -78,6 +81,10 @@ on top of the same importer.
 
 ## The shape of the screen
 
+Called **Capabilities** rather than Skills. Putting a built-in tool, an instruction file
+and a remote server under the word "skill" hides exactly the difference that matters: what
+each one costs you and who wrote it.
+
 Organising by MCP, Skills and Tools sorts by implementation format, which is the
 developer's mental model. The user's question is "can it search the web", not "is that a
 tool or a server". But the trust difference above is real and has to show somewhere.
@@ -86,8 +93,8 @@ The resolution is to mirror **Models**, which the user already understands, and 
 difference on each row rather than in the tabs:
 
 ```
-Skills
-  [ Installed ]  [ Discover ]
+Capabilities
+  [ Installed ]  [ Add ]
 
   Installed
     Web search          built in     on
@@ -117,10 +124,11 @@ already opens a model picker, and Discover is where models come from, so a whole
 destination for the local list is a tab in disguise.
 
 ```
-Chat · Models · Skills · Usage · Settings
+Chat · Models · Capabilities · Usage · Settings
 ```
 
-with Models becoming `[ Installed | Discover ]` exactly as Skills does. Usage stays: it is
+with Models becoming `[ Installed | Discover ]`, keeping model discovery as a first-class
+tab rather than folding it into a list of local files. Usage stays: it is
 the screen no hosted assistant can show you, because on a hosted assistant those numbers
 are somebody else's too.
 

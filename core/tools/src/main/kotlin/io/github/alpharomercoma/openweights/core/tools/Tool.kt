@@ -34,8 +34,18 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 interface Tool {
     val definition: ToolDefinition
 
-    /** Whether the user has to approve each run. False only for tools that read nothing private. */
+    /** Whether the user has to approve each run in [AgentMode.ASK]. */
     val needsApproval: Boolean get() = true
+
+    /**
+     * Whether the user has to approve each run even in [AgentMode.AUTO].
+     *
+     * For tools whose reach the model chooses rather than the app. Searching one
+     * encyclopedia is bounded no matter what the model asks; fetching an address the model
+     * composed is not, so that one keeps asking however the mode is set. Auto is about
+     * removing pointless taps, not about removing the only check on an open primitive.
+     */
+    val alwaysAsk: Boolean get() = false
 
     /**
      * Runs the call and returns what the model should be told.

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.tools
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import kotlinx.coroutines.CancellationException
 
 /** One step the agent took, as the transcript shows it. */
 sealed interface AgentStep {
@@ -114,7 +115,8 @@ class AgentRunner(
                     "Available: ${registry.definitions.joinToString { it.name }}.",
             )
 
-        val allowed = mode == AgentMode.AUTO || !tool.needsApproval || approve(call)
+        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk
+        val allowed = autoAllows || !tool.needsApproval || approve(call)
         if (!allowed) {
             return AgentStep.Skipped(call, "The user declined to run ${call.name}.")
         }
@@ -122,8 +124,18 @@ class AgentRunner(
         val startedAt = now()
         // A tool that throws must not end the turn: the model is told what went wrong and
         // can try something else, which is the whole point of a tool loop.
-        val result = runCatching { tool.run(call) }
-            .getOrElse { failure -> "${call.name} failed: ${failure.message ?: "unknown error"}" }
+        //
+        // Cancellation is the exception, and it has to be rethrown. runCatching swallows
+        // it like anything else, which turned Stop pressed during a slow request into a
+        // tool failure the agent then carried on from: the turn kept going after the user
+        // had ended it.
+        val result = try {
+            tool.run(call)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+            "${call.name} failed: ${failure.message ?: "unknown error"}"
+        }
         return AgentStep.Ran(call, result, now() - startedAt)
     }
 

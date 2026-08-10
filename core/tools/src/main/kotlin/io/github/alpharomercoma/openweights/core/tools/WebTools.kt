@@ -175,8 +175,9 @@ class WebSearchTool @Inject constructor(private val httpClient: OkHttpClient) : 
 class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : Tool {
     override val definition = ToolDefinition(
         name = "fetch_url",
-        description = "Fetch a web page and return its readable text. Use it after " +
-            "web_search to read a result properly.",
+        description = "Fetch a public web page and return its readable text. Use it to " +
+            "read a page whose address you already have, for example one that " +
+            "search_wikipedia returned.",
         parametersJson = """
             {
               "type": "object",
@@ -219,6 +220,12 @@ class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : T
     private companion object {
         /** About a thousand tokens: enough to answer from, small enough to leave room. */
         const val MAX_CHARS = 4_000
+
+        /** Read at most this much, whatever the page claims about its length. */
+        const val MAX_BYTES = 512 * 1024
+
+        /** Content types worth handing to a language model. */
+        val TEXTUAL = listOf("text/", "application/json", "application/xml", "application/xhtml")
     }
 }
 

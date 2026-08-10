@@ -125,6 +125,8 @@ fun ChatScreen(
     onSavePreferences: (ModelPreferences) -> Unit = {},
     onResetPreferences: () -> Unit = {},
     onAttach: (Uri) -> Unit = {},
+    onAttachDocument: (Uri) -> Unit = {},
+    onRemoveDocument: () -> Unit = {},
     onRemoveStaged: (MessagePart.File) -> Unit = {},
     onToggleReadAloud: (String) -> Unit = {},
     isSpeaking: Boolean = false,
@@ -188,6 +190,8 @@ fun ChatScreen(
             onSavePreferences = onSavePreferences,
             onResetPreferences = onResetPreferences,
             onAttach = onAttach,
+            onAttachDocument = onAttachDocument,
+            onRemoveDocument = onRemoveDocument,
             onRemoveStaged = onRemoveStaged,
             onToggleReadAloud = onToggleReadAloud,
             isSpeaking = isSpeaking,
@@ -222,6 +226,8 @@ private fun ChatContent(
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
     onAttach: (Uri) -> Unit,
+    onAttachDocument: (Uri) -> Unit,
+    onRemoveDocument: () -> Unit,
     onRemoveStaged: (MessagePart.File) -> Unit,
     onToggleReadAloud: (String) -> Unit,
     isSpeaking: Boolean,
@@ -320,24 +326,16 @@ private fun ChatContent(
                 enabled = state.canSend,
                 isGenerating = state.isGenerating,
                 staged = state.staged,
+                document = state.stagedDocument,
+                onRemoveDocument = onRemoveDocument,
                 canAttach = state.mediaSupport.any,
                 isAttaching = state.isAttaching,
                 canDictate = canDictate,
                 isListening = dictation.isListening,
                 heard = dictation.partial,
                 onAttach = { showAttachments = true },
-                thinking = {
-                    ThinkingControl(
-                        supportsEffort = state.supportsReasoningEffort,
-                        supportsThinking = state.supportsThinking,
-                        effort = state.preferences.toSamplerParams().reasoningEffort,
-                        thinking = state.preferences.thinking,
-                        enabled = state.canSend,
-                        onEffort = {
-                            onSavePreferences(state.preferences.copy(reasoningEffort = it.name))
-                        },
-                        onThinking = { onSavePreferences(state.preferences.copy(thinking = it)) },
-                    )
+                leading = {
+                    AttachDocumentButton(enabled = state.canSend, onPicked = onAttachDocument)
                 },
                 onRemoveStaged = onRemoveStaged,
                 onDictate = onDictate,

@@ -73,6 +73,7 @@ import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.model.StagedDocument
 
 /**
  * Where you type.
@@ -92,6 +93,8 @@ fun Composer(
     enabled: Boolean,
     isGenerating: Boolean,
     staged: List<MessagePart.File>,
+    document: StagedDocument?,
+    onRemoveDocument: () -> Unit,
     canAttach: Boolean,
     isAttaching: Boolean,
     canDictate: Boolean,
@@ -104,7 +107,7 @@ fun Composer(
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
     /** The thinking control, drawn beside Attach. Empty when the model offers no choice. */
-    thinking: @Composable () -> Unit = {},
+    leading: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Saveable, and keyed to the conversation. Saveable because a half-written message is
@@ -114,7 +117,7 @@ fun Composer(
     var draft by rememberSaveable(conversationKey) { mutableStateOf("") }
     var isFocused by remember { mutableStateOf(false) }
     val commands = SlashCommand.match(draft)
-    val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty()
+    val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty() || document != null
 
     // The border is the focus indicator: it is the only boundary this control has, so it
     // has to be the thing that answers when the field is live.
@@ -166,6 +169,23 @@ fun Composer(
                 )
             }
 
+            AnimatedVisibility(
+                visible = document != null,
+                enter = fadeIn(Motion.quick()) + expandVertically(Motion.quick()),
+                exit = fadeOut(Motion.instant()) + shrinkVertically(Motion.instant()),
+            ) {
+                // Held while it is visible, so the chip does not empty out mid-animation as
+                // it collapses.
+                val held = remember(document) { document }
+                held?.let {
+                    StagedDocumentChip(
+                        document = it,
+                        onRemove = onRemoveDocument,
+                        modifier = Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp),
+                    )
+                }
+            }
+
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it },
@@ -210,7 +230,7 @@ fun Composer(
                 enabled = enabled,
                 isGenerating = isGenerating,
                 canAttach = canAttach,
-                thinking = thinking,
+                leading = leading,
                 isAttaching = isAttaching,
                 canDictate = canDictate,
                 isListening = isListening,
@@ -240,7 +260,7 @@ private fun ComposerActions(
     enabled: Boolean,
     isGenerating: Boolean,
     canAttach: Boolean,
-    thinking: @Composable () -> Unit,
+    leading: @Composable () -> Unit,
     isAttaching: Boolean,
     canDictate: Boolean,
     isListening: Boolean,
@@ -263,7 +283,7 @@ private fun ComposerActions(
         }
         // Left of the spacer, with Attach: both answer "what goes into this message",
         // while the right-hand side is for sending it.
-        thinking()
+        leading()
         Spacer(Modifier.weight(1f))
         if (canDictate) {
             DictateButton(isListening = isListening, enabled = enabled, onDictate = onDictate)
@@ -412,6 +432,8 @@ private fun ComposerPreview() {
                 enabled = true,
                 isGenerating = false,
                 staged = emptyList(),
+                document = null,
+                onRemoveDocument = {},
                 canAttach = true,
                 isAttaching = false,
                 canDictate = true,

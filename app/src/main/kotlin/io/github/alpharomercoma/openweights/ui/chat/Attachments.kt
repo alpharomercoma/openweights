@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -61,9 +62,11 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
+import io.github.alpharomercoma.openweights.model.StagedDocument
 import java.io.File
 
 /**
@@ -74,6 +77,91 @@ import java.io.File
  * download, and offering a photo to a text-only model would produce a confident answer
  * about a picture it never saw.
  */
+/**
+ * Attach a document, whatever model is loaded.
+ *
+ * Sits where the thinking switch used to. That switch appeared on two of the four models on
+ * this phone and did nothing on one of them, while a document is something every model can
+ * read: it is text, and text is what they all take. A control that is always useful earns
+ * the place better than one that is usually absent.
+ *
+ * Text types only, and deliberately not PDF. A PDF is a page layout, not a document: pulling
+ * words out of one needs a parser the size of this whole app, and what it would produce for
+ * a four thousand token window is a fraction of a paper. Offering it would be offering a
+ * feature that disappoints on the first try.
+ */
+@Composable
+fun AttachDocumentButton(enabled: Boolean, onPicked: (Uri) -> Unit) {
+    val openDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let(onPicked) }
+
+    IconButton(
+        onClick = { openDocument.launch(DOCUMENT_TYPES) },
+        enabled = enabled,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Description,
+            contentDescription = "Attach a document",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** What can be read as text without a parser. */
+private val DOCUMENT_TYPES = arrayOf("text/*", "application/json", "application/xml")
+
+/**
+ * The document waiting to be sent, and the way to change your mind about it.
+ *
+ * Says how much of it is going, because that is the part nobody expects: a phone's context
+ * window holds a few pages, and a document that was quietly cut in half would be answered
+ * about as though it were whole.
+ */
+@Composable
+fun StagedDocumentChip(
+    document: StagedDocument,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Description,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+            Text(
+                text = document.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Metric(
+                if (document.wasTrimmed) {
+                    "${document.text.length} characters, cut to fit the context"
+                } else {
+                    "${document.text.length} characters"
+                },
+            )
+        }
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Remove ${document.name}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AttachmentSheet(

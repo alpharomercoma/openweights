@@ -38,6 +38,14 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
+ * A text document waiting in the composer.
+ *
+ * Held as characters rather than as a file, because that is all it ever becomes: unlike an
+ * image, which needs a projector and a path on disk, a document is read into the question.
+ */
+data class StagedDocument(val name: String, val text: String, val wasTrimmed: Boolean)
+
+/**
  * Keeps attachments alongside the conversations that refer to them.
  *
  * Picked media arrives as a `content://` URI whose read permission lasts only as long as
@@ -211,6 +219,33 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
             decoded.recycle()
         }
         return true
+    }
+
+    /**
+     * Reads a document as text, for models that cannot see.
+     *
+     * Nothing is copied and nothing is stored. A document is not media: it becomes part of
+     * the sentence the model is asked, so the only thing worth keeping is its characters,
+     * and the file it came from can stay where it is.
+     *
+     * Trimmed to [limit] here rather than at the point of sending. A phone's context window
+     * is four thousand tokens, roughly sixteen thousand characters, and the whole
+     * conversation and the reply have to fit beside whatever this returns. Cutting it
+     * silently would be worse than not attaching it, so the caller is told.
+     */
+    suspend fun readDocument(uri: Uri, limit: Int): StagedDocument? = withContext(Dispatchers.IO) {
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader().readText()
+            }
+        }.getOrNull() ?: return@withContext null
+
+        if (text.isBlank()) return@withContext null
+        StagedDocument(
+            name = displayName(uri) ?: "document",
+            text = text.take(limit),
+            wasTrimmed = text.length > limit,
+        )
     }
 
     private fun displayName(uri: Uri): String? = runCatching {

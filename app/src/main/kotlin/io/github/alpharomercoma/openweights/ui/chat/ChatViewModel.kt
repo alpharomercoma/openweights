@@ -41,6 +41,7 @@ import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.model.AttachmentStore
+import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -172,6 +173,15 @@ data class ChatUiState(
     val deviceCelsius: Float? = null,
     /** Attachments staged in the composer, not yet sent. */
     val staged: List<MessagePart.File> = emptyList(),
+    /**
+     * A text document staged in the composer, not yet sent.
+     *
+     * Separate from [staged] because it is a different thing wearing the same word. Media
+     * needs a model that can see or hear and a file on disk for the projector to open; a
+     * document needs neither, because it becomes part of the question. That is why this one
+     * is offered whatever model is loaded.
+     */
+    val stagedDocument: StagedDocument? = null,
     /** True while a picked file is being copied in. */
     val isAttaching: Boolean = false,
     /** The compute device the engine is actually running on, e.g. `CPU`. */
@@ -434,10 +444,18 @@ class ChatViewModel @Inject constructor(
     }
 
     fun send(prompt: String) {
-        val text = prompt.trim()
+        val typed = prompt.trim()
         val staged = _uiState.value.staged
+        val document = _uiState.value.stagedDocument
         // An attachment on its own is a complete message: "what is this?" is implied.
-        if ((text.isEmpty() && staged.isEmpty()) || !_uiState.value.canSend) return
+        val nothingToSend = typed.isEmpty() && staged.isEmpty() && document == null
+        if (nothingToSend || !_uiState.value.canSend) return
+
+        // The document becomes part of what was asked, rather than something carried
+        // alongside it. That keeps one string as the message: what is shown, what is
+        // stored, and what the model reads are the same, which is what makes a reopened
+        // conversation send the model the same thing it saw the first time.
+        val text = document?.let { it.asPrompt() + typed }?.trim() ?: typed
 
         // isGenerating is claimed here, before any suspending work: two quick taps would
         // otherwise both pass canSend, create two conversations, and race the engine.
@@ -447,6 +465,7 @@ class ChatViewModel @Inject constructor(
                     entry(ChatRole.USER, text).copy(attachments = staged),
                 isGenerating = true,
                 staged = emptyList(),
+                stagedDocument = null,
                 error = null,
             )
         }
@@ -504,6 +523,41 @@ class ChatViewModel @Inject constructor(
     fun removeStaged(attachment: MessagePart.File) {
         _uiState.update { it.copy(staged = it.staged - attachment) }
         viewModelScope.launch { attachments.discard(attachment) }
+    }
+
+    /**
+     * Stages a text document to be read into the next question, or clears the staged one.
+     *
+     * One function for both because they are one decision, made twice: what document, if
+     * any, goes with the next message. Null is that decision reaching "none".
+     *
+     * Offered whatever model is loaded, which is the point of it: reading a document takes
+     * no projector and no vision, so this is the one attachment a plain text model can use.
+     *
+     * How much of it fits is decided here, from the window the loaded model actually has,
+     * because a document that overruns the context does not produce a worse answer, it
+     * produces a failed decode.
+     */
+    fun stageDocument(uri: Uri?) {
+        if (uri == null) {
+            _uiState.update { it.copy(stagedDocument = null) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAttaching = true) }
+            val document = try {
+                attachments.readDocument(uri, documentBudget(_uiState.value))
+            } finally {
+                _uiState.update { it.copy(isAttaching = false) }
+            }
+            if (document == null) {
+                _uiState.update {
+                    it.copy(error = "That file could not be read as text.")
+                }
+                return@launch
+            }
+            _uiState.update { it.copy(stagedDocument = document) }
+        }
     }
 
     /**
@@ -968,7 +1022,13 @@ class ChatViewModel @Inject constructor(
         val engineCleaned = event.content.isNotEmpty() && event.content != raw
         val answer = if (engineCleaned) event.content else parsed.answer
 
-        noteIfThinkingSwitchWasIgnored(reasoning)
+        // The template test at load asks whether being told not to think changes the
+        // prompt; it cannot ask whether the weights care. This is the other half of that
+        // question, answered by the only thing that can answer it.
+        if (_uiState.value.thinkingSwitchWasIgnored(reasoning)) {
+            preferencesKey?.let(runtime::rememberIgnoresThinkingSwitch)
+            _uiState.update { it.copy(supportsThinking = false) }
+        }
         val canonical = canonicalText(reasoning, answer)
 
         updateLastEntry {
@@ -1067,27 +1127,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Retires the thinking switch for a model that has just ignored it.
-     *
-     * The template test at load asks whether being told not to think changes the prompt,
-     * and it cannot ask whether the weights care. This is the second half of that question,
-     * answered by the only thing that can answer it: a reply that came back with reasoning
-     * in it after reasoning was switched off.
-     *
-     * Costs one wrong reply, once, per model. Nothing is offered again after that, and the
-     * finding is kept against the file rather than the session, so it survives a restart and
-     * does not have to be rediscovered.
-     */
-    private fun noteIfThinkingSwitchWasIgnored(reasoning: String?) {
-        val model = preferencesKey ?: return
-        val state = _uiState.value
-        if (!state.supportsThinking || state.preferences.thinking || reasoning == null) return
-
-        runtime.rememberIgnoresThinkingSwitch(model)
-        _uiState.update { it.copy(supportsThinking = false) }
-    }
-
     private fun applyStreamedText(
         raw: String,
         parsed: AssistantReply,
@@ -1126,6 +1165,57 @@ class ChatViewModel @Inject constructor(
  * re-scroll: starts to overlap itself and the transcript visibly judders; above it the
  * text arrives in visible chunks.
  */
+/**
+ * True when a reply came back reasoning after reasoning was switched off.
+ *
+ * Proof that this model ignores the switch, which is worth one wrong reply to learn and
+ * nothing after that: the finding is kept against the file rather than the session.
+ */
+private fun ChatUiState.thinkingSwitchWasIgnored(reasoning: String?): Boolean =
+    supportsThinking && !preferences.thinking && reasoning != null
+
+/**
+ * The document, as the model reads it.
+ *
+ * Named and fenced, so the model can tell the document from the question about it. Saying
+ * when it was cut short matters more than it looks: a model that believes it read the whole
+ * thing will answer confidently about an ending that was never there.
+ */
+private fun StagedDocument.asPrompt(): String = buildString {
+    append("Document: ").append(name).append('\n')
+    append("\"\"\"\n").append(text.trim()).append('\n')
+    if (wasTrimmed) append("[cut short: the rest did not fit]\n")
+    append("\"\"\"\n\n")
+}
+
+/**
+ * How many characters of a document may be sent.
+ *
+ * Half of what is left of the window, not half of the window. The first version used the
+ * whole size and a fresh conversation to reason about, and attaching a spreadsheet to a
+ * chat that already had one exchange in it filled the context and lost the turn.
+ *
+ * Two characters to a token, which is pessimistic for prose and about right for the thing
+ * people actually attach. English runs nearer four, but a comma separated file of names,
+ * dates and numbers tokenises far worse than a paragraph, and it was exactly that file
+ * which overran. Being wrong in this direction costs some of a document; being wrong in
+ * the other direction costs the whole reply.
+ */
+private fun documentBudget(state: ChatUiState): Int {
+    val size = state.contextSize.takeIf { it > 0 } ?: DEFAULT_CONTEXT_TOKENS
+    val remaining = (size - state.contextUsed).coerceAtLeast(0)
+    return remaining * CHARS_PER_TOKEN / DOCUMENT_SHARE
+}
+
+/** Two characters to a token: what dense, comma heavy text actually costs. */
+private const val CHARS_PER_TOKEN = 2
+
+/** Half the window. The conversation, the instructions and the reply share the rest. */
+private const val DOCUMENT_SHARE = 2
+
+/** Used before a model is loaded and its real window is known. */
+private const val DEFAULT_CONTEXT_TOKENS = 4096
+
 private const val STREAM_FRAME_MS = 33L
 
 private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."

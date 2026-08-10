@@ -16,9 +16,6 @@
 
 package io.github.alpharomercoma.openweights.core.tools
 
-import android.content.Context
-import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,20 +35,18 @@ import javax.inject.Singleton
  * may answer, neither of which is a secret.
  */
 @Singleton
-class SearchSettings @Inject constructor(@param:ApplicationContext context: Context) {
-    private val store = context.getSharedPreferences("search_settings", Context.MODE_PRIVATE)
-
-    /** The SearXNG instance to query, or blank when none is set. */
-    var searxUrl: String
-        get() = store.getString(KEY_SEARX_URL, "").orEmpty()
-        set(value) = store.edit { putString(KEY_SEARX_URL, value.trim()) }
+class SearchSettings @Inject constructor() {
 
     /**
      * The providers to try, in order.
      *
-     * The built in scraper first, then a SearXNG instance if one is configured. Each is
-     * tried until one answers, and a provider that is rate limited says so rather than
-     * returning nothing, which is what makes the order meaningful instead of decorative.
+     * One, for now. A provider that is rate limited says so rather than returning nothing,
+     * which is what will make the order meaningful once there is more than one.
+     *
+     * A SearXNG instance used to be second. It went for the same reason Wikipedia did, in
+     * reverse: not because it was hardcoded, but because it was a field in a screen that
+     * nobody was ever going to fill in, and it has no index of its own anyway, so it moved
+     * the blocking to a machine the user had to run rather than removing it.
      *
      * Wikipedia used to sit at the end of this list. It went because it was a hardcoded
      * site nobody could see or switch off, and because of what it did to answers: the model
@@ -64,10 +59,5 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
      */
     fun providers(httpClient: OkHttpClient): List<SearchProvider> = buildList {
         add(DuckDuckGoProvider(httpClient))
-        add(SearxProvider(httpClient, searxUrl))
     }.filter { it.isConfigured }
-
-    private companion object {
-        const val KEY_SEARX_URL = "searx_url"
-    }
 }

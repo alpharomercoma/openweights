@@ -344,7 +344,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 ToolsScreen(
                     state = state,
                     onToggle = viewModel::setEnabled,
-                    onSearxUrl = viewModel::setSearxUrl,
                 )
             }
 

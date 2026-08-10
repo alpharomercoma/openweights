@@ -18,7 +18,6 @@ package io.github.alpharomercoma.openweights.ui.tools
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.alpharomercoma.openweights.core.tools.SearchSettings
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,25 +36,15 @@ data class ToolSummary(
     val isEnabled: Boolean,
 )
 
-data class ToolsUiState(
-    val tools: List<ToolSummary> = emptyList(),
-    /** The SearXNG instance web search should use, or blank for the built in scraper. */
-    val searxUrl: String = "",
-)
+data class ToolsUiState(val tools: List<ToolSummary> = emptyList())
 
 @HiltViewModel
 class ToolsViewModel @Inject constructor(
     private val registry: ToolRegistry,
     private val switches: ToolSwitches,
-    private val search: SearchSettings,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ToolsUiState(read(), search.searxUrl))
+    private val _uiState = MutableStateFlow(ToolsUiState(read()))
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
-
-    fun setSearxUrl(url: String) {
-        search.searxUrl = url
-        _uiState.update { it.copy(searxUrl = search.searxUrl) }
-    }
 
     fun setEnabled(id: String, enabled: Boolean) {
         switches.setEnabled(id, enabled)

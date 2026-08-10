@@ -41,8 +41,7 @@
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.OpenWeights"
-        android:usesCleartextTraffic="false"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:usesCleartextTraffic="false">
 
         <!--
              Portrait on phones only. A chat composer with the keyboard up leaves almost no

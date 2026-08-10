@@ -16,17 +16,11 @@
 
 package io.github.alpharomercoma.openweights.core.tools
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLDecoder
@@ -176,35 +170,6 @@ private class MemoryCookieJar : CookieJar {
         jar.filterKeys { url.host.endsWith(it) || it.endsWith(url.host) }.values.flatten()
 }
 
-/**
- * A SearXNG instance, the user's own or one they trust.
- *
- * The whole appeal is that no key is involved and the instance is the user's choice.
- * Public instances mostly rate limit anonymous JSON requests, so this is documented as
- * "point it at your own" rather than shipped with a default host: a default that returns
- * 429 to everyone would be worse than none.
- */
-class SearxProvider(private val httpClient: OkHttpClient, private val baseUrl: String) :
-    SearchProvider {
-    override val id = "searxng"
-    override val label = "SearXNG"
-    override val isConfigured get() = baseUrl.isNotBlank() && baseUrl.toHttpUrlOrNull() != null
-
-    override suspend fun search(query: String, limit: Int): List<SearchHit>? {
-        val root = baseUrl.toHttpUrlOrNull() ?: return null
-        val url = root.newBuilder()
-            .addPathSegments("search")
-            .addQueryParameter("q", query)
-            .addQueryParameter("format", "json")
-            .build()
-        val body = httpClient.textOrNull(url) ?: return null
-        val results = runCatching {
-            Json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
-        }.getOrNull() ?: return null
-        return results.toHits(limit, title = "title", snippet = "content", url = "url")
-    }
-}
-
 /** The body of a successful response, or null for anything else. */
 private inline fun OkHttpClient.textOrNull(
     url: HttpUrl,
@@ -222,25 +187,6 @@ private inline fun OkHttpClient.textOrNull(
         }
     }.getOrNull()
 }
-
-/** Reads the three fields every engine has, whatever it calls them. */
-private fun JsonArray.toHits(
-    limit: Int,
-    title: String,
-    snippet: String,
-    url: String,
-): List<SearchHit> = mapNotNull { element ->
-    val fields = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
-    val link = fields[url]?.text() ?: return@mapNotNull null
-    SearchHit(
-        title = fields[title]?.text() ?: link,
-        snippet = fields[snippet]?.text().orEmpty(),
-        url = link,
-    )
-}.take(limit)
-
-private fun kotlinx.serialization.json.JsonElement.text(): String? =
-    runCatching { jsonPrimitive.content }.getOrNull()
 
 /** Identifies the client, which is what Wikimedia asks for and what Brave logs. */
 const val SEARCH_USER_AGENT =

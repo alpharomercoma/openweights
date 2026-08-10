@@ -3,9 +3,15 @@
 Written 2026-08-10, to answer one question that turned out to be three: can the app run
 SearXNG on the phone, would it help if it could, and what should the default be.
 
-The short version is that the default stays DuckDuckGo, a self-hosted SearXNG is an opt-in
-escape hatch for anyone running many queries at once, and the thing actually worth building
-is neither of those.
+The short version is that DuckDuckGo is the whole of it, a self-hosted SearXNG was tried and
+removed, and the thing actually worth building is neither of those.
+
+Updated 2026-08-11: the SearXNG field is gone. It worked, and that was never the question.
+It was a text box asking for the address of a server the user had to run, on a screen in an
+app whose entire promise is that it needs nothing else. Nobody was going to fill it in, and
+an option nobody uses is not a feature, it is a thing that has to keep working. What it did
+for a person running many queries at once is real and is written down below, so the case for
+bringing it back is on the record if that person ever turns up.
 
 ## What was measured
 
@@ -78,13 +84,13 @@ did not. That is the product: not a better source, a second and third source.
 screen is that nothing leaves the device. "First run Docker on a Mac" is not a default that
 can be squared with that sentence.
 
-**A self-hosted SearXNG is an opt-in field in Tools.** It was already in the code with no
-control anywhere, so nobody could set it. It is the right tool for many queries at once,
-where one address hitting DuckDuckGo repeatedly is the thing that gets blocked. It must be
-https unless it is on the phone itself, because cleartext stays off: `fetch_url` fetches an
-address the model chose, and an unencrypted request to an unvetted host is the one place in
-this app where somebody on the network gets to change what the model reads. Loopback is
-exempted, which is enough for a local proxy or an `adb reverse` tunnel while developing.
+**A self-hosted SearXNG is not shipped.** It was built, proved, and taken out again. The
+instance answers and the app could talk to it, which is why the numbers above are real
+measurements rather than estimates, but shipping it meant a settings field asking for a
+server address in an app that otherwise asks for nothing. The loopback exemption in the
+network security config went with it, so cleartext is off with no exceptions: `fetch_url`
+fetches an address the model chose, and an unencrypted request to an unvetted host is the
+one place here where somebody on the network gets to change what the model reads.
 
 **searxist is not a fit.** It is [an Android app](https://codeberg.org/Linerly/searxist), a
 Material You wrapper around public instances, not a library, not on Maven Central, and

@@ -731,20 +731,21 @@ private fun ActivityLine(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // Only once it is worth saying. A phone that is cool while working is the normal
-        // case and does not need a word for itself, but one that is slowing down does,
-        // because otherwise a hot phone is indistinguishable from a slow model.
-        if (thermal.isWarm) {
-            Text(
-                text = "· ${thermal.label}",
-                style = MetricTextStyle,
-                color = if (thermal == ThermalLevel.NONE) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-            )
-        }
+        // Always, not only once the phone is hot. This is the one reading no hosted
+        // assistant can show, because there the hardware warming up is somebody else's,
+        // and showing it only when warm meant it was never seen: a phone on a desk at room
+        // temperature is cool, so the monitor that was asked for looked like it had never
+        // been built. Red when it is warm, which is the moment a hot phone would otherwise
+        // be indistinguishable from a slow model.
+        Text(
+            text = "· ${thermal.label}",
+            style = MetricTextStyle,
+            color = if (thermal.isWarm) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
     }
 }
 

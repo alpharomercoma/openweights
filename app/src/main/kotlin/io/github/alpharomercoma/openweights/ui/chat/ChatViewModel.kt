@@ -75,13 +75,10 @@ data class TranscriptEntry(
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
     val isStreaming: Boolean = false,
-    /** Tools the model asked for. Shown as steps; execution is not wired up yet. */
-    val toolCalls: List<ToolCall> = emptyList(),
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
     /** Files sent with this turn, shown above its text. */
     val attachments: List<MessagePart.File> = emptyList(),
-    /** What the agent did while producing this reply, in order. */
     /** Everything the model said and did before the answer, in order. */
     val blocks: List<TurnBlock> = emptyList(),
     /** Wall clock from send to finished, which is what the wait actually felt like. */
@@ -958,7 +955,6 @@ class ChatViewModel @Inject constructor(
                 text = canonical,
                 answer = answer,
                 reasoning = reasoning,
-                toolCalls = event.toolCalls,
                 isStreaming = false,
                 isReasoningInProgress = false,
                 tokensPerSecond = event.stats.decodeTokensPerSecond,

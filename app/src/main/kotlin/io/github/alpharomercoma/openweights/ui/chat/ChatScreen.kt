@@ -455,6 +455,7 @@ private fun Transcript(
                         entry.id == lastId && entry.isStreaming
                     },
                     thermal = state.thermal,
+                    celsius = state.deviceCelsius,
                     isSpeaking = isSpeaking,
                     onLongPress = { onActionsForId(entry.id) },
                     onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
@@ -603,6 +604,7 @@ private fun AssistantTurn(
     entry: TranscriptEntry,
     activity: RuntimeState?,
     thermal: ThermalLevel,
+    celsius: Float?,
     isSpeaking: Boolean,
     onLongPress: () -> Unit,
     onCopy: () -> Unit,
@@ -621,8 +623,8 @@ private fun AssistantTurn(
                 )
             }
             // In the order they happened, between the thinking that led to them and the
-            // answer they fed. These outlive a pass; toolCalls is cleared by the next one,
-            // which is why nothing was visible before.
+            // answer they fed. These outlive a pass, which is what the field they replaced
+            // did not: it was overwritten by the next one, so nothing was ever visible.
             entry.blocks.forEach { block ->
                 when (block) {
                     is TurnBlock.Step -> ToolStepBlock(block.step)
@@ -635,7 +637,7 @@ private fun AssistantTurn(
             // Last, under whatever has been written so far, because that is where the eye
             // already is while waiting. The top bar says the same thing, but a status two
             // hundred pixels above the text being read is a status nobody sees.
-            activity?.takeIf { it.isBusy }?.let { ActivityLine(it, thermal) }
+            activity?.takeIf { it.isBusy }?.let { ActivityLine(it, thermal, celsius) }
 
             // Only once the reply has finished: actions on a half-written answer copy half
             // an answer, and a retry mid-stream is a stop the user did not ask for.
@@ -686,6 +688,7 @@ private const val MILLIS_PER_SECOND = 1000.0
 private fun ActivityLine(
     state: RuntimeState,
     thermal: ThermalLevel,
+    celsius: Float?,
     modifier: Modifier = Modifier,
 ) {
     var seconds by remember(state) { mutableIntStateOf(0) }
@@ -738,7 +741,10 @@ private fun ActivityLine(
         // been built. Red when it is warm, which is the moment a hot phone would otherwise
         // be indistinguishable from a slow model.
         Text(
-            text = "· ${thermal.label}",
+            // The reading if the phone will give one, the four step word if it will not.
+            text = celsius
+                ?.let { "· " + String.format(LocalConfiguration.current.locales[0], "%.1f°C", it) }
+                ?: "· ${thermal.label}",
             style = MetricTextStyle,
             color = if (thermal.isWarm) {
                 MaterialTheme.colorScheme.error

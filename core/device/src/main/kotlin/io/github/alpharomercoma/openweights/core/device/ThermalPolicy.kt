@@ -17,6 +17,9 @@
 package io.github.alpharomercoma.openweights.core.device
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.PowerManager
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,17 +39,6 @@ data class ThreadPlan(
 )
 
 /**
- * Picks thread counts from the device's current thermal state.
- *
- * Measured on the dev device: cold, prompt processing scaled all the way to eight threads
- * (69.5 tok/s); after a long run of inference the same benchmark gave 73.6 tok/s at *two*
- * threads and 28.0 at eight. Once the big cores are throttled, extra threads add
- * contention instead of throughput, so a fixed count is wrong half the time.
- *
- * Sustained inference on a phone is a thermal problem as much as a compute one.
- */
-@Singleton
-/**
  * How hot the device is, in the four steps Android reports.
  *
  * Named for what the user would say rather than for the constant: nobody thinks "my phone
@@ -62,10 +54,44 @@ enum class ThermalLevel(val label: String) {
     val isWarm: Boolean get() = this != NONE
 }
 
+/**
+ * Picks thread counts from the device's current thermal state.
+ *
+ * Measured on the dev device: cold, prompt processing scaled all the way to eight threads
+ * (69.5 tok/s); after a long run of inference the same benchmark gave 73.6 tok/s at *two*
+ * threads and 28.0 at eight. Once the big cores are throttled, extra threads add
+ * contention instead of throughput, so a fixed count is wrong half the time.
+ *
+ * Sustained inference on a phone is a thermal problem as much as a compute one.
+ */
+@Singleton
 class ThermalPolicy @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val profiler: DeviceProfiler,
 ) {
+    /**
+     * The device temperature in degrees, or null if this phone will not say.
+     *
+     * The battery's sensor, because on stock Android it is the only one an app can read.
+     * Checked on the device rather than assumed: `/sys/class/thermal` is refused by SELinux
+     * even to the adb shell user, which is more privileged than this app will ever be, and
+     * `HardwarePropertiesManager.getDeviceTemperatures` needs to be the device owner.
+     *
+     * So this is the battery, not the chip. It reads a degree or two behind the cores under
+     * a sudden load and it is a real measurement of the thing in your hand, which is what
+     * the question "how hot is my phone" is actually about. The four step level is still
+     * what decides throttling, because that is what the scheduler acts on.
+     *
+     * The sticky broadcast is the whole read: no receiver stays registered, no permission is
+     * needed, and the value is whatever the platform last published.
+     */
+    fun celsius(): Float? {
+        val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ?: return null
+        val tenths = battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, UNAVAILABLE)
+        return if (tenths == UNAVAILABLE) null else tenths / TENTHS_PER_DEGREE
+    }
+
     /**
      * How many threads the next generation should use.
      *
@@ -110,10 +136,10 @@ class ThermalPolicy @Inject constructor(
      * How hot the system says the device is.
      *
      * The operating system's own assessment, which is the only thermal reading an ordinary
-     * app can have: a temperature in degrees needs HardwarePropertiesManager, which is
-     * privileged, and `/sys/class/thermal` is not readable under SELinux on any recent
-     * Android. What this gives instead is better for the purpose anyway, because it is the
-     * same signal the scheduler is acting on when the phone slows down.
+     * app can have of the chip itself: degrees from the SoC need HardwarePropertiesManager,
+     * which is privileged, and `/sys/class/thermal` is refused under SELinux. See [celsius]
+     * for the number that can be read. This is the one to act on, because it is the same
+     * signal the scheduler uses when it slows the phone down.
      */
     fun level(): ThermalLevel {
         val status = context.getSystemService<PowerManager>()?.currentThermalStatus
@@ -132,3 +158,9 @@ class ThermalPolicy @Inject constructor(
         const val MAX_BATCH_THREADS = 8
     }
 }
+
+/** What getIntExtra returns when the platform has no reading to give. */
+private const val UNAVAILABLE = Int.MIN_VALUE
+
+/** Android reports battery temperature in tenths of a degree Celsius. */
+private const val TENTHS_PER_DEGREE = 10f

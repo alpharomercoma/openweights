@@ -157,12 +157,19 @@ data class ChatUiState(
     /**
      * How hot the device is, sampled while a reply is being written.
      *
-     * The one number no hosted assistant can show, because on a hosted assistant the
-     * hardware getting warm is somebody else's. Android reports a level rather than a
-     * temperature: degrees need a privileged API, and the level is what the scheduler is
-     * acting on anyway when the phone slows down.
+     * The one reading no hosted assistant can show, because there the hardware getting warm
+     * is somebody else's. This is the four step level the system publishes, which is what
+     * the scheduler acts on when it slows the phone down, so it is the one to colour by and
+     * to throttle on. [deviceCelsius] is the number beside it.
      */
     val thermal: ThermalLevel = ThermalLevel.NONE,
+    /**
+     * The device temperature in degrees, or null where the platform will not say.
+     *
+     * The level above is what decides throttling; this is the number a person asked for
+     * when they asked how hot their phone was.
+     */
+    val deviceCelsius: Float? = null,
     /** Attachments staged in the composer, not yet sent. */
     val staged: List<MessagePart.File> = emptyList(),
     /** True while a picked file is being copied in. */
@@ -553,7 +560,8 @@ class ChatViewModel @Inject constructor(
         thermalJob = viewModelScope.launch(Dispatchers.Default) {
             while (true) {
                 val level = runtime.thermalLevel()
-                _uiState.update { it.copy(thermal = level) }
+                val degrees = runtime.thermalCelsius()
+                _uiState.update { it.copy(thermal = level, deviceCelsius = degrees) }
                 delay(THERMAL_SAMPLE_MS)
             }
         }

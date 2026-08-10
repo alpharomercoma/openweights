@@ -78,6 +78,9 @@ class ModelRuntime @Inject constructor(
     /** How hot the system says the device is, for the line that says so while working. */
     fun thermalLevel(): ThermalLevel = thermal.level()
 
+    /** The device temperature in degrees, or null where the platform will not say. */
+    fun thermalCelsius(): Float? = thermal.celsius()
+
     /**
      * Re-plans the thread count for the next reply.
      *

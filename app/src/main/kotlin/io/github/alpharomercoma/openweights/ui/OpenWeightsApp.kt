@@ -25,11 +25,11 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.Build
-import androidx.compose.material.icons.rounded.Chat
-import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -85,18 +85,22 @@ import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
  * a narrow phone next to four short words, and Context already means the context window,
  * shown as a percentage two screens away.
  *
- * The icons are one family and one idea: a chip for the weights, because that is what this
- * app is about and a database cylinder said the opposite, files on a server somewhere. Five
+ * The icons are outlines, all five, which is the only way they read as a set. They were all
+ * from one family before and still looked mismatched, because a family is not the same as a
+ * weight: a filled wrench and a filled gear are solid masses where a chip and a bar chart
+ * are mostly air, so the row looked like two heavy icons and three light ones. Drawn as
+ * strokes they carry the same amount of ink. The chip is deliberate, because that is what
+ * this app is about and a database cylinder said the opposite, files on a server. Five
  * destinations is the most Material allows and all five earn it. Four of them are the parts
  * no hosted assistant has, and burying them behind a menu to tidy the bar would be hiding
  * the reason to use this at all.
  */
 private enum class Destination(val route: String, val label: String, val icon: ImageVector) {
-    CHAT("chat", "Chat", Icons.Rounded.Chat),
-    MODELS("models", "Models", Icons.Rounded.Memory),
-    TOOLS("tools", "Tools", Icons.Rounded.Build),
-    USAGE("usage", "Usage", Icons.Rounded.BarChart),
-    SETTINGS("settings", "Settings", Icons.Rounded.Settings),
+    CHAT("chat", "Chat", Icons.Outlined.ChatBubbleOutline),
+    MODELS("models", "Models", Icons.Outlined.Memory),
+    TOOLS("tools", "Tools", Icons.Outlined.Build),
+    USAGE("usage", "Usage", Icons.Outlined.BarChart),
+    SETTINGS("settings", "Settings", Icons.Outlined.Settings),
 }
 
 /** A twelfth of the screen: enough rise to read as arrival, small enough to stay quick. */

@@ -148,18 +148,33 @@ internal val OpenWeightsTypography = Typography().let { base ->
         labelLarge = base.labelLarge.copy(
             fontFamily = PlexSans,
             fontWeight = FontWeight.Medium,
+            // Material tracks its small labels wide, and this scale had tightened every
+            // other style and left these three alone, so the navigation labels were the
+            // only airy text in the app. Neutral rather than negative: at twelve points
+            // and below, pulling letters together costs more legibility than it buys.
+            letterSpacing = 0.em,
             fontSize = 14.sp,
             lineHeight = 18.sp,
         ),
         labelMedium = base.labelMedium.copy(
             fontFamily = PlexSans,
             fontWeight = FontWeight.Medium,
+            // Material tracks its small labels wide, and this scale had tightened every
+            // other style and left these three alone, so the navigation labels were the
+            // only airy text in the app. Neutral rather than negative: at twelve points
+            // and below, pulling letters together costs more legibility than it buys.
+            letterSpacing = 0.em,
             fontSize = 12.sp,
             lineHeight = 16.sp,
         ),
         labelSmall = base.labelSmall.copy(
             fontFamily = PlexSans,
             fontWeight = FontWeight.Medium,
+            // Material tracks its small labels wide, and this scale had tightened every
+            // other style and left these three alone, so the navigation labels were the
+            // only airy text in the app. Neutral rather than negative: at twelve points
+            // and below, pulling letters together costs more legibility than it buys.
+            letterSpacing = 0.em,
             fontSize = 11.sp,
             lineHeight = 15.sp,
         ),

@@ -125,12 +125,19 @@ class FakeInferenceEngine : InferenceEngine {
     /**
      * Ends a held generation the way the model reaching its stop token does.
      *
-     * [content] stands in for what llama.cpp's parser hands back, which is the answer with
-     * reasoning and tool syntax already removed. Empty means the parser recognised nothing
-     * of the format and the caller's own buffer is the only text there is.
+     * [content] and [reasoning] stand in for what llama.cpp's parser hands back: the answer
+     * with reasoning and tool syntax removed, and the thinking on its own. Both empty means
+     * the parser recognised nothing of the format and the caller's buffer is all there is.
      */
-    fun finish(content: String = "") {
-        events.trySend(GenerationEvent.Completed(StopReason.END_OF_TURN, stats(), content))
+    fun finish(content: String = "", reasoning: String = "") {
+        events.trySend(
+            GenerationEvent.Completed(
+                reason = StopReason.END_OF_TURN,
+                stats = stats(),
+                content = content,
+                reasoning = reasoning,
+            ),
+        )
         events.close()
     }
 

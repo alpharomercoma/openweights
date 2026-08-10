@@ -36,6 +36,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -274,11 +275,11 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun `the last model asked for is the one left loaded`() = runTest(dispatcher) {
-        // Both requested before either finishes, which is what tapping twice in the model
-        // sheet does. Loads that overlap would each write their own identity, and the
-        // engine would be left holding whichever finished last.
-        engine.loadDelayMs = 500
+    fun `a second model tapped while the first is queued replaces it`() = runTest(dispatcher) {
+        // Both requested before either reaches the engine. The second is what the user
+        // wants, and the first is worth the seconds it would cost only if it is still the
+        // answer by the time it runs.
+        engine.loadDelayMs = LOAD_MS
         viewModel.loadModel(modelFile("model-a.gguf"))
         viewModel.loadModel(modelFile("model-b.gguf"))
         advanceUntilIdle()
@@ -288,6 +289,60 @@ class ChatViewModelTest {
         assertThat(engine.loads).containsExactly("model-b.gguf")
         engine.loadDelayMs = 0
     }
+
+    @Test
+    fun `a second model tapped mid load waits rather than running alongside`() =
+        runTest(dispatcher) {
+            engine.loadDelayMs = LOAD_MS
+            viewModel.loadModel(modelFile("model-a.gguf"))
+            // Far enough in that the first load is inside the engine and holding the lock.
+            advanceTimeBy(LOAD_MS / 2)
+
+            viewModel.loadModel(modelFile("model-b.gguf"))
+            advanceUntilIdle()
+            settle()
+
+            // Both ran, in order, and neither was inside the engine while the other was.
+            // Overlapping loads free the weights under each other and leave the engine
+            // holding one model while the screen names the other.
+            assertThat(engine.loads).containsExactly("model-a.gguf", "model-b.gguf").inOrder()
+            assertThat(viewModel.uiState.value.modelName).isEqualTo("model-b")
+            assertThat(viewModel.uiState.value.isLoadingModel).isFalse()
+            engine.loadDelayMs = 0
+        }
+
+    @Test
+    fun `a reply llama cpp parsed reopens as what was shown, not as raw tool syntax`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.send("What is the weather")
+            settle()
+
+            // What a model with a recognised tool format streams, against what the engine's
+            // parser hands back once it has lifted the call out.
+            engine.emit("<think>They want weather.</think>Checking. ")
+            engine.emit("""<tool_call>{"name":"weather"}</tool_call>""")
+            engine.finish(content = "Checking. ", reasoning = "They want weather.")
+            settle()
+
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            val shown = viewModel.uiState.value.transcript.last()
+            assertThat(shown.answer).isEqualTo("Checking. ")
+            assertThat(shown.reasoning).isEqualTo("They want weather.")
+
+            // Reopening re-reads the row and re-parses it. It has to arrive at the same
+            // answer, or the chat changes what it says the moment it is closed.
+            val stored = awaitMessages(id, count = 2).last()
+            viewModel.openConversation(id)
+            settle()
+
+            val reopened = viewModel.uiState.value.transcript.last()
+            assertThat(reopened.text).isEqualTo(stored.text)
+            assertThat(reopened.answer).isEqualTo(shown.answer)
+            assertThat(reopened.reasoning).isEqualTo(shown.reasoning)
+            assertThat(reopened.answer).doesNotContain("tool_call")
+        }
 
     @Test
     fun `loading a model without keeping the conversation starts a fresh one`() =
@@ -326,8 +381,10 @@ class ChatViewModelTest {
         viewModel.send("Question")
         settle()
         val id = requireNotNull(viewModel.uiState.value.activeConversationId)
-        assertThat(awaitMessages(id, count = 2)).hasSize(2)
 
+        // No waiting for the first reply to reach the table. Regenerate can be tapped the
+        // moment the reply appears, and its delete has to queue behind the insert rather
+        // than read past it and leave the discarded reply in storage.
         viewModel.regenerate()
         settle()
 
@@ -336,6 +393,35 @@ class ChatViewModelTest {
         assertThat(viewModel.uiState.value.transcript.count { it.role == ChatRole.ASSISTANT })
             .isEqualTo(1)
     }
+
+    @Test
+    fun `a stopped reply keeps its place when the next question follows immediately`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.send("First")
+            settle()
+            engine.emit("Partial answer.")
+            advanceUntilIdle()
+
+            // Stop and ask again, which is what happens when a reply goes wrong. The
+            // partial belongs between the two questions, not after both of them.
+            viewModel.stop()
+            settle()
+            engine.hold = false
+            viewModel.send("Second")
+            settle()
+
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            val stored = awaitMessages(id, count = 4)
+            // Out of order here means the chat reopens as a different conversation from
+            // the one on screen, and the model is resent that different conversation.
+            assertThat(stored.map { it.role })
+                .containsExactly("user", "assistant", "user", "assistant").inOrder()
+            assertThat(stored.map { it.text })
+                .containsExactly("First", "Partial answer.", "Second", "A short answer.")
+                .inOrder()
+        }
 
     @Test
     fun `a file the model cannot read is refused rather than sent and dropped`() =
@@ -422,5 +508,8 @@ class ChatViewModelTest {
 
         /** How many times to re-check the table before giving up and asserting on it. */
         const val AWAIT_STEPS = 20
+
+        /** Virtual milliseconds a held load takes, long enough to interleave a second. */
+        const val LOAD_MS = 500L
     }
 }

@@ -206,6 +206,17 @@ class ChatViewModel @Inject constructor(
     /** Held for the length of a load, so two of them cannot interleave. */
     private val loadMutex = Mutex()
 
+    /**
+     * Serializes everything that touches the conversation tables.
+     *
+     * Writes are launched rather than awaited, so the screen never waits on the disk. That
+     * leaves them racing each other unless they queue: a reply written at the end of one
+     * turn can otherwise land after the next question, and a regeneration can read the
+     * table before the reply it means to delete has been inserted. The mutex is fair, so
+     * the rows end up in the order the user produced them.
+     */
+    private val storageMutex = Mutex()
+
     /** Counts load requests, so a queued one can tell it has been superseded. */
     private var loadRequest = 0L
 
@@ -343,7 +354,9 @@ class ChatViewModel @Inject constructor(
                 )
             }
             if (keepConversation) {
-                conversationId?.let { id -> chats.setModel(id, modelFile.nameWithoutExtension) }
+                conversationId?.let { id ->
+                    storageMutex.withLock { chats.setModel(id, modelFile.nameWithoutExtension) }
+                }
             }
         }.onFailure { failure ->
             _uiState.update { it.copy(isLoadingModel = false, error = failure.userMessage()) }
@@ -371,11 +384,13 @@ class ChatViewModel @Inject constructor(
         // Awaited before generating: a fast reply could otherwise finish before the row
         // exists and be dropped, taking its usage record with it.
         viewModelScope.launch {
-            val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
-            val id = conversationId
-                ?: chats.startConversation(title, _uiState.value.modelName)
-                    .also { conversationId = it }
-            chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+            storageMutex.withLock {
+                val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
+                val id = conversationId
+                    ?: chats.startConversation(title, _uiState.value.modelName)
+                        .also { conversationId = it }
+                chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+            }
             generate()
         }
     }
@@ -443,10 +458,17 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             // Storage has to lose the same replies the screen just lost. Without this the
             // conversation reopens with the discarded reply and the new one both in it.
-            conversationId?.let { id ->
-                val stored = chats.messages(id)
-                val firstDiscarded = stored.indexOfLast { it.role == ChatRole.USER.wireName } + 1
-                stored.getOrNull(firstDiscarded)?.let { chats.deleteFrom(id, it.id) }
+            // Under the same lock as the writes, so the read cannot happen before the
+            // reply being discarded has been inserted.
+            storageMutex.withLock {
+                conversationId?.let { id ->
+                    val stored = chats.messages(id)
+                    // The same rule the transcript used: the trailing run of replies, which
+                    // starts after the last thing that was not one.
+                    val firstDiscarded =
+                        stored.indexOfLast { it.role != ChatRole.ASSISTANT.wireName } + 1
+                    stored.getOrNull(firstDiscarded)?.let { chats.deleteFrom(id, it.id) }
+                }
             }
             generate()
         }
@@ -598,7 +620,9 @@ class ChatViewModel @Inject constructor(
             // Without this a compacted chat reopens with no summary and re-sends the whole
             // transcript, which walks straight back into the context wall it just escaped.
             startedIn?.let { id ->
-                chats.saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
+                storageMutex.withLock {
+                    chats.saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
+                }
             }
         }
 
@@ -661,7 +685,10 @@ class ChatViewModel @Inject constructor(
             generationJob?.join()
             engine.resetContext()
 
-            val conversation = chats.conversation(id)
+            // Behind the write queue: a reply from the turn that just ended may not have
+            // been inserted yet, and reopening the same chat without it would show a
+            // question with no answer and then resend it.
+            val conversation = storageMutex.withLock { chats.conversation(id) }
             if (conversation == null) {
                 // Deleted between the tap and this read; adopting the id would make the
                 // next message violate the foreign key.
@@ -669,7 +696,7 @@ class ChatViewModel @Inject constructor(
                 return@launch
             }
 
-            val messages = chats.messages(id)
+            val messages = storageMutex.withLock { chats.messages(id) }
             conversationId = id
             nextEntryId = 0
 
@@ -735,9 +762,13 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             // Read before deleting: the rows are what says which files were attached, and
             // once they are gone nothing else on disk remembers, so the photos would stay
-            // forever in a folder the user cannot see.
-            val orphaned = chats.messages(id).flatMap { it.attachments.decodeAttachments() }
-            chats.deleteConversation(id)
+            // forever in a folder the user cannot see. Behind the write queue, so a reply
+            // still being written is deleted with the rest rather than after it.
+            val orphaned = storageMutex.withLock {
+                val attached = chats.messages(id).flatMap { it.attachments.decodeAttachments() }
+                chats.deleteConversation(id)
+                attached
+            }
             attachments.discard(orphaned)
             if (conversationId == id) newChat()
         }
@@ -758,16 +789,20 @@ class ChatViewModel @Inject constructor(
      * are all the same string.
      */
     private fun applyCompletion(event: GenerationEvent.Completed, raw: String) {
-        val canonical = raw.ifEmpty { event.content }
-        // The engine has already lifted reasoning and tool syntax out of its own content,
-        // so prefer that for what is displayed; parsing the buffer covers the models whose
-        // format it does not recognise.
-        val parsed = parseAssistantReply(canonical)
+        val parsed = parseAssistantReply(raw)
+        val streamed = _uiState.value.transcript.lastOrNull()
+        // Whichever source has it. llama.cpp separates thinking itself for the formats it
+        // knows; for the rest it comes out of the buffer, and what was already on screen
+        // is the last resort.
+        val reasoning = event.reasoning.ifEmpty { null } ?: parsed.reasoning ?: streamed?.reasoning
+        val answer = event.content.ifEmpty { parsed.answer }
+        val canonical = canonicalText(reasoning, answer)
+
         updateLastEntry {
             it.copy(
                 text = canonical,
-                answer = event.content.ifEmpty { parsed.answer },
-                reasoning = event.reasoning.ifEmpty { null } ?: parsed.reasoning ?: it.reasoning,
+                answer = answer,
+                reasoning = reasoning,
                 toolCalls = event.toolCalls,
                 isStreaming = false,
                 isReasoningInProgress = false,
@@ -809,16 +844,19 @@ class ChatViewModel @Inject constructor(
         }
 
         val parsed = parseAssistantReply(raw)
+        // Closed off rather than left as the stream had it: thinking that was cut off
+        // mid-tag reopens as an unterminated block and swallows the answer after it.
+        val canonical = canonicalText(parsed.reasoning, parsed.answer)
         updateLastEntry {
             it.copy(
-                text = raw,
+                text = canonical,
                 answer = parsed.answer,
                 reasoning = parsed.reasoning ?: it.reasoning,
                 isStreaming = false,
                 isReasoningInProgress = false,
             )
         }
-        persistReply(raw, stats = null)
+        persistReply(canonical, stats = null)
     }
 
     /**
@@ -835,22 +873,24 @@ class ChatViewModel @Inject constructor(
         val model = _uiState.value.modelName
 
         viewModelScope.launch {
-            chats.addMessage(
-                conversationId = id,
-                role = ChatRole.ASSISTANT.wireName,
-                text = text,
-                tokensPerSecond = stats?.decodeTokensPerSecond,
-                timeToFirstTokenMs = stats?.timeToFirstTokenMs,
-                generatedTokens = stats?.generatedTokens,
-                reasoningMs = reasoningMs,
-            )
-            if (stats != null && model != null) {
-                chats.recordUsage(
-                    modelName = model,
-                    promptTokens = stats.promptTokens,
-                    generatedTokens = stats.generatedTokens,
-                    inferenceMs = stats.prefillMs + stats.decodeMs,
+            storageMutex.withLock {
+                chats.addMessage(
+                    conversationId = id,
+                    role = ChatRole.ASSISTANT.wireName,
+                    text = text,
+                    tokensPerSecond = stats?.decodeTokensPerSecond,
+                    timeToFirstTokenMs = stats?.timeToFirstTokenMs,
+                    generatedTokens = stats?.generatedTokens,
+                    reasoningMs = reasoningMs,
                 )
+                if (stats != null && model != null) {
+                    chats.recordUsage(
+                        modelName = model,
+                        promptTokens = stats.promptTokens,
+                        generatedTokens = stats.generatedTokens,
+                        inferenceMs = stats.prefillMs + stats.decodeMs,
+                    )
+                }
             }
         }
     }
@@ -928,6 +968,20 @@ private fun TranscriptEntry.toChatMessage(): ChatMessage = ChatMessage(
     role = role,
     parts = attachments + MessagePart.Text(text),
 )
+
+/**
+ * The one string that stands for a reply everywhere.
+ *
+ * It is what the entry holds, what is written to storage, and what is resent as history,
+ * so it has to read back through [parseAssistantReply] as the same reply the user saw.
+ *
+ * Rebuilt from the split parts rather than kept as the raw stream, because for the formats
+ * llama.cpp recognises the raw stream still holds tool invocation syntax that was lifted
+ * out of what is displayed. Storing it would make a chat change what it says the moment it
+ * is reopened. Where nothing was lifted out this returns the stream unchanged.
+ */
+private fun canonicalText(reasoning: String?, answer: String): String =
+    if (reasoning.isNullOrEmpty()) answer else "<think>$reasoning</think>$answer"
 
 /**
  * Why a picked file cannot be sent to the loaded model.

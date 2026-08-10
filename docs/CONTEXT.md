@@ -109,10 +109,14 @@ Single source of truth: `gradle/libs.versions.toml`.
       a conversation drawer for reopening past chats, and per-model hyperparameters
 - [x] **P4** Multimodal in: libmtmd is compiled in and wired through the engine, the
       message model, storage and the UI. Verified on-device: LFM2.5-VL-1.6B describes a
-      real image attached from the photo picker. Audio input works through the same path
-      with an audio projector (none tested yet); video needs `MTMD_VIDEO=ON`, which the
-      vendored tag does not enable. Multimodal out is text plus Android TTS read-aloud;
-      dictation is still to come.
+      real image attached from the photo picker, and Voxtral-Mini answers about a real
+      recording. Video is sampled into frames by the app, because libmtmd decodes video by
+      shelling out to `ffmpeg`. Multimodal out is text plus Android TTS read-aloud, with
+      dictation through the on-device recogniser.
+- [x] **Test tiers**: `./gradlew verify` runs ktlint, detekt, assemble and the unit and
+      Robolectric tiers in one command, 110 tests. `verifyOnDevice` is the instrumented
+      tier and is separate because it needs a phone and model files. A standalone native
+      probe covers the C++ that JNI makes awkward to test, such as the UTF-8 validator.
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
 
 ## Multimodal: what libmtmd gives us, and what it does not
@@ -295,6 +299,28 @@ sort chips on screen instead of behaving like its own screen.
 One environment note: a model file placed with `adb` lands as `shell:ext_data_rw` mode 660
 and the app cannot read it: `chmod 666` fixes it. Files the app downloads itself are
 unaffected.
+
+## One reply, one string (2026-08-10)
+
+A reply exists in three places: the entry on screen, the row in Room, and the history
+resent to the model next turn. They have to be the same string, or the chat says one thing
+and reopens saying another. Three ways they used to drift, all now closed:
+
+- Publishing to the screen is coalesced to a frame, so the engine's buffer runs ahead of
+  it. Both the completion and the stop path apply the whole buffer before anything is
+  written.
+- For the formats llama.cpp recognises, the raw stream still contains the tool invocation
+  syntax that was lifted out of what is displayed. The stored text is rebuilt from the
+  parsed parts, with reasoning put back in the `<think>` tags the Kotlin parser reads, so
+  reopening renders what was shown.
+- Writes are launched rather than awaited, so the screen never waits on the disk. They
+  queue behind one fair mutex in `ChatViewModel`, along with the reads that depend on
+  them, so a regeneration cannot read past a pending insert and a stopped reply cannot
+  land after the question that followed it.
+
+Stopping with nothing produced removes the placeholder rather than storing a blank turn.
+A stopped reply is stored without stats: those only arrive with a completion, and the
+lifetime ledger should not carry invented numbers.
 
 ## Development device access
 

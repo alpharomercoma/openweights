@@ -30,7 +30,7 @@ detekt = "1.23.8"
 ktlint = "14.2.0"
 
 [libraries]
-# Gradle plugin artifacts — used only by build-logic convention plugins
+# Gradle plugin artifacts, used only by build-logic convention plugins
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 ksp-gradlePlugin = { group = "com.google.devtools.ksp", name = "com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }

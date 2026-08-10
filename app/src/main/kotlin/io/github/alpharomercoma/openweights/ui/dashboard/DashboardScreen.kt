@@ -16,12 +16,13 @@
 
 package io.github.alpharomercoma.openweights.ui.dashboard
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,10 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,6 +54,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkT
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
+import java.time.LocalDate
+import java.time.format.TextStyle
 import java.util.Locale
 
 /**
@@ -108,7 +110,7 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
         ) {
             Headline(summary)
             GrowthChart(summary.growth)
-            if (summary.perDay.size > 1) DailyChart(summary.perDay)
+            WeekChart(summary.growth)
             ModelBreakdown(summary.perModel)
         }
     }
@@ -227,34 +229,81 @@ private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Tokens per day.
+ * The last seven days, one bar a day, with the day of the week under each.
  *
- * A bare bar chart with no axes: the shape of the habit is the information,
- * and gridlines on a phone-width chart cost more space than they explain.
+ * A week rather than the whole history, because the question this answers is how much the
+ * phone has been used lately, and a lifetime of two-pixel bars answers it for nobody. The
+ * weekday letters are what make it read as a week instead of an anonymous run of numbers,
+ * and they are the reason this is bars rather than a line: seven discrete days are seven
+ * things, and a line between them implies a reading in the gaps that does not exist.
+ *
+ * Days with nothing on them are drawn as a floor rather than skipped. A quiet Sunday is
+ * part of the shape of a week, and a chart that omits it makes six days look like seven.
  */
 @Composable
-private fun DailyChart(days: List<DailyUsage>) {
+private fun WeekChart(growth: List<GrowthPoint>) {
+    val latest = growth.lastOrNull()?.day ?: return
+    // Seven slots always, counted back from the most recent day, rather than however many
+    // days happen to have rows. A first-day user has one point, and one bar is not a week:
+    // the six empty days are the context that makes the one full day mean something.
+    val tokensByDay = growth.associate { it.day to it.dayTokens }
+    val week = (DAYS_IN_WEEK - 1 downTo 0).map { back ->
+        val day = latest - back
+        day to (tokensByDay[day] ?: 0L)
+    }
     val dark = LocalIsDarkTheme.current
-    val peak = days.maxOf { it.generatedTokens }.coerceAtLeast(1)
+    val locale = LocalConfiguration.current.locales[0]
+    val peak = week.maxOf { it.second }.coerceAtLeast(1)
 
     Column {
-        Metric("tokens per day · peak ${peak.grouped()}")
-        Canvas(
+        Text("This week", style = MaterialTheme.typography.titleSmall)
+        Metric("tokens a day · best day ${peak.grouped()}")
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(88.dp)
-                .padding(top = 6.dp),
+                .height(WEEK_CHART_HEIGHT.dp)
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            val slot = size.width / days.size
-            val barWidth = (slot * BAR_FILL).coerceAtLeast(2f)
+            week.forEach { (_, tokens) ->
+                val fraction = tokens.toFloat() / peak
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(fraction.coerceAtLeast(EMPTY_DAY_BAR))
+                        .clip(RoundedCornerShape(Radius.xs))
+                        // A day with nothing on it is drawn in the outline colour, not on
+                        // the speed scale. The scale runs from slow to fast, and the bottom
+                        // of it is red: a day the phone was not used came out looking like
+                        // a day something went wrong with it.
+                        .background(
+                            if (tokens == 0L) {
+                                MaterialTheme.colorScheme.outlineVariant
+                            } else {
+                                signalColor(fraction, dark)
+                            },
+                        ),
+                )
+            }
+        }
 
-            days.forEachIndexed { index, day ->
-                val fraction = day.generatedTokens.toFloat() / peak
-                val barHeight = (size.height * fraction).coerceAtLeast(2f)
-                drawRect(
-                    color = signalColor(fraction, dark),
-                    topLeft = Offset(index * slot, size.height - barHeight),
-                    size = Size(barWidth, barHeight),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            week.forEach { (day, _) ->
+                Text(
+                    text = LocalDate.ofEpochDay(day)
+                        .dayOfWeek
+                        .getDisplayName(TextStyle.NARROW, locale),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -298,7 +347,14 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
     }
 }
 
-private const val BAR_FILL = 0.7f
+/** Seven bars: a week is the unit people actually think in. */
+private const val DAYS_IN_WEEK = 7
+
+/** Tall enough to compare two quiet days, short enough to leave the totals above visible. */
+private const val WEEK_CHART_HEIGHT = 96
+
+/** A day with nothing on it still gets a sliver, so the week reads as seven days. */
+private const val EMPTY_DAY_BAR = 0.02f
 
 /** The middle of the signal scale, which is where "no change since yesterday" belongs. */
 private const val UNCHANGED = 0.5

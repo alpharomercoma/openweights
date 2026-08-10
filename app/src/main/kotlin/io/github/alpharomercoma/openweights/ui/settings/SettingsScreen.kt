@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.BuildConfig
 import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
@@ -102,7 +103,43 @@ fun SettingsScreen(
 
             HorizontalDivider()
             DeviceSection(state)
+
+            HorizontalDivider()
+            AboutSection()
         }
+    }
+}
+
+/**
+ * What this app is, at the bottom of the last screen.
+ *
+ * Last because it is the least urgent thing here and the first thing someone looks for when
+ * they want to know what they installed. It says the two facts that are the whole point:
+ * the models are open weights that the user chose and downloaded, and nothing they type is
+ * sent anywhere. An app making that second claim should be checkable, so the licence and
+ * the source are named rather than implied.
+ */
+@Composable
+private fun AboutSection() {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("About", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "OpenWeights runs open weight language models on this phone. Models come from " +
+                "Hugging Face, you choose which ones, and they run on the processor in " +
+                "your hand.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Nothing you type leaves the device. There is no account, no server, and no " +
+                "telemetry. The only requests it makes are the ones you ask for: finding " +
+                "and downloading a model, and any web search you switch on in Tools.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Metric("version ${BuildConfig.VERSION_NAME}")
+        Metric("Apache License 2.0")
+        Metric("github.com/alpharomercoma/openweights")
     }
 }
 

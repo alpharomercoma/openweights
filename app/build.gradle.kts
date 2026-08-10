@@ -16,6 +16,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Off by default since AGP 8, and About needs the version name it generates. Nothing
+    // else here reads BuildConfig, so this exists to let one screen say which build it is.
+    buildFeatures { buildConfig = true }
+
     /*
      * Release signing.
      *
@@ -95,6 +99,10 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.compose)
+    // Coil 3 split network loading into its own artifact. Without it AsyncImage has no
+    // fetcher for an https model, fails silently, and every publisher tile in Discover fell
+    // back to drawing initials: the avatars were being looked up correctly and thrown away.
+    implementation(libs.coil.network.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
 

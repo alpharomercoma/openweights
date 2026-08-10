@@ -37,8 +37,8 @@ class EngineMessagesTest {
         // 1.5B audio model with no tool support was told it had tools, could not emit a
         // call, and answered "hello" with "I do not have a tool for that". How long an
         // answer should be is a separate matter and is always said.
-        assertThat(system.text).doesNotContain("LOOKUP:")
-        assertThat(system.text).contains("Answer the question directly")
+        assertThat(system.text).doesNotContain("Search only when")
+        assertThat(system.text).contains("Answer from what you know")
     }
 
     @Test
@@ -52,7 +52,7 @@ class EngineMessagesTest {
 
         val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
 
-        assertThat(system.text).contains("LOOKUP:")
+        assertThat(system.text).contains("Search only when")
     }
 
     @Test
@@ -68,7 +68,7 @@ class EngineMessagesTest {
 
         // Being able to render a call and having one to make are different things. Told it
         // could search with search switched off, the model answered by saying it would.
-        assertThat(system.text).doesNotContain("LOOKUP:")
+        assertThat(system.text).doesNotContain("Search only when")
     }
 
     @Test
@@ -97,11 +97,10 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // The instruction turn comes first, then the summary as its own system turn. Its
-        // two halves are both load-bearing: answer from memory, and the one line to write
-        // instead when memory is not enough.
-        assertThat(messages.first().text).contains("Answer from what you already know")
-        assertThat(messages.first().text).contains("LOOKUP:")
+        // The instruction turn comes first, then the summary as its own system turn. Both
+        // halves of it are load-bearing: answer from memory, and when to go and look.
+        assertThat(messages.first().text).contains("Answer from what you know")
+        assertThat(messages.first().text).contains("Search only when")
         val summary = messages[1]
         assertThat(summary.role).isEqualTo(ChatRole.SYSTEM)
         assertThat(summary.text).contains("The user is porting a parser.")

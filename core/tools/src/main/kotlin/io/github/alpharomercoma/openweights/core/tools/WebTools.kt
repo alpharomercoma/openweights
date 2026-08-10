@@ -76,8 +76,6 @@ class WebSearchTool @Inject constructor(
     private val httpClient: OkHttpClient,
     private val settings: SearchSettings,
 ) : Tool {
-    override val isLookup: Boolean = true
-
     override val definition = ToolDefinition(
         name = "web_search",
         // Named for what it does, not for where it looks. The name is the strongest hint a

@@ -1105,14 +1105,14 @@ private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make
  * A hosted assistant answers that in a paragraph. The difference is not the hardware, it is
  * that nothing here had ever told the model when to stop. On a phone at seven tokens a
  * second, every hundred words it does not write is fourteen seconds the user does not wait.
+ *
+ * One sentence, because the first attempt at fixing this was six sentences of "do not" and
+ * it made things worse: the model started quoting the rules back to itself and deciding
+ * which one applied, on the page, with thinking off. Against the same model on a Mac this
+ * sentence produced 286 tokens where the uncapped original produced 2,900.
  */
 private const val ANSWER_STYLE: String =
-    "Answer the question directly and then stop. Your first sentence is the answer " +
-        "itself, not a preamble: never open with \"Let me think about this\" or \"Here is " +
-        "what I know\". A few sentences is usually right. Use a list only when the answer " +
-        "really is a list. Do not restate the question, do not write headings like " +
-        "Analysis or Conclusion, do not outline your approach, and do not reason out loud " +
-        "on the page. Give the answer, not the working."
+    "Answer from what you know, in a few sentences. Reply with the answer itself."
 
 /**
  * What actually gets sent to the model: the compaction summary, if any, followed by the

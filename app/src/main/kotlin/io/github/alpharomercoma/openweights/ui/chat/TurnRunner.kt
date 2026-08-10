@@ -27,7 +27,6 @@ import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
-import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import javax.inject.Inject
@@ -107,41 +106,32 @@ class TurnRunner @Inject constructor(
         val agent = AgentRunner(active)
         val budget = ToolBudget(engine.loadedModel?.contextSize ?: 0)
 
-        // The tool to reach for when the model says it does not know something. Whether one
-        // exists decides how the turn starts: with a way to ask for a lookup in one line,
-        // the first pass is asked to answer and given no tools at all.
-        val lookup = if (withTools) active.all.firstOrNull(Tool::isLookup) else null
-
         var messages = conversation
         var round = 0
         var lastRaw = ""
 
         while (true) {
-            // The first pass gets no tools. A small model handed a toolbox uses it, and
-            // most questions do not need one: "gojo vs sukuna" took five minutes of
-            // searching to answer something the weights already knew. So the opening pass
-            // is a question, not a menu, and the model's own three-token answer to "do you
-            // know this" is what decides whether anything is fetched. When there is nothing
-            // to look up with there is no decision to route, and tools are offered as
-            // before from the first pass.
-            val routing = lookup != null && round == 0
+            // Tools are offered from the first pass, which was tried the other way and was
+            // worse. Withholding them was meant to stop a small model searching for things
+            // it already knew, with a plain-text line it could write instead when it did not
+            // know. Measured against LFM2.5 the line was never written once: asked who a
+            // stranger was, the model emitted its own trained call syntax naming a tool that
+            // does not exist here, so the turn ended with two unrunnable calls and the user
+            // got no answer at all.
+            //
+            // The same measurement showed the decision itself was never the problem. Asked
+            // to compare two characters it reasoned that it knew them and answered; asked
+            // about a stranger or this year's phone it went to look. What it needs is not to
+            // be talked out of searching, it is the real tool present so that when it does
+            // decide to search it calls something that exists.
             val offerTools = withTools &&
-                !routing &&
                 round < AgentRunner.DEFAULT_MAX_ROUNDS &&
                 budget.hasRoom
-            val pass = streamOnce(messages, params, active, offerTools, lookup != null, listener) {
-                lastRaw = it
-            } ?: return lastRaw.withoutLookup()
+            val pass = streamOnce(messages, params, active, offerTools, listener) { lastRaw = it }
+                ?: return lastRaw
 
-            val requested = pass.raw.lookupQuery()
-                ?.let { query -> lookup?.callFor(query.ifBlank { conversation.lastQuestion() }) }
-                ?.takeIf { budget.hasRoom }
-            val calls = listOfNotNull(requested)
-                .ifEmpty { pass.event.toolCalls }
-                .ifEmpty { pass.raw.salvagedCall(active, conversation) }
-            // Sanitised on the way out, because a model that asked for a lookup we could not
-            // run must not have its syntax shown to the user as though it were the answer.
-            if (calls.isEmpty()) return lastRaw.withoutLookup()
+            val calls = pass.event.toolCalls.ifEmpty { pass.raw.salvagedCall(active, conversation) }
+            if (calls.isEmpty()) return lastRaw
 
             // Said first, then the steps, so the transcript reads in the order it happened.
             // The parser's content, not the raw stream: raw still carries the call itself,
@@ -154,7 +144,7 @@ class TurnRunner @Inject constructor(
 
             val results = (decision as? AgentDecision.Continue)?.messages.orEmpty()
                 .map(budget::fit)
-            if (results.isEmpty()) return lastRaw.withoutLookup()
+            if (results.isEmpty()) return lastRaw
 
             // The assistant turn that asked goes back too, or the model is handed results
             // for a question it cannot see itself having asked. Its thinking does not:
@@ -176,7 +166,6 @@ class TurnRunner @Inject constructor(
         params: SamplerParams,
         active: ToolRegistry,
         offerTools: Boolean,
-        mayLookUp: Boolean,
         listener: TurnListener,
         publishRaw: (String) -> Unit,
     ): Pass? {
@@ -195,13 +184,8 @@ class TurnRunner @Inject constructor(
             when (event) {
                 is GenerationEvent.Token -> {
                     reply.append(event.text)
-                    val raw = reply.toString()
-                    publishRaw(raw)
-                    // Withheld only while the reply could still turn out to be a request to
-                    // search. One character usually decides it, so an ordinary answer is
-                    // released on its first token and is no slower for this, while a lookup
-                    // never reaches the screen as syntax the user has to read past.
-                    if (!mayLookUp || !raw.mayBeLookup()) listener.onText(raw)
+                    publishRaw(reply.toString())
+                    listener.onText(reply.toString())
                 }
 
                 is GenerationEvent.Completed -> {
@@ -243,54 +227,8 @@ private fun String.salvagedCall(
 ): List<ToolCall> {
     val named = tools.all.filter { contains(it.definition.name, ignoreCase = true) }
     val tool = named.singleOrNull()?.takeUnless { it.alwaysAsk } ?: return emptyList()
-    return listOfNotNull(tool.callFor(conversation.lastQuestion()))
-}
-
-/** The question this turn is answering, for tools that take it as their argument. */
-private fun List<ChatMessage>.lastQuestion(): String =
-    lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
-
-/**
- * The one line a model writes instead of an answer when it does not know something.
- *
- * Plain text rather than a tool call, because the point is to ask the question before the
- * model has been shown any tools: a tool call needs the tool schemas in the prompt, and it
- * is exactly having them there that makes a small model search for things it already knows.
- * Three tokens is the whole cost of the decision, and a model that does know the answer
- * pays none of it.
- */
-private const val LOOKUP = "LOOKUP:"
-
-/**
- * What to search for, or null when this is an ordinary answer.
- *
- * Reasoning is stripped first: a thinking model opens with a block that is displayed
- * separately, and the request, if it comes, comes after it.
- */
-private fun String.lookupQuery(): String? {
-    val said = withoutReasoning().trimStart()
-    if (!said.startsWith(LOOKUP, ignoreCase = true)) return null
-    return said.substring(LOOKUP.length).trim().lineSequence().firstOrNull()?.trim().orEmpty()
-}
-
-/**
- * True while the text so far is still consistent with being a lookup request.
- *
- * The test is a prefix, not a match, so it answers before the line is finished and the
- * first token of a real answer clears it. While the model is inside its reasoning block
- * there is nothing to decide yet, and that block is the user's to watch.
- */
-private fun String.mayBeLookup(): Boolean {
-    if (contains("<think>") && !contains("</think>")) return false
-    val head = withoutReasoning().trimStart().take(LOOKUP.length)
-    return head.isNotEmpty() && LOOKUP.startsWith(head, ignoreCase = true)
-}
-
-/** The text with an unanswered lookup request taken off the front of it. */
-private fun String.withoutLookup(): String {
-    if (lookupQuery() == null) return this
-    val said = withoutReasoning().trimStart()
-    return said.substringAfter('\n', "").trim()
+    val question = conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
+    return listOfNotNull(tool.callFor(question))
 }
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
@@ -358,7 +296,7 @@ private class ToolBudget(contextSize: Int) {
  * the call in it.
  */
 private fun TurnRunner.Pass.spoken(): String =
-    event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.withoutLookup().trim()
+    event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.trim()
 
 /**
  * The text with any tool call taken out of it.

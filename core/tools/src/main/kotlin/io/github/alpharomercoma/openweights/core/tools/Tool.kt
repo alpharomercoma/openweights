@@ -48,16 +48,6 @@ interface Tool {
     val alwaysAsk: Boolean get() = false
 
     /**
-     * Whether this is the tool to reach for when the model says it does not know something.
-     *
-     * One tool answers "what is this thing I have never heard of", and the turn loop needs
-     * to name it without knowing which tools exist. Marked on the tool rather than matched
-     * by name in the caller, so adding a second search provider does not mean editing a
-     * string in the UI layer.
-     */
-    val isLookup: Boolean get() = false
-
-    /**
      * Runs the call and returns what the model should be told.
      *
      * Failures come back as text rather than exceptions, because a model that is told

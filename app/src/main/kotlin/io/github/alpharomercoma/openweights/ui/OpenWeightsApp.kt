@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -91,6 +92,27 @@ private enum class Destination(val route: String, val label: String, val icon: I
 /** A twelfth of the screen: enough rise to read as arrival, small enough to stay quick. */
 private const val TAB_SLIDE = 12
 
+/**
+ * Moves to a tab, from the bar or from anywhere else that sends the user to one.
+ *
+ * One function because there were two ways to reach a tab and only the bar used the options
+ * that make it a switch rather than a push. Tapping the model name in the chat header called
+ * plain navigate, so Models went on top of Chat instead of replacing it, and the tab the bar
+ * highlighted was no longer the tab the back stack thought it was on. Tapping Chat then
+ * landed on a second copy of Chat, and from there the way back was a back gesture nobody
+ * would guess at from a bottom bar.
+ *
+ * saveState and restoreState are what let Discover keep its search results and Chat keep its
+ * scroll position while the user goes to look at something else.
+ */
+private fun NavHostController.switchTab(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
 @Composable
 fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
@@ -117,15 +139,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         currentDestination?.hierarchy?.any { it.route == destination.route } == true
                     NavigationBarItem(
                         selected = selected,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
+                        onClick = { navController.switchTab(destination.route) },
                         icon = { Icon(destination.icon, contentDescription = null) },
                         label = { Text(destination.label) },
                         colors = NavigationBarItemDefaults.colors(
@@ -182,7 +196,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onRegenerate = chatViewModel::regenerate,
                     onNewChat = chatViewModel::newChat,
                     onCompact = chatViewModel::compactNow,
-                    onOpenModels = { navController.navigate(Destination.MODELS.route) },
+                    onOpenModels = { navController.switchTab(Destination.MODELS.route) },
                     onOpenConversation = chatViewModel::openConversation,
                     onDeleteConversation = chatViewModel::deleteConversation,
                     onSavePreferences = chatViewModel::savePreferences,
@@ -225,7 +239,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                                 // throwing the conversation away to do it is not a trade
                                 // anyone would choose.
                                 chatViewModel.loadModel(model.file, keepConversation = true)
-                                navController.navigate(Destination.CHAT.route)
+                                navController.switchTab(Destination.CHAT.route)
                             },
                             onDelete = modelsViewModel::delete,
                             onCancelDownload = modelsViewModel::cancel,

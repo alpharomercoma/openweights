@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.zip.ZipFile
 
 plugins {
     id("openweights.android.application")
@@ -120,4 +121,70 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+/**
+ * Proves the names JNI resolves at runtime survived R8.
+ *
+ * A release build once aborted the process on the first token of every reply because a keep
+ * rule said `allowobfuscation` and R8 duly renamed `onToken`, the one string the native side
+ * looks up. No debug build can catch that, because R8 does not run there, and the checklist
+ * that said to re-test the release build by hand did not get followed.
+ *
+ * So it is a build step now. Dex stores method names as plain UTF-8, so this reads the
+ * shipped artifact rather than the rules that were meant to protect it: it fails on what
+ * actually got built, not on what was intended.
+ */
+val jniSymbols = listOf(
+    // Resolved by GetMethodID during generation. The class names are free to change,
+    // because native code reaches them through GetObjectClass.
+    "onToken",
+    "onReply",
+    // Resolved by the dynamic linker as Java_..._LlamaBridge_nativeGenerate and friends,
+    // so for these the package and class name have to survive as well.
+    "nativeGenerate",
+    "nativeLoadModel",
+    "LlamaBridge",
+    "LlamaException",
+)
+
+tasks.register("verifyJniSymbols") {
+    group = "verification"
+    description = "Fails if R8 renamed or removed a name the native library resolves."
+
+    val apks = fileTree(layout.buildDirectory.dir("outputs/apk/release")) {
+        include("*.apk")
+    }
+    val symbols = jniSymbols
+    inputs.files(apks)
+
+    doLast {
+        val artifacts = apks.files.filter { it.isFile }
+        check(artifacts.isNotEmpty()) {
+            "No release APK to check. Run assembleRelease first."
+        }
+        artifacts.forEach { apk ->
+            val found = mutableSetOf<String>()
+            ZipFile(apk).use { zip ->
+                zip.entries().asSequence()
+                    .filter { it.name.endsWith(".dex") }
+                    .forEach { entry ->
+                        val bytes = zip.getInputStream(entry).readBytes()
+                        val text = String(bytes, Charsets.ISO_8859_1)
+                        symbols.forEach { if (text.contains(it)) found += it }
+                    }
+            }
+            val missing = symbols - found
+            check(missing.isEmpty()) {
+                "R8 removed or renamed names the native library resolves by string, in " +
+                    "${apk.name}: $missing. Generation would abort the process at runtime. " +
+                    "Check core/engine/consumer-rules.pro."
+            }
+        }
+        logger.lifecycle("verifyJniSymbols: all ${symbols.size} names survived R8")
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy("verifyJniSymbols")
 }

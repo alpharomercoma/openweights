@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
@@ -10,6 +11,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Dictation only. Requested the first time the mic is tapped, never at launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
+         A model is one to eight gigabytes, which is minutes on a phone connection, and
+         nobody watches a progress bar for minutes. Without a foreground service the download
+         stops the moment Android reclaims the process, and the user comes back to a bar that
+         has not moved. dataSync is the accurate type: bytes are being moved to storage at
+         the user's request, with a notification saying so and a button to stop it.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!--
          RECORD_AUDIO makes Play assume the app requires a microphone, which would hide it
@@ -61,6 +72,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--
+             WorkManager runs the download in this service. It declares no type of its own,
+             and from API 34 a service that starts in the foreground without one is refused,
+             so the type is merged in here.
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+        <!--
+             WorkManager's own initializer would build a default configuration before the
+             application class gets a say, and that configuration has no Hilt worker factory
+             in it: the download worker takes an injected downloader, so it would fail to
+             construct. Removing the initializer makes Configuration.Provider authoritative.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
         <!--
              Hands the camera app a private file to write into, so taking a photo needs no
              permission at all: the app never reads the camera, it receives a file.

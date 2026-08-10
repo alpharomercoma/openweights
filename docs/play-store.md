@@ -41,7 +41,8 @@ build cannot tell you.
 |---|---|---|
 | `INTERNET` | Hugging Face search and downloads, and the web tools below | Never prompted; normal permission |
 | `RECORD_AUDIO` | Dictation, through the on-device recogniser only | First time the mic is tapped |
-| `POST_NOTIFICATIONS` | Says a reply has finished, and only while the app is in the background | On first launch |
+| `POST_NOTIFICATIONS` | Says a reply has finished, and shows download progress | On first launch |
+| `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` | Keeps a model download running once the app is off screen | Never prompted; normal permissions |
 
 An earlier version of this document said `POST_NOTIFICATIONS` had been declared, never
 used, and removed. It is declared and it is used: a reply on a phone takes tens of seconds
@@ -50,10 +51,29 @@ posts exactly one notification when the app is not on screen. `android.hardware.
 is declared `required="false"`, because `RECORD_AUDIO` otherwise makes Play hide the app
 from every device without a microphone, and dictation is one optional way to enter text.
 
-There is no foreground service and no `FOREGROUND_SERVICE` permission, which keeps the app
-out of the Play Console's foreground service declaration flow entirely. Fixing downloads so
-they survive leaving the app, which is the open defect below, changes that: a `dataSync`
-foreground service brings its own declaration and its own justification video.
+### The foreground service declaration
+
+There is one, of type `dataSync`, and it needs the Play Console declaration form and a
+video. What to say on it:
+
+- **What the service does.** Downloads a model file the user has explicitly chosen, from
+  Hugging Face to the app's own storage. One to eight gigabytes, which is minutes on a phone
+  connection.
+- **Why it has to run in the foreground.** Nobody watches a progress bar for minutes. The
+  moment the user switches apps, Android is free to reclaim the process, and without the
+  service the transfer stops and they come back to a bar that has not moved. The app is
+  useless until a model finishes arriving, so this is not a background convenience, it is
+  the one transfer the product depends on.
+- **Why no other API fits.** `setExpedited` gives a few minutes at most. `DownloadManager`
+  cannot verify the Hub's SHA-256, cannot resume through the Hub's redirect chain with an
+  `Authorization` header intact, and writes into shared storage the app would then have to
+  copy out of, doubling the space needed for a file this size.
+- **User visibility and control.** A low-importance notification shows the model's name and
+  the bytes transferred, with a Cancel action wired to `WorkManager.createCancelPendingIntent`.
+  It only appears while a download the user started is running.
+
+The video needs to show: tapping download in Discover, the notification appearing, leaving
+the app, the notification still counting up, and Cancel stopping it.
 
 ## Data safety form
 
@@ -155,10 +175,6 @@ Two things still need a human before submission:
 
 ## Known gaps a reviewer would be right to raise
 
-- **Downloads do not survive leaving the app.** `ModelsViewModel.download` runs in
-  `viewModelScope`, so a multi-gigabyte download dies when the process does. This is not a
-  policy violation, it is a product defect, and the fix is WorkManager with a `dataSync`
-  foreground service, which brings its own Play declaration.
 - **No baseline profile**, so first-run startup and first scroll are slower than they need
   to be.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us

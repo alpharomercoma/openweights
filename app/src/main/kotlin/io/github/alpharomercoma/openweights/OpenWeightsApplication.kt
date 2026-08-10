@@ -17,7 +17,28 @@
 package io.github.alpharomercoma.openweights
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
+/**
+ * The application, and WorkManager's configuration.
+ *
+ * The download worker takes an injected downloader, which the default worker factory cannot
+ * construct: it only knows how to call a two argument constructor. Handing WorkManager
+ * Hilt's factory instead is what lets a worker have dependencies, and the manifest removes
+ * WorkManager's own startup initializer so this configuration is the one that is used.
+ */
 @HiltAndroidApp
-class OpenWeightsApplication : Application()
+class OpenWeightsApplication :
+    Application(),
+    Configuration.Provider {
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
+}

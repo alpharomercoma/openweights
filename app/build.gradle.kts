@@ -106,6 +106,11 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
+    // Downloads outlive the screen that started them, so they run as WorkManager jobs and
+    // the worker is built by Hilt rather than by the default factory that cannot inject.
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

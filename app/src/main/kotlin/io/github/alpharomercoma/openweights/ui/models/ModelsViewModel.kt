@@ -18,20 +18,28 @@ package io.github.alpharomercoma.openweights.ui.models
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
 import io.github.alpharomercoma.openweights.core.hub.HubFile
-import io.github.alpharomercoma.openweights.core.hub.ModelDownloader
+import io.github.alpharomercoma.openweights.download.ModelDownloadWorker
 import io.github.alpharomercoma.openweights.model.ModelStore
-import io.github.alpharomercoma.openweights.ui.discover.readableMessage
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /** A model file on disk. */
@@ -71,23 +79,60 @@ data class ModelsUiState(
 
 @HiltViewModel
 class ModelsViewModel @Inject constructor(
-    private val downloader: ModelDownloader,
+    private val workManager: WorkManager,
     private val modelStore: ModelStore,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ModelsUiState())
-    val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
+    private val local = MutableStateFlow(ModelsUiState())
 
-    private val jobs = mutableMapOf<String, Job>()
+    /**
+     * Downloads the user has waved away, which WorkManager has no concept of.
+     *
+     * A failed download stays in its database until something replaces it, so without this
+     * a failure would sit on the screen with no way to clear it but a retry.
+     */
+    private val dismissed = MutableStateFlow(emptySet<String>())
+
+    /** Finished work already folded into the model list, so it is folded in once. */
+    private val absorbed = mutableSetOf<UUID>()
+
+    val uiState: StateFlow<ModelsUiState> = combine(
+        local,
+        workManager.getWorkInfosByTagFlow(ModelDownloadWorker.TAG_DOWNLOAD),
+        dismissed,
+    ) { state, work, hidden ->
+        state.copy(downloads = work.toDownloads(hidden))
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(SUBSCRIBE_GRACE_MILLIS),
+        initialValue = ModelsUiState(),
+    )
 
     init {
         refresh()
+        // Last run's finished rows, which are of no interest now: their files are either on
+        // disk, where refresh finds them, or they are not, and a failure the user cannot
+        // act on any more is just clutter.
+        workManager.pruneWork()
+
+        // A second collector rather than a side effect inside the combine above, because
+        // this has to keep running when nothing is looking at the screen. A download that
+        // completes while the user is in a chat still has to appear in the model list when
+        // they come back.
+        viewModelScope.launch {
+            workManager.getWorkInfosByTagFlow(ModelDownloadWorker.TAG_DOWNLOAD).collect { work ->
+                val finished = work.any {
+                    it.state == WorkInfo.State.SUCCEEDED && absorbed.add(it.id)
+                }
+                if (finished) refresh()
+            }
+        }
     }
 
     fun refresh() {
         val models = modelStore.availableModels().map { file ->
             LocalModel(file, modelStore.projectorFor(file))
         }
-        _uiState.update {
+        local.update {
             it.copy(models = models, storageUsedBytes = models.sumOf { model -> model.sizeBytes })
         }
     }
@@ -97,10 +142,8 @@ class ModelsViewModel @Inject constructor(
      *
      * Keyed by the file it writes rather than the remote path: two repositories can offer
      * the same filename, and letting both run would have them overwrite each other's bytes
-     * in the same partial file.
-     *
-     * Downloads survive leaving the screen because they run in the view model scope; the
-     * partial file on disk means even process death only costs the current chunk.
+     * in the same partial file. That key is also the unique work name, so the "already
+     * running" check is WorkManager's rather than ours, and it holds across a restart.
      */
     fun download(repoId: String, path: String, sizeBytes: Long, sha256: String?) {
         val file = HubFile(path, sizeBytes, sha256)
@@ -120,28 +163,39 @@ class ModelsViewModel @Inject constructor(
 
     private fun start(repoId: String, file: HubFile, destination: File) {
         val key = destination.name
-        if (jobs.containsKey(key)) return
 
-        _uiState.update {
-            it.copy(downloads = it.downloads + ActiveDownload(repoId, file.path, key))
-        }
+        val request = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+            .setInputData(
+                workDataOf(
+                    ModelDownloadWorker.KEY_REPO_ID to repoId,
+                    ModelDownloadWorker.KEY_PATH to file.path,
+                    ModelDownloadWorker.KEY_DESTINATION to destination.absolutePath,
+                    ModelDownloadWorker.KEY_SIZE_BYTES to file.sizeBytes,
+                    ModelDownloadWorker.KEY_SHA256 to file.sha256,
+                ),
+            )
+            .setConstraints(
+                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+            )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
+            .addTag(ModelDownloadWorker.TAG_DOWNLOAD)
+            .addTag(ModelDownloadWorker.TAG_KEY + key)
+            .addTag(ModelDownloadWorker.TAG_REPO + repoId)
+            .addTag(ModelDownloadWorker.TAG_PATH + file.path)
+            .addTag(ModelDownloadWorker.TAG_SIZE + file.sizeBytes)
+            .build()
 
-        val job = viewModelScope.launch {
-            downloader.download(repoId, file, destination)
-                .catch { failure ->
-                    updateDownload(key) { it.copy(error = failure.readableMessage()) }
-                }
-                .collect { progress -> apply(key, progress) }
-        }
-        jobs[key] = job
-        // Cancellation skips anything after collect, so clearing the entry has to be tied
-        // to completion or a cancelled download could never be retried.
-        job.invokeOnCompletion { jobs.remove(key) }
+        // KEEP, so tapping download twice does not start a second writer on the same file.
+        // A run that has already finished is not kept, which is what makes a failed download
+        // retryable from the same button.
+        workManager.enqueueUniqueWork(key, ExistingWorkPolicy.KEEP, request)
+        dismissed.update { it - key }
     }
 
     fun cancel(key: String) {
-        jobs[key]?.cancel()
-        _uiState.update { it.copy(downloads = it.downloads.filterNot { d -> d.key == key }) }
+        workManager.cancelUniqueWork(key)
+        // Also covers dismissing a failure, which has nothing left to cancel.
+        dismissed.update { it + key }
     }
 
     fun delete(model: LocalModel) {
@@ -153,35 +207,61 @@ class ModelsViewModel @Inject constructor(
     }
 
     /**
-     * Folds progress into the row it belongs to.
+     * Turns WorkManager's view of the queue into rows.
      *
-     * Matched on the key, the file being written, and not on the remote path, which is
-     * merely equal to it when a repository keeps its GGUFs at the top level. A file in a
-     * subdirectory, or a projector saved under a name of our own, would otherwise report
-     * no progress and leave a finished download on screen forever.
+     * Everything the row needs before the worker has run once comes from tags, because
+     * input data is not readable from a [WorkInfo] and the row has to say which model it is
+     * fetching while the work is still waiting for a network.
      */
-    private fun apply(key: String, progress: DownloadProgress) {
-        when (progress) {
-            is DownloadProgress.Downloading -> updateDownload(key) {
-                it.copy(bytesDone = progress.bytesDone, bytesTotal = progress.bytesTotal)
-            }
+    private fun List<WorkInfo>.toDownloads(hidden: Set<String>): List<ActiveDownload> = this
+        .mapNotNull { info ->
+            val key = info.tagValue(ModelDownloadWorker.TAG_KEY) ?: return@mapNotNull null
+            if (key in hidden) return@mapNotNull null
 
-            DownloadProgress.Verifying -> updateDownload(key) { it.copy(isVerifying = true) }
-
-            is DownloadProgress.Finished -> {
-                _uiState.update {
-                    it.copy(downloads = it.downloads.filterNot { d -> d.key == key })
-                }
-                refresh()
-            }
-        }
-    }
-
-    private fun updateDownload(key: String, transform: (ActiveDownload) -> ActiveDownload) {
-        _uiState.update { state ->
-            state.copy(
-                downloads = state.downloads.map { if (it.key == key) transform(it) else it },
+            val row = ActiveDownload(
+                repoId = info.tagValue(ModelDownloadWorker.TAG_REPO).orEmpty(),
+                path = info.tagValue(ModelDownloadWorker.TAG_PATH).orEmpty(),
+                key = key,
             )
+
+            when (info.state) {
+                // Gone from the list either way: a finished file belongs in the model list
+                // above, and a cancelled one was asked to disappear.
+                WorkInfo.State.SUCCEEDED, WorkInfo.State.CANCELLED -> null
+
+                WorkInfo.State.FAILED -> row.copy(
+                    error = info.outputData.getString(ModelDownloadWorker.KEY_ERROR)
+                        ?: "The download could not be completed.",
+                )
+
+                else -> row.copy(
+                    bytesDone = info.progress.getLong(ModelDownloadWorker.KEY_BYTES_DONE, 0L),
+                    // The declared size until the worker reports its own, so a queued
+                    // download still shows what it is about to cost.
+                    bytesTotal = info.progress.getLong(
+                        ModelDownloadWorker.KEY_BYTES_TOTAL,
+                        info.tagValue(ModelDownloadWorker.TAG_SIZE)?.toLongOrNull() ?: 0L,
+                    ),
+                    isVerifying = info.progress.getBoolean(
+                        ModelDownloadWorker.KEY_VERIFYING,
+                        false,
+                    ),
+                )
+            }
         }
+        // Replacing a finished run leaves its record behind for a moment, so the same file
+        // can appear twice. The one still going is the one worth showing.
+        .groupBy { it.key }
+        .map { (_, rows) -> rows.firstOrNull { it.error == null } ?: rows.first() }
+
+    private fun WorkInfo.tagValue(prefix: String): String? =
+        tags.firstOrNull { it.startsWith(prefix) }?.removePrefix(prefix)
+
+    private companion object {
+        /** Long enough that a rotation does not tear down the query and rebuild it. */
+        const val SUBSCRIBE_GRACE_MILLIS = 5_000L
+
+        /** A dropped connection is usually back well inside a minute. */
+        const val BACKOFF_SECONDS = 30L
     }
 }

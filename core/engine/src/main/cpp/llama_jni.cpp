@@ -33,40 +33,136 @@ namespace {
 
 Session * as_session(jlong handle) { return reinterpret_cast<Session *>(handle); }
 
+/** One code point, appended as the UTF-8 the rest of the world means by that name. */
+void append_utf8(std::string & out, uint32_t code) {
+    if (code < 0x80) {
+        out.push_back(static_cast<char>(code));
+    } else if (code < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (code >> 6)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else if (code < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (code >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (code >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    }
+}
+
+/**
+ * Real UTF-8 for a Java string.
+ *
+ * Not `GetStringUTFChars`, which despite the name returns *modified* UTF-8: a private
+ * encoding in which anything above the basic plane comes back as a six byte surrogate
+ * pair rather than the four bytes UTF-8 defines. Every emoji a user types is above the
+ * basic plane, and handing those six bytes to a tokenizer that expects UTF-8 feeds it a
+ * sequence that is not valid UTF-8 at all. Reading UTF-16 and encoding it here is the only
+ * way to get the bytes the rest of the world means.
+ */
 std::string to_utf8(JNIEnv * env, jstring value) {
     if (value == nullptr) {
         return {};
     }
-    const char * chars = env->GetStringUTFChars(value, nullptr);
-    std::string result(chars != nullptr ? chars : "");
-    if (chars != nullptr) {
-        env->ReleaseStringUTFChars(value, chars);
+    const jsize length = env->GetStringLength(value);
+    const jchar * chars = env->GetStringChars(value, nullptr);
+    if (chars == nullptr) {
+        return {};
     }
+
+    std::string result;
+    result.reserve(static_cast<size_t>(length));
+    for (jsize i = 0; i < length; ++i) {
+        uint32_t code = chars[i];
+        // A high surrogate followed by a low one is a single character split across two
+        // UTF-16 units, which is how UTF-16 carries anything above the basic plane.
+        if (code >= 0xD800 && code <= 0xDBFF && i + 1 < length &&
+            chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
+            code = 0x10000 + ((code - 0xD800) << 10) + (chars[i + 1] - 0xDC00);
+            ++i;
+        }
+        append_utf8(result, code);
+    }
+
+    env->ReleaseStringChars(value, chars);
     return result;
+}
+
+/** UTF-16 for validated UTF-8, which is what the JVM actually stores. */
+std::vector<jchar> to_utf16(const std::string & text) {
+    std::vector<jchar> out;
+    out.reserve(text.size());
+
+    size_t index = 0;
+    while (index < text.size()) {
+        const auto lead = static_cast<unsigned char>(text[index]);
+        size_t width = 1;
+        uint32_t code = lead;
+        if ((lead & 0xF8) == 0xF0) {
+            width = 4;
+            code = lead & 0x07u;
+        } else if ((lead & 0xF0) == 0xE0) {
+            width = 3;
+            code = lead & 0x0Fu;
+        } else if ((lead & 0xE0) == 0xC0) {
+            width = 2;
+            code = lead & 0x1Fu;
+        }
+        if (index + width > text.size()) {
+            break;
+        }
+        for (size_t k = 1; k < width; ++k) {
+            code = (code << 6) | (static_cast<unsigned char>(text[index + k]) & 0x3Fu);
+        }
+        index += width;
+
+        if (code < 0x10000) {
+            out.push_back(static_cast<jchar>(code));
+        } else {
+            code -= 0x10000;
+            out.push_back(static_cast<jchar>(0xD800 + (code >> 10)));
+            out.push_back(static_cast<jchar>(0xDC00 + (code & 0x3FF)));
+        }
+    }
+    return out;
 }
 
 /**
  * A Java string from bytes that may not be valid UTF-8.
  *
- * `NewStringUTF` does not reject bad input, it aborts the process. A JNI check failure
- * takes the whole app down with SIGABRT and no catchable exception. Model output, GGUF
- * metadata and error messages all originate outside this app, so every one of them is
- * truncated to its valid prefix on the way across rather than trusted.
+ * Two separate hazards, and only one of them used to be handled. Truncated or malformed
+ * bytes are still cut back to their valid prefix, because model output, GGUF metadata and
+ * error messages all originate outside this app.
+ *
+ * The other is that `NewStringUTF` does not take UTF-8. It takes modified UTF-8, which
+ * encodes anything above the basic plane as a six byte surrogate pair, and a four byte
+ * sequence is not something it is allowed to be given. Those four bytes are exactly what a
+ * model emits for an emoji, and JNI does not reject bad input, it aborts the process:
+ * SIGABRT, no catchable exception, on a reply containing a smiling face. Converting to
+ * UTF-16 and calling `NewString` sidesteps the encoding entirely.
  */
 jstring to_jstring(JNIEnv * env, const std::string & text) {
     const size_t valid = openweights::complete_utf8_prefix(text);
-    return valid == text.size()
-        ? env->NewStringUTF(text.c_str())
-        : env->NewStringUTF(text.substr(0, valid).c_str());
+    const std::vector<jchar> utf16 = to_utf16(text.substr(0, valid));
+    return env->NewString(utf16.data(), static_cast<jsize>(utf16.size()));
 }
 
 void throw_engine_exception(JNIEnv * env, const std::string & message) {
     jclass clazz = env->FindClass("io/github/alpharomercoma/openweights/core/engine/LlamaException");
     if (clazz == nullptr) return;
-    // ThrowNew takes modified UTF-8 too, and error messages carry file names and model
-    // metadata that came from somewhere else.
-    const size_t valid = openweights::complete_utf8_prefix(message);
-    env->ThrowNew(clazz, message.substr(0, valid).c_str());
+    // Built through the String constructor rather than ThrowNew, which has the same
+    // modified UTF-8 problem: an error message carries file names and model metadata, and
+    // a model whose name contains an emoji would abort the process while reporting that it
+    // failed to load. consumer-rules.pro keeps this constructor for exactly this call.
+    jmethodID constructor = env->GetMethodID(clazz, "<init>", "(Ljava/lang/String;)V");
+    if (constructor == nullptr) return;
+    jstring text = to_jstring(env, message);
+    auto error = static_cast<jthrowable>(env->NewObject(clazz, constructor, text));
+    if (error != nullptr) {
+        env->Throw(error);
+    }
 }
 
 /** Maps the native stop reason onto the ordinal of Kotlin's StopReason enum. */
@@ -85,11 +181,27 @@ jint stop_reason_ordinal(StopReason reason) {
 
 extern "C" {
 
+/*
+ * Every export below is a function try block.
+ *
+ * A C++ exception must not cross a JNI frame: it unwinds into the runtime and aborts the
+ * process, which no Kotlin runCatching can recover. Loading and generating were guarded
+ * already, and the rest were not, though they all build std::string and std::vector, and
+ * a phone with a model loaded is exactly a phone where the next allocation can fail.
+ * Written as function try blocks so the bodies stay as they were.
+ */
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSystemInfo(
-    JNIEnv * env, jobject /*thiz*/) {
+    JNIEnv * env, jobject /*thiz*/) try {
     openweights::init_backend();
     return to_jstring(env, openweights::system_info());
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeSystemInfo failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeSystemInfo failed for an unknown reason");
+    return nullptr;
 }
 
 /**
@@ -99,7 +211,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSystemIn
  */
 JNIEXPORT jobjectArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeComputeDevices(
-    JNIEnv * env, jobject /*thiz*/) {
+    JNIEnv * env, jobject /*thiz*/) try {
     const auto devices = openweights::compute_devices();
     jclass string_class = env->FindClass("java/lang/String");
     jobjectArray result =
@@ -120,6 +232,13 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeComputeD
         }
     }
     return result;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeComputeDevices failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeComputeDevices failed for an unknown reason");
+    return nullptr;
 }
 
 JNIEXPORT jlong JNICALL
@@ -166,26 +285,40 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeFreeMode
 
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeResetContext(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     as_session(handle)->reset();
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeResetContext failed: ") + failure.what());
+    return;
+} catch (...) {
+    throw_engine_exception(env, "nativeResetContext failed for an unknown reason");
+    return;
 }
 
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSetThreads(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle, jint threads, jint batch_threads) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle, jint threads, jint batch_threads) try {
     as_session(handle)->set_threads(threads, batch_threads);
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeSetThreads failed: ") + failure.what());
+    return;
+} catch (...) {
+    throw_engine_exception(env, "nativeSetThreads failed for an unknown reason");
+    return;
 }
 
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeCancel(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) {
     // Callable while nativeGenerate is running on another thread.
     as_session(handle)->cancel();
 }
 
 JNIEXPORT jlongArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelInfo(
-    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     Session * session = as_session(handle);
     jlong values[6] = {
         static_cast<jlong>(session->parameter_count()),
@@ -199,17 +332,31 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelInf
     env->SetLongArrayRegion(result, 0, 6, values);
     return result;
 }
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeModelInfo failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeModelInfo failed for an unknown reason");
+    return nullptr;
+}
 
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelDescription(
-    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return to_jstring(env, as_session(handle)->model_description());
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeModelDescription failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeModelDescription failed for an unknown reason");
+    return nullptr;
 }
 
 /** Returns [vision, audio]: what the loaded projector can accept. */
 JNIEXPORT jbooleanArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSupport(
-    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     const auto support = as_session(handle)->media_support();
     jboolean values[2] = {
         static_cast<jboolean>(support.vision),
@@ -219,30 +366,65 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSup
     env->SetBooleanArrayRegion(result, 0, 2, values);
     return result;
 }
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeMediaSupport failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeMediaSupport failed for an unknown reason");
+    return nullptr;
+}
 
 /** True when the loaded chat template understands being told whether to think. */
 JNIEXPORT jboolean JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsThinking(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return as_session(handle)->supports_thinking() ? JNI_TRUE : JNI_FALSE;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeSupportsThinking failed: ") + failure.what());
+    return JNI_FALSE;
+} catch (...) {
+    throw_engine_exception(env, "nativeSupportsThinking failed for an unknown reason");
+    return JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsTools(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return as_session(handle)->supports_tools() ? JNI_TRUE : JNI_FALSE;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeSupportsTools failed: ") + failure.what());
+    return JNI_FALSE;
+} catch (...) {
+    throw_engine_exception(env, "nativeSupportsTools failed for an unknown reason");
+    return JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsReasoningEffort(
-    JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return as_session(handle)->supports_reasoning_effort() ? JNI_TRUE : JNI_FALSE;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeSupportsReasoningEffort failed: ") + failure.what());
+    return JNI_FALSE;
+} catch (...) {
+    throw_engine_exception(env, "nativeSupportsReasoningEffort failed for an unknown reason");
+    return JNI_FALSE;
 }
 
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaMarker(
-    JNIEnv * env, jobject /*thiz*/, jlong handle) {
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return to_jstring(env, as_session(handle)->media_marker());
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeMediaMarker failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeMediaMarker failed for an unknown reason");
+    return nullptr;
 }
 
 /**

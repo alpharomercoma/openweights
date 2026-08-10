@@ -93,6 +93,8 @@ internal class LlamaBridge {
         handle: Long,
         roles: Array<String>,
         contents: Array<String>,
+        /** Empty for every message except a tool result, which names the call it answers. */
+        toolCallIds: Array<String>,
         mediaPaths: Array<String>,
         mediaCounts: IntArray,
         temperature: Float,

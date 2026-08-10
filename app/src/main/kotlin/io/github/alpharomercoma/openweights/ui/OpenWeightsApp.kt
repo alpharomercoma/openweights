@@ -179,6 +179,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     dictation = dictation,
                     canDictate = mediaViewModel.canDictate,
                     onDictate = mediaViewModel::toggleDictation,
+                    onMode = chatViewModel::setMode,
+                    onApproval = chatViewModel::resolveApproval,
                     onReport = { entry, reason, note ->
                         reportViewModel.report(
                             modelName = state.modelName,

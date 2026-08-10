@@ -82,6 +82,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:engine"))
     implementation(project(":core:hub"))
+    implementation(project(":core:tools"))
     implementation(project(":core:device"))
     implementation(project(":core:data"))
 

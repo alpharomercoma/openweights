@@ -42,7 +42,13 @@ complexity:
     ignoreAnnotated: ['Composable']
     # A view model that owns one screen ends up with one function per user action plus a
     # few private helpers. Splitting that to satisfy a counter scatters cohesive logic.
-    thresholdInClasses: 15
+    #
+    # Raised from 15 to 18 in 2026-08 when agent modes and tool approval each added an
+    # action to the chat screen. The check that matters is LongParameterList below, which
+    # counts collaborators rather than user actions: it caught this same class doing too
+    # much twice, and both times the fix was a real extraction (TurnRunner, ModelRuntime)
+    # rather than a threshold.
+    thresholdInClasses: 18
     ignorePrivate: true
 
 exceptions:

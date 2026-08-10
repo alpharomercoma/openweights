@@ -21,6 +21,20 @@ enum class ChatRole(val wireName: String) {
     SYSTEM("system"),
     USER("user"),
     ASSISTANT("assistant"),
+
+    /**
+     * The result of running a tool, fed back so the model can carry on.
+     *
+     * Without this role a model can ask for a tool and never learn what happened, which is
+     * the difference between a chat that answers and one that acts.
+     */
+    TOOL("tool"),
+    ;
+
+    companion object {
+        fun of(wireName: String): ChatRole =
+            entries.firstOrNull { it.wireName == wireName } ?: ASSISTANT
+    }
 }
 
 /**
@@ -79,7 +93,17 @@ enum class MediaKind {
 }
 
 /** One turn of a conversation as handed to the inference engine. */
-data class ChatMessage(val role: ChatRole, val parts: List<MessagePart>) {
+data class ChatMessage(
+    val role: ChatRole,
+    val parts: List<MessagePart>,
+    /**
+     * Which call this message answers, for a [ChatRole.TOOL] message.
+     *
+     * Chat templates that support tools use it to pair a result with the call that asked
+     * for it, which matters as soon as a model asks for two things at once.
+     */
+    val toolCallId: String = "",
+) {
     /** The text of this message with attachments omitted. */
     val text: String get() = parts.filterIsInstance<MessagePart.Text>().joinToString("") { it.text }
 
@@ -110,5 +134,12 @@ data class ChatMessage(val role: ChatRole, val parts: List<MessagePart>) {
     companion object {
         fun text(role: ChatRole, text: String): ChatMessage =
             ChatMessage(role, listOf(MessagePart.Text(text)))
+
+        /** The result of a tool run, paired with the call that asked for it. */
+        fun toolResult(callId: String, content: String): ChatMessage = ChatMessage(
+            role = ChatRole.TOOL,
+            parts = listOf(MessagePart.Text(content)),
+            toolCallId = callId,
+        )
     }
 }

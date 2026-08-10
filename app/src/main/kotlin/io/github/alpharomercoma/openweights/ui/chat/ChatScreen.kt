@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -69,9 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -88,13 +85,14 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.model.DictationState
 import kotlinx.coroutines.launch
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,6 +120,8 @@ fun ChatScreen(
     canDictate: Boolean = false,
     onDictate: ((String) -> Unit) -> Unit = {},
     onReport: (TranscriptEntry, ReportReason, String) -> Unit = { _, _, _ -> },
+    onMode: (AgentMode) -> Unit = {},
+    onApproval: (Boolean) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -183,6 +183,8 @@ fun ChatScreen(
             canDictate = canDictate,
             onDictate = onDictate,
             onReport = onReport,
+            onMode = onMode,
+            onApproval = onApproval,
             modifier = modifier,
         )
     }
@@ -215,6 +217,8 @@ private fun ChatContent(
     canDictate: Boolean,
     onDictate: ((String) -> Unit) -> Unit,
     onReport: (TranscriptEntry, ReportReason, String) -> Unit,
+    onMode: (AgentMode) -> Unit,
+    onApproval: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -290,6 +294,9 @@ private fun ChatContent(
             }
 
             StatusStrip(state = state, dictationError = dictation.error)
+            state.pendingApproval?.let { call ->
+                ToolApproval(call = call, onAnswer = onApproval)
+            }
 
             Composer(
                 conversationKey = state.activeConversationId,
@@ -311,6 +318,9 @@ private fun ChatContent(
                         SlashCommand.NEW_CHAT -> onNewChat()
                         SlashCommand.COMPACT -> onCompact()
                         SlashCommand.REGENERATE -> onRegenerate()
+                        SlashCommand.PLAN -> onMode(AgentMode.PLAN)
+                        SlashCommand.AUTO -> onMode(AgentMode.AUTO)
+                        SlashCommand.ASK -> onMode(AgentMode.ASK)
                     }
                 },
             )
@@ -561,15 +571,10 @@ private fun AssistantTurn(
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().speedRail(entry.tokensPerSecond)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier
-                .padding(start = RAIL_GUTTER.dp)
-                .combinedClickable(onClick = {}, onLongClick = onLongPress),
+            modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
         ) {
-            if (!entry.isStreaming && entry.tokensPerSecond != null) {
-                Metric(entry.readout())
-            }
             entry.reasoning?.let { reasoning ->
                 ReasoningBlock(
                     reasoning = reasoning,
@@ -604,6 +609,7 @@ private fun AssistantTurn(
                     onReadAloud = onReadAloud,
                     onRetry = onRetry,
                     modifier = Modifier.padding(top = 2.dp),
+                    measurements = entry.tokensPerSecond?.let { { Measurements(entry) } },
                 )
             }
         }
@@ -613,49 +619,42 @@ private fun AssistantTurn(
 private const val MILLIS_PER_SECOND = 1000.0
 
 /**
- * Paints the throughput rail down the leading edge of whatever it modifies.
+ * The measurements under a reply.
  *
- * A modifier rather than a sibling composable. Laying the rail out beside the reply meant
- * asking the row for IntrinsicSize.Min, which measures the reply twice, once to discover
- * its height and once to use it. Doing that to a growing markdown tree on every frame of a
- * stream is what made the transcript judder. drawBehind runs after measurement is already
- * done, so it costs a rectangle.
+ * This replaced a coloured rail down the left of every model turn. The rail cost a gutter
+ * on every reply on a screen that has none to spare, and it said one thing, throughput,
+ * that this line already says in words. Colour now lands on the number it describes, which
+ * is where it was always most useful.
  */
 @Composable
-private fun Modifier.speedRail(tokensPerSecond: Double?): Modifier {
+private fun Measurements(entry: TranscriptEntry) {
     val dark = LocalIsDarkTheme.current
-    val color = tokensPerSecond
-        ?.let { signalColor((it / FAST_TOKENS_PER_SECOND).toFloat(), dark) }
-        ?: MaterialTheme.colorScheme.outline
-    val description = tokensPerSecond
-        ?.let { "Generated at ${it.roundToInt()} tokens per second" }
-        ?: "Generating"
+    val locale = LocalConfiguration.current.locales[0]
+    val speed = entry.tokensPerSecond ?: return
 
-    return drawBehind {
-        drawRoundRect(
-            color = color,
-            size = Size(RAIL_WIDTH.dp.toPx(), size.height),
-            cornerRadius = CornerRadius(RAIL_WIDTH.dp.toPx() / 2),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = String.format(locale, "%.1f tok/s", speed),
+            style = MetricTextStyle,
+            color = signalColor((speed / FAST_TOKENS_PER_SECOND).toFloat(), dark),
+            maxLines = 1,
+            modifier = Modifier.semantics {
+                contentDescription = "Generated at ${speed.roundToInt()} tokens per second"
+            },
         )
-    }.semantics { contentDescription = description }
-}
-
-/** Matches the rail the design system draws elsewhere. */
-private const val RAIL_WIDTH = 2
-
-/** Clear of the rail, with the same gap the old layout had. */
-private const val RAIL_GUTTER = 14
-
-private fun TranscriptEntry.readout(): String {
-    val locale = Locale.getDefault()
-    val speed = tokensPerSecond?.let { String.format(locale, "%.1f tok/s", it) }
-    // Abbreviated so the line survives one phone width at the metric size: three readouts
-    // that wrap are harder to compare than three that do not.
-    val ttft = timeToFirstTokenMs?.let {
-        String.format(locale, "%.1fs first token", it / MILLIS_PER_SECOND)
+        // Two numbers, not four. How fast it wrote and how long the wait was are the two
+        // anyone reads at a glance; time to first token and the token count are detail,
+        // and detail belongs in the long press sheet where there is room for it.
+        entry.totalMillis?.let { total ->
+            Metric(
+                text = String.format(locale, "%.1fs", total / MILLIS_PER_SECOND),
+                maxLines = 1,
+            )
+        }
     }
-    val tokens = generatedTokens?.let { "$it tok" }
-    return listOfNotNull(speed, ttft, tokens).joinToString(" · ")
 }
 
 @Composable

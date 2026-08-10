@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import java.util.Locale
 
 /**
  * Actions for one message, opened by long-pressing it.
@@ -82,6 +83,16 @@ fun MessageActionsSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 12.dp),
         ) {
+            // The measurements that no longer fit beside the actions. There is room here,
+            // and a reader who wants time to first token has already gone looking for it.
+            entry.detail()?.let { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
             ActionRow(
                 icon = Icons.Rounded.ContentCopy,
                 label = "Copy text",
@@ -152,3 +163,27 @@ private fun Context.copyToClipboard(text: String) {
     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("OpenWeights message", text))
 }
+
+/**
+ * Everything measured about one reply, for the sheet.
+ *
+ * Null while a reply is still arriving, because half a measurement is worse than none.
+ */
+private fun TranscriptEntry.detail(): String? {
+    if (tokensPerSecond == null) return null
+    val locale = Locale.getDefault()
+    return listOfNotNull(
+        String.format(locale, "%.1f tok/s", tokensPerSecond),
+        timeToFirstTokenMs?.let {
+            String.format(
+                locale,
+                "%.1fs to first token",
+                it / MILLIS_PER_SECOND,
+            )
+        },
+        generatedTokens?.let { "$it tokens" },
+        totalMillis?.let { String.format(locale, "%.1fs in total", it / MILLIS_PER_SECOND) },
+    ).joinToString(" · ")
+}
+
+private const val MILLIS_PER_SECOND = 1000.0

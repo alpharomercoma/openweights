@@ -26,7 +26,8 @@ class EngineMessagesTest {
     fun `without compaction every turn is sent`() {
         val state = ChatUiState(transcript = transcript(4))
 
-        assertThat(state.engineMessages()).hasSize(4)
+        // One more than the turns: every conversation opens with the tool instruction.
+        assertThat(state.engineMessages()).hasSize(5)
     }
 
     @Test
@@ -44,9 +45,12 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        assertThat(messages.first().role).isEqualTo(ChatRole.SYSTEM)
-        assertThat(messages.first().text).contains("The user is porting a parser.")
-        assertThat(messages.first().text).doesNotContain("$")
+        // The instruction turn comes first, then the summary as its own system turn.
+        assertThat(messages.first().text).contains("You have tools")
+        val summary = messages[1]
+        assertThat(summary.role).isEqualTo(ChatRole.SYSTEM)
+        assertThat(summary.text).contains("The user is porting a parser.")
+        assertThat(summary.text).doesNotContain("$")
     }
 
     @Test
@@ -59,8 +63,8 @@ class EngineMessagesTest {
         val messages = state.engineMessages()
 
         // One summary plus the two turns after the fold.
-        assertThat(messages).hasSize(3)
-        assertThat(messages.drop(1).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        assertThat(messages).hasSize(4)
+        assertThat(messages.drop(2).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
     }
 
     private fun transcript(count: Int) = List(count) { index ->

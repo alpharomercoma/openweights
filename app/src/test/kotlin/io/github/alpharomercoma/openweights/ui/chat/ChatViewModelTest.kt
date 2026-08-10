@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
+import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.Dispatchers
@@ -75,14 +76,18 @@ class ChatViewModelTest {
 
         engine = FakeInferenceEngine()
         val chats = ChatRepository(database, Clock.System)
+        val registry = ToolRegistry(emptyList())
         viewModel = ChatViewModel(
-            engine = engine,
+            runtime = ModelRuntime(
+                engine = engine,
+                modelStore = ModelStore(context),
+                preferences = ModelPreferencesRepository(context),
+                thermal = ThermalPolicy(context, DeviceProfiler(context)),
+            ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
-            modelStore = ModelStore(context),
             attachments = AttachmentStore(context),
             chats = chats,
-            modelPreferences = ModelPreferencesRepository(context),
-            thermalPolicy = ThermalPolicy(context, DeviceProfiler(context)),
+            turns = TurnRunner(engine, registry),
         )
     }
 

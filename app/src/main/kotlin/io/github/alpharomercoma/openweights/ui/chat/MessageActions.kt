@@ -23,6 +23,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
@@ -34,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -59,8 +62,14 @@ fun MessageActions(
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** Drawn at the end of the row, after the actions, when the reply has finished. */
+    measurements: (@Composable () -> Unit)? = null,
 ) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Action(Icons.Rounded.ContentCopy, "Copy reply", onCopy)
         Action(
             icon = if (isSpeaking) {
@@ -72,6 +81,16 @@ fun MessageActions(
             onClick = onReadAloud,
         )
         onRetry?.let { Action(Icons.Rounded.Refresh, "Try again", it) }
+
+        // The measurements share the action row rather than taking a line of their own.
+        // They used to sit above the reply on a line that ran out of width and wrapped,
+        // which on a narrow phone pushed the answer down and read as broken. Here they
+        // occupy space the row already had and cannot wrap, because they are the last
+        // thing in it and they ellipsize.
+        measurements?.let {
+            Spacer(Modifier.weight(1f))
+            it()
+        }
     }
 }
 

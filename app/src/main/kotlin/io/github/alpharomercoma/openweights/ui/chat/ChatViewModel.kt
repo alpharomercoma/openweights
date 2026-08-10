@@ -32,17 +32,16 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
-import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
-import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
-import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.model.AttachmentStore
-import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +77,10 @@ data class TranscriptEntry(
     val compactionNote: String? = null,
     /** Files sent with this turn, shown above its text. */
     val attachments: List<MessagePart.File> = emptyList(),
+    /** What the agent did while producing this reply, in order. */
+    val steps: List<AgentStep> = emptyList(),
+    /** Wall clock from send to finished, which is what the wait actually felt like. */
+    val totalMillis: Long? = null,
 )
 
 /** A past conversation, as shown in the drawer. */
@@ -146,6 +149,18 @@ data class ChatUiState(
      * a measurement minutes out of date.
      */
     val isThrottled: Boolean = false,
+    /**
+     * How much rope the model gets.
+     *
+     * Auto by default. Asking per call sounds safer and is not: a model that searches
+     * three times to answer one question produces three prompts, and a user who taps
+     * through three prompts stops reading the fourth. The tools that ship cannot write
+     * anything or spend anything, so the honest default is to let them run and to say
+     * clearly in the transcript what ran.
+     */
+    val mode: AgentMode = AgentMode.AUTO,
+    /** A tool waiting for the user to allow it. Null when nothing is waiting. */
+    val pendingApproval: ToolCall? = null,
 ) {
     /**
      * The runtime's current state, in the order it matters.
@@ -189,14 +204,14 @@ data class ChatUiState(
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val engine: InferenceEngine,
+    private val runtime: ModelRuntime,
     private val compactor: ConversationCompactor,
-    private val modelStore: ModelStore,
     private val attachments: AttachmentStore,
     private val chats: ChatRepository,
-    private val modelPreferences: ModelPreferencesRepository,
-    private val thermalPolicy: ThermalPolicy,
+    private val turns: TurnRunner,
 ) : ViewModel() {
+    /** Completed by the approval buttons, so the agent can wait on a human. */
+    private var approval: CompletableDeferred<Boolean>? = null
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -258,7 +273,7 @@ class ChatViewModel @Inject constructor(
 
     /** Loads whichever model is already on disk, if any. */
     fun loadDefaultModel() {
-        modelStore.firstAvailableModel()?.let(::loadModel)
+        runtime.firstAvailableModel()?.let(::loadModel)
     }
 
     /** Loads a GGUF file from disk. */
@@ -295,12 +310,12 @@ class ChatViewModel @Inject constructor(
         keepConversation: Boolean,
     ) {
         _uiState.update { it.copy(isLoadingModel = true, error = null) }
-        val preferences = modelPreferences.current(modelFile.name)
+        val preferences = runtime.settingsFor(modelFile.name)
         val loadParams = contextLength
             ?.let { ModelLoadParams(contextLength = it) }
             ?: preferences.toLoadParams()
 
-        val projector = modelStore.projectorFor(modelFile)
+        val projector = runtime.projectorFor(modelFile)
 
         // Cleared before the attempt: the engine frees whatever it held before it loads, so
         // from here on the old identity describes nothing. The staged files go with it,
@@ -321,19 +336,19 @@ class ChatViewModel @Inject constructor(
         if (abandoned.isNotEmpty()) attachments.discard(abandoned)
 
         runCatching {
-            engine.load(modelFile, loadParams, projector)
+            runtime.load(modelFile, loadParams, projector)
         }.onSuccess {
             // The cache belonged to the old weights. Clearing it makes the next reply
             // re-read the transcript, which is what carries the conversation across.
-            engine.resetContext()
+            runtime.resetContext()
             if (!keepConversation) conversationId = null
             preferencesKey = modelFile.name
-            val info = engine.loadedModel
+            val info = runtime.loadedModel
             val support = info?.mediaSupport ?: MediaSupport()
             _uiState.update {
                 it.copy(
                     isLoadingModel = false,
-                    backend = engine.computeDevices().firstOrNull()?.id?.uppercase(),
+                    backend = runtime.backendName(),
                     modelName = modelFile.nameWithoutExtension,
                     // The filename's own quantization, not llama's verbose description:
                     // "Q4_K_M" beside the compute device and context window reads as a
@@ -493,9 +508,47 @@ class ChatViewModel @Inject constructor(
         }
 
         generationJob = viewModelScope.launch {
-            val reply = StringBuilder()
-            val startedAt = System.currentTimeMillis()
+            val turnStartedAt = System.currentTimeMillis()
+            var lastFrameAt = 0L
             var reasoningEndedAt: Long? = null
+            var raw = ""
+
+            val listener = object : TurnListener {
+                override fun onText(text: String) {
+                    raw = text
+                    // Not every token: re-parsing the whole reply and rebuilding its
+                    // markdown tree costs more than a frame, so publishing per token on a
+                    // phone that is also running the model means the list never settles.
+                    val now = System.currentTimeMillis()
+                    if (now - lastFrameAt < STREAM_FRAME_MS) return
+                    lastFrameAt = now
+
+                    val parsed = parseAssistantReply(text)
+                    if (reasoningEndedAt == null &&
+                        parsed.reasoning != null &&
+                        !parsed.isReasoningInProgress
+                    ) {
+                        reasoningEndedAt = System.currentTimeMillis()
+                    }
+                    applyStreamedText(text, parsed, reasoningEndedAt, turnStartedAt)
+                }
+
+                override fun onPass(event: GenerationEvent.Completed, raw: String) =
+                    applyCompletion(event, raw)
+
+                override fun onSteps(steps: List<AgentStep>) =
+                    updateLastEntry { it.copy(steps = it.steps + steps) }
+
+                override fun onNextPass() {
+                    // Room for the next pass under the same entry, which is what makes a
+                    // turn with tools in it read as one answer rather than several.
+                    raw = ""
+                    lastFrameAt = 0L
+                    updateLastEntry { it.copy(isStreaming = true, text = "", answer = "") }
+                }
+
+                override suspend fun onApproval(call: ToolCall): Boolean = askUser(call)
+            }
 
             try {
                 // Re-planned per reply: the phone is a different machine hot than cold,
@@ -503,89 +556,87 @@ class ChatViewModel @Inject constructor(
                 // Inside the try because it suspends, so Stop can land here too.
                 if (!applyThreadPlan()) return@launch
 
-                var lastFrameAt = 0L
-
-                engine.chat(conversation, state.preferences.toSamplerParams()).collect { event ->
-                    when (event) {
-                        is GenerationEvent.Token -> {
-                            reply.append(event.text)
-
-                            // Not every token: re-parsing the whole reply and rebuilding
-                            // its markdown tree costs more than a frame, so publishing per
-                            // token on a phone that is also running the model means the
-                            // list never settles between updates. Coalescing to roughly
-                            // every other frame is still faster than anyone reads.
-                            val now = System.currentTimeMillis()
-                            if (now - lastFrameAt < STREAM_FRAME_MS) return@collect
-                            lastFrameAt = now
-
-                            val parsed = parseAssistantReply(reply.toString())
-                            if (reasoningEndedAt == null &&
-                                parsed.reasoning != null &&
-                                !parsed.isReasoningInProgress
-                            ) {
-                                reasoningEndedAt = System.currentTimeMillis()
-                            }
-                            applyStreamedText(reply.toString(), parsed, reasoningEndedAt, startedAt)
-                        }
-
-                        is GenerationEvent.Completed -> {
-                            // The coalescing above can have skipped the last few tokens,
-                            // so the finished reply is applied in full regardless.
-                            applyCompletion(event, reply.toString())
-                        }
-                    }
-                }
+                raw = turns.run(
+                    conversation = conversation,
+                    params = state.preferences.toSamplerParams(),
+                    mode = _uiState.value.mode,
+                    listener = listener,
+                )
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
                 // being written, so it is kept and stored like any other reply.
-                finishInterrupted(reply.toString())
-                _uiState.update { it.copy(isGenerating = false) }
+                finishInterrupted(raw)
+                _uiState.update { it.copy(isGenerating = false, pendingApproval = null) }
                 throw cancellation
             } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                finishInterrupted(reply.toString())
+                finishInterrupted(raw)
                 _uiState.update { it.copy(error = failure.userMessage()) }
             }
+
             // A stream that ends without a completion event, which happens if the engine's
-            // channel closes under it, would otherwise leave the entry streaming forever
-            // and never write it down.
+            // channel closes under it, would otherwise leave the entry streaming forever.
             if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
-                finishInterrupted(reply.toString())
+                finishInterrupted(raw)
             }
+            updateLastEntry { it.copy(totalMillis = System.currentTimeMillis() - turnStartedAt) }
             // Re-read rather than leave the last reading standing: a phone that has cooled
             // between replies should stop claiming it is hot.
             _uiState.update {
-                it.copy(isGenerating = false, isThrottled = thermalPolicy.isThrottling())
+                it.copy(
+                    isGenerating = false,
+                    isThrottled = runtime.isThrottling(),
+                    pendingApproval = null,
+                )
             }
             compactIfNeeded()
         }
     }
 
     /**
-     * Re-plans the thread count for this reply, and says whether to go ahead.
+     * Waits for the user to allow one tool.
      *
-     * Re-planned per reply because the phone is a different machine hot than cold, and a
-     * count chosen at load time is wrong by the third long answer. Returns false when the
-     * device is hot enough that the right move is to stop rather than to stop slightly
-     * less: sustained inference is among the heaviest things this hardware can do.
+     * Suspends the agent rather than polling, so Stop is never blocked by a question
+     * nobody answered: cancelling the turn cancels this too.
+     */
+    private suspend fun askUser(call: ToolCall): Boolean {
+        val pending = CompletableDeferred<Boolean>()
+        approval = pending
+        _uiState.update { it.copy(pendingApproval = call) }
+        return try {
+            pending.await()
+        } finally {
+            approval = null
+            _uiState.update { it.copy(pendingApproval = null) }
+        }
+    }
+
+    /** Answers the pending tool question. */
+    fun resolveApproval(allowed: Boolean) {
+        approval?.complete(allowed)
+    }
+
+    /** Switches how much the model may do without being asked. */
+    fun setMode(mode: AgentMode) = _uiState.update { it.copy(mode = mode) }
+
+    /**
+     * Re-plans threads for this reply, and says whether to go ahead.
+     *
+     * The decision to stop rather than to stop slightly less lives in the runtime; what
+     * lives here is what the user is told when it does.
      */
     private suspend fun applyThreadPlan(): Boolean {
-        val plan = thermalPolicy.plan()
-        _uiState.update { it.copy(isThrottled = thermalPolicy.isThrottling()) }
+        _uiState.update { it.copy(isThrottled = runtime.isThrottling()) }
+        if (runtime.planThreads()) return true
 
-        if (plan.shouldPause) {
-            _uiState.update {
-                it.copy(
-                    isGenerating = false,
-                    error = "The phone is too hot to keep generating. It will work again " +
-                        "once it cools down.",
-                )
-            }
-            updateLastEntry { it.copy(isStreaming = false) }
-            return false
+        _uiState.update {
+            it.copy(
+                isGenerating = false,
+                error = "The phone is too hot to keep generating. It will work again " +
+                    "once it cools down.",
+            )
         }
-        engine.setThreads(plan.generateThreads, plan.batchThreads)
-        return true
+        updateLastEntry { it.copy(isStreaming = false) }
+        return false
     }
 
     /**
@@ -653,7 +704,7 @@ class ChatViewModel @Inject constructor(
             // transcript this is about to replace, and would do so after the engine cache
             // has already been reset underneath it.
             generationJob?.join()
-            engine.resetContext()
+            runtime.resetContext()
             conversationId = null
             _uiState.update {
                 it.copy(
@@ -683,7 +734,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             stop()
             generationJob?.join()
-            engine.resetContext()
+            runtime.resetContext()
 
             // Behind the write queue: a reply from the turn that just ended may not have
             // been inserted yet, and reopening the same chat without it would show a
@@ -744,7 +795,7 @@ class ChatViewModel @Inject constructor(
     fun savePreferences(preferences: ModelPreferences) {
         val model = preferencesKey ?: return
         viewModelScope.launch {
-            modelPreferences.save(model, preferences)
+            runtime.saveSettings(model, preferences)
             _uiState.update { it.copy(preferences = preferences) }
         }
     }
@@ -752,7 +803,7 @@ class ChatViewModel @Inject constructor(
     fun resetPreferences() {
         val model = preferencesKey ?: return
         viewModelScope.launch {
-            modelPreferences.reset(model)
+            runtime.resetSettings(model)
             _uiState.update { it.copy(preferences = ModelPreferences()) }
         }
     }
@@ -776,7 +827,7 @@ class ChatViewModel @Inject constructor(
 
     /** Stops the running generation, keeping whatever has been produced so far. */
     fun stop() {
-        engine.cancel()
+        runtime.cancel()
         generationJob?.cancel()
     }
 
@@ -922,7 +973,7 @@ class ChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        engine.cancel()
+        runtime.cancel()
     }
 }
 
@@ -942,7 +993,12 @@ private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make
  * turns that were not folded into it.
  */
 internal fun ChatUiState.engineMessages(): List<ChatMessage> {
-    val system = preferences.systemPrompt
+    val instructions = listOfNotNull(
+        preferences.systemPrompt.takeIf { it.isNotBlank() },
+        toolInstruction(mode),
+    ).joinToString("\n\n")
+
+    val system = instructions
         .takeIf { it.isNotBlank() }
         ?.let { listOf(ChatMessage.text(ChatRole.SYSTEM, it)) }
         .orEmpty()
@@ -1017,6 +1073,27 @@ private fun List<TranscriptEntry>.unreadableWarning(support: MediaSupport): Stri
     if (dropped.isEmpty()) return null
     return "This chat has ${dropped.size} attachment(s) the new model cannot read. Replies " +
         "will be based on the text alone."
+}
+
+/**
+ * What to tell the model about its tools.
+ *
+ * Small models given tools tend to describe them rather than use them: asked to search,
+ * they reply "I could use the web search tool, would you like me to?", which is a question
+ * the user already answered by asking. Saying plainly that calling is expected and that
+ * permission is not needed is what turns a description into a call.
+ *
+ * Empty in plan mode, where describing the tool is exactly the right behaviour.
+ */
+private fun toolInstruction(mode: AgentMode): String? = when (mode) {
+    AgentMode.PLAN ->
+        "You have tools available. Do not call them. Say which you would use and why."
+
+    AgentMode.ASK, AgentMode.AUTO ->
+        "You have tools. Call them directly when they would help, especially for anything " +
+            "current, specific, or that you are unsure of. Do not ask for permission and " +
+            "do not describe the tool instead of calling it. After a tool returns, answer " +
+            "the question using what it gave you."
 }
 
 /** A short human label for an attachment, used where there is no text to go on. */

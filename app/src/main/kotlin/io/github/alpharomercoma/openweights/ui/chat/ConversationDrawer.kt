@@ -44,9 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.data.groupByDay
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import java.time.Instant
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -94,14 +97,33 @@ fun ConversationDrawer(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            items(conversations, key = { it.id }) { conversation ->
-                ConversationRow(
-                    conversation = conversation,
-                    isActive = conversation.id == activeId,
-                    nowMillis = nowMillis,
-                    onOpen = { onOpen(conversation.id) },
-                    onDelete = { onDelete(conversation.id) },
-                )
+            // Grouped by the day each chat was last touched, the way every assistant
+            // does it, because a flat list of forty titles is a list nobody scans.
+            val today = Instant.ofEpochMilli(nowMillis)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+
+            conversations.groupByDay(today) { it.updatedAt }.forEach { group ->
+                item(key = "header-${group.label}") {
+                    Text(
+                        text = group.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                items(group.items, key = { it.id }) { conversation ->
+                    ConversationRow(
+                        conversation = conversation,
+                        isActive = conversation.id == activeId,
+                        nowMillis = nowMillis,
+                        onOpen = { onOpen(conversation.id) },
+                        onDelete = { onDelete(conversation.id) },
+                    )
+                }
             }
         }
     }

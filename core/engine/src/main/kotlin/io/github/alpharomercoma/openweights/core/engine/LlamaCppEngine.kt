@@ -128,6 +128,7 @@ class LlamaCppEngine internal constructor(
             handle = activeHandle,
             roles = messages.map { it.role.wireName }.toTypedArray(),
             contents = prompt.contents,
+            toolCallIds = messages.map { it.toolCallId }.toTypedArray(),
             mediaPaths = prompt.mediaPaths,
             mediaCounts = prompt.mediaCounts,
             temperature = params.temperature,

@@ -1,0 +1,105 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.core.tools
+
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+
+/**
+ * Something the model can actually run.
+ *
+ * The definition is what the model is shown; [run] is what happens when it asks. Keeping
+ * both on one object means a tool cannot be advertised without being runnable, which is
+ * the state the app was in before: tools were described to nobody and executed never.
+ *
+ * Every tool here reaches the network or reads something already on the device. None of
+ * them execute code, write files outside the app, or touch anything a user would be
+ * surprised by. That is a deliberate ceiling, not a temporary one: an app that runs
+ * arbitrary code on a phone at a model's suggestion is a different and much worse product.
+ */
+interface Tool {
+    val definition: ToolDefinition
+
+    /** Whether the user has to approve each run. False only for tools that read nothing private. */
+    val needsApproval: Boolean get() = true
+
+    /**
+     * Runs the call and returns what the model should be told.
+     *
+     * Failures come back as text rather than exceptions, because a model that is told
+     * "that host did not respond" can try something else, while an exception ends the turn
+     * and tells the user nothing they can act on.
+     */
+    suspend fun run(call: ToolCall): String
+}
+
+/** What the model is allowed to reach for, and how it is found by name. */
+class ToolRegistry(tools: List<Tool>) {
+    private val byName = tools.associateBy { it.definition.name }
+
+    val all: List<Tool> = tools
+
+    /** The definitions handed to the engine, which renders them into the model's own syntax. */
+    val definitions: List<ToolDefinition> = tools.map { it.definition }
+
+    fun find(name: String): Tool? = byName[name]
+
+    /** The subset the user has switched on, in the order they were registered. */
+    fun enabled(names: Set<String>): ToolRegistry =
+        ToolRegistry(all.filter { it.definition.name in names })
+}
+
+/**
+ * How much rope the model gets this turn.
+ *
+ * Named after what the user asked for rather than after an internal state, because the
+ * mode is chosen by typing `/plan` or `/auto` and has to mean the same thing in both
+ * places.
+ */
+enum class AgentMode(val command: String, val label: String, val description: String) {
+    /**
+     * The model may call tools, and each call waits for the user.
+     *
+     * Not the default. Approval is per call, and a model that searches three times to
+     * answer one question produces three prompts; the fourth one nobody reads. Worth
+     * having for anyone who wants it, wrong to impose.
+     */
+    ASK("ask", "Ask first", "Approve each tool before it runs"),
+
+    /**
+     * The default. Tools run without asking, and the transcript says what ran.
+     *
+     * Defensible because of what the tools are: they read the public web and nothing
+     * else. Nothing here writes a file, spends money, or touches anything private, so
+     * the cost of a wrong call is a wasted second rather than damage.
+     */
+    AUTO("auto", "Auto", "Run tools without asking"),
+
+    /**
+     * No tools run at all. The model says what it would do.
+     *
+     * The point is a turn you can read before anything happens, which is what makes it
+     * worth having on a phone where the alternative is watching results arrive.
+     */
+    PLAN("plan", "Plan", "Say what it would do, run nothing"),
+    ;
+
+    companion object {
+        fun of(command: String): AgentMode? =
+            entries.firstOrNull { it.command.equals(command, ignoreCase = true) }
+    }
+}

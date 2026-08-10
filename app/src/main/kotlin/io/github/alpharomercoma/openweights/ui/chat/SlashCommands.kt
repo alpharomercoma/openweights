@@ -47,6 +47,12 @@ enum class SlashCommand(val trigger: String, val description: String) {
     NEW_CHAT("/new", "Start a fresh conversation"),
     COMPACT("/compact", "Summarize earlier turns to free up context now"),
     REGENERATE("/retry", "Ask the model for a different answer"),
+
+    // The three modes, typed the way Claude Code and Codex do it, because that is the
+    // vocabulary anyone reaching for a mode already has.
+    PLAN("/plan", "Say what it would do, run no tools"),
+    AUTO("/auto", "Run tools without asking"),
+    ASK("/ask", "Ask before each tool. The default"),
     ;
 
     companion object {

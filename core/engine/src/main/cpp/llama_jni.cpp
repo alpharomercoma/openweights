@@ -243,6 +243,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jlong handle,
     jobjectArray roles,
     jobjectArray contents,
+    jobjectArray tool_call_ids,
     jobjectArray media_paths,
     jintArray media_counts,
     jfloat temperature,
@@ -286,7 +287,10 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
             env->DeleteLocalRef(path);
         }
 
-        messages.push_back({to_utf8(env, role), to_utf8(env, content), "", attachments});
+        auto call_id = static_cast<jstring>(env->GetObjectArrayElement(tool_call_ids, i));
+        messages.push_back(
+            {to_utf8(env, role), to_utf8(env, content), to_utf8(env, call_id), attachments});
+        env->DeleteLocalRef(call_id);
         env->DeleteLocalRef(role);
         env->DeleteLocalRef(content);
     }

@@ -15,3 +15,6 @@ local.properties
 keystore.properties
 /models/
 *.gguf
+
+# Debris from the Playwright MCP browser tool, not project content.
+.playwright-mcp/

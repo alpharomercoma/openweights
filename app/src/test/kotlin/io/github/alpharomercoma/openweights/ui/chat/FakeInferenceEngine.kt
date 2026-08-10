@@ -47,6 +47,9 @@ class FakeInferenceEngine : InferenceEngine {
     /** When true, a generation waits for [emit] and [finish] instead of completing at once. */
     var hold = false
 
+    /** What the template test would report for this model. */
+    var supportsThinking = true
+
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
@@ -90,6 +93,10 @@ class FakeInferenceEngine : InferenceEngine {
             layerCount = 1,
             contextUsed = 0,
             mediaSupport = mediaSupport[modelFile.name] ?: MediaSupport(),
+            // A template that branches on the flag, which is what the load time test can
+            // establish. Whether the weights honour it is a separate question and the
+            // reason the view model keeps watching after this point.
+            supportsThinking = supportsThinking,
         )
     }
 

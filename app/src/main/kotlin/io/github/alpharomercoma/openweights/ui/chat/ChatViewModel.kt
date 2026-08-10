@@ -409,7 +409,11 @@ class ChatViewModel @Inject constructor(
                     transcript = if (keepConversation) it.transcript else emptyList(),
                     compaction = if (keepConversation) it.compaction else null,
                     mediaSupport = support,
-                    supportsThinking = info?.supportsThinking == true,
+                    // Two hurdles, and a model has to clear both. The template must render
+                    // differently when told not to think, and the weights must not have
+                    // been caught ignoring that in a previous reply.
+                    supportsThinking = info?.supportsThinking == true &&
+                        !runtime.ignoresThinkingSwitch(modelFile.name),
                     supportsTools = info?.supportsTools == true,
                     supportsReasoningEffort = info?.supportsReasoningEffort == true,
                     error = if (keepConversation) {
@@ -963,6 +967,8 @@ class ChatViewModel @Inject constructor(
         // text it did not parse, so the local split is the better of the two.
         val engineCleaned = event.content.isNotEmpty() && event.content != raw
         val answer = if (engineCleaned) event.content else parsed.answer
+
+        noteIfThinkingSwitchWasIgnored(reasoning)
         val canonical = canonicalText(reasoning, answer)
 
         updateLastEntry {
@@ -1059,6 +1065,27 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Retires the thinking switch for a model that has just ignored it.
+     *
+     * The template test at load asks whether being told not to think changes the prompt,
+     * and it cannot ask whether the weights care. This is the second half of that question,
+     * answered by the only thing that can answer it: a reply that came back with reasoning
+     * in it after reasoning was switched off.
+     *
+     * Costs one wrong reply, once, per model. Nothing is offered again after that, and the
+     * finding is kept against the file rather than the session, so it survives a restart and
+     * does not have to be rediscovered.
+     */
+    private fun noteIfThinkingSwitchWasIgnored(reasoning: String?) {
+        val model = preferencesKey ?: return
+        val state = _uiState.value
+        if (!state.supportsThinking || state.preferences.thinking || reasoning == null) return
+
+        runtime.rememberIgnoresThinkingSwitch(model)
+        _uiState.update { it.copy(supportsThinking = false) }
     }
 
     private fun applyStreamedText(

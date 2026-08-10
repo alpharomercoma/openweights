@@ -210,6 +210,25 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `a model that reasons anyway loses its thinking switch`() = runTest(dispatcher) {
+        loadModel()
+        viewModel.savePreferences(viewModel.uiState.value.preferences.copy(thinking = false))
+        settle()
+        assertThat(viewModel.uiState.value.supportsThinking).isTrue()
+
+        engine.hold = true
+        viewModel.send("Question")
+        settle()
+        // Told not to think, and it thought. The template test at load cannot catch this,
+        // because the template does branch on the flag; the weights are what ignore it.
+        engine.emit("<think>Thinking anyway.</think>The answer.")
+        engine.finish(content = "<think>Thinking anyway.</think>The answer.")
+        settle()
+
+        assertThat(viewModel.uiState.value.supportsThinking).isFalse()
+    }
+
+    @Test
     fun `a new chat clears the transcript and the conversation it belonged to`() =
         runTest(dispatcher) {
             loadModel()

@@ -81,6 +81,13 @@ class ModelRuntime @Inject constructor(
     /** The device temperature in degrees, or null where the platform will not say. */
     fun thermalCelsius(): Float? = thermal.celsius()
 
+    /** True once this model has been caught reasoning after being told not to. */
+    fun ignoresThinkingSwitch(model: String): Boolean = modelStore.ignoresThinkingSwitch(model)
+
+    /** Remembers that it does, so the switch stops being offered for it. */
+    fun rememberIgnoresThinkingSwitch(model: String) =
+        modelStore.rememberIgnoresThinkingSwitch(model)
+
     /**
      * Re-plans the thread count for the next reply.
      *

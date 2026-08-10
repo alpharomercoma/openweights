@@ -58,6 +58,32 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         store.edit().putString(KEY_LAST_MODEL, model.name).apply()
     }
 
+    /**
+     * True once this model has been caught reasoning after being told not to.
+     *
+     * The template is asked at load whether being told not to think changes the prompt, and
+     * a template that ignores the flag never gets a switch. What that cannot catch is a
+     * template that does branch on it and weights that pay no attention, because the only
+     * way to know is to ask and read the answer.
+     *
+     * So the answer is read. A reply that comes back with reasoning in it when reasoning
+     * was switched off is proof, and it is remembered against the file, so the switch costs
+     * one wrong reply once rather than every time the model is loaded.
+     */
+    fun ignoresThinkingSwitch(model: String): Boolean =
+        store.getBoolean(KEY_IGNORES_THINKING + model, false)
+
+    /**
+     * Remembers that it does.
+     *
+     * One way on purpose. One reply that arrives without reasoning proves nothing: a model
+     * that usually obeys and sometimes does not is still a switch that does not work, while
+     * a single reply that ignored it is conclusive.
+     */
+    fun rememberIgnoresThinkingSwitch(model: String) {
+        store.edit().putBoolean(KEY_IGNORES_THINKING + model, true).apply()
+    }
+
     private val store =
         context.getSharedPreferences("model_store", Context.MODE_PRIVATE)
 
@@ -93,6 +119,9 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
 
     private companion object {
         const val KEY_LAST_MODEL = "last_model"
+
+        /** Prefix, because the answer is per model file rather than per install. */
+        const val KEY_IGNORES_THINKING = "ignores_thinking:"
         const val MODELS_DIRECTORY = "models"
         const val GGUF_EXTENSION = GgufFileName.GGUF_SUFFIX
     }

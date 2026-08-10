@@ -513,9 +513,46 @@ int32_t Session::ingest_media_prompt(
     return static_cast<int32_t>(new_n_past);
 }
 
+/**
+ * True when telling this template not to think actually changes the prompt.
+ *
+ * Rendered twice and compared, the same way reasoning effort is decided, and for the same
+ * reason: a control that changes nothing is worse than no control.
+ *
+ * llama.cpp's own `common_chat_templates_support_enable_thinking` was asked first and is
+ * the wrong question. For a template handled by the generic parser it reports
+ * `reasoning.mode != NONE`, which says this model reasons, not that it can be told not to.
+ * LFM2.5 answers yes to that and then reasons anyway: measured across four questions with
+ * the flag on and off, a thinking block came back four times out of four either way, on
+ * the desktop and on the phone. The switch was offered on a promise nothing could keep.
+ */
 bool Session::supports_thinking() const {
     auto * templates = static_cast<common_chat_templates *>(chat_templates_);
-    return templates != nullptr && common_chat_templates_support_enable_thinking(templates);
+    if (templates == nullptr) {
+        return false;
+    }
+
+    auto render = [&](bool thinking) -> std::string {
+        common_chat_templates_inputs inputs;
+        inputs.add_generation_prompt = true;
+        inputs.use_jinja = true;
+        inputs.enable_thinking = thinking;
+
+        common_chat_msg msg;
+        msg.role = "user";
+        msg.content = "probe";
+        inputs.messages.push_back(msg);
+
+        try {
+            return common_chat_templates_apply(templates, inputs).prompt;
+        } catch (const std::exception &) {
+            return std::string();
+        }
+    };
+
+    const std::string on = render(true);
+    const std::string off = render(false);
+    return !on.empty() && on != off;
 }
 
 bool Session::supports_tools() const {

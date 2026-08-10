@@ -176,6 +176,16 @@ Two things still need a human before submission:
 ## Known gaps a reviewer would be right to raise
 
 - **No baseline profile**, so first-run startup and first scroll are slower than they need
-  to be.
+  to be. The release build carries the merged profiles of the AndroidX libraries it uses
+  and nothing of its own.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
   unless a user opens an issue. The pre-launch report partly covers this.
+- **The web tools are on by default.** `web_search` and `fetch_url` are switched on the
+  first time the app runs, so a question can leave the device before the user has looked at
+  the Tools tab. Everything else in the app is local, which makes this the one place the
+  promise bends, and the data safety section above declares it. `fetch_url` will only reach
+  public addresses, so a page cannot talk the model into reading the router, but that is a
+  bound on the damage rather than an answer to the question of what the default should be.
+- **No upload key.** `keystore.properties` does not exist in this checkout, so
+  `bundleRelease` produces an unsigned AAB. Creating the key and enrolling in Play App
+  Signing is the first Console step and has deliberately not been done for you.

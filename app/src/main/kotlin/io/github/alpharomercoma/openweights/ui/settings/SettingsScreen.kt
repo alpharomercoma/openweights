@@ -131,9 +131,20 @@ private fun AboutSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            "Nothing you type leaves the device. There is no account, no server, and no " +
-                "telemetry. The only requests it makes are the ones you ask for: finding " +
-                "and downloading a model, and any web search you switch on in Tools.",
+            "There is no account, no server of ours, and no telemetry. The model runs " +
+                "here and your conversations are stored here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            // Said plainly, because the previous wording implied web search was something
+            // you opt into and it is on when the app is installed. A tool that sends your
+            // question somewhere is worth one sentence of its own rather than a clause at
+            // the end of a sentence about privacy.
+            "Two things do reach the network, and both are switched on in Tools where you " +
+                "can switch them off: web search sends what the model decides to look up, " +
+                "and reading a page fetches the address it found. Downloading a model " +
+                "talks to Hugging Face.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

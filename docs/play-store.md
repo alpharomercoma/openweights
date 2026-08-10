@@ -39,15 +39,21 @@ build cannot tell you.
 
 | Permission | Why | When asked |
 |---|---|---|
-| `INTERNET` | Hugging Face search and model downloads | Never prompted; normal permission |
+| `INTERNET` | Hugging Face search and downloads, and the web tools below | Never prompted; normal permission |
 | `RECORD_AUDIO` | Dictation, through the on-device recogniser only | First time the mic is tapped |
+| `POST_NOTIFICATIONS` | Says a reply has finished, and only while the app is in the background | On first launch |
 
-`POST_NOTIFICATIONS` was declared and never used. Removed. `android.hardware.microphone`
+An earlier version of this document said `POST_NOTIFICATIONS` had been declared, never
+used, and removed. It is declared and it is used: a reply on a phone takes tens of seconds
+and sometimes minutes, which is long enough to put the phone down, and `ReplyNotifier`
+posts exactly one notification when the app is not on screen. `android.hardware.microphone`
 is declared `required="false"`, because `RECORD_AUDIO` otherwise makes Play hide the app
 from every device without a microphone, and dictation is one optional way to enter text.
 
 There is no foreground service and no `FOREGROUND_SERVICE` permission, which keeps the app
-out of the Play Console's foreground service declaration flow entirely.
+out of the Play Console's foreground service declaration flow entirely. Fixing downloads so
+they survive leaving the app, which is the open defect below, changes that: a `dataSync`
+foreground service brings its own declaration and its own justification video.
 
 ## Data safety form
 
@@ -56,22 +62,35 @@ have been a false declaration. Play counts data as collected when it is transmit
 device **at all**, including when it is only processed in flight and never stored. The app
 transmits to Hugging Face on the user's behalf, so the form has to say so.
 
-What actually leaves the device, and only when the user searches or downloads:
+What actually leaves the device:
 
 | Leaves the device | When | Declared as |
 |---|---|---|
 | Search terms typed into Discover | On search | App activity, or search history |
 | Repository and file identifiers | On open and download | App activity |
 | The Hugging Face access token, if the user set one | Every Hub request, as an `Authorization` header | Credentials |
-| Standard request metadata, including IP | Every Hub request | Handled by the recipient |
+| **What the model decides to search for** | Whenever it uses `web_search`, which is on by default | App activity, and treat it as user content |
+| **A page address the model chose, and the request for it** | Whenever it uses `fetch_url`, which is on by default | App activity |
+| Standard request metadata, including IP | Every request above | Handled by the recipient |
 
-What never leaves the device: chats, prompts, model replies, attachments, usage totals and
-content reports. There is no analytics SDK, no crash reporter, no account and no backend of
-ours.
+The two bold rows are the ones this document previously got wrong, and they are the ones
+that matter most. It used to say that chats and prompts never leave the device. That has
+not been true since the web tools shipped, and they ship **switched on**: `ToolSwitches`
+defaults every tool to enabled. The query is composed by the model rather than typed by the
+user, which makes it no less sensitive, because the model composes it out of the
+conversation. Anything the user pasted or attached can end up in it. The form should be
+filled in on that basis.
 
-**Hosts contacted.** `huggingface.co`, and the delivery hosts it redirects downloads to.
-The listing and the privacy policy should say "Hugging Face and its content delivery
-network", not a single hostname, because a download follows a redirect off the API host.
+What still never leaves the device: the conversation itself, model replies, attachments,
+usage totals and content reports. There is no analytics SDK, no crash reporter, no account
+and no backend of ours. The model runs here and nothing about a reply is uploaded.
+
+**Hosts contacted.** `huggingface.co` and the delivery hosts it redirects downloads to;
+`duckduckgo.com` for search; and, through `fetch_url`, whatever host the model found in a
+search result. That last one cannot be enumerated in advance, which is worth saying plainly
+in the privacy policy rather than implying a fixed list. The listing should say "Hugging
+Face and its content delivery network, DuckDuckGo, and pages the assistant is asked to
+read".
 
 **The token** is encrypted with an AES-GCM key held in the Android Keystore, is attached
 only to Hub requests, and is never logged. It is optional; the app works without one for

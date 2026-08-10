@@ -818,8 +818,14 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
                 )
             }
 
+            // This said "Nothing leaves this device", which stopped being true the day web
+            // search shipped switched on: a question can become a search, and a search is
+            // text going to somebody else's server. The sentence was the best line in the
+            // app and it was the one users had least reason to doubt, which is exactly why
+            // it could not stay. What is left is the part that is still true of every
+            // reply, and Tools is where the exception is named and can be turned off.
             hasModel -> Text(
-                "Ready. Ask it anything. Nothing leaves this device.",
+                "Ready. Ask it anything. The model runs on this phone.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

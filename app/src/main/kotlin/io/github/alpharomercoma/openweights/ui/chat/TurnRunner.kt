@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
+import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
@@ -137,6 +138,13 @@ class TurnRunner @Inject constructor(
                 budget.hasRoom
             val pass = streamOnce(messages, params, active, offerTools, listener) { lastRaw = it }
                 ?: return lastRaw
+
+            // A cancelled or truncated pass ends the turn here, whatever it left behind.
+            // The engine hands its reply back regardless of why it stopped, so half a tool
+            // call written before Stop was pressed still parses into a call, and running it
+            // means the turn the user ended goes on to fetch a page. Cancelling the
+            // coroutine usually gets there first; usually is not a guarantee.
+            if (pass.event.reason != StopReason.END_OF_TURN) return lastRaw
 
             val calls = pass.event.toolCalls.ifEmpty { pass.raw.salvagedCall(active, conversation) }
             if (calls.isEmpty()) return lastRaw

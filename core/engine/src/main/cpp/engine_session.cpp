@@ -716,6 +716,14 @@ bool Session::ingest_prompt(
     const int32_t n_batch = static_cast<int32_t>(llama_n_batch(ctx_));
 
     for (size_t offset = from; offset < tokens.size(); offset += n_batch) {
+        // Between batches, because prefill is the one part of a turn that can run for
+        // seconds without producing a token. Cancellation used to be read only once the
+        // sampling loop began, so Stop on a long prompt did nothing at all: the phone kept
+        // decoding the whole conversation before noticing it had been asked not to.
+        if (cancelled_.load(std::memory_order_relaxed)) {
+            error = "cancelled";
+            return false;
+        }
         const int32_t chunk =
             std::min<int32_t>(n_batch, static_cast<int32_t>(tokens.size() - offset));
         llama_batch batch =
@@ -827,7 +835,11 @@ StopReason Session::generate(
         n_past_ = static_cast<int32_t>(reusable);
 
         if (!ingest_prompt(prompt_tokens, reusable, error)) {
-            return StopReason::ERROR;
+            // Stop during prefill is not a failure, and reporting it as one would put an
+            // error on screen for something the user asked for.
+            return cancelled_.load(std::memory_order_relaxed)
+                ? StopReason::CANCELLED
+                : StopReason::ERROR;
         }
 
         stats.prompt_tokens = static_cast<int32_t>(prompt_tokens.size() - reusable);

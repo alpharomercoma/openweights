@@ -978,6 +978,18 @@ class ChatViewModel @Inject constructor(
     /** Deletes a conversation; if it is the open one, the screen returns to a blank chat. */
     fun deleteConversation(id: Long) {
         viewModelScope.launch {
+            // Stopped and awaited first when it is the open one, for the reason newChat
+            // gives about the same wait: a turn still unwinding writes a reply into this
+            // conversation, and if the rows have gone by then the insert has no parent to
+            // hang from. The attachments are worse, because those are files, and the
+            // prompt reader on the engine's thread may still have one open when this
+            // deletes it. Both races were open while the stop happened last.
+            val wasOpen = conversationId == id
+            if (wasOpen) {
+                stop()
+                generationJob?.join()
+            }
+
             // Read before deleting: the rows are what says which files were attached, and
             // once they are gone nothing else on disk remembers, so the photos would stay
             // forever in a folder the user cannot see. Behind the write queue, so a reply
@@ -988,7 +1000,7 @@ class ChatViewModel @Inject constructor(
                 attached
             }
             attachments.discard(orphaned)
-            if (conversationId == id) newChat()
+            if (wasOpen) newChat()
         }
     }
 

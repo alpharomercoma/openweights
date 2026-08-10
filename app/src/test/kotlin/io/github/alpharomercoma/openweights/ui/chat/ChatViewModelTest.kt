@@ -263,6 +263,30 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `deleting the open conversation while it is answering leaves nothing behind`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.send("Delete me mid sentence")
+            settle()
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            assertThat(viewModel.uiState.value.isGenerating).isTrue()
+
+            // The reply is still being written when the row and its files go. This holds
+            // the outcome, not the ordering: a test scheduler runs everything on one
+            // virtual thread, so it cannot reproduce the interleaving that made stopping
+            // last a bug, and it passes either way. It is here to catch the case being
+            // broken outright, not to prove the ordering is right.
+            viewModel.deleteConversation(id)
+            settle()
+
+            assertThat(database.conversations().byId(id)).isNull()
+            assertThat(viewModel.uiState.value.isGenerating).isFalse()
+            assertThat(viewModel.uiState.value.transcript).isEmpty()
+            assertThat(database.messages().forConversation(id)).isEmpty()
+        }
+
+    @Test
     fun `deleting a conversation that is not open leaves the open one alone`() =
         runTest(dispatcher) {
             loadModel()

@@ -192,6 +192,37 @@ fun ParameterSheet(
                 )
             }
 
+            Column {
+                Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "Sent with the tools, before your own prompt above. This is the " +
+                        "whole of what the app adds: nothing else is sent that you cannot " +
+                        "see here. Empty it and the model is told nothing about its tools.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = draft.toolPrompt,
+                    onValueChange = { draft = draft.copy(toolPrompt = it) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    placeholder = { Text("Nothing about tools") },
+                    minLines = 3,
+                    maxLines = 8,
+                    shape = RoundedCornerShape(Radius.sm),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                )
+                TextButton(
+                    onClick = {
+                        draft = draft.copy(toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT)
+                    },
+                ) {
+                    Text("Restore the default wording")
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onSave(draft) }) { Text("Save") }
                 TextButton(onClick = onReset) { Text("Reset to defaults") }

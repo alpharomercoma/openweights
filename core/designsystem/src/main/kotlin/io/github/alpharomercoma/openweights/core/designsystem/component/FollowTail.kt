@@ -133,3 +133,34 @@ private const val BOTTOM_TOLERANCE_PX = 24
 
 /** Larger than any plausible message; scrollBy clamps, so this just means "to the end". */
 private const val OVERSCROLL_PX = 100_000f
+
+/**
+ * Whether enough is hidden below to be worth offering a jump.
+ *
+ * The pill used to appear as soon as the list was detached, which on a short conversation
+ * meant it appeared over a bottom that was already visible. Measured against what is left
+ * below the viewport rather than against the item count, because one long reply and ten
+ * short ones hide different amounts.
+ */
+@Composable
+fun LazyListState.hasHiddenTail(): Boolean {
+    val hidden by remember(this) {
+        derivedStateOf {
+            val layout = layoutInfo
+            val last = layout.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf false
+            val isLastItem = last.index == layout.totalItemsCount - 1
+            val overshoot = last.offset + last.size - layout.viewportEndOffset
+            // Either there are whole items below, or the last one runs well past the fold.
+            !isLastItem || overshoot > HIDDEN_TAIL_THRESHOLD_PX
+        }
+    }
+    return hidden
+}
+
+/**
+ * How much has to be out of sight before the jump is offered, in pixels.
+ *
+ * Roughly a third of a phone screen. Below this the reader can see where they are and a
+ * button telling them to go there is noise.
+ */
+private const val HIDDEN_TAIL_THRESHOLD_PX = 700

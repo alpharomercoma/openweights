@@ -83,6 +83,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOK
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
+import io.github.alpharomercoma.openweights.core.designsystem.component.hasHiddenTail
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
@@ -285,7 +286,11 @@ private fun ChatContent(
                 }
 
                 JumpToLatestButton(
-                    visible = followTail.isDetached && state.transcript.isNotEmpty(),
+                    // Detached is not enough on its own: a transcript that fits the screen
+                    // is detached the moment you touch it, and offering to scroll to a
+                    // bottom already in view is an offer that reads as a bug. Only once
+                    // there is a screenful or so out of sight below.
+                    visible = followTail.isDetached && listState.hasHiddenTail(),
                     onClick = followTail::jumpToLatest,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -582,12 +587,10 @@ private fun AssistantTurn(
                     durationMs = entry.reasoningMs,
                 )
             }
-            entry.toolCalls.forEach { call ->
-                // A tool call is a step the model took, not prose. Showing the arguments
-                // verbatim is the point: an agent whose actions you cannot inspect is one
-                // you cannot trust on your own phone.
-                Metric("→ ${call.name}(${call.argumentsJson})")
-            }
+            // In the order they happened, between the thinking that led to them and the
+            // answer they fed. Steps outlive a pass; toolCalls is cleared by the next one,
+            // which is why nothing was visible before.
+            entry.steps.forEach { step -> ToolStepBlock(step) }
 
             when {
                 entry.answer.isNotEmpty() -> MarkdownText(entry.answer)

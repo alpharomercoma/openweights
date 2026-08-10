@@ -995,7 +995,7 @@ private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make
 internal fun ChatUiState.engineMessages(): List<ChatMessage> {
     val instructions = listOfNotNull(
         preferences.systemPrompt.takeIf { it.isNotBlank() },
-        toolInstruction(mode),
+        toolInstruction(mode, preferences.toolPrompt),
     ).joinToString("\n\n")
 
     val system = instructions
@@ -1078,22 +1078,18 @@ private fun List<TranscriptEntry>.unreadableWarning(support: MediaSupport): Stri
 /**
  * What to tell the model about its tools.
  *
- * Small models given tools tend to describe them rather than use them: asked to search,
- * they reply "I could use the web search tool, would you like me to?", which is a question
- * the user already answered by asking. Saying plainly that calling is expected and that
- * permission is not needed is what turns a description into a call.
+ * Comes from settings, not from here. An app that quietly prepends instructions to every
+ * conversation is an app whose behaviour its user cannot account for, so the text is a
+ * preference they can read, edit, or empty.
  *
- * Empty in plan mode, where describing the tool is exactly the right behaviour.
+ * Plan mode is the one exception, and it is one the user selected by typing `/plan`: the
+ * instruction is the mode.
  */
-private fun toolInstruction(mode: AgentMode): String? = when (mode) {
+private fun toolInstruction(mode: AgentMode, configured: String): String? = when (mode) {
     AgentMode.PLAN ->
         "You have tools available. Do not call them. Say which you would use and why."
 
-    AgentMode.ASK, AgentMode.AUTO ->
-        "You have tools. Call them directly when they would help, especially for anything " +
-            "current, specific, or that you are unsure of. Do not ask for permission and " +
-            "do not describe the tool instead of calling it. After a tool returns, answer " +
-            "the question using what it gave you."
+    AgentMode.ASK, AgentMode.AUTO -> configured.takeIf { it.isNotBlank() }
 }
 
 /** A short human label for an attachment, used where there is no text to go on. */

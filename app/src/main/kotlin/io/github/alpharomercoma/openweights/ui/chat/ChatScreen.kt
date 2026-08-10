@@ -81,6 +81,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
+import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
@@ -620,9 +621,6 @@ private const val RAIL_WIDTH = 2
 
 /** Clear of the rail, with the same gap the old layout had. */
 private const val RAIL_GUTTER = 14
-
-/** Decode speed at or above this reads as comfortably fast on a phone. */
-private const val FAST_TOKENS_PER_SECOND = 25.0
 
 private fun TranscriptEntry.readout(): String {
     val locale = Locale.getDefault()

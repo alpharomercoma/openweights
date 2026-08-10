@@ -117,5 +117,20 @@ data class ModelLoadParams(
 
     companion object {
         const val DEFAULT_CONTEXT_LENGTH = 4096
+
+        /**
+         * The context window the app will let a user ask for.
+         *
+         * The floor is where a chat stops being able to hold a question and its answer.
+         * The ceiling is not a model limit, it is a memory one: the KV cache grows with
+         * this number and is what runs a phone out of RAM. Both screens that offer the
+         * choice read them from here, so raising the ceiling is one edit rather than
+         * three that have to agree.
+         */
+        const val MIN_CONTEXT_LENGTH = 1024
+        const val MAX_CONTEXT_LENGTH = 32_768
+
+        /** Slider stops between the two, giving roughly 1k granularity. */
+        const val CONTEXT_STEPS = 30
     }
 }

@@ -20,6 +20,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
+import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
@@ -31,9 +32,10 @@ import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HubTask
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
+import io.github.alpharomercoma.openweights.core.hub.PublisherAvatars
+import io.github.alpharomercoma.openweights.core.hub.RangeByteSource
 import io.github.alpharomercoma.openweights.core.hub.gguf.GgufHeaderParser
 import io.github.alpharomercoma.openweights.model.ModelStore
-import io.github.alpharomercoma.openweights.model.RangeByteSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -72,9 +74,12 @@ data class DiscoverUiState(
      * you know which side of it your phone is on.
      */
     val parameterCeilingBillions: Int = 0,
+    /** Publisher name to avatar URL, filled in as the lookups come back. */
+    val avatars: Map<String, String> = emptyMap(),
 ) {
     companion object {
-        const val DEFAULT_CONTEXT = 4096
+        /** The same default a model is loaded with, so the estimate matches the load. */
+        const val DEFAULT_CONTEXT = ModelLoadParams.DEFAULT_CONTEXT_LENGTH
     }
 }
 
@@ -85,6 +90,7 @@ class DiscoverViewModel @Inject constructor(
     private val estimator: FitEstimator,
     private val rangeSourceFactory: RangeByteSource.Factory,
     private val modelStore: ModelStore,
+    private val avatars: PublisherAvatars,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -159,12 +165,35 @@ class DiscoverViewModel @Inject constructor(
             runCatching { client.search(_uiState.value.query) }
                 .onSuccess { results ->
                     _uiState.update { it.copy(isSearching = false, results = results) }
+                    resolveAvatars(results)
                 }
                 .onFailure { failure ->
                     _uiState.update {
                         it.copy(isSearching = false, error = failure.readableMessage())
                     }
                 }
+        }
+    }
+
+    /**
+     * Looks up the picture for each publisher in the results.
+     *
+     * One lookup per distinct name, and only for names not already resolved, because a
+     * page of GGUF repositories is usually a handful of prolific publishers. Each result
+     * is published as it lands rather than waiting for the set, so the fast ones appear
+     * while a slow one is still in flight. Failures are silent: the row already draws
+     * initials, and a missing picture is not news.
+     */
+    private fun resolveAvatars(results: List<HubModel>) {
+        val wanted = results.map { it.owner }
+            .filter { it.isNotEmpty() && it !in _uiState.value.avatars }
+            .distinct()
+
+        wanted.forEach { owner ->
+            viewModelScope.launch {
+                val url = runCatching { avatars.urlFor(owner) }.getOrNull() ?: return@launch
+                _uiState.update { it.copy(avatars = it.avatars + (owner to url)) }
+            }
         }
     }
 

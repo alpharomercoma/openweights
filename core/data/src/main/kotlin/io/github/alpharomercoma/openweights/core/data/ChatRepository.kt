@@ -33,9 +33,6 @@ class ChatRepository @Inject constructor(
     fun observeConversations(): Flow<List<ConversationEntity>> =
         database.conversations().observeAll()
 
-    fun observeMessages(conversationId: Long): Flow<List<MessageEntity>> =
-        database.messages().observeFor(conversationId)
-
     suspend fun conversation(id: Long): ConversationEntity? = database.conversations().byId(id)
 
     suspend fun messages(conversationId: Long): List<MessageEntity> =
@@ -83,11 +80,6 @@ class ChatRepository @Inject constructor(
                 attachments = attachments.encodeAttachments(),
             ),
         )
-    }
-
-    suspend fun updateMessage(message: MessageEntity) {
-        database.messages().upsert(message)
-        touch(message.conversationId)
     }
 
     /** Drops a message and everything after it: what regenerating a reply needs. */

@@ -43,4 +43,86 @@ class UsageSummaryTest {
 
         assertThat(summary.averageTokensPerSecond).isNull()
     }
+
+    @Test
+    fun `the growth curve fills the days nothing happened`() {
+        // Two days of use a week apart. Plotted as they come they would sit side by side
+        // and the chart would claim the week never passed.
+        val days = listOf(DailyUsage(day = 100, generatedTokens = 500), DailyUsage(107, 300))
+
+        val curve = days.growth(today = 107)
+
+        assertThat(curve).hasSize(8)
+        assertThat(curve.map { it.day }).isEqualTo((100L..107L).toList())
+        assertThat(curve.map { it.dayTokens })
+            .containsExactly(500L, 0L, 0L, 0L, 0L, 0L, 0L, 300L).inOrder()
+    }
+
+    @Test
+    fun `the curve only ever climbs`() {
+        val days = listOf(DailyUsage(1, 100), DailyUsage(2, 0), DailyUsage(3, 50))
+
+        val curve = days.growth(today = 3)
+
+        assertThat(curve.map { it.cumulativeTokens }).containsExactly(100L, 100L, 150L).inOrder()
+        assertThat(curve.zipWithNext().all { (a, b) -> b.cumulativeTokens >= a.cumulativeTokens })
+            .isTrue()
+    }
+
+    @Test
+    fun `the curve runs to today, not to the last day used`() {
+        // Otherwise a fortnight away looks like a chart that stopped rather than a flat
+        // line, and the dashboard reads as broken.
+        val days = listOf(DailyUsage(day = 10, generatedTokens = 900))
+
+        val curve = days.growth(today = 20)
+
+        assertThat(curve.last().day).isEqualTo(20)
+        assertThat(curve.last().dayTokens).isEqualTo(0)
+        assertThat(curve.last().cumulativeTokens).isEqualTo(900)
+    }
+
+    @Test
+    fun `history before the window is carried into the first point`() {
+        // Starting the visible curve from zero would draw a device's second month as
+        // though it were its first.
+        val days = listOf(DailyUsage(1, 10_000), DailyUsage(40, 500), DailyUsage(41, 500))
+
+        val curve = days.growth(today = 41, windowDays = 3)
+
+        assertThat(curve).hasSize(3)
+        assertThat(curve.first().cumulativeTokens).isEqualTo(10_000)
+        assertThat(curve.last().cumulativeTokens).isEqualTo(11_000)
+    }
+
+    @Test
+    fun `an unused device has no curve`() {
+        assertThat(emptyList<DailyUsage>().growth(today = 100)).isEmpty()
+    }
+
+    @Test
+    fun `today against yesterday is a fraction of yesterday`() {
+        val summary = UsageSummary(
+            growth = listOf(
+                GrowthPoint(day = 1, dayTokens = 200, cumulativeTokens = 200),
+                GrowthPoint(day = 2, dayTokens = 300, cumulativeTokens = 500),
+            ),
+        )
+
+        assertThat(summary.tokensToday).isEqualTo(300)
+        assertThat(summary.tokensYesterday).isEqualTo(200)
+        assertThat(summary.dayOverDayChange).isWithin(0.001).of(0.5)
+    }
+
+    @Test
+    fun `there is no comparison to make against a day with nothing in it`() {
+        val summary = UsageSummary(
+            growth = listOf(
+                GrowthPoint(day = 1, dayTokens = 0, cumulativeTokens = 0),
+                GrowthPoint(day = 2, dayTokens = 300, cumulativeTokens = 300),
+            ),
+        )
+
+        assertThat(summary.dayOverDayChange).isNull()
+    }
 }

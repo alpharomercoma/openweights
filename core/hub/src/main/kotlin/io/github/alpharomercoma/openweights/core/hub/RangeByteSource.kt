@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package io.github.alpharomercoma.openweights.model
+package io.github.alpharomercoma.openweights.core.hub
 
-import io.github.alpharomercoma.openweights.core.hub.HubException
-import io.github.alpharomercoma.openweights.core.hub.HubTokenSource
+import io.github.alpharomercoma.openweights.core.hub.HubHttp.withRange
+import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import io.github.alpharomercoma.openweights.core.hub.gguf.ByteWindowSource
-import io.github.alpharomercoma.openweights.core.hub.toHubException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
@@ -33,6 +32,10 @@ import javax.inject.Singleton
  *
  * This is what makes inspecting a model cheap: the Hub serves ranges from its CDN, so the
  * app can read a GGUF header out of a two-gigabyte file without fetching the file.
+ *
+ * It lives beside the rest of the Hub client rather than in the app, because everything it
+ * knows is the Hub's: its authentication, its status codes, and what its CDN does when it
+ * decides to ignore a range.
  */
 class RangeByteSource(
     private val httpClient: OkHttpClient,
@@ -43,13 +46,13 @@ class RangeByteSource(
     override suspend fun read(offset: Long, length: Int): ByteArray = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
-            .header("Range", "bytes=$offset-${offset + length - 1}")
-            .apply { tokenSource.token()?.let { header("Authorization", "Bearer $it") } }
+            .withRange(offset, length)
+            .withToken(tokenSource.token())
             .build()
 
         httpClient.newCall(request).execute().use { response ->
             when {
-                response.code == HTTP_PARTIAL_CONTENT -> response.body.bytes()
+                response.code == HubHttp.PARTIAL_CONTENT -> response.body.bytes()
 
                 // Reporting an empty read here would surface as "malformed GGUF", hiding a
                 // token or rate-limit problem the user could actually fix.
@@ -72,9 +75,5 @@ class RangeByteSource(
         private val tokenSource: HubTokenSource,
     ) {
         fun create(url: HttpUrl) = RangeByteSource(httpClient, url, tokenSource)
-    }
-
-    private companion object {
-        const val HTTP_PARTIAL_CONTENT = 206
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -145,20 +146,6 @@ private fun FitReport.memoryLine(): String =
                 String.format(Locale.getDefault(), " · ~%.0f tok/s", it)
             } ?: ""
             )
-
-private const val BYTES_PER_MIB = 1024.0 * 1024.0
-private const val BYTES_PER_GIB = BYTES_PER_MIB * 1024.0
-
-/** Sizes here are always storage or memory, so binary units are the correct ones. */
-internal fun formatBytes(bytes: Long): String {
-    val locale = Locale.getDefault()
-    val gigabytes = bytes / BYTES_PER_GIB
-    return if (gigabytes >= 1) {
-        String.format(locale, "%.2f GB", gigabytes)
-    } else {
-        String.format(locale, "%.0f MB", bytes / BYTES_PER_MIB)
-    }
-}
 
 @Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable

@@ -27,6 +27,15 @@ import javax.inject.Singleton
 /** Tokens generated on one day. */
 data class DailyUsage(val day: Long, val generatedTokens: Long)
 
+/**
+ * One day on the lifetime curve.
+ *
+ * @param day days since the epoch, local time.
+ * @param dayTokens what was generated that day, zero on a day the app was not used.
+ * @param cumulativeTokens the lifetime total as it stood at the end of that day.
+ */
+data class GrowthPoint(val day: Long, val dayTokens: Long, val cumulativeTokens: Long)
+
 /** What one model has been used for, over its lifetime on this device. */
 data class ModelUsage(
     val modelName: String,
@@ -45,7 +54,28 @@ data class UsageSummary(
     val activeDays: Int = 0,
     val perDay: List<DailyUsage> = emptyList(),
     val perModel: List<ModelUsage> = emptyList(),
+    /** The lifetime total day by day, gaps filled, most recent last. */
+    val growth: List<GrowthPoint> = emptyList(),
 ) {
+    /** What was generated on the most recent day in the window. */
+    val tokensToday: Long get() = growth.lastOrNull()?.dayTokens ?: 0
+
+    /** The day before it, which is what today is being compared against. */
+    val tokensYesterday: Long get() = growth.getOrNull(growth.lastIndex - 1)?.dayTokens ?: 0
+
+    /**
+     * Today against yesterday, as a fraction.
+     *
+     * Null when yesterday was zero: everything is infinitely more than nothing, and a
+     * percentage saying so tells the reader less than the raw count beside it already has.
+     */
+    val dayOverDayChange: Double?
+        get() = if (tokensYesterday > 0) {
+            (tokensToday - tokensYesterday).toDouble() / tokensYesterday
+        } else {
+            null
+        }
+
     /** Average generation speed across everything ever run here. */
     val averageTokensPerSecond: Double?
         get() = if (lifetimeInferenceMs > 0 && lifetimeGeneratedTokens > 0) {
@@ -67,7 +97,10 @@ data class UsageSummary(
  * who generated them, not to anyone else.
  */
 @Singleton
-class UsageRepository @Inject constructor(private val database: OpenWeightsDatabase) {
+class UsageRepository @Inject constructor(
+    private val database: OpenWeightsDatabase,
+    private val clock: Clock,
+) {
     fun observeSummary(): Flow<UsageSummary> = combine(
         database.usage().observeAll(),
         database.conversations().observeCount(),
@@ -101,15 +134,56 @@ class UsageRepository @Inject constructor(private val database: OpenWeightsDatab
                 )
             }
             .sortedByDescending { it.generatedTokens },
-    )
-
-    fun observeDaily(): Flow<List<DailyUsage>> = database.usage().observeAll().map { rows ->
-        rows.groupBy { it.day }
+        growth = groupBy { it.day }
             .map { (day, entries) -> DailyUsage(day, entries.sumOf { it.generatedTokens }) }
-            .sortedBy { it.day }
-    }
+            .growth(today = clock.today()),
+    )
 
     private companion object {
         const val MILLIS_PER_SECOND = 1000.0
     }
 }
+
+/**
+ * Turns the days that have rows into a continuous lifetime curve.
+ *
+ * Two things the raw rows cannot show. Days with no use have no row, so plotting them in
+ * the order they arrive puts a week away and a week of daily use side by side at the same
+ * width, and a curve that lies about time is worse than no curve. And the lifetime total
+ * only ever climbs, which is the shape worth seeing: the per-day bars say how much on a
+ * day, this says how far in total.
+ *
+ * The window ends at [today] rather than at the last day used, so a quiet fortnight reads
+ * as a flat line rather than as a chart that stops.
+ *
+ * @param windowDays how many days the curve covers, counting back from [today].
+ */
+internal fun List<DailyUsage>.growth(
+    today: Long,
+    windowDays: Int = GROWTH_WINDOW_DAYS,
+): List<GrowthPoint> {
+    if (isEmpty()) return emptyList()
+
+    val byDay = associate { it.day to it.generatedTokens }
+    val lastDay = maxOf(today, byDay.keys.max())
+    val firstDay = maxOf(byDay.keys.min(), lastDay - windowDays + 1)
+
+    // Anything older than the window is already history, so the curve starts from that
+    // total rather than from zero. Starting at zero would draw a device's second month as
+    // though it were its first.
+    var running = filter { it.day < firstDay }.sumOf { it.generatedTokens }
+
+    return (firstDay..lastDay).map { day ->
+        val tokens = byDay[day] ?: 0
+        running += tokens
+        GrowthPoint(day = day, dayTokens = tokens, cumulativeTokens = running)
+    }
+}
+
+/**
+ * How far back the lifetime curve reaches.
+ *
+ * A month fits a phone's width at a readable point spacing. Past that the curve stops
+ * being a shape and becomes a texture.
+ */
+private const val GROWTH_WINDOW_DAYS = 30

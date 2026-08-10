@@ -54,10 +54,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
-import io.github.alpharomercoma.openweights.ui.discover.formatBytes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

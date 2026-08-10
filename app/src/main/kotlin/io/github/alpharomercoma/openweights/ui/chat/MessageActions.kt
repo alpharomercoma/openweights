@@ -93,8 +93,13 @@ private fun Action(icon: ImageVector, description: String, onClick: () -> Unit) 
     }
 }
 
-/** Comfortably above the 48 dp minimum once the icon's own padding is counted. */
-private const val TARGET = 40
+/**
+ * The minimum touch target, from the Material accessibility guidance.
+ *
+ * This was 40 with a comment claiming the icon's padding made up the difference. It does
+ * not: padding inside the button does not grow the button.
+ */
+private const val TARGET = 48
 
 private const val ICON = 18
 

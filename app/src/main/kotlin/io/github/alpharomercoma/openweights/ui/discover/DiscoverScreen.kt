@@ -53,7 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.hub.HubModel
@@ -172,7 +174,11 @@ fun DiscoverScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(state.results, key = { it.id }) { model ->
-                    ModelRow(model = model, onClick = { onOpenModel(model.id) })
+                    ModelRow(
+                        model = model,
+                        onClick = { onOpenModel(model.id) },
+                        avatarUrl = state.avatars[model.owner],
+                    )
                 }
             }
         }
@@ -263,8 +269,8 @@ private fun ModelDetail(
                 Slider(
                     value = state.contextLength.toFloat(),
                     onValueChange = { onContextLengthChange(it.roundToInt()) },
-                    valueRange = MIN_CONTEXT..MAX_CONTEXT,
-                    steps = CONTEXT_STEPS,
+                    valueRange = CONTEXT_RANGE,
+                    steps = ModelLoadParams.CONTEXT_STEPS,
                 )
             }
         }
@@ -289,10 +295,6 @@ private fun Callout(text: String) {
             .padding(12.dp),
     )
 }
-
-private const val MIN_CONTEXT = 1024f
-private const val MAX_CONTEXT = 32_768f
-private const val CONTEXT_STEPS = 30
 
 @Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
@@ -336,3 +338,7 @@ private fun DiscoverScreenPreview() {
         )
     }
 }
+
+/** The context lengths a user may pick, as the slider wants them. */
+private val CONTEXT_RANGE =
+    ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..ModelLoadParams.MAX_CONTEXT_LENGTH.toFloat()

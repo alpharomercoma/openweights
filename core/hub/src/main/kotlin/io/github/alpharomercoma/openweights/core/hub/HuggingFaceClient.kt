@@ -17,6 +17,8 @@
 package io.github.alpharomercoma.openweights.core.hub
 
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
+import io.github.alpharomercoma.openweights.core.common.model.GgufFileName.GGUF_SUFFIX
+import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -94,7 +96,7 @@ data class HubFile(
      */
     val quantizationLabel: String
         get() = fileName
-            .removeSuffix(".gguf")
+            .removeSuffix(GGUF_SUFFIX)
             .substringAfterLast('-')
 
     val fileName: String get() = path.substringAfterLast('/')
@@ -229,6 +231,27 @@ class HuggingFaceClient @Inject constructor(
         )
     }
 
+    /**
+     * The picture a publisher publishes under, if it has one.
+     *
+     * A repository id says who published it but not whether that is an organisation or a
+     * person, and the two live at different paths. Organisations are tried first because
+     * the labs people go looking for are organisations; a person costs one extra request,
+     * and [PublisherAvatars] makes sure it is paid once.
+     *
+     * Returns null rather than throwing for every failure. A missing picture is not a
+     * problem the user can do anything about, and a row draws perfectly well without one.
+     */
+    suspend fun avatarUrl(owner: String): String? {
+        if (owner.isBlank()) return null
+        return avatarUrlAt("organizations", owner) ?: avatarUrlAt("users", owner)
+    }
+
+    private suspend fun avatarUrlAt(kind: String, owner: String): String? = runCatching {
+        val payload = get(apiUrl(kind, owner, "avatar").build())
+        json.decodeFromString<AvatarEntry>(payload).avatarUrl
+    }.getOrNull()
+
     /** Confirms a token works, returning the account name it belongs to. */
     suspend fun whoAmI(): String {
         val payload = json.decodeFromString<WhoAmI>(get(apiUrl("whoami-v2").build()))
@@ -252,7 +275,7 @@ class HuggingFaceClient @Inject constructor(
         val token = tokenSource.token()
         val request = Request.Builder()
             .url(url)
-            .apply { if (token != null) header("Authorization", "Bearer $token") }
+            .withToken(token)
             .build()
 
         httpClient.newCall(request).execute().use { response ->
@@ -265,7 +288,6 @@ class HuggingFaceClient @Inject constructor(
 
     private companion object {
         val HOST = "https://huggingface.co".toHttpUrl()
-        const val GGUF_SUFFIX = ".gguf"
         const val DEFAULT_LIMIT = 30
 
         /** The Hub's identifier for the local app this project is built on. */

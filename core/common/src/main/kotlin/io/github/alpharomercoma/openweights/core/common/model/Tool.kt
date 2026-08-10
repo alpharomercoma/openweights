@@ -44,7 +44,14 @@ data class ToolCall(
     val argumentsJson: String,
 )
 
-/** The outcome of running a tool, to be fed back into the conversation. */
+/**
+ * The outcome of running a tool, to be fed back into the conversation.
+ *
+ * Nothing constructs one yet. Calls are parsed out of a reply and shown, but the app does
+ * not run tools, so there is no result to send back. The shape is here because it is the
+ * other half of a contract already half implemented, and because the engine's message
+ * roles already include the one it would be sent under.
+ */
 data class ToolResult(
     val callId: String,
     val name: String,

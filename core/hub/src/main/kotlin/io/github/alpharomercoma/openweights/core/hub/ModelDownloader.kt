@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.core.hub
 
+import io.github.alpharomercoma.openweights.core.hub.HubHttp.withRangeFrom
+import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -106,9 +108,9 @@ class ModelDownloader @Inject constructor(
         val request = Request.Builder()
             .url(client.downloadUrl(repoId, file.path))
             .apply {
-                tokenSource.token()?.let { header("Authorization", "Bearer $it") }
+                withToken(tokenSource.token())
                 // Resume where the last attempt stopped instead of re-downloading gigabytes.
-                if (alreadyHave > 0) header("Range", "bytes=$alreadyHave-")
+                if (alreadyHave > 0) withRangeFrom(alreadyHave)
             }
             .build()
 
@@ -119,7 +121,7 @@ class ModelDownloader @Inject constructor(
             // A server that ignores the range header restarts the file, so partial bytes
             // must be discarded rather than appended to. Trusting the 206 alone is not
             // enough: the range served has to actually start where we asked.
-            val resuming = response.code == HTTP_PARTIAL_CONTENT &&
+            val resuming = response.code == HubHttp.PARTIAL_CONTENT &&
                 alreadyHave > 0 &&
                 response.servesRangeFrom(alreadyHave)
             val total = file.sizeBytes.takeIf { it > 0 }
@@ -220,6 +222,5 @@ class ModelDownloader @Inject constructor(
         const val PARTIAL_SUFFIX = ".part"
         const val BUFFER_BYTES = 1 shl 16
         const val PROGRESS_INTERVAL_BYTES = 1L shl 20
-        const val HTTP_PARTIAL_CONTENT = 206
     }
 }

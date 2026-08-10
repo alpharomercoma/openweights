@@ -44,8 +44,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.DailyUsage
+import io.github.alpharomercoma.openweights.core.data.GrowthPoint
 import io.github.alpharomercoma.openweights.core.data.ModelUsage
 import io.github.alpharomercoma.openweights.core.data.UsageSummary
+import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -104,6 +106,7 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Headline(summary)
+            GrowthChart(summary.growth)
             if (summary.perDay.size > 1) DailyChart(summary.perDay)
             ModelBreakdown(summary.perModel)
         }
@@ -118,6 +121,7 @@ private fun Headline(summary: UsageSummary) {
             style = MaterialTheme.typography.displaySmall,
         )
         Metric("tokens generated on this device")
+        DayChange(summary)
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -140,7 +144,73 @@ private fun Headline(summary: UsageSummary) {
             modifier = Modifier.weight(1f),
         )
     }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The ledger has counted these since the first reply and nothing showed them.
+        // Reading is the other half of the work: a long conversation spends most of its
+        // time here, and it is why replies get slower as a chat grows.
+        Stat(
+            label = "Tokens read",
+            value = summary.lifetimePromptTokens.grouped(),
+            modifier = Modifier.weight(1f),
+        )
+        Stat(
+            label = "Tokens written",
+            value = summary.lifetimeGeneratedTokens.grouped(),
+            modifier = Modifier.weight(1f),
+        )
+    }
 }
+
+/**
+ * What today added, and how that compares with yesterday.
+ *
+ * The lifetime figure above it only ever grows, so on its own it stops meaning anything
+ * after the first week. This is the part that changes.
+ */
+@Composable
+private fun DayChange(summary: UsageSummary) {
+    if (summary.growth.isEmpty()) return
+    val dark = LocalIsDarkTheme.current
+    val change = summary.dayOverDayChange
+
+    val comparison = when {
+        summary.tokensToday == 0L -> "nothing yet today"
+        change == null -> "nothing yesterday to compare with"
+        change > 0 -> "${change.asPercent()} more than yesterday"
+        change < 0 -> "${(-change).asPercent()} less than yesterday"
+        else -> "the same as yesterday"
+    }
+
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "+${summary.tokensToday.grouped()} today",
+            style = MaterialTheme.typography.labelLarge,
+            // Coloured against yesterday, which is the only thing this line claims. A
+            // quiet day is grey, not red: not using your phone is not a fault.
+            color = signalColor(fraction = changeFraction(change), dark = dark),
+        )
+        Metric(comparison)
+    }
+}
+
+/**
+ * A day-over-day change mapped onto the signal scale.
+ *
+ * Half is the middle of the scale and means unchanged. A day that doubles reaches the top;
+ * anything past that has nowhere further to go, which is fine, since the number is right
+ * there beside it.
+ */
+private fun changeFraction(change: Double?): Float {
+    if (change == null) return UNCHANGED.toFloat()
+    return (UNCHANGED + change / 2).toFloat().coerceIn(0f, 1f)
+}
+
+private fun Double.asPercent(): String =
+    String.format(Locale.getDefault(), "%.0f%%", this * PERCENT)
 
 @Composable
 private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
@@ -227,12 +297,14 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
 }
 
 private const val BAR_FILL = 0.7f
+
+/** The middle of the signal scale, which is where "no change since yesterday" belongs. */
+private const val UNCHANGED = 0.5
+
+private const val PERCENT = 100
 private const val MILLIS_PER_SECOND = 1000
 private const val SECONDS_PER_MINUTE = 60
 private const val MINUTES_PER_HOUR = 60
-
-/** Matches the rail in chat, so the same number means the same colour in both places. */
-private const val FAST_TOKENS_PER_SECOND = 25.0
 
 private fun Long.grouped(): String = String.format(Locale.getDefault(), "%,d", this)
 
@@ -260,6 +332,7 @@ private fun DashboardScreenPreview() {
                 conversations = 19,
                 activeDays = 12,
                 perDay = List(12) { DailyUsage(it.toLong(), (2000L..14000L).random()) },
+                growth = previewGrowth(),
                 perModel = listOf(
                     ModelUsage("LFM2.5-2.6B-Q4_K_M", 120_400, 180, 16.4),
                     ModelUsage("Qwen3-1.7B-Q4_K_M", 22_480, 34, 28.1),
@@ -270,3 +343,24 @@ private fun DashboardScreenPreview() {
 }
 
 private fun LongRange.random(): Long = first + (last - first) / 2
+
+/** A few weeks of climbing totals, with a day off each week. */
+private fun previewGrowth(): List<GrowthPoint> {
+    var running = 0L
+    return (0 until PREVIEW_DAYS).map { index ->
+        val tokens = if (index % DAYS_PER_WEEK == PREVIEW_REST_DAY) {
+            0L
+        } else {
+            PREVIEW_BASE_TOKENS + index * PREVIEW_DAILY_GROWTH
+        }
+        running += tokens
+        GrowthPoint(day = PREVIEW_FIRST_DAY + index, dayTokens = tokens, cumulativeTokens = running)
+    }
+}
+
+private const val PREVIEW_DAYS = 24
+private const val DAYS_PER_WEEK = 7
+private const val PREVIEW_REST_DAY = 3
+private const val PREVIEW_BASE_TOKENS = 2_000L
+private const val PREVIEW_DAILY_GROWTH = 400L
+private const val PREVIEW_FIRST_DAY = 20_000L

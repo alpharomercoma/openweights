@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -159,8 +160,8 @@ fun ParameterSheet(
                 Slider(
                     value = draft.contextLength.toFloat(),
                     onValueChange = { draft = draft.copy(contextLength = it.roundToInt()) },
-                    valueRange = MIN_CONTEXT..MAX_CONTEXT,
-                    steps = CONTEXT_STEPS,
+                    valueRange = CONTEXT_RANGE,
+                    steps = ModelLoadParams.CONTEXT_STEPS,
                 )
             }
 
@@ -280,9 +281,6 @@ private const val MIN_TOP_P = 0.1f
 private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
-private const val MIN_CONTEXT = 1024f
-private const val MAX_CONTEXT = 32_768f
-private const val CONTEXT_STEPS = 30
 
 @Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
@@ -298,3 +296,7 @@ private fun ParameterSheetPreview() {
         )
     }
 }
+
+/** The context lengths a user may pick, as the slider wants them. */
+private val CONTEXT_RANGE =
+    ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..ModelLoadParams.MAX_CONTEXT_LENGTH.toFloat()

@@ -72,6 +72,10 @@ internal data class DetailEntry(
     )
 }
 
+/** The one field of a publisher's profile this app has any use for. */
+@Serializable
+internal data class AvatarEntry(val avatarUrl: String? = null)
+
 @Serializable
 internal data class Sibling(val rfilename: String, val size: Long? = null, val lfs: Lfs? = null)
 

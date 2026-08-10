@@ -40,10 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import java.util.Locale
@@ -57,7 +59,12 @@ import java.util.Locale
  * anything. Everything else is one quiet line underneath.
  */
 @Composable
-fun ModelRow(model: HubModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ModelRow(
+    model: HubModel,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    avatarUrl: String? = null,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -68,7 +75,7 @@ fun ModelRow(model: HubModel, onClick: () -> Unit, modifier: Modifier = Modifier
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        PublisherTile(model.owner)
+        PublisherTile(owner = model.owner, avatarUrl = avatarUrl)
 
         Column(
             modifier = Modifier.weight(1f),
@@ -104,24 +111,27 @@ fun ModelRow(model: HubModel, onClick: () -> Unit, modifier: Modifier = Modifier
 }
 
 /**
- * The publisher's initials in a tile tinted from their name.
+ * The publisher's own picture, or their initials until it arrives.
  *
- * Not an avatar: the Hub does not return one with search results, and fetching one per row
- * would be thirty requests to decorate a list. The hue is derived from the name, so the
- * same publisher is the same colour every time and a list of eight repositories from four
- * publishers reads as four groups.
+ * The Hub has avatars but does not put them in search results, so each one is a separate
+ * lookup and may never arrive. The initials are drawn first and stay if it does not: the
+ * tile is the same size either way, so nothing moves when a picture loads. The tint is
+ * derived from the name, so the same publisher is the same colour every time and a list of
+ * eight repositories from four publishers reads as four groups.
  */
 @Composable
-private fun PublisherTile(owner: String) {
+private fun PublisherTile(owner: String, avatarUrl: String?) {
     val tint = ownerTint(owner)
+    val shape = RoundedCornerShape(Radius.xs)
+
     Box(
         modifier = Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(Radius.xs))
+            .size(TILE_SIZE)
+            .clip(shape)
             .background(tint.copy(alpha = TILE_FILL_ALPHA))
-            .border(1.dp, tint.copy(alpha = TILE_EDGE_ALPHA), RoundedCornerShape(Radius.xs))
-            // One label for the row is enough; the initials are decoration for the name
-            // already read out below.
+            .border(1.dp, tint.copy(alpha = TILE_EDGE_ALPHA), shape)
+            // One label for the row is enough; the tile repeats the publisher name that is
+            // already read out below it.
             .clearAndSetSemantics { contentDescription = "" },
         contentAlignment = Alignment.Center,
     ) {
@@ -130,6 +140,14 @@ private fun PublisherTile(owner: String) {
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        if (avatarUrl != null) {
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().clip(shape),
+            )
+        }
     }
 }
 
@@ -204,6 +222,7 @@ private val TILE_HUES = listOf(
     Color(0xFF8C99A4),
 )
 
+private val TILE_SIZE = 40.dp
 private const val TILE_FILL_ALPHA = 0.18f
 private const val TILE_EDGE_ALPHA = 0.45f
 

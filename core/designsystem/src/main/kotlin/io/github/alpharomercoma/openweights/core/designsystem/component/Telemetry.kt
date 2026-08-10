@@ -45,8 +45,15 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import kotlin.math.roundToInt
 
-/** Decode speed at or above this reads as comfortably fast on a phone. */
-private const val FAST_TOKENS_PER_SECOND = 25.0
+/**
+ * Decode speed at or above this reads as comfortably fast on a phone.
+ *
+ * The top of the signal scale wherever throughput is coloured, which is the reply rail,
+ * the stats line under a reply, and the per-model breakdown on the dashboard. One number,
+ * because three screens disagreeing about what counts as fast would be worse than any of
+ * them being slightly wrong.
+ */
+const val FAST_TOKENS_PER_SECOND = 25.0
 
 /**
  * The vertical rail beside a model reply, coloured by how fast that reply was generated.

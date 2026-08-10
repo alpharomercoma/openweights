@@ -40,13 +40,18 @@ subprojects {
 tasks.register("verify") {
     group = "verification"
     description = "Static analysis, unit tests and host integration tests."
+    // Matched by name as each subproject configures itself, not read out of the task
+    // container now: findByName here returns null for anything the Android plugin has not
+    // created yet, which silently drops whole tiers from the run.
     dependsOn(
-        subprojects.mapNotNull { it.tasks.findByName("assembleDebug") },
-        subprojects.mapNotNull { it.tasks.findByName("ktlintCheck") },
-        subprojects.mapNotNull { it.tasks.findByName("detekt") },
-        subprojects.mapNotNull { it.tasks.findByName("testDebugUnitTest") },
+        VERIFY_TASKS.map { name ->
+            subprojects.map { project -> project.tasks.matching { it.name == name } }
+        },
     )
 }
+
+/** The host-side tiers, in the order they fail fastest. */
+val VERIFY_TASKS = listOf("ktlintCheck", "detekt", "assembleDebug", "testDebugUnitTest")
 
 /**
  * The device tier: the engine against real weights.
@@ -58,5 +63,9 @@ tasks.register("verify") {
 tasks.register("verifyOnDevice") {
     group = "verification"
     description = "Instrumented engine tests. Needs a connected device and model files."
-    dependsOn(subprojects.mapNotNull { it.tasks.findByName("connectedDebugAndroidTest") })
+    dependsOn(
+        subprojects.map { project ->
+            project.tasks.matching { it.name == "connectedDebugAndroidTest" }
+        },
+    )
 }

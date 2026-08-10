@@ -110,32 +110,58 @@ llama_sampler * build_sampler(const SamplerConfig & cfg, const llama_vocab * voc
 }  // namespace
 
 /**
- * The length of the longest prefix of [text] that is complete UTF-8.
+ * The length of the longest prefix of [text] that is valid UTF-8.
  *
- * A token is a sequence of bytes, not a character. "Belém" and every emoji span several
- * tokens, so a single piece routinely ends halfway through a multi-byte character. Handing
- * that half to JNI's NewStringUTF does not throw, it aborts the process, so the tail is
- * held back until the bytes that finish it arrive.
+ * A token is a sequence of bytes, not a character. "Belem" with an accent and every emoji
+ * span several tokens, so a single piece routinely ends halfway through a character.
+ * Handing that half to JNI's NewStringUTF does not throw, it aborts the process.
+ *
+ * Scans from the start rather than inspecting the tail. An earlier version only checked
+ * the last few bytes, which accepted a string whose damage was in the middle. Overlong
+ * encodings, surrogate halves and anything above U+10FFFF are rejected too: all three are
+ * ill-formed UTF-8 that a decoder is required to refuse.
  */
 size_t complete_utf8_prefix(const std::string & text) {
-    size_t index = text.size();
-    // A character is at most four bytes, so a lead byte is within four of the end.
-    for (int examined = 0; index > 0 && examined < 4; ++examined) {
-        const auto byte = static_cast<unsigned char>(text[index - 1]);
-        if ((byte & 0xC0) == 0x80) {
-            --index;  // continuation byte: keep walking back for its lead
-            continue;
+    size_t index = 0;
+    while (index < text.size()) {
+        const auto lead = static_cast<unsigned char>(text[index]);
+
+        size_t length = 0;
+        uint32_t code = 0;
+        if ((lead & 0x80) == 0x00) {
+            length = 1;
+            code = lead;
+        } else if ((lead & 0xE0) == 0xC0) {
+            length = 2;
+            code = lead & 0x1Fu;
+        } else if ((lead & 0xF0) == 0xE0) {
+            length = 3;
+            code = lead & 0x0Fu;
+        } else if ((lead & 0xF8) == 0xF0) {
+            length = 4;
+            code = lead & 0x07u;
+        } else {
+            return index;  // continuation byte or invalid lead
         }
 
-        size_t needed = 0;
-        if ((byte & 0x80) == 0x00) needed = 1;
-        else if ((byte & 0xE0) == 0xC0) needed = 2;
-        else if ((byte & 0xF0) == 0xE0) needed = 3;
-        else if ((byte & 0xF8) == 0xF0) needed = 4;
-        else return index - 1;  // not a lead byte at all; drop it rather than pass it on
+        if (index + length > text.size()) {
+            return index;  // a character still arriving
+        }
 
-        const size_t available = text.size() - (index - 1);
-        return available >= needed ? text.size() : index - 1;
+        for (size_t offset = 1; offset < length; ++offset) {
+            const auto byte = static_cast<unsigned char>(text[index + offset]);
+            if ((byte & 0xC0) != 0x80) return index;
+            code = (code << 6) | (byte & 0x3Fu);
+        }
+
+        const bool overlong = (length == 2 && code < 0x80) ||
+                              (length == 3 && code < 0x800) ||
+                              (length == 4 && code < 0x10000);
+        const bool surrogate = code >= 0xD800 && code <= 0xDFFF;
+        if (overlong || surrogate || code > 0x10FFFF) {
+            return index;
+        }
+        index += length;
     }
     return index;
 }
@@ -617,7 +643,11 @@ StopReason Session::generate(
     int64_t first_token_ms = 0;
 
     char piece_buffer[512];
+    // Everything the model produced, and the subset of it that is well formed. The parser
+    // reads the second: a trailing half character withheld from the UI must not reappear
+    // in the finished reply.
     std::string raw_reply;
+    std::string safe_reply;
     // Bytes seen but not yet emitted, because they are the start of a character whose
     // remaining bytes are still to come.
     std::string pending;
@@ -664,6 +694,7 @@ StopReason Session::generate(
         if (complete > 0) {
             const std::string emit = pending.substr(0, complete);
             pending.erase(0, complete);
+            safe_reply += emit;
             if (!on_token(emit.c_str())) {
                 reason = StopReason::CANCELLED;
                 break;
@@ -697,15 +728,21 @@ StopReason Session::generate(
         parser_params.parse_tool_calls = true;
         parser_params.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
 
+        // Anything other than a clean end of turn was cut off mid-sentence, and a cut-off
+        // tool call read as a complete one produces a call the model never finished asking
+        // for. The parser handles that itself when told the input is partial.
+        const bool truncated = reason != StopReason::END_OF_TURN;
         const common_chat_msg parsed =
-            common_chat_parse(raw_reply, /*is_partial=*/false, parser_params);
+            common_chat_parse(safe_reply, truncated, parser_params);
         for (const auto & call : parsed.tool_calls) {
             reply.tool_calls.push_back({call.id, call.name, call.arguments});
         }
         // Only trust the cleaned text when the parser actually recognised something.
         // Otherwise it returns the input unchanged plus the generation prompt, which is
         // worse than the raw text the Kotlin parser can still handle.
-        if (!reply.tool_calls.empty()) {
+        // Tool calls are only acted on from a reply that finished. A truncated one may
+        // have been about to add arguments.
+        if (!reply.tool_calls.empty() && reason == StopReason::END_OF_TURN) {
             reply.content = parsed.content;
             reply.reasoning = parsed.reasoning_content;
             return_parsed_content = true;
@@ -716,9 +753,10 @@ StopReason Session::generate(
     }
 
     if (!return_parsed_content) {
-        // The raw text crosses the boundary and Kotlin splits it, where the logic is
-        // unit-tested against output captured from real models.
-        reply.content = raw_reply;
+        // The text crosses the boundary and Kotlin splits it, where the logic is
+        // unit-tested against output captured from real models. safe_reply, not raw_reply:
+        // the caller was never shown the withheld tail and the stored reply must match.
+        reply.content = safe_reply;
     }
 
     const int64_t decode_end = now_ms();

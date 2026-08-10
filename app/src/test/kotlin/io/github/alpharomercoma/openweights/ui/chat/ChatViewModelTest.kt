@@ -16,13 +16,16 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.Clock
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
+import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
@@ -30,6 +33,7 @@ import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -111,6 +115,71 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `stopping keeps the tokens produced since the last publish`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Tell me something long")
+        settle()
+
+        engine.emit("First half. ")
+        settle()
+        // Collected without letting real time pass, so this piece falls inside the
+        // coalescing window and never reaches the screen on its own. It is the piece a
+        // naive stop drops.
+        engine.emit("Second half.")
+        advanceUntilIdle()
+
+        viewModel.stop()
+        settle()
+
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        val shown = viewModel.uiState.value.transcript.last()
+        assertThat(shown.text).isEqualTo("First half. Second half.")
+        // The same string on both sides. A reply the user can read but the app cannot
+        // resend is worse than one that was never produced.
+        val stored = awaitMessages(id, count = 2).last()
+        assertThat(stored.role).isEqualTo("assistant")
+        assertThat(stored.text).isEqualTo("First half. Second half.")
+    }
+
+    @Test
+    fun `stopping before any token leaves no empty reply behind`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Never mind")
+        settle()
+
+        viewModel.stop()
+        settle()
+
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        assertThat(viewModel.uiState.value.transcript.map { it.role })
+            .containsExactly(ChatRole.USER)
+        assertThat(database.messages().forConversation(id).map { it.role })
+            .containsExactly("user")
+    }
+
+    @Test
+    fun `a finished reply is stored exactly as it is shown`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Question")
+        settle()
+
+        engine.emit("One ")
+        engine.emit("two ")
+        engine.emit("three.")
+        engine.finish()
+        settle()
+
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        val shown = viewModel.uiState.value.transcript.last()
+        assertThat(shown.isStreaming).isFalse()
+        assertThat(shown.text).isEqualTo("One two three.")
+        assertThat(awaitMessages(id, count = 2).last().text).isEqualTo("One two three.")
+    }
+
+    @Test
     fun `a new chat clears the transcript and the conversation it belonged to`() =
         runTest(dispatcher) {
             loadModel()
@@ -172,6 +241,7 @@ class ChatViewModelTest {
         settle()
         val id = requireNotNull(viewModel.uiState.value.activeConversationId)
         val before = viewModel.uiState.value.transcript.size
+        val resetsBefore = engine.resetCount
 
         loadModel(name = "model-b.gguf", keepConversation = true)
         settle()
@@ -182,7 +252,41 @@ class ChatViewModelTest {
         assertThat(database.conversations().byId(id)?.modelName).isEqualTo("model-b")
         // The cache belonged to the old weights and has to go, or the new model decodes
         // against positions it never wrote.
-        assertThat(engine.resetCount).isAtLeast(1)
+        assertThat(engine.resetCount).isGreaterThan(resetsBefore)
+    }
+
+    @Test
+    fun `the new model is sent the turns the old one produced`() = runTest(dispatcher) {
+        loadModel(name = "model-a.gguf")
+        viewModel.send("Carry me over")
+        settle()
+
+        loadModel(name = "model-b.gguf", keepConversation = true)
+        settle()
+        viewModel.send("And this one")
+        settle()
+
+        // The cache is gone, so the transcript is the only thing carrying the conversation
+        // across. If it is not resent, the new model answers the last question blind.
+        val sent = engine.prompts.last().map { message -> message.text }
+        assertThat(sent).contains("Carry me over")
+        assertThat(sent).contains("And this one")
+    }
+
+    @Test
+    fun `the last model asked for is the one left loaded`() = runTest(dispatcher) {
+        // Both requested before either finishes, which is what tapping twice in the model
+        // sheet does. Loads that overlap would each write their own identity, and the
+        // engine would be left holding whichever finished last.
+        engine.loadDelayMs = 500
+        viewModel.loadModel(modelFile("model-a.gguf"))
+        viewModel.loadModel(modelFile("model-b.gguf"))
+        advanceUntilIdle()
+        settle()
+
+        assertThat(viewModel.uiState.value.modelName).isEqualTo("model-b")
+        assertThat(engine.loads).containsExactly("model-b.gguf")
+        engine.loadDelayMs = 0
     }
 
     @Test
@@ -206,9 +310,47 @@ class ChatViewModelTest {
         settle()
         val id = requireNotNull(viewModel.uiState.value.activeConversationId)
 
-        val stored = database.messages().forConversation(id)
+        val stored = awaitMessages(id, count = 2)
         assertThat(stored.map { it.role }).containsExactly("user", "assistant").inOrder()
+        assertThat(stored.map { it.text })
+            .containsExactly("Question", viewModel.uiState.value.transcript.last().text)
+            .inOrder()
+        // Written twice on purpose: the row carries this reply's numbers, the ledger the
+        // totals, so deleting the chat later does not un-count the work.
+        assertThat(database.usage().observeAll().first()).isNotEmpty()
     }
+
+    @Test
+    fun `regenerating replaces the stored reply instead of adding one`() = runTest(dispatcher) {
+        loadModel()
+        viewModel.send("Question")
+        settle()
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        assertThat(awaitMessages(id, count = 2)).hasSize(2)
+
+        viewModel.regenerate()
+        settle()
+
+        val stored = awaitMessages(id, count = 2)
+        assertThat(stored.map { it.role }).containsExactly("user", "assistant").inOrder()
+        assertThat(viewModel.uiState.value.transcript.count { it.role == ChatRole.ASSISTANT })
+            .isEqualTo(1)
+    }
+
+    @Test
+    fun `a file the model cannot read is refused rather than sent and dropped`() =
+        runTest(dispatcher) {
+            // No projector, so the engine would drop the attachment while the message still
+            // showed it. Refusing at the composer is the only place the user can act on it.
+            loadModel(name = "text-only.gguf")
+            val picture = File(models, "photo.jpg").apply { writeText("not really a jpeg") }
+
+            viewModel.attach(Uri.fromFile(picture))
+            settle()
+
+            assertThat(viewModel.uiState.value.staged).isEmpty()
+            assertThat(viewModel.uiState.value.error).contains("text only")
+        }
 
     @Test
     fun `a failed load does not leave the old model on screen`() = runTest(dispatcher) {
@@ -227,12 +369,34 @@ class ChatViewModelTest {
         name: String = "model-a.gguf",
         keepConversation: Boolean = false,
     ) {
-        // An exact name, not createTempFile: the view model derives the displayed model
-        // name from the file name, and createTempFile appends random digits to it.
-        val file = File(models, name)
-        file.writeText("not a real model")
-        viewModel.loadModel(file, keepConversation = keepConversation)
+        viewModel.loadModel(modelFile(name), keepConversation = keepConversation)
         settle()
+    }
+
+    /**
+     * A throwaway file with an exact name.
+     *
+     * Not createTempFile: the view model derives the displayed model name from the file
+     * name, and createTempFile appends random digits to it.
+     */
+    private fun modelFile(name: String): File =
+        File(models, name).apply { writeText("not a real model") }
+
+    /**
+     * Waits for a conversation to hold [count] messages and returns them.
+     *
+     * Persistence is launched separately from the state update that precedes it, so
+     * reading the table straight after an assertion on the screen can catch it one write
+     * short. This waits for the write rather than assuming a fixed number of drains is
+     * enough.
+     */
+    private suspend fun TestScope.awaitMessages(id: Long, count: Int): List<MessageEntity> {
+        repeat(AWAIT_STEPS) {
+            val rows = database.messages().forConversation(id)
+            if (rows.size >= count) return rows
+            settle(steps = 2)
+        }
+        return database.messages().forConversation(id)
     }
 
     /**
@@ -255,5 +419,8 @@ class ChatViewModelTest {
         /** Enough passes for a DataStore read and its continuation to both complete. */
         const val SETTLE_STEPS = 6
         const val SETTLE_PAUSE_MS = 20L
+
+        /** How many times to re-check the table before giving up and asserting on it. */
+        const val AWAIT_STEPS = 20
     }
 }

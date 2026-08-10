@@ -27,8 +27,10 @@ import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaException
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
+import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
@@ -57,12 +59,23 @@ class FakeInferenceEngine : InferenceEngine {
     /** Every conversation the engine was asked to answer, in order. */
     val prompts = mutableListOf<List<ChatMessage>>()
 
+    /** What each loaded model claims it can read, keyed by file name. */
+    val mediaSupport = mutableMapOf<String, MediaSupport>()
+
+    /** Load order, so a test can prove which model the engine ended up holding. */
+    val loads = mutableListOf<String>()
+
+    /** Loads wait on this many milliseconds of virtual time, to overlap two of them. */
+    var loadDelayMs = 0L
+
     private var loaded: LoadedModelInfo? = null
-    private var tokens = Channel<String>(Channel.UNLIMITED)
+    private var events = Channel<GenerationEvent>(Channel.UNLIMITED)
 
     override val loadedModel: LoadedModelInfo? get() = loaded
 
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
+        if (loadDelayMs > 0) delay(loadDelayMs)
+        loads += modelFile.name
         if (failNextLoad) {
             failNextLoad = false
             loaded = null
@@ -76,6 +89,7 @@ class FakeInferenceEngine : InferenceEngine {
             trainingContextSize = params.contextLength,
             layerCount = 1,
             contextUsed = 0,
+            mediaSupport = mediaSupport[modelFile.name] ?: MediaSupport(),
         )
     }
 
@@ -95,22 +109,34 @@ class FakeInferenceEngine : InferenceEngine {
                 emit(GenerationEvent.Completed(StopReason.END_OF_TURN, stats(), REPLY))
             }
         }
-        tokens = Channel(Channel.UNLIMITED)
+        events = Channel(Channel.UNLIMITED)
         return channelFlow {
-            for (piece in tokens) {
-                send(GenerationEvent.Token(piece))
+            for (event in events) {
+                send(event)
             }
         }
     }
 
     /** Pushes one piece into a held generation. */
     fun emit(text: String) {
-        tokens.trySend(text)
+        events.trySend(GenerationEvent.Token(text))
+    }
+
+    /**
+     * Ends a held generation the way the model reaching its stop token does.
+     *
+     * [content] stands in for what llama.cpp's parser hands back, which is the answer with
+     * reasoning and tool syntax already removed. Empty means the parser recognised nothing
+     * of the format and the caller's own buffer is the only text there is.
+     */
+    fun finish(content: String = "") {
+        events.trySend(GenerationEvent.Completed(StopReason.END_OF_TURN, stats(), content))
+        events.close()
     }
 
     override fun cancel() {
         cancelCount++
-        tokens.close()
+        events.close()
     }
 
     override suspend fun resetContext() {

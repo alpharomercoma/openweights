@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
+import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -48,6 +49,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import javax.inject.Inject
 
@@ -200,6 +203,12 @@ class ChatViewModel @Inject constructor(
     private var generationJob: Job? = null
     private var nextEntryId = 0L
 
+    /** Held for the length of a load, so two of them cannot interleave. */
+    private val loadMutex = Mutex()
+
+    /** Counts load requests, so a queued one can tell it has been superseded. */
+    private var loadRequest = 0L
+
     /**
      * The filename settings are stored against.
      *
@@ -253,65 +262,91 @@ class ChatViewModel @Inject constructor(
         // A generation in flight writes into the transcript, so it has to finish before the
         // model under it is replaced, not merely be asked to stop.
         stop()
+        // Claimed on the caller's thread, so the ordering matches the taps rather than the
+        // order coroutines happen to start in.
+        val request = ++loadRequest
         viewModelScope.launch {
             generationJob?.join()
-            _uiState.update { it.copy(isLoadingModel = true, error = null) }
-            val preferences = modelPreferences.current(modelFile.name)
-            val loadParams = contextLength
-                ?.let { ModelLoadParams(contextLength = it) }
-                ?: preferences.toLoadParams()
+            // One load at a time. Two in flight would both write the identity of whichever
+            // model they finished with, and the engine would be holding neither.
+            loadMutex.withLock {
+                // A load that was superseded while queueing is not worth the seconds it
+                // costs: the user has already asked for a different model.
+                if (request != loadRequest) return@withLock
+                performLoad(modelFile, contextLength, keepConversation)
+            }
+        }
+    }
 
-            val projector = modelStore.projectorFor(modelFile)
+    private suspend fun performLoad(
+        modelFile: File,
+        contextLength: Int?,
+        keepConversation: Boolean,
+    ) {
+        _uiState.update { it.copy(isLoadingModel = true, error = null) }
+        val preferences = modelPreferences.current(modelFile.name)
+        val loadParams = contextLength
+            ?.let { ModelLoadParams(contextLength = it) }
+            ?: preferences.toLoadParams()
 
-            // Cleared before the attempt: the engine frees whatever it held before it loads,
-            // so from here on the old identity describes nothing.
+        val projector = modelStore.projectorFor(modelFile)
+
+        // Cleared before the attempt: the engine frees whatever it held before it loads, so
+        // from here on the old identity describes nothing. The staged files go with it,
+        // succeed or fail, because they were picked for a model that is no longer loaded.
+        val abandoned = _uiState.value.staged
+        _uiState.update {
+            it.copy(
+                modelName = null,
+                modelQuantization = null,
+                backend = null,
+                contextSize = 0,
+                contextUsed = 0,
+                mediaSupport = MediaSupport(),
+                supportsThinking = false,
+                staged = emptyList(),
+            )
+        }
+        if (abandoned.isNotEmpty()) attachments.discard(abandoned)
+
+        runCatching {
+            engine.load(modelFile, loadParams, projector)
+        }.onSuccess {
+            // The cache belonged to the old weights. Clearing it makes the next reply
+            // re-read the transcript, which is what carries the conversation across.
+            engine.resetContext()
+            if (!keepConversation) conversationId = null
+            preferencesKey = modelFile.name
+            val info = engine.loadedModel
+            val support = info?.mediaSupport ?: MediaSupport()
             _uiState.update {
                 it.copy(
-                    modelName = null,
-                    modelQuantization = null,
-                    backend = null,
-                    contextSize = 0,
-                    contextUsed = 0,
-                    mediaSupport = MediaSupport(),
+                    isLoadingModel = false,
+                    backend = engine.computeDevices().firstOrNull()?.id?.uppercase(),
+                    modelName = modelFile.nameWithoutExtension,
+                    // The filename's own quantization, not llama's verbose description:
+                    // "Q4_K_M" beside the compute device and context window reads as a
+                    // spec line, "lfm2 1.2B Q4_K - Medium" reads as a sentence.
+                    modelQuantization = GgufFileName.quantization(modelFile.name),
+                    contextSize = info?.contextSize ?: 0,
+                    contextUsed = info?.contextUsed ?: 0,
+                    preferences = preferences,
+                    transcript = if (keepConversation) it.transcript else emptyList(),
+                    compaction = if (keepConversation) it.compaction else null,
+                    mediaSupport = support,
+                    supportsThinking = info?.supportsThinking == true,
+                    error = if (keepConversation) {
+                        it.transcript.unreadableWarning(support)
+                    } else {
+                        null
+                    },
                 )
             }
-
-            runCatching {
-                engine.load(modelFile, loadParams, projector)
-            }.onSuccess {
-                // The cache belonged to the old weights. Clearing it makes the next reply
-                // re-read the transcript, which is what carries the conversation across.
-                engine.resetContext()
-                if (!keepConversation) conversationId = null
-                preferencesKey = modelFile.name
-                val info = engine.loadedModel
-                _uiState.update {
-                    it.copy(
-                        isLoadingModel = false,
-                        backend = engine.computeDevices().firstOrNull()?.id?.uppercase(),
-                        modelName = modelFile.nameWithoutExtension,
-                        // The filename's own quantization, not llama's verbose description:
-                        // "Q4_K_M" beside the compute device and context window reads as a
-                        // spec line, "lfm2 1.2B Q4_K - Medium" reads as a sentence.
-                        modelQuantization = GgufFileName.quantization(modelFile.name),
-                        contextSize = info?.contextSize ?: 0,
-                        contextUsed = info?.contextUsed ?: 0,
-                        preferences = preferences,
-                        transcript = if (keepConversation) it.transcript else emptyList(),
-                        compaction = if (keepConversation) it.compaction else null,
-                        mediaSupport = info?.mediaSupport ?: MediaSupport(),
-                        supportsThinking = info?.supportsThinking == true,
-                        // Dropped either way: an attachment staged for a model that could
-                        // read it may be one the new model cannot.
-                        staged = emptyList(),
-                    )
-                }
-                if (keepConversation) {
-                    conversationId?.let { id -> chats.setModel(id, modelFile.nameWithoutExtension) }
-                }
-            }.onFailure { failure ->
-                _uiState.update { it.copy(isLoadingModel = false, error = failure.userMessage()) }
+            if (keepConversation) {
+                conversationId?.let { id -> chats.setModel(id, modelFile.nameWithoutExtension) }
             }
+        }.onFailure { failure ->
+            _uiState.update { it.copy(isLoadingModel = false, error = failure.userMessage()) }
         }
     }
 
@@ -361,12 +396,22 @@ class ChatViewModel @Inject constructor(
             } finally {
                 _uiState.update { it.copy(isAttaching = false) }
             }
-            _uiState.update { state ->
-                state.copy(
-                    staged = state.staged + stored,
-                    error = if (stored.isEmpty()) "That file could not be read." else state.error,
-                )
+            if (stored.isEmpty()) {
+                _uiState.update { it.copy(error = "That file could not be read.") }
+                return@launch
             }
+
+            // Checked here rather than at send: the engine drops media a model has no
+            // projector for, so an unsupported file would otherwise sit in the composer,
+            // appear in the sent message, be stored with it, and never reach the model.
+            val unreadable = stored.filterNot { _uiState.value.mediaSupport.accepts(it.kind) }
+            if (unreadable.isNotEmpty()) {
+                attachments.discard(stored)
+                _uiState.update { it.copy(error = it.mediaSupport.rejection(unreadable.first())) }
+                return@launch
+            }
+
+            _uiState.update { it.copy(staged = it.staged + stored) }
         }
     }
 
@@ -391,15 +436,31 @@ class ChatViewModel @Inject constructor(
                     entry.role == ChatRole.ASSISTANT
                 },
                 error = null,
+                isGenerating = true,
             )
         }
-        generate()
+
+        viewModelScope.launch {
+            // Storage has to lose the same replies the screen just lost. Without this the
+            // conversation reopens with the discarded reply and the new one both in it.
+            conversationId?.let { id ->
+                val stored = chats.messages(id)
+                val firstDiscarded = stored.indexOfLast { it.role == ChatRole.USER.wireName } + 1
+                stored.getOrNull(firstDiscarded)?.let { chats.deleteFrom(id, it.id) }
+            }
+            generate()
+        }
     }
 
     private fun generate() {
         val state = _uiState.value
         val conversation = state.engineMessages()
-        if (conversation.isEmpty()) return
+        if (conversation.isEmpty()) {
+            // Callers claim the busy state before this point to close the double-tap
+            // window, so nothing to send has to give it back.
+            _uiState.update { it.copy(isGenerating = false) }
+            return
+        }
 
         _uiState.update { state ->
             state.copy(
@@ -449,18 +510,25 @@ class ChatViewModel @Inject constructor(
                         is GenerationEvent.Completed -> {
                             // The coalescing above can have skipped the last few tokens,
                             // so the finished reply is applied in full regardless.
-                            applyCompletion(event)
+                            applyCompletion(event, reply.toString())
                         }
                     }
                 }
             } catch (cancellation: CancellationException) {
-                // Stop was pressed. Keep what was produced and do not report it as an error.
-                updateLastEntry { it.copy(isStreaming = false, isReasoningInProgress = false) }
+                // Stop was pressed. What arrived before it is real output the user watched
+                // being written, so it is kept and stored like any other reply.
+                finishInterrupted(reply.toString())
                 _uiState.update { it.copy(isGenerating = false) }
                 throw cancellation
             } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                updateLastEntry { it.copy(isStreaming = false, isReasoningInProgress = false) }
+                finishInterrupted(reply.toString())
                 _uiState.update { it.copy(error = failure.userMessage()) }
+            }
+            // A stream that ends without a completion event, which happens if the engine's
+            // channel closes under it, would otherwise leave the entry streaming forever
+            // and never write it down.
+            if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
+                finishInterrupted(reply.toString())
             }
             // Re-read rather than leave the last reading standing: a phone that has cooled
             // between replies should stop claiming it is hot.
@@ -681,15 +749,25 @@ class ChatViewModel @Inject constructor(
         generationJob?.cancel()
     }
 
-    private fun applyCompletion(event: GenerationEvent.Completed) {
-        persistReply(event)
+    /**
+     * Finishes a reply that ran to its end.
+     *
+     * [raw] is everything the engine produced, which is ahead of the screen by up to one
+     * coalescing window. It becomes the entry's text and the row written to storage, so
+     * what is shown, what is re-read on reopening, and what is sent as history next turn
+     * are all the same string.
+     */
+    private fun applyCompletion(event: GenerationEvent.Completed, raw: String) {
+        val canonical = raw.ifEmpty { event.content }
+        // The engine has already lifted reasoning and tool syntax out of its own content,
+        // so prefer that for what is displayed; parsing the buffer covers the models whose
+        // format it does not recognise.
+        val parsed = parseAssistantReply(canonical)
         updateLastEntry {
-            // The engine has already lifted any tool call out of the text, so the answer
-            // shown never contains the raw invocation syntax.
-            val parsed = parseAssistantReply(event.content.ifEmpty { it.text })
             it.copy(
-                answer = parsed.answer,
-                reasoning = parsed.reasoning ?: it.reasoning,
+                text = canonical,
+                answer = event.content.ifEmpty { parsed.answer },
+                reasoning = event.reasoning.ifEmpty { null } ?: parsed.reasoning ?: it.reasoning,
                 toolCalls = event.toolCalls,
                 isStreaming = false,
                 isReasoningInProgress = false,
@@ -698,6 +776,9 @@ class ChatViewModel @Inject constructor(
                 generatedTokens = event.stats.generatedTokens,
             )
         }
+        // After the transcript is reconciled, not before: storage takes the same text the
+        // screen settled on.
+        persistReply(canonical, event.stats)
         _uiState.update {
             it.copy(
                 contextUsed = event.stats.contextUsed,
@@ -708,32 +789,69 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Writes the finished reply and folds it into the lifetime ledger.
+     * Finishes a reply that was stopped or that failed part way.
+     *
+     * The buffer runs ahead of the screen, so it is applied in full before anything else:
+     * stopping must not silently discard the tokens produced since the last publish. An
+     * empty buffer means nothing was produced, and a blank turn is worse than no turn, so
+     * the placeholder is removed instead of being written down.
+     */
+    private fun finishInterrupted(raw: String) {
+        if (raw.isEmpty()) {
+            _uiState.update { state ->
+                if (state.transcript.lastOrNull()?.isStreaming != true) {
+                    state
+                } else {
+                    state.copy(transcript = state.transcript.dropLast(1))
+                }
+            }
+            return
+        }
+
+        val parsed = parseAssistantReply(raw)
+        updateLastEntry {
+            it.copy(
+                text = raw,
+                answer = parsed.answer,
+                reasoning = parsed.reasoning ?: it.reasoning,
+                isStreaming = false,
+                isReasoningInProgress = false,
+            )
+        }
+        persistReply(raw, stats = null)
+    }
+
+    /**
+     * Writes a reply and folds it into the lifetime ledger.
      *
      * Two writes on purpose: the message carries this reply's own numbers, and the ledger
-     * carries the totals, so deleting the chat later does not un-count the work.
+     * carries the totals, so deleting the chat later does not un-count the work. A stopped
+     * reply has no numbers, since they only arrive with a completion, and it is written
+     * without them rather than with invented ones.
      */
-    private fun persistReply(event: GenerationEvent.Completed) {
+    private fun persistReply(text: String, stats: GenerationStats?) {
         val id = conversationId ?: return
-        val reply = _uiState.value.transcript.lastOrNull() ?: return
-        val model = _uiState.value.modelName ?: return
+        val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
+        val model = _uiState.value.modelName
 
         viewModelScope.launch {
             chats.addMessage(
                 conversationId = id,
                 role = ChatRole.ASSISTANT.wireName,
-                text = reply.text,
-                tokensPerSecond = event.stats.decodeTokensPerSecond,
-                timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
-                generatedTokens = event.stats.generatedTokens,
-                reasoningMs = reply.reasoningMs,
+                text = text,
+                tokensPerSecond = stats?.decodeTokensPerSecond,
+                timeToFirstTokenMs = stats?.timeToFirstTokenMs,
+                generatedTokens = stats?.generatedTokens,
+                reasoningMs = reasoningMs,
             )
-            chats.recordUsage(
-                modelName = model,
-                promptTokens = event.stats.promptTokens,
-                generatedTokens = event.stats.generatedTokens,
-                inferenceMs = event.stats.prefillMs + event.stats.decodeMs,
-            )
+            if (stats != null && model != null) {
+                chats.recordUsage(
+                    modelName = model,
+                    promptTokens = stats.promptTokens,
+                    generatedTokens = stats.generatedTokens,
+                    inferenceMs = stats.prefillMs + stats.decodeMs,
+                )
+            }
         }
     }
 
@@ -810,6 +928,43 @@ private fun TranscriptEntry.toChatMessage(): ChatMessage = ChatMessage(
     role = role,
     parts = attachments + MessagePart.Text(text),
 )
+
+/**
+ * Why a picked file cannot be sent to the loaded model.
+ *
+ * Names what the model can read rather than only what it cannot, so the next attempt is an
+ * informed one.
+ */
+private fun MediaSupport.rejection(rejected: MessagePart.File): String {
+    val readable = listOfNotNull(
+        "pictures".takeIf { vision },
+        "sound".takeIf { audio },
+    )
+    val what = when (rejected.kind) {
+        MediaKind.IMAGE -> "pictures"
+        MediaKind.AUDIO -> "sound"
+        MediaKind.VIDEO -> "video"
+        MediaKind.OTHER -> "files of this type"
+    }
+    return if (readable.isEmpty()) {
+        "This model reads text only. Load a model with a projector file to send $what."
+    } else {
+        "This model cannot read $what. It reads ${readable.joinToString(" and ")}."
+    }
+}
+
+/**
+ * Warns when a chat carried over to a new model contains media that model cannot read.
+ *
+ * The transcript is resent as history on the next reply, and the engine drops attachments
+ * a model has no projector for, so those turns arrive as text with the picture missing.
+ */
+private fun List<TranscriptEntry>.unreadableWarning(support: MediaSupport): String? {
+    val dropped = flatMap { it.attachments }.filterNot { support.accepts(it.kind) }
+    if (dropped.isEmpty()) return null
+    return "This chat has ${dropped.size} attachment(s) the new model cannot read. Replies " +
+        "will be based on the text alone."
+}
 
 /** A short human label for an attachment, used where there is no text to go on. */
 internal fun MessagePart.File.describe(): String = name ?: when (kind) {

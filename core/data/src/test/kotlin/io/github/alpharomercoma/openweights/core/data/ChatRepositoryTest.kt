@@ -119,7 +119,7 @@ class ChatRepositoryTest {
     }
 
     @Test
-    fun `regenerating drops the reply and everything after it`() = runTest {
+    fun `deleting from a message takes everything after it too`() = runTest {
         val id = repository.startConversation("Question", "model-a")
         repository.addMessage(id, ChatRole.USER.wireName, "Question")
         val firstReply = repository.addMessage(id, ChatRole.ASSISTANT.wireName, "Answer one")

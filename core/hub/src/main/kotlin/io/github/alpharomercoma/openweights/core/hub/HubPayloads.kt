@@ -35,6 +35,7 @@ internal data class SearchEntry(
     val gated: JsonElement? = null,
     val tags: List<String> = emptyList(),
     val lastModified: String? = null,
+    @SerialName("pipeline_tag") val pipelineTag: String? = null,
 ) {
     fun toModel() = HubModel(
         id = id,
@@ -43,6 +44,7 @@ internal data class SearchEntry(
         isGated = gated.isGated(),
         tags = tags,
         updatedAt = lastModified,
+        pipelineTag = pipelineTag,
     )
 }
 
@@ -57,6 +59,7 @@ internal data class DetailEntry(
     val siblings: List<Sibling>? = null,
     val cardData: CardData? = null,
     val gguf: GgufSummary? = null,
+    @SerialName("pipeline_tag") val pipelineTag: String? = null,
 ) {
     fun toModel() = HubModel(
         id = id,
@@ -65,6 +68,7 @@ internal data class DetailEntry(
         isGated = gated.isGated(),
         tags = tags,
         updatedAt = lastModified,
+        pipelineTag = pipelineTag,
     )
 }
 

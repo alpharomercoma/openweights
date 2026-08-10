@@ -300,6 +300,38 @@ One environment note: a model file placed with `adb` lands as `shell:ext_data_rw
 and the app cannot read it: `chmod 666` fixes it. Files the app downloads itself are
 unaffected.
 
+## Discover searches by app, not by tag (2026-08-10)
+
+Search asks the Hub for `apps=llama.cpp`, not `filter=gguf`. The Hub computes the app
+filter from whether llama.cpp can load the repository; the tag is just a tag anyone can
+attach. Measured against the live API, sampling the top 500 by downloads: 411 repositories
+appear under both, 89 only under the tag, 89 only under the app.
+
+What the tag adds and the app filter drops is the part that matters. `filter=gguf` offers
+`city96/Wan2.1-I2V-14B-480P-gguf` (a video diffusion model, 14 GB, for ComfyUI),
+`handy-computer/whisper-large-v3-turbo-gguf` (whisper.cpp's format), and
+`jukofyork/creative-writing-control-vectors-v3.0` (not a model). None of them load here.
+There is a live test pinning this: `theLlamaCppFilterExcludesGgufThatIsNotALanguageModel`.
+
+`library=gguf` is a third thing again and is wrong for this: it returned
+`google-bert/bert-base-uncased` at the top.
+
+The app filter is not a clean chat-model list either. Across 200 results the task tags run
+text-generation 100, image-text-to-text 46, none 36, any-to-any 6, feature-extraction 4,
+translation 4, sentence-similarity 3, text-to-video 1. Filtering by `pipeline_tag` is
+therefore offered but off by default, because a third of repositories carry no task and
+would disappear.
+
+Other query parameters confirmed against the live API: `num_parameters=min:2B,max:4B`
+(bare `4B` returns nothing, the prefixes are required), `author`, `gated=false`,
+`sort=trendingScore` (`trending_score` is rejected), and `expand[]`. Repeated `apps`
+values are a union, not an intersection, so there is no point sending more than one.
+
+`expand[]=gguf` would give a repository's true parameter count and context length in the
+search response, and is not used: it drags each repository's whole chat template along
+with it, and 30 results grow from 15 KB to 270 KB. The size badge on a row is read out of
+the repository name instead, which is where people read it anyway.
+
 ## One reply, one string (2026-08-10)
 
 A reply exists in three places: the entry on screen, the row in Room, and the history

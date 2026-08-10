@@ -126,6 +126,21 @@ class FitEstimator @Inject constructor() {
         return minOf(affordable, trained)
     }
 
+    /**
+     * The largest model, in billions of parameters, worth showing this device.
+     *
+     * A coarse figure on purpose. The Hub filters by parameter count, which is all that is
+     * known before a repository is opened, and the honest answer for any one file needs
+     * its header. This is the bound at the quantization almost everyone downloads,
+     * Q4_K_M, with room left for the context window and the runtime, so what comes back is
+     * a list where opening something is usually worth it.
+     */
+    fun parameterCeilingBillions(device: DeviceProfile): Int {
+        val forWeights = device.usableMemoryBytes - RUNTIME_OVERHEAD_BYTES - MODEST_KV_CACHE_BYTES
+        if (forWeights <= 0) return 1
+        return (forWeights / BYTES_PER_BILLION_Q4).toInt().coerceAtLeast(1)
+    }
+
     private companion object {
         /**
          * Compute buffers, the tokenizer, the app itself, and the JVM heap. Measured at
@@ -133,6 +148,15 @@ class FitEstimator @Inject constructor() {
          * an app promises a fit and then gets killed.
          */
         const val RUNTIME_OVERHEAD_BYTES = 450L * 1024 * 1024
+
+        /**
+         * Q4_K_M averages a little under five bits a weight, so a billion parameters costs
+         * about 0.6 GB on disk and the same in memory.
+         */
+        const val BYTES_PER_BILLION_Q4 = 600L * 1024 * 1024
+
+        /** A few thousand tokens of context, which is what the app defaults to. */
+        const val MODEST_KV_CACHE_BYTES = 400L * 1024 * 1024
 
         /** Leave room for the download plus a little, so the device is not left at zero. */
         const val STORAGE_MARGIN_BYTES = 512L * 1024 * 1024

@@ -54,12 +54,45 @@ class HubIntegrationTest {
 
     @Test
     fun searchReturnsRunnableModels() = runBlocking {
-        val results = client.search("LFM2.5")
+        val results = client.search(HubQuery(text = "LFM2.5"))
 
         println("search returned ${results.size} repositories")
         assertThat(results).isNotEmpty()
-        // The gguf filter is what keeps the results loadable by this app.
+        // The llama.cpp app filter is what keeps the results loadable by this app.
         assertThat(results.map { it.id }).contains(REPO)
+    }
+
+    @Test
+    fun theLlamaCppFilterExcludesGgufThatIsNotALanguageModel() = runBlocking {
+        // A video diffusion model packaged as GGUF for ComfyUI. It carries the gguf tag,
+        // so the tag filter offers it, and it is 14 GB of weights this app cannot load.
+        val results = client.search(HubQuery(text = "Wan2.1-I2V-14B-480P"), limit = 20)
+
+        println("search returned ${results.map { it.id }}")
+        assertThat(results.map { it.id }).doesNotContain(VIDEO_GGUF_REPO)
+    }
+
+    @Test
+    fun theSizeFilterIsAppliedByTheHub() = runBlocking {
+        val small = client.search(HubQuery(parameters = ParameterRange.TINY), limit = 20)
+        val large = client.search(HubQuery(parameters = ParameterRange.HUGE), limit = 20)
+
+        println("under 2B: ${small.take(3).map { it.id }}")
+        println("over 16B: ${large.take(3).map { it.id }}")
+        assertThat(small).isNotEmpty()
+        assertThat(large).isNotEmpty()
+        // Different bands, different repositories. A filter the Hub ignored would return
+        // the same page twice and nothing here would notice.
+        assertThat(small.map { it.id }.toSet().intersect(large.map { it.id }.toSet())).isEmpty()
+    }
+
+    @Test
+    fun everySortOrderIsAcceptedByTheHub() = runBlocking {
+        HubSort.entries.forEach { sort ->
+            val results = client.search(HubQuery(sort = sort), limit = 3)
+            println("${sort.parameter}: ${results.firstOrNull()?.id}")
+            assertThat(results).isNotEmpty()
+        }
     }
 
     @Test
@@ -150,6 +183,9 @@ class HubIntegrationTest {
     private companion object {
         const val REPO = "LiquidAI/LFM2.5-2.6B-GGUF"
         const val FILE = "LFM2.5-2.6B-Q4_K_M.gguf"
+
+        /** GGUF, and nothing llama.cpp can load. The tag filter offers it; the app filter does not. */
+        const val VIDEO_GGUF_REPO = "city96/Wan2.1-I2V-14B-480P-gguf"
         const val EXPECTED_BLOCKS = 30
         const val HEADS_PER_ATTENDING_BLOCK = 8
         const val CONTEXT = 4096

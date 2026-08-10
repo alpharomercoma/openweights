@@ -35,9 +35,47 @@ data class HubModel(
     val isGated: Boolean,
     val tags: List<String>,
     val updatedAt: String?,
+    /** The Hub's task tag, absent on a good number of repositories. */
+    val pipelineTag: String? = null,
 ) {
     val owner: String get() = id.substringBefore('/', missingDelimiterValue = "")
     val name: String get() = id.substringAfter('/')
+
+    /** True when the repository ships a vision encoder alongside the weights. */
+    val isVision: Boolean
+        get() = pipelineTag == HubTask.VISION.parameter ||
+            pipelineTag == HubTask.ANY_TO_ANY.parameter
+
+    /** True when it can be given a recording. */
+    val isAudio: Boolean
+        get() = pipelineTag == HubTask.AUDIO.parameter ||
+            pipelineTag == HubTask.ANY_TO_ANY.parameter
+
+    /**
+     * The parameter count as the publisher wrote it in the name, for example `2.6B`.
+     *
+     * Read from the name rather than asked for, because the Hub only returns a repository's
+     * true parameter count through `expand[]=gguf`, which also drags the whole chat
+     * template along: 30 results grow from 15 KB to 270 KB. The name is what people read
+     * anyway, and every quantizer puts the size in it.
+     */
+    val parameterHint: String?
+        get() = PARAMETER_PATTERN.find(name)?.value?.uppercase()
+
+    private companion object {
+        /**
+         * A number followed by B or M, on a boundary, as in `LFM2.5-2.6B-GGUF`.
+         *
+         * Case insensitive because `gemma-7b` and `Qwen3-8B` are both common. The
+         * lookaround is what keeps it from reading a version number or a quantization
+         * label as a size: a row that says 4B about a model of unknown size is worse than
+         * a row that says nothing.
+         */
+        val PARAMETER_PATTERN = Regex(
+            """(?<![A-Za-z0-9.])\d+(\.\d+)?[BM](?![A-Za-z0-9])""",
+            RegexOption.IGNORE_CASE,
+        )
+    }
 }
 
 /** One downloadable GGUF inside a repository. */
@@ -133,22 +171,30 @@ class HuggingFaceClient @Inject constructor(
     }
 
     /**
-     * Searches models that ship GGUF files.
+     * Searches models this app could actually run.
      *
-     * The `gguf` library filter is what makes the result set runnable: without it the Hub
-     * returns thousands of repositories this app could never load.
+     * Scoped by `apps=llama.cpp` rather than the `gguf` tag. The Hub computes that filter
+     * from whether llama.cpp can load the repository, and the two differ in the results
+     * that matter: the tag also matches Whisper GGUFs, video diffusion weights packaged as
+     * GGUF, and control vectors, none of which are chat models, while the app filter
+     * catches repositories that never got tagged. Sampling the top 500 by downloads,
+     * roughly one in six differs between them.
      */
-    suspend fun search(
-        query: String,
-        sort: HubSort = HubSort.DOWNLOADS,
-        limit: Int = DEFAULT_LIMIT,
-    ): List<HubModel> {
+    suspend fun search(query: HubQuery, limit: Int = DEFAULT_LIMIT): List<HubModel> {
         val url = apiUrl("models")
-            .addQueryParameter("filter", "gguf")
+            .addQueryParameter("apps", LLAMA_CPP)
             .addQueryParameter("limit", limit.toString())
-            .addQueryParameter("sort", sort.parameter)
+            .addQueryParameter("sort", query.sort.parameter)
             .addQueryParameter("direction", "-1")
-            .apply { if (query.isNotBlank()) addQueryParameter("search", query) }
+            .apply {
+                query.text.trim().takeIf { it.isNotEmpty() }
+                    ?.let { addQueryParameter("search", it) }
+                query.task?.let { addQueryParameter("pipeline_tag", it.parameter) }
+                query.author?.trim()?.takeIf { it.isNotEmpty() }
+                    ?.let { addQueryParameter("author", it) }
+                query.parameterBand?.let { addQueryParameter("num_parameters", it) }
+                if (query.hideGated) addQueryParameter("gated", "false")
+            }
             .build()
 
         return json.decodeFromString<List<SearchEntry>>(get(url)).map { it.toModel() }
@@ -221,10 +267,45 @@ class HuggingFaceClient @Inject constructor(
         val HOST = "https://huggingface.co".toHttpUrl()
         const val GGUF_SUFFIX = ".gguf"
         const val DEFAULT_LIMIT = 30
+
+        /** The Hub's identifier for the local app this project is built on. */
+        const val LLAMA_CPP = "llama.cpp"
     }
 }
 
-/** How search results are ordered. */
+/** Everything the Discover screen can ask the Hub for. */
+data class HubQuery(
+    val text: String = "",
+    val sort: HubSort = HubSort.TRENDING,
+    /** The task the model is published for. Null means any. */
+    val task: HubTask? = null,
+    /** A single organisation or user, as it appears in the repository id. */
+    val author: String? = null,
+    val parameters: ParameterRange = ParameterRange.ANY,
+    /**
+     * A ceiling worked out from the device, in billions of parameters.
+     *
+     * Overrides [parameters] while it is set, because "what this phone can hold" and "8B
+     * to 16B" are two answers to the same question and showing both would leave the user
+     * to work out which one won.
+     */
+    val maxParametersBillions: Int? = null,
+    val hideGated: Boolean = false,
+) {
+    /** How many filters are on, for the badge on the filter button. */
+    val activeCount: Int = listOf(
+        task != null,
+        !author.isNullOrBlank(),
+        parameters != ParameterRange.ANY,
+        maxParametersBillions != null,
+        hideGated,
+    ).count { it }
+
+    /** The `num_parameters` value for this query, or null when size is unconstrained. */
+    internal val parameterBand: String?
+        get() = maxParametersBillions?.let { "max:${it}B" } ?: parameters.parameter()
+}
+
 /**
  * How search results are ordered.
  *
@@ -234,7 +315,48 @@ class HuggingFaceClient @Inject constructor(
  * and together they read as one choice.
  */
 enum class HubSort(val parameter: String, val label: String) {
+    /** The Hub's own measure of what people are picking up right now. */
+    TRENDING("trendingScore", "Trending"),
     DOWNLOADS("downloads", "Downloads"),
     LIKES("likes", "Likes"),
     RECENT("lastModified", "Recent"),
 }
+
+/**
+ * The task a repository is published for.
+ *
+ * Only the tasks a chat app can use. The Hub's `apps=llama.cpp` set also contains
+ * embedding, translation and even video models, which load and then cannot hold a
+ * conversation, so being able to rule them out is worth a filter of its own. Left off by
+ * default because roughly one repository in six carries no task tag at all, and filtering
+ * would hide them.
+ */
+enum class HubTask(val parameter: String, val label: String, val description: String) {
+    CHAT("text-generation", "Chat", "Text in, text out"),
+    VISION("image-text-to-text", "Vision", "Reads pictures and video"),
+    AUDIO("audio-text-to-text", "Audio", "Listens to recordings"),
+    ANY_TO_ANY("any-to-any", "Any to any", "Several kinds of input at once"),
+}
+
+/**
+ * A parameter count band.
+ *
+ * The Hub takes these as `min:`/`max:` with unit suffixes and applies them server side, so
+ * a phone-sized band is one request rather than paging through 30B models to find the 3B
+ * ones. The bands are chosen around what a phone can hold rather than around round
+ * numbers: under 2B is comfortable everywhere, 8B is the edge of a 12 GB device.
+ */
+enum class ParameterRange(val label: String, val min: String?, val max: String?) {
+    ANY("Any size", null, null),
+    TINY("Under 2B", null, "2B"),
+    SMALL("2B to 4B", "2B", "4B"),
+    MEDIUM("4B to 8B", "4B", "8B"),
+    LARGE("8B to 16B", "8B", "16B"),
+    HUGE("Over 16B", "16B", null),
+}
+
+/** The `num_parameters` value for a band, or null when the band is everything. */
+internal fun ParameterRange.parameter(): String? = listOfNotNull(
+    min?.let { "min:$it" },
+    max?.let { "max:$it" },
+).joinToString(",").takeIf { it.isNotEmpty() }

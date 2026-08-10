@@ -100,3 +100,19 @@ interface UsageDao {
         )
     }
 }
+
+/** Reads and writes the reports the user filed against model output. */
+@Dao
+interface ContentReportDao {
+    @Insert
+    suspend fun insert(report: ContentReportEntity): Long
+
+    @Query("SELECT * FROM content_reports ORDER BY reportedAt DESC")
+    fun observeAll(): Flow<List<ContentReportEntity>>
+
+    @Query("SELECT COUNT(*) FROM content_reports WHERE modelName = :modelName")
+    suspend fun countFor(modelName: String): Int
+
+    @Query("DELETE FROM content_reports WHERE id = :id")
+    suspend fun delete(id: Long)
+}

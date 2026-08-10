@@ -53,6 +53,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
 import io.github.alpharomercoma.openweights.ui.chat.MediaViewModel
+import io.github.alpharomercoma.openweights.ui.chat.ReportViewModel
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
@@ -150,6 +151,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 val state by chatViewModel.uiState.collectAsStateWithLifecycle()
                 val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
                 val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
+                val reportViewModel: ReportViewModel = hiltViewModel()
 
                 LaunchedEffect(Unit) {
                     // The view model outlives the composition, so returning to this tab
@@ -177,6 +179,14 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     dictation = dictation,
                     canDictate = mediaViewModel.canDictate,
                     onDictate = mediaViewModel::toggleDictation,
+                    onReport = { entry, reason, note ->
+                        reportViewModel.report(
+                            modelName = state.modelName,
+                            replyText = entry.answer.ifEmpty { entry.text },
+                            reason = reason,
+                            note = note,
+                        )
+                    },
                 )
             }
 

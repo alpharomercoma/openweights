@@ -51,7 +51,17 @@ tasks.register("verify") {
 }
 
 /** The host-side tiers, in the order they fail fastest. */
-val VERIFY_TASKS = listOf("ktlintCheck", "detekt", "assembleDebug", "testDebugUnitTest")
+val VERIFY_TASKS = listOf(
+    "ktlintCheck",
+    "detekt",
+    // Android lint, on the variant that ships. It had never been run before 2026-08-10 and
+    // was holding four errors, including composables reading the locale in a way that
+    // ignores the user changing it. Run it on release, because that is the variant with
+    // R8 and the manifest that reaches Play.
+    "lintRelease",
+    "assembleDebug",
+    "testDebugUnitTest",
+)
 
 /**
  * The device tier: the engine against real weights.

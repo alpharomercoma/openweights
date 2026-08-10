@@ -24,6 +24,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.core.content.FileProvider
+import androidx.core.graphics.scale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -189,8 +190,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
 
         val scale = MAX_IMAGE_EDGE.toFloat() / max(decoded.width, decoded.height)
         val resized = if (scale < 1f) {
-            Bitmap.createScaledBitmap(
-                decoded,
+            decoded.scale(
                 (decoded.width * scale).roundToInt().coerceAtLeast(1),
                 (decoded.height * scale).roundToInt().coerceAtLeast(1),
                 true,

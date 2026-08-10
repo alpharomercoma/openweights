@@ -23,14 +23,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Everything the app remembers. Never leaves the device and is excluded from backups. */
 @Database(
-    entities = [ConversationEntity::class, MessageEntity::class, UsageEntity::class],
-    version = 2,
+    entities = [
+        ConversationEntity::class,
+        MessageEntity::class,
+        UsageEntity::class,
+        ContentReportEntity::class,
+    ],
+    version = 3,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun conversations(): ConversationDao
     abstract fun messages(): MessageDao
     abstract fun usage(): UsageDao
+    abstract fun reports(): ContentReportDao
 
     companion object {
         const val NAME = "openweights.db"
@@ -45,6 +51,24 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN attachments TEXT")
+            }
+        }
+
+        /** Adds the table behind the in-app report action. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS content_reports (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        modelName TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        replyText TEXT NOT NULL,
+                        note TEXT NOT NULL,
+                        reportedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
             }
         }
     }

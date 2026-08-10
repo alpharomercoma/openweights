@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("openweights.android.application")
     id("openweights.android.compose")
@@ -14,6 +16,42 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    /*
+     * Release signing.
+     *
+     * Read from a properties file or the environment, never from the repository. Play App
+     * Signing holds the key that users verify against; this is only the upload key, but an
+     * upload key in git is still an upload key anyone can use.
+     *
+     * Local:  keystore.properties in the project root, git-ignored.
+     * CI:     OPENWEIGHTS_KEYSTORE and friends in the environment.
+     *
+     * Absent, the release build is simply unsigned, which is what a contributor building
+     * from a fresh clone should get rather than a confusing failure.
+     */
+    val keystoreProperties = Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+
+    fun secret(key: String, env: String): String? =
+        keystoreProperties.getProperty(key) ?: System.getenv(env)
+
+    val storePath = secret("storeFile", "OPENWEIGHTS_KEYSTORE")
+
+    signingConfigs {
+        if (storePath != null) {
+            create("release") {
+                // Resolved against the root, where keystore.properties lives. file()
+                // here would resolve a relative path under app/ instead.
+                storeFile = rootProject.file(storePath)
+                storePassword = secret("storePassword", "OPENWEIGHTS_KEYSTORE_PASSWORD")
+                keyAlias = secret("keyAlias", "OPENWEIGHTS_KEY_ALIAS")
+                keyPassword = secret("keyPassword", "OPENWEIGHTS_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -26,6 +64,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

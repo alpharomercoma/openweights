@@ -46,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
@@ -54,7 +55,6 @@ import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -76,6 +76,10 @@ fun ParameterSheet(
     onDismiss: () -> Unit,
 ) {
     var draft by remember(preferences) { mutableStateOf(preferences) }
+    // Read from the composition, not Locale.getDefault(): a screen formatted with the
+    // latter keeps the old decimal separator after the user changes language, because
+    // nothing tells it to recompose.
+    val locale = LocalConfiguration.current.locales[0]
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -104,7 +108,7 @@ fun ParameterSheet(
                 label = "Temperature",
                 explanation = "Lower is more predictable, higher is more varied. 0 always " +
                     "picks the most likely next word.",
-                value = String.format(Locale.getDefault(), "%.2f", draft.temperature),
+                value = String.format(locale, "%.2f", draft.temperature),
             ) {
                 Slider(
                     value = draft.temperature,
@@ -117,7 +121,7 @@ fun ParameterSheet(
                 label = "Top-p",
                 explanation = "Considers only the most likely words that together make up " +
                     "this much of the probability.",
-                value = String.format(Locale.getDefault(), "%.2f", draft.topP),
+                value = String.format(locale, "%.2f", draft.topP),
             ) {
                 Slider(
                     value = draft.topP,
@@ -142,7 +146,7 @@ fun ParameterSheet(
                 label = "Repeat penalty",
                 explanation = "Discourages repeating itself. Too high and it avoids words " +
                     "it needs.",
-                value = String.format(Locale.getDefault(), "%.2f", draft.repeatPenalty),
+                value = String.format(locale, "%.2f", draft.repeatPenalty),
             ) {
                 Slider(
                     value = draft.repeatPenalty,

@@ -451,6 +451,7 @@ class ChatViewModelTest {
     }
 
     /** Loads a throwaway file through the real code path and waits for it to settle. */
+
     private fun TestScope.loadModel(
         name: String = "model-a.gguf",
         keepConversation: Boolean = false,

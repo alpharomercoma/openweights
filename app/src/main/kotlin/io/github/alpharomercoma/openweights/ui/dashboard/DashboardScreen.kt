@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -263,6 +264,7 @@ private fun DailyChart(days: List<DailyUsage>) {
 @Composable
 private fun ModelBreakdown(models: List<ModelUsage>) {
     if (models.isEmpty()) return
+    val locale = LocalConfiguration.current.locales[0]
     val total = models.sumOf { it.generatedTokens }.coerceAtLeast(1)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -286,7 +288,7 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
                     // size would say a busy day was a fast one.
                     model.averageTokensPerSecond?.let { rate ->
                         Metric(
-                            text = String.format(Locale.getDefault(), "· %.1f tok/s", rate),
+                            text = String.format(locale, "· %.1f tok/s", rate),
                             color = signalColor((rate / FAST_TOKENS_PER_SECOND).toFloat(), dark),
                         )
                     }

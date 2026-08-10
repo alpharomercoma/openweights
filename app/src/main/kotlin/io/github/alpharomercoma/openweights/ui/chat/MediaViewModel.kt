@@ -72,6 +72,5 @@ class MediaViewModel @Inject constructor(
     override fun onCleared() {
         dictation.stop()
         speech.release()
-        super.onCleared()
     }
 }

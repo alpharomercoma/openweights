@@ -923,7 +923,6 @@ class ChatViewModel @Inject constructor(
 
     override fun onCleared() {
         engine.cancel()
-        super.onCleared()
     }
 }
 

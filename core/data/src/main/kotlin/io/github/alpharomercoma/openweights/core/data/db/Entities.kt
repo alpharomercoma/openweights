@@ -90,3 +90,28 @@ data class UsageEntity(
     val inferenceMs: Long,
     val replies: Int,
 )
+
+/**
+ * A reply the user flagged as offensive or wrong.
+ *
+ * Play requires an app that generates AI content to let people report it without leaving
+ * the app. It is also the only signal this app can have about model behaviour, because
+ * nothing is measured remotely: a model that earns reports is one worth warning the next
+ * person about.
+ *
+ * The reply text is kept because a report with no example is not a report. It stays on the
+ * device like everything else, and sending it anywhere is a separate, explicit choice.
+ */
+@Entity(tableName = "content_reports")
+data class ContentReportEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Which model produced it, so repeat offenders are visible. */
+    val modelName: String,
+    /** One of the reasons offered in the sheet. */
+    val reason: String,
+    /** What the model actually said. */
+    val replyText: String,
+    /** Anything the user chose to add. Empty when they added nothing. */
+    val note: String,
+    val reportedAt: Long,
+)

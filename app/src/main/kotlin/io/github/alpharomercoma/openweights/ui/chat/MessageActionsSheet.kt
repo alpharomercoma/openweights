@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,16 +61,27 @@ fun MessageActionsSheet(
     isSpeaking: Boolean,
     onRegenerate: () -> Unit,
     onToggleReadAloud: () -> Unit,
+    onReport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        // Fully expanded, like every other sheet here. Half height clipped the last
+        // action off the bottom with nothing to say it was there.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Column(modifier = Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
+        // Sized to its content, deliberately. A verticalScroll here makes the column
+        // willing to be any height, so the sheet hands it the leftover space and the last
+        // action falls off the bottom. Four rows fit; skipPartiallyExpanded is what makes
+        // sure they are all shown.
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
+        ) {
             ActionRow(
                 icon = Icons.Rounded.ContentCopy,
                 label = "Copy text",
@@ -101,6 +113,15 @@ fun MessageActionsSheet(
                     icon = Icons.Rounded.Refresh,
                     label = "Regenerate reply",
                     onClick = onRegenerate,
+                )
+            }
+            if (entry.role == ChatRole.ASSISTANT) {
+                // Required of anything that generates AI content, and the only signal this
+                // app can have about a model's behaviour when nothing is measured remotely.
+                ActionRow(
+                    icon = Icons.Rounded.Flag,
+                    label = "Report this reply",
+                    onClick = onReport,
                 )
             }
         }

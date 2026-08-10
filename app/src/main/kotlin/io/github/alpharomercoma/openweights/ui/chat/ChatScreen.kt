@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
+import io.github.alpharomercoma.openweights.core.data.ReportReason
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
@@ -120,6 +121,7 @@ fun ChatScreen(
     dictation: DictationState = DictationState(),
     canDictate: Boolean = false,
     onDictate: ((String) -> Unit) -> Unit = {},
+    onReport: (TranscriptEntry, ReportReason, String) -> Unit = { _, _, _ -> },
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -180,6 +182,7 @@ fun ChatScreen(
             dictation = dictation,
             canDictate = canDictate,
             onDictate = onDictate,
+            onReport = onReport,
             modifier = modifier,
         )
     }
@@ -211,6 +214,7 @@ private fun ChatContent(
     dictation: DictationState,
     canDictate: Boolean,
     onDictate: ((String) -> Unit) -> Unit,
+    onReport: (TranscriptEntry, ReportReason, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -333,6 +337,7 @@ private fun ChatContent(
         onToggleReadAloud = onToggleReadAloud,
         isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
+        onReport = onReport,
     )
 }
 
@@ -431,7 +436,10 @@ private fun ChatSheets(
     onToggleReadAloud: (String) -> Unit,
     isSpeaking: Boolean,
     onDismissActions: () -> Unit,
+    onReport: (TranscriptEntry, ReportReason, String) -> Unit,
 ) {
+    var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
+
     if (showParameters && state.modelName != null) {
         ParameterSheet(
             modelName = state.modelName,
@@ -449,6 +457,18 @@ private fun ChatSheets(
         )
     }
 
+    reportFor?.let { entry ->
+        ReportSheet(
+            modelName = state.modelName.orEmpty(),
+            replyText = entry.answer.ifEmpty { entry.text },
+            onSubmit = { reason, note ->
+                onReport(entry, reason, note)
+                reportFor = null
+            },
+            onDismiss = { reportFor = null },
+        )
+    }
+
     actionsFor?.let { entry ->
         MessageActionsSheet(
             entry = entry,
@@ -462,6 +482,10 @@ private fun ChatSheets(
             onRegenerate = {
                 onRegenerate()
                 onDismissActions()
+            },
+            onReport = {
+                onDismissActions()
+                reportFor = entry
             },
             onDismiss = onDismissActions,
         )

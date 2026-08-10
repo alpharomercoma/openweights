@@ -27,6 +27,10 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
 
         extensions.configure<LibraryExtension> {
             configureAndroidCommon(this)
+            // Rules a module needs in order to survive R8 travel with the module, so the
+            // app does not have to know which of its dependencies has a native half or
+            // uses reflection. Missing when the file is absent, which is most modules.
+            defaultConfig.consumerProguardFiles("consumer-rules.pro")
         }
 
         dependencies {

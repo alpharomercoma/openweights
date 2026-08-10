@@ -19,16 +19,18 @@ package io.github.alpharomercoma.openweights.ui
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Chat
-import androidx.compose.material.icons.rounded.InsertChart
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -41,6 +43,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -80,12 +84,18 @@ import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
  * Called Tools rather than Capabilities or Context. Capabilities is long enough to wrap on
  * a narrow phone next to four short words, and Context already means the context window,
  * shown as a percentage two screens away.
+ *
+ * The icons are one family and one idea: a chip for the weights, because that is what this
+ * app is about and a database cylinder said the opposite, files on a server somewhere. Five
+ * destinations is the most Material allows and all five earn it. Four of them are the parts
+ * no hosted assistant has, and burying them behind a menu to tidy the bar would be hiding
+ * the reason to use this at all.
  */
 private enum class Destination(val route: String, val label: String, val icon: ImageVector) {
     CHAT("chat", "Chat", Icons.Rounded.Chat),
-    MODELS("models", "Models", Icons.Rounded.Storage),
+    MODELS("models", "Models", Icons.Rounded.Memory),
     TOOLS("tools", "Tools", Icons.Rounded.Build),
-    USAGE("usage", "Usage", Icons.Rounded.InsertChart),
+    USAGE("usage", "Usage", Icons.Rounded.BarChart),
     SETTINGS("settings", "Settings", Icons.Rounded.Settings),
 }
 
@@ -133,23 +143,50 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         // twice, which is what left the top bar and the composer floating mid-screen.
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
-                Destination.entries.forEach { destination ->
-                    val selected =
-                        currentDestination?.hierarchy?.any { it.route == destination.route } == true
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = { navController.switchTab(destination.route) },
-                        icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(destination.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primary,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    )
+            // A hairline and the page's own colour, rather than a raised slab. Every screen
+            // above it is drawn on `background`, so a bar in `surfaceContainer` read as a
+            // separate panel bolted to the bottom. One line is enough to say where the page
+            // ends, and it lets the five destinations look like part of the app rather than
+            // a tray the app is sitting in.
+            Column {
+                HorizontalDivider(
+                    // outline, not outlineVariant. The palette calls the variant decorative
+                    // and says it is never the only boundary, and measured against this
+                    // background it is 1.3:1, which is a line nobody can see. This one is
+                    // 3.8:1 in light and 4.3:1 in dark: still a hairline, actually there.
+                    thickness = Dp.Hairline,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    tonalElevation = 0.dp,
+                ) {
+                    Destination.entries.forEach { destination ->
+                        val selected = currentDestination?.hierarchy
+                            ?.any { it.route == destination.route } == true
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = { navController.switchTab(destination.route) },
+                            icon = { Icon(destination.icon, contentDescription = null) },
+                            label = { Text(destination.label) },
+                            // Brass, at container weight. The palette's first rule is that
+                            // the accent means "you can act here" and names the active tab
+                            // as one of the four places it belongs, so a neutral tab would
+                            // have been a quieter bar bought by breaking the design system.
+                            // What was wrong was the weight: a filled accent slab with a
+                            // reversed icon reads as a button dropped into a row of icons.
+                            // The container is a warm tint at 1.4:1 against the bar, and the
+                            // icon and label on top of it are the accent itself at 6.9:1.
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor =
+                                MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                        )
+                    }
                 }
             }
         },

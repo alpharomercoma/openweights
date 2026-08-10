@@ -68,6 +68,13 @@ fun OpenWeightsTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            // Android draws a translucent scrim behind the three button navigation strip
+            // unless told not to. With it, the phone's own buttons sit on a slab a shade
+            // apart from the app's navigation bar directly above them, and the bottom of
+            // the screen reads as two rows of controls rather than one edge. Turning it
+            // off lets our bar's colour run to the bottom of the display, which is the
+            // whole difference between a bar that ends and a bar that the phone continues.
+            window.isNavigationBarContrastEnforced = false
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !darkTheme
                 isAppearanceLightNavigationBars = !darkTheme

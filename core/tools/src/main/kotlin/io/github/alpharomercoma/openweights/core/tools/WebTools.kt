@@ -148,7 +148,16 @@ class WebSearchTool @Inject constructor(
     }
 }
 
-class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : Tool {
+class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
+    /**
+     * The shared client, refusing to dial anything off the public internet.
+     *
+     * newBuilder keeps the connection pool and dispatcher, so this costs nothing but the
+     * resolver. It is only this tool that needs it: every other request in the app goes to
+     * an address the app chose, and this is the one the model chooses. See [PublicOnlyDns].
+     */
+    private val httpClient: OkHttpClient = httpClient.newBuilder().dns(PublicOnlyDns()).build()
+
     override val definition = ToolDefinition(
         name = "fetch_url",
         description = "Fetch a public web page and return its readable text. Use it to " +
@@ -173,7 +182,10 @@ class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : T
             ?: return@withContext "No URL was given. Call fetch_url again with a url."
 
         // https only, and the app disables cleartext anyway, so this refusal is the honest
-        // message rather than a network error the model cannot interpret.
+        // message rather than a network error the model cannot interpret. The scheme is all
+        // this can usefully check: whether the address is somewhere the app has any business
+        // reaching is a question about the machine behind the name, which only the resolver
+        // can answer, and PublicOnlyDns answers it for every hop.
         if (!url.startsWith("https://")) {
             return@withContext "Only https addresses can be read. Got: $url"
         }

@@ -85,8 +85,17 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
 
     override suspend fun search(query: String, limit: Int): List<SearchHit>? {
         val landing = HOME.toHttpUrl().newBuilder().addQueryParameter("q", query).build()
-        // Only for its cookies. A failure here is not fatal: the POST is still worth trying.
-        client.textOrNull(landing) { it.header("Accept", "text/html") }
+        // Only for its cookies, which arrive in the headers: the body is read and thrown
+        // away, so it is never read at all. A failure here is not fatal, the POST is still
+        // worth trying.
+        runCatching {
+            val probe = Request.Builder()
+                .url(landing)
+                .header("User-Agent", SEARCH_USER_AGENT)
+                .header("Accept", "text/html")
+                .build()
+            client.newCall(probe).execute().close()
+        }
 
         val form = FormBody.Builder().add("q", query).build()
         val request = Request.Builder()
@@ -99,7 +108,11 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
 
         val page = runCatching {
             client.newCall(request).execute().use { response ->
-                if (response.code != HTTP_OK) null else response.body.string()
+                // Bounded, because the size of this page is decided by a server we do not
+                // run. peekBody stops at the limit rather than after it, so a response that
+                // never ends cannot take the heap with it. A results page is tens of
+                // kilobytes; a megabyte is generous and still finite.
+                if (response.code != HTTP_OK) null else response.peekBody(MAX_PAGE_BYTES).string()
             }
         }.getOrNull() ?: return null
 
@@ -113,6 +126,9 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
         const val HOME = "https://duckduckgo.com"
         const val HTML_ENDPOINT = "https://html.duckduckgo.com/html/"
         const val HTTP_OK = 200
+
+        /** Far more than a results page needs, and an end where there was none. */
+        const val MAX_PAGE_BYTES = 1L shl 20
 
         private val RESULT = Regex(
             """result__a[^>]*href="([^"]+)"[^>]*>(.*?)</a>.*?result__snippet[^>]*>(.*?)</a>""",
@@ -164,28 +180,19 @@ private class MemoryCookieJar : CookieJar {
         jar[url.host] = cookies
     }
 
+    /**
+     * Cookies for this host and the registrable domain above it, and nothing else.
+     *
+     * Sharing across duckduckgo.com and html.duckduckgo.com is the whole point: the cookies
+     * the search page sets are what the html endpoint checks for. Matching that with a bare
+     * endsWith also made evilduckduckgo.com a match for duckduckgo.com, because one string
+     * does end with the other. Requiring the dot makes it a subdomain test rather than a
+     * spelling one.
+     */
     override fun loadForRequest(url: HttpUrl): List<Cookie> =
-        // Shared across duckduckgo.com and html.duckduckgo.com, which is the whole point:
-        // the cookies the search page sets are what the html endpoint checks for.
-        jar.filterKeys { url.host.endsWith(it) || it.endsWith(url.host) }.values.flatten()
-}
-
-/** The body of a successful response, or null for anything else. */
-private inline fun OkHttpClient.textOrNull(
-    url: HttpUrl,
-    headers: (Request.Builder) -> Unit = {},
-): String? {
-    val request = Request.Builder()
-        .url(url)
-        .header("User-Agent", SEARCH_USER_AGENT)
-        .header("Accept", "application/json")
-        .also(headers)
-        .build()
-    return runCatching {
-        newCall(request).execute().use { response ->
-            if (response.isSuccessful) response.body.string() else null
-        }
-    }.getOrNull()
+        jar.filterKeys { host -> url.host == host || url.host.endsWith(".$host") }
+            .values
+            .flatten()
 }
 
 /** Identifies the client, which is what Wikimedia asks for and what Brave logs. */

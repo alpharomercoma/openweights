@@ -72,6 +72,13 @@ class ToolCallingTest {
     @Test
     fun modelAsksForAToolWhenOneFits() = runBlocking {
         engine.load(MODEL, ModelLoadParams(contextLength = CONTEXT))
+        // Not every model can. A template that does not render tools drops them without
+        // complaint and the model answers in prose, so asserting a call here would be
+        // asserting something about the file someone happened to push, not about the app.
+        assumeTrue(
+            "${MODEL.name} has a chat template that does not support tools",
+            engine.loadedModel?.supportsTools == true,
+        )
 
         val completed = engine.chat(
             messages = listOf(

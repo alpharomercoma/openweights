@@ -28,11 +28,20 @@ android {
                     "-DGGML_OPENMP=OFF",
                     "-DGGML_LLAMAFILE=OFF",
                     "-DGGML_CPU_KLEIDIAI=ON",
-                    // GPU backends are not built yet. ggml's Vulkan target
-                    // needs vendored SPIRV-Headers and a host shader compiler, and on the
-                    // Mali-class GPUs we have measured it loses to the tuned CPU path.
-                    // The engine enumerates backends at runtime, so turning this on later
-                    // makes the GPU option appear in Settings with no other code change.
+                    // The Adreno GPU backend, through OpenCL. Measured on a Snapdragon 8
+                    // Elite (Adreno 830): prefill runs 4.8 to 5.5 times faster than the
+                    // tuned CPU path, and decode runs about 0.7 times as fast, because
+                    // reading one token at a time is bound by memory bandwidth rather than
+                    // by compute. So it is built in and offered, not switched on by
+                    // default. Kernels are embedded rather than loaded from files, since
+                    // an APK has no directory to read them from.
+                    "-DGGML_OPENCL=ON",
+                    "-DGGML_OPENCL_EMBED_KERNELS=ON",
+                    "-DGGML_OPENCL_USE_ADRENO_KERNELS=ON",
+                    // Vulkan stays off: its ggml target needs vendored SPIRV-Headers and a
+                    // host shader compiler, and on the Mali-class GPUs we have measured it
+                    // loses to the tuned CPU path. The engine enumerates backends at
+                    // runtime, so turning it on later needs no other code change.
                     // "-DGGML_VULKAN=ON", "-DVulkan_GLSLC_EXECUTABLE=" + glslcPath,
                     "-DLLAMA_CURL=OFF",
                     "-DLLAMA_BUILD_COMMON=ON",
@@ -59,6 +68,12 @@ android {
 
     packaging {
         jniLibs.useLegacyPackaging = false
+        // Khronos's ICD loader is a link target, not a runtime one. Qualcomm lists
+        // libOpenCL.so in /vendor/etc/public.libraries.txt, so the app resolves the
+        // driver already on the phone. Shipping ours would shadow it, and ours reads
+        // /vendor/etc/OpenCL/vendors, which Android devices do not have: the result is a
+        // GPU backend that loads, reports no platforms, and silently runs on the CPU.
+        jniLibs.excludes += "**/libOpenCL.so"
     }
 }
 

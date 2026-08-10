@@ -216,6 +216,25 @@ void load_best_cpu_backend() {
     ggml_backend_load(best_name);
 }
 
+/**
+ * Registers the GPU backend, on the devices that have one.
+ *
+ * Same reason as the CPU variants: nothing is extracted from the APK, so ggml cannot scan
+ * a directory and the library has to be named. Failing is normal and quiet. The backend
+ * only loads where the vendor ships an OpenCL driver, which is Qualcomm and not much
+ * else, and a device without one is not broken, it just has no GPU option.
+ *
+ * Registering it does not move any work onto the GPU. Weights stay on the CPU until a
+ * load asks for layers to be offloaded, which is a choice made per model.
+ */
+void load_gpu_backend() {
+    if (!ggml_backend_load("libggml-opencl.so")) {
+        LOGI("no OpenCL backend on this device, running on the CPU");
+        return;
+    }
+    LOGI("OpenCL backend registered");
+}
+
 /** Size of a file in bytes, or 0 when it cannot be read. */
 size_t file_size(const std::string & path) {
     struct stat info {};
@@ -230,6 +249,7 @@ void init_backend() {
         // stderr, which on Android means nowhere.
         mtmd_helper_log_set(log_callback, nullptr);
         load_best_cpu_backend();
+        load_gpu_backend();
         llama_backend_init();
     });
 }
@@ -447,6 +467,38 @@ int32_t Session::ingest_media_prompt(
 bool Session::supports_thinking() const {
     auto * templates = static_cast<common_chat_templates *>(chat_templates_);
     return templates != nullptr && common_chat_templates_support_enable_thinking(templates);
+}
+
+bool Session::supports_tools() const {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    if (templates == nullptr) {
+        return false;
+    }
+
+    // Ask the template rather than guess from the architecture, by rendering a tool with
+    // an unmistakable name and looking for it. Handing a tool to a model whose template
+    // ignores it is not an error anywhere in llama.cpp: the definition is silently dropped
+    // and the model answers in prose, which is indistinguishable from a model that chose
+    // not to call anything. This tells cannot apart from did not.
+    static constexpr const char * kProbeName = "openweights_probe_tool";
+
+    common_chat_templates_inputs inputs;
+    inputs.add_generation_prompt = true;
+    inputs.use_jinja = true;
+
+    common_chat_msg msg;
+    msg.role = "user";
+    msg.content = "probe";
+    inputs.messages.push_back(msg);
+    inputs.tools.push_back({kProbeName, "probe", "{\"type\":\"object\",\"properties\":{}}"});
+
+    try {
+        const common_chat_params params = common_chat_templates_apply(templates, inputs);
+        return params.prompt.find(kProbeName) != std::string::npos;
+    } catch (const std::exception &) {
+        // A template that throws on tools cannot use them either.
+        return false;
+    }
 }
 
 bool Session::render_prompt(

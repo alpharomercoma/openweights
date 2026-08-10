@@ -305,6 +305,7 @@ class LlamaCppEngine internal constructor(
                 MediaSupport(vision = support[0], audio = support[1])
             },
             supportsThinking = bridge.nativeSupportsThinking(activeHandle),
+            supportsTools = bridge.nativeSupportsTools(activeHandle),
         )
     }
 

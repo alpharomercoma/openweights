@@ -77,6 +77,8 @@ internal class LlamaBridge {
     /** True when the loaded chat template understands being told whether to think. */
     external fun nativeSupportsThinking(handle: Long): Boolean
 
+    external fun nativeSupportsTools(handle: Long): Boolean
+
     /** The marker the projector expects where an attachment belongs in the prompt. */
     external fun nativeMediaMarker(handle: Long): String
 

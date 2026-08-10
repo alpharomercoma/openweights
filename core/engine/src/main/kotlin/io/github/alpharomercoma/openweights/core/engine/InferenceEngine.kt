@@ -128,6 +128,14 @@ data class LoadedModelInfo(
     val mediaSupport: MediaSupport = MediaSupport(),
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,
+    /**
+     * True when this model's chat template renders tool definitions.
+     *
+     * A template that does not will drop them without complaint, and the model then
+     * answers in prose. Knowing the difference is what stops the app offering a tool
+     * setting on a model that cannot act on it.
+     */
+    val supportsTools: Boolean = false,
 )
 
 /**

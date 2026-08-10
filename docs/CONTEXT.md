@@ -32,7 +32,7 @@ Fully open source under **Apache-2.0**, aimed at a developer audience.
 | Device | SoC | RAM | Notes |
 |---|---|---|---|
 | Poco X8 Pro Max (primary dev device) | MediaTek **MT6991** | 11.5 GiB total | Measured on-device, see below |
-| TBD (second test device) | Snapdragon 8 Elite | TBD | Adreno; OpenCL backend is the interesting GPU path there |
+| Qualcomm Device Cloud `sun` (second test device) | Qualcomm **SM8750** (Snapdragon 8 Elite) | 14.8 GiB total | Adreno 830; OpenCL backend verified here, see below |
 
 ### Measured facts for the dev device (adb, 2026-08-09)
 
@@ -98,8 +98,10 @@ Single source of truth: `gradle/libs.versions.toml`.
       long-press actions, slash-command palette
 - [x] **Compaction**: folds older turns into a model-written summary before the context
       window fills, so long conversations continue instead of dying
-- [~] **Compute backend choice**: engine enumerates ggml devices at runtime; GPU backends
-      not yet compiled in (see ROADMAP for why), Settings screen not built
+- [~] **Compute backend choice**: engine enumerates ggml devices at runtime and the
+      Adreno OpenCL backend is compiled in and verified on a Snapdragon 8 Elite. The
+      choice is not yet in Settings, and `gpuLayers` still defaults to 0, so the GPU is
+      available but nothing offloads to it yet.
 - [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
       requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
 - [x] **Tool calling**: tools are rendered into each model's own syntax and calls are
@@ -114,7 +116,7 @@ Single source of truth: `gradle/libs.versions.toml`.
       shelling out to `ffmpeg`. Multimodal out is text plus Android TTS read-aloud, with
       dictation through the on-device recogniser.
 - [x] **Test tiers**: `./gradlew verify` runs ktlint, detekt, assemble and the unit and
-      Robolectric tiers in one command, 110 tests. `verifyOnDevice` is the instrumented
+      Robolectric tiers in one command, 127 tests. `verifyOnDevice` is the instrumented
       tier and is separate because it needs a phone and model files. A standalone native
       probe covers the C++ that JNI makes awkward to test, such as the UTF-8 validator.
 - [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
@@ -299,6 +301,65 @@ sort chips on screen instead of behaving like its own screen.
 One environment note: a model file placed with `adb` lands as `shell:ext_data_rw` mode 660
 and the app cannot read it: `chmod 666` fixes it. Files the app downloads itself are
 unaffected.
+
+## Second device: Snapdragon 8 Elite, and the GPU backend (2026-08-10)
+
+Run on a Qualcomm Device Cloud device over an SSH tunnel to the QDC ADB server. The local
+adb server has to be stopped first, because the tunnel binds the same port 5037.
+
+```sh
+adb kill-server
+ssh -i <key.pem> -o ExitOnForwardFailure=yes -L 5037:<device-host>:5037 -N sshtunnel@ssh.qdc.qualcomm.com &
+adb devices   # reaches the remote server through the tunnel
+```
+
+**The device.** `SM8750` (Snapdragon 8 Elite, board `sun`), 8 Oryon cores, 15.5 GB RAM,
+Android 16 / API 36, Adreno 830 v2. CPU features: dotprod, i8mm, bf16, and **no SME2**,
+unlike the Dimensity 9500 in the Poco. Both phones therefore take the `armv8.6_1` CPU
+backend, which is the i8mm one.
+
+**Measured with `llama-bench`, Gemma 3 1B Q4_K_M, 762 MiB:**
+
+| test | CPU, 6 threads | Adreno 830, all layers | GPU vs CPU |
+| --- | ---: | ---: | ---: |
+| pp128 | 149.6 t/s | 722.0 t/s | 4.8x |
+| pp512 | 135.8 t/s | 745.6 t/s | 5.5x |
+| pp2048 | 121.2 t/s | 653.5 t/s | 5.4x |
+| tg64 | 58.2 t/s | 41.1 t/s | 0.71x |
+
+So the GPU is worth roughly five times the CPU at reading a prompt and about a third
+slower at writing the answer. Reading is compute-bound and the Adreno has far more of it;
+writing one token at a time is bound by memory bandwidth, where a tuned CPU kernel with
+i8mm is hard to beat. That is why the backend is built in and offered rather than switched
+on: `gpuLayers` defaults to 0, and the phone-sized default stays the CPU.
+
+Thread count matters more than expected. On this chip decode peaks at 4 to 6 threads and
+collapses at 8: tg64 goes 47.8 (t=2), 56.9 (t=4), 54.7 (t=6), **23.0 (t=8)**. Prefill
+still improves to 6. Using every core is the wrong answer for decode, which is what the
+per-reply thread plan already assumes.
+
+**Three things that silently produce a GPU that is not there.** All three were hit here,
+and each one looks like success until you read the layer assignments.
+
+1. `LD_LIBRARY_PATH=.:/vendor/lib64` makes the OpenCL backend load and report **"platform
+   IDs not available"**, then run every layer on the CPU while still printing `OpenCL` in
+   the backend column. Putting vendor libraries on the search path pulls them into the
+   wrong linker namespace. Use `LD_LIBRARY_PATH=.` and let the linker resolve
+   `libOpenCL.so` itself.
+2. Packaging Khronos's ICD loader in the APK shadows the driver. It looks for
+   `/vendor/etc/OpenCL/vendors`, which Android devices do not have. The loader is a link
+   target only, excluded from the APK by `jniLibs.excludes`.
+3. Being listed in `/vendor/etc/public.libraries.txt` is not enough. Since Android 12 an
+   app must also name the library in `<uses-native-library>`, or `dlopen` fails with
+   "library not found" on a device that plainly has one.
+
+**Instrumented tests on this device: 15 tests, 0 failures, 6 skipped.** Unlike the Poco,
+QDC devices allow installing a new test package, so `connectedDebugAndroidTest` works
+here. The skips are five multimodal tests with no projector pushed and one tool-calling
+test, which now skips rather than fails when the loaded model's template does not render
+tools. Gemma 3 1B's does not, and a dropped tool definition is indistinguishable from a
+model that chose not to call anything, so `LoadedModelInfo.supportsTools` was added to
+tell cannot apart from did not.
 
 ## Discover searches by app, not by tag (2026-08-10)
 

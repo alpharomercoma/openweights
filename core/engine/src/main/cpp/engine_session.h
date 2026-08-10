@@ -170,6 +170,9 @@ public:
     /** True when the loaded chat template understands being told whether to think. */
     bool supports_thinking() const;
 
+    /** True when this model's chat template renders tool definitions. */
+    bool supports_tools() const;
+
     /** Signals the running generation to stop. Safe to call from any thread. */
     void cancel() { cancelled_.store(true, std::memory_order_relaxed); }
 

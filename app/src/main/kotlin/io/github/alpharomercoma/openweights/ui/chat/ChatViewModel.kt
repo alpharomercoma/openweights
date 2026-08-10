@@ -478,22 +478,24 @@ class ChatViewModel @Inject constructor(
         // it can wait on the mutex behind a compaction, and isGenerating is already true:
         // Stop in that window did nothing at all, and the turn it appeared to cancel then
         // started against whatever state had replaced it.
-        generationJob = viewModelScope.launch {
-            try {
-                storageMutex.withLock {
-                    val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
-                    val id = conversationId
-                        ?: chats.startConversation(title, _uiState.value.modelName)
-                            .also { conversationId = it }
-                    chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
-                }
-            } catch (cancellation: CancellationException) {
-                // generate() is what normally hands the busy state back, and it is never
-                // going to run now.
-                _uiState.update { it.copy(isGenerating = false) }
-                throw cancellation
+        val send = viewModelScope.launch {
+            storageMutex.withLock {
+                val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
+                val id = conversationId
+                    ?: chats.startConversation(title, _uiState.value.modelName)
+                        .also { conversationId = it }
+                chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
             }
             generate()
+        }
+        generationJob = send
+        // On completion rather than in a catch inside the block, because a job cancelled
+        // before its body starts never runs the catch at all. generate() is what normally
+        // hands the busy state back, and if it was never reached nothing else will.
+        send.invokeOnCompletion { cause ->
+            if (cause != null && generationJob === send) {
+                _uiState.update { it.copy(isGenerating = false) }
+            }
         }
     }
 

@@ -102,6 +102,24 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `stopping before the message is written gives the composer back`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+
+        viewModel.send("Something")
+        // Deliberately not settled: the row is still being written and generate() has not
+        // run, so there is no generation job in the old sense of the word. Stop was
+        // ignored here, and the turn it looked like it had cancelled went on to run
+        // anyway, against whatever state had replaced it.
+        assertThat(viewModel.uiState.value.isGenerating).isTrue()
+
+        viewModel.stop()
+        settle()
+
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
     fun `stopping a generation leaves what was produced and clears the busy state`() =
         runTest(dispatcher) {
             loadModel()

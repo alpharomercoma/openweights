@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -95,9 +96,23 @@ class ModelsViewModel @Inject constructor(
     /** Finished work already folded into the model list, so it is folded in once. */
     private val absorbed = mutableSetOf<UUID>()
 
+    /**
+     * The download queue, made to say "nothing yet" before it says anything else.
+     *
+     * On a phone that has never downloaded a model this query emits nothing at all, rather
+     * than an empty list, and a combine stays silent until every source has spoken once. The
+     * models already on disk therefore never reached the screen: a fresh install showed "no
+     * models yet" with gigabytes sitting in its own directory, and the list only appeared
+     * after the first download created a row to report. Seeding an empty list costs nothing
+     * when there is work, because the real value replaces it immediately.
+     */
+    private val downloadWork = workManager
+        .getWorkInfosByTagFlow(ModelDownloadWorker.TAG_DOWNLOAD)
+        .onStart { emit(emptyList()) }
+
     val uiState: StateFlow<ModelsUiState> = combine(
         local,
-        workManager.getWorkInfosByTagFlow(ModelDownloadWorker.TAG_DOWNLOAD),
+        downloadWork,
         dismissed,
     ) { state, work, hidden ->
         state.copy(downloads = work.toDownloads(hidden))
@@ -119,7 +134,7 @@ class ModelsViewModel @Inject constructor(
         // completes while the user is in a chat still has to appear in the model list when
         // they come back.
         viewModelScope.launch {
-            workManager.getWorkInfosByTagFlow(ModelDownloadWorker.TAG_DOWNLOAD).collect { work ->
+            downloadWork.collect { work ->
                 val finished = work.any {
                     it.state == WorkInfo.State.SUCCEEDED && absorbed.add(it.id)
                 }

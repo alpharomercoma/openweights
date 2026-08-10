@@ -52,24 +52,26 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
     runCatching { content }.getOrNull()
 
 /**
- * Searches an encyclopedia.
+ * Searches the web.
  *
- * Wikipedia's own API, and not a search engine, after measuring both. Scraping
- * DuckDuckGo's keyless HTML endpoint worked in a first test and then returned nothing for
- * ten consecutive requests once it had seen a burst from one address: it rate limits by
- * serving a page with no results rather than an error, so the tool cannot tell "nothing
- * matched" from "you have been blocked" and would quietly tell the model the web is empty.
- * A search that fails silently is worse than no search.
+ * DuckDuckGo, scraped, because there is no keyless general web search that is not a
+ * scraper. That was measured rather than assumed, and the note in docs/research has the
+ * table: the lite and html endpoints answer 202 to a plain GET, the Instant Answer API is
+ * empty for anything that is not a dictionary word, public SearXNG instances answer 403
+ * because they ship with the JSON format disabled, and everything else wants a key. What
+ * works is the two step the `ddgs` package uses, cookies first and then a POST carrying a
+ * Referer, which is what [DuckDuckGoProvider] does.
  *
- * Wikipedia answered five out of five, in under a second, and returns article intros in
- * the same call, so one round trip is enough to answer from. What it costs is breadth:
- * this is the wrong tool for prices, news and anything from this week, and the description
- * says so, because a model that knows a tool's limits asks for it less often when it will
- * not help.
+ * This KDoc used to describe Wikipedia and argue against DuckDuckGo, on the strength of an
+ * early test where the scrape returned nothing ten times in a row. That was rate limiting
+ * being mistaken for a dead end. Wikipedia went because it was a hardcoded site nobody
+ * could see or switch off, and because of what it did to answers: asked about a stranger
+ * it returned an unrelated senator rather than nothing.
  *
- * General web search needs a key. The seam for one is [SearchProvider]; nothing keyed
- * ships, because shipping our key would be giving it away and demanding the user's would
- * mean the feature does not work until they find one.
+ * One source is the standing weakness. A provider that is rate limited returns null rather
+ * than an empty list, so the chain can tell "nothing matched" from "you have been blocked"
+ * and move on, but today there is nothing to move on to. More providers behind
+ * [SearchProvider] is the work that fixes it.
  */
 @Singleton
 class WebSearchTool @Inject constructor(

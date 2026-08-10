@@ -7,6 +7,12 @@ rest of it gets built, and why each piece exists.
 
 Status legend: **done** · *in progress* · planned.
 
+Rewritten 2026-08-11. Six of these sections still said "planned" for work that had already
+shipped, which is the sort of drift that makes a roadmap worse than no roadmap: a
+contributor reading it would have built a model browser that already exists. Each heading
+below was checked against the code before it was changed, and the gaps that remain are
+named as gaps rather than left implied.
+
 ---
 
 ## 1. Inference core: **done**
@@ -16,28 +22,28 @@ runtime, split thread counts for prefill and decode, KV-cache prefix reuse acros
 Measured 76.9 tok/s prefill / 16.2 tok/s decode on a MediaTek MT6991. See
 `docs/research/inference-engines.md` and `docs/CONTEXT.md`.
 
-## 2. Compute backend choice: *in progress*
+## 2. Compute backend choice: **done**, and the answer was the CPU
 
-Google AI Edge lets you pick CPU or GPU; people expect that control, and on mobile the
-right answer varies by chip. The engine already loads backends dynamically, so
-this is a matter of offering the choice rather than guessing.
+This was going to be a picker with a benchmark behind it. What shipped is the CPU, because
+that is what the measurements kept saying, and Settings explains rather than offers.
 
-- **CPU**, always available, and today the fastest path on most phones.
-- **GPU (Vulkan)**. One API present on essentially every modern Android device. Frequently
-  *slower* than a well-tuned CPU path on Mali/Immortalis, so it is offered as a real option
-  with measured numbers, never as a default that quietly makes things worse.
-- **GPU (OpenCL)**. The better GPU path on Qualcomm Adreno, verified by Qualcomm on
-  Snapdragon 8 Gen 3 and 8 Elite. Worth adding when the Snapdragon test device arrives.
+- **CPU**, always available, and the fastest path on every phone tested. KleidiAI matters
+  more than the backend does: the same model at Q4_0 runs at 13.8 tokens a second where
+  Q4_K_M runs at 7.7, because Q4_K_M carries q6_K tensors KleidiAI has no kernel for.
+- **GPU (OpenCL)**. Built and registered. On the Immortalis G925 in the dev phone it logs
+  `unsupported GPU` and drops the device, so the backend is present and unusable, which is
+  a more honest outcome than not shipping it.
+- **GPU (Vulkan)**. Not built. Frequently slower than a tuned CPU path on Mali, and adding
+  a second GPU backend to be slower twice was not worth the binary.
 - **NPU**. No path through llama.cpp. Reaching MediaTek APU or Qualcomm Hexagon means a
-  second engine (ExecuTorch has vendor delegates) and per-SoC pre-exported models, which
-  is the curated-catalog trade-off this project exists to avoid. The setting will say that
-  plainly rather than showing a disabled toggle with no explanation.
+  second engine and per-SoC pre-exported models, which is the curated-catalog trade-off
+  this project exists to avoid.
 
-Settings shows the backends this device actually reports, lets the user pick one and set
-how many layers to offload, and, because guessing is the whole problem, offers a
-one-tap benchmark that measures each option on the model they are running.
+So there is no backend picker and no one-tap benchmark. Settings lists what the device
+actually reports, including the CPU feature flags, and says in a sentence why there is
+nothing to choose between.
 
-## 3. Getting models: planned (the biggest functional gap)
+## 3. Getting models: **done**, except that a download dies with the app
 
 Nothing else matters if you cannot get a model in. Hugging Face search filtered to GGUF,
 with the app reading each file's GGUF header over HTTP range requests *before* downloading
@@ -47,7 +53,7 @@ it will run, and whether it will run at all. Then a resumable, checksum-verified
 The token is stored encrypted with a hardware-backed Android Keystore key, sent only to
 `huggingface.co`, and never logged.
 
-## 4. Agent runtime: planned
+## 4. Agent runtime: **done**
 
 This is the part that turns a chat app into something that does work. Four layers, and
 they are different concerns:
@@ -86,7 +92,7 @@ own window and returns only its conclusion. On a phone this is sequential rather
 parallel, since there is one model resident in memory at a time. The win is context
 isolation, not concurrency.
 
-## 5. Tool calling: planned
+## 5. Tool calling: **done**
 
 The foundation for everything in section 4. llama.cpp's chat templates already accept tool
 definitions, and models trained for tool use emit calls in their own format. Work:
@@ -95,7 +101,7 @@ plumb tool schemas into template rendering, parse calls out of the stream, model
 steps, and gate execution behind permission. Built-in tools come first (device clock, math,
 file read within app storage); user-defined and MCP-style tools later.
 
-## 6. Composer affordances: planned
+## 6. Composer affordances: **done**
 
 Two input conventions people already know from developer tools:
 
@@ -107,13 +113,13 @@ Two input conventions people already know from developer tools:
 Both are pure UI over existing capabilities, which is why they come after tool calling
 rather than before it.
 
-## 7. History, usage, and the dashboard: planned
+## 7. History, usage, and the dashboard: **done**
 
 Conversations in Room, with per-message stats. Lifetime usage lives in a separate
 append-only day-bucketed ledger so deleting a chat never falsifies your totals: tokens
 generated, tokens per day, per-model share, average throughput trend, total inference time.
 
-## 8. Multimodal: done, except dictation
+## 8. Multimodal: **done**, dictation included
 
 llama.cpp's `libmtmd` keeps every input modality inside the one engine: a model paired with
 its `mmproj` projector reads images and audio, and video is sampled into frames on the
@@ -128,7 +134,7 @@ second engine. `docs/research/multimodality.md` has the full reasoning and the n
 Dictation uses Android's on-device recogniser only, so the "nothing leaves this device"
 promise holds for the microphone too. Audio input is proven with LFM2.5-Audio-1.5B.
 
-## 9. Play Store production: planned
+## 9. Play Store production: *in progress*
 
 Target API 36 audit, 16 KB alignment verification (already satisfied by NDK r29), foreground
 service declarations for downloads, R8, signed AAB, data-safety form (every answer is "no

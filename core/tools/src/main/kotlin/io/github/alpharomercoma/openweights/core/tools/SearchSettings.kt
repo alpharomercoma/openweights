@@ -47,23 +47,16 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
         set(value) = store.edit { putString(KEY_SEARX_URL, value.trim()) }
 
     /**
-     * Whether Wikipedia may answer when nothing else can.
-     *
-     * On by default so that a fresh install can answer something, off for anyone who would
-     * rather see "no search is configured" than an encyclopedia article about a question
-     * that was not encyclopedic.
-     */
-    var wikipediaFallback: Boolean
-        get() = store.getBoolean(KEY_WIKIPEDIA, true)
-        set(value) = store.edit { putBoolean(KEY_WIKIPEDIA, value) }
-
-    /**
      * The providers to try, in order.
      *
-     * A general engine first and the encyclopedia last, so an answer only falls back to
-     * Wikipedia when the web could not be reached at all. Each is tried until one answers;
-     * a provider that is rate limited says so rather than returning nothing, which is what
-     * makes the order meaningful instead of decorative.
+     * The built in scraper first, then a SearXNG instance if one is configured. Each is
+     * tried until one answers, and a provider that is rate limited says so rather than
+     * returning nothing, which is what makes the order meaningful instead of decorative.
+     *
+     * Wikipedia used to sit at the end of this list. It went because it was a hardcoded
+     * site nobody could see or switch off, and because of what it did to answers: the model
+     * talked about encyclopedia articles when it had been asked about the web, and a
+     * stranger's name came back as an unrelated senator rather than as nothing.
      *
      * A keyed provider belongs here too and is deliberately absent: the key would have to
      * live in the encrypted store this module cannot see, and an unwired settings field is
@@ -72,11 +65,9 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
     fun providers(httpClient: OkHttpClient): List<SearchProvider> = buildList {
         add(DuckDuckGoProvider(httpClient))
         add(SearxProvider(httpClient, searxUrl))
-        if (wikipediaFallback) add(WikipediaProvider(httpClient))
     }.filter { it.isConfigured }
 
     private companion object {
         const val KEY_SEARX_URL = "searx_url"
-        const val KEY_WIKIPEDIA = "wikipedia_fallback"
     }
 }

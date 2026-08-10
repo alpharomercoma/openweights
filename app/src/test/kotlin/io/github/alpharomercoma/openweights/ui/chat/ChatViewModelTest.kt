@@ -189,6 +189,27 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `thinking is not repeated in the answer when no tool was called`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Question")
+        settle()
+
+        engine.emit("<think>Weighing the instructions.</think>")
+        engine.emit("The answer.")
+        // What the engine really hands back for a reply with no tool call: the whole thing,
+        // thinking included, because llama.cpp only returns cleaned text once its parser has
+        // recognised a call. Preferring that over the local split put the reasoning on
+        // screen twice, once collapsed and once as the reply.
+        engine.finish(content = "<think>Weighing the instructions.</think>The answer.")
+        settle()
+
+        val shown = viewModel.uiState.value.transcript.last()
+        assertThat(shown.reasoning).isEqualTo("Weighing the instructions.")
+        assertThat(shown.answer).isEqualTo("The answer.")
+    }
+
+    @Test
     fun `a new chat clears the transcript and the conversation it belonged to`() =
         runTest(dispatcher) {
             loadModel()

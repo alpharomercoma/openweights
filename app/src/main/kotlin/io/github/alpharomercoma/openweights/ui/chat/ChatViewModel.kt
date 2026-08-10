@@ -955,7 +955,14 @@ class ChatViewModel @Inject constructor(
         // knows; for the rest it comes out of the buffer, and what was already on screen
         // is the last resort.
         val reasoning = event.reasoning.ifEmpty { null } ?: parsed.reasoning ?: streamed?.reasoning
-        val answer = event.content.ifEmpty { parsed.answer }
+        // The engine only cleans a reply when llama.cpp's parser recognised a tool call in
+        // it. For an ordinary reply it hands the whole thing back untouched, thinking and
+        // all, and preferring that is how the same reasoning came to be shown twice: once
+        // in the block where it belongs and again as the answer. That is what "the model is
+        // quoting the prompt at me" turned out to be. Text the engine did not change is
+        // text it did not parse, so the local split is the better of the two.
+        val engineCleaned = event.content.isNotEmpty() && event.content != raw
+        val answer = if (engineCleaned) event.content else parsed.answer
         val canonical = canonicalText(reasoning, answer)
 
         updateLastEntry {

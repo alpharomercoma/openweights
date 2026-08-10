@@ -132,7 +132,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     jint thread_count,
     jint batch_thread_count,
     jint gpu_layers,
-    jboolean use_mmap) {
+    jboolean use_mmap) try {
     std::string error;
     Session * session = Session::load(
         to_utf8(env, model_path),
@@ -144,6 +144,18 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
         return 0;
     }
     return reinterpret_cast<jlong>(session);
+}
+// A function try block, so the body below is untouched: C++ exceptions must not
+// cross a JNI frame. An escaping std::bad_alloc, which is what a phone under memory
+// pressure produces while a reply grows, unwinds into the runtime and aborts the
+// process. Turned into an exception Kotlin already knows how to show, a low memory
+// device fails loading the model and says so instead of vanishing.
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("loading the model failed: ") + failure.what());
+    return 0;
+} catch (...) {
+    throw_engine_exception(env, "loading the model failed for an unknown reason");
+    return 0;
 }
 
 JNIEXPORT void JNICALL
@@ -266,7 +278,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jboolean enable_thinking,
     jstring reasoning_effort,
     jobject token_sink,
-    jobject reply_sink) {
+    jobject reply_sink) try {
     Session * session = as_session(handle);
 
     const jsize message_count = env->GetArrayLength(roles);
@@ -407,6 +419,18 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jlongArray result = env->NewLongArray(8);
     env->SetLongArrayRegion(result, 0, 8, values);
     return result;
+}
+// A function try block, so the body below is untouched: C++ exceptions must not
+// cross a JNI frame. An escaping std::bad_alloc, which is what a phone under memory
+// pressure produces while a reply grows, unwinds into the runtime and aborts the
+// process. Turned into an exception Kotlin already knows how to show, a low memory
+// device fails generation and says so instead of vanishing.
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("generation failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "generation failed for an unknown reason");
+    return nullptr;
 }
 
 }  // extern "C"

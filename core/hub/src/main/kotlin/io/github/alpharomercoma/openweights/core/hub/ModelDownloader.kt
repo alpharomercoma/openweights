@@ -49,8 +49,16 @@ sealed interface DownloadProgress {
     data class Finished(val file: File) : DownloadProgress
 }
 
-/** Raised when a download cannot complete or arrives corrupt. */
-class DownloadException(message: String) : Exception(message)
+/**
+ * Raised when a download cannot complete or arrives corrupt.
+ *
+ * [isRetryable] separates the two kinds. A stream that stopped short can be picked up from
+ * the partial file and is worth another attempt; a file that failed its checksum will fail
+ * it again, and retrying would spend gigabytes of someone's data allowance rediscovering
+ * that. Deliberately not an IOException, so a caller that retries every IOException does
+ * not quietly retry a corrupt download too.
+ */
+class DownloadException(message: String, val isRetryable: Boolean = false) : Exception(message)
 
 /**
  * Downloads model files, resumably and verified.
@@ -77,6 +85,14 @@ class ModelDownloader @Inject constructor(
 
         val partial = File(destination.parentFile, destination.name + PARTIAL_SUFFIX)
 
+        // A partial longer than the file it is meant to become can never be resumed: the
+        // range request starts past the end, the server answers 416, and every retry
+        // repeats that forever with nothing on screen offering a way out. It happens when a
+        // publisher replaces a file with a smaller one under the same name.
+        if (file.sizeBytes > 0 && partial.length() > file.sizeBytes) {
+            partial.delete()
+        }
+
         // A .part of exactly the right length is a download that finished but died before
         // the rename. Asking the server to resume from the end returns 416, so skip
         // straight to verification.
@@ -88,6 +104,7 @@ class ModelDownloader @Inject constructor(
             throw DownloadException(
                 "The download ended early: got ${partial.length()} bytes of ${file.sizeBytes}. " +
                     "Try again. It will resume from where it stopped.",
+                isRetryable = true,
             )
         }
         verify(file, partial)

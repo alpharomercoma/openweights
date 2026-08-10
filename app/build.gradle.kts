@@ -157,21 +157,28 @@ tasks.register("verifyJniSymbols") {
     group = "verification"
     description = "Fails if R8 renamed or removed a name the native library resolves."
 
-    val apks = fileTree(layout.buildDirectory.dir("outputs/apk/release")) {
+    // Both artifacts, because they are not the same file and only one of them is what
+    // Play receives. The guard was written against the APK, which is the one nobody
+    // uploads: bundleRelease produces the AAB, and it was going out unchecked.
+    val artifacts = fileTree(layout.buildDirectory.dir("outputs/apk/release")) {
         include("*.apk")
+    } + fileTree(layout.buildDirectory.dir("outputs/bundle/release")) {
+        include("*.aab")
     }
     val symbols = jniSymbols
-    inputs.files(apks)
+    inputs.files(artifacts)
 
     doLast {
-        val artifacts = apks.files.filter { it.isFile }
-        check(artifacts.isNotEmpty()) {
-            "No release APK to check. Run assembleRelease first."
+        val built = artifacts.files.filter { it.isFile }
+        check(built.isNotEmpty()) {
+            "Nothing to check. Run assembleRelease or bundleRelease first."
         }
-        artifacts.forEach { apk ->
+        built.forEach { artifact ->
             val found = mutableSetOf<String>()
-            ZipFile(apk).use { zip ->
+            ZipFile(artifact).use { zip ->
                 zip.entries().asSequence()
+                    // An AAB keeps its dex under base/dex/ rather than at the root, so
+                    // match on the extension alone and both layouts are covered.
                     .filter { it.name.endsWith(".dex") }
                     .forEach { entry ->
                         val bytes = zip.getInputStream(entry).readBytes()
@@ -182,14 +189,16 @@ tasks.register("verifyJniSymbols") {
             val missing = symbols - found
             check(missing.isEmpty()) {
                 "R8 removed or renamed names the native library resolves by string, in " +
-                    "${apk.name}: $missing. Generation would abort the process at runtime. " +
-                    "Check core/engine/consumer-rules.pro."
+                    "${artifact.name}: $missing. Generation would abort the process at " +
+                    "runtime. Check core/engine/consumer-rules.pro."
             }
+            logger.lifecycle(
+                "verifyJniSymbols: all ${symbols.size} names survived R8 in ${artifact.name}",
+            )
         }
-        logger.lifecycle("verifyJniSymbols: all ${symbols.size} names survived R8")
     }
 }
 
-tasks.matching { it.name == "assembleRelease" }.configureEach {
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     finalizedBy("verifyJniSymbols")
 }

@@ -33,6 +33,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.hub.DownloadException
 import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.ModelDownloader
@@ -70,6 +71,17 @@ class ModelDownloadWorker @AssistedInject constructor(
     /** The last whole percent shown, so the notification is rebuilt about a hundred times. */
     private var lastPercent = -1
 
+    /**
+     * One notification per unit of work, kept clear of the reply notifier's id of 1.
+     *
+     * Two downloads run at once when a multimodal model brings its projector, and sharing
+     * an id would have the second overwrite the first's progress. The work id is used
+     * rather than the filename because a filename hash was folded to sixteen bits, which is
+     * few enough for two ordinary model names to collide.
+     */
+    private val notificationId =
+        id.hashCode().let { if (it == REPLY_NOTIFICATION_ID) it + 1 else it }
+
     override suspend fun getForegroundInfo(): ForegroundInfo =
         foregroundInfo(bytesDone = 0, bytesTotal = sizeBytes, isVerifying = false)
 
@@ -93,12 +105,13 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         val error = failure ?: return Result.success()
 
-        // A dropped connection is worth another attempt, because the partial file means the
-        // attempt resumes where it stopped. DownloadException is not an IOException, and
-        // that separation is the whole rule: it is raised for a checksum that did not match
-        // or a file that could not be moved into place, and retrying either would spend
-        // gigabytes of someone's data allowance rediscovering the same answer.
-        return if (error is IOException && runAttemptCount < MAX_ATTEMPTS) {
+        // A dropped connection is worth another attempt, because the partial file means
+        // the attempt resumes where it stopped. So is a stream that stopped short, which
+        // arrives as a retryable DownloadException: its own message promises the download
+        // will resume, and treating it as terminal made that message a lie the user had to
+        // act on by hand. A checksum that did not match is not retryable and says so.
+        val retryable = error is IOException || (error as? DownloadException)?.isRetryable == true
+        return if (retryable && runAttemptCount < MAX_ATTEMPTS) {
             Result.retry()
         } else {
             Result.failure(errorData(error.message ?: "The download could not be completed."))
@@ -167,7 +180,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             .build()
 
         return ForegroundInfo(
-            notificationId(destination.name),
+            notificationId,
             notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
@@ -219,20 +232,8 @@ class ModelDownloadWorker @AssistedInject constructor(
         private const val PROGRESS_MAX = 100
         private const val MAX_ATTEMPTS = 5
 
-        /** Clear of the reply notifier's id of 1, with room for the ids below it. */
-        private const val NOTIFICATION_ID_BASE = 1_000
-
-        /** Sixteen bits of the hash: enough spread for the handful of files at a time. */
-        private const val NOTIFICATION_ID_MASK = 0xFFFF
-
-        /**
-         * A notification id per destination, kept clear of the reply notifier's id of 1.
-         *
-         * Two downloads run at once when a multimodal model brings its projector, and
-         * sharing an id would have the second one overwrite the first's progress.
-         */
-        fun notificationId(key: String): Int =
-            NOTIFICATION_ID_BASE + (key.hashCode() and NOTIFICATION_ID_MASK)
+        /** What ReplyNotifier posts on, which this must never land on. */
+        private const val REPLY_NOTIFICATION_ID = 1
 
         internal fun percentOf(done: Long, total: Long): Int =
             if (total > 0) ((done * PROGRESS_MAX) / total).toInt().coerceIn(0, PROGRESS_MAX) else 0

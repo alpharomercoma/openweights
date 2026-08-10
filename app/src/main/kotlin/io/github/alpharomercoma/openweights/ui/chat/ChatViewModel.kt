@@ -472,13 +472,26 @@ class ChatViewModel @Inject constructor(
 
         // Awaited before generating: a fast reply could otherwise finish before the row
         // exists and be dropped, taking its usage record with it.
-        viewModelScope.launch {
-            storageMutex.withLock {
-                val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
-                val id = conversationId
-                    ?: chats.startConversation(title, _uiState.value.modelName)
-                        .also { conversationId = it }
-                chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+        //
+        // Tracked as the generation job from the first line, because until generate() runs
+        // there was nothing for Stop to cancel. The write is short but it is not instant,
+        // it can wait on the mutex behind a compaction, and isGenerating is already true:
+        // Stop in that window did nothing at all, and the turn it appeared to cancel then
+        // started against whatever state had replaced it.
+        generationJob = viewModelScope.launch {
+            try {
+                storageMutex.withLock {
+                    val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
+                    val id = conversationId
+                        ?: chats.startConversation(title, _uiState.value.modelName)
+                            .also { conversationId = it }
+                    chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+                }
+            } catch (cancellation: CancellationException) {
+                // generate() is what normally hands the busy state back, and it is never
+                // going to run now.
+                _uiState.update { it.copy(isGenerating = false) }
+                throw cancellation
             }
             generate()
         }
@@ -752,11 +765,29 @@ class ChatViewModel @Inject constructor(
             notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
         }
         generationJob = job
-        // Tied to the job ending rather than to the last line of it, because two of the
-        // three ways a turn ends never reach that line: Stop rethrows the cancellation,
-        // and a failed decode returns through the catch. Either one left the sampler
-        // reading the thermal API every few seconds for the rest of the process.
-        job.invokeOnCompletion { thermalJob?.cancel() }
+        job.invokeOnCompletion(::releaseTurn)
+    }
+
+    /**
+     * Gives back everything a turn was holding, however it ended.
+     *
+     * The try inside [generate] does not open until compaction has finished, and folding a
+     * long history asks the model for a summary, which is seconds. Stop pressed in that
+     * window threw straight out of the coroutine, past every catch, with isGenerating still
+     * claimed from the tap: the composer stayed locked behind a Stop button that had
+     * nothing left to cancel. Anything ending this job abnormally has to give the busy
+     * state back, wherever it happened.
+     *
+     * The sampler is stopped either way, because two of the three ways a turn ends never
+     * reach the last line of the body: Stop rethrows its cancellation and a failed decode
+     * returns through the catch, and either one left the thermal API being read every few
+     * seconds for the rest of the process.
+     */
+    private fun releaseTurn(cause: Throwable?) {
+        thermalJob?.cancel()
+        if (cause != null) {
+            _uiState.update { it.copy(isGenerating = false, pendingApproval = null) }
+        }
     }
 
     /**

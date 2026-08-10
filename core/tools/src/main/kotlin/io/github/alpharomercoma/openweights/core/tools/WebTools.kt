@@ -184,7 +184,19 @@ class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : T
         val body = runCatching {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use "HTTP ${response.code}"
-                response.body.string().readable()
+
+                // Both of these guards existed as constants and neither was applied, so the
+                // tool would pull a response of any size and any type into memory and then
+                // try to read it as prose. The model chooses this address, which is what
+                // makes it worth checking: a link in a search result can point at a video,
+                // an archive, or a page that never stops.
+                val type = response.body.contentType()?.let { "${it.type}/${it.subtype}" }
+                if (type != null && TEXTUAL.none { type.startsWith(it) }) {
+                    return@use "That address is $type, which is not text. Nothing to read."
+                }
+                // peekBody stops at the limit rather than after it: the bytes past it are
+                // never buffered, so a page with no end cannot exhaust the heap.
+                response.peekBody(MAX_BYTES.toLong()).string().readable()
             }
         }.getOrNull()
             ?: return@withContext "That page could not be read. The device may be offline."
@@ -196,7 +208,13 @@ class FetchUrlTool @Inject constructor(private val httpClient: OkHttpClient) : T
         /** About a thousand tokens: enough to answer from, small enough to leave room. */
         const val MAX_CHARS = 4_000
 
-        /** Read at most this much, whatever the page claims about its length. */
+        /**
+         * Read at most this much, whatever the page claims about its length.
+         *
+         * Half a megabyte is far more than the four thousand characters that survive
+         * trimming, and the gap is deliberate: the cap is there to bound the download, not
+         * to choose the excerpt, and HTML spends most of its bytes on markup this strips.
+         */
         const val MAX_BYTES = 512 * 1024
 
         /** Content types worth handing to a language model. */

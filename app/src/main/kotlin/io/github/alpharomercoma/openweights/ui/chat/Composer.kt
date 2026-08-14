@@ -103,7 +103,7 @@ fun Composer(
     onAttach: () -> Unit,
     onRemoveStaged: (MessagePart.File) -> Unit,
     onDictate: ((String) -> Unit) -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (String) -> Boolean,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
     /** The thinking control, drawn beside Attach. Empty when the model offers no choice. */
@@ -237,8 +237,9 @@ fun Composer(
                 onAttach = onAttach,
                 onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
                 onSend = {
-                    onSend(draft)
-                    draft = ""
+                    // Cleared only if it was taken. Refused messages stay in the box, which
+                    // is the difference between "not yet" and "gone".
+                    if (onSend(draft)) draft = ""
                 },
                 onStop = onStop,
                 hasSomethingToSend = hasSomethingToSend,
@@ -442,7 +443,7 @@ private fun ComposerPreview() {
                 onAttach = {},
                 onRemoveStaged = {},
                 onDictate = {},
-                onSend = {},
+                onSend = { true },
                 onStop = {},
                 onCommand = {},
             )

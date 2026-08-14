@@ -71,7 +71,13 @@ class ChatScreenTest {
     @Test
     fun sendIsBlockedUntilThereIsSomethingToSend() {
         var sent: String? = null
-        showChat(transcript = emptyList(), onSend = { sent = it })
+        showChat(
+            transcript = emptyList(),
+            onSend = {
+                sent = it
+                true
+            },
+        )
 
         compose.onNodeWithContentDescription("Send message").performClick()
         assert(sent == null) { "an empty composer must not send" }
@@ -97,7 +103,7 @@ class ChatScreenTest {
     private fun showChat(
         transcript: List<TranscriptEntry>,
         isGenerating: Boolean = false,
-        onSend: (String) -> Unit = {},
+        onSend: (String) -> Boolean = { true },
         onStop: () -> Unit = {},
     ) {
         compose.setContent {

@@ -456,13 +456,27 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun send(prompt: String) {
+    /**
+     * Sends a message, or says it could not.
+     *
+     * Returns false when the turn was refused, so the composer can keep what was typed.
+     * It used to return silently and the composer cleared regardless, so a question asked
+     * while the weights were still being mapped, which is the first thing anyone does on a
+     * cold start, vanished with nothing said about it.
+     */
+    fun send(prompt: String): Boolean {
         val typed = prompt.trim()
         val staged = _uiState.value.staged
         val document = _uiState.value.stagedDocument
         // An attachment on its own is a complete message: "what is this?" is implied.
         val nothingToSend = typed.isEmpty() && staged.isEmpty() && document == null
-        if (nothingToSend || !_uiState.value.canSend) return
+        if (nothingToSend) return false
+        if (!_uiState.value.canSend) {
+            _uiState.value.refusalReason()?.let { why ->
+                _uiState.update { it.copy(error = why) }
+            }
+            return false
+        }
 
         // The document becomes part of what was asked, rather than something carried
         // alongside it. That keeps one string as the message: what is shown, what is
@@ -516,6 +530,7 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(isGenerating = false) }
             }
         }
+        return true
     }
 
     /**
@@ -1457,6 +1472,20 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
         }
         kept
     }
+}
+
+/**
+ * Why a message cannot be sent right now, or null when it is not worth saying.
+ *
+ * Generating is not worth saying: the composer shows Stop rather than Send, so reaching it
+ * at all means a tap beat the recomposition. The other two are the cold start, where
+ * somebody types before the weights are mapped, and those are worth saying because the
+ * alternative is a question that simply disappears.
+ */
+private fun ChatUiState.refusalReason(): String? = when {
+    isLoadingModel -> "The model is still loading. Ask again in a moment."
+    modelName == null -> "No model is loaded yet. Choose one in Models."
+    else -> null
 }
 
 /**

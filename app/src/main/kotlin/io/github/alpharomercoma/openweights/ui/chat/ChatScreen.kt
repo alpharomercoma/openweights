@@ -113,7 +113,7 @@ import kotlin.time.Duration.Companion.seconds
 @Suppress("LongParameterList")
 fun ChatScreen(
     state: ChatUiState,
-    onSend: (String) -> Unit,
+    onSend: (String) -> Boolean,
     onStop: () -> Unit,
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
@@ -216,7 +216,7 @@ private fun ChatContent(
     followTail: io.github.alpharomercoma.openweights.core.designsystem.component.FollowTailState,
     actionsForId: Long?,
     onActionsForId: (Long?) -> Unit,
-    onSend: (String) -> Unit,
+    onSend: (String) -> Boolean,
     onStop: () -> Unit,
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
@@ -887,7 +887,7 @@ private fun ChatScreenPreview() {
                     ),
                 ),
             ),
-            onSend = {},
+            onSend = { true },
             onStop = {},
             onRegenerate = {},
             onNewChat = {},

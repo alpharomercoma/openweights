@@ -356,6 +356,71 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `a question asked before a model is loaded is refused, not swallowed`() =
+        runTest(dispatcher) {
+            // The cold start: the app opens, somebody types, and the weights are not mapped
+            // yet. send returned nothing either way and the composer cleared regardless, so
+            // the question vanished with nothing said about it.
+            val accepted = viewModel.send("Too early")
+            settle()
+
+            assertThat(accepted).isFalse()
+            assertThat(viewModel.uiState.value.error).isNotNull()
+            assertThat(viewModel.uiState.value.transcript).isEmpty()
+        }
+
+    @Test
+    fun `a question asked while the weights are still loading is refused`() = runTest(dispatcher) {
+        engine.loadDelayMs = LOAD_MS
+        viewModel.loadModel(modelFile("model-a.gguf"))
+        advanceTimeBy(LOAD_MS / 2)
+
+        val accepted = viewModel.send("Too early")
+
+        // False is what the composer reads to decide whether to keep what was typed.
+        assertThat(accepted).isFalse()
+        advanceUntilIdle()
+        settle()
+        engine.loadDelayMs = 0
+    }
+
+    @Test
+    fun `two questions sent at once produce one conversation, not two`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+
+        viewModel.send("First")
+        viewModel.send("Second")
+        settle()
+
+        // canSend is claimed before any suspending work precisely so this cannot race into
+        // two conversations, each with one of the questions in it.
+        assertThat(database.conversations().observeAll().first()).hasSize(1)
+        assertThat(viewModel.uiState.value.transcript.count { it.role == ChatRole.USER })
+            .isEqualTo(1)
+    }
+
+    @Test
+    fun `a turn that dies mid flight leaves nothing streaming`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Answer me")
+        settle()
+        engine.emit("Half an ans")
+        settle()
+
+        // The engine's channel closing under the collector, which is what process death
+        // and an engine crash both look like from here: no completion event ever arrives.
+        engine.cancel()
+        settle()
+
+        // Nothing may be left claiming to be streaming, or the row spins forever and the
+        // composer never comes back.
+        assertThat(viewModel.uiState.value.transcript.none { it.isStreaming }).isTrue()
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
     fun `a message that could not be saved says so`() = runTest(dispatcher) {
         loadModel()
         // The disk, as far as the chat is concerned, is gone.

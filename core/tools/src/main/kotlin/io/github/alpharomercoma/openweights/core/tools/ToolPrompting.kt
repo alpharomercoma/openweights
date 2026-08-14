@@ -20,6 +20,43 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 
 /**
+ * The shape a model is asked to write a call in, when the prompt has to say.
+ *
+ * Two, because which one a small model handles better is a measurement rather than an
+ * opinion, and the benchmark runs them as arms against the same cases.
+ */
+enum class CallFormat(val instruction: String) {
+    /**
+     * One flat JSON object, which is the least there is to get wrong.
+     *
+     * A 1B model copies a shape it has just been shown far more reliably than it invents one,
+     * and every extra brace and tag is another thing to drop.
+     */
+    BARE(
+        "To use one, reply with only this and nothing else:\n" +
+            """{"tool": "name", "arguments": {"argument": "value"}}""" + "\n" +
+            "Do not explain that you are going to use it. Just send the object. " +
+            "If no tool is needed, answer normally and send no object.",
+    ),
+
+    /**
+     * The same object inside the tags Hermes uses.
+     *
+     * More characters than [BARE] and, on the argument above, more to get wrong. What makes
+     * it worth measuring anyway is that it is not a shape the model has to be taught: these
+     * tags are what a large share of tool fine-tuning data looks like, so for the models that
+     * read their format out of the prompt it may already be in the weights.
+     */
+    TAGGED(
+        "To use one, reply with only this and nothing else:\n" +
+            """<tool_call>{"name": "tool_name", "arguments": {"argument": "value"}}</tool_call>""" +
+            "\n" +
+            "Do not explain that you are going to use it. Just send the tags. " +
+            "If no tool is needed, answer normally and send no tags.",
+    ),
+}
+
+/**
  * Tools for a model whose template will not carry them.
  *
  * Most of the good small models cannot do this the proper way. A chat template either knows
@@ -34,22 +71,17 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
  * something that looks like a call inside an ordinary sentence. It is better than the
  * alternative, which is nothing at all.
  *
- * The format asked for is one flat JSON object rather than anything nested or tagged. A 1B
- * model copies a shape it has just been shown far more reliably than it invents one, and
- * every extra brace is another thing to get wrong.
+ * Which shape to ask for is [CallFormat], and it is a live question rather than a settled
+ * one, so it is a parameter with an arm in the benchmark behind it.
  */
 object ToolPrompting {
     /** What to add to the system message so a model without tool support can still call. */
-    fun describe(tools: List<ToolDefinition>): String {
+    fun describe(tools: List<ToolDefinition>, format: CallFormat = CallFormat.BARE): String {
         if (tools.isEmpty()) return ""
         val listed = tools.joinToString("\n") { tool ->
             "- ${tool.name}: ${tool.description} Arguments: ${tool.parametersJson.compact()}"
         }
-        return "You can use these tools:\n$listed\n\n" +
-            "To use one, reply with only this and nothing else:\n" +
-            """{"tool": "name", "arguments": {"argument": "value"}}""" + "\n" +
-            "Do not explain that you are going to use it. Just send the object. " +
-            "If no tool is needed, answer normally and send no object."
+        return "You can use these tools:\n$listed\n\n" + format.instruction
     }
 
     /**
@@ -57,15 +89,23 @@ object ToolPrompting {
      *
      * Deliberately strict about the shape and forgiving about what surrounds it. A model told
      * to send only the object usually sends a sentence as well, so the object is looked for
-     * anywhere; but it has to have a `tool` naming something real, or a sentence that merely
-     * mentions a tool becomes an action, which is the mistake the prose salvage path already
-     * makes and one worth not making twice.
+     * anywhere; but it has to name something real in a key, or a sentence that merely mentions
+     * a tool becomes an action.
+     *
+     * That strictness is not an argument against the prose salvage path in `TurnRunner`, which
+     * does turn a named tool into a call and is the right thing there. The two are ordered by
+     * trust rather than in conflict: this is a parser, and prose is not the syntax it parses,
+     * so it says no and lets the next path decide. Salvage then decides under three conditions
+     * this one has no business knowing about, being that the tool was offered in the first
+     * place, that it is not one whose reach the model chooses, and that exactly one tool could
+     * have built a call from the question. A parser that guessed would take that decision away
+     * from the layer that can make it properly.
      */
     fun parse(reply: String, tools: ToolRegistry): ToolCall? {
         val name = tools.all.map { it.definition.name }
             .firstOrNull { reply.contains("\"$it\"") }
             ?: return null
-        val marker = reply.indexOf("\"tool\"")
+        val marker = reply.callKey()
         if (marker < 0) return null
 
         // An arguments object that starts and never closes is a call that was cut off, not a
@@ -79,6 +119,23 @@ object ToolPrompting {
 
         return ToolCall(id = name, name = name, argumentsJson = arguments ?: "{}")
     }
+
+    /**
+     * Where the key naming the tool begins, in whichever spelling the model used.
+     *
+     * Two are accepted rather than one, and the second is not a guess: `tool` is what
+     * [CallFormat.BARE] asks for, and `name` is what the Hermes envelope uses and with it a
+     * large share of the instruction data these models were tuned on. A model that has seen
+     * ten thousand examples of one spelling will write that one whatever the prompt says, so
+     * refusing it means refusing the call the model actually made.
+     *
+     * Nested wrappers come out of this too. `{"type":"function","function":{"name":...}}` has
+     * its name in the same key, and the arguments are found from there by the same walk.
+     */
+    private fun String.callKey(): Int =
+        CALL_KEYS.mapNotNull { key -> indexOf(key).takeIf { it >= 0 } }.minOrNull() ?: -1
+
+    private val CALL_KEYS = listOf("\"tool\"", "\"name\"")
 
     /**
      * The `arguments` object, taken by matching braces rather than by parsing.

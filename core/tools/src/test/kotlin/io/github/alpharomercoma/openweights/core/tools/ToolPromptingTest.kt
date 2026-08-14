@@ -29,8 +29,9 @@ import org.junit.Test
  * these are the shapes a small model actually produces: the object on its own, the object
  * with an apology in front of it, and the sentence that mentions a tool without calling it.
  *
- * The last one is the one that matters. Turning a remark into an action is the mistake the
- * prose salvage path already makes, and there is no reason to make it twice.
+ * The last one is the one that matters, and refusing it is not a claim that prose can never
+ * be a decision. It is a parser saying no so that the layer which can weigh the question
+ * gets to weigh it.
  */
 class ToolPromptingTest {
     private val registry = ToolRegistry(
@@ -72,7 +73,11 @@ class ToolPromptingTest {
 
     @Test
     fun `merely naming a tool is not calling one`() {
-        // The mistake worth not repeating: prose about a tool is a remark, not an action.
+        // Not because prose can never be a decision. TurnRunner's salvage path decides that
+        // it sometimes is, under conditions this parser cannot see: whether the tool was
+        // offered at all, whether its reach is the model's to choose, and whether any other
+        // tool could have been meant. Refusing here is what leaves that decision where it can
+        // be made properly, rather than a parser guessing first and pre-empting it.
         val reply = "I could use web_search for that, but I already know the answer."
 
         assertThat(ToolPrompting.parse(reply, registry)).isNull()
@@ -112,6 +117,42 @@ class ToolPromptingTest {
         val reply = """{"tool": "web_search"}"""
 
         assertThat(ToolPrompting.parse(reply, registry)?.argumentsJson).isEqualTo("{}")
+    }
+
+    @Test
+    fun `the envelope the tuning data uses is read too`() {
+        // Hermes wraps the object in tags and names the key "name" rather than "tool", and so
+        // does a large share of the instruction data these models were tuned on. Refusing that
+        // spelling means refusing the call a model actually made, whatever the prompt asked
+        // for. The tags need no handling of their own: the object is found by its keys and
+        // taken by matching braces, so what surrounds it never comes into it.
+        val reply = """<tool_call>{"name": "web_search", """ +
+            """"arguments": {"query": "ada"}}</tool_call>"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.name).isEqualTo("web_search")
+        assertThat(call?.argumentsJson).contains("ada")
+    }
+
+    @Test
+    fun `a nested function wrapper is read from the same key`() {
+        // The other spelling in the wild. The name is in the same place, so the walk that
+        // finds the arguments finds these too.
+        val reply = """{"type": "function", "function": {"name": "read_file", """ +
+            """"arguments": {"path": "a.md"}}}"""
+
+        assertThat(ToolPrompting.parse(reply, registry)?.name).isEqualTo("read_file")
+    }
+
+    @Test
+    fun `the tagged format is what the tagged prompt asks for`() {
+        val described = ToolPrompting.describe(registry.definitions, CallFormat.TAGGED)
+
+        assertThat(described).contains("<tool_call>")
+        assertThat(described).contains("web_search")
+        // And the default is still the bare object, so nothing shipped changed with it.
+        assertThat(ToolPrompting.describe(registry.definitions)).doesNotContain("<tool_call>")
     }
 
     @Test

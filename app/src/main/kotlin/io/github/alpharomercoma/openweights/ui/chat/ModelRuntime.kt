@@ -82,7 +82,7 @@ class ModelRuntime @Inject constructor(
      * than no setting.
      */
     fun hasGpu(): Boolean = runCatching {
-        engine.computeDevices().any { it.kind != ComputeDeviceKind.CPU }
+        engine.computeDevices().any { it.kind == ComputeDeviceKind.GPU }
     }.getOrDefault(false)
 
     fun isThrottling(): Boolean = thermal.isThrottling()

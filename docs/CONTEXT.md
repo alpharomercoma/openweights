@@ -503,6 +503,39 @@ written to storage, so a chat that searched reopened with a message the user nev
 sources had rotted: `ChatScreen` gained two parameters and the screen test calling it had
 not compiled since.
 
+### What the GPU is worth, per shape of turn (2026-08-14)
+
+`gpuLayers` existed on `ModelLoadParams` from the day the OpenCL backend landed and nothing
+outside a test ever set it, so every install had run every layer on the CPU with no way to
+say otherwise. There is now a switch in the model parameters, shown only where a GPU backend
+registered.
+
+The published figures for this chip come from `llama-bench`, which measures reading and
+writing separately. A turn does both, and in a ratio that depends on what was asked.
+`OffloadBenchmark` measures the two shapes through the engine that ships, Gemma 3 1B Q4 on
+the Adreno 830:
+
+| turn | prompt | generated | prefill | decode | wall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| chat, CPU | 16 | 300 | 266 ms | 6166 ms | **6.4 s** |
+| chat, GPU | 16 | 300 | 2004 ms | 8173 ms | **10.2 s** |
+| agent, CPU | 2017 | 46 | 13387 ms | 1129 ms | **14.5 s** |
+| agent, GPU | 2017 | 42 | 3233 ms | 1340 ms | **4.6 s** |
+
+**The GPU is 3.2x faster on a turn that used a tool and 1.6x slower on a plain chat turn.**
+That is a far sharper split than the component figures suggested, and it is the whole
+argument for a switch rather than a default: the right answer depends on what the user is
+doing, which the app cannot know.
+
+Two things not to misread. The 2004 ms prefill for a sixteen-token chat prompt is one-off
+GPU warm-up, not throughput, so the 8 pp/s it implies is meaningless; the agent row's 624
+pp/s is the real figure and it lines up with `llama-bench`. And decode is 31 to 37 t/s on
+the GPU against 41 to 49 on the CPU, a ratio of about 0.75, which matches the 0.71 already
+recorded here.
+
+CPU stays the default because a plain chat is the common case and the one where being slower
+is felt immediately.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

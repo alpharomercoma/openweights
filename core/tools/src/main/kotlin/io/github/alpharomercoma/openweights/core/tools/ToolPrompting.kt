@@ -68,8 +68,16 @@ object ToolPrompting {
         val marker = reply.indexOf("\"tool\"")
         if (marker < 0) return null
 
-        val arguments = reply.argumentsAfter(marker) ?: "{}"
-        return ToolCall(id = name, name = name, argumentsJson = arguments)
+        // An arguments object that starts and never closes is a call that was cut off, not a
+        // call with no arguments. Dispatching it with an empty object spends a round on a
+        // tool that can only answer "you gave me nothing", and the model is then told its
+        // own truncation was a missing argument. A tool that genuinely takes none says so by
+        // having no arguments key at all, which is the other branch.
+        val started = reply.indexOf("\"arguments\"", startIndex = marker) >= 0
+        val arguments = reply.argumentsAfter(marker)
+        if (started && arguments == null) return null
+
+        return ToolCall(id = name, name = name, argumentsJson = arguments ?: "{}")
     }
 
     /**

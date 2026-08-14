@@ -95,8 +95,21 @@ class ToolPromptingTest {
     }
 
     @Test
-    fun `an unclosed object gives back nothing rather than the rest of the reply`() {
+    fun `a call cut off mid arguments is not dispatched with empty ones`() {
+        // It used to come back as a call with no arguments, which spends a round on a tool
+        // that can only answer "you gave me nothing" and then tells the model its own
+        // truncation was a missing argument. The name said the arguments gave back nothing;
+        // what it actually did was dispatch.
         val reply = """{"tool": "web_search", "arguments": {"query": "unterminated"""
+
+        assertThat(ToolPrompting.parse(reply, registry)).isNull()
+    }
+
+    @Test
+    fun `a tool that takes no arguments is still callable`() {
+        // The other branch, and the reason the rule is about a truncated object rather than
+        // about an absent one: no arguments key at all is a tool that needs none.
+        val reply = """{"tool": "web_search"}"""
 
         assertThat(ToolPrompting.parse(reply, registry)?.argumentsJson).isEqualTo("{}")
     }

@@ -85,9 +85,14 @@ class WebSearchTool @Inject constructor(
         // model gets: while this was called search_wikipedia, replies said "Wikipedia" for
         // questions that had nothing to do with an encyclopedia, and the model wrote as
         // though the rest of the web were out of reach.
-        description = "Search the web and return the best matching pages with a summary " +
-            "of each. Use it whenever an answer depends on a fact you do not already " +
-            "have: people, places, organisations, products, events, definitions.",
+        // The old wording said to use it "whenever an answer depends on a fact you do not
+        // already have", and listed definitions among the examples. That argues with the
+        // system message beside it, which says to answer settled facts directly, and a model
+        // told two things follows the one attached to the tool it is looking at. Gemma 3 1B
+        // over-called on twelve of twelve chances with that pairing in place.
+        description = "Search the web for something that changes or is recent: news, " +
+            "prices, schedules, results, or a named person, product or organisation. " +
+            "Not for definitions, translations, or facts that do not change.",
         parametersJson = """
             {
               "type": "object",

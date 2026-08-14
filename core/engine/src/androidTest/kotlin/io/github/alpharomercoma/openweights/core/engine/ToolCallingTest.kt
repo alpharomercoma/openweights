@@ -39,6 +39,13 @@ import java.io.File
  * The value of routing through llama.cpp's chat engine is that tool syntax differs per
  * model family; a test that only checked our own plumbing would pass while the model
  * emitted something the parser never sees. So this asserts on a parsed call.
+ *
+ * Every generation here is greedy, which is what makes asserting on a model's output
+ * defensible at all. At a temperature above zero this was a coin weighted by the sampler:
+ * the same run could pass and fail with nothing changed, which is how a suite stops being
+ * trusted and then stops being run. At zero, one model file and one prompt give one answer,
+ * so a failure means something changed. It is still a statement about the file somebody
+ * pushed rather than about the app, which is what [org.junit.Assume] is for below.
  */
 @RunWith(AndroidJUnit4::class)
 class ToolCallingTest {
@@ -84,7 +91,7 @@ class ToolCallingTest {
             messages = listOf(
                 ChatMessage.text(ChatRole.USER, "What is the weather in Manila right now?"),
             ),
-            params = SamplerParams(temperature = 0.1f, maxTokens = REASONING_BUDGET, seed = 3),
+            params = SamplerParams(temperature = 0f, maxTokens = REASONING_BUDGET, seed = 3),
             tools = listOf(weather),
         ).toList().filterIsInstance<GenerationEvent.Completed>().single()
 
@@ -106,7 +113,7 @@ class ToolCallingTest {
 
         val completed = engine.chat(
             messages = listOf(ChatMessage.text(ChatRole.USER, "Say the word blue and stop.")),
-            params = SamplerParams(temperature = 0.1f, maxTokens = REASONING_BUDGET, seed = 5),
+            params = SamplerParams(temperature = 0f, maxTokens = REASONING_BUDGET, seed = 5),
         ).toList().filterIsInstance<GenerationEvent.Completed>().single()
 
         Log.i(TAG, "content=${completed.content} | reasoning=${completed.reasoning.take(80)}")
@@ -122,7 +129,7 @@ class ToolCallingTest {
 
         val completed = engine.chat(
             messages = listOf(ChatMessage.text(ChatRole.USER, "What is 2 + 2?")),
-            params = SamplerParams(temperature = 0.1f, maxTokens = REASONING_BUDGET, seed = 11),
+            params = SamplerParams(temperature = 0f, maxTokens = REASONING_BUDGET, seed = 11),
         ).toList().filterIsInstance<GenerationEvent.Completed>().single()
 
         assertThat(completed.toolCalls).isEmpty()

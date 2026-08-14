@@ -285,6 +285,32 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `a folded conversation still reports what its summary costs`() = runTest(dispatcher) {
+        loadModel()
+        repeat(4) { index ->
+            viewModel.send("Question $index")
+            settle()
+        }
+
+        // compactNow refuses while a turn is in flight, so the last one has to have landed
+        // before it is asked, or the test proves nothing.
+        settle(steps = FOLD_SETTLE_STEPS)
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+
+        viewModel.compactNow()
+        settle(steps = FOLD_SETTLE_STEPS)
+
+        val state = viewModel.uiState.value
+        assertThat(state.compaction).isNotNull()
+        // Folding frees most of the window and not all of it: the summary and the turns
+        // kept verbatim are still sent every turn. Reporting zero told everything that
+        // sizes itself against the window that the whole of it was free, and the next
+        // attachment was measured against a window that did not exist.
+        assertThat(state.contextUsed).isGreaterThan(0)
+        assertThat(state.contextUsed).isLessThan(state.contextSize)
+    }
+
+    @Test
     fun `a conversation that has to fold before the next turn folds instead of throwing`() =
         runTest(dispatcher) {
             loadModel()

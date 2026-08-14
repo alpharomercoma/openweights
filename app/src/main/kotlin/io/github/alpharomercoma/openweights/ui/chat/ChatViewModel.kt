@@ -927,7 +927,7 @@ class ChatViewModel @Inject constructor(
             if (compaction == null) {
                 current
             } else {
-                current.copy(
+                val folded = current.copy(
                     compaction = compaction,
                     transcript = current.transcript.mapIndexed { index, entry ->
                         if (index == compaction.foldedThroughIndex + 1) {
@@ -936,8 +936,14 @@ class ChatViewModel @Inject constructor(
                             entry
                         }
                     },
-                    contextUsed = 0,
                 )
+                // Not zero, which is what the cache holds and not what the next turn will.
+                // Folding frees most of the window and never all of it: the summary and
+                // the turns kept verbatim are sent again every turn. Reporting zero told
+                // everything that sizes itself against the window that the whole of it was
+                // free, and the next attachment was measured against a window that was not
+                // there.
+                folded.copy(contextUsed = folded.estimatedPromptTokens())
             }
         }
     }
@@ -1376,6 +1382,18 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
     val remaining = transcript.drop(compaction.foldedThroughIndex + 1)
     return system + summary + remaining.map { it.toChatMessage() }
 }
+
+/**
+ * A pessimistic guess at what the next prompt will occupy.
+ *
+ * Wanted only just after a fold, where the engine's own reading says nothing useful: the
+ * cache was reset, so it reports empty, while the next turn will re-decode the summary and
+ * whatever was kept verbatim. Two characters to a token, the same deliberately pessimistic
+ * ratio the attachment budget uses and for the same reason: over-estimating what is spent
+ * costs some of a document, and under-estimating it costs the whole reply.
+ */
+internal fun ChatUiState.estimatedPromptTokens(): Int =
+    engineMessages().sumOf { it.text.length } / CHARS_PER_TOKEN
 
 /**
  * A transcript entry as the engine sees it.

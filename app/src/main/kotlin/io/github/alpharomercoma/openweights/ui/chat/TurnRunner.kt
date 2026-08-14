@@ -21,6 +21,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.containsToolMarkup
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
@@ -118,6 +119,9 @@ class TurnRunner @Inject constructor(
         var messages = conversation
         var round = 0
         var lastRaw = ""
+        // Spent at most once a turn. Re-asking a model that cannot produce the syntax is
+        // how a phone spends a minute arriving nowhere.
+        var repaired = false
 
         while (true) {
             // Tools are offered from the first pass, which was tried the other way and was
@@ -156,7 +160,22 @@ class TurnRunner @Inject constructor(
             val salvaged =
                 if (offerTools) pass.raw.salvagedCall(active, conversation) else emptyList()
             val calls = pass.event.toolCalls.ifEmpty { salvaged }
-            if (calls.isEmpty()) return lastRaw
+            if (calls.isEmpty()) {
+                // Call-shaped text that neither parser could read. For a model this size
+                // that is the common case rather than the exceptional one, and the usual
+                // mistake is inventing a tool that does not exist, so it is handed back the
+                // names that do. One round trip, and it does not count against the tool
+                // budget, because nothing was run and nothing was read.
+                if (offerTools && !repaired && pass.raw.containsToolMarkup()) {
+                    repaired = true
+                    messages = messages +
+                        ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                        ChatMessage.text(ChatRole.USER, repairRequest(active))
+                    listener.onNextPass()
+                    continue
+                }
+                return lastRaw
+            }
 
             // Said first, then the steps, so the transcript reads in the order it happened.
             // The parser's content, not the raw stream: raw still carries the call itself,
@@ -200,6 +219,19 @@ class TurnRunner @Inject constructor(
     }
 
     internal class Pass(val raw: String, val event: GenerationEvent.Completed)
+
+    /**
+     * What to say to a model whose call could not be read.
+     *
+     * Names the tools rather than describing the format, because the format is the
+     * template's job and the name is what a small model gets wrong. Ends by permitting an
+     * answer without a tool, so a model that cannot manage the syntax at all still finishes
+     * the turn rather than trying again forever.
+     */
+    private fun repairRequest(active: ToolRegistry): String =
+        "That did not read as a tool call. The tools available are " +
+            active.definitions.joinToString { it.name } +
+            ". Call one of those, or answer without a tool."
 
     @Suppress("LongParameterList")
     private suspend fun streamOnce(

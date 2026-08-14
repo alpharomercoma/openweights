@@ -105,6 +105,14 @@ private const val CLOSE_TAG = "</think>"
 fun String.withoutToolMarkup(): String =
     TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }.trim()
 
+/**
+ * True when the text carries a tool invocation, whether or not anything could read it.
+ *
+ * The difference between a model that answered and one that tried to call something and got
+ * the syntax wrong. Only the second is worth another pass.
+ */
+fun String.containsToolMarkup(): Boolean = TOOL_MARKUP.any { it.containsMatchIn(this) }
+
 private val TOOL_MARKUP = listOf(
     Regex("""<\|tool_call_start\|>.*?<\|tool_call_end\|>""", RegexOption.DOT_MATCHES_ALL),
     Regex("""<tool_call>.*?</tool_call>""", RegexOption.DOT_MATCHES_ALL),

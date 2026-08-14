@@ -240,6 +240,58 @@ class TurnRunnerTest {
             assertThat(engine.offered.single()).isEmpty()
         }
 
+    @Test
+    fun `a call that did not parse is handed back with the tools that exist`() = runBlocking {
+        // Call-shaped, and neither parser could make anything of it: llama.cpp did not
+        // recognise the format, and salvage cannot match a name no tool has. The common
+        // failure for a model this size is inventing the name, so being told the real ones
+        // is the correction that helps.
+        engine.scripted += ScriptedPass(
+            text = "<|tool_call_start|>[look_up(topic='ada')]<|tool_call_end|>",
+            content = "",
+        )
+        engine.scripted += ScriptedPass(
+            "Looking.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"ada"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+
+        run(withTools = true)
+
+        assertThat(engine.prompts).hasSize(3)
+        val repair = engine.prompts[1].last()
+        assertThat(repair.role).isEqualTo(ChatRole.USER)
+        assertThat(repair.text).contains("web_search")
+        assertThat(repair.text).doesNotContain("look_up")
+        // The repair bought a real call, which is the only reason to spend a pass on it.
+        assertThat(search.calls).hasSize(1)
+    }
+
+    @Test
+    fun `the same mistake twice is not repaired twice`() = runBlocking {
+        val broken = ScriptedPass("<tool_call>{bad</tool_call>", content = "")
+        engine.scripted += broken
+        engine.scripted += ScriptedPass("<tool_call>{still bad</tool_call>", content = "")
+        engine.scripted += ScriptedPass("Here is what I know without looking.")
+
+        run(withTools = true)
+
+        // One repair, then the turn is left to end. Re-asking a model that cannot produce
+        // the syntax is how a phone spends a minute arriving nowhere.
+        assertThat(engine.prompts).hasSize(2)
+    }
+
+    @Test
+    fun `nothing is repaired when tools were never offered`() = runBlocking {
+        engine.scripted += ScriptedPass("<tool_call>{bad</tool_call>", content = "")
+
+        run(withTools = false)
+
+        assertThat(engine.prompts).hasSize(1)
+    }
+
     /** Runs one turn and returns every step it reported. */
     private suspend fun run(
         withTools: Boolean,

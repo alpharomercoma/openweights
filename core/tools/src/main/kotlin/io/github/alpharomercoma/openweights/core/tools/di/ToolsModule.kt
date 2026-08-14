@@ -22,6 +22,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
+import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
@@ -47,5 +48,7 @@ object ToolsModule {
         searchFiles: SearchFilesTool,
         readFile: ReadFileTool,
         writeFile: WriteFileTool,
-    ): ToolRegistry = ToolRegistry(listOf(search, fetch, searchFiles, readFile, writeFile))
+        runScript: RunScriptTool,
+    ): ToolRegistry =
+        ToolRegistry(listOf(search, fetch, searchFiles, readFile, writeFile, runScript))
 }

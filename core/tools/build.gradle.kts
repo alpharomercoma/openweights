@@ -9,6 +9,7 @@ android {
 
 dependencies {
     api(project(":core:common"))
+    implementation(project(":core:sandbox"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)

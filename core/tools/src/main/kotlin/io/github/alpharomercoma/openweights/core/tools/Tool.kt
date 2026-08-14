@@ -26,19 +26,32 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
  * both on one object means a tool cannot be advertised without being runnable, which is
  * the state the app was in before: tools were described to nobody and executed never.
  *
- * Every tool here reaches the network, reads something already on the device, or works
- * inside one folder the user picked and handed over. None of them execute code, and none
- * reach anything that was not granted. That part is a deliberate ceiling and not a temporary
- * one: an app that runs arbitrary code on a phone at a model's suggestion is a different and
- * much worse product.
+ * Every tool here reaches the network, reads something already on the device, works inside
+ * one folder the user picked and handed over, or runs a program somewhere that can reach
+ * none of those things. Nothing here acts with this app's authority on a model's say-so.
  *
- * The line moved once, deliberately. It used to read "none of them write files outside the
- * app", which was true of every tool there was until the file tools arrived. What holds the
- * new position is not a promise but a shape: the folder is chosen in the system's own
- * picker, the grant is revocable from Settings without uninstalling anything, the app asks
- * for no storage permission at all, and writing can only create a file that is not there
- * yet. Nothing here can replace or delete what somebody already had. Moving the line again
- * deserves the same argument set down in the same place.
+ * The line has moved twice, both times on purpose, and both arguments belong here rather
+ * than in a commit message nobody will find.
+ *
+ * It used to read "none of them write files outside the app", which was true of every tool
+ * there was until the file tools arrived. What holds that position is a shape rather than a
+ * promise: the folder is chosen in the system's own picker, the grant is revocable from
+ * Settings without uninstalling anything, the app asks for no storage permission at all, and
+ * writing can only create a file that is not there yet.
+ *
+ * It also used to read "none of them execute code", followed by the observation that an app
+ * running arbitrary code at a model's suggestion is a different and much worse product. That
+ * observation is still correct, and it is worth being exact about why what ships is not the
+ * thing it was refusing. The objection was never to arithmetic; it was to code running with
+ * everything this app can reach. A script here runs in a service declared `isolatedProcess`:
+ * its own uid, no permissions, no files, no network, no way back except the value it
+ * returns. The interpreter is linked without qjs-libc, so the functions a script would use
+ * to open a file are absent from the binary rather than merely discouraged. It is code with
+ * no authority at all, which is a different proposition from code with ours.
+ *
+ * Moving the line a third time deserves the same argument set down in the same place. The
+ * test is not whether a capability is useful. It is whether what gains the capability is
+ * this app, or something that has been given nothing.
  */
 interface Tool {
     val definition: ToolDefinition

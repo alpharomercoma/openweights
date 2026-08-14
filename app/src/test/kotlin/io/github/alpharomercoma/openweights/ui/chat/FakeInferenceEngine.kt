@@ -65,6 +65,9 @@ class FakeInferenceEngine : InferenceEngine {
     /** What the template test would report for this model. */
     var supportsThinking = true
 
+    /** Off by default, so a test only deals with the tool loop when it asks to. */
+    var supportsTools = false
+
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
@@ -141,6 +144,7 @@ class FakeInferenceEngine : InferenceEngine {
             // establish. Whether the weights honour it is a separate question and the
             // reason the view model keeps watching after this point.
             supportsThinking = supportsThinking,
+            supportsTools = supportsTools,
         )
     }
 

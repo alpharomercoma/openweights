@@ -22,6 +22,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.Clock
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
@@ -29,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
+import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.model.AttachmentStore
@@ -78,7 +81,9 @@ class ChatViewModelTest {
 
         engine = FakeInferenceEngine()
         val chats = ChatRepository(database, Clock.System)
-        val registry = ToolRegistry(emptyList())
+        // Registered but unreachable unless a test says the model supports tools, so the
+        // tool loop is available to the tests that want it and invisible to the rest.
+        val registry = ToolRegistry(listOf(StubTool))
         viewModel = ChatViewModel(
             runtime = ModelRuntime(
                 engine = engine,
@@ -244,6 +249,39 @@ class ChatViewModelTest {
         settle()
 
         assertThat(viewModel.uiState.value.supportsThinking).isFalse()
+    }
+
+    @Test
+    fun `a turn with a tool is stored as one reply, not one per pass`() = runTest(dispatcher) {
+        engine.supportsTools = true
+        loadModel()
+        engine.scripted += ScriptedPass(
+            text = "Looking that up.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+
+        viewModel.send("Who is Ada Lovelace?")
+        settle(steps = FOLD_SETTLE_STEPS)
+
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        val stored = database.messages().forConversation(id)
+
+        // The screen shows one answer with the tool folded into it, and storage has to
+        // agree. It used to be written once per pass, so this reopened as the interim
+        // reply that asked for the tool followed by the real one, and the model was
+        // resent that as history.
+        assertThat(stored.map { it.role }).containsExactly("user", "assistant").inOrder()
+        assertThat(stored.last().text).contains("Ada Lovelace")
+        assertThat(stored.last().text).doesNotContain("Looking that up")
+
+        // The ledger still counts both passes, which is the one part of this that was
+        // already right: the phone really did decode twice to answer once, and the
+        // usage tab is about work done rather than about replies kept.
+        val usage = database.usage().observeAll().first().single()
+        assertThat(usage.generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
     }
 
     @Test
@@ -601,6 +639,17 @@ class ChatViewModelTest {
     private fun modelFile(name: String): File =
         File(models, name).apply { writeText("not a real model") }
 
+    /** Something for a scripted call to land on. What it returns does not matter here. */
+    private object StubTool : Tool {
+        override val definition = ToolDefinition(
+            name = "web_search",
+            description = "Search the web.",
+            parametersJson = """{"type":"object","properties":{"query":{"type":"string"}}}""",
+        )
+
+        override suspend fun run(call: ToolCall): String = "Ada Lovelace, 1815 to 1852."
+    }
+
     /**
      * Waits for a conversation to hold [count] messages and returns them.
      *
@@ -644,6 +693,12 @@ class ChatViewModelTest {
 
         /** A fold runs the model, resets the cache and writes, all before its turn starts. */
         const val FOLD_SETTLE_STEPS = 30
+
+        /** What [FakeInferenceEngine] reports for every completed pass. */
+        const val FAKE_TOKENS_PER_PASS = 4
+
+        /** One to ask for the tool, one to answer with what it returned. */
+        const val PASSES = 2
 
         /** Virtual milliseconds a held load takes, long enough to interleave a second. */
         const val LOAD_MS = 500L

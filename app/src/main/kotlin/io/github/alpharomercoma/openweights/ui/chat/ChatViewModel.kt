@@ -686,6 +686,12 @@ class ChatViewModel @Inject constructor(
             var reasoningEndedAt: Long? = null
             var raw = ""
 
+            // What the turn will write down, replaced by each pass that completes, so what
+            // survives is the pass the turn ended on rather than the one that asked for a
+            // tool. Null until a pass completes at all, which is what tells the difference
+            // between a turn that answered and one that was stopped before it could.
+            var settled: Pair<String, GenerationStats>? = null
+
             val listener = object : TurnListener {
                 override fun onText(text: String) {
                     raw = text
@@ -706,8 +712,9 @@ class ChatViewModel @Inject constructor(
                     applyStreamedText(text, parsed, reasoningEndedAt, turnStartedAt)
                 }
 
-                override fun onPass(event: GenerationEvent.Completed, raw: String) =
-                    applyCompletion(event, raw)
+                override fun onPass(event: GenerationEvent.Completed, raw: String) {
+                    settled = applyCompletion(event, raw) to event.stats
+                }
 
                 override fun onSteps(steps: List<AgentStep>) =
                     updateLastEntry { it.copy(blocks = it.blocks + steps.map(TurnBlock::Step)) }
@@ -743,6 +750,9 @@ class ChatViewModel @Inject constructor(
                     withTools = state.supportsTools && state.toolsAvailable,
                     listener = listener,
                 )
+                // Here, so a turn that used a tool is written down once. Skipped by both
+                // catches below, where finishInterrupted writes what was produced instead.
+                settled?.let { (text, stats) -> persistReply(text, stats) }
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
                 // being written, so it is kept and stored like any other reply.
@@ -1080,14 +1090,15 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Finishes a reply that ran to its end.
+     * Settles the screen on one finished pass, and says what it settled on.
      *
      * [raw] is everything the engine produced, which is ahead of the screen by up to one
-     * coalescing window. It becomes the entry's text and the row written to storage, so
-     * what is shown, what is re-read on reopening, and what is sent as history next turn
-     * are all the same string.
+     * coalescing window. The string returned is what the entry now shows, and it is what
+     * the turn writes to storage once it has finished asking for tools, so what is shown,
+     * what is re-read on reopening, and what is sent as history next turn are all the same
+     * string.
      */
-    private fun applyCompletion(event: GenerationEvent.Completed, raw: String) {
+    private fun applyCompletion(event: GenerationEvent.Completed, raw: String): String {
         val parsed = parseAssistantReply(raw)
         val streamed = _uiState.value.transcript.lastOrNull()
         // Whichever source has it. llama.cpp separates thinking itself for the formats it
@@ -1124,9 +1135,7 @@ class ChatViewModel @Inject constructor(
                 generatedTokens = event.stats.generatedTokens,
             )
         }
-        // After the transcript is reconciled, not before: storage takes the same text the
-        // screen settled on.
-        persistReply(canonical, event.stats)
+        recordWork(event.stats)
         _uiState.update {
             it.copy(
                 contextUsed = event.stats.contextUsed,
@@ -1134,6 +1143,7 @@ class ChatViewModel @Inject constructor(
                 error = event.reason.warning(),
             )
         }
+        return canonical
     }
 
     /**
@@ -1173,17 +1183,20 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Writes a reply and folds it into the lifetime ledger.
+     * Writes the reply a turn settled on.
      *
-     * Two writes on purpose: the message carries this reply's own numbers, and the ledger
-     * carries the totals, so deleting the chat later does not un-count the work. A stopped
-     * reply has no numbers, since they only arrive with a completion, and it is written
-     * without them rather than with invented ones.
+     * Once per turn, not once per pass. A turn that uses a tool completes two passes or
+     * more, and this used to run at the end of each: the screen showed one answer with the
+     * tool folded into it, storage held the interim reply that asked for the tool and then
+     * the real one, and reopening the chat produced a conversation the user had never had
+     * and then sent it back to the model as history.
+     *
+     * A stopped reply has no numbers, since they only arrive with a completion, and it is
+     * written without them rather than with invented ones.
      */
     private fun persistReply(text: String, stats: GenerationStats?) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
-        val model = _uiState.value.modelName
 
         viewModelScope.launch {
             storageMutex.withLock {
@@ -1196,14 +1209,29 @@ class ChatViewModel @Inject constructor(
                     generatedTokens = stats?.generatedTokens,
                     reasoningMs = reasoningMs,
                 )
-                if (stats != null && model != null) {
-                    chats.recordUsage(
-                        modelName = model,
-                        promptTokens = stats.promptTokens,
-                        generatedTokens = stats.generatedTokens,
-                        inferenceMs = stats.prefillMs + stats.decodeMs,
-                    )
-                }
+            }
+        }
+    }
+
+    /**
+     * Folds one pass into the lifetime ledger.
+     *
+     * Per pass rather than per turn, which is the one part of this that was already right.
+     * A turn that searched before answering really did decode twice, and the tab says how
+     * much work the phone has done. Kept apart from the reply for that reason: the row
+     * carries the answer's own numbers, the ledger carries the totals, and deleting the
+     * chat later does not un-count the work.
+     */
+    private fun recordWork(stats: GenerationStats) {
+        val model = _uiState.value.modelName ?: return
+        viewModelScope.launch {
+            storageMutex.withLock {
+                chats.recordUsage(
+                    modelName = model,
+                    promptTokens = stats.promptTokens,
+                    generatedTokens = stats.generatedTokens,
+                    inferenceMs = stats.prefillMs + stats.decodeMs,
+                )
             }
         }
     }

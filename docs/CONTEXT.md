@@ -771,6 +771,41 @@ putting the schemas in the system message and parsing a call back out, is the on
 would take two thirds of the tested models off zero, and it is the largest piece of work
 outstanding on the agent loop.
 
+### Three families, one prompt, and why that does not work (2026-08-15)
+
+Re-run on a second Device Cloud instance, `pineapple` (Snapdragon 8 Gen 3), which is not the
+`sun` the earlier tables were measured on, so the timings are not comparable with them. The
+catalogue here was three tools rather than six, because no folder was shared on this device
+and the file tools correctly excluded themselves.
+
+The point of the run was the models that used to be skipped. Both now route through the
+prompted path and both call tools:
+
+| model | route | best arm | right | over-called | under-called |
+| --- | --- | --- | ---: | ---: | ---: |
+| Qwen 2.5 1.5B | native | greedy | 17/24 | 0 | 7 |
+| Gemma 3 1B | prompted | the superseded wording | 12/24 | 9 | 0 |
+| LFM2 1.2B | prompted | shipped | 13/24 | 0 | 11 |
+
+**The wording tuned on Qwen is worse on Gemma.** Shipped scores 8/24 there against 12/24 for
+the wording it replaced, because it deliberately errs towards looking things up and Gemma's
+problem is the opposite: twelve over-calls out of twelve chances at it. Qwen under-calls and
+Gemma over-calls, so one sentence cannot serve both, and the tool prompt being a single
+global constant is the thing that is actually wrong.
+
+**A tidy theory about that, and its refutation.** Gemma is on the prompted path, which ends
+by telling the model to reply with a JSON object, and that instruction looked like an
+invitation to call something. If that were the mechanism, LFM2 would over-call too, since it
+takes the same path. It does not: zero over-calls and eleven under-calls, the opposite
+failure. So the bias belongs to the model rather than to the route, and choosing a wording by
+route would have been the wrong fix for a plausible reason.
+
+**Also found, and not yet fixed.** LFM2 1.2B fails with `llama_decode returned 1` partway
+through a sustained run, after something like thirty generations on one loaded engine. The
+other two families ran a hundred and sixty each without it. It is a real defect in the engine
+or in that model's cache handling rather than anything to do with tool choice, and it is what
+stopped the benchmark before LFM's remaining arms.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

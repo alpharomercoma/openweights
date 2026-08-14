@@ -35,6 +35,8 @@ import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
+import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
 import io.github.alpharomercoma.openweights.core.tools.Workspace
 import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
@@ -100,22 +102,23 @@ class ToolChoiceBenchmark {
         val engine: InferenceEngine = LlamaCppEngine()
         try {
             engine.load(file, ModelLoadParams(contextLength = CONTEXT))
-            if (engine.loadedModel?.supportsTools != true) {
-                Log.i(TAG, "SKIP model=$name reason=template-renders-no-tools")
-                return
-            }
-            arms().forEach { arm -> score(engine, name, arm) }
+            // Not a reason to skip any more. A template that drops tool definitions gets
+            // them in the system message instead, which is what the app now does, so what
+            // is measured here is the route each model actually takes.
+            val native = engine.loadedModel?.supportsTools == true
+            Log.i(TAG, "ROUTE model=$name native=$native")
+            arms().forEach { arm -> score(engine, name, arm, native) }
         } finally {
             engine.close()
         }
     }
 
-    private suspend fun score(engine: InferenceEngine, model: String, arm: Arm) {
+    private suspend fun score(engine: InferenceEngine, model: String, arm: Arm, native: Boolean) {
         val tally = Tally()
         for (case in CASES) {
             for (seed in SEEDS) {
                 val began = System.currentTimeMillis()
-                val got = chosenTool(engine, case.prompt, arm, seed)
+                val got = chosenTool(engine, case.prompt, arm, seed, native)
                 tally.millis += System.currentTimeMillis() - began
                 when {
                     got == case.expects -> tally.right++
@@ -139,9 +142,13 @@ class ToolChoiceBenchmark {
         prompt: String,
         arm: Arm,
         seed: Int,
+        native: Boolean,
     ): String? {
+        // The same split TurnRunner makes: a template that can carry the definitions gets
+        // them, and one that cannot gets them written into what it can carry.
+        val described = if (native) "" else "\n\n" + ToolPrompting.describe(catalogue())
         val messages = listOf(
-            ChatMessage.text(ChatRole.SYSTEM, arm.system),
+            ChatMessage.text(ChatRole.SYSTEM, arm.system + described),
             ChatMessage.text(ChatRole.USER, prompt),
         )
         // Greedy on the routing arms, because picking a tool is an argmax and the public
@@ -152,11 +159,16 @@ class ToolChoiceBenchmark {
             seed = seed,
             temperature = if (arm.greedy) 0f else SHIPPED.temperature,
         )
-        val completed = engine.chat(messages, params, tools = catalogue())
+        val offered = if (native) catalogue() else emptyList()
+        val completed = engine.chat(messages, params, tools = offered)
             .toList()
             .filterIsInstance<GenerationEvent.Completed>()
             .single()
-        return completed.toolCalls.firstOrNull()?.name
+        return if (native) {
+            completed.toolCalls.firstOrNull()?.name
+        } else {
+            ToolPrompting.parse(completed.content, registry())?.name
+        }
     }
 
     /**
@@ -169,19 +181,23 @@ class ToolChoiceBenchmark {
      * catalogue is logged rather than assumed. Reading it off the log is the only way to know
      * which of the two arrangements a given run measured.
      */
-    private fun catalogue(): List<ToolDefinition> {
+    private fun registry(): ToolRegistry {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val client = OkHttpClient()
         val workspace = Workspace(context, WorkspaceGrant(context))
-        return listOf(
-            WebSearchTool(client, SearchSettings()),
-            FetchUrlTool(client),
-            SearchFilesTool(workspace),
-            ReadFileTool(workspace),
-            WriteFileTool(workspace),
-            RunScriptTool(Sandbox(context), workspace),
-        ).filter { it.isAvailable }.map { it.definition }
+        return ToolRegistry(
+            listOf(
+                WebSearchTool(client, SearchSettings()),
+                FetchUrlTool(client),
+                SearchFilesTool(workspace),
+                ReadFileTool(workspace),
+                WriteFileTool(workspace),
+                RunScriptTool(Sandbox(context), workspace),
+            ).filter { it.isAvailable },
+        )
     }
+
+    private fun catalogue(): List<ToolDefinition> = registry().definitions
 
     private fun arms(): List<Arm> {
         val today = LocalDate.now()

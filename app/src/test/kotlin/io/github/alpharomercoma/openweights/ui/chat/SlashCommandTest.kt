@@ -46,4 +46,17 @@ class SlashCommandTest {
     fun `an unknown command matches nothing rather than everything`() {
         assertThat(SlashCommand.match("/zzz")).isEmpty()
     }
+
+    @Test
+    fun `the mode the app starts in is the one the palette calls the default`() {
+        // /ask described itself as the default while the app started in auto, so the list
+        // that is meant to be the documentation told the user tools would ask first when
+        // they were about to run on their own. Two places said it and only one was right.
+        val started = ChatUiState().mode
+        val describedAsDefault = SlashCommand.entries.filter {
+            it.description.contains("default", ignoreCase = true)
+        }
+
+        assertThat(describedAsDefault.map { it.trigger }).containsExactly("/${started.command}")
+    }
 }

@@ -226,6 +226,20 @@ class TurnRunnerTest {
         assertThat(engine.prompts).hasSize(2)
     }
 
+    @Test
+    fun `tools are withheld once there is no room left to answer with what they return`() =
+        runBlocking {
+            engine.scripted += ScriptedPass("Answering from what I have.")
+            // Two hundred tokens free, which the budget halves and calls too little to be
+            // worth a round trip. Offering a tool here spends the last of the window on a
+            // result there is no room to answer from.
+            engine.contextUsed = CONTEXT - NEARLY_FULL_HEADROOM
+
+            run(withTools = true)
+
+            assertThat(engine.offered.single()).isEmpty()
+        }
+
     /** Runs one turn and returns every step it reported. */
     private suspend fun run(
         withTools: Boolean,
@@ -304,5 +318,8 @@ class TurnRunnerTest {
 
         /** The same English approximation the budget uses. */
         const val CHARS_PER_TOKEN = 4
+
+        /** Tokens free at the point the budget stops thinking a tool is worth it. */
+        const val NEARLY_FULL_HEADROOM = 200
     }
 }

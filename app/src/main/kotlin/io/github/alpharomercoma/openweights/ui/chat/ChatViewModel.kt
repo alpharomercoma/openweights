@@ -1431,6 +1431,12 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
     val system = takeWhile { it.role == ChatRole.SYSTEM }
     val body = drop(system.size).dropWhile { it.role == ChatRole.ASSISTANT }
 
+    // Instructions with nothing to answer are not a prompt. A fold that keeps only answers
+    // leaves this, and sending it asks the model to reply to nobody: refused by the
+    // templates that check, and answered at random by the ones that do not. Empty is what
+    // the caller already treats as nothing to send.
+    if (body.isEmpty()) return emptyList()
+
     return system + body.fold(mutableListOf()) { kept, message ->
         val previous = kept.lastOrNull()
         if (previous != null && previous.role == message.role) {

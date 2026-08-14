@@ -51,8 +51,8 @@ enum class SlashCommand(val trigger: String, val description: String) {
     // The three modes, typed the way Claude Code and Codex do it, because that is the
     // vocabulary anyone reaching for a mode already has.
     PLAN("/plan", "Say what it would do, run no tools"),
-    AUTO("/auto", "Run tools without asking"),
-    ASK("/ask", "Ask before each tool. The default"),
+    AUTO("/auto", "Run tools without asking. The default"),
+    ASK("/ask", "Approve each tool before it runs"),
     ;
 
     companion object {

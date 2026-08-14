@@ -177,6 +177,22 @@ class EngineMessagesTest {
         assertAlternates(state.engineMessages())
     }
 
+    @Test
+    fun `a transcript with no question in it is not sent at all`() {
+        // What a fold leaves when everything it kept is an answer: the opening assistant
+        // turns are dropped, and nothing is left to answer. Sending the instructions on
+        // their own asks the model to reply to nobody, which some templates refuse and the
+        // rest answer at random.
+        val state = ChatUiState(
+            transcript = listOf(
+                TranscriptEntry(id = 0, role = ChatRole.ASSISTANT, text = "an answer"),
+                TranscriptEntry(id = 1, role = ChatRole.ASSISTANT, text = "another"),
+            ),
+        )
+
+        assertThat(state.engineMessages()).isEmpty()
+    }
+
     /**
      * Fails unless the prompt is one leading system turn and then user, assistant, user.
      *

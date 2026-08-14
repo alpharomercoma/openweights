@@ -713,6 +713,64 @@ genuinely broken script still reports its own complaint rather than the rewritin
 that and one clearer sentence in the tool's description, the same question at the same three
 seeds came back 3 out of 3.
 
+### Tool choice: 42 percent to 75 percent, and how it was found (2026-08-14)
+
+`ToolChoiceBenchmark` compares arrangements that differ in one thing each, on the phone and
+the models that ship. Twenty four routing decisions per arm: eight questions, half needing a
+tool and half not, at three seeds. It counts the two ways of being wrong apart, because they
+are not the same mistake. Answering "the weather right now" out of memory is a wrong answer;
+searching for the capital of France is a slow right one.
+
+Qwen 2.5 1.5B Q4_K_M, Snapdragon 8 Elite:
+
+| system message | sampling | right | over-called | under-called | ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| the old wording | 0.8 | 10/24 | 6 | 7 | 1345 |
+| the new wording | 0.8 | 14/24 | 2 | 8 | 1056 |
+| **the new wording** | **greedy** | **18/24** | **0** | 6 | **1069** |
+| new wording, no answer-style line | greedy | 12/24 | 12 | 0 | 1541 |
+| date and routing, no answer-style line | greedy | 14/24 | 9 | 1 | 1479 |
+
+Two changes, and each was measured on its own before both were kept.
+
+**The wording.** It used to say "search only when the answer depends on something you cannot
+recall", which asks a 1.5B model a question about its own memory. Naming the kinds of
+question instead, and telling it what day it is, took it from ten to fourteen. The date is
+most of that: a model cannot tell that "this year's final" is past its training data if
+nobody tells it the year.
+
+**Greedy while a tool is on the table.** Choosing among tools is an argmax and the
+leaderboards score it that way. Fourteen to eighteen, and slightly faster. Only while tools
+are offered: the pass that writes the final answer out of tool results has none, so prose
+keeps the user's sampler.
+
+**The hypothesis that was wrong, and why it is written down.** The first guess was that
+`ANSWER_STYLE`, which opens the system message with "answer from what you know", was arguing
+the model out of using its tools. It was not. Removing it made things worse, 12/24 with
+twelve over-calls, because it is the only thing holding back the other failure. The two lines
+pull in opposite directions on purpose and neither works alone.
+
+**What the first attempt at this measured, which was nothing.** It sent no system message at
+all, at a temperature the app does not use, over twelve observations per arm, and concluded
+from 2/12 against 4/12 that a larger tool catalogue was harmless. Twelve Bernoulli trials
+cannot separate those: Fisher's exact puts it at p = 0.64. The old wording is kept in the
+benchmark as a `superseded` arm so the improvement stays reproducible rather than being a
+number in a commit message.
+
+### Gemma and LFM render no tools at all (2026-08-14)
+
+`gemma-3-1b-it-Q4_K_M` and `LFM2-1.2B-Q4_K_M` both come back from `supports_tools()` false:
+their chat templates drop tool definitions on the floor. The probe is honest, rendering a
+tool with an unmistakable name and looking for it, so this is a property of the templates
+rather than a bug in the check.
+
+The app does not fail on those models. It quietly becomes a chatbot, and every measurement
+above reaches exactly one of the three families tested. No amount of prompt work moves that,
+because there is nothing to prompt: the definitions never reach the model. A generic path,
+putting the schemas in the system message and parsing a call back out, is the only thing that
+would take two thirds of the tested models off zero, and it is the largest piece of work
+outstanding on the agent loop.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

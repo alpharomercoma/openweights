@@ -53,7 +53,11 @@ class EngineMessagesTest {
 
         val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
 
-        assertThat(system.text).contains("Search only when")
+        // The wording that measured best names the kinds of question rather than asking
+        // the model whether it can recall something. Pinned on the tool's own name, which is
+        // the part the model has to match up with what it was offered.
+        assertThat(system.text).contains("web_search")
+        assertThat(system.text).contains("Today is")
     }
 
     @Test
@@ -100,10 +104,11 @@ class EngineMessagesTest {
 
         // One system turn carrying all of it. The summary used to be a second one, which
         // is what templates requiring strict alternation refuse. Every part is
-        // load-bearing: answer from memory, when to go and look, and what was folded away.
+        // load-bearing: today's date, answer from memory, when to go and look, and what
+        // was folded away.
         val system = messages.single { it.role == ChatRole.SYSTEM }
         assertThat(system.text).contains("Answer from what you know")
-        assertThat(system.text).contains("Search only when")
+        assertThat(system.text).contains("web_search")
         assertThat(system.text).contains("The user is porting a parser.")
         assertThat(system.text).doesNotContain("$")
     }

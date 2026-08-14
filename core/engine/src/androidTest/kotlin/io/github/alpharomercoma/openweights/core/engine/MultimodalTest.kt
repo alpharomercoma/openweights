@@ -40,6 +40,18 @@ import java.io.File
  * produces a fluent, confident answer, because the language model happily describes an
  * imaginary picture. So the assertion is on a detail only visible in the file. The colour
  * and shape drawn into it: rather than on the reply merely existing.
+ *
+ * Nothing here is committed, so push the three first. The picture has to be the one the
+ * assertions describe, which is what the generator is for:
+ * ```
+ * python3 tools/red-octagon.py
+ * adb push red-octagon.png /data/local/tmp/openweights/test-image.png
+ * adb push LFM2.5-VL-3B-Q4_0.gguf /data/local/tmp/openweights/vl.gguf
+ * adb push mmproj-LFM2.5-VL-3B-Q4_0.gguf /data/local/tmp/openweights/mmproj.gguf
+ * ```
+ * The audio case wants `audio.gguf`, `audio-mmproj.gguf` and `test-audio.wav` beside them.
+ * Anything missing skips rather than fails, so a machine with no device stays green, and
+ * for a long time all five skipped quietly for want of a picture nobody knew to draw.
  */
 @RunWith(AndroidJUnit4::class)
 class MultimodalTest {

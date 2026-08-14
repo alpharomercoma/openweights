@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -253,6 +254,7 @@ class ChatViewModel @Inject constructor(
     private val compactor: ConversationCompactor,
     private val attachments: AttachmentStore,
     private val chats: ChatRepository,
+    private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
 ) : ViewModel() {
@@ -277,17 +279,6 @@ class ChatViewModel @Inject constructor(
 
     /** Held for the length of a load, so two of them cannot interleave. */
     private val loadMutex = Mutex()
-
-    /**
-     * Serializes everything that touches the conversation tables.
-     *
-     * Writes are launched rather than awaited, so the screen never waits on the disk. That
-     * leaves them racing each other unless they queue: a reply written at the end of one
-     * turn can otherwise land after the next question, and a regeneration can read the
-     * table before the reply it means to delete has been inserted. The mutex is fair, so
-     * the rows end up in the order the user produced them.
-     */
-    private val storageMutex = Mutex()
 
     /** Counts load requests, so a queued one can tell it has been superseded. */
     private var loadRequest = 0L
@@ -445,7 +436,7 @@ class ChatViewModel @Inject constructor(
             }
             if (keepConversation) {
                 conversationId?.let { id ->
-                    storageMutex.withLock { chats.setModel(id, modelFile.nameWithoutExtension) }
+                    writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
                 }
             }
         }.onFailure { failure ->
@@ -489,12 +480,18 @@ class ChatViewModel @Inject constructor(
         // Stop in that window did nothing at all, and the turn it appeared to cancel then
         // started against whatever state had replaced it.
         val send = viewModelScope.launch {
-            storageMutex.withLock {
-                val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
-                val id = conversationId
-                    ?: chats.startConversation(title, _uiState.value.modelName)
-                        .also { conversationId = it }
-                chats.addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+            // Answered either way. What the user typed is on screen and worth a reply even
+            // if the disk would not take it, so a failure here is reported rather than
+            // thrown: silence left a message that was there for the session and gone on
+            // reopening, with the turn generating against it as though it were durable.
+            reportingFailure {
+                writer.inOrder {
+                    val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
+                    val id = conversationId
+                        ?: startConversation(title, _uiState.value.modelName)
+                            .also { conversationId = it }
+                    addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+                }
             }
             generate()
         }
@@ -609,9 +606,9 @@ class ChatViewModel @Inject constructor(
             // conversation reopens with the discarded reply and the new one both in it.
             // Under the same lock as the writes, so the read cannot happen before the
             // reply being discarded has been inserted.
-            storageMutex.withLock {
+            writer.inOrder {
                 conversationId?.let { id ->
-                    val stored = chats.messages(id)
+                    val stored = messages(id)
                     // The same rule the transcript used: the trailing run of replies, which
                     // starts after the last thing that was not one.
                     val firstDiscarded =
@@ -917,8 +914,8 @@ class ChatViewModel @Inject constructor(
             // Without this a compacted chat reopens with no summary and re-sends the whole
             // transcript, which walks straight back into the context wall it just escaped.
             startedIn?.let { id ->
-                storageMutex.withLock {
-                    chats.saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
+                writer.inOrder {
+                    saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
                 }
             }
         }
@@ -991,7 +988,7 @@ class ChatViewModel @Inject constructor(
             // Behind the write queue: a reply from the turn that just ended may not have
             // been inserted yet, and reopening the same chat without it would show a
             // question with no answer and then resend it.
-            val conversation = storageMutex.withLock { chats.conversation(id) }
+            val conversation = writer.inOrder { conversation(id) }
             if (conversation == null) {
                 // Deleted between the tap and this read; adopting the id would make the
                 // next message violate the foreign key.
@@ -999,7 +996,7 @@ class ChatViewModel @Inject constructor(
                 return@launch
             }
 
-            val messages = storageMutex.withLock { chats.messages(id) }
+            val messages = writer.inOrder { messages(id) }
             conversationId = id
             nextEntryId = 0
 
@@ -1079,7 +1076,7 @@ class ChatViewModel @Inject constructor(
             // once they are gone nothing else on disk remembers, so the photos would stay
             // forever in a folder the user cannot see. Behind the write queue, so a reply
             // still being written is deleted with the rest rather than after it.
-            val orphaned = storageMutex.withLock {
+            val orphaned = writer.inOrder {
                 val attached = chats.messages(id).flatMap { it.attachments.decodeAttachments() }
                 chats.deleteConversation(id)
                 attached
@@ -1146,7 +1143,12 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 contextUsed = event.stats.contextUsed,
                 contextSize = event.stats.contextSize,
-                error = event.reason.warning(),
+                // Falls back to what is already there rather than clearing it. A reply that
+                // ends normally has no warning of its own, and setting null wiped whatever
+                // the turn had already reported: a write that would not go through was
+                // announced and then quietly withdrawn by the answer arriving. Nothing goes
+                // stale, because send clears the line at the start of every turn.
+                error = event.reason.warning() ?: it.error,
             )
         }
         return canonical
@@ -1203,21 +1205,13 @@ class ChatViewModel @Inject constructor(
     private fun persistReply(text: String, stats: GenerationStats?) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
-
         viewModelScope.launch {
-            storageMutex.withLock {
-                chats.addMessage(
-                    conversationId = id,
-                    role = ChatRole.ASSISTANT.wireName,
-                    text = text,
-                    tokensPerSecond = stats?.decodeTokensPerSecond,
-                    timeToFirstTokenMs = stats?.timeToFirstTokenMs,
-                    generatedTokens = stats?.generatedTokens,
-                    reasoningMs = reasoningMs,
-                )
-            }
+            reportingFailure { writer.reply(id, text, stats, reasoningMs) }
         }
     }
+
+    private suspend fun reportingFailure(write: suspend () -> Unit) =
+        writeReportingFailure(write) { _uiState.update { state -> state.copy(error = it) } }
 
     /**
      * Folds one pass into the lifetime ledger.
@@ -1230,16 +1224,7 @@ class ChatViewModel @Inject constructor(
      */
     private fun recordWork(stats: GenerationStats) {
         val model = _uiState.value.modelName ?: return
-        viewModelScope.launch {
-            storageMutex.withLock {
-                chats.recordUsage(
-                    modelName = model,
-                    promptTokens = stats.promptTokens,
-                    generatedTokens = stats.generatedTokens,
-                    inferenceMs = stats.prefillMs + stats.decodeMs,
-                )
-            }
-        }
+        viewModelScope.launch { reportingFailure { writer.work(model, stats) } }
     }
 
     private fun applyStreamedText(
@@ -1334,6 +1319,39 @@ private const val DEFAULT_CONTEXT_TOKENS = 4096
 private const val STREAM_FRAME_MS = 33L
 
 private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."
+
+/**
+ * Runs a write, and reports it rather than dying when it fails.
+ *
+ * Every write in the chat is launched rather than awaited, so the screen never waits on the
+ * disk. That also means nothing is watching: an exception in one of those coroutines has no
+ * catch above it and no handler on the scope, so a full disk or a database that would not
+ * open took the process with it rather than the write.
+ *
+ * The cause is logged and the reader is told the consequence. There is nothing they can do
+ * about an SQLite error, and the thing they can act on while the conversation is still on
+ * screen is that it will not be there later.
+ */
+private suspend fun writeReportingFailure(write: suspend () -> Unit, report: (String) -> Unit) {
+    try {
+        write()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+        Log.w("OpenWeights", "a chat write did not go through", failure)
+        report(STORAGE_FAILED)
+    }
+}
+
+/**
+ * What a write that would not go through is worth saying.
+ *
+ * Names the consequence rather than the cause, because the cause is a database and the
+ * consequence is that this conversation will not be here tomorrow, which is the part
+ * somebody can act on while it is still on screen.
+ */
+private const val STORAGE_FAILED =
+    "This chat could not be saved. It is still here now, but it will not be when you come back."
 
 /**
  * How long an answer should be.

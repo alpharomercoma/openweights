@@ -69,6 +69,7 @@ class ChatViewModelTest {
     private val models: File = Files.createTempDirectory("openweights-models").toFile()
     private lateinit var database: OpenWeightsDatabase
     private lateinit var engine: FakeInferenceEngine
+    private lateinit var writer: FailableWriter
     private lateinit var viewModel: ChatViewModel
 
     @Before
@@ -81,6 +82,7 @@ class ChatViewModelTest {
 
         engine = FakeInferenceEngine()
         val chats = ChatRepository(database, Clock.System)
+        writer = FailableWriter(chats)
         // Registered but unreachable unless a test says the model supports tools, so the
         // tool loop is available to the tests that want it and invisible to the rest.
         val registry = ToolRegistry(listOf(StubTool))
@@ -94,6 +96,7 @@ class ChatViewModelTest {
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             attachments = AttachmentStore(context),
             chats = chats,
+            writer = writer,
             turns = TurnRunner(engine, registry, ToolSwitches(context)),
             notifier = ReplyNotifier(context),
         )
@@ -282,6 +285,26 @@ class ChatViewModelTest {
         // usage tab is about work done rather than about replies kept.
         val usage = database.usage().observeAll().first().single()
         assertThat(usage.generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
+    }
+
+    @Test
+    fun `a message that could not be saved says so`() = runTest(dispatcher) {
+        loadModel()
+        // The disk, as far as the chat is concerned, is gone.
+        writer.broken = true
+
+        viewModel.send("This one will not survive")
+        settle()
+
+        // Every write here is launched and awaited by nobody, so a failure had no catch
+        // above it and no handler on the scope: the process went with it. Short of that,
+        // the message sat on screen for the session, was not there on reopening, and
+        // nothing was ever said either way.
+        assertThat(viewModel.uiState.value.error).contains("could not be saved")
+        // Still on screen, and still answered. What somebody typed is not thrown away
+        // because a write failed.
+        assertThat(viewModel.uiState.value.transcript.first().text)
+            .isEqualTo("This one will not survive")
     }
 
     @Test
@@ -664,6 +687,17 @@ class ChatViewModelTest {
      */
     private fun modelFile(name: String): File =
         File(models, name).apply { writeText("not a real model") }
+
+    /** A write queue that can be told the disk is gone. */
+    private class FailableWriter(chats: ChatRepository) : ChatWriter(chats) {
+        /** Set to make every write from here on throw, as a full disk would. */
+        var broken = false
+
+        override suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T {
+            if (broken) error("the disk would not take it")
+            return super.inOrder(work)
+        }
+    }
 
     /** Something for a scripted call to land on. What it returns does not matter here. */
     private object StubTool : Tool {

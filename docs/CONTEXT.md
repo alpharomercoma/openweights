@@ -527,6 +527,26 @@ That is a far sharper split than the component figures suggested, and it is the 
 argument for a switch rather than a default: the right answer depends on what the user is
 doing, which the app cannot know.
 
+Repeated with Qwen 2.5 1.5B, the two rows move a long way:
+
+| turn | prompt | generated | CPU | GPU |
+| --- | ---: | ---: | ---: | ---: |
+| chat | 37 | ~200 | **4.7 s** | 8.0 s |
+| agent | 2077 | ~50 | 13.4 s | **8.5 s** |
+| **load** | | | **0.8 s** | **11.9 s** |
+
+Two things that matter more than the wall clocks. **Loading onto the GPU takes twelve
+seconds against under one**, paid on every cold start, because the OpenCL kernels are built
+then. And the crossover is a property of the model rather than of the phone: solving the
+rates gives **a prompt 1.4x the answer for Gemma and 10x for Qwen**, seven times apart. A
+threshold taken from the friendlier model sends Qwen to the GPU at five hundred prompt
+tokens against a hundred and fifty of answer, where the CPU is three seconds faster and the
+load cost another eleven. `Offload.AUTO` therefore uses the demanding end.
+
+"Chat" and "agent" above are shapes of turn, not modes of the app. There is no chat mode:
+every turn has the same tools available, and what actually moves is how much prompt there is
+to re-read, which grows with the conversation and jumps whenever a tool returns.
+
 Two things not to misread. The 2004 ms prefill for a sixteen-token chat prompt is one-off
 GPU warm-up, not throughput, so the 8 pp/s it implies is meaningless; the agent row's 624
 pp/s is the real figure and it lines up with `llama-bench`. And decode is 31 to 37 t/s on

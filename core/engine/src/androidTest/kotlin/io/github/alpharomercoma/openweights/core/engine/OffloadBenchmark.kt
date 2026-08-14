@@ -57,7 +57,12 @@ class OffloadBenchmark {
         for (layers in listOf(0, ALL_LAYERS)) {
             val where = if (layers == 0) "cpu" else "gpu"
             LlamaCppEngine().use { engine ->
+                // Timed, because this is what switching processors costs: llama.cpp assigns
+                // layers when the weights are mapped, so changing the choice means paying
+                // this again. The GPU pays for kernel setup here as well.
+                val startedAt = System.currentTimeMillis()
                 engine.load(modelFile, ModelLoadParams(contextLength = CONTEXT, gpuLayers = layers))
+                Log.i(TAG, "$where load: ${System.currentTimeMillis() - startedAt}ms")
 
                 // A chat turn: short question, long answer.
                 report(where, "chat", engine.turn("Explain what a KV cache is.", LONG_ANSWER))

@@ -196,22 +196,31 @@ enum class Offload {
 /**
  * How many layers to hand to the GPU, which is all of them or none.
  *
- * The two processors are good at opposite halves of a turn. Measured on an Adreno 830 with
- * Gemma 3 1B: reading a prompt runs at 624 tokens a second on the GPU against 151 on the
- * CPU, and writing an answer at about 34 against 45. A turn that reads a lot and writes a
- * little is three times faster on the GPU; one that reads a question and writes an essay is
- * half again slower.
+ * The two processors are good at opposite halves of a turn: the GPU reads a prompt several
+ * times faster and writes an answer slower. So the question is only ever what shape the
+ * turns are, and [Offload.AUTO] answers it from the usage ledger, which has recorded both
+ * totals per model since it existed and therefore needs no new bookkeeping.
  *
- * So [Offload.AUTO] asks which of those this model is used for. Solving the two rates for
- * where they cross gives a prompt about one and a half times the answer, and the usage
- * ledger already records both totals per model, so the question needs no new bookkeeping and
- * no guess: an agent that keeps re-reading a conversation crosses it, and a chat does not.
+ * Where the two meet is a property of the model, not of the phone, which is the part that
+ * cost a wrong constant here. Measured on one Adreno 830:
  *
- * Decided at load, because llama.cpp assigns layers when the weights are mapped and not
- * after, and re-deciding mid-session would mean reloading the model under the conversation.
- * A model with nothing recorded yet stays on the CPU, which is the better wrong answer:
- * being slower to write is felt immediately, and being slower to read is not felt at all
- * until a conversation is long.
+ * | model | prompt | answer | crossover |
+ * | --- | ---: | ---: | ---: |
+ * | Gemma 3 1B | 151 to 624 t/s | 45 to 34 t/s | prompt > 1.4x answer |
+ * | Qwen 2.5 1.5B | 177 to 387 t/s | 32 to 16 t/s | prompt > 10x answer |
+ *
+ * Seven times apart. A threshold taken from the friendlier of the two picks the GPU for
+ * Qwen at five hundred prompt tokens against a hundred and fifty of answer, where the CPU
+ * is three seconds faster.
+ *
+ * So the demanding end is what ships. Two things make being wrong towards the CPU much
+ * cheaper than being wrong towards the GPU: loading onto the GPU takes twelve seconds
+ * against under one, paid on every cold start, so a marginal win never repays it; and the
+ * CPU is never catastrophically wrong, while the GPU writing at half speed is felt on every
+ * token of a long answer.
+ *
+ * Decided at load, because llama.cpp assigns layers when the weights are mapped. A model
+ * with nothing recorded stays on the CPU.
  */
 fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long): Int {
     if (!hasGpu) return 0
@@ -229,6 +238,6 @@ fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long
 /** More layers than any model has, which is llama.cpp's way of saying all of them. */
 private const val ALL_LAYERS = 99
 
-/** A prompt worth 1.4 answers, held as a fraction so the comparison stays in integers. */
-private const val CROSSOVER_NUMERATOR = 7L
-private const val CROSSOVER_DENOMINATOR = 5L
+/** A prompt worth ten answers: the demanding end of the models measured. */
+private const val CROSSOVER_NUMERATOR = 10L
+private const val CROSSOVER_DENOMINATOR = 1L

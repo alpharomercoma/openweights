@@ -70,13 +70,23 @@ class OffloadTest {
     }
 
     @Test
-    fun `the crossover sits where the two rates say it should`() {
-        // Solving 151 and 45 against 624 and 34 puts it at a prompt about 1.4 times the
-        // answer. Either side of that by a hair, so the constant cannot drift unnoticed.
-        assertThat(Offload.AUTO.layersFor(hasGpu = true, promptTokens = 139, generatedTokens = 100))
+    fun `the crossover sits at the demanding end of the models measured`() {
+        // Gemma crosses at 1.4 and Qwen at 10, and the constant is the second. Either side
+        // of it by a hair, so it cannot drift unnoticed.
+        assertThat(Offload.AUTO.layersFor(hasGpu = true, promptTokens = 999, generatedTokens = 100))
             .isEqualTo(0)
-        assertThat(Offload.AUTO.layersFor(hasGpu = true, promptTokens = 141, generatedTokens = 100))
-            .isGreaterThan(0)
+        assertThat(
+            Offload.AUTO.layersFor(hasGpu = true, promptTokens = 1_001, generatedTokens = 100),
+        ).isGreaterThan(0)
+    }
+
+    @Test
+    fun `a middling turn stays on the cpu, where the wrong answer is cheaper`() {
+        // Five hundred tokens of conversation and a hundred and fifty of answer. The old
+        // constant sent this to the GPU, where Qwen took three seconds longer, and charged
+        // eleven extra seconds of loading for the privilege.
+        assertThat(Offload.AUTO.layersFor(hasGpu = true, promptTokens = 500, generatedTokens = 150))
+            .isEqualTo(0)
     }
 
     @Test

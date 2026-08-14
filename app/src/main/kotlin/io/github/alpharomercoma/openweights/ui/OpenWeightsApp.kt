@@ -344,6 +344,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 ToolsScreen(
                     state = state,
                     onToggle = viewModel::setEnabled,
+                    onChooseFolder = viewModel::chooseFolder,
+                    onForgetFolder = viewModel::forgetFolder,
                 )
             }
 

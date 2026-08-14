@@ -16,6 +16,9 @@
 
 package io.github.alpharomercoma.openweights.ui.tools
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -43,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.tools.GrantState
 
 /**
  * What the model can do, and what each one costs you.
@@ -65,6 +70,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 fun ToolsScreen(
     state: ToolsUiState,
     onToggle: (String, Boolean) -> Unit,
+    onChooseFolder: (Uri) -> Unit,
+    onForgetFolder: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -98,6 +105,16 @@ fun ToolsScreen(
                 )
             }
 
+            // Above the rows it governs, because three of them can do nothing until it is
+            // set and do not appear to the model at all while it is not.
+            item {
+                WorkspaceRow(
+                    workspace = state.workspace,
+                    onChosen = onChooseFolder,
+                    onForget = onForgetFolder,
+                )
+            }
+
             items(state.tools, key = { it.id }) { tool ->
                 ToolRow(
                     tool = tool,
@@ -119,6 +136,68 @@ fun ToolsScreen(
             }
         }
     }
+}
+
+/**
+ * Where the file tools get somewhere to work.
+ *
+ * The launcher lives here rather than on the screen so the screen stays a function of its
+ * state and a pair of callbacks, which is what makes it testable without an activity. The
+ * picker itself is the system's, so nothing here asks for a permission: the folder someone
+ * taps is the whole of what the app may reach.
+ */
+@Composable
+private fun WorkspaceRow(
+    workspace: WorkspaceSummary,
+    onChosen: (Uri) -> Unit,
+    onForget: () -> Unit,
+) {
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
+        it?.let(onChosen)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Shared folder", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = workspace.describe(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "On this device · you choose the folder, and can take it back",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (workspace.folder != null) {
+            TextButton(onClick = onForget) { Text("Remove") }
+        }
+        TextButton(onClick = { pick.launch(null) }) {
+            Text(if (workspace.folder == null) "Choose" else "Change")
+        }
+    }
+}
+
+/** What the row says about the folder, which is a different sentence for each way of failing. */
+private fun WorkspaceSummary.describe(): String = when (state) {
+    GrantState.NONE ->
+        "None yet. Searching, reading and saving files stay switched off until you pick one."
+    GrantState.LOST ->
+        "${folder ?: "The folder"} cannot be reached now. Choose it again to carry on."
+    GrantState.READ_ONLY ->
+        "$folder. It will not take new files, so saving is off and reading still works."
+    GrantState.READ_WRITE ->
+        "$folder. The model can search it, read from it, and save new files into it."
 }
 
 @Composable
@@ -174,6 +253,8 @@ private fun ToolsScreenPreview() {
                 ),
             ),
             onToggle = { _, _ -> },
+            onChooseFolder = {},
+            onForgetFolder = {},
         )
     }
 }

@@ -376,7 +376,7 @@ class AgentRunnerTest {
         // space: the arguments go through the parser before they are compared.
         assertThat(ran).containsExactly("echo")
         val told = (again as AgentDecision.Continue).messages.single()
-        assertThat(told.text).contains("already ran")
+        assertThat(told.text).contains("Already run this turn")
         // Pointed at, not repeated. Sending the result again would spend the context twice
         // to tell the model something already in front of it.
         assertThat(told.text).doesNotContain("echoed")
@@ -444,7 +444,7 @@ class AgentRunnerTest {
         assertThat(asked).isEqualTo(1)
         assertThat(ran).isEmpty()
         assertThat((again as AgentDecision.Continue).messages.single().text)
-            .contains("already declined")
+            .contains("Already declined")
     }
 
     @Test

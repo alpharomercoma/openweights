@@ -172,8 +172,11 @@ class AgentRunner(
             )
 
         if (!allowed(tool, call, mode, approve)) {
-            settled[call.settledKey()] = "The user has already declined ${call.name} with " +
-                "these arguments. Do not ask again; answer without it."
+            // Written to read sensibly twice over: it goes back to the model as this call's
+            // result, and onto the chip in the transcript that already says which tool and
+            // that it was skipped.
+            settled[call.settledKey()] = "Already declined by the user, with these same " +
+                "arguments. Answer without it."
             return AgentStep.Skipped(call, "The user declined to run ${call.name}.")
         }
 
@@ -198,8 +201,8 @@ class AgentRunner(
         // Pointed at rather than repeated. The result is already in the conversation as a
         // tool message, so sending it a second time would spend the context twice over to
         // tell the model something it can see.
-        settled[call.settledKey()] = "${call.name} already ran this turn with exactly these " +
-            "arguments and its result is above. Answer from that rather than calling it again."
+        settled[call.settledKey()] = "Already run this turn with these same arguments. " +
+            "Its result is above; answer from that rather than calling it again."
         return AgentStep.Ran(call, result, now() - startedAt)
     }
 

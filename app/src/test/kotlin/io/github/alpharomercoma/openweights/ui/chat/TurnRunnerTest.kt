@@ -266,7 +266,7 @@ class TurnRunnerTest {
         // rather than repeating it, which is the difference between a wasted round and a
         // wasted round that also spends the window twice.
         val second = engine.prompts[2].last { it.role == ChatRole.TOOL }
-        assertThat(second.text).contains("already ran")
+        assertThat(second.text).contains("Already run this turn")
         assertThat(second.toolCallId).isEqualTo("2")
     }
 

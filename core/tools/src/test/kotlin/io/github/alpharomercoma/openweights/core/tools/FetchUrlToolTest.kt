@@ -37,6 +37,15 @@ class FetchUrlToolTest {
         tool.run(ToolCall(id = "1", name = "fetch_url", argumentsJson = """{"url":"$url"}"""))
 
     @Test
+    fun `reading an address the model composed always asks first`() {
+        // Tool.alwaysAsk exists for exactly this tool and says so: searching is bounded
+        // whatever the model asks for, and fetching an address it composed is not. Auto
+        // mode is about removing pointless taps, not the only check on an open primitive,
+        // and the address can come from a page the model has just read.
+        assertThat(tool.alwaysAsk).isTrue()
+    }
+
+    @Test
     fun `an address written as a bare loopback literal is refused`() = runTest {
         // OkHttp routes a hostname through Dns and an IP literal straight to a socket, so
         // PublicOnlyDns is never consulted about this one and cannot refuse it. A page that

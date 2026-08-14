@@ -208,13 +208,17 @@ class TurnRunner @Inject constructor(
     /**
      * Tokens of the window still free, as the engine last reported it.
      *
+     * Null when no model is loaded, which is a different thing from zero and used to be
+     * confused with it: zero headroom fell through to the no-model default and offered a
+     * turn four thousand characters of tool output on a context with no room for any.
+     *
      * Read from the engine rather than from the screen, and read again every round: the
      * engine updates this after every pass, so it already counts the assistant turns that
      * asked for the tools and the template overhead around them, which nothing here could
      * estimate as well.
      */
-    private fun headroomTokens(): Int {
-        val model = engine.loadedModel ?: return 0
+    private fun headroomTokens(): Int? {
+        val model = engine.loadedModel ?: return null
         return (model.contextSize - model.contextUsed).coerceAtLeast(0)
     }
 
@@ -331,7 +335,7 @@ private fun AgentDecision.steps(): List<AgentStep> = when (this) {
  * was left. The attachment path had already learned this and sizes itself from
  * `contextSize - contextUsed`; this one had not.
  */
-private class ToolBudget(headroomTokens: Int) {
+private class ToolBudget(headroomTokens: Int?) {
     /**
      * Half of what is free, in characters.
      *
@@ -340,11 +344,9 @@ private class ToolBudget(headroomTokens: Int) {
      * deliberately pessimistic here: overestimating the budget is what produces the error
      * this exists to avoid.
      */
-    private var remaining = if (headroomTokens > 0) {
-        headroomTokens * CHARS_PER_TOKEN / ANSWER_SHARE
-    } else {
-        DEFAULT_BUDGET
-    }
+    private var remaining = headroomTokens
+        ?.let { (it * CHARS_PER_TOKEN / ANSWER_SHARE).coerceAtLeast(0) }
+        ?: DEFAULT_BUDGET
 
     val hasRoom: Boolean get() = remaining > MINIMUM_USEFUL
 

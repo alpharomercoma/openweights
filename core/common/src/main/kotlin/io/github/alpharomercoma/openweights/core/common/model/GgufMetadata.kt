@@ -45,7 +45,18 @@ data class GgufMetadata(
         get() = if (headCount > 0) embeddingLength / headCount else 0
 
     /** Total key/value heads across every block: what the KV cache is actually sized by. */
-    val totalKeyValueHeads: Int get() = keyValueHeadsPerLayer.sum()
+    /**
+     * Key and value heads across every layer.
+     *
+     * Summed as Long and clamped, because the parts come from a remote header. Summed as
+     * Int it wraps: enough large per-layer counts and the total goes negative, which makes
+     * the KV cache a negative number of bytes and a model that cannot run look comfortable.
+     */
+    val totalKeyValueHeads: Int
+        get() = keyValueHeadsPerLayer
+            .sumOf { it.coerceAtLeast(0).toLong() }
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
 
     /**
      * Bytes the KV cache occupies at [contextLength].

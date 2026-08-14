@@ -153,4 +153,44 @@ class GgufHeaderParserTest {
             return bytes.copyOfRange(offset.toInt(), end)
         }
     }
+
+    @Test
+    fun `a header claiming two billion blocks is refused rather than allocated`() = runTest {
+        // block_count comes from the remote file and nothing bounded it. One number in a
+        // header the app inspects before downloading anything was enough to make it build a
+        // list of two billion entries and die of memory.
+        val header = GgufBuilder()
+            .string("general.architecture", "llama")
+            .uint32("llama.block_count", Int.MAX_VALUE)
+            .uint32("llama.embedding_length", 4096)
+            .uint32("llama.attention.head_count", 32)
+            .uint32("llama.attention.head_count_kv", 8)
+            .build()
+
+        val failure = runCatching { GgufHeaderParser(header.asSource()).parse() }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(GgufParseException::class.java)
+    }
+
+    @Test
+    fun `head counts that would overflow the sum cannot report a model as fitting`() = runTest {
+        // totalKeyValueHeads sums a list of Int. Enough large values and the sum wraps
+        // negative, which makes the KV cache a negative number of bytes, which makes a
+        // model that cannot possibly run look comfortable.
+        val header = GgufBuilder()
+            .string("general.architecture", "llama")
+            .uint32("llama.block_count", 4)
+            .uint32("llama.embedding_length", 4096)
+            .uint32("llama.attention.head_count", 32)
+            .int32Array("llama.attention.head_count_kv", List(4) { Int.MAX_VALUE })
+            .uint32("llama.context_length", 8192)
+            .build()
+
+        val metadata = runCatching { GgufHeaderParser(header.asSource()).parse() }.getOrNull()
+
+        if (metadata != null) {
+            assertThat(metadata.totalKeyValueHeads).isAtLeast(0)
+            assertThat(metadata.kvCacheBytes(8192)).isAtLeast(0L)
+        }
+    }
 }

@@ -114,7 +114,15 @@ class GgufHeaderParser(
      * so callers never have to care which one a model used.
      */
     private fun Map<String, Any>.keyValueHeads(architecture: String): List<Int> {
-        val blocks = int("$architecture.block_count") ?: 0
+        // Bounded before it is used as a length. This number comes from a remote file that
+        // the app inspects before downloading anything, and nothing else checked it: one
+        // field claiming two billion blocks was enough to build a list that size and run
+        // the phone out of memory while merely looking at a search result.
+        val blocks = (int("$architecture.block_count") ?: 0).also {
+            if (it !in 0..MAX_BLOCKS) {
+                throw GgufParseException("GGUF header declares $it blocks")
+            }
+        }
         return when (val value = this["$architecture.attention.head_count_kv"]) {
             is List<*> -> value.map { (it as? Number)?.toInt() ?: 0 }
             is Int -> List(blocks) { value }
@@ -125,6 +133,14 @@ class GgufHeaderParser(
     }
 
     private companion object {
+        /**
+         * More layers than any published model has, by a wide margin.
+         *
+         * A ceiling rather than a guess at the real maximum: the point is to refuse the
+         * absurd, not to predict the largest model anyone will ship.
+         */
+        const val MAX_BLOCKS = 10_000
+
         val MAGIC =
             byteArrayOf('G'.code.toByte(), 'G'.code.toByte(), 'U'.code.toByte(), 'F'.code.toByte())
         val SUPPORTED_VERSIONS = 1..3

@@ -159,6 +159,17 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
      */
     private val httpClient: OkHttpClient = httpClient.newBuilder().dns(PublicOnlyDns()).build()
 
+    /**
+     * Always, whatever the mode says.
+     *
+     * [Tool.alwaysAsk] was written for this tool and describes it exactly: searching is
+     * bounded however the model phrases it, and fetching an address the model composed is
+     * not. The address usually comes from a page the model has just read, which is somebody
+     * else's text deciding where this app connects. Auto mode is for removing pointless
+     * taps, not the only check on an open primitive.
+     */
+    override val alwaysAsk: Boolean = true
+
     override val definition = ToolDefinition(
         name = "fetch_url",
         description = "Fetch a public web page and return its readable text. Use it to " +

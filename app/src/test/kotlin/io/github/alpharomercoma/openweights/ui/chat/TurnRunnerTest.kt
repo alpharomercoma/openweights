@@ -292,6 +292,19 @@ class TurnRunnerTest {
         assertThat(engine.prompts).hasSize(1)
     }
 
+    @Test
+    fun `a context with nothing left is not treated as a context with no model`() = runBlocking {
+        engine.scripted += ScriptedPass("Answering from what I have.")
+        // Exactly full. Zero headroom used to fall through to the no-model default of four
+        // thousand characters, so tools were offered on a context with no room at all and
+        // the results went in on top: the decode failure the budget exists to prevent.
+        engine.contextUsed = CONTEXT
+
+        run(withTools = true)
+
+        assertThat(engine.offered.single()).isEmpty()
+    }
+
     /** Runs one turn and returns every step it reported. */
     private suspend fun run(
         withTools: Boolean,

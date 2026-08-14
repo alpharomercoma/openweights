@@ -463,6 +463,23 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `a reopened conversation does not report an empty context`() = runTest(dispatcher) {
+        loadModel()
+        viewModel.send("Something worth a few tokens of context")
+        settle()
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+
+        viewModel.openConversation(id)
+        settle(steps = FOLD_SETTLE_STEPS)
+
+        // The cache is empty on reopening because the model has not read this conversation
+        // yet. The next turn will read all of it, so reporting nothing used told the
+        // attachment budget the whole window was free.
+        assertThat(viewModel.uiState.value.transcript).isNotEmpty()
+        assertThat(viewModel.uiState.value.contextUsed).isGreaterThan(0)
+    }
+
+    @Test
     fun `a message that could not be saved says so`() = runTest(dispatcher) {
         loadModel()
         // The disk, as far as the chat is concerned, is gone.

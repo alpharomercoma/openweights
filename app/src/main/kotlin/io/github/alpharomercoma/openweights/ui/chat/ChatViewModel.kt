@@ -1053,7 +1053,7 @@ class ChatViewModel @Inject constructor(
                 conversation.modelName != currentModel
 
             _uiState.update { state ->
-                state.copy(
+                val reopened = state.copy(
                     transcript = messages.map { message ->
                         val parsed = parseAssistantReply(message.text)
                         TranscriptEntry(
@@ -1073,7 +1073,6 @@ class ChatViewModel @Inject constructor(
                     compaction = conversation.compactionSummary?.let {
                         Compaction(it, conversation.compactionThroughIndex, 0)
                     },
-                    contextUsed = 0,
                     error = if (mismatch) {
                         "This chat was written by ${conversation.modelName}. Replies will " +
                             "now come from $currentModel."
@@ -1081,6 +1080,12 @@ class ChatViewModel @Inject constructor(
                         null
                     },
                 )
+                // Not zero. The cache is empty because the model has not read this
+                // conversation yet, but the next turn will read all of it, and everything
+                // that sizes itself against what is left took the zero for a free window.
+                // Reopen a long chat, attach a document, and it was measured against a
+                // window that was already spoken for.
+                reopened.copy(contextUsed = reopened.estimatedPromptTokens())
             }
         }
     }

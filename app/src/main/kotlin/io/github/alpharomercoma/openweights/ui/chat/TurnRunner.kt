@@ -390,8 +390,12 @@ private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
  * cannot build one: a path or a search pattern is not recoverable from what the user asked,
  * which is why [Tool.callFor] is left unimplemented there, and why naming one in prose is
  * not a second option being weighed.
+ *
+ * Internal rather than private so the benchmark can count how often this fires and whether it
+ * was right to. It is the one part of the routing path that is a guess, so whether it earns
+ * its place is a measurement, and a measurement has to be able to call it.
  */
-private fun String.salvagedCall(
+internal fun String.salvagedCall(
     tools: ToolRegistry,
     conversation: List<ChatMessage>,
 ): List<ToolCall> {

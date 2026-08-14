@@ -105,7 +105,6 @@ class TurnRunner @Inject constructor(
         // would keep offering it until the process died.
         val active = tools.enabled(switches.enabled(tools.all.map { it.definition.name }))
         val agent = AgentRunner(active)
-        val budget = ToolBudget(engine.loadedModel?.contextSize ?: 0)
 
         // Said once per turn, because "why did it not search" has three possible answers
         // and the per-pass line only ever showed the conclusion. withTools is the template
@@ -135,7 +134,7 @@ class TurnRunner @Inject constructor(
             // decide to search it calls something that exists.
             val offerTools = withTools &&
                 round < AgentRunner.DEFAULT_MAX_ROUNDS &&
-                budget.hasRoom
+                ToolBudget(headroomTokens()).hasRoom
             val pass = streamOnce(messages, params, active, offerTools, listener) { lastRaw = it }
                 ?: return lastRaw
 
@@ -167,6 +166,9 @@ class TurnRunner @Inject constructor(
             val decision = agent.step(calls, round, mode, listener::onApproval)
             listener.onSteps(decision.steps())
 
+            // Sized here rather than once for the whole turn, and after the pass rather
+            // than before it, so what the model has just written is already counted.
+            val budget = ToolBudget(headroomTokens())
             val results = (decision as? AgentDecision.Continue)?.messages.orEmpty()
                 .map(budget::fit)
             if (results.isEmpty()) return lastRaw
@@ -181,6 +183,19 @@ class TurnRunner @Inject constructor(
             round++
             listener.onNextPass()
         }
+    }
+
+    /**
+     * Tokens of the window still free, as the engine last reported it.
+     *
+     * Read from the engine rather than from the screen, and read again every round: the
+     * engine updates this after every pass, so it already counts the assistant turns that
+     * asked for the tools and the template overhead around them, which nothing here could
+     * estimate as well.
+     */
+    private fun headroomTokens(): Int {
+        val model = engine.loadedModel ?: return 0
+        return (model.contextSize - model.contextUsed).coerceAtLeast(0)
     }
 
     internal class Pass(val raw: String, val event: GenerationEvent.Completed)
@@ -264,7 +279,7 @@ private fun AgentDecision.steps(): List<AgentStep> = when (this) {
 }
 
 /**
- * How much of the context window a turn may spend on what tools returned.
+ * How much of what is left of the context window a turn may spend on what tools returned.
  *
  * A page and three search results are a few thousand characters each, and four rounds of
  * them do not fit in 4096 tokens beside the conversation that asked for them. What that
@@ -274,18 +289,29 @@ private fun AgentDecision.steps(): List<AgentStep> = when (this) {
  * So results are trimmed to what is left rather than sent whole, and once the budget is
  * gone no further tools are offered: the model is made to answer from what it already has,
  * which is a worse answer than it wanted and a far better one than an error.
+ *
+ * This used to be a share of the whole window, handed out once at the start of a turn, and
+ * that is the same error in a subtler form. A conversation twenty turns deep has most of
+ * its window already spent, and the fold that would free some does not run until three
+ * quarters full and never between passes of one turn: at seventy percent used the turn was
+ * still being offered a third of the window on top, which is more than the whole of what
+ * was left. The attachment path had already learned this and sizes itself from
+ * `contextSize - contextUsed`; this one had not.
  */
-private class ToolBudget(contextSize: Int) {
+private class ToolBudget(headroomTokens: Int) {
     /**
-     * A third of the window, in characters.
+     * Half of what is free, in characters.
      *
-     * The other two thirds are the conversation, the system prompt and the answer being
-     * written, all of which have to fit alongside. Four characters to a token is the usual
-     * English approximation and is deliberately pessimistic here: overestimating the
-     * budget is what produces the error this exists to avoid.
+     * The other half is the answer the model still has to write, and the turn that asks
+     * for the tools. Four characters to a token is the usual English approximation and is
+     * deliberately pessimistic here: overestimating the budget is what produces the error
+     * this exists to avoid.
      */
-    private var remaining =
-        if (contextSize > 0) contextSize * CHARS_PER_TOKEN / TOOL_SHARE else DEFAULT_BUDGET
+    private var remaining = if (headroomTokens > 0) {
+        headroomTokens * CHARS_PER_TOKEN / ANSWER_SHARE
+    } else {
+        DEFAULT_BUDGET
+    }
 
     val hasRoom: Boolean get() = remaining > MINIMUM_USEFUL
 
@@ -306,8 +332,12 @@ private class ToolBudget(contextSize: Int) {
 
     private companion object {
         const val CHARS_PER_TOKEN = 4
-        const val TOOL_SHARE = 3
+
+        /** Results take half of what is free, the answer being written takes the other. */
+        const val ANSWER_SHARE = 2
         const val MINIMUM_USEFUL = 400
+
+        /** Used only before a model is loaded, when there is no window to divide. */
         const val DEFAULT_BUDGET = 4_000
     }
 }

@@ -120,6 +120,29 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `what a tool returns is cut to the context that is actually left`() = runBlocking {
+        val call = ToolCall(id = "3", name = "web_search", argumentsJson = """{"query":"x"}""")
+        engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        engine.scripted += ScriptedPass("Here is the answer.")
+        search.answer = "y".repeat(HUGE_RESULT)
+        // Below the fold-at-three-quarters threshold, so nothing has compacted and nothing
+        // will before this turn ends. This is the window where the budget was wrong.
+        engine.contextUsed = CONTEXT * ALMOST_FULL_PERCENT / 100
+
+        run(withTools = true)
+
+        // The budget used to be a third of the whole window, which at this point is more
+        // than the whole of what is left: the turn handed the model more than it could
+        // hold and llama.cpp answered with no KV slot. What is left is the only number
+        // that means anything here.
+        val freeChars = (CONTEXT - engine.contextUsed) * CHARS_PER_TOKEN
+        val sent = engine.prompts[1].single { it.role == ChatRole.TOOL }
+        assertThat(sent.text.length).isLessThan(freeChars)
+        // And still worth sending: a budget that trimmed everything would be no better.
+        assertThat(sent.text.length).isGreaterThan(0)
+    }
+
+    @Test
     fun `plan mode runs nothing and still reaches an answer`() = runBlocking {
         val call = ToolCall(id = "2", name = "web_search", argumentsJson = """{"query":"x"}""")
         // A model that ignores the instruction and calls anyway, which is what small ones do.
@@ -164,6 +187,9 @@ class TurnRunnerTest {
     private class RecordingTool(name: String) : Tool {
         val calls = mutableListOf<ToolCall>()
 
+        /** What it hands back, so a test can make it longer than the context allows. */
+        var answer = "Ada Lovelace wrote the first algorithm."
+
         override val definition = ToolDefinition(
             name = name,
             description = "Search the web.",
@@ -172,7 +198,7 @@ class TurnRunnerTest {
 
         override suspend fun run(call: ToolCall): String {
             calls += call
-            return "Ada Lovelace wrote the first algorithm."
+            return answer
         }
 
         override fun callFor(question: String): ToolCall? =
@@ -197,5 +223,14 @@ class TurnRunnerTest {
 
         /** More passes than the loop is ever allowed to take. */
         const val PLENTY = 8
+
+        /** Full enough to matter, below the three quarters that would have folded first. */
+        const val ALMOST_FULL_PERCENT = 72
+
+        /** A page longer than any window, so what arrives is the budget and not the page. */
+        const val HUGE_RESULT = 20_000
+
+        /** The same English approximation the budget uses. */
+        const val CHARS_PER_TOKEN = 4
     }
 }

@@ -116,7 +116,9 @@ class FakeInferenceEngine : InferenceEngine {
     private var loaded: LoadedModelInfo? = null
     private var events = Channel<GenerationEvent>(Channel.UNLIMITED)
 
-    override val loadedModel: LoadedModelInfo? get() = loaded
+    // Carries the same reading the stats do, because the real engine updates its loaded
+    // model after every generation and the turn loop sizes what it sends from that.
+    override val loadedModel: LoadedModelInfo? get() = loaded?.copy(contextUsed = contextUsed)
 
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
         if (loadDelayMs > 0) delay(loadDelayMs)

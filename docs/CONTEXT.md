@@ -616,6 +616,46 @@ stranger was, a 1.5B model answered "I don't have any specific information" inst
 searching. That is what BFCL measures at around 55 percent multi-turn for models this size,
 and no scaffold fixes it: naming the tool in the question is what makes it call.
 
+### A folder the model can work in (2026-08-14)
+
+The three file tools go through the Storage Access Framework and one folder the user grants,
+rather than `MANAGE_EXTERNAL_STORAGE`, which Google reserves for file managers and backup
+apps and would put the Play release at risk. The app asks for no storage permission at all;
+the manifest is unchanged.
+
+**What the device settled.** Granting the root of internal storage is refused outright: the
+picker shows "Can't use this folder, to protect your privacy choose another folder" and
+greys out its own confirm button. So a workspace is always a subdirectory, and any copy that
+invites someone to "share your phone" is wrong. Granting `Documents` works, reports
+read and write, and survives `am force-stop`, which is what `takePersistableUriPermission`
+is for and the reason attachments still have to be copied in while this does not.
+
+**Three things the design got wrong before it was attacked**, found by codex and agy
+independently and each fatal on its own:
+
+1. `DEFAULT_MAX_ROUNDS = 2` made the feature impossible. Find, read, write is three rounds,
+   and the third was refused, so a turn spent its whole budget and threw away the step that
+   saved the work. Tools now declare whether they chain and only those turns pay for four.
+2. Whole-file overwrite plus `ToolBudget` was a data-loss path, not a feature. A long file
+   read back gets cut with `[cut short: no context left]`, and a model rewriting from that
+   commits the truncated half over the whole. `write_file` therefore creates and refuses an
+   occupied path, which removes the outcome rather than warning about it.
+3. Confining by string prefix does not work here at all. Document ids are provider-defined
+   and have no path structure, so a Drive child shares no prefix with its parent and there
+   is nothing for `..` to climb. Containment is the walk down from the granted folder plus
+   Android's own refusal to answer outside the grant.
+
+**And one the model itself forces.** Asking a small model to put a file's text inside a JSON
+string means asking it to escape every quote, backslash and newline, which it does not
+reliably do. The envelope then fails to parse, the argument reads as absent, and the tool
+answers "no content was given" while the content sits in the call. The strict reading is
+kept where it works and only an already-broken call is scavenged.
+
+**Still to measure.** The literature puts the accuracy cost of a larger tool catalogue at
+7 to 85 percent, and going from two tools to five on a 2048 token window is exactly that
+change. Whether `web_search` gets worse with the file tools registered has not been measured
+on hardware yet, and the answer belongs here when it is.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

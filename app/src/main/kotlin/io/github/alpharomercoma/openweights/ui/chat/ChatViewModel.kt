@@ -133,6 +133,13 @@ data class ChatUiState(
     val transcript: List<TranscriptEntry> = emptyList(),
     val contextUsed: Int = 0,
     val contextSize: Int = 0,
+    /**
+     * How this model tokenises this conversation, as the last completed pass reported it.
+     *
+     * Null until something has been generated, which is the only time anything has to be
+     * guessed. See [estimatedPromptTokens].
+     */
+    val charsPerToken: Float? = null,
     val error: String? = null,
     val isCompacting: Boolean = false,
     val compaction: Compaction? = null,
@@ -1190,6 +1197,13 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 contextUsed = event.stats.contextUsed,
                 contextSize = event.stats.contextSize,
+                // Read off the pass that just finished: the cache now holds this whole
+                // conversation, and its length in characters is right here, so the ratio
+                // between them is measured rather than assumed. Kept when a pass reports
+                // nothing usable, so one odd reading cannot throw the estimate away.
+                charsPerToken = event.stats
+                    .charsPerToken(it.engineMessages().sumOf { message -> message.text.length })
+                    ?: it.charsPerToken,
                 // Falls back to what is already there rather than clearing it. A reply that
                 // ends normally has no warning of its own, and setting null wiped whatever
                 // the turn had already reported: a write that would not go through was
@@ -1356,6 +1370,16 @@ private fun documentBudget(state: ChatUiState): Int {
 
 /** Two characters to a token: what dense, comma heavy text actually costs. */
 private const val CHARS_PER_TOKEN = 2
+
+/**
+ * The same number, for the one case that has nothing measured to use instead.
+ *
+ * Named apart from [CHARS_PER_TOKEN] because they answer opposite questions and only happen
+ * to share a value. That one asks how much of a document fits, where being low means
+ * attaching less; this one asks how full the window is, where being low means folding early.
+ * Sharing a constant made a change for one silently a change for the other.
+ */
+private const val PESSIMISTIC_CHARS_PER_TOKEN = 2
 
 /** Half the window. The conversation, the instructions and the reply share the rest. */
 private const val DOCUMENT_SHARE = 2
@@ -1578,16 +1602,36 @@ private fun List<MessageEntity>.toTranscript(foldedThrough: Int?): List<Transcri
     }
 
 /**
- * A pessimistic guess at what the next prompt will occupy.
+ * What the next prompt will occupy, from what the last one actually did.
  *
- * Wanted only just after a fold, where the engine's own reading says nothing useful: the
- * cache was reset, so it reports empty, while the next turn will re-decode the summary and
- * whatever was kept verbatim. Two characters to a token, the same deliberately pessimistic
- * ratio the attachment budget uses and for the same reason: over-estimating what is spent
- * costs some of a document, and under-estimating it costs the whole reply.
+ * Wanted only just after a fold and on reopen, where the engine's own reading says nothing
+ * useful: the cache was reset, so it reports empty, while the next turn will re-decode the
+ * summary and whatever was kept verbatim.
+ *
+ * It used to be two characters to a token, borrowed from the attachment budget, where that
+ * number is right for a reason that does not apply here: an attachment is dense comma-heavy
+ * text and being wrong costs part of a document. English prose runs nearer four, so the
+ * borrowed ratio read a conversation as twice as full as it was and folded it again sooner
+ * than it needed to, each fold costing a summary generation and a cache reset.
+ *
+ * So it is measured instead of guessed. Every completed pass reports how many tokens the
+ * whole conversation occupies, and the conversation's length in characters is known, so the
+ * ratio is a fact about this model and this text rather than about English in general. It
+ * still errs the safe way: the count includes the template's own tokens while the characters
+ * do not, so the ratio comes out low and the estimate comes out high.
+ *
+ * [PESSIMISTIC_CHARS_PER_TOKEN] is only for the first fold of a conversation reopened before
+ * anything has been generated, where there is nothing to measure yet.
  */
-internal fun ChatUiState.estimatedPromptTokens(): Int =
-    engineMessages().sumOf { it.text.length } / CHARS_PER_TOKEN
+internal fun ChatUiState.estimatedPromptTokens(): Int {
+    val chars = engineMessages().sumOf { it.text.length }
+    val ratio = charsPerToken ?: return chars / PESSIMISTIC_CHARS_PER_TOKEN
+    return (chars / ratio).toInt()
+}
+
+/** Characters to a token as this model was last seen to tokenise, or null before then. */
+internal fun GenerationStats.charsPerToken(chars: Int): Float? =
+    (chars.toFloat() / contextUsed).takeIf { contextUsed > 0 && it.isFinite() && it > 0f }
 
 /**
  * A transcript entry as the engine sees it.

@@ -20,6 +20,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import org.junit.Test
 
@@ -212,6 +213,37 @@ class EngineMessagesTest {
         body.zipWithNext().forEach { (before, after) ->
             assertThat(before.role).isNotEqualTo(after.role)
         }
+    }
+
+    @Test
+    fun `the prompt estimate follows the ratio the model was measured at`() {
+        val state = ChatUiState(transcript = transcript(6))
+        val chars = state.engineMessages().sumOf { it.text.length }
+
+        // Four characters to a token, which is roughly what English costs, against the two
+        // this used to borrow from the attachment budget. The difference is a conversation
+        // read as twice as full as it is, and a fold that fires at half the size it should.
+        val measured = state.copy(charsPerToken = 4f).estimatedPromptTokens()
+
+        assertThat(measured).isEqualTo(chars / 4)
+        assertThat(state.estimatedPromptTokens()).isEqualTo(chars / 2)
+    }
+
+    @Test
+    fun `a pass that measured nothing leaves the ratio alone`() {
+        // contextUsed is zero before anything has been decoded, and dividing by it would
+        // put an infinity into the state that every later estimate would inherit.
+        val stats = GenerationStats(
+            promptTokens = 0,
+            generatedTokens = 0,
+            prefillMs = 0,
+            decodeMs = 0,
+            timeToFirstTokenMs = 0,
+            contextUsed = 0,
+            contextSize = 4096,
+        )
+
+        assertThat(stats.charsPerToken(chars = 400)).isNull()
     }
 
     private fun transcript(count: Int) = List(count) { index ->

@@ -103,7 +103,7 @@ class ChatViewModelTest {
                 thermal = ThermalPolicy(context, DeviceProfiler(context)),
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
-            attachments = AttachmentStore(context),
+            staging = Staging(AttachmentStore(context)),
             writer = writer,
             turns = TurnRunner(engine, ToolRegistry(listOf(StubTool)), ToolSwitches(context)),
             notifier = ReplyNotifier(context),

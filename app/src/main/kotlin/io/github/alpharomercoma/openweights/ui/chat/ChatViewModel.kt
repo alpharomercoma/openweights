@@ -44,7 +44,6 @@ import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
-import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
@@ -257,7 +256,7 @@ data class ChatUiState(
 class ChatViewModel @Inject constructor(
     private val runtime: ModelRuntime,
     private val compactor: ConversationCompactor,
-    private val attachments: AttachmentStore,
+    private val staging: Staging,
     private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
@@ -395,7 +394,7 @@ class ChatViewModel @Inject constructor(
                 staged = emptyList(),
             )
         }
-        if (abandoned.isNotEmpty()) attachments.discard(abandoned)
+        if (abandoned.isNotEmpty()) staging.discard(abandoned)
     }
 
     /**
@@ -578,34 +577,19 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(isAttaching = true) }
             // In a finally: a throw here would otherwise leave the attach button spinning
             // with no way back to it.
-            val stored = try {
-                attachments.store(uri)
+            val staged = try {
+                staging.file(uri, _uiState.value.mediaSupport)
             } finally {
                 _uiState.update { it.copy(isAttaching = false) }
             }
-            if (stored.isEmpty()) {
-                _uiState.update { it.copy(error = "That file could not be read.") }
-                return@launch
-            }
-
-            // Checked here rather than at send: the engine drops media a model has no
-            // projector for, so an unsupported file would otherwise sit in the composer,
-            // appear in the sent message, be stored with it, and never reach the model.
-            val unreadable = stored.filterNot { _uiState.value.mediaSupport.accepts(it.kind) }
-            if (unreadable.isNotEmpty()) {
-                attachments.discard(stored)
-                _uiState.update { it.copy(error = it.mediaSupport.rejection(unreadable.first())) }
-                return@launch
-            }
-
-            _uiState.update { it.copy(staged = it.staged + stored) }
+            _uiState.update { it.after(staged) }
         }
     }
 
     /** Removes a staged attachment and deletes the copy that was made of it. */
     fun removeStaged(attachment: MessagePart.File) {
         _uiState.update { it.copy(staged = it.staged - attachment) }
-        viewModelScope.launch { attachments.discard(attachment) }
+        viewModelScope.launch { staging.discard(attachment) }
     }
 
     /**
@@ -628,18 +612,12 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isAttaching = true) }
-            val document = try {
-                attachments.readDocument(uri, documentBudget(_uiState.value))
+            val staged = try {
+                staging.document(uri, documentBudget(_uiState.value))
             } finally {
                 _uiState.update { it.copy(isAttaching = false) }
             }
-            if (document == null) {
-                _uiState.update {
-                    it.copy(error = "That file could not be read as text.")
-                }
-                return@launch
-            }
-            _uiState.update { it.copy(stagedDocument = document) }
+            _uiState.update { it.after(staged) }
         }
     }
 
@@ -1148,7 +1126,7 @@ class ChatViewModel @Inject constructor(
                 deleteConversation(id)
                 attached
             }
-            attachments.discard(orphaned)
+            staging.discard(orphaned)
             if (wasOpen) newChat()
         }
     }
@@ -1512,6 +1490,19 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
 }
 
 /**
+ * The state with the outcome of an attachment folded into it.
+ *
+ * One place where the three answers land, so a refusal cannot be reported by one path and
+ * swallowed by another. Which of the two staging slots a file fills is a property of the
+ * file rather than of the caller.
+ */
+private fun ChatUiState.after(staged: Staged): ChatUiState = when (staged) {
+    is Staged.Files -> copy(staged = this.staged + staged.files)
+    is Staged.Document -> copy(stagedDocument = staged.document)
+    is Staged.Refused -> copy(error = staged.why)
+}
+
+/**
  * Why a message cannot be sent right now, or null when it is not worth saying.
  *
  * Generating is not worth saying: the composer shows Stop rather than Send, so reaching it
@@ -1586,30 +1577,6 @@ private fun TranscriptEntry.toChatMessage(): ChatMessage = ChatMessage(
  */
 private fun canonicalText(reasoning: String?, answer: String): String =
     if (reasoning.isNullOrEmpty()) answer else "<think>$reasoning</think>$answer"
-
-/**
- * Why a picked file cannot be sent to the loaded model.
- *
- * Names what the model can read rather than only what it cannot, so the next attempt is an
- * informed one.
- */
-private fun MediaSupport.rejection(rejected: MessagePart.File): String {
-    val readable = listOfNotNull(
-        "pictures".takeIf { vision },
-        "sound".takeIf { audio },
-    )
-    val what = when (rejected.kind) {
-        MediaKind.IMAGE -> "pictures"
-        MediaKind.AUDIO -> "sound"
-        MediaKind.VIDEO -> "video"
-        MediaKind.OTHER -> "files of this type"
-    }
-    return if (readable.isEmpty()) {
-        "This model reads text only. Load a model with a projector file to send $what."
-    } else {
-        "This model cannot read $what. It reads ${readable.joinToString(" and ")}."
-    }
-}
 
 /**
  * Warns when a chat carried over to a new model contains media that model cannot read.

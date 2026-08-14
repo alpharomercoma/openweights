@@ -321,6 +321,10 @@ private fun ChatContent(
                 ToolApproval(call = call, onAnswer = onApproval)
             }
 
+            val dispatch: (SlashCommand) -> Unit = {
+                it.run(onNewChat, onCompact, onRegenerate, onMode)
+            }
+
             Composer(
                 conversationKey = state.activeConversationId,
                 enabled = state.canSend,
@@ -339,18 +343,21 @@ private fun ChatContent(
                 },
                 onRemoveStaged = onRemoveStaged,
                 onDictate = onDictate,
-                onSend = onSend,
-                onStop = onStop,
-                onCommand = { command ->
-                    when (command) {
-                        SlashCommand.NEW_CHAT -> onNewChat()
-                        SlashCommand.COMPACT -> onCompact()
-                        SlashCommand.REGENERATE -> onRegenerate()
-                        SlashCommand.PLAN -> onMode(AgentMode.PLAN)
-                        SlashCommand.AUTO -> onMode(AgentMode.AUTO)
-                        SlashCommand.ASK -> onMode(AgentMode.ASK)
+                // A command that was typed out and sent runs, rather than going to the model
+                // as text for it to answer. The palette is how these are found; it was also
+                // the only way to run one, which anybody who already knew the word found out
+                // by watching the model reply to "/plan".
+                onSend = { typed ->
+                    val command = SlashCommand.typed(typed)
+                    if (command != null) {
+                        dispatch(command)
+                        true
+                    } else {
+                        onSend(typed)
                     }
                 },
+                onStop = onStop,
+                onCommand = dispatch,
             )
         }
     }

@@ -252,6 +252,10 @@ data class ChatUiState(
             // above, and repeating it wastes the only line that can say something new.
             backend,
             contextSize.takeIf { it > 0 }?.let { "$it ctx" },
+            // Only when it is not the default, which is the same rule the rest of this line
+            // follows. A mode was choosable by typing and then invisible: nothing anywhere
+            // said the app was in plan mode, so the only evidence was tools not running.
+            mode.takeIf { it != ChatUiState().mode }?.label,
         ).joinToString(" · ")
 
     val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
@@ -1462,7 +1466,11 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         "Today is ${LocalDate.now()}.",
         ANSWER_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
-        toolInstruction(mode, preferences.toolPrompt).takeIf { toolsAvailable },
+        // Plan mode says its piece whether or not any tool is switched on, because it is a
+        // mode the user chose and it changes how the model is meant to answer. Gated on
+        // tools being available, "/plan" with everything switched off sent no instruction
+        // at all and the mode was a silent no-op.
+        toolInstruction(mode, preferences.toolPrompt, anyTools = toolsAvailable),
         // Part of the instructions, not a turn of its own. Sent separately this was a second
         // system message beside them, and Gemma 3's template raises rather than renders when
         // the roles do not alternate: every turn after the first fold came back as an error,
@@ -1681,12 +1689,18 @@ private fun List<TranscriptEntry>.unreadableWarning(support: MediaSupport): Stri
  * Plan mode is the one exception, and it is one the user selected by typing `/plan`: the
  * instruction is the mode.
  */
-private fun toolInstruction(mode: AgentMode, configured: String): String? = when (mode) {
-    AgentMode.PLAN ->
-        "You have tools available. Do not call them. Say which you would use and why."
+private fun toolInstruction(mode: AgentMode, configured: String, anyTools: Boolean): String? =
+    when (mode) {
+        // Two wordings, because the first one is a lie when nothing is switched on, and a
+        // model told it has tools it does not have writes a plan around using them.
+        AgentMode.PLAN -> if (anyTools) {
+            "You have tools available. Do not call them. Say which you would use and why."
+        } else {
+            "Do not act on anything yet. Say what you would do and why, as short steps."
+        }
 
-    AgentMode.ASK, AgentMode.AUTO -> configured.takeIf { it.isNotBlank() }
-}
+        AgentMode.ASK, AgentMode.AUTO -> configured.takeIf { it.isNotBlank() && anyTools }
+    }
 
 /** A short human label for an attachment, used where there is no text to go on. */
 internal fun MessagePart.File.describe(): String = name ?: when (kind) {

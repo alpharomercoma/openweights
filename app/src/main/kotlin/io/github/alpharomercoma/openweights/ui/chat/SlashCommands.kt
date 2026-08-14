@@ -36,6 +36,28 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
+
+/**
+ * Does what the command says, wherever it was typed or tapped.
+ *
+ * Here rather than in the screen because there are two callers now, and the screen having
+ * one of them and the composer the other is how typing a command came to mean something
+ * different from choosing it.
+ */
+fun SlashCommand.run(
+    onNewChat: () -> Unit,
+    onCompact: () -> Unit,
+    onRegenerate: () -> Unit,
+    onMode: (AgentMode) -> Unit,
+) = when (this) {
+    SlashCommand.NEW_CHAT -> onNewChat()
+    SlashCommand.COMPACT -> onCompact()
+    SlashCommand.REGENERATE -> onRegenerate()
+    SlashCommand.PLAN -> onMode(AgentMode.PLAN)
+    SlashCommand.AUTO -> onMode(AgentMode.AUTO)
+    SlashCommand.ASK -> onMode(AgentMode.ASK)
+}
 
 /**
  * Something the user can do to the conversation rather than say to the model.
@@ -66,6 +88,22 @@ enum class SlashCommand(val trigger: String, val description: String) {
         fun match(draft: String): List<SlashCommand>? {
             if (!draft.startsWith("/") || draft.contains(' ')) return null
             return entries.filter { it.trigger.startsWith(draft, ignoreCase = true) }
+        }
+
+        /**
+         * The command a finished message is, if it is one at all.
+         *
+         * The palette is how these are found, and it was also the only way to run them: a
+         * command typed out and sent went to the model as text, which duly answered "/plan"
+         * as though it were a question. Anyone who already knows the word types it.
+         *
+         * Exact rather than prefixed, which is the difference between this and [match].
+         * Half a command is something still being typed, and a sentence that opens with one
+         * is a sentence; either becoming an action would be worse than having no commands.
+         */
+        fun typed(message: String): SlashCommand? {
+            val trimmed = message.trim()
+            return entries.firstOrNull { it.trigger.equals(trimmed, ignoreCase = true) }
         }
     }
 }

@@ -48,6 +48,28 @@ class SlashCommandTest {
     }
 
     @Test
+    fun `a command that was typed rather than tapped is still a command`() {
+        // The palette is a way of finding these, not the only way of running them. Typing
+        // the whole word and pressing send is what anyone who already knows the command
+        // does, and it used to send the literal text "/plan" to the model, which answered
+        // it as a question.
+        assertThat(SlashCommand.typed("/plan")).isEqualTo(SlashCommand.PLAN)
+        assertThat(SlashCommand.typed("  /compact  ")).isEqualTo(SlashCommand.COMPACT)
+        assertThat(SlashCommand.typed("/PLAN")).isEqualTo(SlashCommand.PLAN)
+    }
+
+    @Test
+    fun `only an exact command counts as one`() {
+        // The prefix matching that fills the palette must not reach this: half a command is
+        // something the user is still typing, and a sentence beginning with one is a
+        // sentence. Both would otherwise become an action nobody asked for.
+        assertThat(SlashCommand.typed("/pl")).isNull()
+        assertThat(SlashCommand.typed("/plan the migration")).isNull()
+        assertThat(SlashCommand.typed("/tmp is full")).isNull()
+        assertThat(SlashCommand.typed("what is a KV cache?")).isNull()
+    }
+
+    @Test
     fun `the mode the app starts in is the one the palette calls the default`() {
         // /ask described itself as the default while the app started in auto, so the list
         // that is meant to be the documentation told the user tools would ask first when

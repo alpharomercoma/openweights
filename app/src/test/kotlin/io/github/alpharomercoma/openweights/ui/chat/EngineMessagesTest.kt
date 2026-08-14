@@ -216,6 +216,39 @@ class EngineMessagesTest {
     }
 
     @Test
+    fun `a mode that is not the default says so on screen`() {
+        // Choosing a mode changed the prompt and nothing else. Nowhere in the app said which
+        // one was on, so the only way to find out you were in plan mode was to notice tools
+        // not running. Auto stays unlabelled: it is the default, and a line that always says
+        // the same thing says nothing.
+        val identity = { mode: AgentMode ->
+            ChatUiState(backend = "CPU", contextSize = 4096, mode = mode).runtimeIdentity
+        }
+
+        assertThat(identity(AgentMode.PLAN)).contains(AgentMode.PLAN.label)
+        assertThat(identity(AgentMode.ASK)).contains(AgentMode.ASK.label)
+        assertThat(identity(AgentMode.AUTO)).doesNotContain(AgentMode.AUTO.label)
+    }
+
+    @Test
+    fun `plan mode still says something when every tool is switched off`() {
+        // The instruction used to be gated on a tool being available, so a user who had
+        // switched them all off and typed /plan got a mode that changed nothing: no
+        // instruction, and nothing on screen to say so either.
+        val planning = ChatUiState(
+            transcript = transcript(1),
+            mode = AgentMode.PLAN,
+            toolsAvailable = false,
+        )
+
+        val system = planning.engineMessages().first { it.role == ChatRole.SYSTEM }.text
+
+        assertThat(system).contains("Say what you would do")
+        // And it does not claim tools it has not got, which is what the other wording says.
+        assertThat(system).doesNotContain("You have tools available")
+    }
+
+    @Test
     fun `the prompt estimate follows the ratio the model was measured at`() {
         val state = ChatUiState(transcript = transcript(6))
         val chars = state.engineMessages().sumOf { it.text.length }

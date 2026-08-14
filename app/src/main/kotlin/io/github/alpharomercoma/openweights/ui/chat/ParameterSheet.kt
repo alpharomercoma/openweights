@@ -179,7 +179,7 @@ fun ParameterSheet(
                         "that need looking things up more than it suits long replies. " +
                         "Auto picks from what you have used this model for. Takes effect " +
                         "the next time the model loads.",
-                    value = Offload.fromName(draft.offload).name.lowercase(),
+                    value = Offload.fromName(draft.offload).label.lowercase(),
                 ) {
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         Offload.entries.forEachIndexed { index, choice ->
@@ -191,7 +191,7 @@ fun ParameterSheet(
                                     count = Offload.entries.size,
                                 ),
                             ) {
-                                Text(choice.name.lowercase().replaceFirstChar { it.uppercase() })
+                                Text(choice.label)
                             }
                         }
                     }

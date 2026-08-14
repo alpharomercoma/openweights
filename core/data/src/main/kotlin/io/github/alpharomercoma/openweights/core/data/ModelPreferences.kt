@@ -181,11 +181,13 @@ class ModelPreferencesRepository @Inject constructor(
  * A choice rather than a slider because splitting layers across both pays the transfer in
  * each direction for every token, which measured slower than either end on its own.
  */
-enum class Offload {
+enum class Offload(val label: String) {
     /** Decide from what this model has actually been used for. See [layersFor]. */
-    AUTO,
-    CPU,
-    GPU,
+    AUTO("Auto"),
+
+    // Written out rather than title-cased from the name, which produced "Cpu" and "Gpu".
+    CPU("CPU"),
+    GPU("GPU"),
     ;
 
     companion object {

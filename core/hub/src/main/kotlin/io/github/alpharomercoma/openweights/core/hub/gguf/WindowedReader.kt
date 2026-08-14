@@ -108,7 +108,12 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
 
         if (elementBytes == null) {
             // Strings have no fixed width, so they must be walked one at a time.
-            return List(count.toInt().coerceAtMost(MAX_ARRAY_ELEMENTS)) { readValue(elementType) }
+            // Clamped as a Long before it becomes an Int. A count above Int.MAX wrapped
+            // negative, and List(negative) throws IllegalArgumentException rather than the
+            // parse exception every caller here is written to expect.
+            return List(count.coerceIn(0, MAX_ARRAY_ELEMENTS.toLong()).toInt()) {
+                readValue(elementType)
+            }
         }
         // Small integer arrays carry real information, per-layer KV head counts, for one,
         // so read them. Anything larger is vocabulary-sized and irrelevant here: skip it,

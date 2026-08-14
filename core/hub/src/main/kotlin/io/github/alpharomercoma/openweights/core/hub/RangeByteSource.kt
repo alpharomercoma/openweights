@@ -52,7 +52,12 @@ class RangeByteSource(
 
         httpClient.newCall(request).execute().use { response ->
             when {
-                response.code == HubHttp.PARTIAL_CONTENT -> response.body.bytes()
+                // peekBody stops at the limit rather than after it, so a server that
+                // answers a two-kilobyte range request with a gigabyte cannot be read into
+                // memory. Refusing the 200 below was never enough on its own: a 206 with a
+                // body of any size was accepted whole, before a single field was validated.
+                response.code == HubHttp.PARTIAL_CONTENT ->
+                    response.peekBody(length.toLong()).bytes()
 
                 // Reporting an empty read here would surface as "malformed GGUF", hiding a
                 // token or rate-limit problem the user could actually fix.

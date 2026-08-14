@@ -69,7 +69,12 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
             .combinedClickable(onClick = onClick, role = Role.Button)
-            .semantics { contentDescription = "Choose a model. ${state.spoken()}" }
+            // Merged, or the description is read and then every line inside it is read
+            // again: the model name, the backend, the context window, one after another.
+            // The whole point of composing a sentence here is that it replaces them.
+            .semantics(mergeDescendants = true) {
+                contentDescription = "Choose a model. ${state.spoken()}"
+            }
             .heightIn(min = TOUCH_TARGET.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.Center,

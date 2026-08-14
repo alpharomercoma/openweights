@@ -178,6 +178,15 @@ class ModelDownloader @Inject constructor(
         var read = source.readInto(buffer)
 
         while (read >= 0) {
+            // Stopped at the advertised size rather than at end of stream. A server that
+            // keeps sending filled the disk, because the length was only checked once the
+            // transfer had finished. Zero means the size was not published, which is the
+            // one case there is nothing to check against.
+            if (total > 0 && written + read > total) {
+                throw DownloadException(
+                    "The server sent more than the $total bytes this file claims to be.",
+                )
+            }
             output.write(buffer, 0, read)
             written += read
 

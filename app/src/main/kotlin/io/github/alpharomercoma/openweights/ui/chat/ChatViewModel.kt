@@ -35,6 +35,7 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
+import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.data.layersFor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
@@ -1043,7 +1044,7 @@ class ChatViewModel @Inject constructor(
 
             val messages = writer.inOrder { messages(id) }
             conversationId = id
-            nextEntryId = 0
+            nextEntryId = messages.size.toLong()
 
             // A conversation continued under a different model would mix two models'
             // voices in one transcript, and the history would not say which said what.
@@ -1054,22 +1055,9 @@ class ChatViewModel @Inject constructor(
 
             _uiState.update { state ->
                 val reopened = state.copy(
-                    transcript = messages.map { message ->
-                        val parsed = parseAssistantReply(message.text)
-                        TranscriptEntry(
-                            id = nextEntryId++,
-                            role = ChatRole.entries.firstOrNull { it.wireName == message.role }
-                                ?: ChatRole.ASSISTANT,
-                            text = message.text,
-                            reasoning = parsed.reasoning,
-                            answer = parsed.answer,
-                            tokensPerSecond = message.tokensPerSecond,
-                            timeToFirstTokenMs = message.timeToFirstTokenMs,
-                            generatedTokens = message.generatedTokens,
-                            reasoningMs = message.reasoningMs,
-                            attachments = message.attachments.decodeAttachments(),
-                        )
-                    },
+                    transcript = messages.toTranscript(
+                        conversation.compactionSummary?.let { conversation.compactionThroughIndex },
+                    ),
                     compaction = conversation.compactionSummary?.let {
                         Compaction(it, conversation.compactionThroughIndex, 0)
                     },
@@ -1545,6 +1533,38 @@ private fun ChatUiState.droppingEmptyReply(): ChatUiState? {
         error = error ?: "The model returned an empty reply. Ask again, or put it another way.",
     )
 }
+
+/**
+ * Stored messages as the screen shows them.
+ *
+ * Its own function because reopening has to rebuild everything the live transcript carries,
+ * and one part of that was quietly missing: the marker saying earlier turns were folded
+ * away is written when the fold happens and was not restored, so a compacted conversation
+ * came back looking as though nothing had been summarised and the gap in it was unexplained.
+ *
+ * @param foldedThrough index of the last entry a fold covered, or null if there was none.
+ */
+private fun List<MessageEntity>.toTranscript(foldedThrough: Int?): List<TranscriptEntry> =
+    mapIndexed { index, message ->
+        val parsed = parseAssistantReply(message.text)
+        TranscriptEntry(
+            id = index.toLong(),
+            role = ChatRole.entries.firstOrNull { it.wireName == message.role }
+                ?: ChatRole.ASSISTANT,
+            text = message.text,
+            reasoning = parsed.reasoning,
+            answer = parsed.answer,
+            tokensPerSecond = message.tokensPerSecond,
+            timeToFirstTokenMs = message.timeToFirstTokenMs,
+            generatedTokens = message.generatedTokens,
+            reasoningMs = message.reasoningMs,
+            attachments = message.attachments.decodeAttachments(),
+            compactionNote = COMPACTION_NOTE.takeIf {
+                foldedThrough != null &&
+                    index == foldedThrough + 1
+            },
+        )
+    }
 
 /**
  * A pessimistic guess at what the next prompt will occupy.

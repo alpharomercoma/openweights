@@ -21,6 +21,10 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -346,6 +350,156 @@ class AgentRunnerTest {
             cancelled = true
         }
         assertThat(cancelled).isTrue()
+    }
+
+    @Test
+    fun `the same call twice is answered from the first run`() = runTest {
+        // What a small model does with a tool result in front of it: writes the same call
+        // again, because a shape it has just seen is the shape it is best at producing. Each
+        // repeat is a full prefill of a longer conversation, and on this round budget it is
+        // the round the answer was going to be written in.
+        runner.step(
+            listOf(call("echo", args = """{"q":"hi"}""")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        val again = runner.step(
+            listOf(call("echo", id = "c2", args = """{"q": "hi"}""")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        // Once, though it was asked for twice, and the second spelling differed only in a
+        // space: the arguments go through the parser before they are compared.
+        assertThat(ran).containsExactly("echo")
+        val told = (again as AgentDecision.Continue).messages.single()
+        assertThat(told.text).contains("already ran")
+        // Pointed at, not repeated. Sending the result again would spend the context twice
+        // to tell the model something already in front of it.
+        assertThat(told.text).doesNotContain("echoed")
+    }
+
+    @Test
+    fun `the same call twice in one pass runs once and both are answered`() = runTest {
+        val decision = runner.step(
+            calls = listOf(
+                call("echo", id = "a", args = """{"q":"hi"}"""),
+                call("echo", id = "b", args = """{"q":"hi"}"""),
+            ),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        assertThat(ran).containsExactly("echo")
+        // Both still answer. A call the model made and heard nothing about is what leaves a
+        // turn unable to finish, whatever the reason it did not run.
+        val messages = (decision as AgentDecision.Continue).messages
+        assertThat(messages.map { it.toolCallId }).containsExactly("a", "b").inOrder()
+    }
+
+    @Test
+    fun `a different call to the same tool still runs`() = runTest {
+        // The property the rule must not break. Searching for something else is a new call,
+        // and a breaker that fired on the tool's name would end the turn's usefulness at one
+        // search.
+        runner.step(
+            listOf(call("echo", args = """{"q":"one"}""")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        runner.step(
+            listOf(call("echo", id = "c2", args = """{"q":"two"}""")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        assertThat(ran).containsExactly("echo", "echo")
+    }
+
+    @Test
+    fun `a call the user declined is not put to them a second time`() = runTest {
+        var asked = 0
+        val declining: suspend (ToolCall) -> Boolean = {
+            asked++
+            false
+        }
+        runner.step(listOf(call("echo")), round = 0, mode = AgentMode.ASK, approve = declining)
+
+        val again = runner.step(
+            listOf(call("echo", id = "c2")),
+            round = 1,
+            mode = AgentMode.ASK,
+            approve = declining,
+        )
+
+        // Asked once. A model that repeats a call it was refused turns one decision into a
+        // row of identical prompts, and the second one is where people stop reading them.
+        assertThat(asked).isEqualTo(1)
+        assertThat(ran).isEmpty()
+        assertThat((again as AgentDecision.Continue).messages.single().text)
+            .contains("already declined")
+    }
+
+    @Test
+    fun `declining one address does not decline the tool`() = runTest {
+        // The decision belongs to the person who made it, and what they saw was one call.
+        // Settling the tool instead of the call would take a choice they never made.
+        var asked = 0
+        val approve: suspend (ToolCall) -> Boolean = {
+            asked++
+            false
+        }
+        runner.step(
+            listOf(call("echo", args = """{"q":"one"}""")),
+            round = 0,
+            mode = AgentMode.ASK,
+            approve = approve,
+        )
+
+        runner.step(
+            listOf(call("echo", id = "c2", args = """{"q":"two"}""")),
+            round = 1,
+            mode = AgentMode.ASK,
+            approve = approve,
+        )
+
+        assertThat(asked).isEqualTo(2)
+    }
+
+    @Test
+    fun `a tool that never returns is stopped when the turn is`() = runTest {
+        // The other test cancels by throwing, which proves the catch clause and nothing else.
+        // This one is the real shape: a tool suspended in a request that will not finish, and
+        // the coroutine that owns the turn cancelled underneath it, which is what Stop does.
+        val reached = CompletableDeferred<Unit>()
+        var finished = false
+        val hangs = object : Tool {
+            override val definition = ToolDefinition("hangs", "Never returns", "{}")
+            override suspend fun run(call: ToolCall): String {
+                reached.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(hangs)))
+
+        val turn = launch {
+            runner.step(listOf(call("hangs")), round = 0, mode = AgentMode.AUTO, approve = {
+                true
+            })
+            finished = true
+        }
+        reached.await()
+        turn.cancelAndJoin()
+
+        assertThat(turn.isCancelled).isTrue()
+        assertThat(finished).isFalse()
     }
 
     @Test

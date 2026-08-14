@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.tools
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 
 /** One step the agent took, as the transcript shows it. */
 sealed interface AgentStep {
@@ -37,6 +38,22 @@ internal fun AgentStep.callId(): String = when (this) {
     is AgentStep.Requested -> call.id
     is AgentStep.Ran -> call.id
     is AgentStep.Skipped -> call.id
+}
+
+/**
+ * What makes two calls the same call.
+ *
+ * The arguments are canonicalised through the parser when they will go through it, so
+ * `{"query":"x"}` and `{"query": "x"}` are one call rather than two. When they will not,
+ * which for a model this size is often, the text stands as written: the alternative is
+ * stripping whitespace out of the string, and that would fold a search for "new york" into
+ * one for "newyork". Missing a repeat costs a round; inventing one refuses a call the model
+ * meant, so the doubt goes that way.
+ */
+internal fun ToolCall.settledKey(): String {
+    val canonical = runCatching { Json.parseToJsonElement(argumentsJson).toString() }
+        .getOrDefault(argumentsJson.trim())
+    return "$name($canonical)"
 }
 
 /** What the model is told about this step. */
@@ -83,6 +100,26 @@ class AgentRunner(
      */
     private var readUntrustedText = false
 
+    /**
+     * Calls this turn has already answered, and what to say if one is asked for again.
+     *
+     * A small model that has just been handed a tool result frequently asks for the same
+     * thing again, word for word: it is the shape most recently in front of it, and repeating
+     * a shape is what these models are best at. Each repeat costs a full prefill of a
+     * conversation that has grown, and on the round budget here it costs the round in which
+     * the answer was going to be written.
+     *
+     * Both halves are keyed the same way, on the name and the arguments together, because
+     * both are claims about one exact call. A search for something else is a new call; the
+     * same search twice is a loop. And a tool the user declined is only settled for the
+     * arguments they saw: declining one address is not declining the tool, and treating it
+     * that way would take the decision away from the person who made it.
+     *
+     * Per turn, like [readUntrustedText] and for the same reason: this instance is one turn,
+     * so the next question starts with nothing settled.
+     */
+    private val settled = mutableMapOf<String, String>()
+
     suspend fun step(
         calls: List<ToolCall>,
         round: Int,
@@ -123,6 +160,10 @@ class AgentRunner(
         approve: suspend (ToolCall) -> Boolean,
         now: () -> Long,
     ): AgentStep {
+        // Before the tool is even looked up, because the cheapest round trip is the one that
+        // does not happen and the answer here does not depend on the tool.
+        settled[call.settledKey()]?.let { return AgentStep.Skipped(call, it) }
+
         val tool = registry.find(call.name)
             ?: return AgentStep.Skipped(
                 call,
@@ -130,14 +171,9 @@ class AgentRunner(
                     "Available: ${registry.definitions.joinToString { it.name }}.",
             )
 
-        // Auto is about removing pointless taps. A tool that would carry off the device text
-        // that something else wrote is not a pointless tap, and until a file has actually
-        // been read there is nothing for it to carry, so the question only ever arises on
-        // the one boundary where it means something.
-        val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
-        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk && !carriesSomebodyElsesText
-        val allowed = autoAllows || !tool.needsApproval || approve(call)
-        if (!allowed) {
+        if (!allowed(tool, call, mode, approve)) {
+            settled[call.settledKey()] = "The user has already declined ${call.name} with " +
+                "these arguments. Do not ask again; answer without it."
             return AgentStep.Skipped(call, "The user declined to run ${call.name}.")
         }
 
@@ -159,7 +195,31 @@ class AgentRunner(
         // Set after the run rather than before it, so a tool that failed to read anything
         // does not spend the turn's freedom on text that never arrived.
         if (tool.returnsUntrustedText) readUntrustedText = true
+        // Pointed at rather than repeated. The result is already in the conversation as a
+        // tool message, so sending it a second time would spend the context twice over to
+        // tell the model something it can see.
+        settled[call.settledKey()] = "${call.name} already ran this turn with exactly these " +
+            "arguments and its result is above. Answer from that rather than calling it again."
         return AgentStep.Ran(call, result, now() - startedAt)
+    }
+
+    /**
+     * Whether this call runs, asking the user if the mode and the tool both say to.
+     *
+     * Auto is about removing pointless taps. A tool that would carry off the device text that
+     * something else wrote is not a pointless tap, and until a file has actually been read
+     * there is nothing for it to carry, so the question only ever arises on the one boundary
+     * where it means something.
+     */
+    private suspend fun allowed(
+        tool: Tool,
+        call: ToolCall,
+        mode: AgentMode,
+        approve: suspend (ToolCall) -> Boolean,
+    ): Boolean {
+        val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
+        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk && !carriesSomebodyElsesText
+        return autoAllows || !tool.needsApproval || approve(call)
     }
 
     companion object {

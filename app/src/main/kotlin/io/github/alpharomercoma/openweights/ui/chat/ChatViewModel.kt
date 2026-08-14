@@ -34,7 +34,9 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
+import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
+import io.github.alpharomercoma.openweights.core.data.layersFor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
@@ -389,9 +391,15 @@ class ChatViewModel @Inject constructor(
     ) {
         _uiState.update { it.copy(isLoadingModel = true, error = null) }
         val preferences = runtime.settingsFor(modelFile.name)
+        // Resolved here rather than stored, because Auto's answer is a measurement and the
+        // measurement changes as the model gets used. Read once per load, which is the only
+        // moment llama.cpp will accept it.
+        val (prompted, generated) = writer.inOrder { turnShape(modelFile.nameWithoutExtension) }
+        val layers = Offload.fromName(preferences.offload)
+            .layersFor(runtime.hasGpu(), prompted, generated)
         val loadParams = contextLength
-            ?.let { ModelLoadParams(contextLength = it) }
-            ?: preferences.toLoadParams()
+            ?.let { ModelLoadParams(contextLength = it, gpuLayers = layers) }
+            ?: preferences.toLoadParams(layers)
 
         val projector = runtime.projectorFor(modelFile)
 

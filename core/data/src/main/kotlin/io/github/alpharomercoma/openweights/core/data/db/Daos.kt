@@ -70,6 +70,10 @@ interface UsageDao {
     @Query("SELECT * FROM usage_ledger WHERE day = :day AND modelName = :modelName")
     suspend fun forDay(day: Long, modelName: String): UsageEntity?
 
+    /** Every day this model has been used, for the shape of turn it is asked for. */
+    @Query("SELECT * FROM usage_ledger WHERE modelName = :modelName")
+    suspend fun forModel(modelName: String): List<UsageEntity>
+
     @Upsert
     suspend fun upsert(usage: UsageEntity)
 

@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
+import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -172,22 +173,28 @@ fun ParameterSheet(
 
             if (hasGpu) {
                 Setting(
-                    label = "Run on the GPU",
-                    explanation = "Reads a prompt about five times faster and writes an " +
-                        "answer about a third slower, so it suits questions that need " +
-                        "looking things up more than long replies. Costs battery, and " +
-                        "takes effect the next time the model loads.",
-                    value = if (draft.gpuLayers > 0) "on" else "off",
+                    label = "Processor",
+                    explanation = "The GPU reads a prompt about four times faster and " +
+                        "writes an answer about a quarter slower, so it suits questions " +
+                        "that need looking things up more than it suits long replies. " +
+                        "Auto picks from what you have used this model for. Takes effect " +
+                        "the next time the model loads.",
+                    value = Offload.fromName(draft.offload).name.lowercase(),
                 ) {
-                    Switch(
-                        checked = draft.gpuLayers > 0,
-                        onCheckedChange = {
-                            // All the layers or none. Anything between splits every token
-                            // across two processors and pays the transfer both ways, which
-                            // measured slower than either on its own.
-                            draft = draft.copy(gpuLayers = if (it) ALL_LAYERS else 0)
-                        },
-                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        Offload.entries.forEachIndexed { index, choice ->
+                            SegmentedButton(
+                                selected = Offload.fromName(draft.offload) == choice,
+                                onClick = { draft = draft.copy(offload = choice.name) },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = Offload.entries.size,
+                                ),
+                            ) {
+                                Text(choice.name.lowercase().replaceFirstChar { it.uppercase() })
+                            }
+                        }
+                    }
                 }
             }
 
@@ -338,9 +345,6 @@ private const val MIN_TOP_P = 0.1f
 private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
-
-/** More layers than any model has, which is llama.cpp's way of saying all of them. */
-private const val ALL_LAYERS = 99
 
 @Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable

@@ -76,20 +76,8 @@ data class ModelPreferences(
     val thinking: Boolean = true,
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val reasoningEffort: String = ReasoningEffort.DEFAULT.name,
-    /**
-     * How many layers to hand to the GPU, zero being all of them on the CPU.
-     *
-     * Off by default, which is the right answer for a chat turn and the wrong one for an
-     * agent. Measured on an Adreno 830: reading a prompt is five and a half times faster on
-     * the GPU and writing one is about a third slower, so a turn that spends most of its
-     * time re-reading a growing conversation wins and a turn that is mostly writing loses.
-     * Which of those a person is doing is not something the app can know, so it is a
-     * setting rather than a guess.
-     *
-     * Read at load, like the context length, because llama.cpp assigns layers when the
-     * weights are mapped and not after.
-     */
-    val gpuLayers: Int = 0,
+    /** Stored by name so an unknown value from a newer build falls back to the default. */
+    val offload: String = Offload.AUTO.name,
 ) {
     fun toSamplerParams() = SamplerParams(
         thinking = thinking,
@@ -102,7 +90,8 @@ data class ModelPreferences(
         maxTokens = if (maxTokens > 0) maxTokens else DEFAULT_MAX_TOKENS,
     )
 
-    fun toLoadParams() = ModelLoadParams(contextLength = contextLength, gpuLayers = gpuLayers)
+    fun toLoadParams(gpuLayers: Int = 0) =
+        ModelLoadParams(contextLength = contextLength, gpuLayers = gpuLayers)
 
     companion object {
         /**
@@ -185,3 +174,61 @@ class ModelPreferencesRepository @Inject constructor(
         const val PREFIX = "model_prefs_"
     }
 }
+
+/**
+ * Which processor a model's layers are loaded onto.
+ *
+ * A choice rather than a slider because splitting layers across both pays the transfer in
+ * each direction for every token, which measured slower than either end on its own.
+ */
+enum class Offload {
+    /** Decide from what this model has actually been used for. See [layersFor]. */
+    AUTO,
+    CPU,
+    GPU,
+    ;
+
+    companion object {
+        fun fromName(name: String): Offload = entries.firstOrNull { it.name == name } ?: AUTO
+    }
+}
+
+/**
+ * How many layers to hand to the GPU, which is all of them or none.
+ *
+ * The two processors are good at opposite halves of a turn. Measured on an Adreno 830 with
+ * Gemma 3 1B: reading a prompt runs at 624 tokens a second on the GPU against 151 on the
+ * CPU, and writing an answer at about 34 against 45. A turn that reads a lot and writes a
+ * little is three times faster on the GPU; one that reads a question and writes an essay is
+ * half again slower.
+ *
+ * So [Offload.AUTO] asks which of those this model is used for. Solving the two rates for
+ * where they cross gives a prompt about one and a half times the answer, and the usage
+ * ledger already records both totals per model, so the question needs no new bookkeeping and
+ * no guess: an agent that keeps re-reading a conversation crosses it, and a chat does not.
+ *
+ * Decided at load, because llama.cpp assigns layers when the weights are mapped and not
+ * after, and re-deciding mid-session would mean reloading the model under the conversation.
+ * A model with nothing recorded yet stays on the CPU, which is the better wrong answer:
+ * being slower to write is felt immediately, and being slower to read is not felt at all
+ * until a conversation is long.
+ */
+fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long): Int {
+    if (!hasGpu) return 0
+    return when (this) {
+        Offload.CPU -> 0
+        Offload.GPU -> ALL_LAYERS
+        Offload.AUTO -> {
+            val prefillHeavy = generatedTokens > 0 &&
+                promptTokens * CROSSOVER_DENOMINATOR > generatedTokens * CROSSOVER_NUMERATOR
+            if (prefillHeavy) ALL_LAYERS else 0
+        }
+    }
+}
+
+/** More layers than any model has, which is llama.cpp's way of saying all of them. */
+private const val ALL_LAYERS = 99
+
+/** A prompt worth 1.4 answers, held as a fraction so the comparison stays in integers. */
+private const val CROSSOVER_NUMERATOR = 7L
+private const val CROSSOVER_DENOMINATOR = 5L

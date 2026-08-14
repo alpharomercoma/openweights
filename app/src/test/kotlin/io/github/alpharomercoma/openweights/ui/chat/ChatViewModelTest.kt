@@ -744,7 +744,15 @@ class ChatViewModelTest {
         keepConversation: Boolean = false,
     ) {
         viewModel.loadModel(modelFile(name), keepConversation = keepConversation)
-        settle()
+        // Waited for rather than drained a fixed number of times. A load reads settings and
+        // the usage ledger before it reaches the engine, and a helper that assumed a set
+        // number of passes started failing the moment one more round trip was added: send
+        // was then called while the model was still loading, refused, and the test failed
+        // somewhere else entirely.
+        repeat(AWAIT_STEPS) {
+            if (viewModel.uiState.value.modelName != null) return
+            settle(steps = 2)
+        }
     }
 
     /**

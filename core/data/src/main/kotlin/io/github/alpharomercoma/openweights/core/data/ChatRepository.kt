@@ -134,6 +134,20 @@ class ChatRepository @Inject constructor(
         inferenceMs = inferenceMs,
     )
 
+    /**
+     * What this model has been asked for so far, as prompt tokens to generated tokens.
+     *
+     * The shape of a turn is the only thing that decides whether the GPU is worth it, and
+     * the ledger has been recording both halves since it existed. Summed over every day
+     * rather than the last one, because the answer should not change with the calendar.
+     */
+    suspend fun turnShape(modelName: String): Pair<Long, Long> {
+        val rows = database.usage().forModel(modelName)
+        return rows.fold(0L to 0L) { (prompt, generated), row ->
+            prompt + row.promptTokens to generated + row.generatedTokens
+        }
+    }
+
     private suspend fun touch(conversationId: Long) {
         val conversation = database.conversations().byId(conversationId) ?: return
         database.conversations().upsert(conversation.copy(updatedAt = clock.nowMillis()))

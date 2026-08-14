@@ -458,9 +458,16 @@ adb shell am instrument -w -r \
 
 Note the class name has no `.test` suffix even though the APK's application id does.
 
-The same recipe runs `:app`'s instrumentation, which now carries `HarnessSmokeTest`: the
-whole turn loop against real weights, asserting only that the turn ended, that nothing
-native went wrong, that the reply is not empty and that no tool syntax leaked into it.
+The same recipe runs `:app`'s instrumentation. Four classes there need a device, and each
+asks a different question:
+
+| class | what only a device can answer |
+| --- | --- |
+| `HarnessSmokeTest` | that the instructions, the template and the parser still add up to a reply |
+| `ToolTurnOnDeviceTest` | that a tool result reaches the answer, proved by a word only the tool knows |
+| `ToolChoiceBenchmark` | which tool a model reaches for, and whether it was told there were any |
+| `WorkspaceOnDeviceTest` | that a file tool saying "saved" has saved something. Needs a folder shared through the picker and skips without one |
+
 Swap the module and the class name:
 
 ```sh
@@ -805,6 +812,59 @@ through a sustained run, after something like thirty generations on one loaded e
 other two families ran a hundred and sixty each without it. It is a real defect in the engine
 or in that model's cache handling rather than anything to do with tool choice, and it is what
 stopped the benchmark before LFM's remaining arms.
+
+### The wording is finished, and two models were never the problem (2026-08-15)
+
+Full detail in `docs/research/tool-calling.md`. The short version, on `pineapple`
+(Snapdragon 8 Gen 3), catalogue of three tools:
+
+**Four system messages, six models, and three of them did not notice.** Llama 3.2 3B and
+Granite 3.3 2B scored 12/24 with twelve under-calls under every wording, which for a set that
+is half tool questions is the score of a model that never calls anything. Phi 4 Mini scored
+15/24 with nine over-calls under every wording. Not close to each other: identical, case by
+case. There is nothing left to find by rewriting the instruction, so the benchmark stopped
+paying for arms that measure it.
+
+**A model that never calls is either declining or ignorant, and `supportsTools` cannot tell
+you which.** The benchmark now renders one question with and without the tools, clearing the
+context either side, and compares what the engine had to prefill:
+
+| model | without tools | with tools | difference |
+| --- | ---: | ---: | ---: |
+| qwen2.5-1.5b | 38 | 470 | 432 tokens of definitions arrived |
+| llama3.2-3b | 44 | 543 | 499 |
+| granite3.3-2b | 68 | 591 | 523 |
+
+Both silent models were told. Their under-calling is judgement, not a renderer we broke, which
+is the opposite of what the earlier note about Gemma and LFM found and had to be checked
+rather than assumed.
+
+**576 generations to 84**, by removing what the data showed measured nothing: four wordings to
+two formats, eight cases to six, three seeds to one. The seed cut rests on determinism at
+temperature zero, which the run now proves rather than assumes: on a native template the two
+arms are the same prompt twice, and every case has to answer identically or the run fails.
+
+**`llama_decode returned 1` was accumulation.** The benchmark clears the context between
+cases now, and LFM2 1.2B finished both arms where it used to die after about thirty
+generations and take the rest of the suite with it. That says what triggered it there. Whether
+a long conversation in the app can reach the same state is a separate question and is not
+answered by this.
+
+**What a catalogue costs to describe**, measured by a host test that fails if either drifts:
+378 tokens for the three tools every install has, 672 for all six once a folder is shared. On
+a 2048 token window the second is a third of it, spent on every pass of every turn.
+
+**Prose salvage has never been observed to help.** The route each call arrives by is recorded
+now, so the same generations score with and without it. Over seventy two it fired five times:
+twice on Llama, net nothing, and three times on Granite, where the arm scored 2/6 with it and
+3/6 without. Five firings is not a reason to delete a path built on watching real turns, and
+none of these cases has the shape it was built for, which is a model that has already been
+handed a tool result. It is on the record and counted every run.
+
+**The Hermes envelope did not win.** `<tool_call>` against the bare object, on the three models
+that read their format from the prompt: 1 to 2, 2 to 3, and 4 to 3. Net one case in eighteen,
+which at six cases an arm is noise. The parser reads both spellings regardless, because
+refusing the one a model was tuned on means refusing the call it made.
 
 ### Coverage (2026-08-14)
 

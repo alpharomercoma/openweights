@@ -394,6 +394,15 @@ private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
  * Internal rather than private so the benchmark can count how often this fires and whether it
  * was right to. It is the one part of the routing path that is a guess, so whether it earns
  * its place is a measurement, and a measurement has to be able to call it.
+ *
+ * **The first measurement is not flattering, and is too small to act on.** Over six models and
+ * seventy two generations it fired five times: twice on Llama 3.2 3B, where it turned one
+ * under-call into a right answer and one right answer into an over-call, and three times on
+ * Granite 3.3 2B, where the arm scored 2/6 with it and 3/6 without. It has not yet been
+ * observed to help. Five firings is not a reason to delete a path that was built on watching
+ * real turns, where a model names its tool and asks permission, and these cases are single
+ * decisions rather than that shape. What would settle it is the same counter over cases where
+ * a model has already been handed a tool result, and it is now counted on every run.
  */
 internal fun String.salvagedCall(
     tools: ToolRegistry,

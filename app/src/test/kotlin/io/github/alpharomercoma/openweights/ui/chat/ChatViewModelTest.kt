@@ -725,6 +725,11 @@ class ChatViewModelTest {
     @Test
     fun `a reply llama cpp parsed reopens as what was shown, not as raw tool syntax`() =
         runTest(dispatcher) {
+            // About what is shown and stored, not about running anything, so the tool is
+            // switched off. Left on, the markup in the raw stream is now read as a call the
+            // model failed to format, and the turn spends its repair round on it.
+            ToolSwitches(ApplicationProvider.getApplicationContext())
+                .setEnabled(StubTool.definition.name, false)
             loadModel()
             engine.hold = true
             viewModel.send("What is the weather")

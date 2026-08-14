@@ -785,7 +785,12 @@ class ChatViewModel @Inject constructor(
                     // Offering a tool to a template that cannot render one wastes the
                     // context it takes up and leaves the model describing what it would
                     // do if it could.
-                    withTools = state.supportsTools && state.toolsAvailable,
+                    // Not gated on the template being able to render tools any more.
+                    // TurnRunner puts the definitions in the conversation for a model whose
+                    // template drops them, which is two of the three families tested here,
+                    // and deciding here that they cannot have tools is what made that
+                    // silent.
+                    withTools = state.toolsAvailable,
                     listener = listener,
                 )
                 // Here, so a turn that used a tool is written down once. Skipped by both
@@ -1433,7 +1438,7 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         "Today is ${LocalDate.now()}.",
         ANSWER_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
-        toolInstruction(mode, preferences.toolPrompt).takeIf { supportsTools && toolsAvailable },
+        toolInstruction(mode, preferences.toolPrompt).takeIf { toolsAvailable },
         // Part of the instructions, not a turn of its own. Sent separately this was a second
         // system message beside them, and Gemma 3's template raises rather than renders when
         // the roles do not alternate: every turn after the first fold came back as an error,

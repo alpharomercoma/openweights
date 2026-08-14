@@ -56,6 +56,10 @@ class TurnRunnerTest {
     @Before
     fun setUp() {
         engine = FakeInferenceEngine()
+        // These are about a model whose template carries tool definitions, which is what the
+        // engine's own parse and the salvage path are for. A model whose template drops them
+        // takes a different route through the loop and has its own test below.
+        engine.supportsTools = true
         search = RecordingTool("web_search")
     }
 
@@ -86,6 +90,28 @@ class TurnRunnerTest {
         assertThat(search.calls).hasSize(1)
         assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
     }
+
+    @Test
+    fun `a model whose template drops tools is given them in the conversation`() =
+        runBlocking<Unit> {
+            // Two of the three families this app is tested against render no tools at all.
+            // Handing the definitions to the engine achieves nothing there: they are dropped
+            // and the model answers in prose, which is indistinguishable from deciding not to
+            // call anything. So they go where every template does carry text.
+            engine.supportsTools = false
+            engine.scripted += ScriptedPass("""{"tool":"web_search","arguments":{"q":"ada"}}""")
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+
+            val steps = run(withTools = true)
+
+            // Nothing went to the engine as a definition, because it would have been lost.
+            assertThat(engine.offered.first()).isEmpty()
+            // It went into the system message instead, which every template does render.
+            assertThat(engine.prompts.first().first().text).contains("web_search")
+            // And the object the model sent back was read as the call it is.
+            assertThat(search.calls).hasSize(1)
+            assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
+        }
 
     @Test
     fun `a tool with nothing to work with is never described to the model`() = runBlocking<Unit> {

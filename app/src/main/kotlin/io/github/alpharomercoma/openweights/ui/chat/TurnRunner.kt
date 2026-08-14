@@ -30,6 +30,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import javax.inject.Inject
@@ -117,11 +118,7 @@ class TurnRunner @Inject constructor(
         // something up. A turn that works with files is a different shape: find it, read it,
         // write it, which is three before the model has said anything. At two the last of
         // those is refused and the work is thrown away on the step that mattered.
-        val maxRounds = if (active.all.any { it.chains }) {
-            AgentRunner.CHAINED_MAX_ROUNDS
-        } else {
-            AgentRunner.DEFAULT_MAX_ROUNDS
-        }
+        val maxRounds = active.roundLimit()
         val agent = AgentRunner(active, maxRounds)
 
         // Said once per turn, because "why did it not search" has three possible answers
@@ -132,7 +129,12 @@ class TurnRunner @Inject constructor(
             "turn withTools=$withTools tools=${active.all.map { it.definition.name }} mode=$mode",
         )
 
-        var messages = conversation
+        // Whether the model's own template will carry the definitions. Two of the three
+        // families this app is tested against will not, and say nothing about it: the tools
+        // are dropped, the model answers in prose, and the app stops being an agent without
+        // anything looking wrong. Those get the definitions in the conversation instead.
+        val native = engine.loadedModel?.supportsTools == true
+        var messages = conversation.describing(active, needed = withTools && !native)
         var round = 0
         var lastRaw = ""
         // Spent at most once a turn. Re-asking a model that cannot produce the syntax is
@@ -157,7 +159,10 @@ class TurnRunner @Inject constructor(
                 round < maxRounds &&
                 ToolBudget(headroomTokens()).hasRoom
             val sampling = params.deciding(offerTools)
-            val pass = streamOnce(messages, sampling, active, offerTools, listener) { lastRaw = it }
+            // Only a template that can carry them gets them here. The rest were given the
+            // same tools in the system message before the first pass.
+            val rendered = offerTools && native
+            val pass = streamOnce(messages, sampling, active, rendered, listener) { lastRaw = it }
                 ?: return lastRaw
 
             // A cancelled or truncated pass ends the turn here, whatever it left behind.
@@ -174,9 +179,7 @@ class TurnRunner @Inject constructor(
             // about what it cannot do. Ungated, that remark reached the network. On the
             // pass after the round limit it was merely noise, a step the user never asked
             // for reported as stopped after two rounds.
-            val salvaged =
-                if (offerTools) pass.raw.salvagedCall(active, conversation) else emptyList()
-            val calls = pass.event.toolCalls.ifEmpty { salvaged }
+            val calls = pass.asked(active, conversation, offerTools, native)
             if (calls.isEmpty()) {
                 // Call-shaped text that neither parser could read. For a model this size
                 // that is the common case rather than the exceptional one, and the usual
@@ -296,6 +299,56 @@ class TurnRunner @Inject constructor(
             }
         }
         return completed?.let { Pass(reply.toString(), it) }
+    }
+}
+
+/**
+ * How many rounds a turn gets, which depends on whether its tools are steps or errands.
+ *
+ * Two is search then answer. Find, read, write is three before a word reaches anybody, so a
+ * turn holding a tool that chains gets four and no more.
+ */
+private fun ToolRegistry.roundLimit(): Int =
+    if (all.any { it.chains }) AgentRunner.CHAINED_MAX_ROUNDS else AgentRunner.DEFAULT_MAX_ROUNDS
+
+/**
+ * What a pass asked for, from whichever of the three ways it had of asking.
+ *
+ * In order, because they are not equally trustworthy. The template's own parse is what the
+ * model was built to produce. The prompted object is what a model whose template drops tools
+ * was asked for instead, and is still a definite shape rather than a guess. Prose salvage is
+ * the guess, and it goes last.
+ */
+private fun TurnRunner.Pass.asked(
+    active: ToolRegistry,
+    conversation: List<ChatMessage>,
+    offerTools: Boolean,
+    native: Boolean,
+): List<ToolCall> {
+    if (!offerTools) return event.toolCalls
+
+    val prompted = if (native) emptyList() else listOfNotNull(ToolPrompting.parse(raw, active))
+    return event.toolCalls
+        .ifEmpty { prompted }
+        .ifEmpty { raw.salvagedCall(active, conversation) }
+}
+
+/**
+ * The conversation with the tools written into its system message.
+ *
+ * For a template that drops tool definitions, this is the only place they can go. Added once
+ * for the whole turn rather than per pass, which also keeps the rendered prefix identical
+ * between passes: the engine reuses its cache by comparing tokens until two differ, and
+ * moving this text about would throw that away on every round.
+ */
+private fun List<ChatMessage>.describing(tools: ToolRegistry, needed: Boolean): List<ChatMessage> {
+    val described = if (needed) ToolPrompting.describe(tools.definitions) else ""
+    if (described.isEmpty()) return this
+
+    val index = indexOfFirst { it.role == ChatRole.SYSTEM }
+    if (index < 0) return listOf(ChatMessage.text(ChatRole.SYSTEM, described)) + this
+    return toMutableList().apply {
+        set(index, ChatMessage.text(ChatRole.SYSTEM, "${this[index].text}\n\n$described"))
     }
 }
 

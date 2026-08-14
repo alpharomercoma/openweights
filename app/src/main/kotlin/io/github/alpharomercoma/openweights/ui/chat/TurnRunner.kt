@@ -134,68 +134,112 @@ class TurnRunner @Inject constructor(
         // are dropped, the model answers in prose, and the app stops being an agent without
         // anything looking wrong. Those get the definitions in the conversation instead.
         val native = engine.loadedModel?.supportsTools == true
-        var messages = conversation.describing(active, needed = withTools && !native)
-        var round = 0
-        var lastRaw = ""
-        // Spent at most once a turn. Re-asking a model that cannot produce the syntax is
-        // how a phone spends a minute arriving nowhere.
-        var repaired = false
 
-        while (true) {
-            // Tools are offered from the first pass, which was tried the other way and was
-            // worse. Withholding them was meant to stop a small model searching for things
-            // it already knew, with a plain-text line it could write instead when it did not
-            // know. Measured against LFM2.5 the line was never written once: asked who a
-            // stranger was, the model emitted its own trained call syntax naming a tool that
-            // does not exist here, so the turn ended with two unrunnable calls and the user
-            // got no answer at all.
-            //
-            // The same measurement showed the decision itself was never the problem. Asked
-            // to compare two characters it reasoned that it knew them and answered; asked
-            // about a stranger or this year's phone it went to look. What it needs is not to
-            // be talked out of searching, it is the real tool present so that when it does
-            // decide to search it calls something that exists.
-            val offerTools = withTools &&
-                round < maxRounds &&
-                ToolBudget(headroomTokens()).hasRoom
-            val sampling = params.deciding(offerTools)
-            // Only a template that can carry them gets them here. The rest were given the
-            // same tools in the system message before the first pass.
-            val rendered = offerTools && native
-            val pass = streamOnce(messages, sampling, active, rendered, listener) { lastRaw = it }
-                ?: return lastRaw
+        return Turn(active, agent, maxRounds, withTools, native, conversation)
+            .run(params, mode, listener)
+    }
 
-            // A cancelled or truncated pass ends the turn here, whatever it left behind.
-            // The engine hands its reply back regardless of why it stopped, so half a tool
-            // call written before Stop was pressed still parses into a call, and running it
-            // means the turn the user ended goes on to fetch a page. Cancelling the
-            // coroutine usually gets there first; usually is not a guarantee.
-            if (pass.event.reason != StopReason.END_OF_TURN) return lastRaw
+    /**
+     * The passes of one turn, and the state that only means anything inside one.
+     *
+     * A type rather than a longer function because there are three ways to go round again,
+     * each carrying something the next pass reads: a repair, a withdrawal, or another round
+     * of tools. Written as one loop it reached twenty branches and three static checks said
+     * so on the same line.
+     */
+    private inner class Turn(
+        private val active: ToolRegistry,
+        private val agent: AgentRunner,
+        private val maxRounds: Int,
+        private val withTools: Boolean,
+        private val native: Boolean,
+        private val conversation: List<ChatMessage>,
+    ) {
+        /**
+         * Whether the engine is handed the schemas, decided once for the whole turn.
+         *
+         * That it is decided once is the point. The engine reuses its cache by comparing
+         * tokens until two differ, and the templates these models ship put the tool block
+         * near the front: Qwen inside the first system turn, LFM2 above it. Taking the
+         * definitions away on the last pass moves the first difference to the top of the
+         * prompt and re-reads everything behind it, measured at 257 tokens of a 578 token
+         * turn and growing with the conversation.
+         *
+         * So the definitions stay and the round limit is said in words instead. Only a model
+         * that asks anyway pays the old price, once, in [withdraw].
+         */
+        private var renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
 
-            // Salvage only where a call was invited. It reads a tool's name out of ordinary
-            // prose, which is sound when the model was shown that tool and got the syntax
-            // wrong, and is not sound otherwise: a model whose template cannot render tools
-            // has never been offered one, so "I could use web_search for that" is a remark
-            // about what it cannot do. Ungated, that remark reached the network. On the
-            // pass after the round limit it was merely noise, a step the user never asked
-            // for reported as stopped after two rounds.
-            val calls = pass.asked(active, conversation, offerTools, native)
-            if (calls.isEmpty()) {
-                // Call-shaped text that neither parser could read. For a model this size
-                // that is the common case rather than the exceptional one, and the usual
-                // mistake is inventing a tool that does not exist, so it is handed back the
-                // names that do. One round trip, and it does not count against the tool
-                // budget, because nothing was run and nothing was read.
-                if (offerTools && !repaired && pass.raw.containsToolMarkup()) {
-                    repaired = true
-                    messages = messages +
-                        ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
-                        ChatMessage.text(ChatRole.USER, repairRequest(active))
-                    listener.onNextPass()
-                    continue
+        private var messages = conversation.describing(active, needed = withTools && !native)
+        private var round = 0
+        private var lastRaw = ""
+
+        /**
+         * Spent at most once a turn. Re-asking a model that cannot produce the syntax is how
+         * a phone spends a minute arriving nowhere.
+         */
+        private var repaired = false
+
+        /** The withdrawal, kept as the exception it should always have been. */
+        private var withdrawn = false
+
+        suspend fun run(params: SamplerParams, mode: AgentMode, listener: TurnListener): String {
+            while (true) {
+                // Tools are offered from the first pass, which was tried the other way and
+                // was worse. Withholding them was meant to stop a small model searching for
+                // things it already knew, with a plain-text line it could write instead when
+                // it did not know. Measured against LFM2.5 the line was never written once:
+                // asked who a stranger was, the model emitted its own trained call syntax
+                // naming a tool that does not exist here, so the turn ended with two
+                // unrunnable calls and the user got no answer at all.
+                //
+                // Whether a call made now would run is a different question from whether the
+                // model can see the tools, and sampling follows this one: choosing among
+                // tools is an argmax, and a pass that can only write prose keeps whatever
+                // temperature the user set.
+                val mayCall =
+                    withTools && round < maxRounds && ToolBudget(headroomTokens()).hasRoom
+                val pass = streamOnce(
+                    messages,
+                    params.deciding(mayCall),
+                    active,
+                    renderTools,
+                    listener,
+                ) { lastRaw = it } ?: return lastRaw
+
+                // A cancelled or truncated pass ends the turn here, whatever it left behind.
+                // The engine hands its reply back regardless of why it stopped, so half a
+                // tool call written before Stop was pressed still parses into a call, and
+                // running it means the turn the user ended goes on to fetch a page.
+                // Cancelling the coroutine usually gets there first; usually is not a
+                // guarantee.
+                if (pass.event.reason != StopReason.END_OF_TURN) return lastRaw
+
+                // Salvage only where a call was invited. It reads a tool's name out of
+                // ordinary prose, which is sound when the model was shown that tool and got
+                // the syntax wrong, and is not sound otherwise: a model whose template
+                // cannot render tools has never been offered one, so "I could use web_search
+                // for that" is a remark about what it cannot do. Ungated, that remark
+                // reached the network.
+                val calls = pass.asked(active, conversation, withTools, native)
+                val again = if (mayCall) {
+                    advance(pass, calls, mode, listener)
+                } else {
+                    withdraw(pass, calls, listener)
                 }
-                return lastRaw
+                if (!again) return lastRaw
+                listener.onNextPass()
             }
+        }
+
+        /** A pass whose calls can still run: run them, or spend the one repair. */
+        private suspend fun advance(
+            pass: Pass,
+            calls: List<ToolCall>,
+            mode: AgentMode,
+            listener: TurnListener,
+        ): Boolean {
+            if (calls.isEmpty()) return repair(pass)
 
             // Said first, then the steps, so the transcript reads in the order it happened.
             // The parser's content, not the raw stream: raw still carries the call itself,
@@ -206,22 +250,63 @@ class TurnRunner @Inject constructor(
             val decision = agent.step(calls, round, mode, listener::onApproval)
             listener.onSteps(decision.steps())
 
-            // Sized here rather than once for the whole turn, and after the pass rather
-            // than before it, so what the model has just written is already counted.
+            // Sized here rather than once for the whole turn, and after the pass rather than
+            // before it, so what the model has just written is already counted.
             val budget = ToolBudget(headroomTokens())
             val results = (decision as? AgentDecision.Continue)?.messages.orEmpty()
                 .map(budget::fit)
-            if (results.isEmpty()) return lastRaw
+                // Said in the last thing the model reads, because that is the only place a
+                // per-pass sentence can go without rewriting the front of the prompt. It
+                // replaces taking the definitions away, which said the same thing by
+                // removing four hundred tokens from the top of it.
+                .let { if (round + 1 >= maxRounds) it.closing(maxRounds) else it }
+            if (results.isEmpty()) return false
 
             // The assistant turn that asked goes back too, or the model is handed results
             // for a question it cannot see itself having asked. Its thinking does not:
             // reasoning is scratch work, and replaying it as an assistant turn hands the
             // model a literal <think> block inside its own history, which for a template
             // that opens one itself is nonsense it then tries to continue.
-            val asked = ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning())
-            messages = messages + asked + results
+            messages = messages +
+                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                results
             round++
-            listener.onNextPass()
+            return true
+        }
+
+        /**
+         * Call-shaped text that neither parser could read.
+         *
+         * For a model this size that is the common case rather than the exceptional one, and
+         * the usual mistake is inventing a tool that does not exist, so it is handed back the
+         * names that do. One round trip, and it does not count against the tool budget,
+         * because nothing was run and nothing was read.
+         */
+        private fun repair(pass: Pass): Boolean {
+            if (repaired || !pass.raw.containsToolMarkup()) return false
+            repaired = true
+            messages = messages +
+                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                ChatMessage.text(ChatRole.USER, repairRequest(active))
+            return true
+        }
+
+        /**
+         * The budget is spent, and the model asked anyway.
+         *
+         * It is still holding its tools, so it needs one pass without them or the turn ends
+         * on "let me look that up" and the user gets no reply. This is the withdrawal the
+         * loop used to perform on every turn, reached now only by a model that earns it.
+         */
+        private fun withdraw(pass: Pass, calls: List<ToolCall>, listener: TurnListener): Boolean {
+            if (calls.isEmpty() || withdrawn) return false
+            withdrawn = true
+            renderTools = false
+            listener.onSteps(calls.map { AgentStep.Skipped(it, spent(maxRounds)) })
+            messages = messages +
+                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                calls.map { ChatMessage.toolResult(it.id, spent(maxRounds)) }
+            return true
         }
     }
 
@@ -256,6 +341,17 @@ class TurnRunner @Inject constructor(
         "That did not read as a tool call. The tools available are " +
             active.definitions.joinToString { it.name } +
             ". Call one of those, or answer without a tool."
+
+    /**
+     * What the model is told once its rounds are gone.
+     *
+     * Phrased as a fact about the budget and then an instruction, because a small model does
+     * better with the reason attached: told only to stop it stops mid-sentence, and told only
+     * to answer it looks for another tool first.
+     */
+    private fun spent(maxRounds: Int): String =
+        "That was the last of $maxRounds rounds, so there are no more tool calls. " +
+            "Answer the question now from what you already have."
 
     @Suppress("LongParameterList")
     private suspend fun streamOnce(
@@ -322,10 +418,10 @@ private fun ToolRegistry.roundLimit(): Int =
 private fun TurnRunner.Pass.asked(
     active: ToolRegistry,
     conversation: List<ChatMessage>,
-    offerTools: Boolean,
+    offered: Boolean,
     native: Boolean,
 ): List<ToolCall> {
-    if (!offerTools) return event.toolCalls
+    if (!offered) return emptyList()
 
     val prompted = if (native) emptyList() else listOfNotNull(ToolPrompting.parse(raw, active))
     return event.toolCalls
@@ -414,6 +510,21 @@ internal fun String.salvagedCall(
         .filterNot { it.alwaysAsk }
         .mapNotNull { it.callFor(question) }
     return listOfNotNull(salvageable.singleOrNull())
+}
+
+/**
+ * The same results, with the last one carrying word that the tools are finished.
+ *
+ * Appended to a message that was going in anyway rather than sent as a turn of its own: a
+ * user turn after a tool result is a shape several templates refuse to render, and a system
+ * turn in the middle is worse. The tail of the last tool result is the one place a sentence
+ * can be added without moving anything the cache has already read.
+ */
+private fun List<ChatMessage>.closing(maxRounds: Int): List<ChatMessage> {
+    val last = lastOrNull() ?: return this
+    val told = "${last.text}\n\nThat was the last of $maxRounds rounds, so there are no " +
+        "more tool calls. Answer the question now from what you already have."
+    return dropLast(1) + ChatMessage.text(ChatRole.TOOL, told).copy(toolCallId = last.toolCallId)
 }
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */

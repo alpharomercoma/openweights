@@ -152,10 +152,7 @@ class TurnRunnerTest {
     }
 
     @Test
-    fun `the last pass is made to answer rather than asked for more tools`() = runBlocking {
-        // A model that would keep searching forever, to prove the loop stops it. Each search
-        // is for something new, or it would never reach the round limit: the same call twice
-        // is answered from the first run, which is a different rule with its own test.
+    fun `the last round tells the model there will be no more tools`() = runBlocking {
         repeat(PLENTY) { round ->
             val call = ToolCall(
                 id = "$round",
@@ -167,12 +164,53 @@ class TurnRunnerTest {
 
         run(withTools = true)
 
-        // Two rounds of tools and then one pass with none, so the model has to answer from
-        // what it collected. Offering them again would leave the user with tool syntax and
-        // no reply.
+        // Said in the last thing the model reads rather than by taking the tools away, which
+        // is the whole point: a sentence at the tail costs fifteen tokens and leaves the
+        // prefix alone, where withdrawing the definitions rewrites the front of the prompt.
+        val lastResult = engine.prompts.last().last { it.role == ChatRole.TOOL }
+        assertThat(lastResult.text).contains("no more tool")
+    }
+
+    @Test
+    fun `a model that asks anyway gets one pass with nothing to ask for`() = runBlocking {
+        // The risk the old design avoided by always withdrawing: a model still holding its
+        // tools writes "let me search" instead of an answer, and the turn ends on that. So
+        // the withdrawal still exists, it is just the exception rather than the rule, and it
+        // costs a re-prefill only when a model earns it.
+        repeat(PLENTY) { round ->
+            val call = ToolCall(
+                id = "$round",
+                name = "web_search",
+                argumentsJson = """{"query":"x$round"}""",
+            )
+            engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        }
+
+        run(withTools = true)
+
         assertThat(search.calls).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS)
-        assertThat(engine.offered).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS + 1)
+        // Two rounds of tools, the pass that was told to stop, and the forced one with none.
+        assertThat(engine.offered).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS + 2)
         assertThat(engine.offered.last()).isEmpty()
+    }
+
+    @Test
+    fun `a model that answers when told to is not made to run again`() = runBlocking {
+        val call = ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}""")
+        repeat(AgentRunner.DEFAULT_MAX_ROUNDS) { round ->
+            engine.scripted += ScriptedPass(
+                "Looking.",
+                toolCalls = listOf(call.copy(id = "$round", argumentsJson = """{"q":"$round"}""")),
+            )
+        }
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        run(withTools = true)
+
+        // The common case, and the one the saving is for: no extra pass, and the schemas were
+        // never taken away, so nothing before the last tool result had to be read again.
+        assertThat(engine.offered).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS + 1)
+        assertThat(engine.offered.last()).isNotEmpty()
     }
 
     @Test

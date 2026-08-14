@@ -78,6 +78,25 @@ interface Tool {
     val chains: Boolean get() = false
 
     /**
+     * Whether what this tool returns is text somebody else wrote.
+     *
+     * A page or a file is not an instruction, but a model this size does not reliably know
+     * that: text arriving as a tool result carries the same weight as the system prompt, and
+     * a small model is very good at continuing a pattern it has just been shown. A file
+     * holding a literal tool call does not need to be understood to be repeated.
+     */
+    val returnsUntrustedText: Boolean get() = false
+
+    /**
+     * Whether running this sends what it is given to somebody else.
+     *
+     * The pair of these two is the whole rule: reading untrusted text is safe, sending
+     * things off the device is safe, and doing the second after the first is the one
+     * combination that can carry a private file to a stranger without anybody asking.
+     */
+    val leavesTheDevice: Boolean get() = false
+
+    /**
      * Runs the call and returns what the model should be told.
      *
      * Failures come back as text rather than exceptions, because a model that is told

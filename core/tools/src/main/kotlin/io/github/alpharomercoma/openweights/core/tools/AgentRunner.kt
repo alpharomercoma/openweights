@@ -73,6 +73,16 @@ class AgentRunner(
     private val registry: ToolRegistry,
     private val maxRounds: Int = DEFAULT_MAX_ROUNDS,
 ) {
+    /**
+     * Whether text somebody else wrote has reached the model during this turn.
+     *
+     * State on the instance, and the instance is one turn: [TurnRunner] builds a runner per
+     * turn, so this resets when the turn does. That is the right scope. A file read an hour
+     * ago is not in the window any more, and holding the suspicion across a whole
+     * conversation would ask about every search anyone ever made afterwards.
+     */
+    private var readUntrustedText = false
+
     suspend fun step(
         calls: List<ToolCall>,
         round: Int,
@@ -120,7 +130,12 @@ class AgentRunner(
                     "Available: ${registry.definitions.joinToString { it.name }}.",
             )
 
-        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk
+        // Auto is about removing pointless taps. A tool that would carry off the device text
+        // that something else wrote is not a pointless tap, and until a file has actually
+        // been read there is nothing for it to carry, so the question only ever arises on
+        // the one boundary where it means something.
+        val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
+        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk && !carriesSomebodyElsesText
         val allowed = autoAllows || !tool.needsApproval || approve(call)
         if (!allowed) {
             return AgentStep.Skipped(call, "The user declined to run ${call.name}.")
@@ -141,6 +156,9 @@ class AgentRunner(
         } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
             "${call.name} failed: ${failure.message ?: "unknown error"}"
         }
+        // Set after the run rather than before it, so a tool that failed to read anything
+        // does not spend the turn's freedom on text that never arrived.
+        if (tool.returnsUntrustedText) readUntrustedText = true
         return AgentStep.Ran(call, result, now() - startedAt)
     }
 

@@ -110,6 +110,15 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
 
     override val chains: Boolean = true
 
+    /**
+     * The one tool here that hands the model a stranger's words.
+     *
+     * search_files reports paths and never contents, and write_file only carries text the
+     * model already had, so this is the single point where something written by somebody
+     * else enters the turn.
+     */
+    override val returnsUntrustedText: Boolean = true
+
     override suspend fun run(call: ToolCall): String =
         workspace.unavailable().ifEmpty { read(call) }
 

@@ -83,4 +83,12 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
 }
 
 /** Enough to read a query or a URL, not enough for a page of JSON to take the screen. */
-private const val ARGUMENT_LINES = 4
+/**
+ * Enough lines to show the whole of anything that would leave the device.
+ *
+ * Four cut a long argument off with an ellipsis, which is tolerable for a file being saved
+ * on the device and not tolerable for a search query: the reason that card is being shown at
+ * all can be the passage hidden behind the dots. A search is capped at a hundred and twenty
+ * characters, so twelve lines shows all of one with room to spare.
+ */
+private const val ARGUMENT_LINES = 12

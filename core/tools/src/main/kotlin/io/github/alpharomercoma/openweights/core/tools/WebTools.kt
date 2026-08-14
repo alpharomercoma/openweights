@@ -102,9 +102,15 @@ class WebSearchTool @Inject constructor(
         """.trimIndent(),
     )
 
+    override val leavesTheDevice: Boolean = true
+
     override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
         val query = call.argument("query", "q", "search", "input", "topic")
             ?: return@withContext "No query was given. Call web_search again with a query."
+        if (query.length > MAX_QUERY_CHARS) {
+            return@withContext "That is too long to search for. Search for a few words " +
+                "rather than a passage."
+        }
 
         val providers = settings.providers(httpClient)
         // Each in turn until one answers. A provider returns null when it could not answer
@@ -141,6 +147,16 @@ class WebSearchTool @Inject constructor(
     }
 
     internal companion object {
+        /**
+         * Longer than any question and shorter than a document.
+         *
+         * A search box takes a few words. Anything approaching a paragraph is either a model
+         * that has misunderstood the tool or a passage out of a file on its way to a
+         * stranger, and neither is worth sending. It is a bound on the damage rather than a
+         * defence: a short secret still fits, which is why it is not the only control here.
+         */
+        const val MAX_QUERY_CHARS = 120
+
         /** Three results is enough to answer from and small enough for a phone's context. */
         const val MAX_RESULTS = 3
 
@@ -169,6 +185,8 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
      * taps, not the only check on an open primitive.
      */
     override val alwaysAsk: Boolean = true
+
+    override val leavesTheDevice: Boolean = true
 
     override val definition = ToolDefinition(
         name = "fetch_url",

@@ -188,11 +188,13 @@ class AgentRunner(
         // it like anything else, which turned Stop pressed during a slow request into a
         // tool failure the agent then carried on from: the turn kept going after the user
         // had ended it.
+        var failed = false
         val result = try {
             tool.run(call)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+            failed = true
             "${call.name} failed: ${failure.message ?: "unknown error"}"
         }
         // Set after the run rather than before it, so a tool that failed to read anything
@@ -201,8 +203,14 @@ class AgentRunner(
         // Pointed at rather than repeated. The result is already in the conversation as a
         // tool message, so sending it a second time would spend the context twice over to
         // tell the model something it can see.
-        settled[call.settledKey()] = "Already run this turn with these same arguments. " +
-            "Its result is above; answer from that rather than calling it again."
+        //
+        // Only a call that got somewhere is settled. A socket that went away is the one case
+        // where asking again for exactly the same thing is the right move, and a breaker that
+        // caught it would turn a blip into the end of the turn.
+        if (!failed) {
+            settled[call.settledKey()] = "Already run this turn with these same arguments. " +
+                "Its result is above; answer from that rather than calling it again."
+        }
         return AgentStep.Ran(call, result, now() - startedAt)
     }
 

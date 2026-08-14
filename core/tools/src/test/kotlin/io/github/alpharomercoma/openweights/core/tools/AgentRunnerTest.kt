@@ -402,6 +402,35 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun `a call that failed can be made again`() = runTest {
+        // The exception to the rule, and the reason the rule is about calls that got
+        // somewhere. A socket that went away is exactly the case where asking again for the
+        // same thing is right, and a breaker that caught it would turn a blip into the end of
+        // the turn.
+        var attempts = 0
+        val flaky = object : Tool {
+            override val definition = ToolDefinition("flaky", "Fails once", "{}")
+            override suspend fun run(call: ToolCall): String {
+                attempts++
+                if (attempts == 1) error("the socket went away")
+                return "worked"
+            }
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(flaky)))
+
+        runner.step(listOf(call("flaky")), round = 0, mode = AgentMode.AUTO, approve = { true })
+        val again = runner.step(
+            listOf(call("flaky", id = "c2")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        assertThat(attempts).isEqualTo(2)
+        assertThat((again as AgentDecision.Continue).messages.single().text).isEqualTo("worked")
+    }
+
+    @Test
     fun `a different call to the same tool still runs`() = runTest {
         // The property the rule must not break. Searching for something else is a new call,
         // and a breaker that fired on the tool's name would end the turn's usefulness at one

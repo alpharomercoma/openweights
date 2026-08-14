@@ -23,8 +23,39 @@ import android.provider.DocumentsContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.Reader
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Fills as much of [buffer] as the stream will part with.
+ *
+ * One read rarely returns everything asked for, and a single call would quietly return a
+ * fraction of the window and look like a short file.
+ */
+/**
+ * What to tell the provider a new file is, worked out from its name.
+ *
+ * A guess, and a deliberately dull one. Providers use this to decide the icon and sometimes
+ * whether to accept the file at all, and plain text is the reading least likely to be
+ * refused by any of them.
+ */
+private fun mediaTypeFor(name: String): String = when (name.substringAfterLast('.', "")) {
+    "json" -> "application/json"
+    "csv" -> "text/csv"
+    "html", "htm" -> "text/html"
+    else -> "text/plain"
+}
+
+private fun Reader.readAsMuchAs(buffer: CharArray): Int {
+    var filled = 0
+    while (filled < buffer.size) {
+        val read = read(buffer, filled, buffer.size - filled)
+        if (read < 0) break
+        filled += read
+    }
+    return filled
+}
 
 /** Something found in the shared folder, named the way the model was taught to name it. */
 data class Entry(
@@ -149,6 +180,73 @@ class Workspace @Inject constructor(
                 )
             }.getOrNull()
         }
+
+    /**
+     * Reads a window of a document without pulling the rest of it into memory.
+     *
+     * Bounded while the bytes are still arriving, rather than read whole and then trimmed.
+     * The trimming version is what the attachment path does, and it is safe there because
+     * the file came out of a picker a person tapped. Here the name came from a model, and
+     * the folder it names can hold a two gigabyte video.
+     */
+    suspend fun readText(entry: Entry, skip: Int, take: Int): String? =
+        withContext(Dispatchers.IO) {
+            val uri = uriFor(entry) ?: return@withContext null
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.reader().use { reader ->
+                        reader.skip(skip.toLong())
+                        val buffer = CharArray(take)
+                        val read = reader.readAsMuchAs(buffer)
+                        String(buffer, 0, read)
+                    }
+                }
+            }.getOrNull()
+        }
+
+    /**
+     * Saves text to a path that has nothing at it yet, and says what happened in a sentence.
+     *
+     * Phrased here rather than in the tool because every way this can fail is a fact about
+     * the folder, and the tool would only be translating them back. Refusing a path that
+     * already exists is the load-bearing line: without it a model that read half a long file
+     * would write that half back over the whole, and report success for having done it.
+     */
+    suspend fun put(path: String, text: String): String {
+        val segments = path.workspaceSegments()
+            ?: return "$path is not a path inside the shared folder. Try one like notes/todo.md."
+        if (resolve(path) != null) {
+            return "$path already exists, and this tool does not replace files. " +
+                "Choose a name that is not taken."
+        }
+        val parentPath = segments.dropLast(1).joinToString("/")
+        val parent = if (parentPath.isEmpty()) {
+            null
+        } else {
+            resolve(parentPath) ?: return "There is no folder called $parentPath to save into."
+        }
+        return putInto(parent, segments.last(), text, path)
+    }
+
+    private suspend fun putInto(parent: Entry?, name: String, text: String, path: String): String {
+        val uri = create(parent, name, mediaTypeFor(name))
+            ?: return "$path could not be created. The folder may not accept new files."
+        return if (write(uri, text)) {
+            "Saved ${text.length} characters to $path."
+        } else {
+            "$path was created but nothing could be written into it."
+        }
+    }
+
+    /** Puts text into a document that was just created, and says whether all of it landed. */
+    suspend fun write(uri: Uri, text: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.writer().use { it.write(text) }
+                true
+            } ?: false
+        }.getOrDefault(false)
+    }
 
     private fun Cursor.entries(under: String): List<Entry> {
         val out = mutableListOf<Entry>()

@@ -159,5 +159,15 @@ class AgentRunner(
          * one is, and a small ceiling forces the question.
          */
         const val DEFAULT_MAX_ROUNDS = 2
+
+        /**
+         * The ceiling for a turn whose tools are steps rather than errands.
+         *
+         * Find the file, read it, write it: three rounds before a word reaches the user, so
+         * two refuses the one that saves the work. Four leaves a single round of slack for
+         * the model to look twice, and no more, because the argument above still holds and
+         * every extra round re-reads a prompt that has grown.
+         */
+        const val CHAINED_MAX_ROUNDS = 4
     }
 }

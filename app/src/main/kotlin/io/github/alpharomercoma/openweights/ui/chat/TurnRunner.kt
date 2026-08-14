@@ -112,7 +112,17 @@ class TurnRunner @Inject constructor(
         // Settings between one turn and the next.
         val offered = tools.all.filter { it.isAvailable }.map { it.definition.name }
         val active = tools.enabled(switches.enabled(offered))
-        val agent = AgentRunner(active)
+
+        // Two rounds is search then answer, which is the whole shape of a turn that looks
+        // something up. A turn that works with files is a different shape: find it, read it,
+        // write it, which is three before the model has said anything. At two the last of
+        // those is refused and the work is thrown away on the step that mattered.
+        val maxRounds = if (active.all.any { it.chains }) {
+            AgentRunner.CHAINED_MAX_ROUNDS
+        } else {
+            AgentRunner.DEFAULT_MAX_ROUNDS
+        }
+        val agent = AgentRunner(active, maxRounds)
 
         // Said once per turn, because "why did it not search" has three possible answers
         // and the per-pass line only ever showed the conclusion. withTools is the template
@@ -144,7 +154,7 @@ class TurnRunner @Inject constructor(
             // be talked out of searching, it is the real tool present so that when it does
             // decide to search it calls something that exists.
             val offerTools = withTools &&
-                round < AgentRunner.DEFAULT_MAX_ROUNDS &&
+                round < maxRounds &&
                 ToolBudget(headroomTokens()).hasRoom
             val pass = streamOnce(messages, params, active, offerTools, listener) { lastRaw = it }
                 ?: return lastRaw

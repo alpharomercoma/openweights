@@ -21,8 +21,11 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
+import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
+import io.github.alpharomercoma.openweights.core.tools.WriteFileTool
 import javax.inject.Singleton
 
 @Module
@@ -32,10 +35,17 @@ object ToolsModule {
      * Every tool the app knows how to run.
      *
      * Search then read, in that order, because that is the order a model uses them and the
-     * order they are listed in is the order they appear to it.
+     * order they are listed in is the order they appear to it. The file tools follow the
+     * same shape and come after, and they describe themselves to the model only once a
+     * folder has been shared, so an install that never shares one carries none of them.
      */
     @Provides
     @Singleton
-    fun registry(search: WebSearchTool, fetch: FetchUrlTool): ToolRegistry =
-        ToolRegistry(listOf(search, fetch))
+    fun registry(
+        search: WebSearchTool,
+        fetch: FetchUrlTool,
+        searchFiles: SearchFilesTool,
+        readFile: ReadFileTool,
+        writeFile: WriteFileTool,
+    ): ToolRegistry = ToolRegistry(listOf(search, fetch, searchFiles, readFile, writeFile))
 }

@@ -26,10 +26,19 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
  * both on one object means a tool cannot be advertised without being runnable, which is
  * the state the app was in before: tools were described to nobody and executed never.
  *
- * Every tool here reaches the network or reads something already on the device. None of
- * them execute code, write files outside the app, or touch anything a user would be
- * surprised by. That is a deliberate ceiling, not a temporary one: an app that runs
- * arbitrary code on a phone at a model's suggestion is a different and much worse product.
+ * Every tool here reaches the network, reads something already on the device, or works
+ * inside one folder the user picked and handed over. None of them execute code, and none
+ * reach anything that was not granted. That part is a deliberate ceiling and not a temporary
+ * one: an app that runs arbitrary code on a phone at a model's suggestion is a different and
+ * much worse product.
+ *
+ * The line moved once, deliberately. It used to read "none of them write files outside the
+ * app", which was true of every tool there was until the file tools arrived. What holds the
+ * new position is not a promise but a shape: the folder is chosen in the system's own
+ * picker, the grant is revocable from Settings without uninstalling anything, the app asks
+ * for no storage permission at all, and writing can only create a file that is not there
+ * yet. Nothing here can replace or delete what somebody already had. Moving the line again
+ * deserves the same argument set down in the same place.
  */
 interface Tool {
     val definition: ToolDefinition
@@ -57,6 +66,16 @@ interface Tool {
      * harder as the list grows, so an unusable entry makes the usable ones worse.
      */
     val isAvailable: Boolean get() = true
+
+    /**
+     * Whether this tool is usually one step of several rather than the whole errand.
+     *
+     * Looking something up is one round and an answer. Working with a file is find it, read
+     * it, write it, which is three rounds before the model has said anything to anybody, and
+     * a limit set for the first shape refuses the last step of the second one: the round
+     * where the work was going to be saved is the round that gets thrown away.
+     */
+    val chains: Boolean get() = false
 
     /**
      * Runs the call and returns what the model should be told.

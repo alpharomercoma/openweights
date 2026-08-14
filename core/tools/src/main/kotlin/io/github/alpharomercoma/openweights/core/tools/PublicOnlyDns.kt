@@ -37,7 +37,7 @@ import java.net.UnknownHostException
  */
 class PublicOnlyDns(private val delegate: Dns = Dns.SYSTEM) : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
-        val public = delegate.lookup(hostname).filter { it.isPublic() }
+        val public = delegate.lookup(hostname).filter { it.isPublicAddress() }
         if (public.isEmpty()) {
             // The same exception a name that does not exist raises, so the caller's existing
             // "that page could not be read" covers it without a second failure path.
@@ -45,44 +45,60 @@ class PublicOnlyDns(private val delegate: Dns = Dns.SYSTEM) : Dns {
         }
         return public
     }
-
-    private fun InetAddress.isPublic(): Boolean = !isAnyLocalAddress &&
-        !isLoopbackAddress &&
-        !isLinkLocalAddress &&
-        // 10/8, 172.16/12 and 192.168/16, and fec0::/10 for the version of IPv6 that had it.
-        !isSiteLocalAddress &&
-        !isMulticastAddress &&
-        !isUniqueLocalIpv6() &&
-        !isCarrierGradeNat()
-
-    /** fc00::/7, IPv6's private range, which the JDK has no predicate for. */
-    private fun InetAddress.isUniqueLocalIpv6(): Boolean =
-        this is Inet6Address && (address[0].toInt() and UNIQUE_LOCAL_MASK) == UNIQUE_LOCAL_PREFIX
-
-    /**
-     * 100.64/10, which a phone on a mobile network sits inside.
-     *
-     * Not private in the RFC1918 sense, but it is the carrier's network rather than the
-     * internet, and the other subscribers on it are no more ours to reach than a neighbour's
-     * router is.
-     */
-    private fun InetAddress.isCarrierGradeNat(): Boolean {
-        val bytes = address
-        return bytes.size == IPV4_BYTES &&
-            (bytes[0].toInt() and OCTET) == CGNAT_FIRST_OCTET &&
-            (bytes[1].toInt() and OCTET) in CGNAT_SECOND_OCTETS
-    }
-
-    private companion object {
-        /** A byte, read back out of a signed Byte. */
-        const val OCTET = 0xFF
-
-        /** The seven bits fc00::/7 fixes, and the value they are fixed to. */
-        const val UNIQUE_LOCAL_MASK = 0xFE
-        const val UNIQUE_LOCAL_PREFIX = 0xFC
-
-        const val IPV4_BYTES = 4
-        const val CGNAT_FIRST_OCTET = 100
-        val CGNAT_SECOND_OCTETS = 64..127
-    }
 }
+
+/**
+ * The address of a host written as digits rather than as a name, when it is one.
+ *
+ * A resolver only ever sees names. An address given as a literal goes straight to a socket,
+ * so [PublicOnlyDns] is never asked about it and cannot refuse it, which left the whole
+ * private network reachable through an address the model composed. Callers that take an
+ * address from a model have to check the literal themselves.
+ *
+ * Only numeric hosts are inspected, so nothing here can trigger a lookup: a name is returned
+ * as null and left to the resolver.
+ */
+internal fun String.ipLiteralOrNull(): InetAddress? {
+    val numeric = isNotEmpty() && (all { it.isDigit() || it == '.' } || contains(':'))
+    if (!numeric) return null
+    return runCatching { InetAddress.getByName(this) }.getOrNull()
+}
+
+/** True when this address is somewhere on the public internet. */
+internal fun InetAddress.isPublicAddress(): Boolean = !isAnyLocalAddress &&
+    !isLoopbackAddress &&
+    !isLinkLocalAddress &&
+    // 10/8, 172.16/12 and 192.168/16, and fec0::/10 for the version of IPv6 that had it.
+    !isSiteLocalAddress &&
+    !isMulticastAddress &&
+    !isUniqueLocalIpv6() &&
+    !isCarrierGradeNat()
+
+/** fc00::/7, IPv6's private range, which the JDK has no predicate for. */
+private fun InetAddress.isUniqueLocalIpv6(): Boolean =
+    this is Inet6Address && (address[0].toInt() and UNIQUE_LOCAL_MASK) == UNIQUE_LOCAL_PREFIX
+
+/**
+ * 100.64/10, which a phone on a mobile network sits inside.
+ *
+ * Not private in the RFC1918 sense, but it is the carrier's network rather than the
+ * internet, and the other subscribers on it are no more ours to reach than a neighbour's
+ * router is.
+ */
+private fun InetAddress.isCarrierGradeNat(): Boolean {
+    val bytes = address
+    return bytes.size == IPV4_BYTES &&
+        (bytes[0].toInt() and OCTET) == CGNAT_FIRST_OCTET &&
+        (bytes[1].toInt() and OCTET) in CGNAT_SECOND_OCTETS
+}
+
+/** A byte, read back out of a signed Byte. */
+private const val OCTET = 0xFF
+
+/** The seven bits fc00::/7 fixes, and the value they are fixed to. */
+private const val UNIQUE_LOCAL_MASK = 0xFE
+private const val UNIQUE_LOCAL_PREFIX = 0xFC
+
+private const val IPV4_BYTES = 4
+private const val CGNAT_FIRST_OCTET = 100
+private val CGNAT_SECOND_OCTETS = 64..127

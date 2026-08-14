@@ -26,6 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.inject.Inject
@@ -181,17 +182,32 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
         val url = call.argument("url", "link", "address", "input")
             ?: return@withContext "No URL was given. Call fetch_url again with a url."
 
+        // Parsed rather than pattern matched. The checks below are about the host, and the
+        // host is not the part of the string it looks like: everything before an @ is
+        // userinfo and goes nowhere, so "https://example.com@10.0.0.1/" reads as example.com
+        // to anything working on the text.
+        val parsed = url.trim().toHttpUrlOrNull()
+            ?: return@withContext "That is not an address that can be read. Got: $url"
+
         // https only, and the app disables cleartext anyway, so this refusal is the honest
-        // message rather than a network error the model cannot interpret. The scheme is all
-        // this can usefully check: whether the address is somewhere the app has any business
-        // reaching is a question about the machine behind the name, which only the resolver
-        // can answer, and PublicOnlyDns answers it for every hop.
-        if (!url.startsWith("https://")) {
+        // message rather than a network error the model cannot interpret. Asked of the parsed
+        // scheme, which is lower-cased for us: startsWith("https://") told a model that
+        // wrote HTTPS the app only reads https, which reads as nonsense.
+        if (!parsed.isHttps) {
             return@withContext "Only https addresses can be read. Got: $url"
         }
 
+        // The resolver cannot cover this. PublicOnlyDns sees names, and an address written
+        // as digits goes straight to a socket without one, so every private address was
+        // reachable by asking for it as a literal. On a phone that is the router, the
+        // printers beside it, and whatever the carrier has on the same subnet.
+        parsed.host.ipLiteralOrNull()?.takeUnless { it.isPublicAddress() }?.let {
+            return@withContext "That address is not on the public internet, so it will not " +
+                "be read. Ask for a public page instead."
+        }
+
         val request = Request.Builder()
-            .url(url)
+            .url(parsed)
             .header("User-Agent", SEARCH_USER_AGENT)
             .build()
 

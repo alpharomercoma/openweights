@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -72,6 +73,8 @@ class ChatViewModelTest {
     private lateinit var engine: FakeInferenceEngine
     private lateinit var writer: FailableWriter
     private lateinit var viewModel: ChatViewModel
+    private lateinit var chats: ChatRepository
+    private val savedState = SavedStateHandle()
 
     @Before
     fun setUp() {
@@ -82,12 +85,17 @@ class ChatViewModelTest {
             .build()
 
         engine = FakeInferenceEngine()
-        val chats = ChatRepository(database, Clock.System)
+        chats = ChatRepository(database, Clock.System)
         writer = FailableWriter(chats)
         // Registered but unreachable unless a test says the model supports tools, so the
         // tool loop is available to the tests that want it and invisible to the rest.
-        val registry = ToolRegistry(listOf(StubTool))
-        viewModel = ChatViewModel(
+        viewModel = newViewModel(savedState)
+    }
+
+    /** Another view model over the same storage, which is what survives process death. */
+    private fun newViewModel(state: SavedStateHandle): ChatViewModel {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        return ChatViewModel(
             runtime = ModelRuntime(
                 engine = engine,
                 modelStore = ModelStore(context),
@@ -96,10 +104,10 @@ class ChatViewModelTest {
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             attachments = AttachmentStore(context),
-            chats = chats,
             writer = writer,
-            turns = TurnRunner(engine, registry, ToolSwitches(context)),
+            turns = TurnRunner(engine, ToolRegistry(listOf(StubTool)), ToolSwitches(context)),
             notifier = ReplyNotifier(context),
+            savedState = state,
         )
     }
 
@@ -418,6 +426,40 @@ class ChatViewModelTest {
         // composer never comes back.
         assertThat(viewModel.uiState.value.transcript.none { it.isStreaming }).isTrue()
         assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
+    fun `a process killed for memory comes back to the conversation it was in`() =
+        runTest(dispatcher) {
+            loadModel()
+            viewModel.send("Remember me")
+            settle()
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+
+            // What Android does to an app holding a model in memory: the process goes, the
+            // saved state does not. A new view model is what comes back.
+            val revived = newViewModel(savedState)
+            revived.loadModel(modelFile("model-a.gguf"))
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            assertThat(revived.uiState.value.activeConversationId).isEqualTo(id)
+            assertThat(revived.uiState.value.transcript.map { it.text })
+                .contains("Remember me")
+        }
+
+    @Test
+    fun `a fresh launch does not drag the last conversation back`() = runTest(dispatcher) {
+        loadModel()
+        viewModel.send("Old news")
+        settle()
+
+        // Swiped away rather than killed, so the saved state went with it.
+        val relaunched = newViewModel(SavedStateHandle())
+        relaunched.loadModel(modelFile("model-a.gguf"))
+        settle(steps = FOLD_SETTLE_STEPS)
+
+        assertThat(relaunched.uiState.value.transcript).isEmpty()
+        assertThat(relaunched.uiState.value.activeConversationId).isNull()
     }
 
     @Test

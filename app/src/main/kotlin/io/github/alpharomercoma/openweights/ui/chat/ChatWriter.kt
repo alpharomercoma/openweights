@@ -18,7 +18,9 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
+import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -42,6 +44,14 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
      * the rows end up in the order the user produced them.
      */
     private val mutex = Mutex()
+
+    /**
+     * The conversation list, which needs no queue: it is a flow the database keeps current.
+     *
+     * Here so the view model has one collaborator for storage rather than two, and cannot
+     * reach the tables without going past the ordering this object exists to provide.
+     */
+    fun conversations(): Flow<List<ConversationEntity>> = chats.observeConversations()
 
     /** Runs [work] with the queue held, for the reads and writes with no method here. */
     open suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T = mutex.withLock {

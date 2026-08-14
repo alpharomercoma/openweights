@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,7 +33,6 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
-import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
@@ -258,10 +258,10 @@ class ChatViewModel @Inject constructor(
     private val runtime: ModelRuntime,
     private val compactor: ConversationCompactor,
     private val attachments: AttachmentStore,
-    private val chats: ChatRepository,
     private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
     /** Completed by the approval buttons, so the agent can wait on a human. */
     private var approval: CompletableDeferred<Boolean>? = null
@@ -301,11 +301,25 @@ class ChatViewModel @Inject constructor(
         set(value) {
             field = value
             _uiState.update { it.copy(activeConversationId = value) }
+            // Remembered, and never forgotten. Android reclaims a process holding a model in
+            // memory sooner than most, and coming back to a blank screen with the
+            // conversation still in the database reads as having lost it. SavedStateHandle
+            // is the right shelf: it survives being killed for memory and does not survive
+            // being swiped away, which is exactly the distinction that matters here.
+            if (value != null) savedState[LAST_CONVERSATION] = value
         }
+
+    /**
+     * The conversation to reopen once a model is up, read once when the view model is built.
+     *
+     * Consumed by the first load, which on a cold start is the one the screen asks for. It
+     * cannot fire twice, so switching model afterwards still starts a fresh chat.
+     */
+    private var restoring: Long? = savedState[LAST_CONVERSATION]
 
     init {
         viewModelScope.launch {
-            chats.observeConversations().collect { rows ->
+            writer.conversations().collect { rows ->
                 _uiState.update { state ->
                     state.copy(
                         conversations = rows.map {
@@ -384,6 +398,26 @@ class ChatViewModel @Inject constructor(
         if (abandoned.isNotEmpty()) attachments.discard(abandoned)
     }
 
+    /**
+     * How to load this model, including which processor gets its layers.
+     *
+     * Auto's answer is a measurement rather than a setting, and the measurement changes as
+     * the model is used, so it is resolved per load. That is also the only moment llama.cpp
+     * will accept it.
+     */
+    private suspend fun loadParamsFor(
+        modelFile: File,
+        preferences: ModelPreferences,
+        contextLength: Int?,
+    ): ModelLoadParams {
+        val (prompted, generated) = writer.inOrder { turnShape(modelFile.nameWithoutExtension) }
+        val layers = Offload.fromName(preferences.offload)
+            .layersFor(runtime.hasGpu(), prompted, generated)
+        return contextLength
+            ?.let { ModelLoadParams(contextLength = it, gpuLayers = layers) }
+            ?: preferences.toLoadParams(layers)
+    }
+
     private suspend fun performLoad(
         modelFile: File,
         contextLength: Int?,
@@ -391,15 +425,7 @@ class ChatViewModel @Inject constructor(
     ) {
         _uiState.update { it.copy(isLoadingModel = true, error = null) }
         val preferences = runtime.settingsFor(modelFile.name)
-        // Resolved here rather than stored, because Auto's answer is a measurement and the
-        // measurement changes as the model gets used. Read once per load, which is the only
-        // moment llama.cpp will accept it.
-        val (prompted, generated) = writer.inOrder { turnShape(modelFile.nameWithoutExtension) }
-        val layers = Offload.fromName(preferences.offload)
-            .layersFor(runtime.hasGpu(), prompted, generated)
-        val loadParams = contextLength
-            ?.let { ModelLoadParams(contextLength = it, gpuLayers = layers) }
-            ?: preferences.toLoadParams(layers)
+        val loadParams = loadParamsFor(modelFile, preferences, contextLength)
 
         val projector = runtime.projectorFor(modelFile)
 
@@ -446,6 +472,14 @@ class ChatViewModel @Inject constructor(
                     },
                 )
             }
+            // Only ever on the startup load, so switching model still starts fresh.
+            if (!keepConversation) {
+                restoring?.let { id ->
+                    restoring = null
+                    openConversation(id)
+                }
+            }
+
             if (keepConversation) {
                 conversationId?.let { id ->
                     writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
@@ -640,7 +674,7 @@ class ChatViewModel @Inject constructor(
                     // starts after the last thing that was not one.
                     val firstDiscarded =
                         stored.indexOfLast { it.role != ChatRole.ASSISTANT.wireName } + 1
-                    stored.getOrNull(firstDiscarded)?.let { chats.deleteFrom(id, it.id) }
+                    stored.getOrNull(firstDiscarded)?.let { deleteFrom(id, it.id) }
                 }
             }
             generate()
@@ -1110,8 +1144,8 @@ class ChatViewModel @Inject constructor(
             // forever in a folder the user cannot see. Behind the write queue, so a reply
             // still being written is deleted with the rest rather than after it.
             val orphaned = writer.inOrder {
-                val attached = chats.messages(id).flatMap { it.attachments.decodeAttachments() }
-                chats.deleteConversation(id)
+                val attached = messages(id).flatMap { it.attachments.decodeAttachments() }
+                deleteConversation(id)
                 attached
             }
             attachments.discard(orphaned)
@@ -1355,6 +1389,9 @@ private const val DEFAULT_CONTEXT_TOKENS = 4096
 private const val STREAM_FRAME_MS = 33L
 
 private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."
+
+/** Where the open conversation is remembered across a process the system reclaimed. */
+private const val LAST_CONVERSATION = "lastConversation"
 
 /**
  * Runs a write, and reports it rather than dying when it fails.

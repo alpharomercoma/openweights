@@ -265,6 +265,16 @@ class ChatViewModel @Inject constructor(
     private var thermalJob: Job? = null
     private var nextEntryId = 0L
 
+    /**
+     * True only while a turn is inside the engine.
+     *
+     * Distinct from [ChatUiState.isGenerating], which the composer sets the moment it is
+     * tapped so that two quick taps cannot both start a turn. Compaction resets the KV
+     * cache, so what it has to know is whether anything is decoding into it, and those two
+     * facts stop agreeing for the whole window between the tap and the first token.
+     */
+    private var isDecoding = false
+
     /** Held for the length of a load, so two of them cannot interleave. */
     private val loadMutex = Mutex()
 
@@ -722,6 +732,7 @@ class ChatViewModel @Inject constructor(
                 // Inside the try because it suspends, so Stop can land here too.
                 if (!applyThreadPlan()) return@launch
 
+                isDecoding = true
                 raw = turns.run(
                     conversation = conversation,
                     params = state.preferences.toSamplerParams(),
@@ -746,28 +757,43 @@ class ChatViewModel @Inject constructor(
                 // the user can see is lost by it.
                 runCatching { runtime.resetContext() }
                 _uiState.update { it.copy(error = failure.userMessage()) }
+            } finally {
+                // However the turn ended, including Stop rethrowing above: the cache is
+                // idle again and the next fold is allowed to reset it.
+                isDecoding = false
             }
 
-            // A stream that ends without a completion event, which happens if the engine's
-            // channel closes under it, would otherwise leave the entry streaming forever.
-            if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
-                finishInterrupted(raw)
-            }
-            updateLastEntry { it.copy(totalMillis = System.currentTimeMillis() - turnStartedAt) }
-            // Re-read rather than leave the last reading standing: a phone that has cooled
-            // between replies should stop claiming it is hot.
-            _uiState.update {
-                it.copy(
-                    isGenerating = false,
-                    isThrottled = runtime.isThrottling(),
-                    pendingApproval = null,
-                )
-            }
-            compactIfNeeded()
-            notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
+            settleTurn(raw, turnStartedAt)
         }
         generationJob = job
         job.invokeOnCompletion(::releaseTurn)
+    }
+
+    /**
+     * Gives back what the turn was holding, and folds if the context now needs it.
+     *
+     * Its own function because it runs the same way whether the turn ended in an answer or
+     * in an error, and because the last act of a turn is the easiest thing to lose sight of
+     * at the bottom of a long one.
+     */
+    private suspend fun settleTurn(raw: String, turnStartedAt: Long) {
+        // A stream that ends without a completion event, which happens if the engine's
+        // channel closes under it, would otherwise leave the entry streaming forever.
+        if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
+            finishInterrupted(raw)
+        }
+        updateLastEntry { it.copy(totalMillis = System.currentTimeMillis() - turnStartedAt) }
+        // Re-read rather than leave the last reading standing: a phone that has cooled
+        // between replies should stop claiming it is hot.
+        _uiState.update {
+            it.copy(
+                isGenerating = false,
+                isThrottled = runtime.isThrottling(),
+                pendingApproval = null,
+            )
+        }
+        compactIfNeeded()
+        notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
     }
 
     /**
@@ -858,7 +884,17 @@ class ChatViewModel @Inject constructor(
 
         _uiState.update { it.copy(isCompacting = true) }
         val compaction = try {
-            compactor.compact(state)
+            compactor.compact(state, engineIsDecoding = isDecoding)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+            // Never fatal. This runs before the try inside generate() opens, in a coroutine
+            // with no exception handler on its scope, so anything thrown here reached the
+            // platform's default handler and took the process with it. Folding is an
+            // optimisation; the conversation is still on screen and the turn can still be
+            // attempted, so a failure to fold is worth saying and nothing more.
+            _uiState.update { it.copy(error = failure.userMessage()) }
+            null
         } finally {
             // In a finally: a model that fails mid-summary would otherwise leave "folding
             // earlier turns" on screen forever, and block every later compaction.

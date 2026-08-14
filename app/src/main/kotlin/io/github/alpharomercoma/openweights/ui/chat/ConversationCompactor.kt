@@ -49,9 +49,19 @@ class ConversationCompactor @Inject constructor(
     /**
      * Summarizes the foldable range of [state], or returns null when there is nothing to
      * fold or the model produced no usable summary.
+     *
+     * @param engineIsDecoding whether a generation is actually inside the engine right now.
+     *   Asked for rather than read off [ChatUiState], because the flag that looks like the
+     *   answer is not one. `isGenerating` means the composer has claimed the turn, which it
+     *   does before any suspending work so that two quick taps cannot both start; the fold
+     *   that runs before a turn therefore always saw it set. This guard read it anyway and
+     *   threw, out of a coroutine with no catch above it and no handler on the scope, so a
+     *   conversation reaching the threshold crashed the app on Send. What the guard is
+     *   really protecting is the KV cache, and only [ChatViewModel] knows whether anything
+     *   is decoding into it.
      */
-    suspend fun compact(state: ChatUiState): Compaction? {
-        check(!state.isGenerating) { "compaction would reset the context mid-generation" }
+    suspend fun compact(state: ChatUiState, engineIsDecoding: Boolean): Compaction? {
+        check(!engineIsDecoding) { "compaction would reset the context mid-generation" }
         val range = policy.foldRange(
             entryCount = state.transcript.size,
             alreadyFoldedThrough = state.compaction?.foldedThroughIndex ?: -1,

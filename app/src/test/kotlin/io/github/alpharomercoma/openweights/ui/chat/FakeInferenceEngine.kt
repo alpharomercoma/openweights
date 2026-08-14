@@ -53,6 +53,15 @@ class FakeInferenceEngine : InferenceEngine {
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
+    /**
+     * What each completion reports the context as holding.
+     *
+     * Settable because context pressure is what decides when the app folds a conversation,
+     * and a fake that always reports eight tokens can never reach the threshold. Read
+     * against [LoadedModelInfo.contextSize] after a load to express it as a fraction.
+     */
+    var contextUsed = 8
+
     var cancelCount = 0
         private set
 
@@ -175,7 +184,7 @@ class FakeInferenceEngine : InferenceEngine {
         prefillMs = 1,
         decodeMs = 1,
         timeToFirstTokenMs = 1,
-        contextUsed = 8,
+        contextUsed = contextUsed,
         contextSize = loaded?.contextSize ?: 0,
     )
 

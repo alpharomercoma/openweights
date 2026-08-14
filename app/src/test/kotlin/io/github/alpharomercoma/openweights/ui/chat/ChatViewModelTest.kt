@@ -247,6 +247,48 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `a conversation that has to fold before the next turn folds instead of throwing`() =
+        runTest(dispatcher) {
+            loadModel()
+            val window = requireNotNull(engine.loadedModel).contextSize
+            // Past the policy's three quarters, so every completed turn leaves the context
+            // reporting itself nearly full.
+            engine.contextUsed = window * 4 / 5
+
+            repeat(3) { index ->
+                viewModel.send("Question $index")
+                settle()
+            }
+            // Six entries is one short of what the policy will fold, so the fold that runs
+            // after a turn found nothing to do and the context is still full. The fold that
+            // matters is the one before the next turn, and that one runs while the composer
+            // has already claimed the turn.
+            assertThat(viewModel.uiState.value.transcript).hasSize(6)
+            assertThat(viewModel.uiState.value.compaction).isNull()
+
+            viewModel.send("The question that has to fold first")
+            // A fold is a model call, a cache reset and a write of its own before the turn
+            // it precedes even starts, so this needs more drains than an ordinary turn.
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // Nothing was thrown on the way. The guard this covers threw out of a coroutine
+            // with no catch above it and no handler on the scope, which ends the process.
+            assertThat(viewModel.uiState.value.error).isNull()
+
+            // Folded through the third entry, which is the range that exists only while the
+            // transcript is seven long: before the answer to this question was added. A
+            // fold that had waited until after the turn would have covered four. This is
+            // what says the fold ran when it was needed rather than after the fact.
+            val compaction = requireNotNull(viewModel.uiState.value.compaction)
+            assertThat(compaction.foldedThroughIndex).isEqualTo(2)
+
+            // And the point of folding first: the question still gets answered.
+            assertThat(viewModel.uiState.value.transcript.last().role)
+                .isEqualTo(ChatRole.ASSISTANT)
+            assertThat(viewModel.uiState.value.isGenerating).isFalse()
+        }
+
+    @Test
     fun `a new chat clears the transcript and the conversation it belonged to`() =
         runTest(dispatcher) {
             loadModel()
@@ -599,6 +641,9 @@ class ChatViewModelTest {
 
         /** How many times to re-check the table before giving up and asserting on it. */
         const val AWAIT_STEPS = 20
+
+        /** A fold runs the model, resets the cache and writes, all before its turn starts. */
+        const val FOLD_SETTLE_STEPS = 30
 
         /** Virtual milliseconds a held load takes, long enough to interleave a second. */
         const val LOAD_MS = 500L

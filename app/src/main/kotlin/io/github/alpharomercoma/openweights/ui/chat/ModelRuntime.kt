@@ -21,6 +21,7 @@ import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
+import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
 import io.github.alpharomercoma.openweights.model.ModelStore
@@ -72,6 +73,17 @@ class ModelRuntime @Inject constructor(
     suspend fun resetContext() = engine.resetContext()
 
     fun backendName(): String? = engine.computeDevices().firstOrNull()?.id?.uppercase()
+
+    /**
+     * True when there is something other than the CPU to hand layers to.
+     *
+     * Asked so the offload control appears only where moving it does anything. A phone with
+     * no working GPU backend gets a setting that cannot change the answer, which is worse
+     * than no setting.
+     */
+    fun hasGpu(): Boolean = runCatching {
+        engine.computeDevices().any { it.kind != ComputeDeviceKind.CPU }
+    }.getOrDefault(false)
 
     fun isThrottling(): Boolean = thermal.isThrottling()
 

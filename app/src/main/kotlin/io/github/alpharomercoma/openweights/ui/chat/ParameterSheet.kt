@@ -71,6 +71,7 @@ fun ParameterSheet(
     modelName: String,
     preferences: ModelPreferences,
     supportsThinking: Boolean,
+    hasGpu: Boolean,
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
@@ -167,6 +168,27 @@ fun ParameterSheet(
                     valueRange = CONTEXT_RANGE,
                     steps = ModelLoadParams.CONTEXT_STEPS,
                 )
+            }
+
+            if (hasGpu) {
+                Setting(
+                    label = "Run on the GPU",
+                    explanation = "Reads a prompt about five times faster and writes an " +
+                        "answer about a third slower, so it suits questions that need " +
+                        "looking things up more than long replies. Costs battery, and " +
+                        "takes effect the next time the model loads.",
+                    value = if (draft.gpuLayers > 0) "on" else "off",
+                ) {
+                    Switch(
+                        checked = draft.gpuLayers > 0,
+                        onCheckedChange = {
+                            // All the layers or none. Anything between splits every token
+                            // across two processors and pays the transfer both ways, which
+                            // measured slower than either on its own.
+                            draft = draft.copy(gpuLayers = if (it) ALL_LAYERS else 0)
+                        },
+                    )
+                }
             }
 
             Column {
@@ -317,6 +339,9 @@ private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
 
+/** More layers than any model has, which is llama.cpp's way of saying all of them. */
+private const val ALL_LAYERS = 99
+
 @Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
 @Composable
 private fun ParameterSheetPreview() {
@@ -325,6 +350,7 @@ private fun ParameterSheetPreview() {
             modelName = "LFM2.5-2.6B-Q4_K_M",
             preferences = ModelPreferences(),
             supportsThinking = true,
+            hasGpu = true,
             onSave = {},
             onReset = {},
             onDismiss = {},

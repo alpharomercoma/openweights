@@ -76,6 +76,20 @@ data class ModelPreferences(
     val thinking: Boolean = true,
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val reasoningEffort: String = ReasoningEffort.DEFAULT.name,
+    /**
+     * How many layers to hand to the GPU, zero being all of them on the CPU.
+     *
+     * Off by default, which is the right answer for a chat turn and the wrong one for an
+     * agent. Measured on an Adreno 830: reading a prompt is five and a half times faster on
+     * the GPU and writing one is about a third slower, so a turn that spends most of its
+     * time re-reading a growing conversation wins and a turn that is mostly writing loses.
+     * Which of those a person is doing is not something the app can know, so it is a
+     * setting rather than a guess.
+     *
+     * Read at load, like the context length, because llama.cpp assigns layers when the
+     * weights are mapped and not after.
+     */
+    val gpuLayers: Int = 0,
 ) {
     fun toSamplerParams() = SamplerParams(
         thinking = thinking,
@@ -88,7 +102,7 @@ data class ModelPreferences(
         maxTokens = if (maxTokens > 0) maxTokens else DEFAULT_MAX_TOKENS,
     )
 
-    fun toLoadParams() = ModelLoadParams(contextLength = contextLength)
+    fun toLoadParams() = ModelLoadParams(contextLength = contextLength, gpuLayers = gpuLayers)
 
     companion object {
         /**

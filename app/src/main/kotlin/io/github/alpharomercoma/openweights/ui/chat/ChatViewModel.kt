@@ -157,6 +157,8 @@ data class ChatUiState(
     val supportsReasoningEffort: Boolean = false,
     /** True when at least one tool is switched on in Tools. */
     val toolsAvailable: Boolean = false,
+    /** True when this device has a backend other than the CPU to offload layers to. */
+    val hasGpu: Boolean = false,
     /**
      * How hot the device is, sampled while a reply is being written.
      *
@@ -410,6 +412,7 @@ class ChatViewModel @Inject constructor(
                 it.copy(
                     isLoadingModel = false,
                     backend = runtime.backendName(),
+                    hasGpu = runtime.hasGpu(),
                     modelName = modelFile.nameWithoutExtension,
                     // The filename's own quantization, not llama's verbose description:
                     // "Q4_K_M" beside the compute device and context window reads as a

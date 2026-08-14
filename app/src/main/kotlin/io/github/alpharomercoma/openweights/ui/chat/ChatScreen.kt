@@ -490,6 +490,7 @@ private fun ChatSheets(
             modelName = state.modelName,
             preferences = state.preferences,
             supportsThinking = state.supportsThinking,
+            hasGpu = state.hasGpu,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()

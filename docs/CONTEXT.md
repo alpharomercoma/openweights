@@ -536,6 +536,28 @@ recorded here.
 CPU stays the default because a plain chat is the common case and the one where being slower
 is felt immediately.
 
+### The tool loop, proven on hardware (2026-08-14)
+
+`ToolCallingTest` had skipped since the day it was written, because the model pushed to
+`/data/local/tmp/openweights/model.gguf` was Gemma 3 1B and its template renders no tools.
+Pushing Qwen 2.5 1.5B Instruct instead un-skips it, and it passes: the model returns
+`ToolCall(name=get_weather, argumentsJson={"city": "Manila"})`, parsed rather than salvaged.
+**Keep a tools-capable model there.** With Gemma the whole tool path is untested and looks
+green.
+
+End to end in the app on the same device, Qwen loaded, `tools=true` at load:
+
+| what | log line | what reached the screen |
+| --- | --- | --- |
+| tools on, explicit request | `withTools=true` then `calls=1`, `calls=0` | the `web_search` chip and the right answer |
+| tools on, question it could not know | `offered=true calls=0` | it declined to search and said so |
+| tools off in Tools | `withTools=false tools=[]` | answered from memory, no chip |
+
+The middle row is the ceiling rather than a defect. Offered the tools and asked who a
+stranger was, a 1.5B model answered "I don't have any specific information" instead of
+searching. That is what BFCL measures at around 55 percent multi-turn for models this size,
+and no scaffold fixes it: naming the tool in the question is what makes it call.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

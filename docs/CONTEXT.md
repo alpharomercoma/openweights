@@ -556,6 +556,44 @@ recorded here.
 CPU stays the default because a plain chat is the common case and the one where being slower
 is felt immediately.
 
+#### Reproduced on a second Snapdragon 8 Elite, and what switching actually costs
+
+The device above was returned when its Device Cloud session ended. The figures were taken
+again on a fresh `sun` instance provisioned from nothing: app installed, Qwen 2.5 1.5B Q4_K_M
+fetched by the device itself from Hugging Face, no state carried over. `OffloadBenchmark` was
+then run twice, once inside the full suite and once alone in a cold process.
+
+| | CPU run 1 | CPU run 2 | GPU run 1 | GPU run 2 |
+| --- | ---: | ---: | ---: | ---: |
+| load | 748 ms | 818 ms | 3432 ms | 3138 ms |
+| chat wall | 4729 ms | 4827 ms | 6343 ms | 8124 ms |
+| agent wall | 13067 ms | 13283 ms | 8382 ms | 8399 ms |
+| prefill | 182.2 t/s | 178.3 t/s | 390.1 t/s | 390.5 t/s |
+| decode | 31.8 t/s | 32.4 t/s | 16.4 t/s | 16.2 t/s |
+
+Solving those rates for the point where the two turn costs meet gives **10.10x and 10.13x**,
+against the 10 that `CROSSOVER_NUMERATOR` already held. The constant was set from one
+measurement on a device that no longer exists; it now has two independent confirmations to
+within one percent. `Offload.AUTO` chose the faster side on both shapes: CPU for the chat
+turn, which it won by 1.34x, and GPU for the agent turn, which it won by 1.56x.
+
+**What a switch costs.** Layers are assigned when the weights are mapped, so Auto changing
+its mind means a reload. That reload is about 2.4 s dearer on the GPU, and the first prefill
+after it carries a further 1.9 s of OpenCL warm-up: the GPU chat prefill was 1849 ms in the
+cold process against 165 ms in the warm one, which is the same one-off already recorded as
+2004 ms above. So flipping to the GPU costs roughly **4.3 s once**, against the 4.7 s the
+agent turn saves. It therefore about breaks even on the first tool turn and is free money on
+every one after it, which is the right shape for a threshold that only trips on conversations
+already long enough to have several such turns left in them.
+
+**One figure did not reproduce.** The 11.9 s GPU load recorded on the previous instance came
+back as 3.1 s cold and 3.4 s warm here. The obvious explanation, that the earlier number paid
+for OpenCL context creation and the later ones did not, is wrong: the cold process was the
+faster of the two, and the warm-up demonstrably lands in first prefill instead. Nothing in
+this run accounts for the gap, and the earlier device is gone, so it stands as a difference
+between two instances rather than a property of the chip. Treat 3 s as the load cost on this
+hardware and 12 s as evidence that it is not guaranteed.
+
 ### The tool loop, proven on hardware (2026-08-14)
 
 `ToolCallingTest` had skipped since the day it was written, because the model pushed to

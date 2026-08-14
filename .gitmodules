@@ -7,3 +7,7 @@
 [submodule "core/engine/src/main/cpp/OpenCL-ICD-Loader"]
 	path = core/engine/src/main/cpp/OpenCL-ICD-Loader
 	url = https://github.com/KhronosGroup/OpenCL-ICD-Loader.git
+[submodule "core/sandbox/src/main/cpp/quickjs"]
+	path = core/sandbox/src/main/cpp/quickjs
+	url = https://github.com/quickjs-ng/quickjs.git
+	branch = v0.16.1

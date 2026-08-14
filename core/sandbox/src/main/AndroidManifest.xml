@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2026 The OpenWeights Authors
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          Where a script actually runs, and the reason this feature is shippable at all.
+
+          isolatedProcess gives the service its own uid with no permissions of its own: no
+          files, no network, no content providers, nothing but the binder call that started
+          it. The app's own sandbox would not do. This process is the only thing standing
+          between a bug in a C interpreter and the token vault, the conversation database
+          and the folder the user shared, all of which the app itself can reach.
+
+          That is the real argument for the second process. Script-level access was already
+          handled by not linking qjs-libc, so a script has no readFile to call. What that
+          does not cover is a memory-safety bug in QuickJS while it parses text somebody
+          else wrote, and no amount of leaving functions out of the language helps there.
+
+          exported=false because nothing outside this app has any business binding to it.
+        -->
+        <service
+            android:name="io.github.alpharomercoma.openweights.core.sandbox.ScriptService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":script" />
+
+    </application>
+
+</manifest>

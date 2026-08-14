@@ -1384,6 +1384,11 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         ANSWER_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
         toolInstruction(mode, preferences.toolPrompt).takeIf { supportsTools && toolsAvailable },
+        // Part of the instructions, not a turn of its own. Sent separately this was a second
+        // system message beside them, and Gemma 3's template raises rather than renders when
+        // the roles do not alternate: every turn after the first fold came back as an error,
+        // and kept coming back, because the next turn rebuilt the same prompt.
+        compaction?.let { "Summary of the earlier conversation:\n${it.summary}" },
     ).joinToString("\n\n")
 
     val system = instructions
@@ -1391,14 +1396,40 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         ?.let { listOf(ChatMessage.text(ChatRole.SYSTEM, it)) }
         .orEmpty()
 
-    val compaction = compaction
-        ?: return system + transcript.map { it.toChatMessage() }
-    val summary = ChatMessage.text(
-        ChatRole.SYSTEM,
-        "Summary of the earlier conversation:\n" + compaction.summary,
-    )
-    val remaining = transcript.drop(compaction.foldedThroughIndex + 1)
-    return system + summary + remaining.map { it.toChatMessage() }
+    val remaining = compaction
+        ?.let { transcript.drop(it.foldedThroughIndex + 1) }
+        ?: transcript
+
+    return (system + remaining.map { it.toChatMessage() }).asExchange()
+}
+
+/**
+ * The prompt as a strict exchange: one system turn, then user and assistant in turn.
+ *
+ * Several widely used templates require this rather than prefer it, and refuse to render
+ * anything at all otherwise. Three things here can break it, and each was reachable: the
+ * fold keeps a fixed number of recent entries and nothing makes that boundary land on a
+ * question; a stop before the first token drops the empty reply, so the next question
+ * follows the last one directly; and the summary used to be sent as its own system turn.
+ *
+ * Neighbours of the same role are joined rather than dropped, because both halves are
+ * things the user said or the model wrote and neither is ours to discard. An answer left
+ * at the front with no question before it is dropped, because there is nothing to join it
+ * to and its question has already been folded away.
+ */
+private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
+    val system = takeWhile { it.role == ChatRole.SYSTEM }
+    val body = drop(system.size).dropWhile { it.role == ChatRole.ASSISTANT }
+
+    return system + body.fold(mutableListOf()) { kept, message ->
+        val previous = kept.lastOrNull()
+        if (previous != null && previous.role == message.role) {
+            kept[kept.lastIndex] = previous.copy(parts = previous.parts + message.parts)
+        } else {
+            kept += message
+        }
+        kept
+    }
 }
 
 /**

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
+import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import org.junit.Test
@@ -97,14 +98,14 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // The instruction turn comes first, then the summary as its own system turn. Both
-        // halves of it are load-bearing: answer from memory, and when to go and look.
-        assertThat(messages.first().text).contains("Answer from what you know")
-        assertThat(messages.first().text).contains("Search only when")
-        val summary = messages[1]
-        assertThat(summary.role).isEqualTo(ChatRole.SYSTEM)
-        assertThat(summary.text).contains("The user is porting a parser.")
-        assertThat(summary.text).doesNotContain("$")
+        // One system turn carrying all of it. The summary used to be a second one, which
+        // is what templates requiring strict alternation refuse. Every part is
+        // load-bearing: answer from memory, when to go and look, and what was folded away.
+        val system = messages.single { it.role == ChatRole.SYSTEM }
+        assertThat(system.text).contains("Answer from what you know")
+        assertThat(system.text).contains("Search only when")
+        assertThat(system.text).contains("The user is porting a parser.")
+        assertThat(system.text).doesNotContain("$")
     }
 
     @Test
@@ -118,9 +119,78 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // One summary plus the two turns after the fold.
-        assertThat(messages).hasSize(4)
-        assertThat(messages.drop(2).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        // The instructions, which now carry the summary, plus the two turns after the fold.
+        assertThat(messages).hasSize(3)
+        assertThat(messages.drop(1).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+    }
+
+    @Test
+    fun `a folded conversation is still one system turn, then strict alternation`() {
+        val state = ChatUiState(
+            transcript = transcript(6),
+            compaction = Compaction("summary", foldedThroughIndex = 3, foldedEntryCount = 4),
+            supportsTools = true,
+            toolsAvailable = true,
+        )
+
+        val messages = state.engineMessages()
+
+        // Gemma 3 raises "Conversation roles must alternate user/assistant" and refuses to
+        // render the prompt at all, so every turn after the first fold failed and the
+        // conversation could not be continued. Found on a device: the summary went in as a
+        // second system turn beside the instructions.
+        assertThat(messages.count { it.role == ChatRole.SYSTEM }).isEqualTo(1)
+        assertThat(messages.first().role).isEqualTo(ChatRole.SYSTEM)
+        assertThat(messages.first().text).contains("summary")
+        assertThat(messages.first().text).contains("Answer from what you know")
+        assertAlternates(messages)
+    }
+
+    @Test
+    fun `two questions in a row are sent as one turn`() {
+        // What a stop before the first token leaves behind: the empty reply is dropped
+        // rather than written down, so the next question follows the previous one with no
+        // answer between them. The same templates refuse that.
+        val state = ChatUiState(
+            transcript = listOf(
+                TranscriptEntry(id = 0, role = ChatRole.USER, text = "first"),
+                TranscriptEntry(id = 1, role = ChatRole.USER, text = "second"),
+            ),
+        )
+
+        val messages = state.engineMessages()
+
+        assertAlternates(messages)
+        assertThat(messages.last().text).contains("first")
+        assertThat(messages.last().text).contains("second")
+    }
+
+    @Test
+    fun `a fold that lands mid exchange does not open on an answer`() {
+        // foldRange keeps a fixed number of recent entries, and nothing makes that boundary
+        // land on a question. Opening on an answer is the same violation from the other end.
+        val state = ChatUiState(
+            transcript = transcript(6),
+            compaction = Compaction("summary", foldedThroughIndex = 2, foldedEntryCount = 3),
+        )
+
+        assertAlternates(state.engineMessages())
+    }
+
+    /**
+     * Fails unless the prompt is one leading system turn and then user, assistant, user.
+     *
+     * The shape several widely used templates require rather than prefer. Gemma 3 raises a
+     * Jinja exception and renders nothing at all, which arrives as a red error in place of
+     * the answer and repeats on every turn afterwards.
+     */
+    private fun assertAlternates(messages: List<ChatMessage>) {
+        val body = messages.dropWhile { it.role == ChatRole.SYSTEM }
+        assertThat(body.map { it.role }).doesNotContain(ChatRole.SYSTEM)
+        assertThat(body.first().role).isEqualTo(ChatRole.USER)
+        body.zipWithNext().forEach { (before, after) ->
+            assertThat(before.role).isNotEqualTo(after.role)
+        }
     }
 
     private fun transcript(count: Int) = List(count) { index ->

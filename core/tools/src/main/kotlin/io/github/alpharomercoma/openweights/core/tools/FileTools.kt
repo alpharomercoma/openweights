@@ -135,9 +135,27 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         if (entry.isDirectory) {
             return "$path is a folder, not a file. Use search_files to see what is in it."
         }
-        val text = workspace.readText(entry, skip, WINDOW_CHARS)
+        // One character past the window, so whether anything follows is a fact rather than an
+        // inference from having filled the buffer exactly.
+        val text = workspace.readText(entry, skip, WINDOW_CHARS + 1)
             ?: return "$path could not be read. It may not be text."
-        return text.ifEmpty { "$path has nothing more to read from character $skip." }
+        if (text.isEmpty()) return "$path has nothing more to read from character $skip."
+        return text.take(WINDOW_CHARS) + rest(read = text.length, skip = skip)
+    }
+
+    /**
+     * What to say when the window stopped before the file did.
+     *
+     * A window presented as a whole file is how a model concludes a document does not mention
+     * something, and answers confidently out of the first fifteen hundred characters of it.
+     * The offset is worked out here rather than left to the model, which at this size is the
+     * difference between a second page and a second copy of the first one.
+     */
+    private fun rest(read: Int, skip: Int): String {
+        if (read <= WINDOW_CHARS) return ""
+        return "\n\n[Cut here: this is $WINDOW_CHARS characters starting at $skip, and the " +
+            "file goes on. To read the next part, call read_file again with the same path " +
+            "and offset ${skip + WINDOW_CHARS}.]"
     }
 }
 

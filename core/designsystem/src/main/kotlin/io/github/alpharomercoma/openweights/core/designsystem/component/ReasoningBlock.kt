@@ -39,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -93,14 +92,17 @@ fun ReasoningBlock(
         }
 
         AnimatedVisibility(visible = expanded) {
+            // Readable, and only here at all once the block has been opened. This carried a
+            // clearAndSetSemantics {} on the grounds that the header announced the same
+            // thing, which the header does not: it says how long thinking took and offers
+            // to show it. So the one control whose whole purpose is to reveal this text
+            // revealed nothing to anybody using a screen reader. Nothing is announced
+            // twice, because the collapsed block does not compose this at all.
             Text(
                 text = reasoning,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .padding(start = 2.dp, bottom = 8.dp)
-                    // The header already announces this content; reading it twice is noise.
-                    .clearAndSetSemantics {},
+                modifier = Modifier.padding(start = 2.dp, bottom = 8.dp),
             )
         }
     }

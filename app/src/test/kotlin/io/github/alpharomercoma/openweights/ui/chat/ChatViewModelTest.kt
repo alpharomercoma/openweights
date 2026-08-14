@@ -317,6 +317,45 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `an empty reply is said rather than shown`() = runTest(dispatcher) {
+        loadModel()
+        // A pass that ends immediately with no text and no call. Small models do this
+        // when the template renders something they will not continue.
+        engine.scripted += ScriptedPass("")
+
+        viewModel.send("Anything")
+        settle()
+
+        // The empty placeholder is dropped, correctly, because a blank turn is worse
+        // than no turn. But then nothing at all is said: the question sits on screen
+        // with no answer, no error, and a composer that works again, so the only
+        // reading is that the app ignored it.
+        assertThat(viewModel.uiState.value.error).isNotNull()
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
+    fun `unreadable tool markup is not shown as the answer`() = runTest(dispatcher) {
+        engine.supportsTools = true
+        loadModel()
+        // Call-shaped text naming a tool that does not exist, which llama.cpp's parser
+        // did not recognise either, so it hands back no calls and no cleaned content.
+        engine.scripted += ScriptedPass(
+            text = "<|tool_call_start|>[read_my_email()]<|tool_call_end|>",
+            content = "",
+        )
+
+        viewModel.send("Read my email")
+        settle()
+
+        // Salvage finds no tool of that name, so there is nothing to run and the raw
+        // pass becomes the reply. What reached the screen was the markup itself.
+        val shown = viewModel.uiState.value.transcript.last()
+        assertThat(shown.answer).doesNotContain("tool_call_start")
+        assertThat(shown.answer).doesNotContain("read_my_email")
+    }
+
+    @Test
     fun `a message that could not be saved says so`() = runTest(dispatcher) {
         loadModel()
         // The disk, as far as the chat is concerned, is gone.

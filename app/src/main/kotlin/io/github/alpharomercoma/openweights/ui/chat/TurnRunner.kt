@@ -21,6 +21,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -352,21 +353,6 @@ private class ToolBudget(headroomTokens: Int) {
  */
 private fun TurnRunner.Pass.spoken(): String =
     event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.trim()
-
-/**
- * The text with any tool call taken out of it.
- *
- * A safety net for the fallback path, covering the two delimiter families models actually
- * emit. Anything else is left alone: a parser that guesses at unknown syntax deletes real
- * answers, and showing markup is a smaller failure than showing a truncated reply.
- */
-private fun String.withoutToolMarkup(): String =
-    TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }.trim()
-
-private val TOOL_MARKUP = listOf(
-    Regex("""<\|tool_call_start\|>.*?<\|tool_call_end\|>""", RegexOption.DOT_MATCHES_ALL),
-    Regex("""<tool_call>.*?</tool_call>""", RegexOption.DOT_MATCHES_ALL),
-)
 
 /**
  * The reply without its thinking.

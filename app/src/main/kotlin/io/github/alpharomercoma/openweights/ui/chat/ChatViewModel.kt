@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
+import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
@@ -749,7 +750,11 @@ class ChatViewModel @Inject constructor(
                 )
                 // Here, so a turn that used a tool is written down once. Skipped by both
                 // catches below, where finishInterrupted writes what was produced instead.
-                settled?.let { (text, stats) -> persistReply(text, stats) }
+                // Blank is not written at all: an empty row reopens as an empty bubble and
+                // is resent as an empty assistant turn, which some templates refuse.
+                settled
+                    ?.takeIf { (text, _) -> text.isNotBlank() }
+                    ?.let { (text, stats) -> persistReply(text, stats) }
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
                 // being written, so it is kept and stored like any other reply.
@@ -789,6 +794,8 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
             finishInterrupted(raw)
         }
+
+        _uiState.update { it.droppingEmptyReply() ?: it }
         updateLastEntry { it.copy(totalMillis = System.currentTimeMillis() - turnStartedAt) }
         // Re-read rather than leave the last reading standing: a phone that has cooled
         // between replies should stop claiming it is hot.
@@ -1115,7 +1122,10 @@ class ChatViewModel @Inject constructor(
         // quoting the prompt at me" turned out to be. Text the engine did not change is
         // text it did not parse, so the local split is the better of the two.
         val engineCleaned = event.content.isNotEmpty() && event.content != raw
-        val answer = if (engineCleaned) event.content else parsed.answer
+        // Stripped when the engine did not clean it, because then nothing has. A call whose
+        // name belongs to no tool cannot be salvaged into anything, so neither parser
+        // removes it and the invocation itself was what the user read.
+        val answer = if (engineCleaned) event.content else parsed.answer.withoutToolMarkup()
 
         // The template test at load asks whether being told not to think changes the
         // prompt; it cannot ask whether the weights care. This is the other half of that
@@ -1430,6 +1440,31 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
         }
         kept
     }
+}
+
+/**
+ * The state with a reply that came back empty taken out of it, or null if there was none.
+ *
+ * A turn can complete and leave nothing behind. The pass finished, so the entry was settled
+ * rather than dropped, and what stayed on screen was an empty bubble with a metrics row
+ * under it: nothing said what had happened, and the empty reply was written to storage as
+ * well, so it came back on reopening and was resent as an empty assistant turn.
+ *
+ * Only ever reached when the model itself came back empty, which a small one does when the
+ * template renders something it will not continue. Stop takes the cancellation path and
+ * never arrives here.
+ */
+private fun ChatUiState.droppingEmptyReply(): ChatUiState? {
+    val last = transcript.lastOrNull() ?: return null
+    val nothingInIt = last.role == ChatRole.ASSISTANT &&
+        last.text.isBlank() &&
+        last.blocks.isEmpty()
+    if (!nothingInIt) return null
+
+    return copy(
+        transcript = transcript.dropLast(1),
+        error = error ?: "The model returned an empty reply. Ask again, or put it another way.",
+    )
 }
 
 /**

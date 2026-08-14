@@ -158,6 +158,74 @@ class TurnRunnerTest {
         assertThat(engine.prompts).hasSize(2)
     }
 
+    @Test
+    fun `a call for a tool that does not exist is answered, not dropped`() = runBlocking {
+        val call = ToolCall(id = "9", name = "read_my_email", argumentsJson = "{}")
+        engine.scripted += ScriptedPass("Checking.", toolCalls = listOf(call))
+        engine.scripted += ScriptedPass("I cannot do that, but here is what I know.")
+
+        val steps = run(withTools = true)
+
+        assertThat(search.calls).isEmpty()
+        // Told what happened and what it could have called instead. A model given nothing
+        // back for a call it made has no way to finish the turn.
+        val skipped = steps.filterIsInstance<AgentStep.Skipped>().single()
+        assertThat(skipped.why).contains("no tool called read_my_email")
+        assertThat(skipped.why).contains("web_search")
+        val results = engine.prompts[1].filter { it.role == ChatRole.TOOL }
+        assertThat(results.single().toolCallId).isEqualTo("9")
+    }
+
+    @Test
+    fun `arguments that are not json still reach the tool`() = runBlocking {
+        val call = ToolCall(id = "4", name = "web_search", argumentsJson = "{query: broken")
+        engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        run(withTools = true)
+
+        // The tool is what decides what a missing argument means, so it runs and says so
+        // rather than the loop refusing on its behalf. Malformed JSON is the common case
+        // for a model this size, not the exceptional one.
+        assertThat(search.calls).hasSize(1)
+        assertThat(engine.prompts).hasSize(2)
+    }
+
+    @Test
+    fun `two calls in one pass are both answered and cost one round`() = runBlocking {
+        val calls = listOf(
+            ToolCall(id = "a", name = "web_search", argumentsJson = """{"query":"one"}"""),
+            ToolCall(id = "b", name = "web_search", argumentsJson = """{"query":"two"}"""),
+        )
+        engine.scripted += ScriptedPass("Looking twice.", toolCalls = calls)
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        run(withTools = true)
+
+        assertThat(search.calls).hasSize(2)
+        // Rounds, not calls: asking for two things at once is efficient rather than a loop,
+        // so it must not eat the whole budget.
+        val results = engine.prompts[1].filter { it.role == ChatRole.TOOL }
+        assertThat(results.map { it.toolCallId }).containsExactly("a", "b")
+        assertThat(engine.prompts).hasSize(2)
+    }
+
+    @Test
+    fun `a tool that throws does not end the turn`() = runBlocking {
+        search.failWith = IllegalStateException("the socket went away")
+        val call = ToolCall(id = "5", name = "web_search", argumentsJson = """{"query":"x"}""")
+        engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        engine.scripted += ScriptedPass("I could not look that up.")
+
+        run(withTools = true)
+
+        // The model is told what went wrong and gets to answer anyway, which is the whole
+        // point of a tool loop. A throw that ended the turn would lose the question.
+        val result = engine.prompts[1].single { it.role == ChatRole.TOOL }
+        assertThat(result.text).contains("the socket went away")
+        assertThat(engine.prompts).hasSize(2)
+    }
+
     /** Runs one turn and returns every step it reported. */
     private suspend fun run(
         withTools: Boolean,
@@ -190,6 +258,9 @@ class TurnRunnerTest {
         /** What it hands back, so a test can make it longer than the context allows. */
         var answer = "Ada Lovelace wrote the first algorithm."
 
+        /** Set to make the tool throw, standing in for a socket that went away. */
+        var failWith: Exception? = null
+
         override val definition = ToolDefinition(
             name = name,
             description = "Search the web.",
@@ -198,6 +269,7 @@ class TurnRunnerTest {
 
         override suspend fun run(call: ToolCall): String {
             calls += call
+            failWith?.let { throw it }
             return answer
         }
 

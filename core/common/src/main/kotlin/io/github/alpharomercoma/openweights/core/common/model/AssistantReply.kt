@@ -89,3 +89,23 @@ fun parseAssistantReply(raw: String): AssistantReply {
 
 private const val OPEN_TAG = "<think>"
 private const val CLOSE_TAG = "</think>"
+
+/**
+ * The text with any recognised tool invocation taken out of it.
+ *
+ * Covers the two delimiter families models actually emit. Anything else is left alone: a
+ * parser that guesses at unknown syntax deletes real answers, and showing markup is a
+ * smaller failure than showing a truncated reply.
+ *
+ * Wanted in two places, which is why it lives here. The turn loop uses it for what the model
+ * said before asking for a tool, and the reply the user reads needs it for the case where
+ * neither parser recognised the call: a name no tool has cannot be salvaged into anything, so
+ * the invocation itself was what reached the screen.
+ */
+fun String.withoutToolMarkup(): String =
+    TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }.trim()
+
+private val TOOL_MARKUP = listOf(
+    Regex("""<\|tool_call_start\|>.*?<\|tool_call_end\|>""", RegexOption.DOT_MATCHES_ALL),
+    Regex("""<tool_call>.*?</tool_call>""", RegexOption.DOT_MATCHES_ALL),
+)

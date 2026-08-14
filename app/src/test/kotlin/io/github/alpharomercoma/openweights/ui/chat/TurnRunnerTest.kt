@@ -88,6 +88,44 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `a tool with nothing to work with is never described to the model`() = runBlocking<Unit> {
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        // A file tool with no folder granted can only ever refuse. Describing it anyway costs
+        // a couple of hundred tokens of a small window on every pass, and a longer list of
+        // tools measurably worsens the choice between the ones that do work.
+        run(withTools = true, beside = listOf(SilentTool("read_file", isAvailable = false)))
+
+        assertThat(engine.offered.single().map { it.name }).containsExactly("web_search")
+    }
+
+    @Test
+    fun `a tool that can build no call leaves the other tool's salvage alone`() = runBlocking {
+        // Both names appear, which used to empty the salvage set and lose the search. Only
+        // one of them can produce a call from a question, so only one option was ever on the
+        // table and the model did decide.
+        engine.scripted += ScriptedPass("I will read_file the notes, then web_search for it.")
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        val steps = run(withTools = true, beside = listOf(SilentTool("read_file")))
+
+        assertThat(search.calls).hasSize(1)
+        assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
+    }
+
+    @Test
+    fun `two tools that could both be salvaged is not a decision`() = runBlocking {
+        // The property that rule protects, kept: naming two tools that could each be called
+        // is a model weighing options, and picking one for it would be the app deciding.
+        engine.scripted += ScriptedPass("Either web_search or lookup_place would do here.")
+
+        val steps = run(withTools = true, beside = listOf(RecordingTool("lookup_place")))
+
+        assertThat(search.calls).isEmpty()
+        assertThat(steps).isEmpty()
+    }
+
+    @Test
     fun `the last pass is made to answer rather than asked for more tools`() = runBlocking {
         val call = ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}""")
         // A model that would keep searching forever, to prove the loop stops it.
@@ -309,11 +347,12 @@ class TurnRunnerTest {
     private suspend fun run(
         withTools: Boolean,
         mode: AgentMode = AgentMode.AUTO,
+        beside: List<Tool> = emptyList(),
     ): List<AgentStep> {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
         val runner = TurnRunner(
             engine = engine,
-            tools = ToolRegistry(listOf(search)),
+            tools = ToolRegistry(listOf(search) + beside),
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
         )
         val steps = mutableListOf<AgentStep>()
@@ -354,6 +393,22 @@ class TurnRunnerTest {
 
         override fun callFor(question: String): ToolCall? =
             ToolCall(id = "", name = definition.name, argumentsJson = """{"query":"$question"}""")
+    }
+
+    /**
+     * A tool that builds no call from a question, which is every tool that reaches a file.
+     *
+     * [Tool.callFor] is left at its default on purpose: a path or a search pattern cannot be
+     * recovered from what the user typed, so there is nothing to salvage.
+     */
+    private class SilentTool(name: String, override val isAvailable: Boolean = true) : Tool {
+        override val definition = ToolDefinition(
+            name = name,
+            description = "Reads a file.",
+            parametersJson = """{"type":"object","properties":{"path":{"type":"string"}}}""",
+        )
+
+        override suspend fun run(call: ToolCall): String = "read something"
     }
 
     /** Keeps the steps and ignores everything the screen would have done with them. */

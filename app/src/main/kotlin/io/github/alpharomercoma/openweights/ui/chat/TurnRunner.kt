@@ -105,7 +105,13 @@ class TurnRunner @Inject constructor(
         // Read once per turn, not once per app start: a tool switched off mid-conversation
         // should be off for the next thing asked, and a registry captured at construction
         // would keep offering it until the process died.
-        val active = tools.enabled(switches.enabled(tools.all.map { it.definition.name }))
+        //
+        // Availability is checked in the same breath as the switches, because a tool the user
+        // left on but which has nothing to work with should not reach the prompt either. That
+        // is a live question rather than a setting: a folder grant can be revoked from
+        // Settings between one turn and the next.
+        val offered = tools.all.filter { it.isAvailable }.map { it.definition.name }
+        val active = tools.enabled(switches.enabled(offered))
         val agent = AgentRunner(active)
 
         // Said once per turn, because "why did it not search" has three possible answers
@@ -294,18 +300,26 @@ class TurnRunner @Inject constructor(
  * which cost more than the search it was trying to produce, and a model pushed into a
  * shape it was not going to choose kept generating past the call.
  *
- * Empty unless exactly one tool is named, because two names is a model weighing options
- * rather than deciding, and empty for anything with side effects the user should see
- * coming, which is what [Tool.alwaysAsk] already marks.
+ * Empty unless exactly one call can be built, because two is a model weighing options rather
+ * than deciding, and empty for anything with side effects the user should see coming, which
+ * is what [Tool.alwaysAsk] already marks.
+ *
+ * Counted over the calls rather than over the names that appear, so a tool which can build
+ * nothing from a question does not take another tool's salvage down with it. A file tool
+ * cannot build one: a path or a search pattern is not recoverable from what the user asked,
+ * which is why [Tool.callFor] is left unimplemented there, and why naming one in prose is
+ * not a second option being weighed.
  */
 private fun String.salvagedCall(
     tools: ToolRegistry,
     conversation: List<ChatMessage>,
 ): List<ToolCall> {
-    val named = tools.all.filter { contains(it.definition.name, ignoreCase = true) }
-    val tool = named.singleOrNull()?.takeUnless { it.alwaysAsk } ?: return emptyList()
     val question = conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
-    return listOfNotNull(tool.callFor(question))
+    val salvageable = tools.all
+        .filter { contains(it.definition.name, ignoreCase = true) }
+        .filterNot { it.alwaysAsk }
+        .mapNotNull { it.callFor(question) }
+    return listOfNotNull(salvageable.singleOrNull())
 }
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */

@@ -48,6 +48,17 @@ interface Tool {
     val alwaysAsk: Boolean get() = false
 
     /**
+     * Whether this tool can do anything at all as things stand.
+     *
+     * False keeps the definition out of the prompt entirely, rather than advertising
+     * something whose only possible answer is a refusal. A tool waiting on a folder nobody
+     * has chosen costs a couple of hundred tokens of a two thousand token window to describe
+     * every pass, and the cost is not only the tokens: picking the right tool gets measurably
+     * harder as the list grows, so an unusable entry makes the usable ones worse.
+     */
+    val isAvailable: Boolean get() = true
+
+    /**
      * Runs the call and returns what the model should be told.
      *
      * Failures come back as text rather than exceptions, because a model that is told

@@ -828,13 +828,37 @@ StopReason Session::generate(
         }
         // Compared against the cache position rather than the token count, because a
         // previous turn with an attachment leaves positions filled that no token describes.
+        //
+        // The answer matters and used to be thrown away. A transformer's cache can be cut at
+        // any position, but a recurrent or hybrid one carries a running state rather than a
+        // row per token, so it can only roll back as far as it kept snapshots for, which by
+        // default is none. It says so by returning false, and the old code rewound n_past_
+        // anyway. Nothing was removed, and llama_batch_get_one leaves the positions unset, so
+        // the next batch was placed after the tail that was supposed to be gone: the model
+        // attended to text nobody could see, the cache grew on every turn, and thirty or so
+        // generations later llama_decode returned 1 with no slot left. That is the LFM2
+        // failure, and Granite-hybrid, Jamba and Nemotron-H reach it by the same route.
+        //
+        // So a refusal means starting over. It costs a full prefill on those families and
+        // buys a session that stays correct.
         if (static_cast<int32_t>(reusable) < n_past_) {
-            llama_memory_seq_rm(llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
+            const bool rolled_back = llama_memory_seq_rm(
+                llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
+            if (!rolled_back) {
+                reset();
+                reusable = 0;
+            }
         }
         cached_.resize(reusable);
         n_past_ = static_cast<int32_t>(reusable);
 
         if (!ingest_prompt(prompt_tokens, reusable, error)) {
+            // Whatever decoded before the stop is in the cache, and the bookkeeping above says
+            // it is not: cached_ and n_past_ still describe the prefix, not the batches that
+            // went in after it. Left that way the next turn finds nothing to remove, appends
+            // after the orphaned tokens, and answers from a conversation with a ghost in it.
+            // Pressing Stop during a long prefill is the ordinary way to reach this.
+            reset();
             // Stop during prefill is not a failure, and reporting it as one would put an
             // error on screen for something the user asked for.
             return cancelled_.load(std::memory_order_relaxed)

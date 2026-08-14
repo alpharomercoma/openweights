@@ -720,7 +720,7 @@ class ChatViewModel @Inject constructor(
             val turnStartedAt = System.currentTimeMillis()
             var lastFrameAt = 0L
             var reasoningEndedAt: Long? = null
-            var raw = ""
+            var produced = ""
 
             // What the turn will write down, replaced by each pass that completes, so what
             // survives is the pass the turn ended on rather than the one that asked for a
@@ -729,8 +729,8 @@ class ChatViewModel @Inject constructor(
             var settled: Pair<String, GenerationStats>? = null
 
             val listener = object : TurnListener {
-                override fun onText(text: String) {
-                    raw = text
+                override fun onText(raw: String) {
+                    produced = raw
                     // Not every token: re-parsing the whole reply and rebuilding its
                     // markdown tree costs more than a frame, so publishing per token on a
                     // phone that is also running the model means the list never settles.
@@ -738,14 +738,14 @@ class ChatViewModel @Inject constructor(
                     if (now - lastFrameAt < STREAM_FRAME_MS) return
                     lastFrameAt = now
 
-                    val parsed = parseAssistantReply(text)
+                    val parsed = parseAssistantReply(raw)
                     if (reasoningEndedAt == null &&
                         parsed.reasoning != null &&
                         !parsed.isReasoningInProgress
                     ) {
                         reasoningEndedAt = System.currentTimeMillis()
                     }
-                    applyStreamedText(text, parsed, reasoningEndedAt, turnStartedAt)
+                    applyStreamedText(raw, parsed, reasoningEndedAt, turnStartedAt)
                 }
 
                 override fun onPass(event: GenerationEvent.Completed, raw: String) {
@@ -761,7 +761,7 @@ class ChatViewModel @Inject constructor(
                 override fun onNextPass() {
                     // Room for the next pass under the same entry, which is what makes a
                     // turn with tools in it read as one answer rather than several.
-                    raw = ""
+                    produced = ""
                     lastFrameAt = 0L
                     updateLastEntry { it.copy(isStreaming = true, text = "", answer = "") }
                 }
@@ -776,7 +776,7 @@ class ChatViewModel @Inject constructor(
                 if (!applyThreadPlan()) return@launch
 
                 isDecoding = true
-                raw = turns.run(
+                produced = turns.run(
                     conversation = conversation,
                     params = state.preferences.toSamplerParams(),
                     mode = _uiState.value.mode,
@@ -796,11 +796,11 @@ class ChatViewModel @Inject constructor(
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
                 // being written, so it is kept and stored like any other reply.
-                finishInterrupted(raw)
+                finishInterrupted(produced)
                 _uiState.update { it.copy(isGenerating = false, pendingApproval = null) }
                 throw cancellation
             } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                finishInterrupted(raw)
+                finishInterrupted(produced)
                 // The cache is whatever the failed decode left behind, and the next turn
                 // would be built on top of it and fail the same way. Clearing it costs one
                 // re-read of the transcript, which is the text still on screen, so nothing
@@ -813,7 +813,7 @@ class ChatViewModel @Inject constructor(
                 isDecoding = false
             }
 
-            settleTurn(raw, turnStartedAt)
+            settleTurn(produced, turnStartedAt)
         }
         generationJob = job
         job.invokeOnCompletion(::releaseTurn)

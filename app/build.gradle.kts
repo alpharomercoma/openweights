@@ -121,6 +121,11 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.okhttp)
+    // The catalogue test builds the real tool set to check every schema a model is shown,
+    // which means reaching the two things core:tools keeps to itself.
+    testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(project(":core:sandbox"))
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)

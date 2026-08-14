@@ -82,9 +82,14 @@ class AgentRunner(
     ): AgentDecision {
         if (calls.isEmpty()) return AgentDecision.Finished
         if (mode == AgentMode.PLAN) {
+            // Answered, not merely refused. Plan mode tells the model not to call anything
+            // and small models call anyway, and a turn that stops on the refusal ends on
+            // whatever fragment preceded the call rather than on a plan. Telling it the
+            // call did not run is what buys the pass in which it writes one.
+            val steps = calls.map { AgentStep.Skipped(it, "plan mode: nothing was run") }
             return AgentDecision.Continue(
-                messages = emptyList(),
-                steps = calls.map { AgentStep.Skipped(it, "plan mode: nothing was run") },
+                messages = steps.map { ChatMessage.toolResult(it.callId(), it.report()) },
+                steps = steps,
             )
         }
         // Counted in rounds rather than in calls, because a model that asks for three

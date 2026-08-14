@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.engine.ComputeDevice
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
@@ -35,6 +36,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import java.io.File
+
+/**
+ * One pass of a turn, as the engine would hand it back.
+ *
+ * [content] is what llama.cpp's parser leaves once it has lifted a call and any thinking
+ * out of the stream, which is not the same string as [text] whenever it recognised
+ * something. [toolCalls] is what it recognised.
+ */
+data class ScriptedPass(
+    val text: String,
+    val content: String = text,
+    val toolCalls: List<ToolCall> = emptyList(),
+    val reason: StopReason = StopReason.END_OF_TURN,
+)
 
 /**
  * An engine that answers instantly, or not at all until told to.
@@ -70,6 +85,24 @@ class FakeInferenceEngine : InferenceEngine {
 
     /** Every conversation the engine was asked to answer, in order. */
     val prompts = mutableListOf<List<ChatMessage>>()
+
+    /**
+     * The tool definitions offered on each call, in order.
+     *
+     * A turn decides pass by pass whether to show the model its tools, and "were tools
+     * offered here" is the question behind most of what the loop does, so it is recorded
+     * rather than inferred from what came back.
+     */
+    val offered = mutableListOf<List<ToolDefinition>>()
+
+    /**
+     * Replies to hand back, one per call, before falling back to a plain answer.
+     *
+     * A tool loop is several passes of one turn, and each has to be able to say something
+     * different: the first asks for a tool, the last answers. Holding and emitting by hand
+     * cannot express that, because the loop calls the engine again on its own.
+     */
+    val scripted = ArrayDeque<ScriptedPass>()
 
     /** What each loaded model claims it can read, keyed by file name. */
     val mediaSupport = mutableMapOf<String, MediaSupport>()
@@ -119,10 +152,19 @@ class FakeInferenceEngine : InferenceEngine {
         tools: List<ToolDefinition>,
     ): Flow<GenerationEvent> {
         prompts += messages
+        offered += tools
         if (!hold) {
+            val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)
             return flow {
-                emit(GenerationEvent.Token(REPLY))
-                emit(GenerationEvent.Completed(StopReason.END_OF_TURN, stats(), REPLY))
+                emit(GenerationEvent.Token(pass.text))
+                emit(
+                    GenerationEvent.Completed(
+                        reason = pass.reason,
+                        stats = stats(),
+                        content = pass.content,
+                        toolCalls = pass.toolCalls,
+                    ),
+                )
             }
         }
         events = Channel(Channel.UNLIMITED)

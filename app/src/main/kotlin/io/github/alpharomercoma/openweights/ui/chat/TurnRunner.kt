@@ -146,7 +146,16 @@ class TurnRunner @Inject constructor(
             // coroutine usually gets there first; usually is not a guarantee.
             if (pass.event.reason != StopReason.END_OF_TURN) return lastRaw
 
-            val calls = pass.event.toolCalls.ifEmpty { pass.raw.salvagedCall(active, conversation) }
+            // Salvage only where a call was invited. It reads a tool's name out of ordinary
+            // prose, which is sound when the model was shown that tool and got the syntax
+            // wrong, and is not sound otherwise: a model whose template cannot render tools
+            // has never been offered one, so "I could use web_search for that" is a remark
+            // about what it cannot do. Ungated, that remark reached the network. On the
+            // pass after the round limit it was merely noise, a step the user never asked
+            // for reported as stopped after two rounds.
+            val salvaged =
+                if (offerTools) pass.raw.salvagedCall(active, conversation) else emptyList()
+            val calls = pass.event.toolCalls.ifEmpty { salvaged }
             if (calls.isEmpty()) return lastRaw
 
             // Said first, then the steps, so the transcript reads in the order it happened.

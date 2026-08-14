@@ -104,9 +104,12 @@ class AgentRunnerTest {
 
         assertThat(ran).isEmpty()
         val continued = decision as AgentDecision.Continue
-        // No tool messages: nothing ran, so there is nothing to tell the model. The steps
-        // are what the transcript shows the user.
-        assertThat(continued.messages).isEmpty()
+        // Told, not merely refused. This used to send nothing, on the reasoning that a
+        // call which did not run has nothing to report, and the turn then ended on the
+        // fragment the model wrote before the call: plan mode with no plan in it. A model
+        // that has to be talked out of calling still needs a pass in which to answer.
+        assertThat(continued.messages.single().role).isEqualTo(ChatRole.TOOL)
+        assertThat(continued.messages.single().text).contains("nothing was run")
         assertThat(continued.steps.single()).isInstanceOf(AgentStep.Skipped::class.java)
     }
 

@@ -114,6 +114,8 @@ class ChatScreenTest {
                     onSend = onSend,
                     onStop = onStop,
                     onRegenerate = {},
+                    onNewChat = {},
+                    onCompact = {},
                 )
             }
         }

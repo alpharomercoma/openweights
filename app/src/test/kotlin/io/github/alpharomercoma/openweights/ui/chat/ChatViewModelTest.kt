@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -285,6 +286,34 @@ class ChatViewModelTest {
         // usage tab is about work done rather than about replies kept.
         val usage = database.usage().observeAll().first().single()
         assertThat(usage.generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
+    }
+
+    @Test
+    fun `stopping while a tool waits for approval frees the screen`() = runTest(dispatcher) {
+        engine.supportsTools = true
+        viewModel.setMode(AgentMode.ASK)
+        loadModel()
+        engine.scripted += ScriptedPass(
+            text = "Let me look.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+            ),
+        )
+
+        viewModel.send("Who is Ada Lovelace?")
+        settle()
+        // The turn is parked on a question only the user can answer.
+        assertThat(viewModel.uiState.value.pendingApproval).isNotNull()
+
+        viewModel.stop()
+        settle()
+
+        // Nothing left holding the screen: no dialog waiting on an answer for a turn
+        // that no longer exists, no row still claiming to be streaming, and a composer
+        // that takes the next question.
+        assertThat(viewModel.uiState.value.pendingApproval).isNull()
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+        assertThat(viewModel.uiState.value.transcript.none { it.isStreaming }).isTrue()
     }
 
     @Test

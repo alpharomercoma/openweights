@@ -69,6 +69,12 @@ val VERIFY_TASKS = listOf(
     // R8 and the manifest that reaches Play.
     "lintRelease",
     "assembleDebug",
+    // Compiled here even though it cannot be run here. Nothing in this tier builds the
+    // instrumentation sources, so they rotted quietly: a composable gained two parameters
+    // and the screen test that calls it had not compiled since, which nobody found out
+    // until the next person needed to run it. Compiling costs seconds and is the whole
+    // difference between a device tier that works when reached for and one that does not.
+    "assembleDebugAndroidTest",
     "testDebugUnitTest",
 )
 

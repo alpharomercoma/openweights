@@ -458,6 +458,51 @@ adb shell am instrument -w -r \
 
 Note the class name has no `.test` suffix even though the APK's application id does.
 
+The same recipe runs `:app`'s instrumentation, which now carries `HarnessSmokeTest`: the
+whole turn loop against real weights, asserting only that the turn ended, that nothing
+native went wrong, that the reply is not empty and that no tool syntax leaked into it.
+Swap the module and the class name:
+
+```sh
+./gradlew :app:assembleDebugAndroidTest
+adb push app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk /data/local/tmp/owtest.apk
+adb shell pm install -r -t --user 0 /data/local/tmp/owtest.apk
+adb shell am instrument -w -r \
+  -e class io.github.alpharomercoma.openweights.ui.chat.HarnessSmokeTest \
+  io.github.alpharomercoma.openweights.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+## The harness has contracts, and they are tested on the host (2026-08-14)
+
+The prompt engineering decisions in this repo are each justified by a measurement written
+into a KDoc: `ANSWER_STYLE` costing 2,900 tokens before it existed and 286 after,
+`DEFAULT_MAX_ROUNDS` at two because four measured at five and a half minutes. Those notes
+are rationale. They were never protection: nothing failed when one of them changed.
+
+`TurnRunnerTest` and the harness cases in `ChatViewModelTest` are the protection. They
+script `FakeInferenceEngine` pass by pass, so the loop can be asserted without a model's
+judgement in the way, and they run in the host tier under `./gradlew verify`:
+
+- a tool named in prose is not run when tools were never offered, and is when they were
+- never more than two rounds of tools, then exactly one pass with none
+- every call the model makes is answered before the next pass
+- plan mode runs nothing and still reaches an answer
+- what a tool returns is cut to the context that is actually left
+- a conversation that has to fold before its turn folds rather than throwing
+- a turn with a tool in it is stored as one reply, and its work counted per pass
+- a folded conversation still reports what its summary costs
+- stopping while a tool waits for approval frees the screen
+- a message that could not be saved says so
+
+Six defects found on 2026-08-14 are the reason each of those exists. The worst two: a
+conversation past three quarters full crashed the app on Send, because the compactor read
+the composer's busy flag as "the engine is decoding"; and every pass of a tool turn was
+written to storage, so a chat that searched reopened with a message the user never saw.
+
+`verify` now also compiles `assembleDebugAndroidTest`. It did not, and the instrumentation
+sources had rotted: `ChatScreen` gained two parameters and the screen test calling it had
+not compiled since.
+
 ## Artifact sizes (2026-08-10)
 
 | artifact | size |

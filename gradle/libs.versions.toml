@@ -28,6 +28,7 @@ turbine = "1.2.1"
 mockwebserver = "5.4.0"
 detekt = "1.23.8"
 ktlint = "14.2.0"
+kover = "0.9.9"
 
 [libraries]
 # Gradle plugin artifacts, used only by build-logic convention plugins
@@ -108,3 +109,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

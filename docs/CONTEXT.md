@@ -503,6 +503,37 @@ written to storage, so a chat that searched reopened with a message the user nev
 sources had rotted: `ChatScreen` gained two parameters and the screen test calling it had
 not compiled since.
 
+### Coverage (2026-08-14)
+
+`./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,
+so anything only a device can run reads as zero here even where a device test covers it.
+
+| area | line coverage |
+| --- | ---: |
+| whole project | **27%** |
+| `core/common/model` | 97% |
+| `core/data` | 66% |
+| `core/tools` | 49% |
+| `ui/chat` | 32% |
+| every Compose screen outside chat | 0% |
+
+The aggregate is not the interesting number. Coverage of the turn loop and what it writes,
+which is where this month's defects were, is high because the tests were written against
+them one at a time:
+
+| | |
+| --- | ---: |
+| `AgentRunner`, `ChatWriter`, `CompactionPolicy` | 100% |
+| `TurnRunner` | 98% |
+| `ConversationCompactor` | 97% |
+| `ChatViewModel` | 91% |
+
+The zeros are Compose: Discover, Dashboard, Settings, Models, and the design system. Chat is
+the only screen with tests, and those run on a device. No threshold fails the build, on
+purpose: a percentage over a Compose screen says more about how much of it is a lambda than
+about whether it works, and a number that must be met is a number people write tests
+against.
+
 ## Artifact sizes (2026-08-10)
 
 | artifact | size |

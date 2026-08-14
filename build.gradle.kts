@@ -8,11 +8,13 @@ plugins {
     alias(libs.plugins.room) apply false
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.kover)
 }
 
 subprojects {
     apply(plugin = rootProject.libs.plugins.ktlint.get().pluginId)
     apply(plugin = rootProject.libs.plugins.detekt.get().pluginId)
+    apply(plugin = rootProject.libs.plugins.kover.get().pluginId)
 
     configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
         version.set("1.5.0")
@@ -93,4 +95,41 @@ tasks.register("verifyOnDevice") {
             project.tasks.matching { it.name == "connectedDebugAndroidTest" }
         },
     )
+}
+
+/**
+ * Coverage, aggregated over every module.
+ *
+ * `./gradlew koverHtmlReport` writes build/reports/kover/html, and `koverLog` prints the
+ * totals. It measures the host tier only, because that is the tier that runs on every
+ * change; the device tier needs a phone and weights and is reported on separately.
+ *
+ * There is no threshold to fail the build on, deliberately. Most of what is uncovered here
+ * is Compose, where a percentage says more about how much of a screen is a lambda than
+ * about whether the screen works, and a number that has to be met is a number people write
+ * tests against rather than against the behaviour.
+ */
+dependencies {
+    subprojects.forEach { kover(project(it.path)) }
+}
+
+kover {
+    reports {
+        filters {
+            excludes {
+                // Generated, or the pieces of a Compose screen that only a device can run.
+                classes(
+                    "*.BuildConfig",
+                    "*_Factory*",
+                    "*_HiltModules*",
+                    "*Hilt_*",
+                    "dagger.hilt.*",
+                    "hilt_aggregated_deps.*",
+                    "*ComposableSingletons*",
+                    "*_Impl*",
+                )
+                annotatedBy("androidx.compose.ui.tooling.preview.Preview")
+            }
+        }
+    }
 }

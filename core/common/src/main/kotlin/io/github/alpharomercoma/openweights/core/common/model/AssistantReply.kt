@@ -43,23 +43,33 @@ data class AssistantReply(
  */
 fun parseAssistantReply(raw: String): AssistantReply {
     val openIndex = raw.indexOf(OPEN_TAG)
-    val closeIndex = raw.indexOf(CLOSE_TAG)
+    val firstClose = raw.indexOf(CLOSE_TAG)
 
     // No reasoning markers at all: the whole thing is the answer.
-    if (openIndex < 0 && closeIndex < 0) {
+    if (openIndex < 0 && firstClose < 0) {
         return AssistantReply(reasoning = null, answer = raw, isReasoningInProgress = false)
     }
 
-    // Closing tag with no opening tag: the template opened the block for the model.
-    if (openIndex < 0) {
+    // A close before any open is the template having opened the block for the model, so the
+    // stream begins mid-thought. Whatever comes after is the answer, tags and all: a model
+    // asked about thinking tags writes one, and the block it belongs to has already ended.
+    //
+    // The condition used to be openIndex < 0, which missed the case where an opening tag
+    // appears later in the answer. Both indexes were then valid and crossed, and the last
+    // branch here computed substring(43, 11) and threw. Reached on every streamed token and
+    // again on reload, where nothing catches it.
+    if (firstClose >= 0 && (openIndex < 0 || firstClose < openIndex)) {
         return AssistantReply(
-            reasoning = raw.take(closeIndex).trim(),
-            answer = raw.substring(closeIndex + CLOSE_TAG.length).removePrefix("\n"),
+            reasoning = raw.take(firstClose).trim(),
+            answer = raw.substring(firstClose + CLOSE_TAG.length).removePrefix("\n"),
             isReasoningInProgress = false,
         )
     }
 
     val prelude = raw.take(openIndex)
+    // Matched against this block's opening tag rather than the first one anywhere, so a
+    // closing tag written inside the answer cannot be mistaken for this block's end.
+    val closeIndex = raw.indexOf(CLOSE_TAG, openIndex + OPEN_TAG.length)
 
     // Opening tag still unclosed: everything after it is reasoning so far.
     if (closeIndex < 0) {

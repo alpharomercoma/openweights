@@ -78,4 +78,37 @@ class AssistantReplyTest {
         assertThat(reply.reasoning).isNull()
         assertThat(reply.answer).isEmpty()
     }
+
+    @Test
+    fun `a stray opening tag after the close does not take the reply down`() {
+        // The template opens the block, so the stream starts mid-thought and closes it. If
+        // the answer then mentions the tag, the close comes before the open and the two
+        // indexes cross. This used to compute substring(29, 9) and throw, in a coroutine
+        // with no catch above it on the conversation reload path: the chat became
+        // impossible to open, and the process went with it.
+        val reply = parseAssistantReply("weighing it</think>Wrap thoughts in <think> tags.")
+
+        assertThat(reply.reasoning).isEqualTo("weighing it")
+        assertThat(reply.answer).isEqualTo("Wrap thoughts in <think> tags.")
+        assertThat(reply.isReasoningInProgress).isFalse()
+    }
+
+    @Test
+    fun `a close tag inside the answer is left where the model put it`() {
+        // The other crossing: an ordinary block, and then the closing tag written again as
+        // text. The first block is the reasoning and the rest is the answer, whatever it
+        // happens to contain.
+        val reply = parseAssistantReply("<think>short</think>Say </think> to end it.")
+
+        assertThat(reply.reasoning).isEqualTo("short")
+        assertThat(reply.answer).isEqualTo("Say </think> to end it.")
+    }
+
+    @Test
+    fun `an unterminated second thought is still reasoning in progress`() {
+        val reply = parseAssistantReply("<think>first</think>answer<think>second")
+
+        assertThat(reply.reasoning).isEqualTo("first")
+        assertThat(reply.answer).isEqualTo("answer<think>second")
+    }
 }

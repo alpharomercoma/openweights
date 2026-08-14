@@ -49,8 +49,8 @@ class RunScriptTool @Inject constructor(
     override val definition = ToolDefinition(
         name = "run_script",
         description = "Write JavaScript and run it to work something out. Use it for sums, " +
-            "dates and going through data rather than doing it in your head. The last " +
-            "expression is the answer. Name files to read them as inputs['name'].",
+            "dates and going through data rather than doing it in your head. Return the " +
+            "answer, or leave it as the last expression. Name files to read as inputs['x'].",
         parametersJson = """
             {
               "type": "object",

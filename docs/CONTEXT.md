@@ -656,6 +656,63 @@ kept where it works and only an already-broken call is scavenged.
 change. Whether `web_search` gets worse with the file tools registered has not been measured
 on hardware yet, and the answer belongs here when it is.
 
+### What six tools cost, and what actually goes wrong (2026-08-14)
+
+The app carried two tool definitions in the morning and six by the evening, and the
+literature prices a bigger catalogue at anywhere from 7 to 85 percent of tool-selection
+accuracy. `ToolChoiceBenchmark` measures it on the model and the phone that ship: six
+questions answerable with the two web tools alone, at two seeds, once with the small
+catalogue and once with all six. Only questions that mean the same thing to both are used,
+because asking whether the model picks `read_file` when `read_file` is not offered measures
+nothing.
+
+**Two tools scored 2 out of 12. Six tools scored 4 out of 12.** The feared degradation did
+not appear; the larger catalogue was slightly better, and at this sample size that is
+probably noise in the other direction. Either way, the thing worth worrying about was not
+the thing worth worrying about.
+
+**What the numbers actually found is worse, and has nothing to do with how many tools there
+are.** The model's decision to look something up is close to inverted:
+
+| asked | with two | with six |
+| --- | --- | --- |
+| the weather in Manila right now | answered from memory | answered from memory |
+| who won Wimbledon this year | answered from memory | answered from memory |
+| the current population of Tokyo | answered from memory | searched |
+| read this URL | fetched it | fetched it |
+| the capital of France | searched | searched |
+| who wrote Pride and Prejudice | searched | searched |
+
+It does not search for the things it cannot know, and it does search for the things it
+certainly does. Only an explicit address works reliably. That is a bad trade twice over: the
+answer is stale where it matters, and a question the model could answer instantly goes to a
+third party and costs seconds.
+
+Two honest caveats. Counting "searched for the capital of France" as a miss is a product
+opinion rather than a fact, though it is the same opinion that makes the search tool worth
+having. And this contradicts what is recorded further up this document for LFM2.5, which
+reasoned that it knew a thing and answered, and went to look when it did not. That behaviour
+was measured on a different model and does not carry over. Tool-choice findings are about a
+model, not about the harness, and should be labelled with the model that produced them.
+
+### The script tool, driven by the model (2026-08-14)
+
+`run_script` works end to end: asked to multiply two five-figure numbers by writing a script,
+the model called the tool at all three seeds and the sandbox returned the right answer.
+
+The first run was 2 out of 3, and the one failure is worth keeping because it was invisible
+from the host. The model wrote `let result = 48273 * 1179; return result;`, which as a script
+is a syntax error, so nothing ran at all. It was picturing the source as the body of a
+function somebody would call, which is a perfectly reasonable thing to picture. A third of
+the attempts were being lost to the shape of the answer rather than to anything wrong with
+the arithmetic.
+
+The interpreter now reads a script the second way when the first way fails to parse, and
+only then, since a syntax error means nothing executed and there is no work to repeat. A
+genuinely broken script still reports its own complaint rather than the rewriting's. With
+that and one clearer sentence in the tool's description, the same question at the same three
+seeds came back 3 out of 3.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

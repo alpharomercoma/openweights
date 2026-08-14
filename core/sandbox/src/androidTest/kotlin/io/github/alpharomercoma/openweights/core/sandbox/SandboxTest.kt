@@ -64,6 +64,28 @@ class SandboxTest {
     }
 
     @Test
+    fun aScriptThatReturnsIsReadAsAFunctionBody() = runBlocking {
+        // Measured on device: given the same sum three times, the model wrote `return` once
+        // and a bare expression twice. As written the first is a syntax error and nothing
+        // runs at all, so a third of the attempts were being lost to the shape of the answer
+        // rather than to anything wrong with it.
+        val result = sandbox.run("let total = 48273 * 1179; return total;")
+
+        assertThat(result.failed).isFalse()
+        assertThat(result.output).isEqualTo("56913867")
+    }
+
+    @Test
+    fun aGenuinelyBrokenScriptStillHearsAboutItsOwnMistake() = runBlocking {
+        // The other half of that rule. Reading it a second way must not mean reporting the
+        // second reading's complaint, which is about code the model never wrote.
+        val result = sandbox.run("function ( {")
+
+        assertThat(result.failed).isTrue()
+        assertThat(result.output).contains("SyntaxError")
+    }
+
+    @Test
     fun aLoopWithNoEndIsStoppedRatherThanWaitedFor() = runBlocking {
         // The case a memory limit cannot catch, because it allocates nothing. Without the
         // interrupt handler this hangs the turn rather than failing it.

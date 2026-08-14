@@ -125,6 +125,9 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.truth)
+    androidTestImplementation(libs.okhttp)
+    // Only the benchmark reaches the sandbox directly; core:tools keeps it internal.
+    androidTestImplementation(project(":core:sandbox"))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

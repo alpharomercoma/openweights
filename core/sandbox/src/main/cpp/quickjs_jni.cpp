@@ -184,8 +184,33 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
 
     JSValue value = JS_Eval(context, source, strlen(source), "<script>", JS_EVAL_TYPE_GLOBAL);
 
+    // A model writes `return` about as often as it writes a bare expression, because it is
+    // picturing the script as the body of a function somebody will call. As written that is
+    // a syntax error and nothing runs, so it gets the other reading before it gets an error:
+    // measured on device, one attempt in three was lost to exactly this and to nothing else.
+    //
+    // Only after a syntax error, which means nothing executed, so there is no work to repeat
+    // and no output to double up. A runtime failure is left alone, because wrapping it would
+    // not have helped and re-running it would only take longer to say the same thing.
+    std::string firstFailure;
+    if (JS_IsException(value)) {
+        firstFailure = failureOf(context);
+        JS_FreeValue(context, value);
+        value = JS_EXCEPTION;
+        if (firstFailure.find("SyntaxError") != std::string::npos) {
+            const std::string wrapped = "(function(){\n" + std::string(source) + "\n})()";
+            value = JS_Eval(context, wrapped.c_str(), wrapped.size(), "<script>",
+                            JS_EVAL_TYPE_GLOBAL);
+        }
+    }
+
     jboolean failed = JS_IsException(value) ? JNI_TRUE : JNI_FALSE;
-    std::string report = failed ? failureOf(context) : resultOf(context, value);
+    // What the code as written did, not what the second reading of it did. A genuinely
+    // broken script should hear about its own mistake rather than about the rewriting.
+    std::string report = failed ? firstFailure : resultOf(context, value);
+    if (failed == JNI_TRUE && report.empty()) {
+        report = failureOf(context);
+    }
     if (failed == JNI_FALSE && !run.output.empty()) {
         report = report.empty() ? run.output : run.output + report;
     }

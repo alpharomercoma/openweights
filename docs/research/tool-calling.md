@@ -148,6 +148,38 @@ and not a reason to reverse the list: choosing an order from six cases would be 
 cases. The benchmark now carries the arm, so an order can be chosen when there is enough to
 choose on.
 
+## What the under-calling looks like from the user's seat
+
+The tables above are the harness measuring itself. This is the same number arriving in
+somebody's hand. Seven questions typed into the composer of a signed release build on a
+Snapdragon 8 Gen 3, 2026-08-15, Qwen 2.5 1.5B Q4_K_M downloaded through the app's own
+Discover tab:
+
+| Asked | Answered | Right | tok/s |
+|---|---|---|---|
+| 17 times 24, number only | 408 | yes | 18.3 |
+| Who wrote Frankenstein | Mary Shelley | yes | 13.7 |
+| Three primes under ten, commas only | 2, 3, 5 | yes | 22.1 |
+| Capital of Australia, one word | Canberra | yes | 13.3 |
+| In a transformer, what does the KV cache store | "key-value pairs … can be either read-only or writeable depending on the use case" | half | 25.0 |
+| Who won the most recent World Cup final | **"France won the most recent FIFA World Cup final."** | **no** | 23.6 |
+| **"Use web_search to find the current weather in Manila"** | answered without searching | **no** | 25.0 |
+
+Every one of those turns logged `calls=0`. The last row is the sharpest form of it: the tool
+was offered, the user named it in the prompt, and the model still did not emit a call.
+
+Two things follow that the arms above do not show. The first is that the closed questions are
+all correct and fast, so nothing on screen distinguishes the wrong answers from the right
+ones: a confident sentence at 23 tok/s either way. The second is that the failure is not
+noise. France won in 2018 and the question said "most recent"; the same wrong answer came
+back on two different devices, hours apart, from a model that had a search tool in front of
+it the whole time.
+
+This is the product's central weakness and it is a routing problem rather than a speed one.
+`Tool.isAvailable`, the catalogue ceiling and the greedy pass all exist to make this decision
+better, and they have moved it; what they have not done is make a 1.5B model reach for the
+web when the answer it already has feels good enough.
+
 ## The route each answer took
 
 There are three ways a call reaches the app, and they are not equally trustworthy: the

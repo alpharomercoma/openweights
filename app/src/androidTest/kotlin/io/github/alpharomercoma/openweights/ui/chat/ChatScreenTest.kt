@@ -23,6 +23,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.tools.UserQuestion
+import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
+import io.github.alpharomercoma.openweights.core.common.context.TaskStep
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import org.junit.Rule
 import org.junit.Test
@@ -100,11 +103,78 @@ class ChatScreenTest {
         assert(stopped) { "the stop button must reach the view model" }
     }
 
+    /**
+     * The question the model asks when a request could mean two things.
+     *
+     * Driven here rather than through a turn, deliberately. `ask_user` only reaches the screen
+     * when a 1B model chooses to call it, which is not a thing a test can rely on, and what is
+     * worth proving is the half that is ours: that the card renders, that a chip answers it,
+     * and that the answer leaves the screen. Whether the model asks is measured by the
+     * benchmark; whether the app can be answered is this.
+     */
+    @Test
+    fun aQuestionFromTheModelCanBeAnsweredByTapping() {
+        var answered: String? = null
+        showChat(
+            transcript = emptyList(),
+            question = UserQuestion(
+                text = "Which folder did you mean?",
+                options = listOf("Notes", "Documents"),
+            ),
+            onAnswerQuestion = { answered = it },
+        )
+
+        compose.onNodeWithText("Which folder did you mean?").assertIsDisplayed()
+        compose.onNodeWithText("Notes").performClick()
+
+        assert(answered == "Notes") { "the tapped option must reach the model, got $answered" }
+    }
+
+    @Test
+    fun aQuestionCanBeAnsweredInWordsWhenTheOptionsDoNotFit() {
+        // The text box is always there, and this is why: a model that offers no options, or
+        // offers them wrong, still has to be answerable.
+        var answered: String? = null
+        showChat(
+            transcript = emptyList(),
+            question = UserQuestion(text = "Which one did you mean?"),
+            onAnswerQuestion = { answered = it },
+        )
+
+        compose.onNodeWithContentDescription("Answer").performTextInput("the shared one")
+        compose.onNodeWithText("Answer").performClick()
+
+        assert(answered == "the shared one") { "typed answers must reach the model, got $answered" }
+    }
+
+    @Test
+    fun aPlanShowsItsStepsAndTicksTheOneThatWasTapped() {
+        var ticked: Int? = null
+        showChat(
+            transcript = emptyList(),
+            plan = TaskPlan(
+                listOf(TaskStep("Find the notes"), TaskStep("Summarise them")),
+            ),
+            onTickStep = { ticked = it },
+        )
+
+        compose.onNodeWithText("Find the notes").assertIsDisplayed()
+        compose.onNodeWithText("Summarise them").assertIsDisplayed()
+        compose.onNodeWithText("Find the notes").performClick()
+
+        assert(ticked == 0) { "ticking a step must reach the board, got $ticked" }
+    }
+
+    @Suppress("LongParameterList")
     private fun showChat(
         transcript: List<TranscriptEntry>,
         isGenerating: Boolean = false,
         onSend: (String) -> Boolean = { true },
         onStop: () -> Unit = {},
+        plan: TaskPlan? = null,
+        onTickStep: (Int) -> Unit = {},
+        question: UserQuestion? = null,
+        onAnswerQuestion: (String) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -122,6 +192,10 @@ class ChatScreenTest {
                     onRegenerate = {},
                     onNewChat = {},
                     onCompact = {},
+                    plan = plan,
+                    onTickStep = onTickStep,
+                    question = question,
+                    onAnswerQuestion = onAnswerQuestion,
                 )
             }
         }

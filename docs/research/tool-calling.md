@@ -401,6 +401,61 @@ a stop token. It also refused the arithmetic by reasoning that the tools only ac
 It is genuinely fast — 1,706 ms a case against Qwen's 6,088 — and that is the only reason to
 come back to it.
 
+## A template lost in conversion, worth two cases out of six
+
+Arch-Agent 1.5B is the most recently published of the purpose-built callers, April 2026, and
+its GGUF conversions are all broken in the same way. The source keeps its chat template in
+`chat_template.jinja`; llama.cpp's converter reads `chat_template` out of
+`tokenizer_config.json`; so every conversion on the Hub carries **no template at all**. Its
+real one asks for the Hermes envelope, which is the single shape the engine parses natively,
+so the defect costs it exactly the route it was built for.
+
+Both were run, the file as published and the same file with the template put back by
+`gguf-new-metadata`:
+
+| arch-agent-1.5b | renders tools | bare | tagged | reversed | warm | over | under | ordering |
+|---|---|---|---|---|---|---|---|---|
+| as published | **no** | 4/6 | 5/6 | 4/6 | 4/6 | 0 | 2 | **2 of 6** |
+| template restored | yes | **6/6** | **6/6** | **6/6** | **6/6** | **0** | **0** | 0 of 6 |
+
+Same weights, same quantization, same device, one metadata key apart. **6 of 6 in every arm**,
+`picked=[web_search, fetch_url, run_script, null, null, null]`, unmoved by ordering or by a
+warm cache. It is the first model measured here to get every case right, and the first to take
+all three tool cases *and* decline all three others.
+
+The broken row is worth keeping for two reasons. It is the only case anywhere in this file
+where the tagged envelope beat the bare object, 5 against 4, and that is not noise: the model
+was trained on `<tool_call>`, so asking for the tagged shape in the prompt asks for its native
+format. And it has the worst ordering sensitivity of anything tested, 2 of 6, picking
+`fetch_url` forward and `run_script` reversed — a model reduced to choosing one tool, with
+list position deciding which.
+
+## Three purpose-built callers, and what separates them
+
+The same suite, second `pineapple`, all against the Qwen 2.5 control:
+
+| model | size | bare · tagged · rev · warm | over | under | order | cache | ms |
+|---|---|---|---|---|---|---|---|---|
+| **arch-agent-1.5b (restored)** | 986 MB | **6·6·6·6** | 0 | 0 | 0/6 | 0/6 | 8.0–8.8 s |
+| hammer2.1-1.5b | 937 MB | 5·5·5·5 | 0 | 1 | 0/6 | 0/6 | **5.1–5.3 s** |
+| xlam2-1b | 935 MB | 4·4·5·4 | 1 | 1 | 1/6 | 0/6 | 4.8–5.2 s |
+| xlam2-3b | 1823 MB | 4·4·5·4 | 1 | 1 | 1/6 | 0/6 | 8.3–9.1 s |
+| qwen2.5-1.5b *(shipping)* | 1117 MB | 4·4·4·**3** | 0 | 2 | 0/6 | **1/6** | 6.4–6.9 s |
+| functiongemma-270m | 242 MB | 3·3·3·3 | 0 | 3 | 0/6 | 0/6 | **1.7–2.0 s** |
+
+The scores hide the interesting part, which is that the failures are not the same failure.
+
+**Hammer and the xLAMs have opposite blind spots.** Hammer takes `fetch_url` and `run_script`
+and writes `[]` for the weather; both xLAMs take `web_search` and `fetch_url` and miss the
+arithmetic. xLAM-2-3b is the first model in this project to search for the weather at all,
+which is the exact under-call the composer runs kept finding — and it pays for it by searching
+the web to translate "good morning", which is the over-call LFM2.5 was rejected for. Two sides
+of one coin, and neither model has both sides. Arch-Agent restored is the only one that does.
+
+**The 3B bought nothing.** xLAM-2-1b scores what xLAM-2-3b scores, on the same cases, at half
+the disk and 60% of the wall clock. Whatever the extra two billion parameters are for, six
+single-turn routing decisions do not show it.
+
 ## The route each answer took
 
 There are three ways a call reaches the app, and they are not equally trustworthy: the

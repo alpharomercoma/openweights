@@ -90,7 +90,21 @@ import java.time.LocalDate
  */
 @RunWith(AndroidJUnit4::class)
 class ToolChoiceBenchmark {
-    internal data class Case(val prompt: String, val expects: String?)
+    internal data class Case(
+        val prompt: String,
+        val expects: String?,
+        /**
+         * What was said before this prompt, which for most cases is nothing.
+         *
+         * The six original cases each open a conversation, and that is not the shape this app
+         * spends most of its time in. A turn that calls a tool comes back for a second pass
+         * with its own call and the tool's answer already in the transcript, so the decision
+         * that matters most is the one taken *after* something has run. BFCL scores that
+         * separately and small models fall off a cliff on it: 55.62 at 3B against 8.38 at 1B
+         * on the same family. Six single-turn cases cannot see that at all.
+         */
+        val prior: List<ChatMessage> = emptyList(),
+    )
 
     /**
      * One arrangement: the shape a call is asked for in.
@@ -165,6 +179,10 @@ class ToolChoiceBenchmark {
 
             val scored = ARMS.map { arm -> arm to score(engine, name, arm, native) }
             val byLabel = scored.associate { (arm, result) -> arm.label to result }
+            // One arm only. The multi-turn pair exists to answer a question the four arms do
+            // not ask, and running it four times would quadruple the cost of the suite to
+            // repeat an ordering and caching answer this file already has.
+            val multi = score(engine, name, ARMS.first(), native, MULTI, "MULTI")
             // Only the two arms that differ in nothing on a native template. The other two
             // differ on purpose, and comparing them here would call a finding a fault.
             if (native) reportDeterminism(name, listOfNotNull(byLabel["bare"], byLabel["tagged"]))
@@ -172,7 +190,7 @@ class ToolChoiceBenchmark {
             reportDifference(name, "CACHE", byLabel["bare"], byLabel["warm"])
             return scored.flatMap { (arm, result) ->
                 List(result.tally.errored) { "$name/${arm.label} generation failed" }
-            }
+            } + List(multi.tally.errored) { "$name/multi generation failed" }
         } finally {
             engine.close()
         }
@@ -213,12 +231,14 @@ class ToolChoiceBenchmark {
         model: String,
         arm: Arm,
         native: Boolean,
+        cases: List<Case> = CASES,
+        label: String = "SCORE",
     ): Scored {
         val tally = Tally()
         val chosen = mutableListOf<String?>()
-        for (case in CASES) {
+        for (case in cases) {
             val began = System.currentTimeMillis()
-            val choice = runCatching { chosenTool(engine, case.prompt, arm, native) }
+            val choice = runCatching { chosenTool(engine, case, arm, native) }
                 .getOrElse {
                     Log.i(TAG, "FAILED model=$model arm=${arm.label} why=${it.message}")
                     Choice(null, Route.ERROR)
@@ -229,9 +249,9 @@ class ToolChoiceBenchmark {
         }
         Log.i(
             TAG,
-            "SCORE model=$model arm=${arm.label} right=${tally.right}/${CASES.size} " +
+            "$label model=$model arm=${arm.label} right=${tally.right}/${cases.size} " +
                 "over=${tally.overCall} under=${tally.underCall} wrong=${tally.wrongTool} " +
-                "errors=${tally.errored} ms=${tally.millis / CASES.size}",
+                "errors=${tally.errored} ms=${tally.millis / cases.size} picked=$chosen",
         )
         return Scored(tally, chosen)
     }
@@ -290,7 +310,7 @@ class ToolChoiceBenchmark {
 
     private suspend fun chosenTool(
         engine: InferenceEngine,
-        prompt: String,
+        case: Case,
         arm: Arm,
         native: Boolean,
     ): Choice {
@@ -299,10 +319,9 @@ class ToolChoiceBenchmark {
         val tools = catalogue().let { if (arm.reversed) it.reversed() else it }
         val described =
             if (native) "" else "\n\n" + ToolPrompting.describe(tools, arm.format)
-        val messages = listOf(
-            ChatMessage.text(ChatRole.SYSTEM, system() + described),
-            ChatMessage.text(ChatRole.USER, prompt),
-        )
+        val messages = listOf(ChatMessage.text(ChatRole.SYSTEM, system() + described)) +
+            case.prior +
+            ChatMessage.text(ChatRole.USER, case.prompt)
         // Greedy, because TurnRunner forces temperature zero while tools are on the table and
         // an arm sampled any other way is measuring behaviour the app stopped having.
         val params = SHIPPED.copy(maxTokens = BUDGET, seed = SEED, temperature = 0f)
@@ -468,6 +487,43 @@ class ToolChoiceBenchmark {
             Case("Write a haiku about rain.", null),
         )
 
+        /**
+         * The decision taken after something has already run, which is most of them.
+         *
+         * A turn that calls a tool comes back for a second pass carrying its own call and the
+         * tool's answer, so [CASES] measures the shape this app is in least often. These are
+         * kept apart from that list rather than folded into it, because every number in
+         * `docs/research/tool-calling.md` is out of six and a changed denominator would
+         * silently invalidate all of them.
+         *
+         * Two of them, pulling opposite ways, because a set that only rewarded calling again
+         * would rank a model that always calls above one that decides. The first needs a
+         * second call and the second must not have one: the answer is sitting in the tool
+         * result directly above the question.
+         */
+        val MULTI = listOf(
+            Case(
+                prompt = "And what about Cebu?",
+                expects = "web_search",
+                prior = listOf(
+                    ChatMessage.text(ChatRole.USER, "What is the weather in Manila right now?"),
+                    ChatMessage.text(ChatRole.ASSISTANT, "Let me look that up."),
+                    ChatMessage.toolResult("web_search", "Manila: 31C, thunderstorms."),
+                    ChatMessage.text(ChatRole.ASSISTANT, "Manila is 31C with thunderstorms."),
+                ),
+            ),
+            Case(
+                prompt = "What temperature did you say Manila was?",
+                expects = null,
+                prior = listOf(
+                    ChatMessage.text(ChatRole.USER, "What is the weather in Manila right now?"),
+                    ChatMessage.text(ChatRole.ASSISTANT, "Let me look that up."),
+                    ChatMessage.toolResult("web_search", "Manila: 31C, thunderstorms."),
+                    ChatMessage.text(ChatRole.ASSISTANT, "Manila is 31C with thunderstorms."),
+                ),
+            ),
+        )
+
         val BENCH = File("/data/local/tmp/openweights/bench")
 
         /**
@@ -479,13 +535,31 @@ class ToolChoiceBenchmark {
          * the one to drop first if anything has to go, since it shares gemma's route and was
          * the model that used to take the suite down with it.
          *
-         * The last two are a different kind of candidate and are here to be measured against
-         * the rest rather than to cover another template. Every model above is a general chat
+         * The rest are a different kind of candidate and are here to be measured against the
+         * first six rather than to cover another template. Every model above is a general chat
          * model asked to acquire a calling policy afterwards, and the table says the best of
-         * them manages four of six. Hammer is Qwen 2.5 fine-tuned for function calling, at
-         * Q4_0 rather than Q4_K_M because the q6_K tensors in Q4_K_M have no KleidiAI kernel
-         * and cost nearly half the decode rate. FunctionGemma is 270M, small enough that if
-         * it can route at all it can route in front of something else.
+         * them manages four of six; these were trained for the policy itself.
+         *
+         * Quantization is not incidental. Q4_0 wherever the publisher offers it, because the
+         * q6_K tensors inside Q4_K_M have no KleidiAI kernel and cost nearly half the decode
+         * rate on this hardware. Arch-Agent is Q4_K_M only because its own GGUF is unquantized
+         * and no conversion of it publishes Q4_0.
+         *
+         * - hammer: Qwen 2.5 fine-tuned for calling, and the best score recorded here.
+         * - xlam3b, xlam1b: the top of the BFCL board under 4B. The 3B is the one to watch,
+         *   for a reason this suite cannot see: BFCL's multi-turn column falls off a cliff
+         *   with size, 55.62 at 3B against 8.38 at 1B, and every tool turn in this app is
+         *   multi-turn by construction. Six single-turn cases would score both alike.
+         * - arch15b, arch15b-tmpl: the most recently published of them, and the only one after
+         *   2025, twice. Every GGUF conversion of Arch-Agent carries no chat template at all,
+         *   because the source keeps it in `chat_template.jinja` and llama.cpp's converter
+         *   reads `chat_template` out of `tokenizer_config.json`. The model's real template
+         *   asks for the Hermes envelope, which is the one shape the engine parses natively,
+         *   so the conversion costs it exactly the route it was built for. The second entry is
+         *   the same file with the template put back by `gguf-new-metadata`, and the pair
+         *   measures what the defect is worth rather than asserting it.
+         * - fgemma: 270M, small enough that if it can route at all it can route in front of
+         *   something else.
          */
         val MODELS = mapOf(
             "qwen2.5-1.5b" to File(BENCH, "qwen.gguf"),
@@ -495,7 +569,14 @@ class ToolChoiceBenchmark {
             "phi4-mini" to File(BENCH, "phi.gguf"),
             "granite3.3-2b" to File(BENCH, "granite.gguf"),
             "hammer2.1-1.5b" to File(BENCH, "hammer.gguf"),
+            "xlam2-3b" to File(BENCH, "xlam3b.gguf"),
+            "xlam2-1b" to File(BENCH, "xlam1b.gguf"),
+            "arch-agent-1.5b" to File(BENCH, "arch15b.gguf"),
+            "arch-agent-1.5b-tmpl" to File(BENCH, "arch15b-tmpl.gguf"),
             "functiongemma-270m" to File(BENCH, "fgemma.gguf"),
+            "qwen2.5-coder-3b" to File(BENCH, "qwencoder3b.gguf"),
+            "smollm3-3b" to File(BENCH, "smollm3.gguf"),
+            "gemma4-e4b" to File(BENCH, "gemma4e4b.gguf"),
         )
     }
 }

@@ -313,8 +313,8 @@ Two candidates the earlier search had missed, both pushed to `pineapple` and run
   by ggml-org itself.
 
 Scored, both came back at 3/6 with every case a null, against the control's 4/6. Scored, that
-reads as two models that never call anything. Both scores were wrong, and the reason is worth
-more than the models are.
+reads as two models that never call anything. One of those scores was wrong by two cases, and
+the reason it was wrong is worth more than either model is.
 
 ### What they actually wrote
 
@@ -362,13 +362,35 @@ runs whenever the native one comes back empty; and a single-quoted arguments obj
 into JSON. The control is the evidence the fix is neutral — Qwen re-ran **bit-identical**,
 same 4/4/4/3, same `picked`, same `ORDERING 0/6`, same `CACHE 1/6`.
 
-### What is still open
+### What Hammer scores once it can be read
 
-The QDC reservation expired partway through the confirming run, so **Hammer's score with the
-complete fix is not measured yet**. What exists is one partial run with the gate removed but
-the old quote handling still in the app APK, where the reversed arm went 3/6 to 4/6 on a
-`fetch_url` it happened to write in double quotes that time. That is a hint, not a result.
-The run to repeat is the whole benchmark on a fresh device with both APKs current.
+The whole benchmark again on a second `pineapple`, `72c4dabb`, both APKs current:
+
+| | qwen2.5-1.5b | **hammer2.1-1.5b** |
+|---|---|---|
+| bare / tagged / reversed | 4/6 · 4/6 · 4/6 | **5/6 · 5/6 · 5/6** |
+| **warm** | **3/6** | **5/6** |
+| ordering changed | 0 of 6 | 0 of 6 |
+| cache changed | **1 of 6**, and cost a case | **0 of 6** |
+| ms a case | 6153–6823 | **5163–5500** |
+| on disk | 1117 MB | **937 MB** |
+
+`picked=[null, fetch_url, run_script, null, null, null]`, identical in all four arms. It is the
+best score any model has recorded here, from the smallest file, in the least time.
+
+The warm row is the one that decides it. Qwen *loses* a case as soon as the cache is warm, and
+warm is not an exotic condition: it is the state every pass after the first runs in, so a turn
+that has already called a tool is routing at 3/6 rather than the 4/6 on the label. Hammer is
+flat at 5/6 either way, and unmoved by catalogue order too.
+
+The control is what makes that readable. Qwen came back **bit-identical across three runs on
+two physical devices** — same arms, same `picked`, same `ORDERING 0/6`, same `CACHE 1/6`. The
+parser reads more; it does not read differently.
+
+Hammer's one miss is the weather case, where it wrote `[]`, which its template defines as "no
+call needed". That is a judgement rather than a parse failure, and it is the same blind spot
+every model here has: it will not reach for the web unprompted. Nothing in this section touches
+that, and it remains the product's central weakness.
 
 FunctionGemma is a separate matter and the probe is enough to set it aside. It emits a third
 format again — `<start_function_call>call:fetch_url{url=example.com}<end_function_call>`,

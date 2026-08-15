@@ -41,13 +41,20 @@ build cannot tell you.
 |---|---|---|
 | `INTERNET` | Hugging Face search and downloads, and the web tools below | Never prompted; normal permission |
 | `RECORD_AUDIO` | Dictation, through the on-device recogniser only | First time the mic is tapped |
-| `POST_NOTIFICATIONS` | Says a reply has finished, and shows download progress | On first launch |
+| `POST_NOTIFICATIONS` | Says a reply has finished, and shows download progress | The first time a reply or a download starts |
 | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` | Keeps a model download running once the app is off screen | Never prompted; normal permissions |
 
 An earlier version of this document said `POST_NOTIFICATIONS` had been declared, never
 used, and removed. It is declared and it is used: a reply on a phone takes tens of seconds
 and sometimes minutes, which is long enough to put the phone down, and `ReplyNotifier`
-posts exactly one notification when the app is not on screen. `android.hardware.microphone`
+posts exactly one notification when the app is not on screen.
+
+It used to be asked for in `onCreate`, which put a system dialog over the first frame a new
+user ever saw and paused the activity underneath it. The argument for that was sound about
+the wrong end of the wait: by the time a reply lands the phone is in a pocket, which is no
+moment for a dialog. So it is asked when the waiting starts instead, on the first send or the
+first download, with the phone in the user's hand and the reason in front of them. Somebody
+who opens the app to look at it is never asked at all. `android.hardware.microphone`
 is declared `required="false"`, because `RECORD_AUDIO` otherwise makes Play hide the app
 from every device without a microphone, and dictation is one optional way to enter text.
 

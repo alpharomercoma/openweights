@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
@@ -72,6 +73,8 @@ import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
 import io.github.alpharomercoma.openweights.ui.settings.SettingsViewModel
 import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * The app's five destinations, which is the most a bottom bar can hold.
@@ -138,6 +141,17 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val chatViewModel: ChatViewModel = hiltViewModel()
     val mediaViewModel: MediaViewModel = hiltViewModel()
     val modelsViewModel: ModelsViewModel = hiltViewModel()
+
+    // A flow rather than two collected states, because the chat state changes with every
+    // token and nothing above here should recompose for that. What is collected is one
+    // boolean, inside a composable that draws nothing.
+    AskAboutNotifications(
+        waiting = remember(chatViewModel, modelsViewModel) {
+            combine(chatViewModel.uiState, modelsViewModel.uiState) { chat, models ->
+                chat.isGenerating || models.downloads.isNotEmpty()
+            }.distinctUntilChanged()
+        },
+    )
 
     Scaffold(
         modifier = modifier,

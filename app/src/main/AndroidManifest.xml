@@ -4,9 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
-         Asked for on first launch, because a reply on a phone can take minutes and the
-         phone is usually back in a pocket by then. Only ever used to say an answer is
-         ready; nothing is sent anywhere.
+         Asked for the first time a reply or a download is started, which is the moment the
+         phone is in the user's hand and the moment the waiting begins. Only ever used to
+         say an answer is ready or how a download is going; nothing is sent anywhere.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Dictation only. Requested the first time the mic is tapped, never at launch. -->

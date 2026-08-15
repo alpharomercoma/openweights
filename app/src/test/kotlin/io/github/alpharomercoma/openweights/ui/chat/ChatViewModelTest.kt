@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -105,7 +106,12 @@ class ChatViewModelTest {
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             staging = Staging(AttachmentStore(context)),
             writer = writer,
-            turns = TurnRunner(engine, ToolRegistry(listOf(StubTool)), ToolSwitches(context)),
+            turns = TurnRunner(
+                engine,
+                ToolRegistry(listOf(StubTool)),
+                ToolSwitches(context),
+                PlanBoard(),
+            ),
             notifier = ReplyNotifier(context),
             savedState = state,
         )

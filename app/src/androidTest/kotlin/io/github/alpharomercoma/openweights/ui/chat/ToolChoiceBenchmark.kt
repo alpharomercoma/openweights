@@ -99,7 +99,14 @@ class ToolChoiceBenchmark {
      * syntax, so for those models the two arms send byte-identical prompts, which is not
      * waste: it is the determinism check the seed count now rests on, run for free.
      */
-    private data class Arm(val label: String, val format: CallFormat)
+    private data class Arm(
+        val label: String,
+        val format: CallFormat = CallFormat.BARE,
+        /** Reversed, to find out whether being listed first is worth anything. */
+        val reversed: Boolean = false,
+        /** Asked on a cache the same conversation warmed, rather than from nothing. */
+        val warm: Boolean = false,
+    )
 
     /** How a call was found, in the order [TurnRunner] looks for one. */
     private enum class Route { NATIVE, PROMPTED, SALVAGE, NONE, ERROR }
@@ -156,7 +163,12 @@ class ToolChoiceBenchmark {
             probeRendering(engine, name, native)
 
             val scored = ARMS.map { arm -> arm to score(engine, name, arm, native) }
-            if (native) reportDeterminism(name, scored.map { it.second })
+            val byLabel = scored.associate { (arm, result) -> arm.label to result }
+            // Only the two arms that differ in nothing on a native template. The other two
+            // differ on purpose, and comparing them here would call a finding a fault.
+            if (native) reportDeterminism(name, listOfNotNull(byLabel["bare"], byLabel["tagged"]))
+            reportDifference(name, "ORDERING", byLabel["bare"], byLabel["reversed"])
+            reportDifference(name, "CACHE", byLabel["bare"], byLabel["warm"])
             return scored.flatMap { (arm, result) ->
                 List(result.tally.errored) { "$name/${arm.label} generation failed" }
             }
@@ -260,6 +272,25 @@ class ToolChoiceBenchmark {
             .that(identical).isTrue()
     }
 
+    /**
+     * How much two arms disagreed, case by case.
+     *
+     * A count rather than a verdict. Both of these are questions nobody here has an answer
+     * to: whether a tool listed first is picked more often, and whether the same prompt
+     * routes differently over a warm cache than a cold one. Either coming back non-zero
+     * would mean every cold number in this file describes one of two behaviours.
+     */
+    private fun reportDifference(model: String, what: String, base: Scored?, other: Scored?) {
+        if (base == null || other == null) return
+        val differing = base.chosen.zip(other.chosen).count { (one, two) -> one != two }
+        Log.i(
+            TAG,
+            "$what model=$model differing=$differing/${base.chosen.size} " +
+                "right=${base.tally.right}->${other.tally.right} " +
+                "base=${base.chosen} other=${other.chosen}",
+        )
+    }
+
     private suspend fun chosenTool(
         engine: InferenceEngine,
         prompt: String,
@@ -268,8 +299,9 @@ class ToolChoiceBenchmark {
     ): Choice {
         // The same split TurnRunner makes: a template that can carry the definitions gets
         // them, and one that cannot gets them written into what it can carry.
+        val tools = catalogue().let { if (arm.reversed) it.reversed() else it }
         val described =
-            if (native) "" else "\n\n" + ToolPrompting.describe(catalogue(), arm.format)
+            if (native) "" else "\n\n" + ToolPrompting.describe(tools, arm.format)
         val messages = listOf(
             ChatMessage.text(ChatRole.SYSTEM, system() + described),
             ChatMessage.text(ChatRole.USER, prompt),
@@ -277,17 +309,42 @@ class ToolChoiceBenchmark {
         // Greedy, because TurnRunner forces temperature zero while tools are on the table and
         // an arm sampled any other way is measuring behaviour the app stopped having.
         val params = SHIPPED.copy(maxTokens = BUDGET, seed = SEED, temperature = 0f)
-        val offered = if (native) catalogue() else emptyList()
+        val offered = if (native) tools else emptyList()
         // Cleared before each case, so a case is not measured on the cache the previous one
         // left. It also keeps the window from filling over a run, which is what
         // llama_decode returned 1 was: the sixth model died partway through the old suite
         // and took its remaining arms with it.
+        //
+        // Except in the warm arm, which exists because clearing it is exactly what makes
+        // every other number here a cold one. In the app the second pass of a turn reads a
+        // cache the first pass filled, and whether that changes which tool comes back had
+        // never been asked.
         engine.resetContext()
+        if (arm.warm) warmTheCache(engine, messages, offered)
         val completed = engine.chat(messages, params, tools = offered)
             .toList()
             .filterIsInstance<GenerationEvent.Completed>()
             .single()
         return read(completed, native, prompt)
+    }
+
+    /**
+     * Puts this exact prompt through once and throws the answer away.
+     *
+     * What is left behind is the whole prompt in the cache, which is the state the app is in
+     * on the second and later passes of a turn. The reuse walk then matches every token and
+     * decodes only the last one, so the arithmetic is the same as a cold run everywhere
+     * except in the kernels: cold prefill runs the prompt as a few large batches, warm reads
+     * it back out of the cache. If those disagree, greedy routing can flip on it, because at
+     * temperature zero the decision is an argmax over logits that are often close.
+     */
+    private suspend fun warmTheCache(
+        engine: InferenceEngine,
+        messages: List<ChatMessage>,
+        offered: List<ToolDefinition>,
+    ) {
+        val once = SHIPPED.copy(maxTokens = 1, seed = SEED, temperature = 0f)
+        engine.chat(messages, once, tools = offered).toList()
     }
 
     /**
@@ -383,8 +440,15 @@ class ToolChoiceBenchmark {
          * had nothing to say at all.
          */
         val ARMS = listOf(
-            Arm("bare", CallFormat.BARE),
-            Arm("tagged", CallFormat.TAGGED),
+            Arm("bare"),
+            Arm("tagged", format = CallFormat.TAGGED),
+            // Whether being listed first is worth anything. Ordered choices are known to be
+            // order sensitive in larger models, and nothing says a 1B is less so, but the
+            // size of it on a catalogue of three had never been measured here.
+            Arm("reversed", reversed = true),
+            // And whether the answer depends on the cache it was asked over, which is the
+            // question every other arm assumes away by clearing it first.
+            Arm("warm", warm = true),
         )
 
         /**

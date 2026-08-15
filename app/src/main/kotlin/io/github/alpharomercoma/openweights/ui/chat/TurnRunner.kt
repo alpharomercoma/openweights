@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.util.Log
+import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
@@ -30,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -79,7 +81,18 @@ class TurnRunner @Inject constructor(
     private val engine: InferenceEngine,
     private val tools: ToolRegistry,
     private val switches: ToolSwitches,
+    private val plans: PlanBoard,
 ) {
+
+    /**
+     * The plan the app is holding, for the screen to show and the user to tick.
+     *
+     * Reached through here rather than injected beside the view model's six other
+     * collaborators, because the plan is part of the turn machinery and this already owns it.
+     * The view model is at both of detekt's limits for a class and has been since before this
+     * feature; adding a seventh constructor parameter to it would be the wrong way to pay.
+     */
+    val planning: PlanBoard get() = plans
 
     /**
      * True when at least one tool is switched on.
@@ -199,8 +212,11 @@ class TurnRunner @Inject constructor(
                 // temperature the user set.
                 val mayCall =
                     withTools && round < maxRounds && ToolBudget(headroomTokens()).hasRoom
+                // Pinned for this pass only, never folded into the accumulator: the block
+                // changes as steps are ticked, and anything that changes has to sit at the
+                // very end or it moves tokens the cache has already read.
                 val pass = streamOnce(
-                    messages,
+                    messages.pinning(plans.plan.value),
                     params.deciding(mayCall),
                     active,
                     renderTools,
@@ -525,6 +541,23 @@ private fun List<ChatMessage>.closing(maxRounds: Int): List<ChatMessage> {
     val told = "${last.text}\n\nThat was the last of $maxRounds rounds, so there are no " +
         "more tool calls. Answer the question now from what you already have."
     return dropLast(1) + ChatMessage.text(ChatRole.TOOL, told).copy(toolCallId = last.toolCallId)
+}
+
+/**
+ * The conversation with the plan's state stuck to the end of the last thing in it.
+ *
+ * The tail, and not the system message, for the reason everything volatile goes there: the
+ * cached prefix is compared token by token from the front, so a block that changes when a
+ * step is ticked would move everything behind it. It is also the position a small model
+ * attends to best, which is the same reason Claude Code puts its reminders into user-turn
+ * content rather than into the instructions.
+ */
+private fun List<ChatMessage>.pinning(plan: TaskPlan?): List<ChatMessage> {
+    val block = plan?.statusBlock().orEmpty()
+    if (block.isEmpty()) return this
+    val last = lastOrNull() ?: return this
+    return dropLast(1) +
+        ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
 }
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */

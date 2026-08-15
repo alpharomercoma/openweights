@@ -45,6 +45,7 @@ import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
@@ -862,6 +863,13 @@ class ChatViewModel @Inject constructor(
                 pendingApproval = null,
             )
         }
+        // Only in plan mode, and only from a reply that actually listed steps. A model that
+        // answered instead of planning has proposed nothing, and putting a plan on screen it
+        // never wrote would be the app inventing one.
+        if (_uiState.value.mode == AgentMode.PLAN) {
+            val proposed = _uiState.value.transcript.lastOrNull()?.answer.orEmpty()
+            turns.planning.propose(proposed)
+        }
         compactIfNeeded()
         notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
     }
@@ -912,6 +920,14 @@ class ChatViewModel @Inject constructor(
     }
 
     /** Switches how much the model may do without being asked. */
+    /**
+     * The plan the app is holding, which the screen shows and the user can tick.
+     *
+     * Handed out rather than mirrored into [ChatUiState]: it is already a flow, and a second
+     * copy would be a second thing to keep in step for nothing.
+     */
+    val planning: PlanBoard get() = turns.planning
+
     fun setMode(mode: AgentMode) = _uiState.update { it.copy(mode = mode) }
 
     /**
@@ -1018,6 +1034,7 @@ class ChatViewModel @Inject constructor(
             generationJob?.join()
             runtime.resetContext()
             conversationId = null
+            turns.planning.clear()
             _uiState.update {
                 it.copy(
                     transcript = emptyList(),

@@ -5,17 +5,38 @@ below was checked against the build rather than assumed.
 
 ## Verified in the build
 
+Everything in this table was re-checked against the artifact on 2026-08-15, not against the
+intent. Where a row says "measured", the command is in the row.
+
 | Requirement | State | How it was checked |
 |---|---|---|
-| `targetSdk` 36 | Done | Required for new apps from 2026-08-31 |
-| 16 KB page alignment | Done | All 18 native libraries have `2**14` LOAD alignment |
-| ABI | arm64-v8a only | 32-bit ARM cannot usefully run inference |
+| `targetSdk` 36 | Done | `aapt2 dump badging` on the release APK |
+| 16 KB page alignment | Done | All **19** native libraries report `2**14` LOAD alignment under `llvm-objdump -p` |
+| ABI | arm64-v8a only | `native-code: 'arm64-v8a'` in the badging dump |
 | R8 minify and resource shrink | On, **and the result is run on a device** | See below |
-| Android lint, release variant | Clean | Now part of `./gradlew verify` |
+| JNI names survive R8 | Done | `verifyJniSymbols`: all 6 names present in both the APK and the AAB |
+| Debuggable | Off | No `application-debuggable` in the badging dump |
+| Android lint, release variant | Clean | Part of `./gradlew verify` |
 | Upload signing | Config reads from `keystore.properties` or environment | Never from the repository |
 | Cleartext traffic | Disabled | `usesCleartextTraffic="false"` |
 | Backup and device transfer | Everything excluded | `data_extraction_rules.xml` |
-| Download size | 20.9 MB AAB, no bundled model | Under the 200 MB cellular threshold with room to spare |
+| Download size | **23.5 MB AAB**, no bundled model | Under the 200 MB cellular threshold with room to spare |
+
+### The release build was run, not just built
+
+A minified, resource-shrunk release APK signed with a throwaway key was installed on a
+Snapdragon 8 Gen 3 and driven by hand: the app launched, chose
+`libggml-cpu-android_armv8.6_1.so`, registered the OpenCL backend, loaded LFM2.5 2.6B at a
+4096 token window, and answered a question at 9.8 tok/s. Tools were offered and none were
+called, which is the right answer to "name one colour".
+
+That is the check nothing else can stand in for. R8 does not run in a debug build, and the
+one failure this catches, a renamed JNI symbol, is invisible until a user loads a model.
+`verifyJniSymbols` is the cheap guard and this is the real one; do both.
+
+The throwaway key is exactly that. It lives outside the repository, it is not the upload key,
+and it exists only so a minified build can be installed. Play App Signing is still step one
+of the Console work.
 
 ### R8 nearly shipped a broken app
 
@@ -37,12 +58,33 @@ build cannot tell you.
 
 ## Permissions, and why each one exists
 
+Nine, not five. The four at the bottom are WorkManager's and are in the shipped manifest
+whether or not anybody writes them down; this table used to list only the ones we declare by
+hand, which is not the same list a reviewer sees.
+
 | Permission | Why | When asked |
 |---|---|---|
 | `INTERNET` | Hugging Face search and downloads, and the web tools below | Never prompted; normal permission |
 | `RECORD_AUDIO` | Dictation, through the on-device recogniser only | First time the mic is tapped |
 | `POST_NOTIFICATIONS` | Says a reply has finished, and shows download progress | The first time a reply or a download starts |
 | `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` | Keeps a model download running once the app is off screen | Never prompted; normal permissions |
+| `WAKE_LOCK` | WorkManager, so a download in progress is not suspended mid-transfer | Never prompted |
+| `ACCESS_NETWORK_STATE` | WorkManager, to honour the "needs a network" constraint on a download | Never prompted |
+| `RECEIVE_BOOT_COMPLETED` | WorkManager, to resume an unfinished download after a reboot | Never prompted |
+| `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | WorkManager's own signature permission, guarding its internal broadcasts | Never prompted, not user visible |
+
+`RECEIVE_BOOT_COMPLETED` is the one that looks alarming on a listing, so it is worth being
+able to answer for: nothing of ours runs at boot. It is there so that a model download the
+user started, which can be gigabytes and take longer than a phone stays awake, survives a
+restart instead of beginning again. Removing it would need `tools:node="remove"` and would
+break exactly that.
+
+**Implied features.** `aapt2 dump badging` reports `android.hardware.faketouch` and
+`android.hardware.screen.portrait`, neither of which is declared. They are derived, the second
+from `android:screenOrientation="portrait"` on the activity, and Play filters devices on
+implied features as well as declared ones. In practice that excludes nothing with a touch
+screen, but it is the reason the listing should not promise anything about desktop-shaped
+devices.
 
 An earlier version of this document said `POST_NOTIFICATIONS` had been declared, never
 used, and removed. It is declared and it is used: a reply on a phone takes tens of seconds
@@ -193,6 +235,9 @@ by row with the reasoning behind each, the generative AI declaration, and the co
 notes. What is left is the part that needs a person, a key, or a graphics tool.
 
 1. Create the upload key and enrol in Play App Signing. Never commit it.
+   Upload `app/build/outputs/mapping/release/mapping.txt` with the bundle, or every crash in
+   the pre-launch report and in Android vitals arrives as `q90.a()`. It is 53 MB and is
+   produced by every release build; Play takes it from the same upload screen.
 2. Publish [privacy-policy.md](privacy-policy.md) at a public URL and paste it into the
    Console. GitHub Pages on this repository is enough.
 3. Make the feature graphic and the phone screenshots. Sizes are in the listing document.
@@ -205,9 +250,11 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 
 ## Known gaps a reviewer would be right to raise
 
-- **No baseline profile**, so first-run startup and first scroll are slower than they need
-  to be. The release build carries the merged profiles of the AndroidX libraries it uses
-  and nothing of its own.
+- **No baseline profile of our own**, so first-run startup and first scroll are slower than
+  they need to be. Confirmed rather than assumed: the release APK ships a 10.6 KB
+  `baselineProfiles/0/app-release-unsigned.dm`, which is the merged profiles of the AndroidX
+  libraries and nothing of ours. Generating one needs a Macrobenchmark module and a device or
+  emulator to run it on.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
   unless a user opens an issue. The pre-launch report partly covers this.
 - **The web tools are on by default.** `web_search` and `fetch_url` are switched on the

@@ -385,7 +385,7 @@ class ToolChoiceBenchmark {
         val workspace = Workspace(context, WorkspaceGrant(context))
         return ToolRegistry(
             listOf(
-                WebSearchTool(client, SearchSettings()),
+                WebSearchTool(client, SearchSettings(context)),
                 FetchUrlTool(client),
                 SearchFilesTool(workspace),
                 ReadFileTool(workspace),

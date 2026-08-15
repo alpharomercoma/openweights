@@ -63,7 +63,7 @@ class ToolCatalogueTest {
         val client = OkHttpClient()
         val workspace = Workspace(context, WorkspaceGrant(context))
         listOf(
-            WebSearchTool(client, SearchSettings()),
+            WebSearchTool(client, SearchSettings(context)),
             FetchUrlTool(client),
             SearchFilesTool(workspace),
             ReadFileTool(workspace),

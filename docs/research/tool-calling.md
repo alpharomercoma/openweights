@@ -275,9 +275,19 @@ Two details worth keeping about the pass itself. It called `fetch_url` rather th
 one; the app does not build the call, so which tool is still the model's to choose. And
 `fetch_url` asks every time, so the user saw an approval card mid-turn.
 
-What this rules out is a whole family of fixes: any repair that spends another full generation
-inherits this multiplier, because the expensive part is the model deciding, not the app
-asking. A cheaper fix has to avoid the second generation altogether.
+What the multiplier is *made of* is not settled by this row, and the obvious reading is
+probably wrong. The after turn did three things the before turn did not: it generated a second
+time, it ran two tools instead of none, and it put a fetched page into the context. The third
+is the one with a number attached — `fetch_url` returns up to 4,000 characters, roughly a
+thousand tokens, and `ToolBudget` will hand over every one of them when the window has room.
+
+Set beside the LFM2.5 table above, that reading gets sharper. The turn that searched and did
+not fetch took 25 s. The two turns that fetched took 457 s and 799 s. Three points is not a
+result, but it is the difference between "a second generation is unaffordable" and "a fetched
+page is unaffordable", and those two beliefs lead to completely different work. **Measure it
+before building on either**: same question, same model, `fetch_url` switched off so only
+`web_search` is on the table. If the World Cup turn comes back in under a minute, the cost is
+the page rather than the pass, and it is a cap away from being fixed.
 
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right

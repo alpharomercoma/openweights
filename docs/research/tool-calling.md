@@ -124,7 +124,7 @@ answer. Two arms, 2026-08-15, on `pineapple`:
 |---|---|---|---|
 | qwen2.5-1.5b | yes | 0 of 6 changed | 0 of 6 changed |
 | gemma3-1b | no | **3 of 6 changed** | 0 of 6 changed |
-| LFM2.5-2.6B | yes | **1 of 6 changed** | 0 of 6 changed |
+| LFM2.5-2.6B | yes | **2 of 6 changed** | 0 of 6 changed |
 
 **Caching: nothing, 0 of 18.** Prefilling the same prompt cold and continuing from a cache
 that already holds it produce the same choice every time. The concern was real in principle,
@@ -178,6 +178,13 @@ no longer picks which tool was meant or invents the arguments. A pass is a coupl
 a wrong tool is a wrong answer and a query that left the device.
 
 `Tool.callFor` went with it, since nothing called it any more.
+
+**The removal was predicted before it was made, and the prediction held.** The counter that
+scored each run both ways said LFM2.5's reversed arm would go from 4 of 6 to 5 of 6 without
+salvage. Removing it, the same arm scores 5 of 6, its wrong-tool count falls to zero, and the
+ordering effect on that model comes out at 2 of 6 rather than 1, because salvage had been
+masking one of the differences. That is the whole reason to count a path apart rather than
+argue about it.
 
 ## What was taken from Hermes, and what was not
 

@@ -120,3 +120,21 @@ interface ContentReportDao {
     @Query("DELETE FROM content_reports WHERE id = :id")
     suspend fun delete(id: Long)
 }
+
+/**
+ * The summaries a conversation has had, newest last.
+ *
+ * No update and no delete: rows are appended and the conversation points at one of them.
+ * Deleting a conversation takes its summaries with it through the foreign key.
+ */
+@Dao
+interface CompactionDao {
+    @Query("SELECT * FROM compactions WHERE conversationId = :conversationId ORDER BY version")
+    suspend fun forConversation(conversationId: Long): List<CompactionEntity>
+
+    @Query("SELECT * FROM compactions WHERE id = :id")
+    suspend fun byId(id: Long): CompactionEntity?
+
+    @Insert
+    suspend fun insert(compaction: CompactionEntity): Long
+}

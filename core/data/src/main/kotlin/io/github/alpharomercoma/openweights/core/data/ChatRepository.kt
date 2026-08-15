@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.data
 
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.data.db.CompactionEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
@@ -103,16 +104,46 @@ class ChatRepository @Inject constructor(
         )
     }
 
-    suspend fun saveCompaction(conversationId: Long, summary: String, throughIndex: Int) {
+    suspend fun saveCompaction(
+        conversationId: Long,
+        summary: String,
+        throughIndex: Int,
+        modelName: String? = null,
+    ) {
         val conversation = database.conversations().byId(conversationId) ?: return
+        val version = database.compactions().forConversation(conversationId).size + 1
+        val head = database.compactions().insert(
+            CompactionEntity(
+                conversationId = conversationId,
+                version = version,
+                summary = summary,
+                throughIndex = throughIndex,
+                modelName = modelName,
+                createdAt = clock.nowMillis(),
+            ),
+        )
         database.conversations().upsert(
             conversation.copy(
+                // Written as well as appended. A conversation folded before the log existed
+                // has its summary only in these two columns, so they stay the fallback and
+                // keeping them current means one code path can read either kind.
                 compactionSummary = summary,
                 compactionThroughIndex = throughIndex,
+                compactionHeadId = head,
                 updatedAt = clock.nowMillis(),
             ),
         )
     }
+
+    /**
+     * Every summary a conversation has had, oldest first.
+     *
+     * Nothing reads this yet beyond its test. It is here because an append-only log whose
+     * history cannot be got at is just a slower way of overwriting, and because the first
+     * thing anyone will want when a summary turns out to be wrong is the one before it.
+     */
+    suspend fun compactionHistory(conversationId: Long): List<CompactionEntity> =
+        database.compactions().forConversation(conversationId)
 
     /**
      * Records one reply in the lifetime ledger.

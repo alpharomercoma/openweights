@@ -151,6 +151,40 @@ class ChatRepositoryTest {
     }
 
     @Test
+    fun `every fold is kept and the conversation points at the newest`() = runTest {
+        // Overwriting was the old behaviour, and it meant the app could not say what it had
+        // believed about a conversation an hour ago, nor which model wrote the summary it is
+        // now reasoning from. Rows are appended and one pointer moves, which is the shape a
+        // resumable session wants: "the latest" is a single write rather than a search.
+        val id = repository.startConversation("Question", "model-a")
+
+        repository.saveCompaction(id, "First pass.", throughIndex = 3, modelName = "model-a")
+        repository.saveCompaction(id, "Second pass.", throughIndex = 7, modelName = "model-b")
+
+        val history = repository.compactionHistory(id)
+        assertThat(history.map { it.version }).containsExactly(1, 2).inOrder()
+        assertThat(history.map { it.summary })
+            .containsExactly("First pass.", "Second pass.").inOrder()
+        assertThat(history.map { it.modelName }).containsExactly("model-a", "model-b").inOrder()
+
+        val conversation = repository.conversation(id)
+        assertThat(conversation?.compactionHeadId).isEqualTo(history.last().id)
+        // And the old columns still say the same thing, so a build that reads either is right.
+        assertThat(conversation?.compactionSummary).isEqualTo("Second pass.")
+        assertThat(conversation?.compactionThroughIndex).isEqualTo(7)
+    }
+
+    @Test
+    fun `deleting a conversation takes its summaries with it`() = runTest {
+        val id = repository.startConversation("Question", "model-a")
+        repository.saveCompaction(id, "First pass.", throughIndex = 3)
+
+        repository.deleteConversation(id)
+
+        assertThat(repository.compactionHistory(id)).isEmpty()
+    }
+
+    @Test
     fun `usage for the same model on the same day accumulates into one row`() = runTest {
         repeat(3) {
             repository.recordUsage(

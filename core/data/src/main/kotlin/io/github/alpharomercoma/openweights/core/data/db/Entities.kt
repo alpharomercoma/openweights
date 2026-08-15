@@ -32,6 +32,50 @@ data class ConversationEntity(
     /** The compaction summary covering folded turns, if the conversation has been compacted. */
     val compactionSummary: String? = null,
     val compactionThroughIndex: Int = -1,
+    /**
+     * Which row of [CompactionEntity] is the current summary, or null before the first fold.
+     *
+     * One mutable pointer over an append-only log, which is the shape Claude Code and Codex
+     * both settled on for a resumable session and the reason "always the latest" is a single
+     * write rather than a search. The two columns above are the previous arrangement, kept
+     * because a migration that dropped them would take every existing conversation's summary
+     * with it; they are written alongside and read only when there is no head yet.
+     */
+    val compactionHeadId: Long? = null,
+)
+
+/**
+ * One summary, as it was when it was written.
+ *
+ * Rows are never updated. Every fold appends, so the history of what the app believed about
+ * a conversation is recoverable, and a summary can be read back against the model and the
+ * prompt that produced it rather than being an anonymous blob of prose. The conversation
+ * points at the current one; nothing points backwards, so an old row costs a few hundred
+ * bytes and answers "what did it think two folds ago".
+ */
+@Entity(
+    tableName = "compactions",
+    foreignKeys = [
+        ForeignKey(
+            entity = ConversationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["conversationId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("conversationId")],
+)
+data class CompactionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val conversationId: Long,
+    /** One, two, three: what the user sees if they are ever shown the history. */
+    val version: Int,
+    val summary: String,
+    /** The last transcript entry this summary covers. */
+    val throughIndex: Int,
+    /** Which model wrote it, because a summary is only as good as what produced it. */
+    val modelName: String?,
+    val createdAt: Long,
 )
 
 /**

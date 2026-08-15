@@ -28,8 +28,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MessageEntity::class,
         UsageEntity::class,
         ContentReportEntity::class,
+        CompactionEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun messages(): MessageDao
     abstract fun usage(): UsageDao
     abstract fun reports(): ContentReportDao
+    abstract fun compactions(): CompactionDao
 
     companion object {
         const val NAME = "openweights.db"
@@ -51,6 +53,39 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN attachments TEXT")
+            }
+        }
+
+        /**
+         * Turns the one summary a conversation had into an append-only log with a pointer.
+         *
+         * The old columns stay. A conversation folded before this arrives has its summary in
+         * them and nowhere else, and dropping them to tidy up would lose exactly the thing
+         * this feature exists to keep. They are still written, and read only when a
+         * conversation has no head row yet.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS compactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        conversationId INTEGER NOT NULL,
+                        version INTEGER NOT NULL,
+                        summary TEXT NOT NULL,
+                        throughIndex INTEGER NOT NULL,
+                        modelName TEXT,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(conversationId) REFERENCES conversations(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_compactions_conversationId " +
+                        "ON compactions(conversationId)",
+                )
+                db.execSQL("ALTER TABLE conversations ADD COLUMN compactionHeadId INTEGER")
             }
         }
 

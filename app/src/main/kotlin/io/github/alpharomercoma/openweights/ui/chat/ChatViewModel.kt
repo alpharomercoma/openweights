@@ -994,7 +994,14 @@ class ChatViewModel @Inject constructor(
             // transcript, which walks straight back into the context wall it just escaped.
             startedIn?.let { id ->
                 writer.inOrder {
-                    saveCompaction(id, compaction.summary, compaction.foldedThroughIndex)
+                    saveCompaction(
+                        conversationId = id,
+                        summary = compaction.summary,
+                        throughIndex = compaction.foldedThroughIndex,
+                        // Recorded with the summary, because a summary is only as good as
+                        // what wrote it and a conversation can change model halfway.
+                        modelName = _uiState.value.modelName,
+                    )
                 }
             }
         }

@@ -63,6 +63,12 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * them and nowhere else, and dropping them to tidy up would lose exactly the thing
          * this feature exists to keep. They are still written, and read only when a
          * conversation has no head row yet.
+         *
+         * The summary that was already there becomes version one of the log. Creating the
+         * table empty and leaving it that way looked harmless, because the old columns still
+         * answered every read. It was not: the next fold appends as version one on top of the
+         * numbering and overwrites those columns, so the summary the app had been using
+         * disappeared, from the feature whose entire purpose is that it should not.
          */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -86,6 +92,23 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
                         "ON compactions(conversationId)",
                 )
                 db.execSQL("ALTER TABLE conversations ADD COLUMN compactionHeadId INTEGER")
+                db.execSQL(
+                    """
+                    INSERT INTO compactions
+                        (conversationId, version, summary, throughIndex, modelName, createdAt)
+                    SELECT id, 1, compactionSummary, compactionThroughIndex, modelName, updatedAt
+                    FROM conversations
+                    WHERE compactionSummary IS NOT NULL
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    UPDATE conversations SET compactionHeadId = (
+                        SELECT c.id FROM compactions c WHERE c.conversationId = conversations.id
+                    )
+                    WHERE compactionSummary IS NOT NULL
+                    """.trimIndent(),
+                )
             }
         }
 

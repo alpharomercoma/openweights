@@ -9,6 +9,15 @@ android {
     namespace = "io.github.alpharomercoma.openweights.core.data"
 }
 
+// MigrationTestHelper reads the exported schemas out of the assets folder, and it is the test
+// that needs them rather than the app: shipping four JSON files describing the database to
+// every install would be paying for a test at runtime. Configured through the new DSL type by
+// name, because the generated `android { }` accessor still resolves to the old source set
+// interface and casting it fails at configuration time.
+extensions.configure<com.android.build.api.dsl.LibraryExtension>("android") {
+    sourceSets.getByName("test").assets.directories.add("$projectDir/schemas")
+}
+
 room {
     // Schemas are checked in so migrations can be written against a known starting point.
     schemaDirectory("$projectDir/schemas")

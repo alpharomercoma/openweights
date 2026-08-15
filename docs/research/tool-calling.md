@@ -151,9 +151,13 @@ choose on.
 ## What the under-calling looks like from the user's seat
 
 The tables above are the harness measuring itself. This is the same number arriving in
-somebody's hand. Seven questions typed into the composer of a signed release build on a
-Snapdragon 8 Gen 3, 2026-08-15, Qwen 2.5 1.5B Q4_K_M downloaded through the app's own
-Discover tab:
+somebody's hand: seven questions typed into the composer of a signed release build on a
+Snapdragon 8 Gen 3, 2026-08-15, with the model downloaded through the app's own Discover tab
+rather than pushed over adb. Method, so it can be repeated: cold start, one fresh chat, auto
+mode, every tool on, the app's own reported throughput.
+
+**Qwen 2.5 1.5B Instruct Q4_K_M** (1.04 GB, downloaded and checksum-verified in under a
+minute; backend `armv8.6`, model loaded 1.0 s after the backend was chosen):
 
 | Asked | Answered | Right | tok/s |
 |---|---|---|---|
@@ -165,8 +169,9 @@ Discover tab:
 | Who won the most recent World Cup final | **"France won the most recent FIFA World Cup final."** | **no** | 23.6 |
 | **"Use web_search to find the current weather in Manila"** | answered without searching | **no** | 25.0 |
 
-Every one of those turns logged `calls=0`. The last row is the sharpest form of it: the tool
-was offered, the user named it in the prompt, and the model still did not emit a call.
+Four of seven right, one half right, two wrong. Every one of those turns logged `calls=0`.
+The last row is the sharpest form of it: the tool was offered, the user named it in the
+prompt, and the model still did not emit a call.
 
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right

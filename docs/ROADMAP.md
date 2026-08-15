@@ -134,11 +134,22 @@ second engine. `docs/research/multimodality.md` has the full reasoning and the n
 Dictation uses Android's on-device recogniser only, so the "nothing leaves this device"
 promise holds for the microphone too. Audio input is proven with LFM2.5-Audio-1.5B.
 
-## 9. Play Store production: *in progress*
+## 9. Play Store production: *code done, paperwork drafted*
 
-Target API 36 audit, 16 KB alignment verification (already satisfied by NDK r29), foreground
-service declarations for downloads, R8, signed AAB, data-safety form (every answer is "no
-data collected", which is true by construction), and a security review pass.
+Target API 36, 16 KB alignment (satisfied by NDK r29), the foreground service declaration for
+downloads, R8 with a build step that fails if it renamed a name JNI resolves, and a signed
+AAB. All verified against the artifact rather than the intent; see
+[play-store.md](play-store.md).
+
+The data safety form is **not** "no data collected", which this document said for a long time
+and which would have been a false declaration. Play counts data as collected the moment it
+leaves the device, and this app searches Hugging Face and lets the assistant search the web
+and fetch pages on the user's behalf. Every row, with the reasoning behind it, is in
+[store-listing.md](store-listing.md), alongside the listing copy and the generative AI
+declaration. The policy those link to is [privacy-policy.md](privacy-policy.md).
+
+What is left needs a person rather than a commit: the upload key, the graphics, the content
+rating questionnaire, the foreground service video, and publishing the policy at a URL.
 
 ---
 

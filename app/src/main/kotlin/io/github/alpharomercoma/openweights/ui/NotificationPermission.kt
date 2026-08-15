@@ -75,7 +75,11 @@ fun AskAboutNotifications(waiting: Flow<Boolean>) {
  * rule is the whole of what is worth getting right: once per session, on the way in rather
  * than on the way out, and not at all for somebody who never starts anything.
  *
- * [rememberSaveable] rather than [remember], because a rotation is not a second request.
+ * [rememberSaveable] rather than [remember], because a rotation is not a second request. It is
+ * deliberately not a stored preference: a fresh launch does ask again, and Android's own rule
+ * bounds that at two dialogs, after which the request is a no-op whatever this does. Two asks
+ * across two launches is what the platform is designed around, and a preference of ours would
+ * add a second thing to be wrong about it.
  */
 @Composable
 internal fun AskOnce(waiting: Flow<Boolean>, ask: () -> Unit) {

@@ -115,11 +115,18 @@ Single source of truth: `gradle/libs.versions.toml`.
       recording. Video is sampled into frames by the app, because libmtmd decodes video by
       shelling out to `ffmpeg`. Multimodal out is text plus Android TTS read-aloud, with
       dictation through the on-device recogniser.
-- [x] **Test tiers**: `./gradlew verify` runs ktlint, detekt, assemble and the unit and
-      Robolectric tiers in one command, 127 tests. `verifyOnDevice` is the instrumented
-      tier and is separate because it needs a phone and model files. A standalone native
-      probe covers the C++ that JNI makes awkward to test, such as the UTF-8 validator.
-- [ ] **P5** Play production: API 36 audit, 16 KB check, AAB, data safety, security review
+- [x] **Test tiers**: `./gradlew verify` runs ktlint, detekt, Android lint on the release
+      variant, assemble and the unit and Robolectric tiers in one command, 339 tests.
+      `verifyOnDevice` is the instrumented tier and is separate because it needs a phone and
+      model files. A standalone native probe covers the C++ that JNI makes awkward to test,
+      such as the UTF-8 validator.
+- [ ] **P5** Play production: the code is done and the paperwork is drafted. API 36, 16 KB
+      alignment, the AAB and the JNI-survives-R8 guard are verified in the build; the
+      listing, the data safety answers row by row, the generative AI declaration and the
+      privacy policy are written out in [store-listing.md](store-listing.md) and
+      [privacy-policy.md](privacy-policy.md). What is left needs a person: the upload key,
+      the graphics, the questionnaire, the foreground service video, and publishing the
+      policy at a URL.
 
 ## Multimodal: what libmtmd gives us, and what it does not
 

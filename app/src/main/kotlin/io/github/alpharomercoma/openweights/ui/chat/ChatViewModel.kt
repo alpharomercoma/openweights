@@ -319,6 +319,9 @@ class ChatViewModel @Inject constructor(
      */
     private var preferencesKey: String? = null
 
+    /** The weights currently loaded, kept so a turn can tell whether they are still there. */
+    private var loadedFile: File? = null
+
     /** The row this conversation is being written to, created lazily on the first message. */
     private var conversationId: Long? = null
         set(value) {
@@ -472,6 +475,7 @@ class ChatViewModel @Inject constructor(
             runtime.rememberChoice(modelFile)
             if (!keepConversation) conversationId = null
             preferencesKey = modelFile.name
+            loadedFile = modelFile
             val info = runtime.loadedModel
             val support = info?.mediaSupport ?: MediaSupport()
             _uiState.update {
@@ -523,6 +527,30 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Whether the weights behind the loaded model have been deleted, and letting go if so.
+     *
+     * Checked at the start of a turn, which is the only moment it matters and is one stat of
+     * a file the process already has open. A model can go while it is loaded: deleted from
+     * the Models tab, removed by a file manager, on a card that was taken out. The engine has
+     * it mapped and carries on regardless, so the screen keeps naming a model that is not
+     * there, Send stays live, and what the turn eventually makes of an unlinked mapping
+     * surfaces minutes later as a generic failure.
+     *
+     * Told at the point of asking rather than at the point of deleting, because deleting is
+     * not the only way it happens and a check at the boundary catches all of them.
+     */
+    private fun loadedModelHasGone(): Boolean {
+        val file = loadedFile ?: return false
+        if (file.exists()) return false
+        loadedFile = null
+        viewModelScope.launch {
+            forgetLoadedModel()
+            reportError("$MODEL_GONE ${file.nameWithoutExtension} is no longer on this device.")
+        }
+        return true
+    }
+
+    /**
      * Sends a message, or says it could not.
      *
      * Returns false when the turn was refused, so the composer can keep what was typed.
@@ -537,6 +565,7 @@ class ChatViewModel @Inject constructor(
         // An attachment on its own is a complete message: "what is this?" is implied.
         val nothingToSend = typed.isEmpty() && staged.isEmpty() && document == null
         if (nothingToSend) return false
+        if (loadedModelHasGone()) return false
         if (!_uiState.value.canSend) {
             _uiState.value.refusalReason()?.let { why ->
                 _uiState.update { it.copy(error = why) }
@@ -1457,6 +1486,9 @@ private const val CHATS_UNREADABLE =
 
 /** Said when one chat will not reopen. The one on screen is untouched, so it stays. */
 private const val CHAT_UNREADABLE = "That chat could not be opened."
+
+/** Said when the weights have been deleted out from under the engine holding them. */
+private const val MODEL_GONE = "Choose a model in Models:"
 
 /**
  * How long an answer should be.

@@ -132,6 +132,25 @@ class ChatConversationsTest : ChatFixture() {
     }
 
     @Test
+    fun `a model whose file has gone is let go of rather than answered with`() =
+        runTest(dispatcher) {
+            loadModel()
+            // Deleted from the Models tab, or by a file manager, or on a card that was
+            // pulled. The engine has it mapped and carries on as though nothing happened,
+            // so the screen still names a model, Send is still live, and whatever the turn
+            // eventually does with a file that is not there surfaces as a generic failure
+            // minutes later.
+            modelFile("model-a.gguf").delete()
+
+            val sent = viewModel.send("Are you still there?")
+            settle()
+
+            assertThat(sent).isFalse()
+            assertThat(viewModel.uiState.value.modelName).isNull()
+            assertThat(viewModel.uiState.value.error).isNotNull()
+        }
+
+    @Test
     fun `a conversation list that will not load does not take the app with it`() =
         runTest(dispatcher) {
             // Writes were guarded and reads were not, which is half a rule: the same

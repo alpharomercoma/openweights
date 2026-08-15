@@ -246,14 +246,16 @@ for a 2026 one; the weather question is the honest one, and it failed that.
 So: across three models and about twenty questions typed into the composer, nothing has both.
 Qwen 2.5 is fast and never calls. LFM2.5 calls well and takes up to seven and a half minutes.
 Qwen3.5 is slow like LFM, calls like Qwen 2.5, and additionally claims to have searched when it
-has not. The conclusion this points at is not "keep looking for the model" but "stop asking a
-2B model to decide" for the one case where the user has already decided.
+has not. The conclusion this points at is not "keep looking for the model": every candidate
+that decides well is too slow to use, and the next section is what happened when we tried to
+make one of the fast ones decide anyway.
 
-### Naming a tool, before and after
+### Naming a tool, before and after — built, measured, reverted
 
-The turn now spends its one repair pass when the request names an available tool and no call
-came back. Measured on the same device, the same model and the same question, forty minutes
-apart:
+A repair pass was added that fired when the request named an available tool and no call came
+back, and then removed once it had been measured. The measurement is why it was removed, and
+is kept here so nobody builds it a second time. Same device, same model, same question, forty
+minutes apart:
 
 | | Before | After |
 |---|---|---|
@@ -261,14 +263,21 @@ apart:
 | What the user was told | "The current weather in Manila is Clouds and sun with a temperature of 85°" — **invented** | a page actually fetched, and the answer written from it |
 | Wall | 49 s | **799 s** |
 
-Both halves of that are the finding. The nudge does what it was built to do: a fabricated
-answer became a real one. And it makes the cost impossible to miss, because a model that only
-searches when pushed is a model that takes thirteen minutes when pushed.
+Both halves of that are the finding, and the right-hand half is the one that decided it. The
+nudge does what it was built to do: a fabricated answer became a real one. It costs sixteen
+times the wall clock to do it, because a model that only searches when pushed is a model that
+takes thirteen minutes when pushed. Nobody waits thirteen minutes for the weather, so the
+honest answer is worth less on a phone than the fast wrong one is, and the change was reverted
+rather than kept as a setting nobody would turn on.
 
-Two details worth keeping. It called `fetch_url` rather than the `web_search` it was told to
-use, so what the pass buys is *a* call rather than the named one; the app does not build the
-call, so which tool is still the model's to choose. And `fetch_url` asks every time, so the
-user saw an approval card mid-turn, which is the design working rather than a surprise.
+Two details worth keeping about the pass itself. It called `fetch_url` rather than the
+`web_search` it was told to use, so what such a pass buys is *a* call rather than the named
+one; the app does not build the call, so which tool is still the model's to choose. And
+`fetch_url` asks every time, so the user saw an approval card mid-turn.
+
+What this rules out is a whole family of fixes: any repair that spends another full generation
+inherits this multiplier, because the expensive part is the model deciding, not the app
+asking. A cheaper fix has to avoid the second generation altogether.
 
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right

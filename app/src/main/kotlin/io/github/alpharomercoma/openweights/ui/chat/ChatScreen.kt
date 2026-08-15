@@ -103,6 +103,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import io.github.alpharomercoma.openweights.model.DictationState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -140,6 +141,8 @@ fun ChatScreen(
     onApproval: (Boolean) -> Unit = {},
     plan: TaskPlan? = null,
     onTickStep: (Int) -> Unit = {},
+    question: UserQuestion? = null,
+    onAnswerQuestion: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -207,6 +210,8 @@ fun ChatScreen(
             onApproval = onApproval,
             plan = plan,
             onTickStep = onTickStep,
+            question = question,
+            onAnswerQuestion = onAnswerQuestion,
             modifier = modifier,
         )
     }
@@ -245,6 +250,8 @@ private fun ChatContent(
     onApproval: (Boolean) -> Unit,
     plan: TaskPlan?,
     onTickStep: (Int) -> Unit,
+    question: UserQuestion?,
+    onAnswerQuestion: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -325,6 +332,7 @@ private fun ChatContent(
 
             StatusStrip(state = state, dictationError = dictation.error)
             plan?.let { PlanCard(plan = it, onTick = onTickStep) }
+            question?.let { QuestionCard(question = it, onAnswer = onAnswerQuestion) }
             state.pendingApproval?.let { call ->
                 ToolApproval(call = call, onAnswer = onApproval)
             }

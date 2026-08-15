@@ -28,6 +28,7 @@ import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -484,6 +485,7 @@ class TurnRunnerTest {
             tools = ToolRegistry(listOf(search) + beside),
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = PlanBoard(),
+            asks = AskBoard(),
         )
         val steps = mutableListOf<AgentStep>()
         runner.run(

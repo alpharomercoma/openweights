@@ -226,6 +226,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 // Collected from the board rather than mirrored into the chat state: it is
                 // already a flow, and a second copy would be a second thing to keep in step.
                 val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
+                val question by chatViewModel.asking.pending.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
                     // The view model outlives the composition, so returning to this tab
@@ -259,6 +260,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onApproval = chatViewModel::resolveApproval,
                     plan = plan,
                     onTickStep = chatViewModel.planning::tick,
+                    question = question,
+                    onAnswerQuestion = chatViewModel.asking::answer,
                     onReport = { entry, reason, note ->
                         reportViewModel.report(
                             modelName = state.modelName,

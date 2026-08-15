@@ -21,6 +21,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
+import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
@@ -51,7 +52,8 @@ object ToolsModule {
         writeFile: WriteFileTool,
         runScript: RunScriptTool,
         advance: AdvanceTool,
+        askUser: AskUserTool,
     ): ToolRegistry = ToolRegistry(
-        listOf(search, fetch, searchFiles, readFile, writeFile, runScript, advance),
+        listOf(search, fetch, searchFiles, readFile, writeFile, runScript, advance, askUser),
     )
 }

@@ -45,6 +45,7 @@ import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
@@ -927,6 +928,9 @@ class ChatViewModel @Inject constructor(
      * copy would be a second thing to keep in step for nothing.
      */
     val planning: PlanBoard get() = turns.planning
+
+    /** The question the model is waiting on. See [planning]. */
+    val asking: AskBoard get() = turns.asking
 
     fun setMode(mode: AgentMode) = _uiState.update { it.copy(mode = mode) }
 

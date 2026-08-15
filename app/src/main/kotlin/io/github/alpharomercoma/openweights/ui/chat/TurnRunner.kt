@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -82,6 +83,7 @@ class TurnRunner @Inject constructor(
     private val tools: ToolRegistry,
     private val switches: ToolSwitches,
     private val plans: PlanBoard,
+    private val asks: AskBoard,
 ) {
 
     /**
@@ -93,6 +95,9 @@ class TurnRunner @Inject constructor(
      * feature; adding a seventh constructor parameter to it would be the wrong way to pay.
      */
     val planning: PlanBoard get() = plans
+
+    /** The question the model is waiting on, for the screen to answer. See [planning]. */
+    val asking: AskBoard get() = asks
 
     /**
      * True when at least one tool is switched on.
@@ -124,6 +129,11 @@ class TurnRunner @Inject constructor(
         // left on but which has nothing to work with should not reach the prompt either. That
         // is a live question rather than a setting: a folder grant can be revoked from
         // Settings between one turn and the next.
+        // Decided here rather than in the screen's mode callback, because this is the thing
+        // that knows the mode and the line below is the thing that reads the answer. Asking a
+        // clarifying question is only useful while deciding what to do, and every tool in the
+        // catalogue makes the choice between the others harder.
+        asks.offered = mode == AgentMode.PLAN
         val offered = tools.all.filter { it.isAvailable }.map { it.definition.name }
         val active = tools.enabled(switches.enabled(offered))
 

@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -91,7 +92,13 @@ class ToolTurnOnDeviceTest {
         val ledger = Ledger()
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val runner =
-            TurnRunner(engine, ToolRegistry(listOf(ledger)), ToolSwitches(context), PlanBoard())
+            TurnRunner(
+                engine,
+                ToolRegistry(listOf(ledger)),
+                ToolSwitches(context),
+                PlanBoard(),
+                AskBoard(),
+            )
         val listener = Recording()
 
         val raw = runner.run(

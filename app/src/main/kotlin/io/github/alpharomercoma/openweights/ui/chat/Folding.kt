@@ -1,0 +1,111 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.ui.chat
+
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+
+/**
+ * Folding older turns into a summary once the context window gets tight.
+ *
+ * Running out of context is what kills a long conversation, and it always happens mid-answer.
+ * Folding between turns instead means the chat simply continues: the full transcript stays on
+ * screen and only what is sent to the model shrinks.
+ *
+ * Its own object because it is its own job, and because [ChatViewModel] has now been told
+ * three times that it is too large. Folding needs the summariser, the write queue and the
+ * screen, and nothing else: not the engine's lifetime, not the drawer, not the turn loop.
+ */
+internal class Folding(
+    private val compactor: ConversationCompactor,
+    private val writer: ChatWriter,
+    private val state: MutableStateFlow<ChatUiState>,
+) {
+    /**
+     * Folds if the window needs it, or because the user asked.
+     *
+     * @param conversationId read rather than passed, and read twice. Folding runs the model,
+     * which takes long enough for the user to open another chat, and applying chat A's
+     * summary to chat B would corrupt both.
+     */
+    suspend fun fold(force: Boolean, engineIsDecoding: Boolean, conversationId: () -> Long?) {
+        val current = state.value
+        if (current.isCompacting) return
+        if (!force && !compactor.shouldCompact(current)) return
+
+        val startedIn = conversationId()
+
+        state.update { it.copy(isCompacting = true) }
+        val compaction = try {
+            compactor.compact(current, engineIsDecoding = engineIsDecoding)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+            // Never fatal. This runs before the try inside the turn opens, in a coroutine
+            // with no exception handler on its scope, so anything thrown here reached the
+            // platform's default handler and took the process with it. Folding is an
+            // optimisation; the conversation is still on screen and the turn can still be
+            // attempted, so a failure to fold is worth saying and nothing more.
+            state.update { it.copy(error = failure.userMessage()) }
+            null
+        } finally {
+            // In a finally: a model that fails mid-summary would otherwise leave "folding
+            // earlier turns" on screen forever, and block every later fold.
+            state.update { it.copy(isCompacting = false) }
+        }
+
+        if (startedIn != conversationId()) return
+        if (compaction == null) return
+
+        // Without this a folded chat reopens with no summary and re-sends the whole
+        // transcript, which walks straight back into the context wall it just escaped.
+        startedIn?.let { id ->
+            writer.inOrder {
+                saveCompaction(
+                    conversationId = id,
+                    summary = compaction.summary,
+                    throughIndex = compaction.foldedThroughIndex,
+                    // Recorded with the summary, because a summary is only as good as what
+                    // wrote it and a conversation can change model halfway.
+                    modelName = state.value.modelName,
+                )
+            }
+        }
+
+        state.update { current ->
+            val folded = current.copy(
+                compaction = compaction,
+                transcript = current.transcript.mapIndexed { index, entry ->
+                    if (index == compaction.foldedThroughIndex + 1) {
+                        entry.copy(compactionNote = COMPACTION_NOTE)
+                    } else {
+                        entry
+                    }
+                },
+            )
+            // Not zero, which is what the cache holds and not what the next turn will. Folding
+            // frees most of the window and never all of it: the summary and the turns kept
+            // verbatim are sent again every turn. Reporting zero told everything that sizes
+            // itself against the window that the whole of it was free, and the next attachment
+            // was measured against a window that was not there.
+            folded.copy(contextUsed = folded.estimatedPromptTokens())
+        }
+    }
+}
+
+internal const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."

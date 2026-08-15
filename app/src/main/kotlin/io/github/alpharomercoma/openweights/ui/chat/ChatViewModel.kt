@@ -291,6 +291,9 @@ class ChatViewModel @Inject constructor(
      */
     private val attachments = Attaching(staging, viewModelScope, _uiState)
 
+    /** Folding older turns into a summary. Built here for the reason [attachments] is. */
+    private val folding = Folding(compactor, writer, _uiState)
+
     private var generationJob: Job? = null
     private var thermalJob: Job? = null
     private var nextEntryId = 0L
@@ -414,8 +417,13 @@ class ChatViewModel @Inject constructor(
      * a model that is no longer there.
      */
     private suspend fun forgetLoadedModel() {
+        // Cleared here as well as on the way in. A load that fails leaves nothing loaded, and
+        // a stale file here would have the next turn check weights that are not in use.
+        loadedFile = null
+        val abandoned = _uiState.value.staged
         _uiState.update {
             it.copy(
+                staged = emptyList(),
                 modelName = null,
                 modelQuantization = null,
                 backend = null,
@@ -427,7 +435,9 @@ class ChatViewModel @Inject constructor(
                 supportsReasoningEffort = false,
             )
         }
-        attachments.abandonFiles()
+        // The screen is left in one step above, so nothing observes a half-forgotten model.
+        // What is left is the copies on disk, which is the part that has to suspend.
+        attachments.discard(abandoned)
     }
 
     /**
@@ -650,6 +660,8 @@ class ChatViewModel @Inject constructor(
     fun regenerate() {
         val state = _uiState.value
         if (state.isGenerating || state.transcript.none { it.role == ChatRole.ASSISTANT }) return
+        // The same check send makes, for the same reason: this runs the model too.
+        if (loadedModelHasGone()) return
 
         _uiState.update {
             it.copy(
@@ -666,15 +678,29 @@ class ChatViewModel @Inject constructor(
             // conversation reopens with the discarded reply and the new one both in it.
             // Under the same lock as the writes, so the read cannot happen before the
             // reply being discarded has been inserted.
-            writer.inOrder {
-                conversationId?.let { id ->
-                    val stored = messages(id)
-                    // The same rule the transcript used: the trailing run of replies, which
-                    // starts after the last thing that was not one.
-                    val firstDiscarded =
-                        stored.indexOfLast { it.role != ChatRole.ASSISTANT.wireName } + 1
-                    stored.getOrNull(firstDiscarded)?.let { deleteFrom(id, it.id) }
+            //
+            // Guarded, because the busy flag was claimed above and a read that throws here
+            // used to leave it claimed forever: not a crash, a chat showing Stop with nothing
+            // behind it, unusable until the app was killed.
+            val discarded = runCatching {
+                writer.inOrder {
+                    conversationId?.let { id ->
+                        val stored = messages(id)
+                        // The same rule the transcript used: the trailing run of replies,
+                        // which starts after the last thing that was not one.
+                        val firstDiscarded =
+                            stored.indexOfLast { it.role != ChatRole.ASSISTANT.wireName } + 1
+                        stored.getOrNull(firstDiscarded)?.let { deleteFrom(id, it.id) }
+                    }
                 }
+            }
+            if (discarded.isFailure) {
+                // Refused rather than generated anyway. The reply on screen is already gone
+                // and the stored one is not, so answering would leave two of them in the
+                // conversation and the user reading a history they never had.
+                Log.w("OpenWeights", "a reply could not be discarded", discarded.exceptionOrNull())
+                _uiState.update { it.copy(isGenerating = false, error = STORAGE_FAILED) }
+                return@launch
             }
             generate()
         }
@@ -964,82 +990,12 @@ class ChatViewModel @Inject constructor(
     /**
      * Folds older turns into a summary once the context window gets tight.
      *
-     * Running out of context is what kills a long conversation, and it always happens
-     * mid-answer. Compacting between turns instead means the chat simply continues; the
-     * full transcript stays on screen and only what is sent to the model shrinks.
+     * The whole of it is in [Folding], which is where the reasoning lives too. What is here
+     * is the two things that object cannot see for itself: which conversation this is, read
+     * again after the fold in case the user moved, and whether the engine is mid-decode.
      */
-    private suspend fun compactIfNeeded(force: Boolean = false) {
-        val state = _uiState.value
-        if (state.isCompacting) return
-        if (!force && !compactor.shouldCompact(state)) return
-
-        // Captured before suspending: compaction runs the model, which takes long enough for
-        // the user to open another chat. Applying chat A's summary to chat B would corrupt
-        // both, so the result is discarded unless it still belongs where it started.
-        val startedIn = conversationId
-
-        _uiState.update { it.copy(isCompacting = true) }
-        val compaction = try {
-            compactor.compact(state, engineIsDecoding = isDecoding)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-            // Never fatal. This runs before the try inside generate() opens, in a coroutine
-            // with no exception handler on its scope, so anything thrown here reached the
-            // platform's default handler and took the process with it. Folding is an
-            // optimisation; the conversation is still on screen and the turn can still be
-            // attempted, so a failure to fold is worth saying and nothing more.
-            _uiState.update { it.copy(error = failure.userMessage()) }
-            null
-        } finally {
-            // In a finally: a model that fails mid-summary would otherwise leave "folding
-            // earlier turns" on screen forever, and block every later compaction.
-            _uiState.update { it.copy(isCompacting = false) }
-        }
-
-        if (startedIn != conversationId) return
-
-        if (compaction != null) {
-            // Without this a compacted chat reopens with no summary and re-sends the whole
-            // transcript, which walks straight back into the context wall it just escaped.
-            startedIn?.let { id ->
-                writer.inOrder {
-                    saveCompaction(
-                        conversationId = id,
-                        summary = compaction.summary,
-                        throughIndex = compaction.foldedThroughIndex,
-                        // Recorded with the summary, because a summary is only as good as
-                        // what wrote it and a conversation can change model halfway.
-                        modelName = _uiState.value.modelName,
-                    )
-                }
-            }
-        }
-
-        _uiState.update { current ->
-            if (compaction == null) {
-                current
-            } else {
-                val folded = current.copy(
-                    compaction = compaction,
-                    transcript = current.transcript.mapIndexed { index, entry ->
-                        if (index == compaction.foldedThroughIndex + 1) {
-                            entry.copy(compactionNote = COMPACTION_NOTE)
-                        } else {
-                            entry
-                        }
-                    },
-                )
-                // Not zero, which is what the cache holds and not what the next turn will.
-                // Folding frees most of the window and never all of it: the summary and
-                // the turns kept verbatim are sent again every turn. Reporting zero told
-                // everything that sizes itself against the window that the whole of it was
-                // free, and the next attachment was measured against a window that was not
-                // there.
-                folded.copy(contextUsed = folded.estimatedPromptTokens())
-            }
-        }
-    }
+    private suspend fun compactIfNeeded(force: Boolean = false) =
+        folding.fold(force = force, engineIsDecoding = isDecoding) { conversationId }
 
     /** Clears the conversation and the model's KV cache, keeping the model loaded. */
     fun newChat() {
@@ -1066,6 +1022,8 @@ class ChatViewModel @Inject constructor(
     /** Folds earlier turns immediately, rather than waiting for the context to fill. */
     fun compactNow() {
         if (_uiState.value.isGenerating || _uiState.value.isCompacting) return
+        // Folding runs the model to write the summary, so it needs the same check send makes.
+        if (loadedModelHasGone()) return
         viewModelScope.launch { compactIfNeeded(force = true) }
     }
 
@@ -1086,14 +1044,16 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun reopen(id: Long) {
+        // Read before anything is disturbed. The row's existence does not depend on a reply
+        // still being written, so this one read needs no queue, and taking it first means a
+        // database that will not answer costs the user nothing: the turn they had running is
+        // still running, and the sentence they get is about the chat that did not open.
+        val conversation = writer.inOrder { conversation(id) }
+
         stop()
         generationJob?.join()
         runtime.resetContext()
 
-        // Behind the write queue: a reply from the turn that just ended may not have
-        // been inserted yet, and reopening the same chat without it would show a
-        // question with no answer and then resend it.
-        val conversation = writer.inOrder { conversation(id) }
         if (conversation == null) {
             // Deleted between the tap and this read; adopting the id would make the
             // next message violate the foreign key.
@@ -1101,6 +1061,9 @@ class ChatViewModel @Inject constructor(
             return
         }
 
+        // Behind the write queue, and after the stop: a reply from the turn that just ended
+        // may not have been inserted yet, and reopening the same chat without it would show a
+        // question with no answer and then resend it.
         val messages = writer.inOrder { messages(id) }
         conversationId = id
         nextEntryId = messages.size.toLong()
@@ -1414,8 +1377,6 @@ private fun StagedDocument.asPrompt(): String = buildString {
 private const val PESSIMISTIC_CHARS_PER_TOKEN = 2
 
 private const val STREAM_FRAME_MS = 33L
-
-private const val COMPACTION_NOTE = "Earlier turns folded into a summary to make room."
 
 /** Where the open conversation is remembered across a process the system reclaimed. */
 private const val LAST_CONVERSATION = "lastConversation"
@@ -1757,7 +1718,7 @@ internal fun MessagePart.File.describe(): String = name ?: when (kind) {
 }
 
 /** Turns engine failures into something a person can act on. */
-private fun Throwable.userMessage(): String = when {
+internal fun Throwable.userMessage(): String = when {
     // What llama.cpp says when the KV cache has no slot left for the batch. The words it
     // uses name an internal return code, and the thing to do about it is not "decode"
     // anything, so it is translated rather than passed through.

@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +33,7 @@ import io.github.alpharomercoma.openweights.ui.discover.readableMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -62,9 +64,16 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            appearance.themeChoice.collect { choice ->
-                _uiState.update { it.copy(theme = choice) }
-            }
+            // Collected for the life of the view model and awaited by nobody, so a store that
+            // will not open would take the process rather than the theme. The default look is
+            // a fine thing to fall back to; a crash on opening Settings is not.
+            appearance.themeChoice
+                .catch { failure ->
+                    Log.w("OpenWeights", "the theme choice could not be read", failure)
+                }
+                .collect { choice ->
+                    _uiState.update { it.copy(theme = choice) }
+                }
         }
         viewModelScope.launch {
             _uiState.update {

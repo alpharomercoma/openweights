@@ -97,18 +97,14 @@ internal class Attaching(
     }
 
     /**
-     * Throws away the staged files, because the model they were staged for has gone.
+     * Deletes the copies made of files that will never be sent.
      *
-     * The copies on disk as well as the entries on screen: they are copies this app made, and
-     * a copy nobody will send is a copy nobody will ever delete.
-     *
-     * A staged document is not among them, deliberately. It is text, and text is the one
-     * attachment every model can read, so it survives a model being swapped underneath it.
+     * Taken as a list rather than read off the state, so a caller clearing several things at
+     * once can do it in one update and nothing observes a half-cleared screen. They are copies
+     * this app made, and a copy nobody will send is a copy nobody will ever delete.
      */
-    suspend fun abandonFiles() {
-        val abandoned = state.value.staged
-        state.update { it.copy(staged = emptyList()) }
-        if (abandoned.isNotEmpty()) staging.discard(abandoned)
+    suspend fun discard(files: List<MessagePart.File>) {
+        if (files.isNotEmpty()) staging.discard(files)
     }
 }
 

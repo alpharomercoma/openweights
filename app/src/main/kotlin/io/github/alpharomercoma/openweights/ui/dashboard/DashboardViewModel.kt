@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.dashboard
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,12 +24,20 @@ import io.github.alpharomercoma.openweights.core.data.UsageRepository
 import io.github.alpharomercoma.openweights.core.data.UsageSummary
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(usage: UsageRepository) : ViewModel() {
     val uiState: StateFlow<UsageSummary> = usage.observeSummary()
+        // A database that will not open throws here, in a flow nobody is awaiting, which
+        // takes the process rather than the tab. An empty dashboard is a dashboard; a crash
+        // on opening one is a phone that cannot run the app.
+        .catch { failure ->
+            Log.w("OpenWeights", "the usage ledger could not be read", failure)
+            emit(UsageSummary())
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), UsageSummary())
 
     private companion object {

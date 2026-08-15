@@ -151,6 +151,24 @@ class ChatConversationsTest : ChatFixture() {
         }
 
     @Test
+    fun `regenerating against a database that will not answer gives the screen back`() =
+        runTest(dispatcher) {
+            loadModel()
+            viewModel.send("Who was Ada Lovelace?")
+            settle()
+            writer.broken = true
+
+            viewModel.regenerate()
+            settle()
+
+            // The busy flag is claimed before the read, so a read that throws left the
+            // composer showing Stop with nothing running behind it: not a crash, a chat that
+            // could never be used again without killing the app.
+            assertThat(viewModel.uiState.value.isGenerating).isFalse()
+            assertThat(viewModel.uiState.value.error).isNotNull()
+        }
+
+    @Test
     fun `a conversation list that will not load does not take the app with it`() =
         runTest(dispatcher) {
             // Writes were guarded and reads were not, which is half a rule: the same

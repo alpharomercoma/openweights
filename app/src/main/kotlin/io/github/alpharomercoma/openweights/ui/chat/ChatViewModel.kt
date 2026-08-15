@@ -57,6 +57,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -282,6 +283,14 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    /**
+     * What is attached to the message being typed.
+     *
+     * Built here rather than injected, because it needs this view model's scope and its state,
+     * and a Hilt binding for something that takes both would be a longer way to say the same.
+     */
+    private val attachments = Attaching(staging, viewModelScope, _uiState)
+
     private var generationJob: Job? = null
     private var thermalJob: Job? = null
     private var nextEntryId = 0L
@@ -333,15 +342,23 @@ class ChatViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            writer.conversations().collect { rows ->
-                _uiState.update { state ->
-                    state.copy(
-                        conversations = rows.map {
-                            ConversationSummary(it.id, it.title, it.modelName, it.updatedAt)
-                        },
-                    )
+            writer.conversations()
+                // Collected for the life of the view model and awaited by nobody, so an
+                // SQLite error here had no catch above it and took the process with it,
+                // from `init`, before there was a screen to say anything on.
+                .catch { failure ->
+                    Log.w("OpenWeights", "the conversation list could not be read", failure)
+                    _uiState.update { it.copy(error = CHATS_UNREADABLE) }
                 }
-            }
+                .collect { rows ->
+                    _uiState.update { state ->
+                        state.copy(
+                            conversations = rows.map {
+                                ConversationSummary(it.id, it.title, it.modelName, it.updatedAt)
+                            },
+                        )
+                    }
+                }
         }
     }
 
@@ -394,7 +411,6 @@ class ChatViewModel @Inject constructor(
      * a model that is no longer there.
      */
     private suspend fun forgetLoadedModel() {
-        val abandoned = _uiState.value.staged
         _uiState.update {
             it.copy(
                 modelName = null,
@@ -406,10 +422,9 @@ class ChatViewModel @Inject constructor(
                 supportsThinking = false,
                 supportsTools = false,
                 supportsReasoningEffort = false,
-                staged = emptyList(),
             )
         }
-        if (abandoned.isNotEmpty()) staging.discard(abandoned)
+        attachments.abandonFiles()
     }
 
     /**
@@ -438,16 +453,19 @@ class ChatViewModel @Inject constructor(
         keepConversation: Boolean,
     ) {
         _uiState.update { it.copy(isLoadingModel = true, error = null) }
-        val preferences = runtime.settingsFor(modelFile.name)
-        val loadParams = loadParamsFor(modelFile, preferences, contextLength)
 
-        val projector = runtime.projectorFor(modelFile)
-
-        forgetLoadedModel()
-
+        // Inside the catch, not before it. Settings come from DataStore and the projector
+        // from a directory listing, and a phone whose storage has gone wrong fails those
+        // exactly as readily as it fails the weights. Outside, they were two unwatched reads
+        // in the one path a cold start always takes. The settings come back out because the
+        // screen shows them, and they are only known once the read has succeeded.
         runCatching {
-            runtime.load(modelFile, loadParams, projector)
-        }.onSuccess {
+            val settings = runtime.settingsFor(modelFile.name)
+            val projector = runtime.projectorFor(modelFile)
+            forgetLoadedModel()
+            runtime.load(modelFile, loadParamsFor(modelFile, settings, contextLength), projector)
+            settings
+        }.onSuccess { preferences ->
             // The cache belonged to the old weights. Clearing it makes the next reply
             // re-read the transcript, which is what carries the conversation across.
             runtime.resetContext()
@@ -587,54 +605,13 @@ class ChatViewModel @Inject constructor(
      * Copied in immediately rather than at send time, so the thumbnail appears at once and
      * the picker's read permission is used while it is still granted.
      */
-    fun attach(uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isAttaching = true) }
-            // In a finally: a throw here would otherwise leave the attach button spinning
-            // with no way back to it.
-            val staged = try {
-                staging.file(uri, _uiState.value.mediaSupport)
-            } finally {
-                _uiState.update { it.copy(isAttaching = false) }
-            }
-            _uiState.update { it.after(staged) }
-        }
-    }
+    fun attach(uri: Uri) = attachments.attach(uri)
 
     /** Removes a staged attachment and deletes the copy that was made of it. */
-    fun removeStaged(attachment: MessagePart.File) {
-        _uiState.update { it.copy(staged = it.staged - attachment) }
-        viewModelScope.launch { staging.discard(attachment) }
-    }
+    fun removeStaged(attachment: MessagePart.File) = attachments.remove(attachment)
 
-    /**
-     * Stages a text document to be read into the next question, or clears the staged one.
-     *
-     * One function for both because they are one decision, made twice: what document, if
-     * any, goes with the next message. Null is that decision reaching "none".
-     *
-     * Offered whatever model is loaded, which is the point of it: reading a document takes
-     * no projector and no vision, so this is the one attachment a plain text model can use.
-     *
-     * How much of it fits is decided here, from the window the loaded model actually has,
-     * because a document that overruns the context does not produce a worse answer, it
-     * produces a failed decode.
-     */
-    fun stageDocument(uri: Uri?) {
-        if (uri == null) {
-            _uiState.update { it.copy(stagedDocument = null) }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isAttaching = true) }
-            val staged = try {
-                staging.document(uri, documentBudget(_uiState.value))
-            } finally {
-                _uiState.update { it.copy(isAttaching = false) }
-            }
-            _uiState.update { it.after(staged) }
-        }
-    }
+    /** Stages a text document for the next question, or clears the staged one. */
+    fun stageDocument(uri: Uri?) = attachments.stageDocument(uri)
 
     /**
      * Discards the last model reply and asks again.
@@ -1072,58 +1049,65 @@ class ChatViewModel @Inject constructor(
      */
     fun openConversation(id: Long) {
         viewModelScope.launch {
-            stop()
-            generationJob?.join()
-            runtime.resetContext()
+            // A read that throws used to leave the launch with nothing above it to catch. The
+            // chat on screen is untouched by a failed reopen, so the sentence says the one
+            // thing that changed: the other chat did not open.
+            readReportingFailure(CHAT_UNREADABLE, ::reportError) { reopen(id) }
+        }
+    }
 
-            // Behind the write queue: a reply from the turn that just ended may not have
-            // been inserted yet, and reopening the same chat without it would show a
-            // question with no answer and then resend it.
-            val conversation = writer.inOrder { conversation(id) }
-            if (conversation == null) {
-                // Deleted between the tap and this read; adopting the id would make the
-                // next message violate the foreign key.
-                newChat()
-                return@launch
-            }
+    private suspend fun reopen(id: Long) {
+        stop()
+        generationJob?.join()
+        runtime.resetContext()
 
-            val messages = writer.inOrder { messages(id) }
-            conversationId = id
-            nextEntryId = messages.size.toLong()
-            // The board is one object for the whole app, so a plan left in it is on screen in
-            // whatever chat is opened next and is pinned to the tail of that chat's prompt.
-            // newChat has always cleared it; this is the switch people actually use.
-            turns.planning.clear()
+        // Behind the write queue: a reply from the turn that just ended may not have
+        // been inserted yet, and reopening the same chat without it would show a
+        // question with no answer and then resend it.
+        val conversation = writer.inOrder { conversation(id) }
+        if (conversation == null) {
+            // Deleted between the tap and this read; adopting the id would make the
+            // next message violate the foreign key.
+            newChat()
+            return
+        }
 
-            // A conversation continued under a different model would mix two models'
-            // voices in one transcript, and the history would not say which said what.
-            val currentModel = _uiState.value.modelName
-            val mismatch = conversation.modelName != null &&
-                currentModel != null &&
-                conversation.modelName != currentModel
+        val messages = writer.inOrder { messages(id) }
+        conversationId = id
+        nextEntryId = messages.size.toLong()
+        // The board is one object for the whole app, so a plan left in it is on screen in
+        // whatever chat is opened next and is pinned to the tail of that chat's prompt.
+        // newChat has always cleared it; this is the switch people actually use.
+        turns.planning.clear()
 
-            _uiState.update { state ->
-                val reopened = state.copy(
-                    transcript = messages.toTranscript(
-                        conversation.compactionSummary?.let { conversation.compactionThroughIndex },
-                    ),
-                    compaction = conversation.compactionSummary?.let {
-                        Compaction(it, conversation.compactionThroughIndex, 0)
-                    },
-                    error = if (mismatch) {
-                        "This chat was written by ${conversation.modelName}. Replies will " +
-                            "now come from $currentModel."
-                    } else {
-                        null
-                    },
-                )
-                // Not zero. The cache is empty because the model has not read this
-                // conversation yet, but the next turn will read all of it, and everything
-                // that sizes itself against what is left took the zero for a free window.
-                // Reopen a long chat, attach a document, and it was measured against a
-                // window that was already spoken for.
-                reopened.copy(contextUsed = reopened.estimatedPromptTokens())
-            }
+        // A conversation continued under a different model would mix two models'
+        // voices in one transcript, and the history would not say which said what.
+        val currentModel = _uiState.value.modelName
+        val mismatch = conversation.modelName != null &&
+            currentModel != null &&
+            conversation.modelName != currentModel
+
+        _uiState.update { state ->
+            val reopened = state.copy(
+                transcript = messages.toTranscript(
+                    conversation.compactionSummary?.let { conversation.compactionThroughIndex },
+                ),
+                compaction = conversation.compactionSummary?.let {
+                    Compaction(it, conversation.compactionThroughIndex, 0)
+                },
+                error = if (mismatch) {
+                    "This chat was written by ${conversation.modelName}. Replies will " +
+                        "now come from $currentModel."
+                } else {
+                    null
+                },
+            )
+            // Not zero. The cache is empty because the model has not read this
+            // conversation yet, but the next turn will read all of it, and everything
+            // that sizes itself against what is left took the zero for a free window.
+            // Reopen a long chat, attach a document, and it was measured against a
+            // window that was already spoken for.
+            reopened.copy(contextUsed = reopened.estimatedPromptTokens())
         }
     }
 
@@ -1163,13 +1147,15 @@ class ChatViewModel @Inject constructor(
             // once they are gone nothing else on disk remembers, so the photos would stay
             // forever in a folder the user cannot see. Behind the write queue, so a reply
             // still being written is deleted with the rest rather than after it.
-            val orphaned = writer.inOrder {
-                val attached = messages(id).flatMap { it.attachments.decodeAttachments() }
-                deleteConversation(id)
-                attached
+            reportingFailure {
+                val orphaned = writer.inOrder {
+                    val attached = messages(id).flatMap { it.attachments.decodeAttachments() }
+                    deleteConversation(id)
+                    attached
+                }
+                staging.discard(orphaned)
+                if (wasOpen) newChat()
             }
-            staging.discard(orphaned)
-            if (wasOpen) newChat()
         }
     }
 
@@ -1308,7 +1294,9 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun reportingFailure(write: suspend () -> Unit) =
-        writeReportingFailure(write) { _uiState.update { state -> state.copy(error = it) } }
+        writeReportingFailure(write) { reportError(it) }
+
+    private fun reportError(why: String) = _uiState.update { it.copy(error = why) }
 
     /**
      * Folds one pass into the lifetime ledger.
@@ -1386,42 +1374,15 @@ private fun StagedDocument.asPrompt(): String = buildString {
 }
 
 /**
- * How many characters of a document may be sent.
+ * Two characters to a token, for the one case that has nothing measured to use instead.
  *
- * Half of what is left of the window, not half of the window. The first version used the
- * whole size and a fresh conversation to reason about, and attaching a spreadsheet to a
- * chat that already had one exchange in it filled the context and lost the turn.
- *
- * Two characters to a token, which is pessimistic for prose and about right for the thing
- * people actually attach. English runs nearer four, but a comma separated file of names,
- * dates and numbers tokenises far worse than a paragraph, and it was exactly that file
- * which overran. Being wrong in this direction costs some of a document; being wrong in
- * the other direction costs the whole reply.
- */
-private fun documentBudget(state: ChatUiState): Int {
-    val size = state.contextSize.takeIf { it > 0 } ?: DEFAULT_CONTEXT_TOKENS
-    val remaining = (size - state.contextUsed).coerceAtLeast(0)
-    return remaining * CHARS_PER_TOKEN / DOCUMENT_SHARE
-}
-
-/** Two characters to a token: what dense, comma heavy text actually costs. */
-private const val CHARS_PER_TOKEN = 2
-
-/**
- * The same number, for the one case that has nothing measured to use instead.
- *
- * Named apart from [CHARS_PER_TOKEN] because they answer opposite questions and only happen
- * to share a value. That one asks how much of a document fits, where being low means
- * attaching less; this one asks how full the window is, where being low means folding early.
- * Sharing a constant made a change for one silently a change for the other.
+ * Named apart from the document budget's own ratio in [Attaching], which happens to share
+ * the value, because they answer opposite questions. That one asks how much of a document
+ * fits, where being low means attaching less; this one asks how full the window is, where
+ * being low means folding early. Sharing a constant made a change for one silently a change
+ * for the other.
  */
 private const val PESSIMISTIC_CHARS_PER_TOKEN = 2
-
-/** Half the window. The conversation, the instructions and the reply share the rest. */
-private const val DOCUMENT_SHARE = 2
-
-/** Used before a model is loaded and its real window is known. */
-private const val DEFAULT_CONTEXT_TOKENS = 4096
 
 private const val STREAM_FRAME_MS = 33L
 
@@ -1462,6 +1423,40 @@ private suspend fun writeReportingFailure(write: suspend () -> Unit, report: (St
  */
 private const val STORAGE_FAILED =
     "This chat could not be saved. It is still here now, but it will not be when you come back."
+
+/**
+ * Runs a read, and says so rather than dying when it fails.
+ *
+ * The mirror of [writeReportingFailure], and it was missing, which made the rule half a rule:
+ * the same database that will not open fails reads and writes alike, and only one of them was
+ * being caught. The worst of them ran in the view model's own `init`, so the process died
+ * before there was a screen to put a message on, and with no crash reporter that is a launch
+ * loop nobody can tell us about.
+ *
+ * What was lost differs per read, so the caller says it. A drawer that cannot be filled and a
+ * chat that will not reopen are different sentences, and neither of them is "the app closed".
+ */
+private suspend fun readReportingFailure(
+    why: String,
+    report: (String) -> Unit,
+    read: suspend () -> Unit,
+) {
+    try {
+        read()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+        Log.w("OpenWeights", "a chat read did not come back", failure)
+        report(why)
+    }
+}
+
+/** Said when the drawer cannot be filled, which does not stop the chat on screen working. */
+private const val CHATS_UNREADABLE =
+    "Your saved chats could not be read. This one still works."
+
+/** Said when one chat will not reopen. The one on screen is untouched, so it stays. */
+private const val CHAT_UNREADABLE = "That chat could not be opened."
 
 /**
  * How long an answer should be.
@@ -1555,19 +1550,6 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
         }
         kept
     }
-}
-
-/**
- * The state with the outcome of an attachment folded into it.
- *
- * One place where the three answers land, so a refusal cannot be reported by one path and
- * swallowed by another. Which of the two staging slots a file fills is a property of the
- * file rather than of the caller.
- */
-private fun ChatUiState.after(staged: Staged): ChatUiState = when (staged) {
-    is Staged.Files -> copy(staged = this.staged + staged.files)
-    is Staged.Document -> copy(stagedDocument = staged.document)
-    is Staged.Refused -> copy(error = staged.why)
 }
 
 /**

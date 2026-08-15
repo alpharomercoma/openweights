@@ -25,6 +25,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.Clock
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
+import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
@@ -39,6 +40,8 @@ import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -153,10 +156,21 @@ abstract class ChatFixture {
         /** Set to make every write from here on throw, as a full disk would. */
         var broken = false
 
+        /**
+         * Set to make the conversation list throw, as a database that will not open would.
+         *
+         * Separate from [broken] because it fails in a different place: the list is a flow
+         * collected for the lifetime of the view model, not a call anybody awaits.
+         */
+        var unreadable = false
+
         override suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T {
             if (broken) error("the disk would not take it")
             return super.inOrder(work)
         }
+
+        override fun conversations(): Flow<List<ConversationEntity>> =
+            if (unreadable) flow { error("the database would not open") } else super.conversations()
     }
 
     /** Something for a scripted call to land on. What it returns does not matter here. */

@@ -51,7 +51,7 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
      * Here so the view model has one collaborator for storage rather than two, and cannot
      * reach the tables without going past the ordering this object exists to provide.
      */
-    fun conversations(): Flow<List<ConversationEntity>> = chats.observeConversations()
+    open fun conversations(): Flow<List<ConversationEntity>> = chats.observeConversations()
 
     /** Runs [work] with the queue held, for the reads and writes with no method here. */
     open suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T = mutex.withLock {

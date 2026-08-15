@@ -132,6 +132,38 @@ class ChatConversationsTest : ChatFixture() {
     }
 
     @Test
+    fun `a conversation list that will not load does not take the app with it`() =
+        runTest(dispatcher) {
+            // Writes were guarded and reads were not, which is half a rule: the same
+            // unopenable database fails both, and this one fails in the view model's own
+            // init, so the process dies before a screen exists to show anything on. With no
+            // crash reporter that is a launch loop nobody can tell us about.
+            writer.unreadable = true
+
+            val opened = newViewModel(SavedStateHandle())
+            settle()
+
+            assertThat(opened.uiState.value.conversations).isEmpty()
+            assertThat(opened.uiState.value.error).isNotNull()
+        }
+
+    @Test
+    fun `a conversation that will not reopen says so and leaves the open one alone`() =
+        runTest(dispatcher) {
+            loadModel()
+            viewModel.send("First chat")
+            settle()
+            val first = requireNotNull(viewModel.uiState.value.activeConversationId)
+            writer.broken = true
+
+            viewModel.openConversation(first)
+            settle()
+
+            assertThat(viewModel.uiState.value.error).isNotNull()
+            assertThat(viewModel.uiState.value.transcript).isNotEmpty()
+        }
+
+    @Test
     fun `a message that could not be saved says so`() = runTest(dispatcher) {
         loadModel()
         // The disk, as far as the chat is concerned, is gone.

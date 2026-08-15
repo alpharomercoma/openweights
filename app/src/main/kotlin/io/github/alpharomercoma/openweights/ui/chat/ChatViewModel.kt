@@ -1090,6 +1090,10 @@ class ChatViewModel @Inject constructor(
             val messages = writer.inOrder { messages(id) }
             conversationId = id
             nextEntryId = messages.size.toLong()
+            // The board is one object for the whole app, so a plan left in it is on screen in
+            // whatever chat is opened next and is pinned to the tail of that chat's prompt.
+            // newChat has always cleared it; this is the switch people actually use.
+            turns.planning.clear()
 
             // A conversation continued under a different model would mix two models'
             // voices in one transcript, and the history would not say which said what.

@@ -223,6 +223,9 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
                 val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
                 val reportViewModel: ReportViewModel = hiltViewModel()
+                // Collected from the board rather than mirrored into the chat state: it is
+                // already a flow, and a second copy would be a second thing to keep in step.
+                val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
                     // The view model outlives the composition, so returning to this tab
@@ -254,6 +257,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onDictate = mediaViewModel::toggleDictation,
                     onMode = chatViewModel::setMode,
                     onApproval = chatViewModel::resolveApproval,
+                    plan = plan,
+                    onTickStep = chatViewModel.planning::tick,
                     onReport = { entry, reason, note ->
                         reportViewModel.report(
                             modelName = state.modelName,

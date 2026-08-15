@@ -83,6 +83,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
@@ -137,6 +138,8 @@ fun ChatScreen(
     onReport: (TranscriptEntry, ReportReason, String) -> Unit = { _, _, _ -> },
     onMode: (AgentMode) -> Unit = {},
     onApproval: (Boolean) -> Unit = {},
+    plan: TaskPlan? = null,
+    onTickStep: (Int) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -202,6 +205,8 @@ fun ChatScreen(
             onReport = onReport,
             onMode = onMode,
             onApproval = onApproval,
+            plan = plan,
+            onTickStep = onTickStep,
             modifier = modifier,
         )
     }
@@ -238,6 +243,8 @@ private fun ChatContent(
     onReport: (TranscriptEntry, ReportReason, String) -> Unit,
     onMode: (AgentMode) -> Unit,
     onApproval: (Boolean) -> Unit,
+    plan: TaskPlan?,
+    onTickStep: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
@@ -317,6 +324,7 @@ private fun ChatContent(
             }
 
             StatusStrip(state = state, dictationError = dictation.error)
+            plan?.let { PlanCard(plan = it, onTick = onTickStep) }
             state.pendingApproval?.let { call ->
                 ToolApproval(call = call, onAnswer = onApproval)
             }

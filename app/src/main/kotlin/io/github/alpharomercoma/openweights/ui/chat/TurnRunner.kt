@@ -517,19 +517,29 @@ private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
  * was right to. It is the one part of the routing path that is a guess, so whether it earns
  * its place is a measurement, and a measurement has to be able to call it.
  *
- * **The first measurement is not flattering, and is too small to act on.** Over six models and
- * seventy two generations it fired five times: twice on Llama 3.2 3B, where it turned one
- * under-call into a right answer and one right answer into an over-call, and three times on
- * Granite 3.3 2B, where the arm scored 2/6 with it and 3/6 without. It has not yet been
- * observed to help. Five firings is not a reason to delete a path that was built on watching
- * real turns, where a model names its tool and asks permission, and these cases are single
- * decisions rather than that shape. What would settle it is the same counter over cases where
- * a model has already been handed a tool result, and it is now counted on every run.
+ * **The first measurement was not flattering.** Over six models and seventy two generations it
+ * fired five times: twice on Llama 3.2 3B, where it turned one under-call into a right answer
+ * and one right answer into an over-call, and three times on Granite 3.3 2B, where the arm
+ * scored 2/6 with it and 3/6 without. Never once did it help.
+ *
+ * Looking at what it fired on says why. The path was built on watching a model announce a tool
+ * and then ask permission, which is a short sentence and nothing else. What it actually caught
+ * was models mentioning a tool inside an answer they had already finished writing, where
+ * naming it is a remark rather than a decision. So it now declines to read a decision out of
+ * anything long enough to be an answer, which is the difference between the two cases and
+ * costs nothing to check.
  */
 internal fun String.salvagedCall(
     tools: ToolRegistry,
     conversation: List<ChatMessage>,
 ): List<ToolCall> {
+    // An announcement, not an answer. "Let me web_search that" is a decision the model failed
+    // to write as a call; three paragraphs that happen to mention web_search are a reply that
+    // was already finished, and running a tool off the back of one is the app deciding.
+    if (withoutReasoning().withoutToolMarkup().trim().length > ANNOUNCEMENT_CHARS) {
+        return emptyList()
+    }
+
     val question = conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
     val salvageable = tools.all
         .filter { contains(it.definition.name, ignoreCase = true) }
@@ -569,6 +579,15 @@ private fun List<ChatMessage>.pinning(plan: TaskPlan?): List<ChatMessage> {
     return dropLast(1) +
         ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
 }
+
+/**
+ * How long a reply can be and still be an announcement rather than an answer.
+ *
+ * A hundred and sixty characters is about forty tokens, which is two sentences. "Let me look
+ * that up with web_search" is twenty four; the replies behind every one of salvage's five
+ * misfires were complete answers that mentioned a tool in passing.
+ */
+private const val ANNOUNCEMENT_CHARS = 160
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
 private fun AgentDecision.steps(): List<AgentStep> = when (this) {

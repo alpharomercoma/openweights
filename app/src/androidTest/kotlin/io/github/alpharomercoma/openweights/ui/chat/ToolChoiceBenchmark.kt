@@ -159,7 +159,10 @@ class ToolChoiceBenchmark {
             // in the system message instead, which is what the app now does, so what is
             // measured here is the route each model actually takes.
             val native = engine.loadedModel?.supportsTools == true
-            Log.i(TAG, "ROUTE model=$name native=$native")
+            // The size as well as the label, because the label is a key in a map and the file
+            // under it is whatever somebody pushed. A run that reported lfm2-1.2b while
+            // measuring LFM2.5-2.6B is a table with the wrong name on a row.
+            Log.i(TAG, "ROUTE model=$name native=$native file=${file.name} bytes=${file.length()}")
             probeRendering(engine, name, native)
 
             val scored = ARMS.map { arm -> arm to score(engine, name, arm, native) }

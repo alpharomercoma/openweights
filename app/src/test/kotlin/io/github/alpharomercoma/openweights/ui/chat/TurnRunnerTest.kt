@@ -142,6 +142,24 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `a finished answer that mentions a tool is not a decision either`() = runBlocking {
+        // What salvage was built for is a model announcing a tool and then asking permission,
+        // which is one short sentence. What it was measured catching is this: a reply that had
+        // already answered the question and mentioned a tool along the way. Five firings
+        // across six models and seventy two generations, and not one of them helped.
+        engine.scripted += ScriptedPass(
+            "The capital of France is Paris, which has been the seat of government since " +
+                "the tenth century and is the largest city in the country by a wide margin. " +
+                "I could web_search for more detail if you wanted something more recent.",
+        )
+
+        val steps = run(withTools = true)
+
+        assertThat(search.calls).isEmpty()
+        assertThat(steps).isEmpty()
+    }
+
+    @Test
     fun `two tools that could both be salvaged is not a decision`() = runBlocking {
         // The property that rule protects, kept: naming two tools that could each be called
         // is a model weighing options, and picking one for it would be the app deciding.

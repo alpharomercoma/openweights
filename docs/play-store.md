@@ -187,14 +187,21 @@ Two things still need a human before submission:
 
 ## Still to do, and none of it is code
 
+Every box that can be filled in ahead of time is filled in, in
+[store-listing.md](store-listing.md): the name, both descriptions, the data safety answers row
+by row with the reasoning behind each, the generative AI declaration, and the content rating
+notes. What is left is the part that needs a person, a key, or a graphics tool.
+
 1. Create the upload key and enrol in Play App Signing. Never commit it.
-2. Store listing: title, short and full description, feature graphic, phone screenshots.
-3. Privacy policy at a public URL. The content is the data safety section above.
-4. Content rating questionnaire.
-5. Generative AI content declaration, per the section above.
-6. Internal testing track, then read the pre-launch report. It runs the app on real
+2. Publish [privacy-policy.md](privacy-policy.md) at a public URL and paste it into the
+   Console. GitHub Pages on this repository is enough.
+3. Make the feature graphic and the phone screenshots. Sizes are in the listing document.
+4. Answer the content rating questionnaire.
+5. File the generative AI content declaration, and ask review the two open questions in it.
+6. Record the foreground service video and submit that declaration.
+7. Internal testing track, then read the pre-launch report. It runs the app on real
    devices and is the cheapest way to find a crash on hardware we do not own.
-7. Decide the launch countries and whether an age rating gate is needed.
+8. Decide the launch countries and whether an age rating gate is needed.
 
 ## Known gaps a reviewer would be right to raise
 

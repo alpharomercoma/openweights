@@ -432,7 +432,10 @@ list position deciding which.
 
 ## Three purpose-built callers, and what separates them
 
-The same suite, second `pineapple`, all against the Qwen 2.5 control:
+The same suite, second `pineapple`, all against the Qwen 2.5 control. The arms here are the
+same values the full table below reports; only the `ms` ranges differ, because these were taken
+early in the session and the full table's means were taken after an hour of it. See the note
+on drift there.
 
 | model | size | bare · tagged · rev · warm | over | under | order | cache | ms |
 |---|---|---|---|---|---|---|---|---|
@@ -458,54 +461,83 @@ single-turn routing decisions do not show it.
 
 ## Fifteen models, both axes
 
-Everything available, on `pineapple` 72c4dabb, 2026-08-16. `6-case` is the four-arm
-single-turn score written best-arm; `multi` is the pair from `MULTI`, where 1 of 2 is what a
-model scores by declining everything *and* by calling everything, so only 2 discriminates.
+Everything available, on `pineapple` 72c4dabb, 2026-08-16, rebuilt from the logs rather than
+from notes: the first table written from this run said "best arm" over a column that was
+actually the bare arm, which understated five models by a case.
 
-| model | on disk | route | 6-case | multi | order | cache | ms |
-|---|---|---|---|---|---|---|---|
-| **arch-agent-1.5b, template restored** | 986 MB | native | **6/6** | **2/2** | 0/6 | 0/6 | 8.1 s |
-| hammer2.1-1.5b | 937 MB | native | 5/6 | 1/2 | 0/6 | 0/6 | **5.2 s** |
-| phi4-mini | 2491 MB | prompted | 4/6 | **2/2** | 2/6 | 1/6 | 15.4 s |
-| qwen2.5-1.5b *(shipping)* | 1117 MB | native | 4/6 | 1/2 | 0/6 | 1/6 | 6.4 s |
-| xlam2-1b | 935 MB | native | 4/6 | 1/2 | 1/6 | 0/6 | 4.5 s |
-| xlam2-3b | 1823 MB | native | 4/6 | 1/2 | 1/6 | 0/6 | 8.4 s |
-| qwen2.5-coder-3b | 1998 MB | native | 4/6 | 1/2 | 2/6 | 0/6 | 9.3 s |
-| arch-agent-1.5b, as published | 986 MB | prompted | 4/6 | 1/2 | 2/6 | 0/6 | 6.5 s |
-| granite3.3-2b | 1453 MB | native | 3/6 | 1/2 | **4/6** | 1/6 | 9.5 s |
-| llama3.2-3b | 1922 MB | native | 3/6 | **0/2** | 2/6 | 0/6 | 12.4 s |
-| gemma4-e4b | 4591 MB | native | 3/6 | 1/2 | 0/6 | 0/6 | **20.5 s** |
-| functiongemma-270m | 242 MB | native | 3/6 | **error** | 0/6 | 0/6 | **1.9 s** |
-| lfm2-1.2b | 696 MB | prompted | 2/6 | 1/2 | 0/6 | 0/6 | 3.5 s |
-| smollm3-3b | 1915 MB | prompted | 2/6 | 1/2 | 1/6 | 0/6 | 13.2 s |
-| gemma3-1b | 806 MB | prompted | 1/6 | **error** | 3/6 | 0/6 | 4.1 s |
+The four single-turn arms are written out because collapsing them is what caused that. `best`
+is the highest of the four. `multi` is the pair from `MULTI`, where 1 of 2 is what a model
+scores by declining everything *and* by calling everything, so only 2 of 2 discriminates.
+
+Where a model also appears in the 2026-08-15 table above, this one supersedes it and the two
+disagree for a reason: that run predates the parser change, so a call the model made in a shape
+neither route could read was scored as a refusal. Granite reads 2/6 there and 4/6 here on the
+same six cases. The files also differ, since these were re-fetched at Q4_0 where the publisher
+offers it. Nothing here is a claim that any model changed.
+
+**`ms` is the mean of the four single-turn arms and is the one soft number here.** It drifts
+upward across a long session: on this device Qwen averaged 6.7 s a case at 11:51 and 8.0 s at
+12:58, same file, same arms, identical answers both times. That is thermal, and it means a
+model measured late reads slower than one measured early, so the column ranks rather than
+measures. The scores have no such problem: Qwen's `picked` list has now reproduced identically
+six times across two devices, and every model's arms reproduced between the two runs of this
+suite.
+
+| model | MB | route | bare | tag | rev | warm | best | multi | order | cache | ms |
+|---|---:|---|---|---|---|---|---|---|---|---|---:|
+| **arch-agent-1.5b, template restored** | 986 | native | 6 | 6 | 6 | 6 | **6/6** | **2/2** | 0/6 | 0/6 | 8.2 |
+| hammer2.1-1.5b | 937 | native | 5 | 5 | 5 | 5 | 5/6 | 1/2 | 0/6 | 0/6 | 6.3 |
+| arch-agent-1.5b, as published | 986 | prompted | 4 | 5 | 4 | 4 | 5/6 | 1/2 | 2/6 | 0/6 | 6.8 |
+| xlam2-1b | 935 | native | 4 | 4 | 5 | 4 | 5/6 | 1/2 | 1/6 | 0/6 | **4.9** |
+| xlam2-3b | 1823 | native | 4 | 4 | 5 | 4 | 5/6 | 1/2 | 1/6 | 0/6 | 8.9 |
+| phi4-mini | 2492 | prompted | 4 | 3 | 2 | 3 | 4/6 | **2/2** | 2/6 | 1/6 | 14.2 |
+| qwen2.5-1.5b *(shipping)* | 1117 | native | 4 | 4 | 4 | 3 | 4/6 | 1/2 | 0/6 | 1/6 | 8.0 |
+| qwen2.5-coder-3b | 1998 | native | 4 | 4 | 4 | 4 | 4/6 | 1/2 | 2/6 | 0/6 | 9.5 |
+| granite3.3-2b | 1453 | native | 3 | 3 | 3 | 4 | 4/6 | 1/2 | **4/6** | 1/6 | 9.4 |
+| functiongemma-270m | 242 | native | 3 | 3 | 3 | 3 | 3/6 | **error** | 0/6 | 0/6 | **1.8** |
+| gemma4-e4b | 4591 | native | 3 | 3 | 3 | 3 | 3/6 | 1/2 | 0/6 | 0/6 | **20.2** |
+| llama3.2-3b | 1922 | native | 3 | 3 | 2 | 3 | 3/6 | **0/2** | 2/6 | 0/6 | 11.4 |
+| smollm3-3b | 1915 | prompted | 2 | 3 | 3 | 2 | 3/6 | 1/2 | 1/6 | 0/6 | 18.6 |
+| lfm2-1.2b | 696 | prompted | 2 | 2 | 2 | 2 | 2/6 | 1/2 | 0/6 | 0/6 | 5.3 |
+| gemma3-1b | 806 | prompted | 1 | 1 | 2 | 1 | 2/6 | **error** | 3/6 | 0/6 | 9.0 |
 
 **One model is good at both, and it is the smallest serious one.** Arch-Agent with its template
 put back is 6/6 on every arm and 2/2 on the pair, unmoved by ordering or by a warm cache, at
 986 MB. Nothing else manages both columns.
 
-**The two columns disagree, and that is the point of adding the second.** Hammer leads the
-single-turn table at 5/6 and then declines both follow-ups. Llama 3.2 gets all three
+**The two columns disagree, and that is the point of adding the second.** Hammer is the only
+model at 5 of 6 on all four arms and then declines both follow-ups. Llama 3.2 gets all three
 single-turn tool cases right — better than Hammer on that axis — and scores 0 of 2, calling
 `fetch_url` for a fact sitting in the transcript above it. Phi-4-mini is mediocre at 4/6 and is
 one of only two models to discriminate on the pair. A suite of opening turns would have ranked
 these three in exactly the wrong order for an app whose every tool turn has a second pass.
 
-**Most models score 1 of 2 by never calling again.** Qwen, Hammer, both xLAMs, Qwen Coder,
-Granite, LFM2, SmolLM3, Gemma 4 all return `picked=[null, null]`. They take the point for
-refusing to re-search a fact they already have and lose the one for the second city. That is a
-policy, not an accident, and for a harness built on multiple passes it is the wrong one.
+**Four models reach 5 of 6 and only one of them means it.** Hammer scores 5 in every arm.
+xLAM-2-1b, xLAM-2-3b and the unrepaired Arch-Agent reach 5 in exactly one arm each and sit at 4
+in the other three, which is why the arms are written out: a best-of-four column would have
+called those four models equal. Reading the same table by the bare arm alone would have been
+just as wrong in the other direction, and understated all three by a case.
+
+**Ten of the fifteen score 1 of 2 by never calling again.** Qwen, Qwen Coder, Hammer, both
+xLAMs, Granite, LFM2, SmolLM3, Gemma 4 and the unrepaired Arch-Agent all return
+`picked=[null, null]`. They take the point for refusing to re-search a fact they already have
+and lose the one for the second city. That is a policy rather than an accident, and for a
+harness built on multiple passes it is the wrong one.
+
+Only two models return anything else, and they return the same thing: `[web_search, null]`,
+from Arch-Agent restored and Phi-4-mini. Llama 3.2 is the only model that calls on both, and
+gets both wrong. Two of fifteen can tell the two questions apart.
 
 **BFCL's multi-turn ranking did not transfer.** xLAM-2-3b is the best model under 4B on that
-board at 55.62 multi-turn against the 1B's 8.38, and here the two are indistinguishable: same
-4/6, same 1/2, same ordering and cache numbers, twice over. The 3B costs 1.9 times the disk and
-1.9 times the wall clock for nothing measurable. Two cases cannot refute a leaderboard, but
-they can say the advantage does not reach this app.
+board at 55.62 multi-turn against the 1B's 8.38, and here the two are indistinguishable: the
+same four arms 4·4·5·4, the same 1 of 2, the same ordering and cache numbers, twice over. The
+3B costs 1.9 times the disk and 1.8 times the wall clock for nothing measurable. Two cases
+cannot refute a leaderboard, but they can say the advantage does not reach this app.
 
 **Size buys nothing here.** Ranking by parameters gives almost the reverse of ranking by score.
 Gemma 4 E4B is the largest thing tested at 4591 MB, never calls a tool once in 24 generations,
-and takes 20.5 seconds a case; Arch-Agent is a fifth of its size and perfect. Every model above
-2 GB is beaten by one under 1 GB.
+and is the slowest at 20.2 s a case; Arch-Agent is a fifth of its size and perfect. The best
+five models on the single-turn arms are all under 2 GB, and four of the five are under 1 GB.
 
 **Three separate ways a capable model arrives unable to call anything.** Arch-Agent's template
 is dropped in GGUF conversion. SmolLM3's template gates its tool block on an `xml_tools`

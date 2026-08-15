@@ -173,6 +173,40 @@ Four of seven right, one half right, two wrong. Every one of those turns logged 
 The last row is the sharpest form of it: the tool was offered, the user named it in the
 prompt, and the model still did not emit a call.
 
+**LFM2.5 2.6B Q4_K_M** (1.56 GB, downloaded the same way, switched to by tapping its row in
+Models), same seven questions, same chat, same device an hour later:
+
+| Asked | Answered | Right | Searched | Wall |
+|---|---|---|---|---|
+| 17 times 24, number only | 408 | yes | no | 15 s |
+| Who wrote Frankenstein | Mary Shelley | yes | **yes** | 25 s |
+| Three primes / capital of Australia | "2,3,5 Canberra" | yes | no | 38 s |
+| In a transformer, what does the KV cache store | "the key and value tensors (K and V) from the self-attention layers … without recomputing all previous attention operations" | yes | no | 33 s |
+| Who won the most recent World Cup final | **Argentina** | **yes** | **yes** | **457 s** |
+| "Use web_search to find the current weather in Manila" | searched | — | **yes** (`calls=1`) | — |
+
+Two of those rows are the whole argument.
+
+**The World Cup row is the trade in one line.** Qwen answered "France" in 0.6 seconds without
+searching. LFM2.5 reasoned that "my knowledge might not be current", searched, fetched a
+Wikipedia page to confirm, and answered "Argentina" in seven and a half minutes. Right and
+slow against wrong and instant, on the same phone, in the same app, on the same question.
+
+**The Frankenstein row is the cost of the fix.** LFM2.5 searched for the author of
+Frankenstein, which it plainly knows, because it decided to "verify it with a web search".
+That is the over-calling the benchmark scores as `over`, and it is what a user pays for the
+World Cup row: twenty five seconds and a network round trip for a fact the model had.
+
+So the two failure modes are not a spectrum with a good middle; they are two different models.
+The one that never searches is fluent and wrong past its cutoff. The one that searches is
+right and makes you wait, sometimes for something it already knew. Nothing in the harness
+chooses between them, and the app ships whichever the user downloaded.
+
+Three parts of the app were seen working during this that no test had reached on hardware:
+the consent card appeared for the first search and never again once answered, compaction fired
+live at 83% of the window with "Folding earlier turns into a summary", and the thermal policy
+showed "Cooling down" during the long tool turns.
+
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right
 ones: a confident sentence at 23 tok/s either way. The second is that the failure is not

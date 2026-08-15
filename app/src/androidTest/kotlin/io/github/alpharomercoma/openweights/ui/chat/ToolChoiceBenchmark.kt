@@ -90,7 +90,7 @@ import java.time.LocalDate
  */
 @RunWith(AndroidJUnit4::class)
 class ToolChoiceBenchmark {
-    private data class Case(val prompt: String, val expects: String?)
+    internal data class Case(val prompt: String, val expects: String?)
 
     /**
      * One arrangement: the shape a call is asked for in.
@@ -99,7 +99,7 @@ class ToolChoiceBenchmark {
      * syntax, so for those models the two arms send byte-identical prompts, which is not
      * waste: it is the determinism check the seed count now rests on, run for free.
      */
-    private data class Arm(
+    internal data class Arm(
         val label: String,
         val format: CallFormat = CallFormat.BARE,
         /** Reversed, to find out whether being listed first is worth anything. */
@@ -322,7 +322,7 @@ class ToolChoiceBenchmark {
             .toList()
             .filterIsInstance<GenerationEvent.Completed>()
             .single()
-        return read(completed, native)
+        return read(completed)
     }
 
     /**
@@ -353,12 +353,10 @@ class ToolChoiceBenchmark {
      * replaced it is a repair round, which cannot be scored from a single generation because
      * it spends a pass to get a real call.
      */
-    private fun read(completed: GenerationEvent.Completed, native: Boolean): Choice {
+    private fun read(completed: GenerationEvent.Completed): Choice {
         completed.toolCalls.firstOrNull()?.let { return Choice(it.name, Route.NATIVE) }
-        if (!native) {
-            ToolPrompting.parse(completed.content, registry())
-                ?.let { return Choice(it.name, Route.PROMPTED) }
-        }
+        ToolPrompting.parse(completed.content, registry())
+            ?.let { return Choice(it.name, Route.PROMPTED) }
         return Choice(null, Route.NONE)
     }
 
@@ -394,7 +392,12 @@ class ToolChoiceBenchmark {
     private fun system(): String =
         "Today is ${LocalDate.now()}.\n\n$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
 
-    private companion object {
+    /**
+     * Internal rather than private so [RawReplyProbe] can run the same models through the same
+     * sampler. The probe exists to explain rows this scores as nulls, and it can only do that
+     * if the two are demonstrably measuring one thing.
+     */
+    internal companion object {
         const val TAG = "OpenWeightsChoice"
         const val CONTEXT = 4096
 
@@ -475,6 +478,14 @@ class ToolChoiceBenchmark {
          * because they cost a minute each now and cover two more template families; lfm is
          * the one to drop first if anything has to go, since it shares gemma's route and was
          * the model that used to take the suite down with it.
+         *
+         * The last two are a different kind of candidate and are here to be measured against
+         * the rest rather than to cover another template. Every model above is a general chat
+         * model asked to acquire a calling policy afterwards, and the table says the best of
+         * them manages four of six. Hammer is Qwen 2.5 fine-tuned for function calling, at
+         * Q4_0 rather than Q4_K_M because the q6_K tensors in Q4_K_M have no KleidiAI kernel
+         * and cost nearly half the decode rate. FunctionGemma is 270M, small enough that if
+         * it can route at all it can route in front of something else.
          */
         val MODELS = mapOf(
             "qwen2.5-1.5b" to File(BENCH, "qwen.gguf"),
@@ -483,6 +494,8 @@ class ToolChoiceBenchmark {
             "lfm2-1.2b" to File(BENCH, "lfm.gguf"),
             "phi4-mini" to File(BENCH, "phi.gguf"),
             "granite3.3-2b" to File(BENCH, "granite.gguf"),
+            "hammer2.1-1.5b" to File(BENCH, "hammer.gguf"),
+            "functiongemma-270m" to File(BENCH, "fgemma.gguf"),
         )
     }
 }

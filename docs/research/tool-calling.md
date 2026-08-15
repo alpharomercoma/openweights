@@ -301,6 +301,84 @@ This is the product's central weakness and it is a routing problem rather than a
 better, and they have moved it; what they have not done is make a 1.5B model reach for the
 web when the answer it already has feels good enough.
 
+## Two models built for calling, and a bug that hid one of them
+
+Two candidates the earlier search had missed, both pushed to `pineapple` and run through
+`ToolChoiceBenchmark` on 2026-08-16 against a freshly pushed Qwen 2.5 as a control:
+
+- **Hammer 2.1 1.5B** at Q4_0, 937 MB, *smaller* than the Qwen 2.5 1.5B already shipping.
+  Qwen 2.5 fine-tuned for function calling. Q4_0 rather than Q4_K_M on purpose: the q6_K
+  tensors inside Q4_K_M have no KleidiAI kernel and cost nearly half the decode rate.
+- **FunctionGemma 270M** at Q4_0, 242 MB, Google's function-calling model, converted to GGUF
+  by ggml-org itself.
+
+Scored, both came back at 3/6 with every case a null, against the control's 4/6. Scored, that
+reads as two models that never call anything. Both scores were wrong, and the reason is worth
+more than the models are.
+
+### What they actually wrote
+
+`ToolChoiceBenchmark` records the call that was *parsed*, which is the right thing to score
+and the wrong thing to debug with: a row of nulls means either the model declined or nobody
+could read it, and those mean opposite things. `RawReplyProbe` exists to tell them apart. It
+logs the reply, both parsers' verdicts, and nothing else. Asked to read a URL:
+
+```
+model=qwen2.5-1.5b    native=null prompted=null
+  RAW=I don't have real-time weather data available. You can check the current weather in
+      Manila by visiting a weather website or app…
+
+model=hammer2.1-1.5b  native=null prompted=null
+  RAW=[{'type': 'function', 'function': {'name': 'fetch_url',
+       'arguments': {'url': 'https://example.com'}}}]
+
+model=functiongemma-270m native=null prompted=null
+  RAW=<start_function_call>call:fetch_url{url=example.com}<end_function_call>
+      <start_function_response>call:web_search{query:example"example"example"example…
+```
+
+Qwen declined, in prose, and its null is honest. Hammer named the right tool and filled in the
+right argument, and was scored as a refusal. It did the same for `run_script` on the
+arithmetic case, with `48273 * 1179` in the argument.
+
+Three separate faults had to line up to lose it, and all three did:
+
+1. Hammer's template renders the tool definitions, so `supportsTools` is true and llama.cpp
+   parsed the reply expecting the Hermes `<tool_call>` envelope. Hammer's template asks for a
+   bare JSON array instead, so there was no envelope and the engine returned no calls.
+2. Being native **switched off** the prompted parser, which is the one that could have read
+   it. A template that renders tool definitions is not a promise about the syntax the weights
+   will answer in, and the code was treating it as one.
+3. Even ungated it would have failed, because Hammer writes a Python dict repr — `'name'`,
+   not `"name"` — and `CALL_KEYS` held only the double-quoted spellings.
+
+A fourth would have bitten immediately after: every tool reads its own arguments by parsing
+that string as JSON, and `{'url': …}` is not JSON, so a call that parsed perfectly would have
+reached `fetch_url` with no url in it and been answered "you gave me nothing".
+
+All four are fixed, with Hammer's own device output as the test fixture: either quote is
+accepted, closing on the quote it opened with so `"o'brien"` is untouched; the prompted parser
+runs whenever the native one comes back empty; and a single-quoted arguments object is walked
+into JSON. The control is the evidence the fix is neutral — Qwen re-ran **bit-identical**,
+same 4/4/4/3, same `picked`, same `ORDERING 0/6`, same `CACHE 1/6`.
+
+### What is still open
+
+The QDC reservation expired partway through the confirming run, so **Hammer's score with the
+complete fix is not measured yet**. What exists is one partial run with the gate removed but
+the old quote handling still in the app APK, where the reversed arm went 3/6 to 4/6 on a
+`fetch_url` it happened to write in double quotes that time. That is a hint, not a result.
+The run to repeat is the whole benchmark on a fresh device with both APKs current.
+
+FunctionGemma is a separate matter and the probe is enough to set it aside. It emits a third
+format again — `<start_function_call>call:fetch_url{url=example.com}<end_function_call>`,
+correct as far as it goes — then invents a `<start_function_response>` block and degenerates
+into `example"example"example"` for the rest of its budget, so it needs a fourth parser *and*
+a stop token. It also refused the arithmetic by reasoning that the tools only accept
+`"news," "prices," or "schedule"`, which is a fixed mobile-actions catalogue rather than ours.
+It is genuinely fast — 1,706 ms a case against Qwen's 6,088 — and that is the only reason to
+come back to it.
+
 ## The route each answer took
 
 There are three ways a call reaches the app, and they are not equally trustworthy: the

@@ -866,6 +866,36 @@ that read their format from the prompt: 1 to 2, 2 to 3, and 4 to 3. Net one case
 which at six cases an arm is noise. The parser reads both spellings regardless, because
 refusing the one a model was tuned on means refusing the call it made.
 
+### Ordering or caching, and three engine faults (2026-08-15)
+
+Full detail in `docs/research/tool-calling.md`. Measured on a fresh `pineapple` instance.
+
+**It is the ordering.** Reversing the tool list changed the choice in 4 of 18 decisions;
+asking the same question over a warm KV cache instead of a cold one changed 0 of 18. Gemma 3
+1B in forward order picked `web_search`, the first tool listed, for all six cases including
+the three that needed no tool. Its over-calling was position, not judgement, which is also why
+four different system messages had made no difference to it.
+
+**`llama_memory_seq_rm` returns false on recurrent and hybrid models, and we ignored it.**
+A transformer's cache is a row per token and can be cut anywhere; a recurrent one carries a
+running state and can only roll back as far as it kept snapshots for, which by default is not
+at all. The engine rewound `n_past_` regardless, nothing was removed, and the next batch went
+in after the tail that should have gone. `SustainedUseTest` reproduces the field error in
+about ninety seconds against the previous code and is flat at 328 tokens against this one.
+It was not a benchmark artefact: `n_past_` counts generated tokens and `cached_` does not, so
+the rollback path is taken on **every follow-up turn of every conversation** on LFM2,
+Granite-hybrid, Jamba and Nemotron-H.
+
+**Stop during prefill left the cache inconsistent.** Batches that already decoded are in the
+KV cache while the bookkeeping still describes the prefix, so the next turn finds nothing to
+remove and appends after the orphans.
+
+**The final pass no longer withdraws the tool definitions.** Withdrawing them moved the first
+differing token to the tool block, which these templates put near the front, and re-prefilled
+everything behind it: 257 tokens of a 578 token turn, growing with the conversation. The round
+limit is a sentence at the tail now, and the withdrawal survives only for a model that asks
+anyway, once.
+
 ### Coverage (2026-08-14)
 
 `./gradlew koverLog` prints the totals, `koverHtmlReport` writes the detail. Host tier only,

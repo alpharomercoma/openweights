@@ -113,6 +113,41 @@ The scores are lower than the previous table's because the cases changed, not be
 got worse. Two easy ones went and an arithmetic question arrived, which is a judgement about
 whether to compute rather than whether to look up, and most of these models do not make it.
 
+## Ordering or caching: it is the ordering
+
+The question was whether tool-choice accuracy is limited by the order the tools are listed in
+or by the KV cache the decision is made over. Every number above was taken with the context
+cleared before each generation, so all of it describes the cold case and none of it could
+answer. Two arms, 2026-08-15, on `pineapple`:
+
+| model | template renders tools | order reversed | asked over a warm cache |
+|---|---|---|---|
+| qwen2.5-1.5b | yes | 0 of 6 changed | 0 of 6 changed |
+| gemma3-1b | no | **3 of 6 changed** | 0 of 6 changed |
+| LFM2.5-2.6B | yes | **1 of 6 changed** | 0 of 6 changed |
+
+**Caching: nothing, 0 of 18.** Prefilling the same prompt cold and continuing from a cache
+that already holds it produce the same choice every time. The concern was real in principle,
+since a warm continuation reads dequantised values back out of the cache while a cold prefill
+computes in full precision, and greedy routing is an argmax over logits that are often close.
+It does not happen here.
+
+**Ordering: 4 of 18, and concentrated where the accuracy is worst.** Gemma's forward-order row
+is the finding: it picked `web_search`, the first tool in the list, for **all six cases**,
+including the arithmetic one and the three that needed no tool at all. Reversed, it stopped
+doing that. Its over-calling was never really a judgement about the web; it was picking what
+it was shown first.
+
+Two things follow. The catalogue order is a real lever, and it is currently nobody's decision:
+it is whatever order `ToolsModule` happens to register in. And this is the mechanism behind
+the earlier finding that four different system messages made no difference on three of six
+models, because no wording competes with position.
+
+Reversing also nudged the scores up, 1 to 2 on Gemma and 3 to 4 on LFM. That is one case each
+and not a reason to reverse the list: choosing an order from six cases would be fitting to the
+cases. The benchmark now carries the arm, so an order can be chosen when there is enough to
+choose on.
+
 ## The route each answer took
 
 There are three ways a call reaches the app, and they are not equally trustworthy: the

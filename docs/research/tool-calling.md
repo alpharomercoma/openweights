@@ -247,7 +247,28 @@ So: across three models and about twenty questions typed into the composer, noth
 Qwen 2.5 is fast and never calls. LFM2.5 calls well and takes up to seven and a half minutes.
 Qwen3.5 is slow like LFM, calls like Qwen 2.5, and additionally claims to have searched when it
 has not. The conclusion this points at is not "keep looking for the model" but "stop asking a
-2B model to decide": when the user names a tool, run it.
+2B model to decide" for the one case where the user has already decided.
+
+### Naming a tool, before and after
+
+The turn now spends its one repair pass when the request names an available tool and no call
+came back. Measured on the same device, the same model and the same question, forty minutes
+apart:
+
+| | Before | After |
+|---|---|---|
+| "Use web_search to find the current weather in Manila" | `calls=0` | **`calls=1`**, then an answering pass |
+| What the user was told | "The current weather in Manila is Clouds and sun with a temperature of 85°" — **invented** | a page actually fetched, and the answer written from it |
+| Wall | 49 s | **799 s** |
+
+Both halves of that are the finding. The nudge does what it was built to do: a fabricated
+answer became a real one. And it makes the cost impossible to miss, because a model that only
+searches when pushed is a model that takes thirteen minutes when pushed.
+
+Two details worth keeping. It called `fetch_url` rather than the `web_search` it was told to
+use, so what the pass buys is *a* call rather than the named one; the app does not build the
+call, so which tool is still the model's to choose. And `fetch_url` asks every time, so the
+user saw an approval card mid-turn, which is the design working rather than a surprise.
 
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right

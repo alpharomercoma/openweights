@@ -37,11 +37,13 @@ import java.io.File
  *
  * The model is not committed: push one first:
  * ```
- * adb shell mkdir -p /data/local/tmp/openweights
+ * adb shell mkdir -p /data/local/tmp/openweights/bench
  * adb push LFM2.5-2.6B-Q4_K_M.gguf /data/local/tmp/openweights/model.gguf
+ * adb push qwen2.5-1.5b-instruct-q4.gguf /data/local/tmp/openweights/bench/qwen.gguf
  * ```
- * Without it, these tests skip rather than fail, so CI stays green on machines with no
- * device attached.
+ * Two of them, because whether a cached prefix can be reused is a property of the model's
+ * memory rather than of this code: see [ROLLS_BACK]. Without either, the tests that need it
+ * skip rather than fail, so CI stays green on machines with no device attached.
  */
 @RunWith(AndroidJUnit4::class)
 class LlamaCppEngineTest {
@@ -124,7 +126,8 @@ class LlamaCppEngineTest {
      */
     @Test
     fun reusesCachedPrefixWhenThePromptRepeats() = runBlocking {
-        engine.load(MODEL, ModelLoadParams(contextLength = CONTEXT_LENGTH))
+        assumeTrue("no rolling-back model at ${ROLLS_BACK.path}", ROLLS_BACK.isFile)
+        engine.load(ROLLS_BACK, ModelLoadParams(contextLength = CONTEXT_LENGTH))
         val params = SamplerParams(temperature = 0.2f, maxTokens = 8, seed = 7)
         val conversation = listOf(
             ChatMessage.text(ChatRole.USER, "Name one colour. Answer with one word."),
@@ -147,7 +150,8 @@ class LlamaCppEngineTest {
     /** A follow-up turn should only pay for the tokens the previous turn did not cover. */
     @Test
     fun reusesCachedPrefixOnFollowUpTurns() = runBlocking {
-        engine.load(MODEL, ModelLoadParams(contextLength = CONTEXT_LENGTH))
+        assumeTrue("no rolling-back model at ${ROLLS_BACK.path}", ROLLS_BACK.isFile)
+        engine.load(ROLLS_BACK, ModelLoadParams(contextLength = CONTEXT_LENGTH))
         val params = SamplerParams(temperature = 0.2f, maxTokens = 8, seed = 7)
         val question = ChatMessage.text(ChatRole.USER, "Name one colour. Answer with one word.")
 
@@ -176,5 +180,22 @@ class LlamaCppEngineTest {
         const val TAG = "OpenWeightsTest"
         const val CONTEXT_LENGTH = 2048
         val MODEL = File("/data/local/tmp/openweights/model.gguf")
+
+        /**
+         * A model whose cache can be cut anywhere, for the two tests about reuse.
+         *
+         * Named apart from [MODEL] because reuse is not a property of the engine alone. A
+         * transformer keeps a row per token and can be truncated at any position; a recurrent
+         * or hybrid model carries a running state and can only roll back as far as it kept
+         * snapshots for, which by default is none. It says so by returning false from
+         * `llama_memory_seq_rm`, and the engine then starts over rather than rewinding into a
+         * cache that was not rolled back, which is what `llama_decode returned 1` used to be.
+         *
+         * Measured on a Snapdragon 8 Gen 3, same binary, minutes apart: re-sending an
+         * identical prompt decoded 1 token of 38 on Qwen 2.5 1.5B and 19 of 19 on LFM2.5
+         * 2.6B. So these two are pointed at the family they describe, and what holds for the
+         * other family is that the session stays correct, which is `SustainedUseTest`.
+         */
+        val ROLLS_BACK = File("/data/local/tmp/openweights/bench/qwen.gguf")
     }
 }

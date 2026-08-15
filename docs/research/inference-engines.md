@@ -114,6 +114,36 @@ Decode remains bandwidth-bound overall, roughly `memory bandwidth ÷ active mode
 so quantization choice dominates it. `docs/CONTEXT.md` keeps the current numbers, and the
 in-app estimator is calibrated against them.
 
+## Prefix reuse is a property of the model, not of the engine
+
+Measured 2026-08-15 on a Snapdragon 8 Gen 3, same binary, minutes apart. Re-sending an
+identical conversation, and then a follow-up that extends it:
+
+| Model | Memory | Repeat prompt | Follow-up |
+|---|---|---|---|
+| Qwen 2.5 1.5B | transformer | **1 token of 38** | 15 of 38 |
+| LFM2.5 2.6B | hybrid recurrent | **19 of 19** | all of it |
+
+A transformer keeps a row per token, so the cache can be cut at any position and everything
+before the cut is free. A recurrent or hybrid model carries a running state instead, and can
+only roll back as far as it kept snapshots for, which by default is none. `llama_memory_seq_rm`
+says so by returning false.
+
+The engine used to ignore that return and rewind its own bookkeeping anyway. Nothing was
+removed, `llama_batch_get_one` leaves positions unset, and the next batch landed after the
+tail that was supposed to be gone: the model attended to text nobody could see, the cache
+grew every turn, and thirty or so generations later `llama_decode` returned 1. That was the
+LFM2 failure, and Granite-hybrid, Jamba and Nemotron-H reach it the same way.
+
+Honouring the refusal means starting over, which is the whole prefill on those families, and
+that is the trade: a slower follow-up for a session that stays correct. `SustainedUseTest`
+is what holds the correct half on hardware, and the two reuse tests are pointed at a
+transformer because reuse is not a claim that can be made about every model.
+
+**What would buy it back** is recurrent state checkpoints, which llama.cpp can keep when
+asked. Nothing here asks yet, and it costs memory per checkpoint on a device that has none
+to spare, so it needs measuring rather than assuming.
+
 ## Sources
 
 - llama.cpp: [build docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md),

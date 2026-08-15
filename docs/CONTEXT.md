@@ -118,8 +118,16 @@ Single source of truth: `gradle/libs.versions.toml`.
 - [x] **Test tiers**: `./gradlew verify` runs ktlint, detekt, Android lint on the release
       variant, assemble and the unit and Robolectric tiers in one command, 339 tests.
       `verifyOnDevice` is the instrumented tier and is separate because it needs a phone and
-      model files. A standalone native probe covers the C++ that JNI makes awkward to test,
+      model files: 19 app tests and 16 engine tests, last green on a Snapdragon 8 Gen 3 on
+      2026-08-15. A standalone native probe covers the C++ that JNI makes awkward to test,
       such as the UTF-8 validator.
+
+      Two things to know before running the device tier. It wants two models, not one:
+      `model.gguf` for everything and `bench/qwen.gguf` for the two prefix-reuse tests, which
+      are about a property a hybrid model does not have (see
+      [research/inference-engines.md](research/inference-engines.md)). And a device sitting on
+      its lockscreen fails every Compose test with "no compose hierarchies found", which reads
+      like the app is broken and is not: `adb shell wm dismiss-keyguard` first.
 - [ ] **P5** Play production: the code is done and the paperwork is drafted. API 36, 16 KB
       alignment, the AAB and the JNI-survives-R8 guard are verified in the build; the
       listing, the data safety answers row by row, the generative AI declaration and the

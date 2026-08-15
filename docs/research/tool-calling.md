@@ -160,17 +160,24 @@ It is a number now. The route is recorded per generation and the same run scores
 no extra cost, so `salvaged` and `withoutSalvage` say exactly what salvage is worth on these
 models and these cases.
 
-**Over seventy two generations it fired five times and never helped.** Twice on Llama 3.2 3B,
-turning one under-call into a right answer and one right answer into an over-call, for a net
-of nothing; three times on Granite 3.3 2B, where the arm scored 2/6 with it and 3/6 without.
-Nothing else in the run reached it at all.
+**It fired seven times across two runs and never once helped.** Twice on Llama 3.2 3B, turning
+one under-call into a right answer and one right answer into an over-call, for a net of
+nothing. Three times on Granite 3.3 2B, where the arm scored 2/6 with it and 3/6 without. Once
+per arm on LFM2.5 2.6B, where the reversed order scored 4 with it and 5 without.
 
-That is not enough to delete it. The path was built on watching real turns, where a model
-names its tool and then asks permission, and every case here is a single decision rather than
-that shape: a model that has just been handed a tool result is where the behaviour was
-observed and where these cases never go. What it does mean is that the belief salvage helps is
-now unsupported by every measurement there is of it, and the counter runs on every benchmark
-from here.
+So it is gone. Looking at what it fired on says why: it was built on watching a model announce
+a tool and then ask permission, which is a short sentence, and what it caught was models
+mentioning a tool inside an answer they had already finished. A length gate, added first,
+helped and did not fix it, because a model can genuinely mention a tool in a short reply and
+still not be asking for it.
+
+What replaced it costs a pass and decides nothing. The repair round already existed for
+call-shaped markup neither parser could read; it now fires on an announcement too, hands back
+the real tool names, and lets the model write the call. The recovery is the same and the app
+no longer picks which tool was meant or invents the arguments. A pass is a couple of seconds;
+a wrong tool is a wrong answer and a query that left the device.
+
+`Tool.callFor` went with it, since nothing called it any more.
 
 ## What was taken from Hermes, and what was not
 

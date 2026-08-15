@@ -21,11 +21,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -143,12 +140,6 @@ class WebSearchTool @Inject constructor(
                 append(result.url).append('\n')
             }
         }
-    }
-
-    override fun callFor(question: String): ToolCall? {
-        if (question.isBlank()) return null
-        val arguments = buildJsonObject { put("query", JsonPrimitive(question)) }
-        return ToolCall(id = "", name = definition.name, argumentsJson = arguments.toString())
     }
 
     internal companion object {

@@ -59,8 +59,8 @@ class TurnRunnerTest {
     fun setUp() {
         engine = FakeInferenceEngine()
         // These are about a model whose template carries tool definitions, which is what the
-        // engine's own parse and the salvage path are for. A model whose template drops them
-        // takes a different route through the loop and has its own test below.
+        // engine's own parse is for. A model whose template drops them takes a different
+        // route through the loop and has its own test below.
         engine.supportsTools = true
         search = RecordingTool("web_search")
     }
@@ -73,24 +73,39 @@ class TurnRunnerTest {
 
         val steps = run(withTools = false)
 
-        // Salvage exists for a model that decided to call a tool and got the syntax wrong.
-        // A model that was never shown the tool has decided nothing, and running one on the
-        // strength of a word in its answer is the app reaching the network on its own.
+        // The repair round exists for a model that decided to call a tool and got the syntax
+        // wrong. A model that was never shown the tool has decided nothing, so there is
+        // nothing to repair and nothing to run.
         assertThat(search.calls).isEmpty()
         assertThat(steps).isEmpty()
     }
 
     @Test
-    fun `a tool named in prose is run when tools were on the table`() = runBlocking {
+    fun `a tool announced in prose buys a pass to call it properly`() = runBlocking<Unit> {
+        // Offered a tool and announcing it is a decision the model failed to write as a call.
+        // The app used to build the call itself, from the tool and the question. Measured
+        // across two device runs and six models, that never once improved a score and cost
+        // one twice, because what it caught was models mentioning a tool inside an answer
+        // they had already finished rather than models announcing one.
+        //
+        // So the names go back and the model gets a pass to try again, which is the same
+        // recovery without the app inventing arguments nobody asked for.
         engine.scripted += ScriptedPass("Let me web_search that.")
+        engine.scripted += ScriptedPass(
+            "Looking.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"ada"}"""),
+            ),
+        )
         engine.scripted += ScriptedPass("Here is the answer.")
 
-        val steps = run(withTools = true)
+        run(withTools = true)
 
-        // The other half of the same rule: offered a tool and naming it is a decision, and
-        // the only thing the model got wrong is the syntax.
+        val repair = engine.prompts[1].last()
+        assertThat(repair.role).isEqualTo(ChatRole.USER)
+        assertThat(repair.text).contains("web_search")
+        // And the pass bought a real call, which is the only reason to spend one.
         assertThat(search.calls).hasSize(1)
-        assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
     }
 
     @Test
@@ -128,17 +143,22 @@ class TurnRunnerTest {
     }
 
     @Test
-    fun `a tool that can build no call leaves the other tool's salvage alone`() = runBlocking {
-        // Both names appear, which used to empty the salvage set and lose the search. Only
-        // one of them can produce a call from a question, so only one option was ever on the
-        // table and the model did decide.
+    fun `a plan named in prose is handed back rather than half run`() = runBlocking<Unit> {
+        // Two tools named in one short sentence used to be a problem to solve: which of them
+        // did the model mean, and could the app build that call from the question. The answer
+        // was that only one of them could be built, so that one ran. Neither question is the
+        // app's to answer, and now neither is asked: the names go back and the model says.
         engine.scripted += ScriptedPass("I will read_file the notes, then web_search for it.")
         engine.scripted += ScriptedPass("Here is the answer.")
 
         val steps = run(withTools = true, beside = listOf(SilentTool("read_file")))
 
-        assertThat(search.calls).hasSize(1)
-        assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
+        assertThat(search.calls).isEmpty()
+        assertThat(steps).isEmpty()
+        val repair = engine.prompts[1].last()
+        assertThat(repair.role).isEqualTo(ChatRole.USER)
+        assertThat(repair.text).contains("read_file")
+        assertThat(repair.text).contains("web_search")
     }
 
     @Test
@@ -540,9 +560,6 @@ class TurnRunnerTest {
             failWith?.let { throw it }
             return answer
         }
-
-        override fun callFor(question: String): ToolCall? =
-            ToolCall(id = "", name = definition.name, argumentsJson = """{"query":"$question"}""")
     }
 
     /**

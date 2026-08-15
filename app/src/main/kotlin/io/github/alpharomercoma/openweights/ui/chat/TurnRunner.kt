@@ -247,7 +247,7 @@ class TurnRunner @Inject constructor(
                 // cannot render tools has never been offered one, so "I could use web_search
                 // for that" is a remark about what it cannot do. Ungated, that remark
                 // reached the network.
-                val calls = pass.asked(active, conversation, withTools, native)
+                val calls = pass.asked(active, withTools, native)
                 val again = if (mayCall) {
                     advance(pass, calls, mode, listener)
                 } else {
@@ -309,7 +309,7 @@ class TurnRunner @Inject constructor(
          * because nothing was run and nothing was read.
          */
         private fun repair(pass: Pass): Boolean {
-            if (repaired || !pass.raw.containsToolMarkup()) return false
+            if (repaired || !pass.raw.invitesRepair(active)) return false
             repaired = true
             messages = messages +
                 ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
@@ -443,16 +443,13 @@ private fun ToolRegistry.roundLimit(): Int =
  */
 private fun TurnRunner.Pass.asked(
     active: ToolRegistry,
-    conversation: List<ChatMessage>,
     offered: Boolean,
     native: Boolean,
 ): List<ToolCall> {
     if (!offered) return emptyList()
 
     val prompted = if (native) emptyList() else listOfNotNull(ToolPrompting.parse(raw, active))
-    return event.toolCalls
-        .ifEmpty { prompted }
-        .ifEmpty { raw.salvagedCall(active, conversation) }
+    return event.toolCalls.ifEmpty { prompted }
 }
 
 /**
@@ -492,63 +489,6 @@ private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
     if (offerTools) copy(temperature = 0f) else this
 
 /**
- * The call a model meant to make, when it named a tool in prose instead of calling it.
- *
- * Small models do this however the prompt is worded: they write the tool's own name, then
- * ask permission. Naming it is the decision; the syntax is the only part they got wrong,
- * so the call is made for them from the question they were asked.
- *
- * Constraining generation to the call grammar was tried first and was worse in both
- * directions: the grammar has to be checked against the whole vocabulary for every token,
- * which cost more than the search it was trying to produce, and a model pushed into a
- * shape it was not going to choose kept generating past the call.
- *
- * Empty unless exactly one call can be built, because two is a model weighing options rather
- * than deciding, and empty for anything with side effects the user should see coming, which
- * is what [Tool.alwaysAsk] already marks.
- *
- * Counted over the calls rather than over the names that appear, so a tool which can build
- * nothing from a question does not take another tool's salvage down with it. A file tool
- * cannot build one: a path or a search pattern is not recoverable from what the user asked,
- * which is why [Tool.callFor] is left unimplemented there, and why naming one in prose is
- * not a second option being weighed.
- *
- * Internal rather than private so the benchmark can count how often this fires and whether it
- * was right to. It is the one part of the routing path that is a guess, so whether it earns
- * its place is a measurement, and a measurement has to be able to call it.
- *
- * **The first measurement was not flattering.** Over six models and seventy two generations it
- * fired five times: twice on Llama 3.2 3B, where it turned one under-call into a right answer
- * and one right answer into an over-call, and three times on Granite 3.3 2B, where the arm
- * scored 2/6 with it and 3/6 without. Never once did it help.
- *
- * Looking at what it fired on says why. The path was built on watching a model announce a tool
- * and then ask permission, which is a short sentence and nothing else. What it actually caught
- * was models mentioning a tool inside an answer they had already finished writing, where
- * naming it is a remark rather than a decision. So it now declines to read a decision out of
- * anything long enough to be an answer, which is the difference between the two cases and
- * costs nothing to check.
- */
-internal fun String.salvagedCall(
-    tools: ToolRegistry,
-    conversation: List<ChatMessage>,
-): List<ToolCall> {
-    // An announcement, not an answer. "Let me web_search that" is a decision the model failed
-    // to write as a call; three paragraphs that happen to mention web_search are a reply that
-    // was already finished, and running a tool off the back of one is the app deciding.
-    if (withoutReasoning().withoutToolMarkup().trim().length > ANNOUNCEMENT_CHARS) {
-        return emptyList()
-    }
-
-    val question = conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
-    val salvageable = tools.all
-        .filter { contains(it.definition.name, ignoreCase = true) }
-        .filterNot { it.alwaysAsk }
-        .mapNotNull { it.callFor(question) }
-    return listOfNotNull(salvageable.singleOrNull())
-}
-
-/**
  * The same results, with the last one carrying word that the tools are finished.
  *
  * Appended to a message that was going in anyway rather than sent as a turn of its own: a
@@ -581,11 +521,31 @@ private fun List<ChatMessage>.pinning(plan: TaskPlan?): List<ChatMessage> {
 }
 
 /**
+ * Whether a reply looks like an attempt at a call that did not come out as one.
+ *
+ * Two shapes. Call-shaped markup neither parser could read, which is the original case. And a
+ * short reply that names a tool and nothing else, which is a model announcing what it is about
+ * to do and then not doing it: "Let me look that up with web_search."
+ *
+ * The second used to be handled by building the call here, from the tool and the user's
+ * question. That was measured across two device runs and six models and never once improved a
+ * score, while costing one twice: what it caught was not models announcing, it was models
+ * mentioning a tool inside an answer they had already finished. Handing the names back and
+ * spending a pass gets the same recovery without the app inventing arguments nobody asked for.
+ */
+private fun String.invitesRepair(tools: ToolRegistry): Boolean {
+    if (containsToolMarkup()) return true
+    val spoken = withoutReasoning().withoutToolMarkup().trim()
+    if (spoken.length > ANNOUNCEMENT_CHARS) return false
+    return tools.all.any { spoken.contains(it.definition.name, ignoreCase = true) }
+}
+
+/**
  * How long a reply can be and still be an announcement rather than an answer.
  *
- * A hundred and sixty characters is about forty tokens, which is two sentences. "Let me look
- * that up with web_search" is twenty four; the replies behind every one of salvage's five
- * misfires were complete answers that mentioned a tool in passing.
+ * A hundred and sixty characters is about forty tokens, or two sentences. "Let me look that up
+ * with web_search" is twenty four; the replies behind every one of the misfires above were
+ * complete answers that mentioned a tool in passing.
  */
 private const val ANNOUNCEMENT_CHARS = 160
 

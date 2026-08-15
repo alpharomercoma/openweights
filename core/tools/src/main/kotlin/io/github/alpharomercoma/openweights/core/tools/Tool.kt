@@ -117,17 +117,6 @@ interface Tool {
      * and tells the user nothing they can act on.
      */
     suspend fun run(call: ToolCall): String
-
-    /**
-     * The call this tool would make to answer [question] on its own, or null if it cannot
-     * be sensibly built without the model's help.
-     *
-     * Exists because a model that names a tool in prose has decided to use it and only
-     * failed to say so in the right syntax. Each tool builds its own arguments: only the
-     * tool knows what its schema means, and a search's argument is the question itself
-     * while a fetch's is a URL that has to come from somewhere.
-     */
-    fun callFor(question: String): ToolCall? = null
 }
 
 /** What the model is allowed to reach for, and how it is found by name. */

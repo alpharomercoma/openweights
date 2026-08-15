@@ -109,7 +109,7 @@ class ToolChoiceBenchmark {
     )
 
     /** How a call was found, in the order [TurnRunner] looks for one. */
-    private enum class Route { NATIVE, PROMPTED, SALVAGE, NONE, ERROR }
+    private enum class Route { NATIVE, PROMPTED, NONE, ERROR }
 
     /** What one generation chose, and by which route it got there. */
     private data class Choice(val tool: String?, val route: Route)
@@ -124,8 +124,6 @@ class ToolChoiceBenchmark {
         var underCall: Int = 0,
         var wrongTool: Int = 0,
         var errored: Int = 0,
-        var salvaged: Int = 0,
-        var rightWithoutSalvage: Int = 0,
         var millis: Long = 0,
     )
 
@@ -233,8 +231,7 @@ class ToolChoiceBenchmark {
             TAG,
             "SCORE model=$model arm=${arm.label} right=${tally.right}/${CASES.size} " +
                 "over=${tally.overCall} under=${tally.underCall} wrong=${tally.wrongTool} " +
-                "errors=${tally.errored} salvaged=${tally.salvaged} " +
-                "withoutSalvage=${tally.rightWithoutSalvage} ms=${tally.millis / CASES.size}",
+                "errors=${tally.errored} ms=${tally.millis / CASES.size}",
         )
         return Scored(tally, chosen)
     }
@@ -244,9 +241,6 @@ class ToolChoiceBenchmark {
             errored++
             return
         }
-        if (choice.route == Route.SALVAGE) salvaged++
-        val withoutSalvage = if (choice.route == Route.SALVAGE) null else choice.tool
-        if (withoutSalvage == case.expects) rightWithoutSalvage++
         when {
             choice.tool == case.expects -> right++
             case.expects == null -> overCall++
@@ -328,7 +322,7 @@ class ToolChoiceBenchmark {
             .toList()
             .filterIsInstance<GenerationEvent.Completed>()
             .single()
-        return read(completed, native, prompt)
+        return read(completed, native)
     }
 
     /**
@@ -351,25 +345,21 @@ class ToolChoiceBenchmark {
     }
 
     /**
-     * Which of the three routes found a call, in the order [TurnRunner] tries them.
+     * Which of the two routes found a call, in the order [TurnRunner] tries them.
      *
-     * Recorded rather than collapsed, because salvage is the one that is a guess. Counting it
-     * apart is what turns "should prose naming a tool become a call" from an argument into a
-     * number: the same generations score both ways at no extra cost.
+     * There were three. The third read a tool's name out of ordinary prose and built the call
+     * from the question, and counting it apart here is what retired it: across two runs and
+     * six models it fired seven times, improved a score never, and cost one twice. What
+     * replaced it is a repair round, which cannot be scored from a single generation because
+     * it spends a pass to get a real call.
      */
-    private fun read(
-        completed: GenerationEvent.Completed,
-        native: Boolean,
-        prompt: String,
-    ): Choice {
+    private fun read(completed: GenerationEvent.Completed, native: Boolean): Choice {
         completed.toolCalls.firstOrNull()?.let { return Choice(it.name, Route.NATIVE) }
         if (!native) {
             ToolPrompting.parse(completed.content, registry())
                 ?.let { return Choice(it.name, Route.PROMPTED) }
         }
-        val asked = listOf(ChatMessage.text(ChatRole.USER, prompt))
-        val salvaged = completed.content.salvagedCall(registry(), asked).firstOrNull()
-        return salvaged?.let { Choice(it.name, Route.SALVAGE) } ?: Choice(null, Route.NONE)
+        return Choice(null, Route.NONE)
     }
 
     /**

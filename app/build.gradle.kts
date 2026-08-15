@@ -5,6 +5,7 @@ plugins {
     id("openweights.android.application")
     id("openweights.android.compose")
     id("openweights.android.hilt")
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {
@@ -111,6 +112,13 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
+    // Installs the shipped profile on the devices whose Play Store does not do it for us,
+    // which is most of them below API 31 and any sideloaded build. Without it the profile
+    // is carried and never applied, which is the quiet way to have done this work twice.
+    implementation(libs.androidx.profileinstaller)
+
+    // Not shipped: the module that records the profile above by driving the app on a device.
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     testImplementation(libs.truth)

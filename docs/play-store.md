@@ -38,6 +38,31 @@ The throwaway key is exactly that. It lives outside the repository, it is not th
 and it exists only so a minified build can be installed. Play App Signing is still step one
 of the Console work.
 
+One trap, since it cost a run: a release APK signed with a throwaway key and the
+`nonMinifiedRelease` build the profile generator installs share an application id and do not
+share a signature, so the second refuses to replace the first with
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Uninstall before generating.
+
+### The baseline profile is ours now
+
+`:baselineprofile` drives the app on a device and records what a cold start and one visit to
+each tab actually run, so ART compiles it ahead of time instead of interpreting it. The
+result is checked in at `app/src/release/generated/baselineProfiles/baseline-prof.txt`, which
+is what lets a machine with no phone attached still build a profiled release.
+
+Measured on the artifact, before and after: the release APK carried one 10.6 KB `.dm` of
+merged AndroidX profiles and nothing of ours; it now carries two, 12.5 and 12.6 KB, and the
+profile behind them has 1,658 lines naming our own classes out of 24,749. `profileinstaller`
+is a dependency now as well, because a profile that ships and is never applied is the quiet
+way to do this work twice.
+
+```
+./gradlew :app:generateReleaseBaselineProfile     # needs a device, rewrites the file above
+```
+
+Re-record it when startup changes shape. A stale profile is not wrong, only less useful: it
+describes methods that still exist and misses the ones that replaced them.
+
 ### R8 nearly shipped a broken app
 
 JNI resolves by name at runtime. R8 renames `io.github...ui.Destination` to `q90`, and
@@ -250,13 +275,9 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 
 ## Known gaps a reviewer would be right to raise
 
-- **No baseline profile of our own**, so first-run startup and first scroll are slower than
-  they need to be. Confirmed rather than assumed: the release APK ships a 10.6 KB
-  `baselineProfiles/0/app-release-unsigned.dm`, which is the merged profiles of the AndroidX
-  libraries and nothing of ours. Generating one needs a Macrobenchmark module and a device or
-  emulator to run it on.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
-  unless a user opens an issue. The pre-launch report partly covers this.
+  unless a user opens an issue. The pre-launch report partly covers this, which is why
+  `mapping.txt` has to go up with the bundle.
 - **The web tools are on by default.** `web_search` and `fetch_url` are switched on the
   first time the app runs, so a question can leave the device before the user has looked at
   the Tools tab. Everything else in the app is local, which makes this the one place the

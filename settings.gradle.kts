@@ -32,3 +32,6 @@ include(":core:tools")
 include(":core:device")
 include(":core:data")
 include(":core:sandbox")
+
+// Not shipped. It drives the app on a device to record the profile the app ships with.
+include(":baselineprofile")

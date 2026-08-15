@@ -208,6 +208,14 @@ class TurnRunner @Inject constructor(
         /** The withdrawal, kept as the exception it should always have been. */
         private var withdrawn = false
 
+        /**
+         * What the user last said, which is the only place a tool can be asked for by name.
+         *
+         * Read once. The conversation does not change under a turn, and the assistant turns
+         * appended between passes are the model's own words rather than a new request.
+         */
+        private val asked = conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
+
         suspend fun run(params: SamplerParams, mode: AgentMode, listener: TurnListener): String {
             while (true) {
                 // Tools are offered from the first pass, which was tried the other way and
@@ -311,11 +319,16 @@ class TurnRunner @Inject constructor(
          * because nothing was run and nothing was read.
          */
         private fun repair(pass: Pass): Boolean {
-            if (repaired || !pass.raw.invitesRepair(active)) return false
+            if (repaired) return false
+            val wanted = asked.toolNamed(active)
+            if (wanted == null && !pass.raw.invitesRepair(active)) return false
             repaired = true
             messages = messages +
                 ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
-                ChatMessage.text(ChatRole.USER, repairRequest(active))
+                ChatMessage.text(
+                    ChatRole.USER,
+                    wanted?.let(::ignoredRequest) ?: repairRequest(active),
+                )
             return true
         }
 
@@ -369,6 +382,24 @@ class TurnRunner @Inject constructor(
         "That did not read as a tool call. The tools available are " +
             active.definitions.joinToString { it.name } +
             ". Call one of those, or answer without a tool."
+
+    /**
+     * What to say to a model that was told which tool to use and did not use it.
+     *
+     * Measured on a phone across three models: told "use web_search to find the weather in
+     * Manila", every one of them answered without calling anything, and two narrated results
+     * from a search they had never run. Naming a tool is the least ambiguous request a user
+     * can make and it was being dropped, so the turn now spends its one repair pass on saying
+     * so rather than on letting a fabrication stand.
+     *
+     * It says the tool's name and nothing else about how to call it. Running the tool here
+     * instead would mean the app choosing the arguments, and that is precisely what prose
+     * salvage did: measured across two device runs and six models it never once improved a
+     * score and twice cost one. The user names the tool; the model still writes the call.
+     */
+    private fun ignoredRequest(name: String): String =
+        "You were asked to use $name and did not call it. Call $name now, or say plainly " +
+            "that you cannot and answer without it."
 
     /**
      * What the model is told once its rounds are gone.
@@ -550,6 +581,19 @@ private fun String.invitesRepair(tools: ToolRegistry): Boolean {
  * complete answers that mentioned a tool in passing.
  */
 private const val ANNOUNCEMENT_CHARS = 160
+
+/**
+ * The tool this request names, if it names one that is actually on the table.
+ *
+ * Deliberately strict. It matches a registered tool's own name written in the request, which
+ * is a thing somebody types on purpose: "use web_search to find the weather" is an
+ * instruction, and "search the web for the weather" is not, because the second is a wish
+ * about the world and the first is a wish about this app. Guessing at the second is the
+ * business of the model, which can see the whole conversation, rather than of a substring
+ * match that can see one line.
+ */
+private fun String.toolNamed(active: ToolRegistry): String? =
+    active.all.map { it.definition.name }.firstOrNull { contains(it, ignoreCase = true) }
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
 private fun AgentDecision.steps(): List<AgentStep> = when (this) {

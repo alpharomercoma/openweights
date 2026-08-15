@@ -541,6 +541,50 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `a tool the user named and the model ignored buys one pass to call it`() =
+        runBlocking<Unit> {
+            // Measured on a phone across three models: told "use web_search to find the
+            // weather in Manila", every one of them answered without calling anything, and
+            // two of them narrated search results they had never fetched. Naming a tool is
+            // the least ambiguous request a user can make, and it was being dropped.
+            engine.scripted += ScriptedPass(
+                "The current weather in Manila is clouds and sun, around 85 degrees.",
+            )
+            engine.scripted += ScriptedPass(
+                "Looking.",
+                toolCalls = listOf(
+                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Here is what the search said.")
+
+            run(withTools = true, asking = "Use web_search to find the weather in Manila")
+
+            // The tool is named back rather than called on the model's behalf. What the app
+            // must not do is invent the arguments, which is what prose salvage did and why it
+            // was removed: it never once improved a score and twice cost one.
+            val nudge = engine.prompts[1].last()
+            assertThat(nudge.role).isEqualTo(ChatRole.USER)
+            assertThat(nudge.text).contains("web_search")
+            assertThat(search.calls).hasSize(1)
+        }
+
+    @Test
+    fun `an answer to a question that named no tool is left alone`() = runBlocking {
+        // The counterweight. A long reply that mentions nothing is a model that answered,
+        // and spending a pass on it is the cost this feature has to stay clear of.
+        engine.scripted += ScriptedPass(
+            "Ada Lovelace wrote the first algorithm intended for a machine, working with " +
+                "Charles Babbage on the analytical engine in the eighteen forties.",
+        )
+
+        run(withTools = true, asking = "Who is Ada Lovelace?")
+
+        assertThat(engine.prompts).hasSize(1)
+        assertThat(search.calls).isEmpty()
+    }
+
+    @Test
     fun `the same mistake twice is not repaired twice`() = runBlocking {
         val broken = ScriptedPass("<tool_call>{bad</tool_call>", content = "")
         engine.scripted += broken
@@ -581,6 +625,7 @@ class TurnRunnerTest {
         withTools: Boolean,
         mode: AgentMode = AgentMode.AUTO,
         beside: List<Tool> = emptyList(),
+        asking: String = "Who is Ada Lovelace?",
     ): List<AgentStep> {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
         val runner = TurnRunner(
@@ -593,7 +638,7 @@ class TurnRunnerTest {
         )
         val steps = mutableListOf<AgentStep>()
         runner.run(
-            conversation = listOf(ChatMessage.text(ChatRole.USER, "Who is Ada Lovelace?")),
+            conversation = listOf(ChatMessage.text(ChatRole.USER, asking)),
             params = SamplerParams(),
             mode = mode,
             withTools = withTools,

@@ -22,11 +22,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import io.github.alpharomercoma.openweights.core.common.model.ChatRole
-import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.context.TaskStep
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import org.junit.Rule
 import org.junit.Test
 

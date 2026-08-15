@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
@@ -143,7 +144,17 @@ class ToolChoiceBenchmark {
 
     @Test
     fun measuresToolChoiceAcrossModels() = runBlocking<Unit> {
-        val present = MODELS.filter { it.value.isFile }
+        // Whichever were asked for, which is how a run survives a model that cannot be loaded
+        // beside the others. Fifteen models in one process met the low memory killer partway
+        // through the sixth: every engine is closed before the next opens, but the allocator
+        // does not have to return the pages to the system, and on a phone that is the
+        // difference between a suite that finishes and one that dies at 2.49 GB. Passing
+        // `-e models phi4-mini` runs that one on a process of its own.
+        val wanted = InstrumentationRegistry.getArguments().getString("models")
+            ?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+        val present = MODELS
+            .filter { it.value.isFile }
+            .filter { wanted.isEmpty() || it.key in wanted }
         assumeTrue("no models under ${BENCH.path}", present.isNotEmpty())
 
         Log.i(TAG, "CATALOGUE offered=${catalogue().map { it.name }}")

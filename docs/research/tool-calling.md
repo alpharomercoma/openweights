@@ -456,6 +456,64 @@ of one coin, and neither model has both sides. Arch-Agent restored is the only o
 the disk and 60% of the wall clock. Whatever the extra two billion parameters are for, six
 single-turn routing decisions do not show it.
 
+## Fifteen models, both axes
+
+Everything available, on `pineapple` 72c4dabb, 2026-08-16. `6-case` is the four-arm
+single-turn score written best-arm; `multi` is the pair from `MULTI`, where 1 of 2 is what a
+model scores by declining everything *and* by calling everything, so only 2 discriminates.
+
+| model | on disk | route | 6-case | multi | order | cache | ms |
+|---|---|---|---|---|---|---|---|
+| **arch-agent-1.5b, template restored** | 986 MB | native | **6/6** | **2/2** | 0/6 | 0/6 | 8.1 s |
+| hammer2.1-1.5b | 937 MB | native | 5/6 | 1/2 | 0/6 | 0/6 | **5.2 s** |
+| phi4-mini | 2491 MB | prompted | 4/6 | **2/2** | 2/6 | 1/6 | 15.4 s |
+| qwen2.5-1.5b *(shipping)* | 1117 MB | native | 4/6 | 1/2 | 0/6 | 1/6 | 6.4 s |
+| xlam2-1b | 935 MB | native | 4/6 | 1/2 | 1/6 | 0/6 | 4.5 s |
+| xlam2-3b | 1823 MB | native | 4/6 | 1/2 | 1/6 | 0/6 | 8.4 s |
+| qwen2.5-coder-3b | 1998 MB | native | 4/6 | 1/2 | 2/6 | 0/6 | 9.3 s |
+| arch-agent-1.5b, as published | 986 MB | prompted | 4/6 | 1/2 | 2/6 | 0/6 | 6.5 s |
+| granite3.3-2b | 1453 MB | native | 3/6 | 1/2 | **4/6** | 1/6 | 9.5 s |
+| llama3.2-3b | 1922 MB | native | 3/6 | **0/2** | 2/6 | 0/6 | 12.4 s |
+| gemma4-e4b | 4591 MB | native | 3/6 | 1/2 | 0/6 | 0/6 | **20.5 s** |
+| functiongemma-270m | 242 MB | native | 3/6 | **error** | 0/6 | 0/6 | **1.9 s** |
+| lfm2-1.2b | 696 MB | prompted | 2/6 | 1/2 | 0/6 | 0/6 | 3.5 s |
+| smollm3-3b | 1915 MB | prompted | 2/6 | 1/2 | 1/6 | 0/6 | 13.2 s |
+| gemma3-1b | 806 MB | prompted | 1/6 | **error** | 3/6 | 0/6 | 4.1 s |
+
+**One model is good at both, and it is the smallest serious one.** Arch-Agent with its template
+put back is 6/6 on every arm and 2/2 on the pair, unmoved by ordering or by a warm cache, at
+986 MB. Nothing else manages both columns.
+
+**The two columns disagree, and that is the point of adding the second.** Hammer leads the
+single-turn table at 5/6 and then declines both follow-ups. Llama 3.2 gets all three
+single-turn tool cases right — better than Hammer on that axis — and scores 0 of 2, calling
+`fetch_url` for a fact sitting in the transcript above it. Phi-4-mini is mediocre at 4/6 and is
+one of only two models to discriminate on the pair. A suite of opening turns would have ranked
+these three in exactly the wrong order for an app whose every tool turn has a second pass.
+
+**Most models score 1 of 2 by never calling again.** Qwen, Hammer, both xLAMs, Qwen Coder,
+Granite, LFM2, SmolLM3, Gemma 4 all return `picked=[null, null]`. They take the point for
+refusing to re-search a fact they already have and lose the one for the second city. That is a
+policy, not an accident, and for a harness built on multiple passes it is the wrong one.
+
+**BFCL's multi-turn ranking did not transfer.** xLAM-2-3b is the best model under 4B on that
+board at 55.62 multi-turn against the 1B's 8.38, and here the two are indistinguishable: same
+4/6, same 1/2, same ordering and cache numbers, twice over. The 3B costs 1.9 times the disk and
+1.9 times the wall clock for nothing measurable. Two cases cannot refute a leaderboard, but
+they can say the advantage does not reach this app.
+
+**Size buys nothing here.** Ranking by parameters gives almost the reverse of ranking by score.
+Gemma 4 E4B is the largest thing tested at 4591 MB, never calls a tool once in 24 generations,
+and takes 20.5 seconds a case; Arch-Agent is a fifth of its size and perfect. Every model above
+2 GB is beaten by one under 1 GB.
+
+**Three separate ways a capable model arrives unable to call anything.** Arch-Agent's template
+is dropped in GGUF conversion. SmolLM3's template gates its tool block on an `xml_tools`
+variable rather than `tools`, so llama.cpp renders nothing and it falls to the prompted route.
+Gemma 3 and FunctionGemma cannot render a tool *result* at all — `Unable to generate parser for
+this template` — so they error on both multi-turn cases and cannot participate in a second pass
+under any circumstances. None of the three is a fact about the weights.
+
 ## The route each answer took
 
 There are three ways a call reaches the app, and they are not equally trustworthy: the

@@ -132,6 +132,14 @@ class AskUserTool @Inject constructor(private val board: AskBoard) : Tool {
     /** The question is the approval: there is nothing to confirm before showing it. */
     override val needsApproval: Boolean = false
 
+    /**
+     * The one tool whose whole purpose is the pass before anything happens.
+     *
+     * Without this it was offered only in plan mode and refused only in plan mode, which is
+     * every time it was offered.
+     */
+    override val runsWhilePlanning: Boolean = true
+
     override val chains: Boolean = true
 
     /** What comes back is what the person typed or chose, which is theirs and not a stranger's. */

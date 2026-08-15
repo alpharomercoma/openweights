@@ -81,6 +81,22 @@ interface Tool {
     val isAvailable: Boolean get() = true
 
     /**
+     * Whether this tool is part of deciding what to do, rather than one of the things to do.
+     *
+     * [AgentMode.PLAN] refuses tools because the point of it is a turn you can read before
+     * anything happens. Writing the plan and asking what was meant are not things that happen
+     * to anybody: they are the reading. A blanket refusal made `advance` and `ask_user`
+     * unreachable, since both describe themselves only in plan mode and plan mode ran nothing,
+     * so the two tools plan mode is made of were offered in the one mode that could not run
+     * them.
+     *
+     * The test for a new one is whether the user, having read the turn, would find anything
+     * different afterwards. A question on the screen is the turn; a search that has already
+     * left the device is not.
+     */
+    val runsWhilePlanning: Boolean get() = false
+
+    /**
      * Whether this tool is usually one step of several rather than the whole errand.
      *
      * Looking something up is one round and an answer. Working with a file is find it, read

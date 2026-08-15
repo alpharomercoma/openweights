@@ -80,7 +80,18 @@ class AgentRunnerTest {
         }
     }
 
-    private val registry = ToolRegistry(listOf(echo, explodes, open, reader, sender))
+    /** Stands in for advance and ask_user: it is how a plan is made, not a thing a plan does. */
+    private val planner = object : Tool {
+        override val definition = ToolDefinition("planner", "Part of planning", "{}")
+        override val needsApproval = false
+        override val runsWhilePlanning = true
+        override suspend fun run(call: ToolCall): String {
+            ran += call.name
+            return "planned"
+        }
+    }
+
+    private val registry = ToolRegistry(listOf(echo, explodes, open, reader, sender, planner))
     private val runner = AgentRunner(registry)
 
     private fun call(name: String, id: String = "c1", args: String = "{}") =
@@ -209,6 +220,43 @@ class AgentRunnerTest {
         assertThat(continued.messages.single().role).isEqualTo(ChatRole.TOOL)
         assertThat(continued.messages.single().text).contains("nothing was run")
         assertThat(continued.steps.single()).isInstanceOf(AgentStep.Skipped::class.java)
+    }
+
+    @Test
+    fun `plan mode runs the tools that planning is made of`() = runTest {
+        // The refusal is about errands, not about every call. `advance` and `ask_user` are
+        // how a plan gets written and checked off, and both describe themselves only in plan
+        // mode, so a blanket refusal made them unreachable: offered in the one mode that
+        // could never run them.
+        val decision = runner.step(
+            calls = listOf(call("planner")),
+            round = 0,
+            mode = AgentMode.PLAN,
+            approve = { true },
+        )
+
+        assertThat(ran).containsExactly("planner")
+        val step = (decision as AgentDecision.Continue).steps.single()
+        assertThat(step).isInstanceOf(AgentStep.Ran::class.java)
+        assertThat((step as AgentStep.Ran).result).isEqualTo("planned")
+    }
+
+    @Test
+    fun `plan mode still refuses the errand it was asked for alongside`() = runTest {
+        // Both in one round, because that is what a model does: ask a question and search the
+        // web in the same breath. The question is answered and the search is not.
+        val decision = runner.step(
+            calls = listOf(call("planner", id = "a"), call("sender", id = "b")),
+            round = 0,
+            mode = AgentMode.PLAN,
+            approve = { true },
+        )
+
+        assertThat(ran).containsExactly("planner")
+        val steps = (decision as AgentDecision.Continue).steps
+        assertThat(steps.first()).isInstanceOf(AgentStep.Ran::class.java)
+        assertThat(steps.last()).isInstanceOf(AgentStep.Skipped::class.java)
+        assertThat(decision.messages.map { it.toolCallId }).containsExactly("a", "b").inOrder()
     }
 
     @Test

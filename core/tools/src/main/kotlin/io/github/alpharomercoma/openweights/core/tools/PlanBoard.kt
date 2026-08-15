@@ -104,6 +104,9 @@ class AdvanceTool @Inject constructor(private val board: PlanBoard) : Tool {
 
     override val needsApproval: Boolean = false
 
+    /** Ticking a box is the plan being read, not something the plan did. */
+    override val runsWhilePlanning: Boolean = true
+
     override val chains: Boolean = true
 
     override suspend fun run(call: ToolCall): String {

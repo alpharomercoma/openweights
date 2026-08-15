@@ -128,17 +128,6 @@ class AgentRunner(
         now: () -> Long = System::currentTimeMillis,
     ): AgentDecision {
         if (calls.isEmpty()) return AgentDecision.Finished
-        if (mode == AgentMode.PLAN) {
-            // Answered, not merely refused. Plan mode tells the model not to call anything
-            // and small models call anyway, and a turn that stops on the refusal ends on
-            // whatever fragment preceded the call rather than on a plan. Telling it the
-            // call did not run is what buys the pass in which it writes one.
-            val steps = calls.map { AgentStep.Skipped(it, "plan mode: nothing was run") }
-            return AgentDecision.Continue(
-                messages = steps.map { ChatMessage.toolResult(it.callId(), it.report()) },
-                steps = steps,
-            )
-        }
         // Counted in rounds rather than in calls, because a model that asks for three
         // things at once has not looped, it has been efficient.
         if (round >= maxRounds) {
@@ -147,11 +136,36 @@ class AgentRunner(
             )
         }
 
-        val steps = calls.map { call -> runOne(call, mode, approve, now) }
+        val steps = calls.map { call -> decide(call, mode, approve, now) }
         // Every step answers, including the ones that did not run: a model told nothing
         // about a call it made has no way to finish the turn.
         val messages = steps.map { ChatMessage.toolResult(it.callId(), it.report()) }
         return AgentDecision.Continue(messages, steps)
+    }
+
+    /**
+     * One call, and whether plan mode lets it through.
+     *
+     * Per call rather than for the round, because a model asks for a question and a search in
+     * the same breath, and refusing both is how plan mode ended up unable to plan. What plan
+     * mode is refusing is errands, so what it refuses is tools that are errands: see
+     * [Tool.runsWhilePlanning].
+     */
+    private suspend fun decide(
+        call: ToolCall,
+        mode: AgentMode,
+        approve: suspend (ToolCall) -> Boolean,
+        now: () -> Long,
+    ): AgentStep {
+        val planning = registry.find(call.name)?.runsWhilePlanning == true
+        if (mode == AgentMode.PLAN && !planning) {
+            // Answered, not merely refused. Plan mode tells the model not to call anything
+            // and small models call anyway, and a turn that stops on the refusal ends on
+            // whatever fragment preceded the call rather than on a plan. Telling it the
+            // call did not run is what buys the pass in which it writes one.
+            return AgentStep.Skipped(call, "plan mode: nothing was run")
+        }
+        return runOne(call, mode, approve, now)
     }
 
     private suspend fun runOne(

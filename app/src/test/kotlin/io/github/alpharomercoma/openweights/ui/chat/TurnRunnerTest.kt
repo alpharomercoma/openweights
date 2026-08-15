@@ -25,14 +25,18 @@ import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
+import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Test
@@ -365,6 +369,67 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `plan mode asks the user and ticks the plan off`() = runBlocking<Unit> {
+        // The two tools plan mode is made of, driven end to end through the real loop. They
+        // used to be unreachable: both describe themselves only in plan mode, and plan mode
+        // refused every call, so the mode that offered them was the one mode that could not
+        // run them. Nothing in the harness noticed, because every test asserted the refusal.
+        val plans = PlanBoard()
+        val asks = AskBoard()
+        plans.propose("1. Find the notes\n2. Summarise them")
+
+        engine.scripted += ScriptedPass(
+            "Which folder?",
+            toolCalls = listOf(
+                ToolCall(
+                    id = "q",
+                    name = "ask_user",
+                    argumentsJson = """{"question":"Which folder?","options":["Notes"]}""",
+                ),
+            ),
+        )
+        engine.scripted += ScriptedPass(
+            "Found them.",
+            toolCalls = listOf(
+                ToolCall(id = "a", name = "advance", argumentsJson = """{"step":1}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Here is the plan.")
+
+        val answering = launch {
+            asks.pending.first { it != null }
+            asks.answer("Notes")
+        }
+        val steps = runPlanning(plans, asks)
+        answering.join()
+
+        // Both ran, and both were told back to the model rather than refused.
+        assertThat(steps.filterIsInstance<AgentStep.Ran>().map { it.call.name })
+            .containsExactly("ask_user", "advance").inOrder()
+        // What the person typed reached the model, which is the only reason to ask.
+        assertThat(engine.prompts[1].last { it.role == ChatRole.TOOL }.text).contains("Notes")
+        // And the tick is the app's, not a rewritten list: step one is done, the plan is not.
+        val plan = plans.plan.value!!
+        assertThat(plan.steps.first().done).isTrue()
+        assertThat(plan.isFinished).isFalse()
+    }
+
+    @Test
+    fun `plan mode still refuses the errands`() = runBlocking {
+        // The refusal that was always the point, kept honest now that it is per call: a search
+        // in plan mode has still not left the device.
+        val call = ToolCall(id = "s", name = "web_search", argumentsJson = """{"query":"x"}""")
+        engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        engine.scripted += ScriptedPass("Here is what I would do.")
+
+        val steps = runPlanning(PlanBoard(), AskBoard())
+
+        assertThat(search.calls).isEmpty()
+        assertThat(steps.filterIsInstance<AgentStep.Skipped>().single().why)
+            .contains("nothing was run")
+    }
+
+    @Test
     fun `a call for a tool that does not exist is answered, not dropped`() = runBlocking {
         val call = ToolCall(id = "9", name = "read_my_email", argumentsJson = "{}")
         engine.scripted += ScriptedPass("Checking.", toolCalls = listOf(call))
@@ -531,6 +596,27 @@ class TurnRunnerTest {
             params = SamplerParams(),
             mode = mode,
             withTools = withTools,
+            listener = Collecting(steps),
+        )
+        return steps
+    }
+
+    /** One plan-mode turn, holding the real boards so a test can answer and read them. */
+    private suspend fun runPlanning(plans: PlanBoard, asks: AskBoard): List<AgentStep> {
+        engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
+        val runner = TurnRunner(
+            engine = engine,
+            tools = ToolRegistry(listOf(search, AdvanceTool(plans), AskUserTool(asks))),
+            switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
+            plans = plans,
+            asks = asks,
+        )
+        val steps = mutableListOf<AgentStep>()
+        runner.run(
+            conversation = listOf(ChatMessage.text(ChatRole.USER, "Summarise my notes")),
+            params = SamplerParams(),
+            mode = AgentMode.PLAN,
+            withTools = true,
             listener = Collecting(steps),
         )
         return steps

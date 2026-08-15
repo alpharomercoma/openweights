@@ -207,6 +207,48 @@ the consent card appeared for the first search and never again once answered, co
 live at 83% of the window with "Folding earlier turns into a summary", and the thermal policy
 showed "Cooling down" during the long tool turns.
 
+## Looking for a model that is both, and not finding one
+
+The obvious next move was a model with switchable thinking: reason while deciding whether to
+use a tool, do not reason while writing prose. Qwen3.5-2B was the candidate, chosen because
+its template renders tools into the `<tool_call>` envelope **and** exposes `enable_thinking`,
+at 1.19 GB, which is within a fifth of the Qwen 2.5 file whose 13 to 25 tok/s we had measured.
+It is the first model in this app to load as `tools=true thinking=true`.
+
+It failed, in a way worth writing down.
+
+| Asked | Thinking | Answered | Called a tool | Wall |
+|---|---|---|---|---|
+| 17 times 24, number only | on (default) | 408, correct | no | 24 s, of which 24 s was thinking |
+| Who won the most recent World Cup final | **off** | Argentina, correct | **no** | 114 s |
+| "Use web_search to find the current weather in Manila" | **off** | **"Clouds and sun with a temperature of 85°"** | **no** | 49 s |
+
+Three findings, in order of how much they matter.
+
+**It fabricates tool use.** On the World Cup question it wrote "Based on the search results, I
+can see that…" having run no search, and on the weather question it reasoned "I should use
+web_search to find this information since it's a current condition that could change" and then
+invented a specific reading. `calls=0` on both. Qwen 2.5 under-calls and answers plainly from
+memory, which is wrong but honest. This dresses invention as verification, and no part of the
+screen contradicts it.
+
+**The thinking switch does not take.** Turning it off left "Thought for 15.5s" on one answer
+and moved the reasoning into the visible reply on another. This is the case the engine already
+anticipates and cannot detect at load: `supports_thinking` asks whether the template renders
+differently, and it does; whether the weights care is a separate question that only a reply can
+answer. So the per-pass thinking idea is not merely unproven on this model, it is not
+actionable on it.
+
+**Being right was not better routing.** Qwen3.5 got the World Cup right because its training is
+newer, not because it searched. The question is a good staleness probe for a 2024 model and not
+for a 2026 one; the weather question is the honest one, and it failed that.
+
+So: across three models and about twenty questions typed into the composer, nothing has both.
+Qwen 2.5 is fast and never calls. LFM2.5 calls well and takes up to seven and a half minutes.
+Qwen3.5 is slow like LFM, calls like Qwen 2.5, and additionally claims to have searched when it
+has not. The conclusion this points at is not "keep looking for the model" but "stop asking a
+2B model to decide": when the user names a tool, run it.
+
 Two things follow that the arms above do not show. The first is that the closed questions are
 all correct and fast, so nothing on screen distinguishes the wrong answers from the right
 ones: a confident sentence at 23 tok/s either way. The second is that the failure is not

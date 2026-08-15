@@ -171,6 +171,58 @@ class ToolPromptingTest {
     }
 
     @Test
+    fun `a call written with the other quote is still a call`() {
+        // Hammer 2.1's own words, copied off a phone. Its template asks for a JSON array and
+        // it writes a Python dict repr instead, single quotes and all. Every key this parser
+        // looks for is there and spelled correctly; only the quote differs, and refusing over
+        // that throws away a call the model got completely right.
+        val reply = """[{'type': 'function', 'function': {'name': 'read_file', """ +
+            """'arguments': {'path': 'a.md'}}}]"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.name).isEqualTo("read_file")
+        assertThat(call?.argumentsJson).contains("a.md")
+    }
+
+    @Test
+    fun `arguments written with the other quote come back as json`() {
+        // Reading the name is half the job. Every tool reads its own arguments by parsing
+        // this string as JSON, and a Python dict repr is not JSON, so a call that parses
+        // perfectly here still reaches fetch_url with no url in it and is answered "you gave
+        // me nothing". The quote is normalised where it is already known to be wrong.
+        val reply = """[{'name': 'read_file', 'arguments': {'path': 'a.md'}}]"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.argumentsJson).isEqualTo("""{"path": "a.md"}""")
+    }
+
+    @Test
+    fun `an apostrophe inside a value is not a quote`() {
+        // The counterweight to normalising. A value already in double quotes is left exactly
+        // as it is, or every apostrophe in ordinary English becomes a broken string.
+        val reply = """{"tool": "web_search", "arguments": {"query": "o'brien's cat"}}"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.argumentsJson).isEqualTo("""{"query": "o'brien's cat"}""")
+    }
+
+    @Test
+    fun `a quote inside a value does not end the name`() {
+        // The counterweight. Accepting either quote must not mean accepting the first of
+        // either: a name in double quotes containing an apostrophe still ends at its own
+        // quote, or the name read back is a fragment and matches nothing.
+        val reply = """{"tool": "web_search", "arguments": {"query": "o'brien"}}"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.name).isEqualTo("web_search")
+        assertThat(call?.argumentsJson).contains("o'brien")
+    }
+
+    @Test
     fun `the tagged format is what the tagged prompt asks for`() {
         val described = ToolPrompting.describe(registry.definitions, CallFormat.TAGGED)
 

@@ -118,11 +118,11 @@ object ToolPrompting {
         // tool that can only answer "you gave me nothing", and the model is then told its
         // own truncation was a missing argument. A tool that genuinely takes none says so by
         // having no arguments key at all, which is the other branch.
-        val started = reply.indexOf("\"arguments\"", startIndex = marker) >= 0
+        val started = reply.keyAt(ARGUMENT_KEYS, marker) >= 0
         val arguments = reply.argumentsAfter(marker)
         if (started && arguments == null) return null
 
-        return ToolCall(id = name, name = name, argumentsJson = arguments ?: "{}")
+        return ToolCall(id = name, name = name, argumentsJson = (arguments ?: "{}").asJson())
     }
 
     /**
@@ -137,10 +137,28 @@ object ToolPrompting {
      * Nested wrappers come out of this too. `{"type":"function","function":{"name":...}}` has
      * its name in the same key, and the arguments are found from there by the same walk.
      */
-    private fun String.callKey(): Int =
-        CALL_KEYS.mapNotNull { key -> indexOf(key).takeIf { it >= 0 } }.minOrNull() ?: -1
+    private fun String.callKey(): Int = keyAt(CALL_KEYS, from = 0)
 
-    private val CALL_KEYS = listOf("\"tool\"", "\"name\"")
+    /** The earliest of these keys at or after [from], or -1 when none of them is there. */
+    private fun String.keyAt(keys: List<String>, from: Int): Int =
+        keys.mapNotNull { key -> indexOf(key, startIndex = from).takeIf { it >= 0 } }
+            .minOrNull() ?: -1
+
+    /**
+     * Both spellings of both keys, because the quote is not part of the decision.
+     *
+     * Measured on a phone: Hammer 2.1, asked to read a URL, wrote
+     * `[{'type': 'function', 'function': {'name': 'fetch_url', 'arguments': {...}}}]`. Its
+     * template asks for JSON and it produced a Python dict repr, which is what a model tuned
+     * on Python examples does. Every key was right and every name was right; only the quote
+     * was, and dropping the call over that is refusing a decision the model made correctly.
+     */
+    private val CALL_KEYS = listOf("\"tool\"", "'tool'", "\"name\"", "'name'")
+
+    private val ARGUMENT_KEYS = listOf("\"arguments\"", "'arguments'")
+
+    /** Either quote, since a model that opened with one closes with the same one. */
+    private const val QUOTES = "\"'"
 
     /**
      * The quoted string the call key names, which is the tool the model asked for.
@@ -151,8 +169,12 @@ object ToolPrompting {
      */
     private fun String.namedAt(marker: Int): String? {
         val colon = indexOf(':', startIndex = marker).takeIf { it >= 0 } ?: return null
-        val open = indexOf('"', startIndex = colon + 1).takeIf { it >= 0 } ?: return null
-        val close = indexOf('"', startIndex = open + 1).takeIf { it >= 0 } ?: return null
+        val open = indexOfAny(QUOTES.toCharArray(), startIndex = colon + 1)
+            .takeIf { it >= 0 } ?: return null
+        // Closed by the quote it opened with, not by whichever comes first. A name in double
+        // quotes may contain an apostrophe, and ending on that returns a fragment that
+        // matches no tool, which reads as the model naming something that does not exist.
+        val close = indexOf(this[open], startIndex = open + 1).takeIf { it >= 0 } ?: return null
         return substring(open + 1, close)
     }
 
@@ -176,7 +198,7 @@ object ToolPrompting {
      * than the rest of the reply.
      */
     private fun String.argumentsAfter(marker: Int): String? {
-        val key = indexOf("\"arguments\"", startIndex = marker)
+        val key = keyAt(ARGUMENT_KEYS, from = marker)
         if (key < 0) return null
         val open = indexOf('{', startIndex = key)
         if (open < 0) return null
@@ -192,6 +214,51 @@ object ToolPrompting {
             }
         }
         return null
+    }
+
+    /**
+     * The same object with its strings quoted the way JSON wants them.
+     *
+     * Reading the name is only half of a call. Every tool reads its own arguments by parsing
+     * this string as JSON, so `{'url': 'https://example.com'}` is a call that names the right
+     * tool and then arrives with nothing in it, and the tool answers that no url was given
+     * while the url sits there in the text. Hammer 2.1 writes exactly that, on a phone, for
+     * every call it makes.
+     *
+     * Walked rather than replaced, because the two quotes are not interchangeable: an
+     * apostrophe inside a double-quoted value is a letter, and turning it into a delimiter
+     * breaks every ordinary English possessive. Only a single quote that is acting as a
+     * delimiter becomes a double one, and a double quote inside such a span is escaped on the
+     * way out so the result still parses.
+     */
+    private fun String.asJson(): String {
+        if (!contains('\'')) return this
+
+        val out = StringBuilder(length)
+        var quote: Char? = null
+        var index = 0
+        while (index < length) {
+            val char = this[index]
+            when {
+                // Inside a string an escape covers whatever follows it, quotes included.
+                quote != null && char == '\\' && index + 1 < length -> {
+                    out.append(char).append(this[index + 1])
+                    index++
+                }
+                quote == null && (char == '\'' || char == '"') -> {
+                    quote = char
+                    out.append('"')
+                }
+                char == quote -> {
+                    quote = null
+                    out.append('"')
+                }
+                char == '"' && quote == '\'' -> out.append("\\\"")
+                else -> out.append(char)
+            }
+            index++
+        }
+        return out.toString()
     }
 
     /** The schema on one line, since a pretty-printed one is only longer. */

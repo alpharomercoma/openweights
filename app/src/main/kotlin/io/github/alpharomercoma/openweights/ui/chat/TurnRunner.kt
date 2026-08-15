@@ -249,7 +249,7 @@ class TurnRunner @Inject constructor(
                 // cannot render tools has never been offered one, so "I could use web_search
                 // for that" is a remark about what it cannot do. Ungated, that remark
                 // reached the network.
-                val calls = pass.asked(active, withTools, native)
+                val calls = pass.asked(active, withTools)
                 val again = if (mayCall) {
                     advance(pass, calls, mode, listener)
                 } else {
@@ -436,22 +436,26 @@ private fun ToolRegistry.roundLimit(): Int =
     if (all.any { it.chains }) AgentRunner.CHAINED_MAX_ROUNDS else AgentRunner.DEFAULT_MAX_ROUNDS
 
 /**
- * What a pass asked for, from whichever of the three ways it had of asking.
+ * What a pass asked for, from whichever of the two ways it had of asking.
  *
  * In order, because they are not equally trustworthy. The template's own parse is what the
- * model was built to produce. The prompted object is what a model whose template drops tools
- * was asked for instead, and is still a definite shape rather than a guess. Prose salvage is
- * the guess, and it goes last.
+ * model was built to produce. The prompted object is a definite shape rather than a guess,
+ * and it is read whenever the first one came back with nothing.
+ *
+ * That fallback used to be gated on the template *not* rendering tools, and the gate cost a
+ * whole model. Hammer 2.1 renders them, so llama.cpp parsed for the Hermes envelope; its
+ * template asks for a bare JSON array, so there was no envelope and the engine found nothing;
+ * and being native switched off the one parser that could read what it wrote. Measured on a
+ * phone, that scored two correct calls out of three as a refusal. A template that renders
+ * tool definitions is not a promise about the syntax the weights will answer in.
+ *
+ * The gate that matters is [offered], and it stays. A model that was never shown a tool has
+ * decided nothing, so call-shaped text in its reply is a remark about what it cannot do.
  */
-private fun TurnRunner.Pass.asked(
-    active: ToolRegistry,
-    offered: Boolean,
-    native: Boolean,
-): List<ToolCall> {
+private fun TurnRunner.Pass.asked(active: ToolRegistry, offered: Boolean): List<ToolCall> {
     if (!offered) return emptyList()
 
-    val prompted = if (native) emptyList() else listOfNotNull(ToolPrompting.parse(raw, active))
-    return event.toolCalls.ifEmpty { prompted }
+    return event.toolCalls.ifEmpty { listOfNotNull(ToolPrompting.parse(raw, active)) }
 }
 
 /**

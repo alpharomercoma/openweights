@@ -541,6 +541,33 @@ class TurnRunnerTest {
     }
 
     @Test
+    fun `a native template that writes a call in its own shape is still read`() = runBlocking {
+        // Hammer 2.1's exact reply, copied off a phone. Its template renders the tools, so
+        // supportsTools is true and llama.cpp parses with the Hermes envelope in mind; but
+        // the template asks for a bare JSON array, so there is no envelope to find and the
+        // engine returns no calls. The second parser can read this perfectly well and was
+        // switched off precisely because the first one claimed the model.
+        //
+        // Scored that way the model looks like it declined. It did not: it named the right
+        // tool and filled in the right argument.
+        engine.scripted += ScriptedPass(
+            text = "```\n[{'type': 'function', 'function': {'name': 'web_search', " +
+                "'arguments': {'query': 'ada'}}}]\n```",
+            content = "```\n[{'type': 'function', 'function': {'name': 'web_search', " +
+                "'arguments': {'query': 'ada'}}}]\n```",
+        )
+        engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+
+        run(withTools = true)
+
+        // Run, not repaired. A pass spent asking for what the model already sent is the
+        // sixteen-times-slower path this project measured and threw away.
+        assertThat(search.calls).hasSize(1)
+        assertThat(search.calls.single().argumentsJson).contains("ada")
+        assertThat(engine.prompts).hasSize(2)
+    }
+
+    @Test
     fun `the same mistake twice is not repaired twice`() = runBlocking {
         val broken = ScriptedPass("<tool_call>{bad</tool_call>", content = "")
         engine.scripted += broken

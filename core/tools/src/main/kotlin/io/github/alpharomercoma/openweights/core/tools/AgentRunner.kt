@@ -89,6 +89,7 @@ sealed interface AgentDecision {
 class AgentRunner(
     private val registry: ToolRegistry,
     private val maxRounds: Int = DEFAULT_MAX_ROUNDS,
+    private val consent: ToolConsent = ToolConsent.Settled,
 ) {
     /**
      * Whether text somebody else wrote has reached the model during this turn.
@@ -242,6 +243,21 @@ class AgentRunner(
         mode: AgentMode,
         approve: suspend (ToolCall) -> Boolean,
     ): Boolean {
+        // The first thing ever to leave the device is asked about whatever the mode says, and
+        // asked once. Everything else in this app is local, so this is the moment that stops
+        // being true, and it used to pass unremarked: `web_search` ships switched on and auto
+        // runs it without asking, so a question could reach a search engine before the user
+        // had opened the Tools tab. See [OffDeviceConsent] for why the answer is not a
+        // shipped-off default instead.
+        //
+        // The answer stands as this call's approval too, rather than falling through to the
+        // ordinary rules and asking a second time about the call the question already showed.
+        if (tool.leavesTheDevice && !consent.isSettled) {
+            val agreed = approve(call)
+            consent.settle(tool.definition.name, agreed)
+            return agreed
+        }
+
         val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
         val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk && !carriesSomebodyElsesText
         return autoAllows || !tool.needsApproval || approve(call)

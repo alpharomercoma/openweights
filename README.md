@@ -32,7 +32,8 @@ per-model export step, no waiting for a first-party blessing.
   the device. Your Hugging Face token is encrypted with a hardware-backed Android Keystore
   key and is only ever sent to `huggingface.co`. Two things do reach the internet on your
   behalf, and it is worth saying rather than implying: model search and download, and the
-  assistant's own `web_search` and `fetch_url` tools, which ship switched on and can be
+  assistant's own `web_search` and `fetch_url` tools. Those two ship switched on, and the
+  first thing either would send asks you first and shows you the request; both can be
   switched off in the Tools tab. [`docs/privacy-policy.md`](docs/privacy-policy.md) says
   exactly what goes and when.
 

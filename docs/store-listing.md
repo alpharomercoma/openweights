@@ -64,10 +64,10 @@ Your conversations, your models and your usage stay on the device. There is no a
 no crash reporter, and no backend of ours. Automatic backup and device transfer are switched
 off, so a new phone does not inherit your chats. Uninstalling removes everything.
 
-Two tools do reach the internet, because they have to: web search and page fetching, both
-switched on at first run and both switchable off in the Tools tab. Your Hugging Face token,
-if you set one, is encrypted with a key held in the Android Keystore and is sent only to
-Hugging Face.
+Two tools do reach the internet, because they have to: web search and page fetching. The
+first time either would send anything, the app asks and shows you the request, and both can
+be switched off in the Tools tab. Your Hugging Face token, if you set one, is encrypted with
+a key held in the Android Keystore and is sent only to Hugging Face.
 
 WHAT YOU NEED
 Android 12 or newer, a 64-bit ARM device, and enough memory for the model you choose. The app

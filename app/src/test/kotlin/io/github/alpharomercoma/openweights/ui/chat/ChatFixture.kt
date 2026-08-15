@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.OffDeviceConsent
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -111,6 +112,7 @@ abstract class ChatFixture {
                 ToolSwitches(context),
                 PlanBoard(),
                 AskBoard(),
+                settledConsent(context),
             ),
             notifier = ReplyNotifier(context),
             savedState = state,
@@ -238,3 +240,11 @@ abstract class ChatFixture {
         const val LOAD_MS = 500L
     }
 }
+
+/**
+ * Consent already given, which is every turn after the first.
+ *
+ * The first one is [AgentRunnerTest]'s business: what it does is ask.
+ */
+internal fun settledConsent(context: android.content.Context): OffDeviceConsent =
+    OffDeviceConsent(context, ToolSwitches(context)).apply { settle("web_search", true) }

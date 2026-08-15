@@ -32,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.OffDeviceConsent
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -83,6 +84,7 @@ class HarnessSmokeTest {
             ToolSwitches(context),
             PlanBoard(),
             AskBoard(),
+            settledConsent(context),
         )
 
         // Through the real instructions rather than a bare question, because the system
@@ -144,3 +146,11 @@ class HarnessSmokeTest {
         val MODEL = File("/data/local/tmp/openweights/model.gguf")
     }
 }
+
+/**
+ * Consent already given, which is every turn after the first.
+ *
+ * The first one is [AgentRunnerTest]'s business: what it does is ask.
+ */
+internal fun settledConsent(context: android.content.Context): OffDeviceConsent =
+    OffDeviceConsent(context, ToolSwitches(context)).apply { settle("web_search", true) }

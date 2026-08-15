@@ -36,10 +36,18 @@ Every request above also carries the ordinary information any web request carrie
 your IP address, which the receiving service handles under its own policy.
 
 **The two assistant tools deserve a paragraph of their own.** `web_search` and `fetch_url`
-are switched on when the app is first installed. The assistant decides when to use them and
-composes the query itself, out of the conversation, which means what it sends can contain
-anything you have said or attached. If you would rather nothing left the device, switch both
-off in the Tools tab; the app works without them and everything else is local.
+are switched on when the app is first installed, but **the first time either would actually
+send something, the app asks you and shows you the request**. Nothing reaches the internet on
+the assistant's behalf before you have answered that once.
+
+If you say yes, searches go out from then on without asking again. The assistant decides when
+to use them and composes the query itself, out of the conversation, which means what it sends
+can contain anything you have said or attached. If you say no, that tool is switched off,
+where you can see it and turn it back on later. You can change either switch at any time in
+the Tools tab; the app works without them and everything else is local.
+
+Fetching a page always asks, every time, because the address is the assistant's choice rather
+than yours.
 
 **Files you share.** If you give the app access to a folder, its contents are read on the
 device and are never uploaded on their own. They can leave only through the two tools above,

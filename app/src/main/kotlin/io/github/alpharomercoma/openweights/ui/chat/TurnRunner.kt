@@ -32,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.OffDeviceConsent
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -84,6 +85,7 @@ class TurnRunner @Inject constructor(
     private val switches: ToolSwitches,
     private val plans: PlanBoard,
     private val asks: AskBoard,
+    private val consent: OffDeviceConsent,
 ) {
 
     /**
@@ -142,7 +144,7 @@ class TurnRunner @Inject constructor(
         // write it, which is three before the model has said anything. At two the last of
         // those is refused and the work is thrown away on the step that mattered.
         val maxRounds = active.roundLimit()
-        val agent = AgentRunner(active, maxRounds)
+        val agent = AgentRunner(active, maxRounds, consent)
 
         // Said once per turn, because "why did it not search" has three possible answers
         // and the per-pass line only ever showed the conclusion. withTools is the template

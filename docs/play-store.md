@@ -278,12 +278,23 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
   unless a user opens an issue. The pre-launch report partly covers this, which is why
   `mapping.txt` has to go up with the bundle.
-- **The web tools are on by default.** `web_search` and `fetch_url` are switched on the
-  first time the app runs, so a question can leave the device before the user has looked at
-  the Tools tab. Everything else in the app is local, which makes this the one place the
-  promise bends, and the data safety section above declares it. `fetch_url` will only reach
-  public addresses, so a page cannot talk the model into reading the router, but that is a
-  bound on the damage rather than an answer to the question of what the default should be.
+- **The web tools are on by default, and nothing leaves before somebody says so.** This used
+  to be the gap: `web_search` ships switched on and the default mode runs it without asking,
+  so a question could reach a search engine before the user had opened the Tools tab.
+  `fetch_url` never had the problem, because the address is the model's to choose and it
+  therefore asks every time.
+
+  Shipping them off was the obvious fix and the wrong one, for the reason `ToolSwitches`
+  already carries: a tool that ships off is a feature nobody finds. Asking at install is
+  worse, because the question means nothing before there is anything to ask about. So the
+  first thing that would leave the device asks, once, showing the exact call, and the answer
+  is remembered. Discovery and consent become the same event. A refusal switches that tool
+  off, so the decision lands somewhere the user can see and reverse, and turning the switch
+  back on is itself the consent.
+
+  What remains, and is declared: after that yes, searches go out without further prompting,
+  composed by the model out of the conversation. `fetch_url` will only reach public
+  addresses, so a page cannot talk the model into reading the router.
 - **No upload key.** `keystore.properties` does not exist in this checkout, so
   `bundleRelease` produces an unsigned AAB. Creating the key and enrolling in Play App
   Signing is the first Console step and has deliberately not been done for you.

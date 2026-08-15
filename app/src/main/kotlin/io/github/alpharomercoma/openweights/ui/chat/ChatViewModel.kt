@@ -1250,13 +1250,31 @@ class ChatViewModel @Inject constructor(
         }
 
         val parsed = parseAssistantReply(raw)
+        // Stripped, as the completed path has always stripped it. Stopping over a call the
+        // model was partway through writing left the markup here, and this is the path that
+        // writes to storage: the half-written call became the assistant's turn, and every
+        // later turn of that conversation was handed an assistant asking for a tool with no
+        // result after it. Nothing was ever going to run it, so it is not part of the reply.
+        val answer = parsed.answer.withoutToolMarkup()
+        // What is left of a reply that was only ever a call is nothing, and a blank turn is
+        // worse than no turn, so it goes the same way an empty buffer does.
+        if (answer.isBlank() && parsed.reasoning.isNullOrBlank()) {
+            _uiState.update { state ->
+                if (state.transcript.lastOrNull()?.isStreaming != true) {
+                    state
+                } else {
+                    state.copy(transcript = state.transcript.dropLast(1))
+                }
+            }
+            return
+        }
         // Closed off rather than left as the stream had it: thinking that was cut off
         // mid-tag reopens as an unterminated block and swallows the answer after it.
-        val canonical = canonicalText(parsed.reasoning, parsed.answer)
+        val canonical = canonicalText(parsed.reasoning, answer)
         updateLastEntry {
             it.copy(
                 text = canonical,
-                answer = parsed.answer,
+                answer = answer,
                 reasoning = parsed.reasoning ?: it.reasoning,
                 isStreaming = false,
                 isReasoningInProgress = false,

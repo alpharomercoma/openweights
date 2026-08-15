@@ -65,7 +65,7 @@ class ConversationCompactor @Inject constructor(
         val range = policy.foldRange(
             entryCount = state.transcript.size,
             alreadyFoldedThrough = state.compaction?.foldedThroughIndex ?: -1,
-        ) ?: return null
+        ) { index -> state.transcript[index].role == ChatRole.ASSISTANT } ?: return null
 
         // Feed the previous summary back in, or a second compaction would produce a
         // summary covering only the newly folded turns while claiming to cover everything

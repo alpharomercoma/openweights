@@ -102,11 +102,16 @@ object ToolPrompting {
      * from the layer that can make it properly.
      */
     fun parse(reply: String, tools: ToolRegistry): ToolCall? {
-        val name = tools.all.map { it.definition.name }
-            .firstOrNull { reply.contains("\"$it\"") }
-            ?: return null
         val marker = reply.callKey()
         if (marker < 0) return null
+
+        // Read out of the key rather than found anywhere in the reply. Scanning the whole
+        // text for any registered name meant a name written inside an argument won, in
+        // registry order and regardless of where the call was: a file whose contents mention
+        // web_search became a call to web_search, carrying read_file's path as its query.
+        val named = reply.namedAt(marker)
+        val name = tools.all.map { it.definition.name }.firstOrNull { it.matches(named) }
+            ?: return null
 
         // An arguments object that starts and never closes is a call that was cut off, not a
         // call with no arguments. Dispatching it with an empty object spends a round on a
@@ -136,6 +141,31 @@ object ToolPrompting {
         CALL_KEYS.mapNotNull { key -> indexOf(key).takeIf { it >= 0 } }.minOrNull() ?: -1
 
     private val CALL_KEYS = listOf("\"tool\"", "\"name\"")
+
+    /**
+     * The quoted string the call key names, which is the tool the model asked for.
+     *
+     * Taken by hand rather than by parsing, for the reason [argumentsAfter] gives: what a
+     * model this size writes is rarely valid JSON all the way through, and this only has to
+     * find one value.
+     */
+    private fun String.namedAt(marker: Int): String? {
+        val colon = indexOf(':', startIndex = marker).takeIf { it >= 0 } ?: return null
+        val open = indexOf('"', startIndex = colon + 1).takeIf { it >= 0 } ?: return null
+        val close = indexOf('"', startIndex = open + 1).takeIf { it >= 0 } ?: return null
+        return substring(open + 1, close)
+    }
+
+    /**
+     * Whether what the model named is this tool.
+     *
+     * The last segment, because some tuning data namespaces a call as `functions.web_search`
+     * and refusing that would refuse a call the model plainly made. Everything before the
+     * last dot is a namespace; what follows it has to be the name exactly, which is the whole
+     * difference from the substring match this replaced.
+     */
+    private fun String.matches(named: String?): Boolean =
+        named?.trim()?.substringAfterLast('.').equals(this, ignoreCase = true)
 
     /**
      * The `arguments` object, taken by matching braces rather than by parsing.

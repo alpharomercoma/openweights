@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,10 +59,15 @@ class PlanBoard @Inject constructor() {
         return true
     }
 
-    /** Marks one step done, by its position in the list as the user and model both see it. */
-    fun tick(step: Int) {
-        current.value = current.value?.ticked(step)
-    }
+    /**
+     * Marks one step done, by its position in the list as the user and model both see it.
+     *
+     * [MutableStateFlow.update] rather than read, modify and assign. Two things tick this and
+     * they are on different threads: the person tapping a box, and [AdvanceTool] running
+     * wherever the turn runs. Written as an assignment, two ticks that overlap keep only one,
+     * and the box the user pressed comes back unticked.
+     */
+    fun tick(step: Int) = current.update { it?.ticked(step) }
 
     /** Dropped when the conversation is, or when the user starts a new one. */
     fun clear() {

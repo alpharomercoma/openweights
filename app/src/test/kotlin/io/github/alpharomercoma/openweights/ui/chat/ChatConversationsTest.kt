@@ -275,12 +275,18 @@ class ChatConversationsTest : ChatFixture() {
             // with no catch above it and no handler on the scope, which ends the process.
             assertThat(viewModel.uiState.value.error).isNull()
 
-            // Folded through the third entry, which is the range that exists only while the
+            // Folded through the fourth entry, which is the range that exists only while the
             // transcript is seven long: before the answer to this question was added. A
-            // fold that had waited until after the turn would have covered four. This is
+            // fold that had waited until after the turn would have covered more. This is
             // what says the fold ran when it was needed rather than after the fact.
+            //
+            // Four and not three, which is where the count alone would put it. Seven entries
+            // is question, answer, three times over and a question, so a boundary at three
+            // leaves an answer at the front of what is kept, and an answer at the front of a
+            // prompt is dropped on the way out. That answer was in neither the summary nor
+            // the prompt, and the model forgot what it had just said.
             val compaction = requireNotNull(viewModel.uiState.value.compaction)
-            assertThat(compaction.foldedThroughIndex).isEqualTo(2)
+            assertThat(compaction.foldedThroughIndex).isEqualTo(3)
 
             // And the point of folding first: the question still gets answered.
             assertThat(viewModel.uiState.value.transcript.last().role)

@@ -63,6 +63,38 @@ class CompactionPolicyTest {
     }
 
     @Test
+    fun `the fold ends on an answer, so what is kept begins with a question`() {
+        // Seven entries is question, answer, four times over and a question: the boundary
+        // lands at index 3, which is an answer. Everything sent to the model has to start
+        // with a question, so an answer left at the front is dropped on the way out, and
+        // this one had not been summarised either. The model forgot what it had just said.
+        val answers = setOf(1, 3, 5)
+
+        val range = policy.foldRange(entryCount = 7) { it in answers }
+
+        assertThat(range!!.last).isEqualTo(3)
+    }
+
+    @Test
+    fun `an even boundary is left where it is`() {
+        val answers = setOf(1, 3, 5, 7)
+
+        val range = policy.foldRange(entryCount = 8) { it in answers }
+
+        // Index 4 is a question already, so there is nothing to move.
+        assertThat(range!!.last).isEqualTo(3)
+    }
+
+    @Test
+    fun `the last entry is never folded, whatever role it has`() {
+        // A transcript of nothing but answers cannot happen through the app, and if it ever
+        // did, folding all of it would leave a prompt with nothing in it.
+        val range = policy.foldRange(entryCount = 7) { true }
+
+        assertThat(range!!.last).isEqualTo(5)
+    }
+
+    @Test
     fun `declines to fold when nothing new has accumulated`() {
         // Right after a compaction there is nothing between the summary and the turns
         // being kept verbatim, so a second pass would summarize a summary.

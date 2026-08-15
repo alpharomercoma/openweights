@@ -84,6 +84,31 @@ class ToolPromptingTest {
     }
 
     @Test
+    fun `a tool named inside an argument is not the tool that was called`() {
+        // The name used to be found by scanning the whole reply for any registered name, in
+        // registry order, with no regard for where the call key was. So a file whose contents
+        // mention another tool renamed the call: web_search is registered first, so this ran
+        // web_search with a path and some prose, and the user was told they gave no query.
+        val reply = """
+            {"tool": "read_file", "arguments": {"path": "notes.txt about web_search"}}
+        """.trimIndent()
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.name).isEqualTo("read_file")
+        assertThat(call?.argumentsJson).contains("notes.txt")
+    }
+
+    @Test
+    fun `a namespaced name is still the tool it names`() {
+        // What some tuning data looks like. Matching on the last segment keeps this readable
+        // as a call without going back to matching anything that merely contains the name.
+        val reply = """{"name": "functions.web_search", "arguments": {"query": "tides"}}"""
+
+        assertThat(ToolPrompting.parse(reply, registry)?.name).isEqualTo("web_search")
+    }
+
+    @Test
     fun `a tool that does not exist is not invented`() {
         val reply = """{"tool": "send_email", "arguments": {"to": "someone"}}"""
 

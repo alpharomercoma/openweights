@@ -287,6 +287,33 @@ class ChatViewModelTest : ChatFixture() {
     }
 
     @Test
+    fun `stopping over a half written call does not write the call down`() = runTest(dispatcher) {
+        engine.supportsTools = true
+        loadModel()
+        // Stop pressed while the model is partway through emitting a call. The completed
+        // path has always stripped this; the interrupted path did not, so the markup went
+        // into storage as the assistant's turn and came back as history on every later turn
+        // of that conversation, an assistant asking for a tool with no result after it.
+        engine.hold = true
+        viewModel.send("Who won?")
+        settle()
+        engine.emit("Looking that up. <|tool_call_start|>[web_search(query=")
+        advanceUntilIdle()
+
+        viewModel.stop()
+        settle()
+
+        val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+        val shown = viewModel.uiState.value.transcript.last()
+        assertThat(shown.answer).doesNotContain("tool_call_start")
+        assertThat(shown.answer).doesNotContain("web_search")
+        // Storage most of all: what is on screen is this turn, and what is stored is every
+        // later turn's history.
+        val stored = awaitMessages(id, count = 2).last()
+        assertThat(stored.text).doesNotContain("tool_call_start")
+    }
+
+    @Test
     fun `a question asked before a model is loaded is refused, not swallowed`() =
         runTest(dispatcher) {
             // The cold start: the app opens, somebody types, and the weights are not mapped

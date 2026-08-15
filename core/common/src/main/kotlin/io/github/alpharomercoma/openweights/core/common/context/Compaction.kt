@@ -61,11 +61,26 @@ class CompactionPolicy(
      *
      * @param alreadyFoldedThrough index of the last entry a previous compaction covered,
      *   or -1 if this is the first one.
+     * @param isAnswer whether the entry at an index is the model's rather than the user's.
+     *   The fold has to end on an answer, so that what is kept verbatim begins with a
+     *   question: every template this app renders needs a question first, and an answer left
+     *   at the front of the prompt is dropped on the way out. Landing the boundary in the
+     *   middle of an exchange therefore lost that answer twice over, from the summary and
+     *   from the prompt, and the model forgot what it had just said.
      */
-    fun foldRange(entryCount: Int, alreadyFoldedThrough: Int = -1): IntRange? {
+    fun foldRange(
+        entryCount: Int,
+        alreadyFoldedThrough: Int = -1,
+        isAnswer: (Int) -> Boolean = { false },
+    ): IntRange? {
         val start = alreadyFoldedThrough + 1
-        val endExclusive = entryCount - keepRecentEntries
+        var endExclusive = entryCount - keepRecentEntries
         if (endExclusive - start < MIN_FOLDABLE_ENTRIES) return null
+        // Never past the last entry: folding the whole transcript would leave a prompt with
+        // nothing in it, which is a worse answer to this than keeping one answer too many.
+        while (endExclusive < entryCount - 1 && isAnswer(endExclusive)) {
+            endExclusive++
+        }
         return start until endExclusive
     }
 

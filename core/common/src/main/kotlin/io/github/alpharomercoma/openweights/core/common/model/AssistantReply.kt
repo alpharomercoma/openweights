@@ -103,7 +103,12 @@ private const val CLOSE_TAG = "</think>"
  * the invocation itself was what reached the screen.
  */
 fun String.withoutToolMarkup(): String =
-    TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }.trim()
+    TOOL_MARKUP.fold(this) { text, pattern -> pattern.replace(text, "") }
+        // The closed ones first, so a finished call followed by prose keeps the prose. What
+        // is left with an opener and no closer is a call that was cut off, which is what
+        // Stop makes of one, and there is nothing after it to keep.
+        .let { closed -> UNCLOSED_TOOL_MARKUP.fold(closed) { text, p -> p.replace(text, "") } }
+        .trim()
 
 /**
  * True when the text carries a tool invocation, whether or not anything could read it.
@@ -116,4 +121,23 @@ fun String.containsToolMarkup(): Boolean = TOOL_MARKUP.any { it.containsMatchIn(
 private val TOOL_MARKUP = listOf(
     Regex("""<\|tool_call_start\|>.*?<\|tool_call_end\|>""", RegexOption.DOT_MATCHES_ALL),
     Regex("""<tool_call>.*?</tool_call>""", RegexOption.DOT_MATCHES_ALL),
+)
+
+/**
+ * An invocation that opened and never closed, which is what a stopped one looks like.
+ *
+ * Only ever matched after the closed forms, and only to the end of the text, because that is
+ * what a truncated call is: the model was writing it when the tokens stopped coming. Nothing
+ * was going to run it, so it is not part of the reply, and it used to be kept: pressing Stop
+ * over a half-written call wrote the markup into storage as the assistant's turn, and every
+ * later turn of that conversation was handed an assistant asking for a tool with no result
+ * after it.
+ *
+ * Not folded into [containsToolMarkup], deliberately. That one decides whether to spend a
+ * pass asking the model to try again, and a call the user stopped is not one they want
+ * retried.
+ */
+private val UNCLOSED_TOOL_MARKUP = listOf(
+    Regex("""<\|tool_call_start\|>.*$""", RegexOption.DOT_MATCHES_ALL),
+    Regex("""<tool_call>.*$""", RegexOption.DOT_MATCHES_ALL),
 )

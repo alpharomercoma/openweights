@@ -55,14 +55,21 @@ tasks.register("verify") {
     // container now: findByName here returns null for anything the Android plugin has not
     // created yet, which silently drops whole tiers from the run.
     dependsOn(
-        VERIFY_TASKS.map { name ->
+        verifyTasks.map { name ->
             subprojects.map { project -> project.tasks.matching { it.name == name } }
         },
     )
+    // The root build script itself, which nothing above covers: those map over subprojects,
+    // and this file belongs to none of them. That gap is not hypothetical. CI runs
+    // `ktlintCheck` from the root, which does include it, so a violation here failed every
+    // CI run for five commits while `./gradlew verify` stayed green in front of the person
+    // who could have fixed it. A local check that green-lights what CI rejects is worse than
+    // no local check, because it is trusted.
+    dependsOn(tasks.matching { it.name == "ktlintKotlinScriptCheck" })
 }
 
 /** The host-side tiers, in the order they fail fastest. */
-val VERIFY_TASKS = listOf(
+val verifyTasks = listOf(
     "ktlintCheck",
     "detekt",
     // Android lint, on the variant that ships. It had never been run before 2026-08-10 and

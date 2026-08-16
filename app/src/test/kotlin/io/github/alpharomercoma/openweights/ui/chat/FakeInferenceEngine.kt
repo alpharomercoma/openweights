@@ -68,6 +68,16 @@ class FakeInferenceEngine : InferenceEngine {
     /** Off by default, so a test only deals with the tool loop when it asks to. */
     var supportsTools = false
 
+    /**
+     * Whether the template renders a tool result, which follows [supportsTools] by default.
+     *
+     * They are separate on a real device and the tests that care set them apart. Following
+     * by default is what keeps every other test measuring the loop rather than the fold:
+     * a template that carries definitions almost always carries their answers too, and the
+     * exceptions are named where they are tested.
+     */
+    var supportsToolResults: Boolean? = null
+
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
@@ -145,6 +155,7 @@ class FakeInferenceEngine : InferenceEngine {
             // reason the view model keeps watching after this point.
             supportsThinking = supportsThinking,
             supportsTools = supportsTools,
+            supportsToolResults = supportsToolResults ?: supportsTools,
         )
     }
 

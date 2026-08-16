@@ -20,6 +20,7 @@ import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.containsToolMarkup
@@ -159,8 +160,13 @@ class TurnRunner @Inject constructor(
         // are dropped, the model answers in prose, and the app stops being an agent without
         // anything looking wrong. Those get the definitions in the conversation instead.
         val native = engine.loadedModel?.supportsTools == true
+        // Asked separately, because it is a separate question and the answers differ. A
+        // template can describe tools and still refuse to render what one gave back:
+        // FunctionGemma is tuned for calling and does exactly that, so gating this on
+        // `native` would have left the model it was written for still broken.
+        val readsResults = engine.loadedModel?.supportsToolResults == true
 
-        return Turn(active, agent, maxRounds, withTools, native, conversation)
+        return Turn(active, agent, maxRounds, withTools, native, readsResults, conversation)
             .run(params, mode, listener)
     }
 
@@ -178,6 +184,7 @@ class TurnRunner @Inject constructor(
         private val maxRounds: Int,
         private val withTools: Boolean,
         private val native: Boolean,
+        private val readsResults: Boolean,
         private val conversation: List<ChatMessage>,
     ) {
         /**
@@ -288,6 +295,9 @@ class TurnRunner @Inject constructor(
                 // replaces taking the definitions away, which said the same thing by
                 // removing four hundred tokens from the top of it.
                 .let { if (round + 1 >= maxRounds) it.closing(maxRounds) else it }
+                // Last, so the closing sentence is inside what gets folded rather than
+                // appended to a message the template was about to refuse.
+                .spelledOut(readsResults)
             if (results.isEmpty()) return false
 
             // The assistant turn that asked goes back too, or the model is handed results
@@ -334,6 +344,7 @@ class TurnRunner @Inject constructor(
             messages = messages +
                 ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
                 calls.map { ChatMessage.toolResult(it.id, spent(maxRounds)) }
+                    .spelledOut(readsResults)
             return true
         }
     }
@@ -502,6 +513,63 @@ private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
  * turn in the middle is worse. The tail of the last tool result is the one place a sentence
  * can be added without moving anything the cache has already read.
  */
+/**
+ * The same conversation with tool results in a role this template will actually render.
+ *
+ * A template that would not carry the tool definitions does not carry their answers either,
+ * and the two failures look nothing alike. Dropping the definitions is silent, which is why
+ * [ToolPrompting] exists at all; the tool role is not, because several of these templates
+ * require the roles to alternate and raise rather than render when they do not. Gemma 3
+ * raises "Conversation roles must alternate user/assistant", llama.cpp reports it as
+ * "Unable to generate parser for this template", and it reaches the user as a turn that
+ * produced nothing: the model asks for a search on nearly every question, the search runs,
+ * and the pass that was going to use the result cannot be built at all. A tool ran and no
+ * answer came back.
+ *
+ * So for those models the results go back as the user turn they already effectively were.
+ * Nothing is being disguised: the model was told about its tools in prose because its
+ * template had nowhere else to put them, it asked in prose, and this is the reply in the
+ * same prose. Naming the call keeps it readable as a result rather than as the user
+ * suddenly reciting a web page.
+ *
+ * Neighbours of one role are joined for the reason `asExchange` joins them, which is that
+ * two user turns in a row is the same violation from the other end and a model that asks
+ * for two things at once would land on it.
+ *
+ * Gated on the template rather than done for everyone, because a template that does support
+ * the tool role pairs each result with the call that asked for it through
+ * [ChatMessage.toolCallId], and folding those into prose would throw that pairing away for
+ * every model the app has no problem with. The gate is its own probe rather than
+ * `supportsTools`: FunctionGemma is tuned for calling, describes its tools happily, and
+ * still raises on the result, so the model this was written for is exactly the one that
+ * answers yes to the other question.
+ */
+internal fun List<ChatMessage>.spelledOut(readsResults: Boolean): List<ChatMessage> {
+    if (readsResults || none { it.role == ChatRole.TOOL }) return this
+    return map { message ->
+        if (message.role != ChatRole.TOOL) {
+            message
+        } else {
+            ChatMessage.text(
+                ChatRole.USER,
+                message.toolCallId.takeIf { it.isNotBlank() }
+                    ?.let { "$it returned:\n${message.text}" }
+                    ?: message.text,
+            )
+        }
+    }.fold(mutableListOf()) { kept, message ->
+        val previous = kept.lastOrNull()
+        if (previous != null && previous.role == message.role) {
+            kept[kept.lastIndex] = previous.copy(
+                parts = previous.parts + MessagePart.Text("\n\n") + message.parts,
+            )
+        } else {
+            kept += message
+        }
+        kept
+    }
+}
+
 private fun List<ChatMessage>.closing(maxRounds: Int): List<ChatMessage> {
     val last = lastOrNull() ?: return this
     val told = "${last.text}\n\nThat was the last of $maxRounds rounds, so there are no " +

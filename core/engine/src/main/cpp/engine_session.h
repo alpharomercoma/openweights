@@ -189,6 +189,17 @@ public:
     /** True when this model's chat template renders tool definitions. */
     bool supports_tools() const;
 
+    /**
+     * True when this model's chat template will also render the *answer* a tool gave.
+     *
+     * A separate question from [supports_tools], which is what made this worth asking.
+     * Gemma's templates describe tools perfectly well and then require the roles to
+     * alternate strictly user/assistant, so the tool message that carries the result raises
+     * instead of rendering. FunctionGemma is tuned for calling and answers yes to
+     * [supports_tools]; it still cannot be told what came back.
+     */
+    bool supports_tool_results() const;
+
     /** True when this model's chat template does something with `reasoning_effort`. */
     bool supports_reasoning_effort() const;
 

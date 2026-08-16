@@ -185,7 +185,12 @@ class ToolChoiceBenchmark {
             // The size as well as the label, because the label is a key in a map and the file
             // under it is whatever somebody pushed. A run that reported lfm2-1.2b while
             // measuring LFM2.5-2.6B is a table with the wrong name on a row.
-            Log.i(TAG, "ROUTE model=$name native=$native file=${file.name} bytes=${file.length()}")
+            val readsResults = engine.loadedModel?.supportsToolResults == true
+            Log.i(
+                TAG,
+                "ROUTE model=$name native=$native results=$readsResults " +
+                    "file=${file.name} bytes=${file.length()}",
+            )
             probeRendering(engine, name, native)
 
             val scored = ARMS.map { arm -> arm to score(engine, name, arm, native) }
@@ -331,7 +336,10 @@ class ToolChoiceBenchmark {
         val described =
             if (native) "" else "\n\n" + ToolPrompting.describe(tools, arm.format)
         val messages = listOf(ChatMessage.text(ChatRole.SYSTEM, system() + described)) +
-            case.prior +
+            // The same fold TurnRunner does before it sends one, and for the same reason:
+            // a template that would not take the definitions raises on the tool role, and a
+            // prior written straight through would measure a defect the app no longer has.
+            case.prior.spelledOut(engine.loadedModel?.supportsToolResults == true) +
             ChatMessage.text(ChatRole.USER, case.prompt)
         // Greedy, because TurnRunner forces temperature zero while tools are on the table and
         // an arm sampled any other way is measuring behaviour the app stopped having.

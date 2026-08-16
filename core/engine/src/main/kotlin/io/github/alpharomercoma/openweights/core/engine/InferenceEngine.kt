@@ -137,6 +137,17 @@ data class LoadedModelInfo(
      */
     val supportsTools: Boolean = false,
     /**
+     * True when this model's chat template will also render what a tool gave back.
+     *
+     * Deliberately not the same question as [supportsTools], because the two answers
+     * differ on models this app ships against. Gemma's templates describe tools and then
+     * require the roles to alternate strictly user then assistant, so the message carrying
+     * the result raises rather than renders; FunctionGemma is tuned for calling and still
+     * cannot be told what came back. A turn that calls a tool on one of those used to end
+     * with the tool having run and nothing written, every time.
+     */
+    val supportsToolResults: Boolean = false,
+    /**
      * True when the chat template does something with `reasoning_effort`.
      *
      * Measured by rendering the template twice with different values and comparing the

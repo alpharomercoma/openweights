@@ -494,12 +494,12 @@ suite.
 | qwen2.5-1.5b *(shipping)* | 1117 | native | 4 | 4 | 4 | 3 | 4/6 | 1/2 | 0/6 | 1/6 | 8.0 |
 | qwen2.5-coder-3b | 1998 | native | 4 | 4 | 4 | 4 | 4/6 | 1/2 | 2/6 | 0/6 | 9.5 |
 | granite3.3-2b | 1453 | native | 3 | 3 | 3 | 4 | 4/6 | 1/2 | **4/6** | 1/6 | 9.4 |
-| functiongemma-270m | 242 | native | 3 | 3 | 3 | 3 | 3/6 | **error** | 0/6 | 0/6 | **1.8** |
+| functiongemma-270m | 242 | native | 3 | 3 | 3 | 3 | 3/6 | 1/2 | 0/6 | 0/6 | **1.8** |
 | gemma4-e4b | 4591 | native | 3 | 3 | 3 | 3 | 3/6 | 1/2 | 0/6 | 0/6 | **20.2** |
 | llama3.2-3b | 1922 | native | 3 | 3 | 2 | 3 | 3/6 | **0/2** | 2/6 | 0/6 | 11.4 |
 | smollm3-3b | 1915 | prompted | 2 | 3 | 3 | 2 | 3/6 | 1/2 | 1/6 | 0/6 | 18.6 |
 | lfm2-1.2b | 696 | prompted | 2 | 2 | 2 | 2 | 2/6 | 1/2 | 0/6 | 0/6 | 5.3 |
-| gemma3-1b | 806 | prompted | 1 | 1 | 2 | 1 | 2/6 | **error** | 3/6 | 0/6 | 9.0 |
+| gemma3-1b | 806 | prompted | 1 | 1 | 2 | 1 | 2/6 | 1/2 | 3/6 | 0/6 | 9.0 |
 
 **One model is good at both, and it is the smallest serious one.** Arch-Agent with its template
 put back is 6/6 on every arm and 2/2 on the pair, unmoved by ordering or by a warm cache, at
@@ -543,8 +543,29 @@ five models on the single-turn arms are all under 2 GB, and four of the five are
 is dropped in GGUF conversion. SmolLM3's template gates its tool block on an `xml_tools`
 variable rather than `tools`, so llama.cpp renders nothing and it falls to the prompted route.
 Gemma 3 and FunctionGemma cannot render a tool *result* at all — `Unable to generate parser for
-this template` — so they error on both multi-turn cases and cannot participate in a second pass
-under any circumstances. None of the three is a fact about the weights.
+this template` — so they errored on both multi-turn cases and could not participate in a second
+pass under any circumstances. None of the three is a fact about the weights.
+
+That third one was ours, and it is fixed. The templates raise because they require the roles to
+alternate strictly user then assistant, and the message carrying a tool's answer sits between
+the two. Nothing in the app noticed: `AgentRunner.step` built a `tool` message whatever the
+model was, so a Gemma 3 user with tools switched on watched a search run and got no reply, on
+every turn — and Gemma 3 asks for a search on six questions out of six, so it was every turn.
+
+The fix is to send those models the result as the user turn it already effectively is, named so
+it still reads as a result rather than as the user reciting a web page. Nothing is disguised:
+these are the models that were told about their tools in prose because the template had nowhere
+else to put them, and this is the reply in the same prose.
+
+What the fix turned on is a probe of its own, `supports_tool_results`, rather than the existing
+`supports_tools`, and that distinction is the whole finding. **FunctionGemma answers yes to
+`supports_tools` and no to the new one.** It is Google's function-calling model; its template
+describes tools perfectly well and then refuses to render what one gave back. Gating on the
+existing flag would have left the model the fix was written for exactly as broken as before.
+
+Both now score 1/2 on the multi-turn pair with no errors. The control is Hammer, whose template
+does render results and which therefore takes none of this path: 5/6 on all four arms, 1/2
+multi, 0/6 ordering, 0/6 cache — identical to the run above, to the case.
 
 ## The route each answer took
 

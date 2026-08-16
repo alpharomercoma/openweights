@@ -587,6 +587,42 @@ bool Session::supports_tools() const {
     }
 }
 
+bool Session::supports_tool_results() const {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    if (templates == nullptr) {
+        return false;
+    }
+
+    // The whole round rather than the tool message alone, because what these templates
+    // refuse is the sequence and not the role: Gemma 3 raises "Conversation roles must
+    // alternate user/assistant" the moment anything sits between a question and its
+    // answer, which llama.cpp reports as being unable to build a parser. Asked with a
+    // lone tool message the check would pass and the app would still fail on the shape a
+    // turn actually has.
+    common_chat_templates_inputs inputs;
+    inputs.add_generation_prompt = true;
+    inputs.use_jinja = true;
+
+    const auto add = [&](const char * role, const char * content, const char * call_id) {
+        common_chat_msg msg;
+        msg.role = role;
+        msg.content = content;
+        if (call_id != nullptr) {
+            msg.tool_call_id = call_id;
+        }
+        inputs.messages.push_back(msg);
+    };
+    add("user", "probe", nullptr);
+    add("assistant", "probe", nullptr);
+    add("tool", "probe", "openweights_probe_call");
+
+    try {
+        return !common_chat_templates_apply(templates, inputs).prompt.empty();
+    } catch (const std::exception &) {
+        return false;
+    }
+}
+
 bool Session::supports_reasoning_effort() const {
     auto * templates = static_cast<common_chat_templates *>(chat_templates_);
     if (templates == nullptr) {

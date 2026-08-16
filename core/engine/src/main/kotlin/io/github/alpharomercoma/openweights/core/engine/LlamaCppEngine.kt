@@ -308,6 +308,7 @@ class LlamaCppEngine internal constructor(
             },
             supportsThinking = bridge.nativeSupportsThinking(activeHandle),
             supportsTools = bridge.nativeSupportsTools(activeHandle),
+            supportsToolResults = bridge.nativeSupportsToolResults(activeHandle),
             supportsReasoningEffort = bridge.nativeSupportsReasoningEffort(activeHandle),
         ).also {
             // What the chat template can actually do, asked of the template at load. Logged
@@ -315,7 +316,8 @@ class LlamaCppEngine internal constructor(
             // otherwise invisible from outside the process.
             Log.i(
                 "OpenWeights",
-                "loaded: tools=${it.supportsTools} thinking=${it.supportsThinking} " +
+                "loaded: tools=${it.supportsTools} results=${it.supportsToolResults} " +
+                    "thinking=${it.supportsThinking} " +
                     "effort=${it.supportsReasoningEffort} " +
                     "vision=${it.mediaSupport.vision} audio=${it.mediaSupport.audio} " +
                     "ctx=${it.contextSize}",

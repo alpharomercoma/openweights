@@ -706,6 +706,96 @@ class TurnRunnerTest {
         override suspend fun onApproval(call: ToolCall): Boolean = true
     }
 
+    @Test
+    fun `a tool result goes back as a user turn when the template cannot render one`() {
+        // Gemma 3 and FunctionGemma raise "Conversation roles must alternate user/assistant"
+        // rather than render a tool role, which llama.cpp reports as being unable to build a
+        // parser and the app cannot recover from: the turn ends having run a tool and
+        // written nothing. Measured on a phone, Gemma 3 asked for a search on six questions
+        // out of six, so with tools switched on this was every turn.
+        val results = listOf(ChatMessage.toolResult("web_search", "Manila: 31C."))
+
+        val spelled = results.spelledOut(readsResults = false)
+
+        assertThat(spelled.map { it.role }).containsExactly(ChatRole.USER)
+        assertThat(spelled.single().text).contains("Manila: 31C.")
+        // Named, or the result reads as the user reciting a web page unprompted.
+        assertThat(spelled.single().text).contains("web_search")
+    }
+
+    @Test
+    fun `two results at once are one turn, not two`() {
+        // The same violation from the other end: a model that asks for two things in one
+        // breath gets two results, and two user turns in a row is what the alternation
+        // check refuses.
+        val results = listOf(
+            ChatMessage.toolResult("web_search", "Manila: 31C."),
+            ChatMessage.toolResult("read_file", "notes.txt: empty."),
+        )
+
+        val spelled = results.spelledOut(readsResults = false)
+
+        assertThat(spelled).hasSize(1)
+        assertThat(spelled.single().text).contains("Manila: 31C.")
+        assertThat(spelled.single().text).contains("notes.txt: empty.")
+    }
+
+    @Test
+    fun `a template that renders tool results keeps them and their pairing`() {
+        // The counterweight, and the reason this is gated rather than done for everyone. A
+        // native template pairs each result with the call that asked for it through
+        // toolCallId, and folding these into prose would throw that pairing away for every
+        // model the app has no trouble with.
+        val results = listOf(
+            ChatMessage.toolResult("call_1", "Manila: 31C."),
+            ChatMessage.toolResult("call_2", "notes.txt: empty."),
+        )
+
+        val spelled = results.spelledOut(readsResults = true)
+
+        assertThat(spelled).isEqualTo(results)
+        assertThat(spelled.map { it.toolCallId }).containsExactly("call_1", "call_2").inOrder()
+    }
+
+    @Test
+    fun `a conversation with no tool result in it is left exactly as it was`() {
+        // Every ordinary turn takes this path, so it has to be the identity and not merely
+        // equivalent: the prompt is compared token by token against the cached prefix, and
+        // a rebuilt message that differs by a newline re-prefills the conversation.
+        val conversation = listOf(
+            ChatMessage.text(ChatRole.SYSTEM, "instructions"),
+            ChatMessage.text(ChatRole.USER, "what is the weather"),
+            ChatMessage.text(ChatRole.ASSISTANT, "let me look"),
+        )
+
+        assertThat(conversation.spelledOut(readsResults = false)).isEqualTo(conversation)
+        assertThat(conversation.spelledOut(readsResults = true)).isEqualTo(conversation)
+    }
+
+    @Test
+    fun `a whole exchange still alternates once its results are folded`() {
+        // What the second pass of a turn actually looks like, and the shape that failed.
+        val conversation = listOf(
+            ChatMessage.text(ChatRole.SYSTEM, "instructions"),
+            ChatMessage.text(ChatRole.USER, "weather in manila"),
+            ChatMessage.text(ChatRole.ASSISTANT, "let me look"),
+            ChatMessage.toolResult("web_search", "Manila: 31C."),
+            ChatMessage.text(ChatRole.ASSISTANT, "Manila is 31C."),
+            ChatMessage.text(ChatRole.USER, "and cebu?"),
+        )
+
+        val roles = conversation.spelledOut(readsResults = false).map { it.role }
+
+        assertThat(roles).containsExactly(
+            ChatRole.SYSTEM,
+            ChatRole.USER,
+            ChatRole.ASSISTANT,
+            ChatRole.USER,
+            ChatRole.ASSISTANT,
+            ChatRole.USER,
+        ).inOrder()
+    }
+
     private companion object {
         const val CONTEXT = 4096
 

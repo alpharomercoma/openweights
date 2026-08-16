@@ -402,6 +402,20 @@ catch (const std::exception & failure) {
 }
 
 JNIEXPORT jboolean JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsToolResults(
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
+    return as_session(handle)->supports_tool_results() ? JNI_TRUE : JNI_FALSE;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(
+        env, std::string("nativeSupportsToolResults failed: ") + failure.what());
+    return JNI_FALSE;
+} catch (...) {
+    throw_engine_exception(env, "nativeSupportsToolResults failed for an unknown reason");
+    return JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeSupportsReasoningEffort(
     JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return as_session(handle)->supports_reasoning_effort() ? JNI_TRUE : JNI_FALSE;

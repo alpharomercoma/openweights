@@ -79,6 +79,9 @@ internal class LlamaBridge {
 
     external fun nativeSupportsTools(handle: Long): Boolean
 
+    /** True when the chat template will also render what a tool gave back. */
+    external fun nativeSupportsToolResults(handle: Long): Boolean
+
     /** True when the chat template renders `reasoning_effort` into the prompt. */
     external fun nativeSupportsReasoningEffort(handle: Long): Boolean
 

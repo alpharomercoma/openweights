@@ -449,6 +449,14 @@ int32_t Session::ingest_media_prompt(
 
     std::vector<mtmd_bitmap *> bitmaps;
     for (const auto & path : media_paths) {
+        // Before each file rather than only before the batch: libmtmd reads and decodes the
+        // whole thing, and several large attachments are seconds of work before a single
+        // chunk exists to be evaluated.
+        if (cancelled_.load(std::memory_order_relaxed)) {
+            for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
+            error = "cancelled";
+            return -1;
+        }
         if (file_size(path) > MAX_ATTACHMENT_BYTES) {
             for (auto * loaded : bitmaps) mtmd_bitmap_free(loaded);
             error = "that attachment is too large to process on this device";
@@ -499,10 +507,34 @@ int32_t Session::ingest_media_prompt(
     cached_.clear();
     cached_covers_context_ = false;
 
+    // Driven a chunk at a time rather than handed to mtmd_helper_eval_chunks, so that Stop
+    // can be answered part way through. Text prefill has checked cancellation between
+    // batches since it was written; this path was a single call that ran to completion
+    // whatever the user did, so Stop during "reading the prompt" did nothing at all for as
+    // long as it took. Measured at roughly thirteen seconds for one image and over a minute
+    // for four video frames, with the phone hot and the button apparently dead.
+    //
+    // A chunk is the granularity the helper offers and it is the honest one: one image is
+    // still one uninterruptible encode, so a single attachment answers Stop no faster than
+    // before. What changes is the case that took the longest, where every frame after the
+    // one in flight is now skipped.
     llama_pos new_n_past = 0;
-    const int32_t evaluated = mtmd_helper_eval_chunks(
-        ctx, ctx_, chunks, /*n_past=*/0, /*seq_id=*/0,
-        static_cast<int32_t>(llama_n_batch(ctx_)), /*logits_last=*/true, &new_n_past);
+    const size_t chunk_count = mtmd_input_chunks_size(chunks);
+    int32_t evaluated = 0;
+    for (size_t index = 0; index < chunk_count && evaluated == 0; ++index) {
+        if (cancelled_.load(std::memory_order_relaxed)) {
+            mtmd_input_chunks_free(chunks);
+            error = "cancelled";
+            return -1;
+        }
+        evaluated = mtmd_helper_eval_chunk_single(
+            ctx, ctx_, mtmd_input_chunks_get(chunks, index), new_n_past, /*seq_id=*/0,
+            static_cast<int32_t>(llama_n_batch(ctx_)),
+            // Only the last one, which is what the all-in-one helper does: logits are read
+            // once, from the end of the prompt.
+            /*logits_last=*/index + 1 == chunk_count,
+            &new_n_past);
+    }
 
     mtmd_input_chunks_free(chunks);
 
@@ -834,7 +866,18 @@ StopReason Session::generate(
         // turn with an attachment re-evaluates the conversation from the start.
         const int32_t evaluated = ingest_media_prompt(prompt, media_paths, error);
         if (evaluated < 0) {
-            return StopReason::ERROR;
+            // The same reckoning the text path does, and for the same reason. Media prefill
+            // empties the cache before it evaluates anything, so a failure part way through
+            // leaves n_past_ describing a prefix that is no longer there: the next turn
+            // finds a cache it thinks is warm, skips a prefix that was cleared, and decodes
+            // from a position the model never saw. reset() puts the three back in
+            // agreement.
+            reset();
+            // Stop is not a failure, and reporting it as one puts an error on screen for
+            // something the user asked for.
+            return cancelled_.load(std::memory_order_relaxed)
+                ? StopReason::CANCELLED
+                : StopReason::ERROR;
         }
         // Assigned before the length check: the cache is already full of these positions,
         // and reporting zero would show an empty context meter over a full context.
@@ -935,7 +978,14 @@ StopReason Session::generate(
     stats.context_size = n_ctx;
 
     llama_sampler * grammar = build_grammar(last_grammar_, vocab);
-    if (grammar == nullptr && !last_grammar_.grammar.empty()) {
+    // Null means two different things here and only one of them is a failure. A grammar
+    // that is not lazy is declined on purpose, for the reasons in build_grammar: it would
+    // have to be checked against the whole vocabulary from the first token, which on this
+    // hardware costs more than the tool call is worth. Treating that as a parse error ended
+    // the turn with "failed to parse the tool-call grammar" after the entire prompt had
+    // already been prefilled, for a template that had done nothing wrong. A lazy grammar
+    // that still comes back null is the real failure, because that one was attempted.
+    if (grammar == nullptr && !last_grammar_.grammar.empty() && last_grammar_.lazy) {
         error = "failed to parse the tool-call grammar the chat template produced";
         return StopReason::ERROR;
     }

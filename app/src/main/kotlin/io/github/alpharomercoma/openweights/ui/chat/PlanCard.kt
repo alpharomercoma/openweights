@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
@@ -71,16 +73,32 @@ fun PlanCard(plan: TaskPlan, onTick: (Int) -> Unit, modifier: Modifier = Modifie
         )
         plan.steps.forEachIndexed { index, step ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                // The whole row, not just the box. A checklist row is read as one thing and
+                // tapped as one thing: the label is the wide part and the obvious target,
+                // and it did nothing, so the only way to tick a step was to hit a box a
+                // finger's width across. Toggleable rather than clickable so a screen reader
+                // is told this is a checkbox and what state it is in.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = step.done,
+                        // Ticking is one way. A model that has done something cannot undo
+                        // it, and a person who ticks a box has decided it is done; offering
+                        // to untick would invite a disagreement the plan has no way to
+                        // settle.
+                        enabled = !step.done,
+                        role = Role.Checkbox,
+                        onValueChange = { onTick(index) },
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Checkbox(
                     checked = step.done,
-                    // Ticking is one way. A model that has done something cannot undo it, and
-                    // a person who ticks a box has decided it is done; offering to untick
-                    // would invite a disagreement the plan has no way to settle.
-                    onCheckedChange = { if (!step.done) onTick(index) },
+                    // Null, so the row above owns the tap and announces it. A box that
+                    // handled its own clicks here would be a second target inside the
+                    // first, and a second node for a screen reader to read out.
+                    onCheckedChange = null,
                 )
                 Text(
                     text = step.text,

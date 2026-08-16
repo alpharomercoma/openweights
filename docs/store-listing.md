@@ -84,17 +84,33 @@ publisher's work rather than ours. Open source, at github.com/alpharomercoma/ope
 **Privacy policy URL**: the published copy of `docs/privacy-policy.md`. GitHub Pages on this
 repository is enough; a raw file URL also works but reads badly.
 
-## Graphics still to make
+## Graphics
 
-| Asset | Size | Notes |
+Made, checked against the spec, and in `play/graphics`. How to regenerate any of them is in
+`play/graphics/README.md`.
+
+| Asset | File | Spec |
 |---|---|---|
-| App icon | 512 x 512 PNG | The launcher icon at listing size |
-| Feature graphic | 1024 x 500 PNG | No screenshot content; it is cropped hard on some surfaces |
-| Phone screenshots | 2 to 8, 16:9 or 9:16 | Chat mid-reply with the token counter visible; the fit estimate in Discover; the Tools tab; a plan with its steps |
+| App icon | `icon-512.png` | 512 x 512, 32-bit with alpha, 54 KB |
+| Feature graphic | `feature-graphic-1024x500.png` | 1024 x 500, 24-bit, no alpha |
+| Phone screenshots | `screenshots-phone/01..05` | five at 1080 x 1920, 24-bit, no alpha |
 
-The screenshots are the one place the product explains itself. The reply-in-progress shot
-should show tokens per second, because that number is the difference between this and every
+The screenshots are the one place the product explains itself, so they are captioned in that
+order: the telemetry, a tool round, a plan, the Hub, and the off switches. The first one
+shows tokens per second, because that number is the difference between this and every
 assistant that hides it.
+
+They are rendered from the real composables by a Robolectric run rather than captured off a
+phone, which is worth knowing for two reasons. A capture from this test handset is
+1220 x 2712 and Play rejects any screenshot whose long side is over twice its short one, so a
+capture could not have been uploaded as taken. And a render costs one command after a UI
+change, where a capture costs an afternoon of staging conversations on a device that has to
+be unlocked to drive.
+
+**The launcher icon changed with them.** It had kept the violet from before the palette moved
+to brass on graphite, which made it the only screen still wearing the old design and the
+first one anybody sees. `docs/design/visual-language.md` says why violet went: it is Qwen's
+colour, and the point of brass was not to be standing in someone else's room.
 
 ## Data safety form
 

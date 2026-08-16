@@ -1,19 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Three stacked weight bars: the "open weights" mark. -->
+<!--
+  Three stacked weight bars: the "open weights" mark.
+
+  Brass on graphite, which is what the rest of the app has been since the design system
+  landed. This file was not: it kept the violet the palette was moved off, and the reason
+  the palette moved is in docs/design/visual-language.md — violet is Qwen's colour, and the
+  point of brass was not to be standing in somebody else's room. The launcher was the last
+  screen still wearing the old one, which nobody sees while using the app and everybody
+  sees before they install it.
+
+  One hue rather than three. A value ladder was tried and the third bar goes muddy against
+  graphite at launcher size; measured at 96px, flat brass is the only version where all
+  three bars still read. The rail that used to sit under them went for the same reason.
+
+  Geometry answers to the adaptive mask: 50 x 43 centred in the 108 viewport puts the
+  corners 65.9 across, inside the 66 circle every launcher shape is guaranteed to keep.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:translateX="0" android:translateY="0">
-        <path
-            android:fillColor="#8B7CF6"
-            android:pathData="M34,38h40a5,5 0,0 1,0 10h-40a5,5 0,0 1,0 -10z" />
-        <path
-            android:fillColor="#C7BFFF"
-            android:pathData="M34,52h28a5,5 0,0 1,0 10h-28a5,5 0,0 1,0 -10z" />
-        <path
-            android:fillColor="#FFD9A0"
-            android:pathData="M34,66h16a5,5 0,0 1,0 10h-16a5,5 0,0 1,0 -10z" />
-    </group>
+    <path
+        android:fillColor="#F0A93B"
+        android:pathData="M29,32.5h39a5.5,5.5 0,0 1,0 11h-39a5.5,5.5 0,0 1,0 -11z" />
+    <path
+        android:fillColor="#F0A93B"
+        android:pathData="M29,48.5h24a5.5,5.5 0,0 1,0 11h-24a5.5,5.5 0,0 1,0 -11z" />
+    <path
+        android:fillColor="#F0A93B"
+        android:pathData="M29,64.5h9.5a5.5,5.5 0,0 1,0 11h-9.5a5.5,5.5 0,0 1,0 -11z" />
 </vector>

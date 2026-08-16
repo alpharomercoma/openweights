@@ -29,7 +29,26 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+/**
+ * These ran on a device and therefore hardly ran at all.
+ *
+ * A phone is plugged in for an afternoon every few weeks, and the one this project uses is
+ * usually locked, which is its own failure: an activity cannot come to the front behind a
+ * keyguard, so the whole file failed with "no compose hierarchies found" rather than
+ * telling anyone what was wrong. Meanwhile `verify` was green on every commit and the chat
+ * screen sat at nought per cent, so a composable could gain a parameter or lose a
+ * behaviour and nothing said so until somebody went looking.
+ *
+ * Robolectric renders the real composables on the host, which is what `PlayScreenshots`
+ * already relies on. Nothing about the tests themselves changed: same rule, same
+ * assertions, same screen. They just run now.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w360dp-h640dp-night-xxhdpi")
 class ChatScreenTest {
     @get:Rule
     val compose = createComposeRule()

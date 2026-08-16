@@ -494,6 +494,34 @@ adb shell am instrument -w -r \
   io.github.alpharomercoma.openweights.debug.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
+### A skip and a pass print the same number
+
+The device tier runs on `assumeTrue`, and it has to: these tests need weights that are not
+in the repository, and a machine with no phone should not fail a suite it cannot run. The
+cost is that "did not run" and "passed" are indistinguishable in the output, and there are
+forty-eight of these preconditions.
+
+`ToolTurnOnDeviceTest` is the sharp end. It reads whichever model is sitting at
+`model.gguf`, then skips if that model renders no tools, and skips again if it declines to
+call one. Push Gemma there and the whole tool path reports itself green with no tool ever
+having run. That is not a hypothesis: pushing Hammer during a review made it fail for a
+reason belonging to the model rather than the code, and the run before it had been green
+for want of a model entirely.
+
+So the preconditions that guard the tool path go through `Fixtures.require`, and a run can
+be told not to accept them:
+
+```sh
+adb shell am instrument -w -r -e strict true \
+  -e class io.github.alpharomercoma.openweights.ui.chat.ToolTurnOnDeviceTest \
+  io.github.alpharomercoma.openweights.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Ordinary runs are unchanged and now log a `SKIPPED` line saying what did not happen. A
+release run passes `-e strict true`, where a precondition that does not hold is a failure.
+Use it before promoting a build: it is the only way a green device tier means what it
+appears to mean.
+
 ## The harness has contracts, and they are tested on the host (2026-08-14)
 
 The prompt engineering decisions in this repo are each justified by a measurement written

@@ -43,6 +43,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -225,7 +227,15 @@ private fun ToolRow(tool: ToolSummary, onToggle: (Boolean) -> Unit) {
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        Switch(checked = tool.isEnabled, onCheckedChange = onToggle)
+        Switch(
+            checked = tool.isEnabled,
+            onCheckedChange = onToggle,
+            // Named, because nothing else in this row is attached to it. The switch is its
+            // own node and the three lines beside it are others, so a screen reader landing
+            // here announced "switch, on" with no way to tell which of six tools it had
+            // reached, and no reason to expect the next swipe to say.
+            modifier = Modifier.semantics { contentDescription = tool.name },
+        )
     }
 }
 

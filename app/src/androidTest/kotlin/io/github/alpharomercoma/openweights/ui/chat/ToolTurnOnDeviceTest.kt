@@ -40,7 +40,6 @@ import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -72,7 +71,7 @@ class ToolTurnOnDeviceTest {
 
     @Before
     fun setUp() {
-        assumeTrue("no test model at ${MODEL.path}", MODEL.isFile)
+        Fixtures.require("no test model at ${MODEL.path}", MODEL.isFile)
         engine = LlamaCppEngine()
     }
 
@@ -84,7 +83,7 @@ class ToolTurnOnDeviceTest {
     @Test
     fun aToolResultReachesTheAnswer() = runBlocking<Unit> {
         engine.load(MODEL, ModelLoadParams(contextLength = CONTEXT))
-        assumeTrue(
+        Fixtures.require(
             "${MODEL.name} has a chat template that does not render tools",
             engine.loadedModel?.supportsTools == true,
         )
@@ -134,7 +133,7 @@ class ToolTurnOnDeviceTest {
 
         // A model that will not route cannot prove anything here, and failing for that would
         // be failing for a judgement this test is not about. Loud in the log and skipped.
-        assumeTrue("${MODEL.name} did not call the tool at all", ledger.calls.isNotEmpty())
+        Fixtures.require("${MODEL.name} did not call the tool at all", ledger.calls.isNotEmpty())
 
         // Called once, not once per round: with the same arguments each time, the second ask
         // is answered from the first run rather than run again.

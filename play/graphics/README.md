@@ -10,10 +10,10 @@ Everything the Console asks to be uploaded, and how to make it again.
 | `screenshots-tablet-7/*.png` | 7-inch tablet | 1200 x 2133, sides within 320..3840 | Four, rendered at 600dp |
 | `screenshots-tablet-10/*.png` | 10-inch tablet | 1800 x 3200, sides within 1080..7680 | Four, rendered at 900dp |
 
-Play takes 2 screenshots at minimum and 8 at most, and promotes listings with 4 or more at
-1080p. There are five. It also refuses any screenshot whose long side is more than twice its
-short one, which is why these are 9:16 and not the 1220 x 2712 a modern handset actually
-produces.
+Play takes 2 screenshots at minimum and 8 at most per slot, and promotes listings with 4 or
+more at 1080p: five for the phone and four for each tablet. It also refuses any screenshot
+whose long side is more than twice its short one, which is why every one of these is 9:16 and
+not the 1220 x 2712 a modern handset actually produces.
 
 ## Making them again
 
@@ -53,6 +53,9 @@ cost a command, not an afternoon of re-staging conversations on a phone.
 
 - **A promo video.** Play takes one YouTube URL, so there is nothing to upload from a repo.
 - **Chromebook and XR screenshots.** Neither form factor is targeted.
+- **Any number the app cannot produce.** 13.8 tok/s is Q4_0 measured on the test phone and
+  4096 ctx is the shipped default. A listing that promises a rate the hardware misses is a
+  one-star review with a receipt.
 
 ## The tablet shots came with a fix attached
 
@@ -66,6 +69,3 @@ middle. Uploading that would have advertised the experience rather than the app.
 So `ChatScreen` caps its content at `READABLE_WIDTH` and centres it, which changes nothing
 on a phone — the window is narrower than the cap — and is the whole difference on anything
 larger, foldables included. The screenshots are of the fixed layout.
-- **Any number the app cannot produce.** 13.8 tok/s is Q4_0 measured on the test phone and
-  4096 ctx is the shipped default. A listing that promises a rate the hardware misses is a
-  one-star review with a receipt.

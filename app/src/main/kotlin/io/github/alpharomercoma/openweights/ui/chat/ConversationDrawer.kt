@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,19 +31,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.groupByDay
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -53,11 +61,16 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
- * Past conversations, reached by swiping from the left edge.
+ * Past conversations and the way to everything that is not a conversation.
  *
- * The drawer is where every chat app puts history, so it is where people look. Titles come
- * from the first thing you said, which is what makes the list scannable. The alternative
- * is a column of identical dates.
+ * The drawer is where every chat app puts history, so it is where people look, and now that
+ * the app has no bottom bar it is also the only way to Tools, Usage and Settings. Those live
+ * in a footer pinned to the bottom rather than at the end of the list, because a list of
+ * forty chats would otherwise bury them, and "where are the settings" is not a question a
+ * person should have to scroll to answer.
+ *
+ * Titles come from the first thing you said, which is what makes the list scannable. The
+ * alternative is a column of identical dates.
  */
 @Composable
 fun ConversationDrawer(
@@ -67,63 +80,119 @@ fun ConversationDrawer(
     onDelete: (Long) -> Unit,
     onNewChat: () -> Unit,
     nowMillis: Long,
+    destinations: ChatDestinations = ChatDestinations(),
 ) {
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(
+        // The one filled control in the drawer, so the eye lands on it first. Lime carries
+        // ink, never white, which is the rule the whole palette is built on.
+        Button(
+            onClick = onNewChat,
+            shape = RoundedCornerShape(Radius.pill),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Chats", style = MaterialTheme.typography.titleMedium)
-            TextButton(onClick = onNewChat) {
-                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("New", modifier = Modifier.padding(start = 6.dp))
+            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text("New chat", modifier = Modifier.padding(start = 8.dp))
+        }
+
+        // Weighted, so the footer stays pinned to the bottom whether there are no chats or
+        // forty. The empty case used to return early from the sheet, which after the footer
+        // arrived would have left somebody with no conversations no route to Settings at all.
+        Box(modifier = Modifier.weight(1f)) {
+            if (conversations.isEmpty()) {
+                Text(
+                    text = "Nothing here yet. Whatever you ask is saved on this device only.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            } else {
+                ConversationList(
+                    conversations = conversations,
+                    activeId = activeId,
+                    onOpen = onOpen,
+                    onDelete = onDelete,
+                    nowMillis = nowMillis,
+                )
             }
         }
 
-        if (conversations.isEmpty()) {
-            Text(
-                text = "Nothing here yet. Whatever you ask is saved on this device only.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            return@ModalDrawerSheet
-        }
+        DrawerFooter(destinations)
+    }
+}
 
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            // Grouped by the day each chat was last touched, the way every assistant
-            // does it, because a flat list of forty titles is a list nobody scans.
-            val today = Instant.ofEpochMilli(nowMillis)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate()
+/**
+ * Tools, Usage and Settings, which have nowhere else to be.
+ *
+ * A hairline above them and nothing else: they are a different kind of thing from a
+ * conversation and the rule is enough to say so without a heading that would only repeat
+ * what the three labels already say.
+ */
+@Composable
+private fun DrawerFooter(destinations: ChatDestinations) {
+    HorizontalDivider(
+        thickness = Dp.Hairline,
+        color = MaterialTheme.colorScheme.outlineVariant,
+        modifier = Modifier.padding(horizontal = 12.dp),
+    )
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        DrawerDestination("Tools", Icons.Rounded.Build, destinations.onOpenTools)
+        DrawerDestination("Usage", Icons.Rounded.BarChart, destinations.onOpenUsage)
+        DrawerDestination("Settings", Icons.Rounded.Settings, destinations.onOpenSettings)
+    }
+}
 
-            conversations.groupByDay(today) { it.updatedAt }.forEach { group ->
-                item(key = "header-${group.label}") {
-                    Text(
-                        text = group.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-                items(group.items, key = { it.id }) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        isActive = conversation.id == activeId,
-                        nowMillis = nowMillis,
-                        onOpen = { onOpen(conversation.id) },
-                        onDelete = { onDelete(conversation.id) },
-                    )
-                }
+@Composable
+private fun DrawerDestination(label: String, icon: ImageVector, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        label = { Text(label) },
+        icon = { Icon(icon, contentDescription = null) },
+        selected = false,
+        onClick = onClick,
+        shape = RoundedCornerShape(Radius.pill),
+        modifier = Modifier.padding(horizontal = 12.dp),
+    )
+}
+
+@Composable
+private fun ConversationList(
+    conversations: List<ConversationSummary>,
+    activeId: Long?,
+    onOpen: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+    nowMillis: Long,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        // Grouped by the day each chat was last touched, the way every assistant
+        // does it, because a flat list of forty titles is a list nobody scans.
+        val today = Instant.ofEpochMilli(nowMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+
+        conversations.groupByDay(today) { it.updatedAt }.forEach { group ->
+            item(key = "header-${group.label}") {
+                Text(
+                    text = group.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+            items(group.items, key = { it.id }) { conversation ->
+                ConversationRow(
+                    conversation = conversation,
+                    isActive = conversation.id == activeId,
+                    nowMillis = nowMillis,
+                    onOpen = { onOpen(conversation.id) },
+                    onDelete = { onDelete(conversation.id) },
+                )
             }
         }
     }

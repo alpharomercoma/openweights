@@ -18,44 +18,23 @@ package io.github.alpharomercoma.openweights.ui
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
+import io.github.alpharomercoma.openweights.ui.chat.ChatDestinations
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
 import io.github.alpharomercoma.openweights.ui.chat.MediaViewModel
@@ -65,10 +44,7 @@ import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverViewModel
 import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
-import io.github.alpharomercoma.openweights.ui.models.ModelsTab
-import io.github.alpharomercoma.openweights.ui.models.ModelsTabs
 import io.github.alpharomercoma.openweights.ui.models.ModelsViewModel
-import io.github.alpharomercoma.openweights.ui.models.rememberModelsTab
 import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
 import io.github.alpharomercoma.openweights.ui.settings.SettingsViewModel
 import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
@@ -77,64 +53,44 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
- * The app's five destinations, which is the most a bottom bar can hold.
+ * The routes, which are no longer tabs.
  *
- * Discover is not among them any more: it is half of Models, reached by a tab there, since
- * finding a model and using one are two steps of the same job. That freed the slot for
- * Tools, which had nowhere to live and is the screen that says what the model can actually
- * do besides talk.
+ * There was a bottom bar here with five destinations and a comment arguing that all five
+ * earned their place. They did not. Chat is what the app is for and the other four are
+ * errands you run occasionally: a bar gave a quarter of the bottom edge, permanently, to
+ * things a person opens once a week, and it made the conversation one tab among five rather
+ * than the surface the app is.
  *
- * Called Tools rather than Capabilities or Context. Capabilities is long enough to wrap on
- * a narrow phone next to four short words, and Context already means the context window,
- * shown as a percentage two screens away.
- *
- * The icons are outlines, all five, which is the only way they read as a set. They were all
- * from one family before and still looked mismatched, because a family is not the same as a
- * weight: a filled wrench and a filled gear are solid masses where a chip and a bar chart
- * are mostly air, so the row looked like two heavy icons and three light ones. Drawn as
- * strokes they carry the same amount of ink. The chip is deliberate, because that is what
- * this app is about and a database cylinder said the opposite, files on a server. Five
- * destinations is the most Material allows and all five earn it. Four of them are the parts
- * no hosted assistant has, and burying them behind a menu to tidy the bar would be hiding
- * the reason to use this at all.
+ * Chat is the only destination now. The rest are pushed over it and come back, which is what
+ * a back arrow means and what a tab never did.
  */
-private enum class Destination(val route: String, val label: String, val icon: ImageVector) {
-    CHAT("chat", "Chat", Icons.Outlined.ChatBubbleOutline),
-    MODELS("models", "Models", Icons.Outlined.Memory),
-    TOOLS("tools", "Tools", Icons.Outlined.Build),
-    USAGE("usage", "Usage", Icons.Outlined.BarChart),
-    SETTINGS("settings", "Settings", Icons.Outlined.Settings),
+private object Routes {
+    const val CHAT = "chat"
+    const val MODELS = "models"
+    const val DISCOVER = "discover"
+    const val TOOLS = "tools"
+    const val USAGE = "usage"
+    const val SETTINGS = "settings"
 }
 
-/** A twelfth of the screen: enough rise to read as arrival, small enough to stay quick. */
-private const val TAB_SLIDE = 12
+/** A twelfth of the screen: enough travel to read as arrival, small enough to stay quick. */
+private const val PUSH_SLIDE = 12
 
 /**
- * Moves to a tab, from the bar or from anywhere else that sends the user to one.
+ * Pushes a screen over the conversation.
  *
- * One function because there were two ways to reach a tab and only the bar used the options
- * that make it a switch rather than a push. Tapping the model name in the chat header called
- * plain navigate, so Models went on top of Chat instead of replacing it, and the tab the bar
- * highlighted was no longer the tab the back stack thought it was on. Tapping Chat then
- * landed on a second copy of Chat, and from there the way back was a back gesture nobody
- * would guess at from a bottom bar.
- *
- * saveState and restoreState are what let Discover keep its search results and Chat keep its
- * scroll position while the user goes to look at something else.
+ * Plain navigate, where the bar needed `popUpTo(start) { saveState }` to make a tab replace
+ * a tab. That option is exactly what must not happen now: Settings sits on top of the chat
+ * and returns to it, so the chat is never torn down and the back gesture means the one
+ * obvious thing. `launchSingleTop` only so a double tap in the drawer cannot stack two.
  */
-private fun NavHostController.switchTab(route: String) {
-    navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
-    }
+private fun NavHostController.push(route: String) {
+    navigate(route) { launchSingleTop = true }
 }
 
 @Composable
 fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
-    val backStack by navController.currentBackStackEntryAsState()
-    val currentDestination = backStack?.destination
 
     // Chat and Models get one view model each, hoisted above the NavHost, so a download
     // keeps running and a loaded model stays loaded while the user moves around the app.
@@ -153,242 +109,177 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         },
     )
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
-        // The navigation bar handles the gesture inset itself, and each screen handles the
-        // status bar. Letting this scaffold apply system insets too padded everything
-        // twice, which is what left the top bar and the composer floating mid-screen.
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            // A hairline and the page's own colour, rather than a raised slab. Every screen
-            // above it is drawn on `background`, so a bar in `surfaceContainer` read as a
-            // separate panel bolted to the bottom. One line is enough to say where the page
-            // ends, and it lets the five destinations look like part of the app rather than
-            // a tray the app is sitting in.
-            Column {
-                HorizontalDivider(
-                    // outline, not outlineVariant. The palette calls the variant decorative
-                    // and says it is never the only boundary, and measured against this
-                    // background it is 1.3:1, which is a line nobody can see. This one is
-                    // 3.8:1 in light and 4.3:1 in dark: still a hairline, actually there.
-                    thickness = Dp.Hairline,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    tonalElevation = 0.dp,
-                ) {
-                    Destination.entries.forEach { destination ->
-                        val selected = currentDestination?.hierarchy
-                            ?.any { it.route == destination.route } == true
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { navController.switchTab(destination.route) },
-                            icon = { Icon(destination.icon, contentDescription = null) },
-                            label = { Text(destination.label) },
-                            // Brass, at container weight. The palette's first rule is that
-                            // the accent means "you can act here" and names the active tab
-                            // as one of the four places it belongs, so a neutral tab would
-                            // have been a quieter bar bought by breaking the design system.
-                            // What was wrong was the weight: a filled accent slab with a
-                            // reversed icon reads as a button dropped into a row of icons.
-                            // The container is a warm tint at 1.4:1 against the bar, and the
-                            // icon and label on top of it are the accent itself at 6.9:1.
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor =
-                                MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        )
-                    }
-                }
-            }
+    // No Scaffold here any more. With the bar gone and zero insets it supplied nothing but a
+    // container colour, and all six screens set that on their own Scaffold already.
+    NavHost(
+        navController = navController,
+        startDestination = Routes.CHAT,
+        modifier = modifier.fillMaxSize(),
+        // Compose Navigation defaults to 700 ms fades, which reads as the app thinking when
+        // it is only moving. These slide sideways now rather than rising: a rise said "a tab
+        // arrived", and what happens now is a screen coming in over the conversation and
+        // leaving again, which is a horizontal idea.
+        enterTransition = {
+            fadeIn(Motion.quick()) + slideInHorizontally(Motion.quick()) { it / PUSH_SLIDE }
         },
-    ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = Destination.CHAT.route,
-            // Consuming what has just been applied is what lets a screen's imePadding()
-            // add only the difference. Without it the keyboard pushes the composer up by
-            // its full height while the navigation bar's reserved space stays behind it,
-            // leaving a band of dead screen between the two.
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(padding),
-            // Compose Navigation defaults to 700 ms fades, which reads as the app thinking
-            // when it is only switching tabs. A tab switch should feel like it already
-            // happened; the slight rise gives it direction without costing time.
-            enterTransition = {
-                fadeIn(Motion.quick()) + slideInVertically(Motion.quick()) { it / TAB_SLIDE }
-            },
-            exitTransition = { fadeOut(Motion.instant()) },
-            popEnterTransition = {
-                fadeIn(Motion.quick()) + slideInVertically(Motion.quick()) { it / TAB_SLIDE }
-            },
-            popExitTransition = { fadeOut(Motion.instant()) },
-        ) {
-            composable(Destination.CHAT.route) {
-                val state by chatViewModel.uiState.collectAsStateWithLifecycle()
-                val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
-                val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
-                val reportViewModel: ReportViewModel = hiltViewModel()
-                // Collected from the board rather than mirrored into the chat state: it is
-                // already a flow, and a second copy would be a second thing to keep in step.
-                val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
-                val question by chatViewModel.asking.pending.collectAsStateWithLifecycle()
+        exitTransition = { fadeOut(Motion.instant()) },
+        popEnterTransition = { fadeIn(Motion.quick()) },
+        popExitTransition = {
+            fadeOut(Motion.instant()) + slideOutHorizontally(Motion.quick()) { it / PUSH_SLIDE }
+        },
+    ) {
+        composable(Routes.CHAT) {
+            // Collected here rather than above the NavHost. This scope already
+            // recomposes on every token, so a download ticking costs nothing extra in
+            // it, whereas hoisting it would make the whole shell recompose for both.
+            val installedModels by modelsViewModel.uiState
+                .collectAsStateWithLifecycle()
+                .let { state -> remember { derivedStateOf { state.value.models } } }
 
-                LaunchedEffect(Unit) {
-                    // The view model outlives the composition, so returning to this tab
-                    // must not reload the model and wipe the conversation.
-                    if (!chatViewModel.hasModel) chatViewModel.loadDefaultModel()
-                }
+            val state by chatViewModel.uiState.collectAsStateWithLifecycle()
+            val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
+            val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
+            val reportViewModel: ReportViewModel = hiltViewModel()
+            // Collected from the board rather than mirrored into the chat state: it is
+            // already a flow, and a second copy would be a second thing to keep in step.
+            val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
+            val question by chatViewModel.asking.pending.collectAsStateWithLifecycle()
 
-                ChatScreen(
-                    state = state,
-                    onSend = chatViewModel::send,
-                    onStop = chatViewModel::stop,
-                    onRegenerate = chatViewModel::regenerate,
-                    onNewChat = chatViewModel::newChat,
-                    onCompact = chatViewModel::compactNow,
-                    onOpenModels = { navController.switchTab(Destination.MODELS.route) },
-                    onOpenConversation = chatViewModel::openConversation,
-                    onDeleteConversation = chatViewModel::deleteConversation,
-                    onSavePreferences = chatViewModel::savePreferences,
-                    onResetPreferences = chatViewModel::resetPreferences,
-                    onAttach = chatViewModel::attach,
-                    onAttachDocument = chatViewModel::stageDocument,
-                    onRemoveDocument = { chatViewModel.stageDocument(null) },
-                    onRemoveStaged = chatViewModel::removeStaged,
-                    onToggleReadAloud = mediaViewModel::toggleReadAloud,
-                    isSpeaking = isSpeaking,
-                    newCaptureUri = mediaViewModel::newCaptureUri,
-                    dictation = dictation,
-                    canDictate = mediaViewModel.canDictate,
-                    onDictate = mediaViewModel::toggleDictation,
-                    onMode = chatViewModel::setMode,
-                    onApproval = chatViewModel::resolveApproval,
-                    plan = plan,
-                    onTickStep = chatViewModel.planning::tick,
-                    question = question,
-                    onAnswerQuestion = chatViewModel.asking::answer,
-                    onReport = { entry, reason, note ->
-                        reportViewModel.report(
-                            modelName = state.modelName,
-                            replyText = entry.answer.ifEmpty { entry.text },
-                            reason = reason,
-                            note = note,
-                        )
-                    },
-                )
+            LaunchedEffect(Unit) {
+                // The view model outlives the composition, so returning to this tab
+                // must not reload the model and wipe the conversation.
+                if (!chatViewModel.hasModel) chatViewModel.loadDefaultModel()
             }
 
-            composable(Destination.MODELS.route) {
-                val tab = rememberModelsTab()
-                val tabs: @Composable () -> Unit =
-                    { ModelsTabs(selected = tab.selected, onSelect = tab.select) }
+            ChatScreen(
+                state = state,
+                onSend = chatViewModel::send,
+                onStop = chatViewModel::stop,
+                onRegenerate = chatViewModel::regenerate,
+                onNewChat = chatViewModel::newChat,
+                onCompact = chatViewModel::compactNow,
+                destinations = ChatDestinations(
+                    onOpenTools = { navController.push(Routes.TOOLS) },
+                    onOpenUsage = { navController.push(Routes.USAGE) },
+                    onOpenSettings = { navController.push(Routes.SETTINGS) },
+                    onBrowseModels = { navController.push(Routes.DISCOVER) },
+                    onManageModels = { navController.push(Routes.MODELS) },
+                ),
+                installedModels = installedModels,
+                onSelectModel = { model ->
+                    chatViewModel.loadModel(model.file, keepConversation = true)
+                },
+                onOpenConversation = chatViewModel::openConversation,
+                onDeleteConversation = chatViewModel::deleteConversation,
+                onSavePreferences = chatViewModel::savePreferences,
+                onResetPreferences = chatViewModel::resetPreferences,
+                onAttach = chatViewModel::attach,
+                onAttachDocument = chatViewModel::stageDocument,
+                onRemoveDocument = { chatViewModel.stageDocument(null) },
+                onRemoveStaged = chatViewModel::removeStaged,
+                onToggleReadAloud = mediaViewModel::toggleReadAloud,
+                isSpeaking = isSpeaking,
+                newCaptureUri = mediaViewModel::newCaptureUri,
+                dictation = dictation,
+                canDictate = mediaViewModel.canDictate,
+                onDictate = mediaViewModel::toggleDictation,
+                onMode = chatViewModel::setMode,
+                onApproval = chatViewModel::resolveApproval,
+                plan = plan,
+                onTickStep = chatViewModel.planning::tick,
+                question = question,
+                onAnswerQuestion = chatViewModel.asking::answer,
+                onReport = { entry, reason, note ->
+                    reportViewModel.report(
+                        modelName = state.modelName,
+                        replyText = entry.answer.ifEmpty { entry.text },
+                        reason = reason,
+                        note = note,
+                    )
+                },
+            )
+        }
 
-                when (tab.selected) {
-                    ModelsTab.INSTALLED -> {
-                        val state by modelsViewModel.uiState.collectAsStateWithLifecycle()
+        composable(Routes.MODELS) {
+            val state by modelsViewModel.uiState.collectAsStateWithLifecycle()
 
-                        ModelsScreen(
-                            state = state,
-                            onUse = { model ->
-                                // Keeps whatever chat is open. Switching model partway
-                                // through a conversation is a normal thing to do, and
-                                // throwing the conversation away to do it is not a trade
-                                // anyone would choose.
-                                chatViewModel.loadModel(model.file, keepConversation = true)
-                                navController.switchTab(Destination.CHAT.route)
-                            },
-                            onDelete = modelsViewModel::delete,
-                            onCancelDownload = modelsViewModel::cancel,
-                            tabs = tabs,
-                        )
+            ModelsScreen(
+                state = state,
+                onUse = { model ->
+                    // Keeps whatever chat is open. Switching model partway through a
+                    // conversation is a normal thing to do, and throwing the
+                    // conversation away to do it is not a trade anyone would choose.
+                    chatViewModel.loadModel(model.file, keepConversation = true)
+                    navController.popBackStack(Routes.CHAT, inclusive = false)
+                },
+                onDelete = modelsViewModel::delete,
+                onCancelDownload = modelsViewModel::cancel,
+                onBack = navController::popBackStack,
+            )
+        }
+        composable(Routes.DISCOVER) {
+            val viewModel: DiscoverViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+            DiscoverScreen(
+                state = state,
+                onQueryChange = viewModel::onQueryChange,
+                onSearch = { viewModel.search() },
+                onSortChange = viewModel::onSortChange,
+                onFiltersChange = viewModel::onQueryChange,
+                onPhoneSizedChange = viewModel::onPhoneSizedChange,
+                onClearFilters = viewModel::clearFilters,
+                onOpenModel = viewModel::openModel,
+                onCloseModel = viewModel::closeModel,
+                onContextLengthChange = viewModel::onContextLengthChange,
+                onDownload = { repoId, path ->
+                    state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
+                        modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)
+                        // The projector is not optional for a multimodal model: without
+                        // it the weights load but every attachment is refused, which
+                        // reads as a broken app rather than a missing file.
+                        state.detail?.pairedProjector(file)?.let { projector ->
+                            modelsViewModel.downloadProjector(repoId, projector, file.fileName)
+                        }
+                        // To the installed list, which is where the download it has just
+                        // started shows its progress.
+                        navController.push(Routes.MODELS)
                     }
+                },
+                onBack = navController::popBackStack,
+            )
+        }
+        composable(Routes.TOOLS) {
+            val viewModel: ToolsViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-                    ModelsTab.DISCOVER -> {
-                        val viewModel: DiscoverViewModel = hiltViewModel()
-                        val state by viewModel.uiState.collectAsStateWithLifecycle()
+            ToolsScreen(
+                state = state,
+                onToggle = viewModel::setEnabled,
+                onChooseFolder = viewModel::chooseFolder,
+                onForgetFolder = viewModel::forgetFolder,
+                onBack = navController::popBackStack,
+            )
+        }
 
-                        DiscoverScreen(
-                            state = state,
-                            onQueryChange = viewModel::onQueryChange,
-                            onSearch = { viewModel.search() },
-                            onSortChange = viewModel::onSortChange,
-                            onFiltersChange = viewModel::onQueryChange,
-                            onPhoneSizedChange = viewModel::onPhoneSizedChange,
-                            onClearFilters = viewModel::clearFilters,
-                            onOpenModel = viewModel::openModel,
-                            onCloseModel = viewModel::closeModel,
-                            onContextLengthChange = viewModel::onContextLengthChange,
-                            onDownload = { repoId, path ->
-                                state.files.firstOrNull {
-                                    it.file.path == path
-                                }?.file?.let { file ->
-                                    modelsViewModel.download(
-                                        repoId,
-                                        path,
-                                        file.sizeBytes,
-                                        file.sha256,
-                                    )
-                                    // The projector is not optional for a multimodal model:
-                                    // without it the weights load but every attachment is
-                                    // refused, which reads as a broken app rather than a
-                                    // missing file.
-                                    state.detail?.pairedProjector(file)?.let { projector ->
-                                        modelsViewModel.downloadProjector(
-                                            repoId,
-                                            projector,
-                                            file.fileName,
-                                        )
-                                    }
-                                    // Back to Installed, which is where the download it has
-                                    // just started shows its progress.
-                                    tab.select(ModelsTab.INSTALLED)
-                                }
-                            },
-                            tabs = tabs,
-                        )
-                    }
-                }
-            }
+        composable(Routes.USAGE) {
+            val viewModel: DashboardViewModel = hiltViewModel()
+            val summary by viewModel.uiState.collectAsStateWithLifecycle()
 
-            composable(Destination.TOOLS.route) {
-                val viewModel: ToolsViewModel = hiltViewModel()
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
+            DashboardScreen(summary = summary, onBack = navController::popBackStack)
+        }
 
-                ToolsScreen(
-                    state = state,
-                    onToggle = viewModel::setEnabled,
-                    onChooseFolder = viewModel::chooseFolder,
-                    onForgetFolder = viewModel::forgetFolder,
-                )
-            }
+        composable(Routes.SETTINGS) {
+            val viewModel: SettingsViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-            composable(Destination.USAGE.route) {
-                val viewModel: DashboardViewModel = hiltViewModel()
-                val summary by viewModel.uiState.collectAsStateWithLifecycle()
-
-                DashboardScreen(summary = summary)
-            }
-
-            composable(Destination.SETTINGS.route) {
-                val viewModel: SettingsViewModel = hiltViewModel()
-                val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-                SettingsScreen(
-                    state = state,
-                    onSaveToken = viewModel::saveToken,
-                    onClearToken = viewModel::clearToken,
-                    onSelectTheme = viewModel::setTheme,
-                )
-            }
+            SettingsScreen(
+                state = state,
+                onSaveToken = viewModel::saveToken,
+                onClearToken = viewModel::clearToken,
+                onSelectTheme = viewModel::setTheme,
+                onBack = navController::popBackStack,
+            )
         }
     }
 }

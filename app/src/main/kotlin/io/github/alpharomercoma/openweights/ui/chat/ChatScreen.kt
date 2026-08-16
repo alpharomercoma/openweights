@@ -108,6 +108,7 @@ import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import io.github.alpharomercoma.openweights.model.DictationState
+import io.github.alpharomercoma.openweights.ui.models.LocalModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -123,8 +124,12 @@ fun ChatScreen(
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
+    /** Everywhere you can go from here. See [ChatDestinations]. */
+    destinations: ChatDestinations = ChatDestinations(),
+    /** What is on the phone, for the picker the model name raises. */
+    installedModels: List<LocalModel> = emptyList(),
+    onSelectModel: (LocalModel) -> Unit = {},
     modifier: Modifier = Modifier,
-    onOpenModels: () -> Unit = {},
     onOpenConversation: (Long) -> Unit = {},
     onDeleteConversation: (Long) -> Unit = {},
     onSavePreferences: (ModelPreferences) -> Unit = {},
@@ -175,6 +180,22 @@ fun ChatScreen(
                     scope.launch { drawerState.close() }
                 },
                 onDelete = onDeleteConversation,
+                // Closed on the way out, so returning from Settings does not land back on an
+                // open drawer over the conversation.
+                destinations = ChatDestinations(
+                    onOpenTools = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenTools()
+                    },
+                    onOpenUsage = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenUsage()
+                    },
+                    onOpenSettings = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenSettings()
+                    },
+                ),
                 onNewChat = {
                     onNewChat()
                     scope.launch { drawerState.close() }
@@ -194,7 +215,9 @@ fun ChatScreen(
             onRegenerate = onRegenerate,
             onNewChat = onNewChat,
             onCompact = onCompact,
-            onOpenModels = onOpenModels,
+            destinations = destinations,
+            installedModels = installedModels,
+            onSelectModel = onSelectModel,
             onOpenHistory = { scope.launch { drawerState.open() } },
             onSavePreferences = onSavePreferences,
             onResetPreferences = onResetPreferences,
@@ -234,7 +257,9 @@ private fun ChatContent(
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
-    onOpenModels: () -> Unit,
+    destinations: ChatDestinations,
+    installedModels: List<LocalModel>,
+    onSelectModel: (LocalModel) -> Unit,
     onOpenHistory: () -> Unit,
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
@@ -259,6 +284,7 @@ private fun ChatContent(
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
     var showParameters by remember { mutableStateOf(false) }
+    var showModelPicker by remember { mutableStateOf(false) }
     var showAttachments by remember { mutableStateOf(false) }
     val clipboard = rememberMessageClipboard()
 
@@ -271,7 +297,10 @@ private fun ChatContent(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { RuntimeBar(state = state, onClick = onOpenModels) },
+                // The name raises the picker rather than leaving for another screen: which
+                // model is answering is a fact about this conversation, so changing it should
+                // not take the conversation off screen.
+                title = { RuntimeBar(state = state, onClick = { showModelPicker = true }) },
                 navigationIcon = {
                     IconButton(onClick = onOpenHistory) {
                         Icon(Icons.Rounded.Menu, contentDescription = "Past chats")
@@ -403,6 +432,26 @@ private fun ChatContent(
                 )
             }
         }
+    }
+
+    if (showModelPicker) {
+        ModelPickerSheet(
+            models = installedModels,
+            activeName = state.modelName,
+            onSelect = {
+                onSelectModel(it)
+                showModelPicker = false
+            },
+            onBrowse = {
+                showModelPicker = false
+                destinations.onBrowseModels()
+            },
+            onManage = {
+                showModelPicker = false
+                destinations.onManageModels()
+            },
+            onDismiss = { showModelPicker = false },
+        )
     }
 
     if (showAttachments) {

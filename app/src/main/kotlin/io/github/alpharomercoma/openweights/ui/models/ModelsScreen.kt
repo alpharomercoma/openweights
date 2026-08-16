@@ -68,19 +68,10 @@ fun ModelsScreen(
     /**
      * Pops back to the conversation, when this screen was pushed from it.
      *
-     * Nullable so the arrow only appears where there is somewhere to go back to, which is
-     * also what keeps every existing caller and every screen test compiling while the
-     * navigation is being rebuilt around it.
+     * Nullable so the arrow only appears where there is somewhere to go back to.
      */
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    /**
-     * The Installed/Discover switch, drawn under this screen's own title.
-     *
-     * A slot rather than a parent wrapper because the top bar applies the status-bar
-     * inset itself: anything stacked above it would have that inset applied twice.
-     */
-    tabs: @Composable () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -112,7 +103,6 @@ fun ModelsScreen(
                         containerColor = MaterialTheme.colorScheme.background,
                     ),
                 )
-                tabs()
             }
         },
     ) { padding ->

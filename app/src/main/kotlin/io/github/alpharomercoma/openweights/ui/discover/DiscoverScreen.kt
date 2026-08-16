@@ -91,7 +91,6 @@ fun DiscoverScreen(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** The Installed/Discover switch, drawn under this screen's own title. */
-    tabs: @Composable () -> Unit = {},
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -137,10 +136,6 @@ fun DiscoverScreen(
                         containerColor = MaterialTheme.colorScheme.background,
                     ),
                 )
-                // Hidden while a model's detail page is open: that page has its own back
-                // arrow, and a tab row there would offer to leave a screen the user is
-                // halfway through reading.
-                if (state.detail == null) tabs()
             }
         },
     ) { padding ->

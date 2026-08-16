@@ -220,8 +220,17 @@ abstract class ChatFixture {
     }
 
     protected companion object {
-        /** Enough passes for a DataStore read and its continuation to both complete. */
-        const val SETTLE_STEPS = 6
+        /**
+         * Enough passes for every piece of off-scheduler work in a turn to land.
+         *
+         * Six covered a DataStore read and its continuation. A turn now also waits for the
+         * reply to be written before it reports itself finished, which is a database round
+         * trip on a real dispatcher and needs its own alternations; at six, a third turn in
+         * a row simply had not happened yet when the assertions ran. Ten is the floor
+         * measured here and this is above it, because the failure mode of too few is a test
+         * that passes on this machine and not on a slower one.
+         */
+        const val SETTLE_STEPS = 16
         const val SETTLE_PAUSE_MS = 20L
 
         /** How many times to re-check the table before giving up and asserting on it. */

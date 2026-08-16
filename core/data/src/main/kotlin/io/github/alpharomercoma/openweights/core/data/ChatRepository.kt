@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import androidx.room.withTransaction
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.db.CompactionEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
@@ -104,13 +105,23 @@ class ChatRepository @Inject constructor(
         )
     }
 
+    /**
+     * Appends a summary and moves the head to it, or does neither.
+     *
+     * In one transaction, because it is two writes that only mean anything together: the row
+     * is the summary and the pointer is which summary counts. Written separately, a process
+     * killed between them left a log with an entry nothing referenced, and the next fold
+     * counted versions from a log that disagreed with the conversation about how many there
+     * were. Room runs the block on one connection and rolls the whole thing back if anything
+     * in it throws.
+     */
     suspend fun saveCompaction(
         conversationId: Long,
         summary: String,
         throughIndex: Int,
         modelName: String? = null,
-    ) {
-        val conversation = database.conversations().byId(conversationId) ?: return
+    ) = database.withTransaction {
+        val conversation = database.conversations().byId(conversationId) ?: return@withTransaction
         val version = database.compactions().forConversation(conversationId).size + 1
         val head = database.compactions().insert(
             CompactionEntity(

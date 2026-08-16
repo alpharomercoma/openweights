@@ -23,9 +23,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -169,7 +171,19 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
      * resolver. It is only this tool that needs it: every other request in the app goes to
      * an address the app chose, and this is the one the model chooses. See [PublicOnlyDns].
      */
-    private val httpClient: OkHttpClient = httpClient.newBuilder().dns(PublicOnlyDns()).build()
+    private val httpClient: OkHttpClient = httpClient.newBuilder()
+        .dns(PublicOnlyDns())
+        // Followed by hand in [run] rather than by OkHttp, and this is a security boundary
+        // rather than a preference. The address checks below run on the address the user
+        // approved; a redirect is a second address, chosen by the page rather than by
+        // anyone here. OkHttp would dial it without asking, and [PublicOnlyDns] cannot
+        // cover it either, because OkHttp skips its resolver entirely for an address
+        // written as digits. So a public page that answers "302 Location:
+        // https://192.168.1.1/admin" reached the router on the user's own network, and the
+        // reply summarising what it found there was the whole exploit.
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
 
     /**
      * Always, whatever the mode says.
@@ -211,55 +225,85 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
         // host is not the part of the string it looks like: everything before an @ is
         // userinfo and goes nowhere, so "https://example.com@10.0.0.1/" reads as example.com
         // to anything working on the text.
-        val parsed = url.trim().toHttpUrlOrNull()
+        var next = url.trim().toHttpUrlOrNull()
             ?: return@withContext "That is not an address that can be read. Got: $url"
 
-        // https only, and the app disables cleartext anyway, so this refusal is the honest
-        // message rather than a network error the model cannot interpret. Asked of the parsed
-        // scheme, which is lower-cased for us: startsWith("https://") told a model that
-        // wrote HTTPS the app only reads https, which reads as nonsense.
-        if (!parsed.isHttps) {
-            return@withContext "Only https addresses can be read. Got: $url"
-        }
+        // Every hop, not only the address the user approved. See [refuseAddress].
+        var hops = 0
+        while (true) {
+            refuseAddress(next)?.let { return@withContext it }
 
-        // The resolver cannot cover this. PublicOnlyDns sees names, and an address written
-        // as digits goes straight to a socket without one, so every private address was
-        // reachable by asking for it as a literal. On a phone that is the router, the
-        // printers beside it, and whatever the carrier has on the same subnet.
-        parsed.host.ipLiteralOrNull()?.takeUnless { it.isPublicAddress() }?.let {
-            return@withContext "That address is not on the public internet, so it will not " +
-                "be read. Ask for a public page instead."
-        }
+            val request = Request.Builder()
+                .url(next)
+                .header("User-Agent", SEARCH_USER_AGENT)
+                .build()
 
-        val request = Request.Builder()
-            .url(parsed)
-            .header("User-Agent", SEARCH_USER_AGENT)
-            .build()
-
-        val body = runCatching {
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use "HTTP ${response.code}"
-
-                // Both of these guards existed as constants and neither was applied, so the
-                // tool would pull a response of any size and any type into memory and then
-                // try to read it as prose. The model chooses this address, which is what
-                // makes it worth checking: a link in a search result can point at a video,
-                // an archive, or a page that never stops.
-                val type = response.body.contentType()?.let { "${it.type}/${it.subtype}" }
-                if (type != null && TEXTUAL.none { type.startsWith(it) }) {
-                    return@use "That address is $type, which is not text. Nothing to read."
+            val hop = runCatching {
+                httpClient.newCall(request).execute().use { response ->
+                    redirectTarget(response, next)?.let { return@use Hop.Moved(it) }
+                    Hop.Read(textOf(response))
                 }
-                // peekBody stops at the limit rather than after it: the bytes past it are
-                // never buffered, so a page with no end cannot exhaust the heap.
-                response.peekBody(MAX_BYTES.toLong()).string().readable()
-            }
-        }.getOrNull()
-            ?: return@withContext "That page could not be read. The device may be offline."
+            }.getOrNull()
+                ?: return@withContext "That page could not be read. The device may be offline."
 
-        if (body.length <= MAX_CHARS) body else body.take(MAX_CHARS) + "\n[truncated]"
+            when (hop) {
+                is Hop.Read -> {
+                    val body = hop.text
+                    return@withContext if (body.length <= MAX_CHARS) {
+                        body
+                    } else {
+                        body.take(MAX_CHARS) + "\n[truncated]"
+                    }
+                }
+                is Hop.Moved -> {
+                    if (++hops > MAX_HOPS) {
+                        return@withContext "That address redirected more than $MAX_HOPS " +
+                            "times, so it was not read."
+                    }
+                    next = hop.to
+                }
+            }
+        }
+        // Unreachable: every branch of the loop returns.
+        @Suppress("UNREACHABLE_CODE")
+        return@withContext "That page could not be read."
+    }
+
+    /**
+     * What is worth reading in a response, or why nothing is.
+     *
+     * Both of these guards existed as constants and neither was applied, so the tool would
+     * pull a response of any size and any type into memory and then try to read it as
+     * prose. The model chooses this address, which is what makes it worth checking: a link
+     * in a search result can point at a video, an archive, or a page that never stops.
+     */
+    private fun textOf(response: Response): String {
+        if (!response.isSuccessful) return "HTTP ${response.code}"
+
+        val type = response.body.contentType()?.let { "${it.type}/${it.subtype}" }
+        if (type != null && TEXTUAL.none { type.startsWith(it) }) {
+            return "That address is $type, which is not text. Nothing to read."
+        }
+        // peekBody stops at the limit rather than after it: the bytes past it are never
+        // buffered, so a page with no end cannot exhaust the heap.
+        return response.peekBody(MAX_BYTES.toLong()).string().readable()
+    }
+
+    /** One step of a fetch: either something to read, or somewhere else to look. */
+    private sealed interface Hop {
+        data class Read(val text: String) : Hop
+        data class Moved(val to: HttpUrl) : Hop
     }
 
     private companion object {
+        /**
+         * How many redirects one address may take before it is given up on.
+         *
+         * Five is what a browser allows for the same reason: a chain longer than that is a
+         * loop or a tracker, and every hop is another address this tool has to be sure of.
+         */
+        const val MAX_HOPS = 5
+
         /** About a thousand tokens: enough to answer from, small enough to leave room. */
         const val MAX_CHARS = 4_000
 
@@ -275,6 +319,51 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
         /** Content types worth handing to a language model. */
         val TEXTUAL = listOf("text/", "application/json", "application/xml", "application/xhtml")
     }
+}
+
+/**
+ * Why this address will not be dialled, or null when it will.
+ *
+ * Its own function because it has to run on every hop rather than once. The version before
+ * this ran the same two checks inline, on the address the user approved, and then handed the
+ * call to a client that followed redirects on its own: a page could answer "302 Location:
+ * https://192.168.1.1/admin" and be dialled with neither check applied. `PublicOnlyDns` does
+ * not close that either, because OkHttp skips its resolver for an address written as digits,
+ * which is exactly the form an attack uses.
+ *
+ * Internal rather than private because it is also the only way this can be tested. The guard
+ * refuses loopback, and loopback is where a test server necessarily lives, so there is no
+ * address a fetch could be exercised against end to end. A test that cannot exist is worse
+ * than a test that checks the rule directly.
+ */
+internal fun refuseAddress(url: HttpUrl): String? {
+    // https only, and the app disables cleartext anyway, so this refusal is the honest
+    // message rather than a network error the model cannot interpret. Asked of the parsed
+    // scheme, which is lower-cased for us: startsWith("https://") told a model that wrote
+    // HTTPS the app only reads https, which reads as nonsense.
+    if (!url.isHttps) return "Only https addresses can be read. Got: $url"
+
+    // The resolver cannot cover this. PublicOnlyDns sees names, and an address written as
+    // digits goes straight to a socket without one, so every private address was reachable
+    // by asking for it as a literal. On a phone that is the router, the printers beside it,
+    // and whatever the carrier has on the same subnet.
+    url.host.ipLiteralOrNull()?.takeUnless { it.isPublicAddress() }?.let {
+        return "That address is not on the public internet, so it will not be read. " +
+            "Ask for a public page instead."
+    }
+    return null
+}
+
+/**
+ * Where a response says to look instead, or null when it is not sending us anywhere.
+ *
+ * Resolved against the address it came from, because a Location header is allowed to be
+ * relative and a relative one cannot leave the host it arrived from. An absolute one can,
+ * which is the case [refuseAddress] then has to answer for.
+ */
+internal fun redirectTarget(response: Response, from: HttpUrl): HttpUrl? {
+    if (!response.isRedirect) return null
+    return response.header("Location")?.let { from.resolve(it) }
 }
 
 /** Everything between tags, with the tags and the unreadable parts taken out. */

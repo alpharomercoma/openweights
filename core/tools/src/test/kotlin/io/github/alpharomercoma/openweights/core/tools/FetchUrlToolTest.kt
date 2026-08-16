@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.tools
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import org.junit.Test
 
@@ -94,5 +95,60 @@ class FetchUrlToolTest {
     @Test
     fun `something that is not an address at all is refused rather than dialled`() = runTest {
         assertThat(fetch("not a url")).isNotEmpty()
+    }
+
+    @Test
+    fun `a redirect to a private literal is refused, not followed`() {
+        // The whole vulnerability, as a rule. The checks used to run once, on the address
+        // the user approved, and the client followed redirects by itself: a public page
+        // answering "302 Location: https://192.168.1.1/admin" reached the router on the
+        // user's own network and the reply summarised what it found there. Every hop is
+        // now put through the same guard, so the second address is refused like the first.
+        val from = "https://example.com/page".toHttpUrl()
+
+        val target = from.resolve("https://192.168.1.1/admin")!!
+
+        assertThat(refuseAddress(target)).contains("not on the public internet")
+    }
+
+    @Test
+    fun `a redirect to the metadata address is refused`() {
+        val from = "https://example.com/page".toHttpUrl()
+
+        val target = from.resolve("https://169.254.169.254/latest/meta-data/")!!
+
+        assertThat(refuseAddress(target)).contains("not on the public internet")
+    }
+
+    @Test
+    fun `a redirect that drops to plain http is refused`() {
+        // followSslRedirects is off for the same reason the scheme is checked at all: a hop
+        // that downgrades is a hop that can be read on the way past.
+        val from = "https://example.com/page".toHttpUrl()
+
+        val target = from.resolve("http://example.com/page")!!
+
+        assertThat(refuseAddress(target)).contains("Only https")
+    }
+
+    @Test
+    fun `an ordinary redirect to another public page is allowed`() {
+        // The counterweight. Redirects are how the web works, and refusing them all would
+        // break every canonical link and every shortened one.
+        val from = "https://example.com/page".toHttpUrl()
+
+        val target = from.resolve("https://www.example.org/moved")!!
+
+        assertThat(refuseAddress(target)).isNull()
+    }
+
+    @Test
+    fun `a relative redirect stays on the host it came from`() {
+        val from = "https://example.com/a/b".toHttpUrl()
+
+        val target = from.resolve("/c")!!
+
+        assertThat(target.host).isEqualTo("example.com")
+        assertThat(refuseAddress(target)).isNull()
     }
 }

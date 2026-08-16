@@ -53,6 +53,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import javax.inject.Inject
@@ -1237,7 +1239,7 @@ class ChatViewModel @Inject constructor(
      * empty buffer means nothing was produced, and a blank turn is worse than no turn, so
      * the placeholder is removed instead of being written down.
      */
-    private fun finishInterrupted(raw: String) {
+    private suspend fun finishInterrupted(raw: String) {
         if (raw.isEmpty()) {
             _uiState.update { state ->
                 if (state.transcript.lastOrNull()?.isStreaming != true) {
@@ -1295,10 +1297,25 @@ class ChatViewModel @Inject constructor(
      * A stopped reply has no numbers, since they only arrive with a completion, and it is
      * written without them rather than with invented ones.
      */
-    private fun persistReply(text: String, stats: GenerationStats?) {
+    /**
+     * Writes the reply down, and does not come back until it is written.
+     *
+     * Awaited rather than launched, and uncancellable while it runs. This used to be
+     * `viewModelScope.launch { }`: the turn reported itself finished and `isGenerating`
+     * cleared while the row was still on its way to the database, so a process kill in that
+     * window left a conversation holding a question with no answer. The question was already
+     * durable, because the user's own message is written before the model is asked, so the
+     * two halves of a turn had different guarantees and the missing half was always the
+     * expensive one.
+     *
+     * [NonCancellable] because the window is not hypothetical on the path that matters most.
+     * Stop cancels the job this is called from, and a reply the user watched being written
+     * is exactly what they expect to still be there.
+     */
+    private suspend fun persistReply(text: String, stats: GenerationStats?) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
-        viewModelScope.launch {
+        withContext(NonCancellable) {
             reportingFailure { writer.reply(id, text, stats, reasoningMs) }
         }
     }

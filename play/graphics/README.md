@@ -7,6 +7,8 @@ Everything the Console asks to be uploaded, and how to make it again.
 | `icon-512.png` | App icon | 512 x 512, 32-bit PNG with alpha, under 1024 KB | The launcher mark at listing size |
 | `feature-graphic-1024x500.png` | Feature graphic | 1024 x 500, 24-bit PNG, no alpha | Header art. No screenshot content: Play crops it hard on some surfaces |
 | `screenshots-phone/*.png` | Phone screenshots | 1080 x 1920, 24-bit PNG, no alpha | Five captioned screens |
+| `screenshots-tablet-7/*.png` | 7-inch tablet | 1200 x 2133, sides within 320..3840 | Four, rendered at 600dp |
+| `screenshots-tablet-10/*.png` | 10-inch tablet | 1800 x 3200, sides within 1080..7680 | Four, rendered at 900dp |
 
 Play takes 2 screenshots at minimum and 8 at most, and promotes listings with 4 or more at
 1080p. There are five. It also refuses any screenshot whose long side is more than twice its
@@ -50,8 +52,20 @@ cost a command, not an afternoon of re-staging conversations on a phone.
 ## What is deliberately not here
 
 - **A promo video.** Play takes one YouTube URL, so there is nothing to upload from a repo.
-- **Tablet screenshots.** The app is `portrait` only and is not submitted for large screens.
-  Adding them means adding a tablet layout first, not adding a picture.
+- **Chromebook and XR screenshots.** Neither form factor is targeted.
+
+## The tablet shots came with a fix attached
+
+This section used to say tablet screenshots would mean adding a tablet layout first rather
+than adding a picture, and that turned out to be exactly right. Rendered at a ten inch
+tablet's 900dp, the chat screen was a phone stretched sideways: the reply ran the full width
+at around a hundred and sixty characters a line, roughly twice what anyone reads
+comfortably, with the composer stretched to match and a band of empty graphite down the
+middle. Uploading that would have advertised the experience rather than the app.
+
+So `ChatScreen` caps its content at `READABLE_WIDTH` and centres it, which changes nothing
+on a phone — the window is narrower than the cap — and is the whole difference on anything
+larger, foldables included. The screenshots are of the fixed layout.
 - **Any number the app cannot produce.** 13.8 tok/s is Q4_0 measured on the test phone and
   4096 ctx is the shipped default. A listing that promises a rate the hardware misses is a
   one-star review with a receipt.

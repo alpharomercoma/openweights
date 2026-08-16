@@ -293,88 +293,103 @@ private fun ChatContent(
             }
         },
     ) { innerPadding ->
-        Column(
+        // Held to a readable width and centred rather than filled to the window's edges.
+        //
+        // On a phone this changes nothing, because the window is narrower than the cap. It
+        // is for the sizes nobody was looking at: rendered at a ten inch tablet's 900dp the
+        // reply ran the full width at about a hundred and sixty characters a line, twice
+        // what anyone reads comfortably, with the composer stretched to match and a band of
+        // empty graphite down the middle where the conversation should have been. The same
+        // applies to a foldable, which is a phone right up until it is not.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .imePadding(),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                if (state.transcript.isEmpty()) {
-                    EmptyState(
-                        isLoadingModel = state.isLoadingModel,
-                        hasModel = state.modelName != null,
-                    )
-                } else {
-                    Transcript(
-                        state = state,
-                        listState = listState,
-                        isSpeaking = isSpeaking,
-                        clipboard = clipboard,
-                        onActionsForId = onActionsForId,
-                        onToggleReadAloud = onToggleReadAloud,
-                        onRegenerate = onRegenerate,
+            // The cap before the fill, not after. Written the other way round fillMaxSize
+            // fixes the width at the window's before widthIn is reached, and a maximum below
+            // a minimum is resolved in the minimum's favour, so the cap silently did nothing
+            // and the render came back byte for byte identical.
+            Column(modifier = Modifier.widthIn(max = READABLE_WIDTH).fillMaxSize()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    if (state.transcript.isEmpty()) {
+                        EmptyState(
+                            isLoadingModel = state.isLoadingModel,
+                            hasModel = state.modelName != null,
+                        )
+                    } else {
+                        Transcript(
+                            state = state,
+                            listState = listState,
+                            isSpeaking = isSpeaking,
+                            clipboard = clipboard,
+                            onActionsForId = onActionsForId,
+                            onToggleReadAloud = onToggleReadAloud,
+                            onRegenerate = onRegenerate,
+                        )
+                    }
+
+                    JumpToLatestButton(
+                        // Detached is not enough on its own: a transcript that fits the screen
+                        // is detached the moment you touch it, and offering to scroll to a
+                        // bottom already in view is an offer that reads as a bug. Only once
+                        // there is a screenful or so out of sight below.
+                        visible = followTail.isDetached && listState.hasHiddenTail(),
+                        onClick = followTail::jumpToLatest,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 12.dp),
                     )
                 }
 
-                JumpToLatestButton(
-                    // Detached is not enough on its own: a transcript that fits the screen
-                    // is detached the moment you touch it, and offering to scroll to a
-                    // bottom already in view is an offer that reads as a bug. Only once
-                    // there is a screenful or so out of sight below.
-                    visible = followTail.isDetached && listState.hasHiddenTail(),
-                    onClick = followTail::jumpToLatest,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp),
+                StatusStrip(state = state, dictationError = dictation.error)
+                plan?.let { PlanCard(plan = it, onTick = onTickStep) }
+                question?.let { QuestionCard(question = it, onAnswer = onAnswerQuestion) }
+                state.pendingApproval?.let { call ->
+                    ToolApproval(call = call, onAnswer = onApproval)
+                }
+
+                val dispatch: (SlashCommand) -> Unit = {
+                    it.run(onNewChat, onCompact, onRegenerate, onMode)
+                }
+
+                Composer(
+                    conversationKey = state.activeConversationId,
+                    enabled = state.canSend,
+                    isGenerating = state.isGenerating,
+                    staged = state.staged,
+                    document = state.stagedDocument,
+                    onRemoveDocument = onRemoveDocument,
+                    canAttach = state.mediaSupport.any,
+                    isAttaching = state.isAttaching,
+                    canDictate = canDictate,
+                    isListening = dictation.isListening,
+                    heard = dictation.partial,
+                    onAttach = { showAttachments = true },
+                    leading = {
+                        AttachDocumentButton(enabled = state.canSend, onPicked = onAttachDocument)
+                    },
+                    onRemoveStaged = onRemoveStaged,
+                    onDictate = onDictate,
+                    // A command that was typed out and sent runs, rather than going to the model
+                    // as text for it to answer. The palette is how these are found; it was also
+                    // the only way to run one, which anybody who already knew the word found out
+                    // by watching the model reply to "/plan".
+                    onSend = { typed ->
+                        val command = SlashCommand.typed(typed)
+                        if (command != null) {
+                            dispatch(command)
+                            true
+                        } else {
+                            onSend(typed)
+                        }
+                    },
+                    onStop = onStop,
+                    onCommand = dispatch,
                 )
             }
-
-            StatusStrip(state = state, dictationError = dictation.error)
-            plan?.let { PlanCard(plan = it, onTick = onTickStep) }
-            question?.let { QuestionCard(question = it, onAnswer = onAnswerQuestion) }
-            state.pendingApproval?.let { call ->
-                ToolApproval(call = call, onAnswer = onApproval)
-            }
-
-            val dispatch: (SlashCommand) -> Unit = {
-                it.run(onNewChat, onCompact, onRegenerate, onMode)
-            }
-
-            Composer(
-                conversationKey = state.activeConversationId,
-                enabled = state.canSend,
-                isGenerating = state.isGenerating,
-                staged = state.staged,
-                document = state.stagedDocument,
-                onRemoveDocument = onRemoveDocument,
-                canAttach = state.mediaSupport.any,
-                isAttaching = state.isAttaching,
-                canDictate = canDictate,
-                isListening = dictation.isListening,
-                heard = dictation.partial,
-                onAttach = { showAttachments = true },
-                leading = {
-                    AttachDocumentButton(enabled = state.canSend, onPicked = onAttachDocument)
-                },
-                onRemoveStaged = onRemoveStaged,
-                onDictate = onDictate,
-                // A command that was typed out and sent runs, rather than going to the model
-                // as text for it to answer. The palette is how these are found; it was also
-                // the only way to run one, which anybody who already knew the word found out
-                // by watching the model reply to "/plan".
-                onSend = { typed ->
-                    val command = SlashCommand.typed(typed)
-                    if (command != null) {
-                        dispatch(command)
-                        true
-                    } else {
-                        onSend(typed)
-                    }
-                },
-                onStop = onStop,
-                onCommand = dispatch,
-            )
         }
     }
 
@@ -676,6 +691,15 @@ private fun AssistantTurn(
         }
     }
 }
+
+/**
+ * The widest the conversation is allowed to get, however wide the window is.
+ *
+ * Prose stops being comfortable somewhere past seventy or eighty characters a line, and a
+ * ten inch tablet at this text size is well over twice that. Material caps a reading pane
+ * for the same reason.
+ */
+private val READABLE_WIDTH = 640.dp
 
 private const val MILLIS_PER_SECOND = 1000.0
 

@@ -89,6 +89,46 @@ class PlayScreenshots {
         ListingShots.tools()
     }
 
+    // The two tablet slots. Both are 9:16 in pixels, which is what Play asks for, and both
+    // are above the width the conversation is now capped at, so what they show is the real
+    // large-screen layout rather than a phone stretched sideways. Four each: Play wants at
+    // least four at 1080px to consider a listing for promotion.
+    @Test
+    @Config(qualifiers = SEVEN_INCH)
+    fun sevenInchChat() = shoot("7/01-chat", until = "attention layers") { ChatShots.midReply() }
+
+    @Test
+    @Config(qualifiers = SEVEN_INCH)
+    fun sevenInchTools() = shoot("7/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
+
+    @Test
+    @Config(qualifiers = SEVEN_INCH)
+    fun sevenInchPlan() = shoot("7/03-plan", until = "Write the summary") { ChatShots.planned() }
+
+    @Test
+    @Config(qualifiers = SEVEN_INCH)
+    fun sevenInchDiscover() = shoot("7/04-discover", until = "Hammer2.1") {
+        ListingShots.discover()
+    }
+
+    @Test
+    @Config(qualifiers = TEN_INCH)
+    fun tenInchChat() = shoot("10/01-chat", until = "attention layers") { ChatShots.midReply() }
+
+    @Test
+    @Config(qualifiers = TEN_INCH)
+    fun tenInchTools() = shoot("10/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
+
+    @Test
+    @Config(qualifiers = TEN_INCH)
+    fun tenInchPlan() = shoot("10/03-plan", until = "Write the summary") { ChatShots.planned() }
+
+    @Test
+    @Config(qualifiers = TEN_INCH)
+    fun tenInchDiscover() = shoot("10/04-discover", until = "Hammer2.1") {
+        ListingShots.discover()
+    }
+
     /**
      * One screen, drawn straight off its own view.
      *
@@ -99,7 +139,7 @@ class PlayScreenshots {
      */
     private fun shoot(name: String, until: String, content: @Composable () -> Unit) {
         val into = System.getenv(OUTPUT) ?: return
-        val directory = File(into).apply { mkdirs() }
+        val directory = File(into)
 
         compose.setContent { OpenWeightsTheme(dynamicColor = false) { content() } }
         // Markdown is parsed off the composition and swapped in when it finishes, so a
@@ -113,7 +153,7 @@ class PlayScreenshots {
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
 
-        val file = File(directory, "$name.png")
+        val file = File(directory, "$name.png").apply { parentFile?.mkdirs() }
         file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         check(file.length() > 0) { "wrote nothing to ${file.name}" }
         println("screenshot ${file.name}: ${bitmap.width}x${bitmap.height} ${file.length()} bytes")
@@ -124,5 +164,11 @@ class PlayScreenshots {
 
         /** Long enough for a markdown parse on a cold host JVM, short enough to fail fast. */
         const val WAIT_MS = 10_000L
+
+        /** 600 x 1067 dp at xhdpi is 1200 x 2134 px: 9:16, inside the 320..3840 Play allows. */
+        const val SEVEN_INCH = "w600dp-h1067dp-night-xhdpi"
+
+        /** 900 x 1600 dp at xhdpi is 1800 x 3200 px: 9:16, inside the 1080..7680 Play allows. */
+        const val TEN_INCH = "w900dp-h1600dp-night-xhdpi"
     }
 }

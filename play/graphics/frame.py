@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 
-W, H = 1080, 1920
+W, H = 1080, 1920          # the phone canvas; tablets scale from it
 CANVAS = "#0B0D0F"
 LIFT = "#232A31"          # the radial the icon and feature graphic also sit on
 TEXT = "#ECF1F4"
@@ -80,17 +80,18 @@ def frame(source: Path, out: Path, headline: str, sub: str) -> None:
     canvas = background()
     draw = ImageDraw.Draw(canvas)
 
-    head_font = ImageFont.truetype(SANS, 58)
-    sub_font = ImageFont.truetype(MONO, 27)
+    scale = W / 1080
+    head_font = ImageFont.truetype(SANS, round(58 * scale))
+    sub_font = ImageFont.truetype(MONO, round(27 * scale))
 
-    y = 132
-    for line in wrap(draw, headline, head_font, W - 2 * 126):
-        draw.text((126, y), line, font=head_font, fill=TEXT)
-        y += 74
-    y += 14
-    for line in wrap(draw, sub, sub_font, W - 2 * 126):
-        draw.text((126, y), line, font=sub_font, fill=MUTED)
-        y += 40
+    y = round(132 * scale)
+    for line in wrap(draw, headline, head_font, W - round(2 * 126 * scale)):
+        draw.text((round(126 * scale), y), line, font=head_font, fill=TEXT)
+        y += round(74 * scale)
+    y += round(14 * scale)
+    for line in wrap(draw, sub, sub_font, W - round(2 * 126 * scale)):
+        draw.text((round(126 * scale), y), line, font=sub_font, fill=MUTED)
+        y += round(40 * scale)
 
     shot = Image.open(source).convert("RGB")
     height = round(shot.height * SHOT_W / shot.width)
@@ -111,10 +112,24 @@ def frame(source: Path, out: Path, headline: str, sub: str) -> None:
     print(f"{out.name}: {canvas.size[0]}x{canvas.size[1]} {out.stat().st_size} bytes")
 
 
+def scaled(width: int, height: int) -> None:
+    """Retarget the canvas, so one set of proportions serves every slot Play asks for."""
+    global W, H, SHOT_W, SHOT_TOP, RADIUS
+    factor = width / 1080
+    W, H = width, height
+    SHOT_W = round(828 * factor)
+    SHOT_TOP = round(396 * factor)
+    RADIUS = round(30 * factor)
+
+
 if __name__ == "__main__":
     import sys
 
     src, dst = Path(sys.argv[1]), Path(sys.argv[2])
+    if len(sys.argv) > 4:
+        scaled(int(sys.argv[3]), int(sys.argv[4]))
     dst.mkdir(parents=True, exist_ok=True)
     for name, headline, sub in CAPTIONS:
-        frame(src / f"{name}.png", dst / f"{name}.png", headline, sub)
+        source = src / f"{name}.png"
+        if source.exists():
+            frame(source, dst / f"{name}.png", headline, sub)

@@ -910,7 +910,7 @@ private fun CompactionMarker(note: String) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun ChatScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

@@ -304,7 +304,7 @@ private fun Callout(text: String) {
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun DiscoverScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

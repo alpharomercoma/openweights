@@ -168,7 +168,7 @@ private const val MIN_PULSE_ALPHA = 0.25f
 
 private const val DOT_SIZE = 6
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun RuntimeBarPreview() {
     OpenWeightsTheme(dynamicColor = false) {

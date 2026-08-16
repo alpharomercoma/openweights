@@ -239,7 +239,7 @@ private fun ToolRow(tool: ToolSummary, onToggle: (Boolean) -> Unit) {
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun ToolsScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {

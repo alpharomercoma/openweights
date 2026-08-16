@@ -423,7 +423,7 @@ private const val SEND_SIZE = 36
 /** The thumb's share, which Android asks to be at least this. */
 private const val TOUCH_TARGET = 48
 
-@Preview(showBackground = true, backgroundColor = 0xFF0D0F11)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun ComposerPreview() {
     OpenWeightsTheme(dynamicColor = false) {

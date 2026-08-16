@@ -22,91 +22,97 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 
 /**
- * Brass on graphite.
+ * Lime on ink, with hueless greys between.
  *
- * OpenWeights is an instrument you own: you chose the file, it runs on your silicon, and
- * you can watch how fast. Warm brass against a cool graphite carries that better than the
- * blue-white every assistant uses, and it keeps us out of a crowded room: ChatGPT is
- * monochrome, Claude is terracotta on cream, Gemini is Google blue, Qwen is violet.
+ * Ported from `alpharomercoma/portfolio-unleashed`, whose `docs/design-system.md` and
+ * `globals.css` are the only places that project defines colour. Three colours and nothing
+ * else: white or near-black as the canvas, [Ink] for text and dark panels, and [Lime] used
+ * boldly rather than as a garnish. Every grey here is neutral on purpose, so lime is the one
+ * chromatic note in the chrome and reads as "you can act here" wherever it appears.
  *
- * Three rules hold the palette together:
+ * Three rules come with it and are not negotiable, because two of them are contrast facts:
  *
- * 1. **One accent.** [Brass] means "you can act here" and nothing else: send, the active
- *    tab, focus, selection. The previous palette used the same teal for "fast" and for
- *    "tap me", so neither reading was reliable.
- * 2. **Measurement is a separate language.** The [signalColor] scale runs jade → slate →
- *    rust and never passes through the accent. Grey in the middle is the
- *    point: most readings are unremarkable, so a coloured one means something.
- * 3. **Colour is never the only signal.** Every telemetry colour sits beside the number it
- *    describes. Hue is the glance; the digits are the answer.
+ * 1. **Ink on lime, never white.** Lime is a light colour. Ink on it measures 12.99:1; white
+ *    on it would be unreadable.
+ * 2. **Lime is never text or a meaningful icon on a light surface.** It measures 1.13:1 on
+ *    white, which is invisible rather than merely poor. A lime word on a light background
+ *    means a lime fill carrying ink text.
+ * 3. **Measurement is a separate language.** [signalColor] runs teal to grey to red and
+ *    never passes through lime. That rule predates this palette: an earlier build put the
+ *    accent at the midpoint of the throughput scale and the rail read as *selected* before
+ *    it read as *12 tok/s*. Lime is a worse offender than brass was, being both the action
+ *    colour and the obvious choice for "fast".
  *
- * Every pair below was checked against WCAG 2.2: body text and accents clear 4.5:1 on the
- * surfaces they appear on, and [Outline] clears 3:1, the non-text threshold, against
- * canvas, raised and raised-high alike, because a border is often the only thing that says
- * where a control begins.
+ * Every pair was computed rather than eyeballed. Body text clears 4.5:1 and [Outline] clears
+ * 3:1 against canvas, raised and raised-high alike, because a hairline border is often the
+ * only thing saying where a control begins.
  */
 object OpenWeightsColors {
-    // 60%. The canvas. Near-black with a cool graphite bias, not pure black: OLED-friendly
-    // without the flatness that makes every panel edge disappear.
-    val Canvas = Color(0xFF0B0D0F)
+    /** The brand accent. A fill, a CTA, a tinted surface. Never text on a light surface. */
+    val Lime = Color(0xFFE0FF4F)
 
-    // 30%: raised surfaces. The step from canvas is small by design, so [Outline] rather
-    // than fill is what makes a control's boundary legible.
-    val Raised = Color(0xFF181C21)
-    val RaisedHigh = Color(0xFF242A31)
+    /** What sits on [Lime]: 12.99:1. Also the light theme's text colour. */
+    val Ink = Color(0xFF052B42)
 
-    /** Interactive boundaries. Passes 3:1 on every surface it can sit against. */
-    val Outline = Color(0xFF6A7783)
+    // Dark. Near-black, not pure black, so panel edges do not disappear on OLED.
+    val Canvas = Color(0xFF0D0E10)
+    val Raised = Color(0xFF161719)
+    val RaisedHigh = Color(0xFF232427)
 
-    /** Decorative rules between rows. Quiet; never the only boundary. */
-    val Divider = Color(0xFF20262C)
+    /** Clears 3:1 on all three dark surfaces. Bounds a control. */
+    val Outline = Color(0xFF6E7178)
 
-    val Text = Color(0xFFECF1F4)
-    val TextDim = Color(0xFF9AA6AF)
+    /** Decorative rule, never load bearing. The portfolio's white-at-12% over [Canvas]. */
+    val Divider = Color(0xFF26272A)
 
-    // 10%. The accent, and only ever for action.
-    val Brass = Color(0xFFF0A93B)
+    val Text = Color(0xFFF5F6F3)
+    val TextDim = Color(0xFFA2A4AB)
 
-    /** Text and icons drawn on top of a [Brass] fill. Near-black, 9.6:1. */
-    val OnBrass = Color(0xFF120E06)
+    /** A lime wash for a raised surface that has to read as active. */
+    val LimeContainer = Color(0xFF33401A)
 
-    /** A brass wash for selected rows and containers, where a full fill would shout. */
-    val BrassContainer = Color(0xFF3A2A0E)
+    // Light. The portfolio's base: plain white, not an off-white.
+    val PaperCanvas = Color(0xFFFFFFFF)
+    val PaperRaised = Color(0xFFF4F5F3)
+    val PaperRaisedHigh = Color(0xFFE7E8E4)
 
-    // Measurement scale. Never used for chrome.
-    val SignalGood = Color(0xFF4FC08D)
-    val SignalPlain = Color(0xFF8C99A4)
-    val SignalPoor = Color(0xFFFF6F59)
+    /** Clears 3:1 on all three light surfaces. */
+    val PaperOutline = Color(0xFF7C7F86)
+    val PaperDivider = Color(0xFFE7E8E4)
 
-    val Danger = Color(0xFFFF6F59)
+    val PaperText = Ink
+    val PaperTextDim = Color(0xFF52555B)
 
-    // Light theme. Not a tint of the dark one: the accent has to darken considerably to
-    // stay readable as text on a pale canvas, and the signal hues darken with it.
-    val PaperCanvas = Color(0xFFFBFBF9)
-    val PaperRaised = Color(0xFFF0F0EB)
-    val PaperRaisedHigh = Color(0xFFE3E3DD)
-    val PaperOutline = Color(0xFF7A8188)
-    val PaperDivider = Color(0xFFDCDCD6)
-    val PaperText = Color(0xFF14181B)
-    val PaperTextDim = Color(0xFF535E67)
-    val PaperBrass = Color(0xFF8A5A0E)
-    val PaperOnBrass = Color(0xFFFFFFFF)
-    val PaperBrassContainer = Color(0xFFF6E6C8)
-    val PaperSignalGood = Color(0xFF0E7A55)
-    val PaperSignalPlain = Color(0xFF5C666E)
-    val PaperSignalPoor = Color(0xFFB23A22)
-    val PaperDanger = Color(0xFFB23A22)
+    /** The portfolio's `lime-wash`, for a tinted section on white. */
+    val PaperLimeContainer = Color(0xFFF3FFCE)
+
+    // The measurement scale. Teal rather than lime, for the reason in the class comment.
+    val SignalGood = Color(0xFF3BA88F)
+    val SignalPlain = TextDim
+    val SignalPoor = Color(0xFFFF6166)
+    val Danger = SignalPoor
+
+    /**
+     * The light theme's teal is much darker than the dark theme's.
+     *
+     * `#3BA88F` measures 2.92:1 on white, which fails the 3:1 a meaningful colour has to
+     * clear, so light gets its own value at 4.15:1. A light theme cannot carry the same
+     * green, the same way it could not carry the same amber before it.
+     */
+    val PaperSignalGood = Color(0xFF2F8B74)
+    val PaperSignalPlain = PaperTextDim
+    val PaperSignalPoor = Color(0xFFE5484D)
+    val PaperDanger = PaperSignalPoor
 }
 
 /**
  * Maps a normalised measurement onto the signal scale.
  *
- * Grey through the middle rather than amber: the accent already owns amber, and most
- * readings are ordinary. A rail that is only coloured when something is fast or
- * struggling is a rail easy to notice.
+ * Grey through the middle, because most readings are ordinary and a rail that is only
+ * coloured when something is fast or struggling is a rail worth looking at.
  *
- * These values come from constants rather than the colour scheme, so wallpaper-derived
- * dynamic colour cannot redefine what a measurement looks like.
+ * Read from constants rather than from the colour scheme, so wallpaper-derived dynamic
+ * colour cannot redefine what a measurement looks like.
  *
  * @param fraction 0 = the poor end (slow, or context nearly full), 1 = fast and roomy.
  */
@@ -125,11 +131,23 @@ fun signalColor(fraction: Float, dark: Boolean = true): Color {
 /** The scale has three stops, so each half of the input range covers one interpolation. */
 private const val SCALE_MIDPOINT = 0.5f
 
+/**
+ * `primary` is lime in both themes, and that needs saying out loud.
+ *
+ * Material treats `primary` as both a fill and a text colour: a filled `Button` paints it
+ * and writes `onPrimary` on top, which is exactly right here, but a `TextButton` writes
+ * `primary` straight onto the surface, which on white would be lime at 1.13:1.
+ *
+ * The fill is the common case and the one the brand depends on, so `primary` stays lime and
+ * text buttons carry an explicit content colour instead. Anything ghost-shaped in this app
+ * uses `onSurface`; anything secondary is an outlined pill. There is no call site left that
+ * paints `primary` as text on a light surface, and there must not be a new one.
+ */
 internal val DarkColorScheme = darkColorScheme(
-    primary = OpenWeightsColors.Brass,
-    onPrimary = OpenWeightsColors.OnBrass,
-    primaryContainer = OpenWeightsColors.BrassContainer,
-    onPrimaryContainer = OpenWeightsColors.Brass,
+    primary = OpenWeightsColors.Lime,
+    onPrimary = OpenWeightsColors.Ink,
+    primaryContainer = OpenWeightsColors.LimeContainer,
+    onPrimaryContainer = OpenWeightsColors.Lime,
     secondary = OpenWeightsColors.TextDim,
     onSecondary = OpenWeightsColors.Canvas,
     secondaryContainer = OpenWeightsColors.RaisedHigh,
@@ -152,10 +170,10 @@ internal val DarkColorScheme = darkColorScheme(
 )
 
 internal val LightColorScheme = lightColorScheme(
-    primary = OpenWeightsColors.PaperBrass,
-    onPrimary = OpenWeightsColors.PaperOnBrass,
-    primaryContainer = OpenWeightsColors.PaperBrassContainer,
-    onPrimaryContainer = OpenWeightsColors.PaperBrass,
+    primary = OpenWeightsColors.Lime,
+    onPrimary = OpenWeightsColors.Ink,
+    primaryContainer = OpenWeightsColors.PaperLimeContainer,
+    onPrimaryContainer = OpenWeightsColors.Ink,
     secondary = OpenWeightsColors.PaperTextDim,
     onSecondary = OpenWeightsColors.PaperCanvas,
     secondaryContainer = OpenWeightsColors.PaperRaisedHigh,
@@ -174,5 +192,5 @@ internal val LightColorScheme = lightColorScheme(
     outline = OpenWeightsColors.PaperOutline,
     outlineVariant = OpenWeightsColors.PaperDivider,
     error = OpenWeightsColors.PaperDanger,
-    onError = OpenWeightsColors.PaperOnBrass,
+    onError = OpenWeightsColors.PaperCanvas,
 )

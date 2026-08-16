@@ -28,24 +28,43 @@ import androidx.compose.ui.unit.sp
 import io.github.alpharomercoma.openweights.core.designsystem.R
 
 /**
- * IBM Plex, chosen because it was drawn for machines and their readouts. The same job this
- * app has. Plex Sans carries the interface; Plex Mono carries every number, model id, and
- * quantization tag, so measurements are visually separable from prose at a glance.
+ * Three families, ported from `alpharomercoma/portfolio-unleashed`.
+ *
+ * The split is the point. [Display] is the voice: a grotesk with tight tracking, used for
+ * anything that states rather than explains. [Body] carries every sentence, drawn to be read
+ * at length rather than admired. [Mono] carries every number, model id and quantization tag,
+ * so a measurement is separable from prose at a glance, which is the one thing this app does
+ * that a hosted assistant does not.
+ *
+ * All three ship as single variable fonts with a weight axis, so each family is one file and
+ * every weight is a variation of it rather than another download.
  */
 @OptIn(ExperimentalTextApi::class)
-private val PlexSans = FontFamily(
-    Font(R.font.plex_sans, FontWeight.Normal, variationSettings = weightAxis(400)),
-    Font(R.font.plex_sans, FontWeight.Medium, variationSettings = weightAxis(500)),
-    Font(R.font.plex_sans, FontWeight.SemiBold, variationSettings = weightAxis(600)),
-    Font(R.font.plex_sans, FontWeight.Bold, variationSettings = weightAxis(700)),
+private val Display = FontFamily(
+    Font(R.font.schibsted_grotesk, FontWeight.SemiBold, variationSettings = weightAxis(600)),
+    Font(R.font.schibsted_grotesk, FontWeight.Bold, variationSettings = weightAxis(700)),
+)
+
+@OptIn(ExperimentalTextApi::class)
+private val Body = FontFamily(
+    Font(R.font.hanken_grotesk, FontWeight.Normal, variationSettings = weightAxis(400)),
+    Font(R.font.hanken_grotesk, FontWeight.Medium, variationSettings = weightAxis(500)),
+    Font(R.font.hanken_grotesk, FontWeight.SemiBold, variationSettings = weightAxis(600)),
 )
 
 private fun weightAxis(weight: Int) = FontVariation.Settings(FontVariation.weight(weight))
 
-/** Monospace family for anything the user might compare row to row. */
+/**
+ * Monospace, for anything the user might compare row to row.
+ *
+ * Still named for what it is rather than for the typeface, because call sites care that the
+ * digits line up and not who drew them. It was IBM Plex Mono; it is Geist Mono now, and no
+ * call site had to change.
+ */
+@OptIn(ExperimentalTextApi::class)
 val PlexMono = FontFamily(
-    Font(R.font.plex_mono_regular, FontWeight.Normal),
-    Font(R.font.plex_mono_medium, FontWeight.Medium),
+    Font(R.font.geist_mono, FontWeight.Normal, variationSettings = weightAxis(400)),
+    Font(R.font.geist_mono, FontWeight.Medium, variationSettings = weightAxis(500)),
 )
 
 /**
@@ -65,33 +84,33 @@ internal val OpenWeightsTypography = Typography().let { base ->
         // default falls back to the platform font, which would quietly put a third family
         // on screen the first time anything reached for it.
         displayLarge = base.displayLarge.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.02).em,
         ),
         displayMedium = base.displayMedium.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.02).em,
         ),
         // The one number a screen is built around. The lifetime token count, and nothing
         // else so far. The only style above 24 sp.
         displaySmall = base.displaySmall.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 40.sp,
             lineHeight = 46.sp,
             letterSpacing = (-0.02).em,
         ),
         headlineLarge = base.headlineLarge.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 26.sp,
             lineHeight = 32.sp,
             letterSpacing = (-0.015).em,
         ),
         headlineMedium = base.headlineMedium.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 22.sp,
             lineHeight = 28.sp,
@@ -99,7 +118,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
         ),
         // Screen titles.
         headlineSmall = base.headlineSmall.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 20.sp,
             lineHeight = 26.sp,
@@ -107,14 +126,14 @@ internal val OpenWeightsTypography = Typography().let { base ->
         ),
         // The model name in the top bar: the most-read title in the app.
         titleLarge = base.titleLarge.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 19.sp,
             lineHeight = 24.sp,
             letterSpacing = (-0.01).em,
         ),
         titleMedium = base.titleMedium.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 17.sp,
             lineHeight = 22.sp,
@@ -122,7 +141,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
         ),
         // Section headings and card titles.
         titleSmall = base.titleSmall.copy(
-            fontFamily = PlexSans,
+            fontFamily = Display,
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
             lineHeight = 20.sp,
@@ -131,22 +150,22 @@ internal val OpenWeightsTypography = Typography().let { base ->
         // Chat replies are read for minutes at a time, so the leading earns its space
         // but 1.6 was bloating long answers, and 1.5 holds the paragraph together better.
         bodyLarge = base.bodyLarge.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontSize = 16.sp,
             lineHeight = 24.sp,
         ),
         bodyMedium = base.bodyMedium.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontSize = 14.sp,
             lineHeight = 21.sp,
         ),
         bodySmall = base.bodySmall.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontSize = 13.sp,
             lineHeight = 19.sp,
         ),
         labelLarge = base.labelLarge.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontWeight = FontWeight.Medium,
             // Material tracks its small labels wide, and this scale had tightened every
             // other style and left these three alone, so the navigation labels were the
@@ -157,7 +176,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
             lineHeight = 18.sp,
         ),
         labelMedium = base.labelMedium.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontWeight = FontWeight.Medium,
             // Material tracks its small labels wide, and this scale had tightened every
             // other style and left these three alone, so the navigation labels were the
@@ -168,7 +187,7 @@ internal val OpenWeightsTypography = Typography().let { base ->
             lineHeight = 16.sp,
         ),
         labelSmall = base.labelSmall.copy(
-            fontFamily = PlexSans,
+            fontFamily = Body,
             fontWeight = FontWeight.Medium,
             // Material tracks its small labels wide, and this scale had tightened every
             // other style and left these three alone, so the navigation labels were the

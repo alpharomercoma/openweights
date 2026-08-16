@@ -38,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -115,21 +114,24 @@ fun ModelRow(
  *
  * The Hub has avatars but does not put them in search results, so each one is a separate
  * lookup and may never arrive. The initials are drawn first and stay if it does not: the
- * tile is the same size either way, so nothing moves when a picture loads. The tint is
- * derived from the name, so the same publisher is the same colour every time and a list of
- * eight repositories from four publishers reads as four groups.
+ * tile is the same size either way, so nothing moves when a picture loads.
+ *
+ * Neutral, and it used to be a colour hashed from the publisher's name. The doc claimed the
+ * five hues came from the measurement scale; three of them were in no palette at all, they
+ * had no light theme variant, and hashing a name onto a hue means the colour says something
+ * it cannot back up. The initials already tell two publishers apart, and the palette now has
+ * exactly one chromatic note to spend.
  */
 @Composable
 private fun PublisherTile(owner: String, avatarUrl: String?) {
-    val tint = ownerTint(owner)
-    val shape = RoundedCornerShape(Radius.xs)
+    val shape = RoundedCornerShape(Radius.sm)
 
     Box(
         modifier = Modifier
             .size(TILE_SIZE)
             .clip(shape)
-            .background(tint.copy(alpha = TILE_FILL_ALPHA))
-            .border(1.dp, tint.copy(alpha = TILE_EDGE_ALPHA), shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             // One label for the row is enough; the tile repeats the publisher name that is
             // already read out below it.
             .clearAndSetSemantics { contentDescription = "" },
@@ -202,29 +204,7 @@ private fun String.initials(): String = split('-', '_', '.', ' ')
     .joinToString("")
     .ifEmpty { "?" }
 
-/**
- * A stable colour per publisher, taken from the signal scale rather than invented.
- *
- * The accent is reserved for things that can be tapped, so these come from the palette's
- * measurement hues at low saturation: enough to tell publishers apart, not enough to read
- * as a control.
- */
-private fun ownerTint(owner: String): Color {
-    if (owner.isEmpty()) return TILE_HUES.first()
-    return TILE_HUES[(owner.hashCode().mod(TILE_HUES.size))]
-}
-
-private val TILE_HUES = listOf(
-    Color(0xFF4FC08D),
-    Color(0xFF5B8DEF),
-    Color(0xFFB07CE8),
-    Color(0xFFE8A0C0),
-    Color(0xFF8C99A4),
-)
-
 private val TILE_SIZE = 40.dp
-private const val TILE_FILL_ALPHA = 0.18f
-private const val TILE_EDGE_ALPHA = 0.45f
 
 /** Download counts run to seven figures, and nobody reads seven figures. */
 internal fun Int.compact(): String = when {

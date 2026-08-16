@@ -16,7 +16,6 @@
 
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -32,6 +31,7 @@ import com.mikepenz.markdown.model.rememberMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.CodeTextStyle
+import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 
 /**
@@ -44,7 +44,11 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
  */
 @Composable
 fun MarkdownText(content: String, modifier: Modifier = Modifier) {
-    val darkTheme = isSystemInDarkTheme()
+    // The theme's own answer, not the platform's. Reading isSystemInDarkTheme() here meant
+    // that forcing the app light while the phone was dark left every code block with dark
+    // syntax colours on a white card, because this is the one colour system the theme does
+    // not own and it was asking a different question from everything around it.
+    val darkTheme = LocalIsDarkTheme.current
     val highlightsBuilder = remember(darkTheme) {
         Highlights.Builder().theme(SyntaxThemes.atom(darkMode = darkTheme))
     }
@@ -96,7 +100,7 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun MarkdownTextPreview() {
     OpenWeightsTheme(dynamicColor = false) {

@@ -143,7 +143,7 @@ internal fun answerFrom(chosen: Set<String>, typed: String, options: List<String
         typed.trim().takeIf { it.isNotEmpty() },
     ).joinToString(". ")
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun QuestionCardPreview() {
     OpenWeightsTheme(dynamicColor = false) {

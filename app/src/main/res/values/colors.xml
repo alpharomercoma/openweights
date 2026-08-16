@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background">#FFFBF8FF</color>
+    <!--
+      The window behind the app, painted before a single composable exists.
+
+      It has to be the theme's canvas exactly, or the first frame of every cold start is a
+      flash of the wrong colour. This value and the one in values-night had both drifted off
+      the palette by the time anyone looked: they were #FBF8FF and #0B0B0F against a canvas
+      of #FBFBF9 and #0B0D0F, which is the sort of thing nobody sees and everybody feels.
+    -->
+    <color name="window_background">#FFFFFFFF</color>
 </resources>

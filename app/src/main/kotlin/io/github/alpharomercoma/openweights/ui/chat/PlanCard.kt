@@ -115,7 +115,7 @@ fun PlanCard(plan: TaskPlan, onTick: (Int) -> Unit, modifier: Modifier = Modifie
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun PlanCardPreview() {
     val plan = readPlan("1. Find the notes file\n2. Read the budget section\n3. Save a summary")

@@ -21,26 +21,32 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * One corner scale, four steps.
+ * One corner scale, built around the reference system's 14 dp base.
  *
  * The build had drifted to five arbitrary radii, 10, 12, 14, 20, chosen a component at a
- * time, which is exactly how an interface stops looking designed. These four are picked to
- * be distinguishable from each other at arm's length and to sit in the middle the product
- * needs: tighter than the 28 dp-plus that reads as a toy, looser than the 4 dp that reads
- * as a terminal.
+ * time, which is exactly how an interface stops looking designed. These are picked to be
+ * distinguishable at arm's length and to sit where the product needs: tighter than the
+ * 28 dp-plus that reads as a toy, looser than the 4 dp that reads as a terminal.
+ *
+ * [pill] is a token rather than an ad-hoc `CircleShape` at five call sites, because the
+ * reference system makes every button and chip a pill and that is a decision the scale
+ * should carry rather than each component remembering.
  */
 object Radius {
-    /** Chips, badges, inline code. */
+    /** Badges and inline code. */
     val xs = 8.dp
 
-    /** Attachment thumbnails, fields inside sheets, small cards. */
+    /** Inputs, attachment thumbnails, fields inside sheets. */
     val sm = 12.dp
 
-    /** Cards, list rows, message bubbles, dialogs. The default. */
-    val md = 16.dp
+    /** The base. Cards, list rows, message bubbles, dialogs. */
+    val md = 14.dp
 
-    /** The composer and bottom sheets. The two surfaces that own the bottom edge. */
-    val lg = 24.dp
+    /** Large cards, the composer and bottom sheets: the surfaces that own an edge. */
+    val lg = 22.dp
+
+    /** Buttons and chips. Fully rounded, whatever the height. */
+    val pill = 999.dp
 }
 
 /** The same scale, as Material's shape roles, so stock components inherit it. */

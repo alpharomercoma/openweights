@@ -166,7 +166,7 @@ fun Metric(
 
 private val METER_HEIGHT = 2.dp
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun TelemetryPreview() {
     OpenWeightsTheme(dynamicColor = false) {

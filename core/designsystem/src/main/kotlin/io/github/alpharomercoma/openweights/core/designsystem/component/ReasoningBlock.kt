@@ -119,7 +119,7 @@ private fun reasoningLabel(isInProgress: Boolean, durationMs: Long?): String = w
 
 private const val MILLIS_PER_SECOND = 1000.0
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun ReasoningBlockPreview() {
     OpenWeightsTheme(dynamicColor = false) {

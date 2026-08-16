@@ -346,7 +346,7 @@ private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D0F)
+@Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable
 private fun ParameterSheetPreview() {
     OpenWeightsTheme(dynamicColor = false) {

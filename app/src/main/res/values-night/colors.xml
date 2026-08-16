@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background">#FF0B0B0F</color>
+    <!-- OpenWeightsColors.Canvas. See the note in values/colors.xml. -->
+    <color name="window_background">#FF0D0E10</color>
 </resources>

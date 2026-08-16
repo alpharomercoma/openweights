@@ -193,14 +193,42 @@ that declares more rather than less.
 Social/Forums/User-Generated-Content category: nothing any user types is ever seen by another
 user, because there is no account, no server and no sharing.
 
+**The questionnaire asks what the app can contain, and this app can contain whatever a model
+says.** An earlier draft of this section answered No to the content descriptors on the
+grounds that the app authors nothing and ships no model. That reasoning is true and the
+answer it produced was wrong, which an outside review caught before submission.
+
+The exclusion printed beside the question — "this does not refer to user-generated content" —
+is there to stop a social app declaring Yes merely because its users can swear at each other.
+It does not cover this app. Model output is not another user's content; it is content this
+app generates and puts on screen, and Google's AI-generated content policy makes the
+developer answerable for it. There is no output filter anywhere in the turn path, the weights
+are chosen by the user from a third-party repository, and an uncensored one can produce every
+category below. Nothing here can promise otherwise.
+
+So the descriptors are answered for what the app is capable of rather than for what it
+authors, and the asymmetry decides the doubtful ones: under-declaring is the most common
+cause of a rejected rating and Play treats it as misrepresentation, while over-declaring
+costs a higher age band and nothing else.
+
 | Section | Answer | Why |
 |---|---|---|
-| Violence | No | The app depicts none. It ships no content of its own |
-| Sexuality and nudity | No | As above |
-| Profanity and crude humour | No | As above |
-| Controlled substances | No | As above |
-| Horror and fear | No | As above |
-| Gambling and contests | No | No wagering, no loot, no prizes, no simulated gambling |
+| Potentially offensive language | **Yes** | A model the user chose can produce it and nothing filters the output |
+| — is it the focus of the app? | No | The app runs models. It is not about the language they produce |
+| — minor profanities | **Yes** | As above |
+| — moderate or significant swearing | **Yes** | As above |
+| — discriminatory language | **Yes** | As above. An uncensored model will produce it if asked |
+| — sexual expletives | **Yes** | As above |
+| Violence | **Yes** | Described rather than depicted, but a model will describe it |
+| Sexuality and nudity | **Yes** | In text, for the same reason |
+| Controlled substances | **Yes** | A model asked about drugs answers about drugs |
+| Horror and fear | **Yes** | In text |
+| Gambling and contests | No | Nothing in the app wagers, and no model output is a wager. No loot, no prizes, no simulated gambling |
+
+Expect a high band back, around Mature 17+ and PEGI 16 to 18, which is where the comparable
+assistants sit and is the honest price of the answer above. Do not tune the answers to reach
+a lower one: a rating authority can override the result, and being overridden means retaking
+the questionnaire with the reviewer already sceptical.
 
 ### The four that are not about depicted content
 
@@ -214,11 +242,11 @@ own, and they are where an app like this actually has something to declare.
 | Digital purchases | **No** | No billing library, no purchases, no ads |
 | Unrestricted internet | **Yes** | `fetch_url` retrieves a public web address the model chose and shows what came back. The user does not browse, and every fetch is approved, but the content that arrives is unfiltered and that is what the question is about |
 
-### Where the draft of this document used to be wrong
+### Two separate declarations, and only one of them is user-generated content
 
-It said to answer **yes** to user-generated content and point at the report action. That
-conflates two separate things, and answering yes would have been inaccurate in the direction
-that costs the most:
+An earlier draft said to answer **yes** to user-generated content and point at the report
+action. That conflates two separate things, and answering yes there would have been
+inaccurate in the direction that costs the most:
 
 - **User-generated content**, as Play means it, is content one user creates that *another*
   user can see. There are no other users here. Answering yes puts the app in the social

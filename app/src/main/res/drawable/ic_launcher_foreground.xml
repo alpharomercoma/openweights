@@ -13,8 +13,13 @@
   graphite at launcher size; measured at 96px, flat brass is the only version where all
   three bars still read. The rail that used to sit under them went for the same reason.
 
-  Geometry answers to the adaptive mask: 50 x 43 centred in the 108 viewport puts the
-  corners 65.9 across, inside the 66 circle every launcher shape is guaranteed to keep.
+  Geometry answers to the adaptive mask, and the arithmetic is not the obvious one. The x in
+  each M is where the straight run starts, not where the bar starts: both arcs bulge a
+  further 5.5 outward, so a bar drawn from 29 actually spans 23.5 to 79. Written that way
+  once, the mark sat 5.5 left of centre and its top-left cap reached 35.2 from the middle of
+  a viewport whose safe circle has a radius of 33, so a circular launcher mask would have
+  clipped it. Starting at 34.5 puts the bars at 29 to 79, centred on 54, with the farthest
+  point 30.7 and inside the circle every launcher shape is guaranteed to keep.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -23,11 +28,11 @@
     android:viewportHeight="108">
     <path
         android:fillColor="#F0A93B"
-        android:pathData="M29,32.5h39a5.5,5.5 0,0 1,0 11h-39a5.5,5.5 0,0 1,0 -11z" />
+        android:pathData="M34.5,32.5h39a5.5,5.5 0,0 1,0 11h-39a5.5,5.5 0,0 1,0 -11z" />
     <path
         android:fillColor="#F0A93B"
-        android:pathData="M29,48.5h24a5.5,5.5 0,0 1,0 11h-24a5.5,5.5 0,0 1,0 -11z" />
+        android:pathData="M34.5,48.5h24a5.5,5.5 0,0 1,0 11h-24a5.5,5.5 0,0 1,0 -11z" />
     <path
         android:fillColor="#F0A93B"
-        android:pathData="M29,64.5h9.5a5.5,5.5 0,0 1,0 11h-9.5a5.5,5.5 0,0 1,0 -11z" />
+        android:pathData="M34.5,64.5h9.5a5.5,5.5 0,0 1,0 11h-9.5a5.5,5.5 0,0 1,0 -11z" />
 </vector>

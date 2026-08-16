@@ -612,12 +612,34 @@ bool Session::supports_tool_results() const {
         }
         inputs.messages.push_back(msg);
     };
+    // Two results rather than one, and each with a name only it could have put there.
+    //
+    // Both halves of that were wrong in the first version, which asked only whether the
+    // render came back non-empty. That is the same mistake supports_tools was written to
+    // avoid: a template with no branch for the tool role does not raise, it drops the
+    // message and renders the two turns around it, so the prompt is non-empty and the probe
+    // says yes. The app would then hand the result to a model that never receives it and
+    // the turn answers as though nothing had run, which is the failure this whole function
+    // exists to prevent, now silent.
+    //
+    // Two, because one call is not the shape a turn takes when a model asks for a search
+    // and a fetch in the same breath. AgentRunner answers every call in a pass, so the real
+    // conversation can carry two tool messages back to back, and a template that renders
+    // one and refuses the pair would pass a one-message probe.
+    static constexpr const char * kFirst = "openweights_probe_result_one";
+    static constexpr const char * kSecond = "openweights_probe_result_two";
     add("user", "probe", nullptr);
     add("assistant", "probe", nullptr);
-    add("tool", "probe", "openweights_probe_call");
+    add("tool", kFirst, "openweights_probe_call_one");
+    add("tool", kSecond, "openweights_probe_call_two");
 
     try {
-        return !common_chat_templates_apply(templates, inputs).prompt.empty();
+        const std::string prompt = common_chat_templates_apply(templates, inputs).prompt;
+        // Both, so that a template which keeps only the last result is treated as unable to
+        // carry them. Folding into a user turn works for any template, so the strict answer
+        // is the safe one to be wrong about.
+        return prompt.find(kFirst) != std::string::npos &&
+            prompt.find(kSecond) != std::string::npos;
     } catch (const std::exception &) {
         return false;
     }

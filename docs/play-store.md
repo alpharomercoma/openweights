@@ -252,6 +252,50 @@ Two things still need a human before submission:
 2. The listing should say plainly that the user chooses the model, that models come from
    third parties, and that their behaviour is the publisher's rather than ours.
 
+## Version codes are counted, not typed
+
+Play's only rule for a version code is that it must be higher than every code uploaded
+before it, forever, and there is no way back: a code that has been used is used, and a
+bundle repeating one is refused at the door. Typing it by hand is a promise to remember
+something indefinitely while thinking about something else.
+
+So `versionCode` is `git rev-list --count HEAD`, and `versionName` is still typed. That split
+is the point rather than an accident: a version name says how big a change this is, which is
+a judgement no tool can make, and a version code is a counter Play uses to order uploads and
+nothing else.
+
+The commit count was chosen over the two obvious alternatives:
+
+- **A CI build number** does not survive a workflow being renamed or recreated, and it
+  resets to one when it happens. A version code that goes down cannot be undone, and the
+  same source would build a different code on a laptop than in CI.
+- **Resolving from Play** — which the Triple-T plugin can do — needs a service account, a
+  secret, and a network call, to answer a question the repository already knows. It is the
+  right tool once uploads are automated, and it is a lot of machinery for a counter.
+
+**A shallow clone breaks this, quietly, and that is the part worth knowing.**
+`actions/checkout` fetches one commit by default, so the count is 1 there and a hundred and
+something locally: the same source, two different codes, and the wrong one coming from the
+machine that builds what ships. Worse, 1 is what used to be typed in, so it would have
+looked right. Measured on this repository:
+
+```
+full clone     is-shallow=false   count=186
+shallow clone  is-shallow=true    count=1
+```
+
+The build therefore refuses a shallow clone rather than believing it, and the workflow asks
+for `fetch-depth: 0`. Release from `main`: the count is per branch, and a branch with fewer
+commits builds a lower code, which Play rejects rather than accepts.
+
+### Automating the upload itself
+
+Not done, and it is a separate job from the version code. The shape is a workflow triggered
+by a tag, which builds the bundle and hands it to Play, and it needs two secrets this
+repository deliberately does not have: the upload keystore, and a Play service account key
+with release permissions. Both are worth adding once there is something to release
+repeatedly; until the first upload is done by hand there is nothing for it to promote.
+
 ## Still to do, and none of it is code
 
 Every box that can be filled in ahead of time is filled in, in

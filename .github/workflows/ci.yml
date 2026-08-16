@@ -17,6 +17,12 @@ jobs:
         with:
           # llama.cpp is a pinned submodule; the native build needs it present.
           submodules: recursive
+          # The whole history, because the version code is the commit count. The default is
+          # a single commit, which would make that count 1 here and a hundred and something
+          # on a laptop: the same source producing two different version codes, with the
+          # wrong one coming from the machine that builds what ships. The build now refuses
+          # a shallow clone rather than believing it, so this line is what keeps CI green.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:

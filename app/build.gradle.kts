@@ -8,12 +8,66 @@ plugins {
     alias(libs.plugins.androidx.baselineprofile)
 }
 
+/**
+ * The number of commits on this branch, used as the version code.
+ *
+ * Play's one rule for a version code is that it must be higher than the last one uploaded,
+ * ever, and it is not recoverable: a code that has been used is used, and a build that
+ * repeats one is rejected at the door. Typing it by hand is therefore a promise to remember
+ * something, indefinitely, while doing something else, and the failure mode is finding out
+ * at upload time with a bundle already built.
+ *
+ * The commit count is the cheapest thing that cannot go backwards. It needs no service
+ * account, no secret, and no state anywhere outside the repository, and it produces the same
+ * answer on this laptop as in CI, which a build-number counter does not: a workflow renamed
+ * or recreated resets that counter, and a version code that goes down cannot be undone.
+ *
+ * Two things to know about it.
+ *
+ * It is per branch, so a release must be cut from `main`. A build from a branch with fewer
+ * commits produces a lower code, which Play will refuse rather than accept, so the failure
+ * is loud.
+ *
+ * And it is wrong on a shallow clone, quietly, which is the one that would actually have
+ * bitten: `actions/checkout` fetches a single commit by default, so a naive count returns 1
+ * in CI while returning a hundred and something locally. That is why the shallow case throws
+ * rather than falling back, and why the workflow asks for the full history.
+ */
+val gitCommitCount: Int by lazy {
+    val git = { args: List<String> ->
+        runCatching {
+            providers.exec {
+                commandLine(args)
+                isIgnoreExitValue = true
+            }.standardOutput.asText.get().trim()
+        }.getOrNull()
+    }
+
+    if (git(listOf("git", "rev-parse", "--is-shallow-repository")) == "true") {
+        throw GradleException(
+            "This is a shallow clone, so the commit count is not the real one and the " +
+                "version code built from it would be wrong. Fetch the full history " +
+                "(actions/checkout with fetch-depth: 0) and build again.",
+        )
+    }
+
+    // Absent git entirely, which is a source archive rather than a checkout. One is the
+    // lowest code Play accepts and nothing built this way is publishable anyway.
+    git(listOf("git", "rev-list", "--count", "HEAD"))?.toIntOrNull()?.takeIf { it > 0 } ?: 1
+}
+
 android {
     namespace = "io.github.alpharomercoma.openweights"
 
     defaultConfig {
         applicationId = "io.github.alpharomercoma.openweights"
-        versionCode = 1
+        // Counted, not typed. See gitCommitCount.
+        versionCode = gitCommitCount
+        // Typed, not counted, and deliberately the other way round from the line above. A
+        // version name is editorial: it says how big a change this is, which is a judgement
+        // no tool can make. A version code is a counter Play uses to order uploads and
+        // nothing else, and the one requirement on it is that it never repeats, which is
+        // exactly the kind of promise a person forgets and a machine does not.
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

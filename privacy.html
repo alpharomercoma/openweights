@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy · OpenWeights</title>
+<meta name="description" content="What OpenWeights keeps on your device, and the few things that leave it.">
+<meta name="color-scheme" content="dark light">
+<style>
+:root {
+  --canvas: #0B0D0F; --raised: #161A1F; --line: #262D34;
+  --text: #ECF1F4; --muted: #9AA6AF; --brass: #F0A93B;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --canvas: #FBFBF9; --raised: #F0F0EB; --line: #DCDCD6;
+    --text: #14181B; --muted: #535E67; --brass: #8A5A0E;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0 24px 96px;
+  background: var(--canvas); color: var(--text);
+  font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 46rem; margin: 0 auto; }
+header { max-width: 46rem; margin: 0 auto; padding: 56px 0 8px; }
+.mark { display: block; margin-bottom: 22px; }
+.mark i { display: block; height: 9px; border-radius: 5px; background: var(--brass);
+          margin-bottom: 4px; }
+h1 { font-size: 2.05rem; line-height: 1.2; letter-spacing: -0.022em; margin: 0 0 6px; }
+h2 { font-size: 1.3rem; letter-spacing: -0.012em; margin: 2.6em 0 0.7em;
+     padding-top: 1.4em; border-top: 1px solid var(--line); }
+h2:first-of-type { border-top: 0; padding-top: 0; }
+a { color: var(--brass); text-underline-offset: 3px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
+       background: var(--raised); padding: 1px 5px; border-radius: 4px; }
+.updated { color: var(--muted); font-size: 0.94rem; margin: 0 0 2.4em; }
+.table-scroll { overflow-x: auto; margin: 1.4em 0; }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.95rem; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
+         vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 0.83rem;
+     letter-spacing: 0.06em; text-transform: uppercase; }
+li { margin: 0.4em 0; }
+footer { max-width: 46rem; margin: 4em auto 0; padding-top: 1.6em;
+         border-top: 1px solid var(--line); color: var(--muted); font-size: 0.92rem; }
+</style>
+</head>
+<body>
+<header><span class="mark"><i style="width:64px"></i><i style="width:45px"></i><i style="width:26px"></i></span><h1>Privacy policy</h1><p class="updated">OpenWeights · last updated 2026-08-15</p></header><main><p>OpenWeights runs language models on your phone. There is no OpenWeights account, no
+OpenWeights server, and no analytics or crash reporting of any kind. Nothing in this app
+reports back to its developer.</p>
+<p>That is the short version and it is true, but it is not the whole story, because the app can
+reach the internet on your behalf. This document says exactly when, and what goes.</p>
+<h2>What stays on your device</h2>
+<ul>
+<li>Your conversations: what you typed, what the model replied, and the files you attached.</li>
+<li>The models you download, and the settings you keep for each one.</li>
+<li>Your usage totals: tokens, speed, and time spent generating.</li>
+<li>Reports you file about a model's output. These are stored in the app and sent nowhere.</li>
+<li>The contents of any folder you share with the app, and anything the assistant reads from
+  it.</li>
+</ul>
+<p>None of this is uploaded, backed up off the device, or readable by anyone else. Android's
+automatic backup and device-to-device transfer are switched off for this app, so your chats
+do not travel to a new phone. Uninstalling the app deletes all of it.</p>
+<h2>What leaves your device, and when</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>What</th>
+<th>When</th>
+<th>Where it goes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A search term you type in Discover</td>
+<td>When you search for a model</td>
+<td>Hugging Face</td>
+</tr>
+<tr>
+<td>A repository or file name</td>
+<td>When you open or download a model</td>
+<td>Hugging Face, and its content delivery network</td>
+</tr>
+<tr>
+<td>Your Hugging Face access token, if you set one</td>
+<td>With every Hugging Face request</td>
+<td>Hugging Face</td>
+</tr>
+<tr>
+<td>A search query the assistant composed</td>
+<td>Whenever it uses the <code>web_search</code> tool</td>
+<td>DuckDuckGo</td>
+</tr>
+<tr>
+<td>A web address the assistant chose, and the request for it</td>
+<td>Whenever it uses the <code>fetch_url</code> tool</td>
+<td>Whichever site the address names</td>
+</tr>
+</tbody>
+</table></div>
+<p>Every request above also carries the ordinary information any web request carries, including
+your IP address, which the receiving service handles under its own policy.</p>
+<p><strong>The two assistant tools deserve a paragraph of their own.</strong> <code>web_search</code> and <code>fetch_url</code>
+are switched on when the app is first installed, but <strong>the first time either would actually
+send something, the app asks you and shows you the request</strong>. Nothing reaches the internet on
+the assistant's behalf before you have answered that once.</p>
+<p>If you say yes, searches go out from then on without asking again. The assistant decides when
+to use them and composes the query itself, out of the conversation, which means what it sends
+can contain anything you have said or attached. If you say no, that tool is switched off,
+where you can see it and turn it back on later. You can change either switch at any time in
+the Tools tab; the app works without them and everything else is local.</p>
+<p>Fetching a page always asks, every time, because the address is the assistant's choice rather
+than yours.</p>
+<p><strong>Files you share.</strong> If you give the app access to a folder, its contents are read on the
+device and are never uploaded on their own. They can leave only through the two tools above,
+and only if you approve it: once the assistant has read a file during a turn, any search or
+page fetch in that same turn asks you first, in every mode. Answering yes is you choosing to
+send it.</p>
+<h2>Third parties</h2>
+<ul>
+<li><strong>Hugging Face</strong> (<a href="https://huggingface.co/privacy">privacy policy</a>) receives your model
+  searches and downloads, and your access token if you set one.</li>
+<li><strong>DuckDuckGo</strong> (<a href="https://duckduckgo.com/privacy">privacy policy</a>) receives the assistant's
+  search queries.</li>
+<li><strong>Any site the assistant is asked to read.</strong> This cannot be listed in advance, because it
+  is whatever the assistant found. Requests are restricted to public internet addresses.</li>
+</ul>
+<p>Data these services hold as a result of your requests is subject to their policies, not this
+one.</p>
+<h2>Your Hugging Face token</h2>
+<p>Setting a token is optional; public repositories work without one. If you set one it is
+encrypted with a key held in the Android Keystore, is attached only to requests to Hugging
+Face, is never written to a log, and is deleted when you remove it or uninstall the app.</p>
+<h2>Permissions</h2>
+<ul>
+<li><strong>Internet.</strong> For everything in the table above.</li>
+<li><strong>Notifications.</strong> To tell you a reply has finished and to show download progress. Asked
+  for the first time you send a message or start a download. Declining costs you nothing but
+  the notifications.</li>
+<li><strong>Microphone.</strong> For dictation, and only when you tap the microphone. Speech is transcribed
+  by the recogniser on your device; the app requests on-device recognition and does not use
+  the online kind. No audio is stored or sent by this app.</li>
+<li><strong>Foreground service.</strong> So a model download keeps running when you leave the app.</li>
+</ul>
+<p>The app asks for no storage permission. Folders and files reach it only through Android's own
+picker, one you chose at a time, and access can be revoked in system settings without
+uninstalling.</p>
+<h2>Children</h2>
+<p>OpenWeights is not directed at children. It runs models published by third parties, whose
+output is not controlled by this app.</p>
+<h2>Deleting your data</h2>
+<p>Delete a conversation to remove it and the files attached to it. Delete a model to remove its
+weights. Uninstall the app to remove everything, including your token. There is nothing held
+elsewhere for us to delete, because there is nowhere else.</p>
+<h2>Changes</h2>
+<p>If this policy changes, the date at the top changes with it, and a version that changes what
+leaves the device will say so in the app's release notes.</p>
+<h2>Contact</h2>
+<p>Open an issue at https://github.com/alpharomercoma/openweights.</p></main><footer><a href="./">OpenWeights</a> · <a href="https://github.com/alpharomercoma/openweights">Source on GitHub</a> · <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/privacy-policy.md">This policy in the repository</a></footer>
+</body>
+</html>

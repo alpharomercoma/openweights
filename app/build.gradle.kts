@@ -129,6 +129,10 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.room.testing)
+    // A real WorkManager on the host, so ModelsViewModel can be driven rather than mocked:
+    // the behaviour worth testing there is what it does with the queue's emissions, and a
+    // fake queue would be a fake of the exact thing that went wrong.
+    testImplementation(libs.androidx.work.testing)
     testImplementation(libs.okhttp)
     // The catalogue test builds the real tool set to check every schema a model is shown,
     // which means reaching the two things core:tools keeps to itself.

@@ -21,9 +21,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +81,14 @@ fun DiscoverScreen(
     onCloseModel: () -> Unit,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
+    /**
+     * Pops back to the conversation, when this screen was pushed from it.
+     *
+     * Nullable so the arrow only appears where there is somewhere to go back to, which is
+     * also what keeps every existing caller and every screen test compiling while the
+     * navigation is being rebuilt around it.
+     */
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** The Installed/Discover switch, drawn under this screen's own title. */
     tabs: @Composable () -> Unit = {},
@@ -99,12 +111,24 @@ fun DiscoverScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                     },
+                    // One arrow, two meanings, in the order a person would expect: while a
+                    // model is open it closes the model, and only once the list is showing
+                    // does it leave the screen. Two separate arrows would be two ways out of
+                    // a place with one way in.
                     navigationIcon = {
-                        if (state.detail != null) {
-                            IconButton(onClick = onCloseModel) {
+                        val back: (() -> Unit)? = when {
+                            state.detail != null -> onCloseModel
+                            else -> onBack
+                        }
+                        back?.let { pop ->
+                            IconButton(onClick = pop) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back to search results",
+                                    contentDescription = if (state.detail != null) {
+                                        "Back to search results"
+                                    } else {
+                                        "Back"
+                                    },
                                 )
                             }
                         }
@@ -120,7 +144,10 @@ fun DiscoverScreen(
             }
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+        ) {
             if (state.detail != null) {
                 ModelDetail(
                     state = state,

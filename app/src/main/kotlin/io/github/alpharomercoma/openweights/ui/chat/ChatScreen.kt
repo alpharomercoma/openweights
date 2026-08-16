@@ -36,12 +36,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -305,7 +308,16 @@ private fun ChatContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .imePadding(),
+                // One modifier for the bottom edge, covering the gesture bar and the
+                // keyboard together. safeDrawing is their union, so unlike chaining
+                // navigationBarsPadding() and imePadding() there is no order to get wrong
+                // and no way to pad twice by the bar's height when the keyboard is up.
+                //
+                // It also resolves to exactly zero while the shell still has a bottom bar,
+                // because windowInsetsPadding only applies what an ancestor has not already
+                // consumed, and the shell consumes the bar's height. That is what lets this
+                // land before the bar is deleted rather than in the same breath as it.
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
             contentAlignment = Alignment.TopCenter,
         ) {
             // The cap before the fill, not after. Written the other way round fillMaxSize

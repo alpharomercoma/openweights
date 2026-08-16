@@ -22,15 +22,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -67,7 +75,18 @@ import java.util.Locale
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
+fun DashboardScreen(
+    summary: UsageSummary,
+    /**
+     * Pops back to the conversation, when this screen was pushed from it.
+     *
+     * Nullable so the arrow only appears where there is somewhere to go back to, which is
+     * also what keeps every existing caller and every screen test compiling while the
+     * navigation is being rebuilt around it.
+     */
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -78,6 +97,16 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
         topBar = {
             TopAppBar(
                 title = { Text("Usage", style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    onBack?.let { back ->
+                        IconButton(onClick = back) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
@@ -86,7 +115,9 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
     ) { padding ->
         if (summary.replies == 0) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                modifier = Modifier.fillMaxSize().padding(padding)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                    .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
@@ -104,6 +135,7 @@ fun DashboardScreen(summary: UsageSummary, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

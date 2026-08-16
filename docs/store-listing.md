@@ -78,9 +78,28 @@ Models come from third parties. You choose which one to run, and what it says is
 publisher's work rather than ours. Open source, at github.com/alpharomercoma/openweights.
 ```
 
-**Category**: Tools. **Tags**: AI assistant, developer tools.
+**Category**: Productivity, as filed. Tools was the other candidate and is the better fit for
+what the app is — the description assumes the reader knows what a GGUF is, and tokens per
+second is a first-class feature — but the category is reversible, carries no compliance
+weight, and the Tools *tag* below recovers most of the discovery either way.
 
-**Contact email**: the address on the GitHub account.
+**Tags**: Personal assistant, Productivity, Privacy & security, Tools. Play's tag vocabulary
+is a fixed list, and an earlier version of this line invented two that are not in it.
+
+Four rather than the five allowed, deliberately. Tags decide the peer group Play benchmarks
+this app's crash and ANR rates against, so a fifth chosen to fill the slot would put it
+beside apps it has nothing in common with and make its vitals read worse than they are.
+Nothing else on the list is true of this app.
+
+**Contact email**: the address on the GitHub account. It is shown publicly on the listing,
+which is the reason to use one that can absorb it.
+
+**Website**: <https://alpharomercoma.github.io/openweights/>, the same site the privacy
+policy is served from.
+
+**External marketing**: left on. It is Google advertising the listing off-Play and involves
+no data from inside the app, so it does not touch what the policy claims. Changes to it take
+sixty days.
 
 **Privacy policy URL**: the published copy of `docs/privacy-policy.md`. GitHub Pages on this
 repository is enough; a raw file URL also works but reads badly.

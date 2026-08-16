@@ -5,8 +5,9 @@ copying rather than composing. The claims here match the app; where a form asks 
 code decides, the code was read rather than remembered.
 
 The checklist of what has been verified in the build is in [play-store.md](play-store.md).
-The policy this listing has to link to is [privacy-policy.md](privacy-policy.md), which needs
-a public URL before submission.
+The policy this listing has to link to is [privacy-policy.md](privacy-policy.md), published at
+<https://alpharomercoma.github.io/openweights/privacy.html>. That is the URL to paste into the
+Console; how the page is built and republished is in `play/site/README.md`.
 
 ## Store listing
 
@@ -178,12 +179,77 @@ Type `dataSync`, for model downloads. The words to use and the video to record a
 
 ## Content rating questionnaire
 
-Answer honestly on the basis that the app displays user-directed generative output:
+One questionnaire produces every regional rating at once: ESRB for North America, PEGI for
+Europe, USK for Germany, ClassInd for Brazil, GRAC for Korea, ACB for Australia. Answer it
+about **what the app itself contains and does**, which for this app is the whole difficulty,
+because the app authors no content at all and displays whatever a model the user chose
+produces.
 
-- No violence, sexuality, profanity or drug references authored by the app.
-- Users can interact with a model whose output is not controlled by the app. Where the
-  questionnaire asks about user-generated content, say yes and point to the report action.
-- No user-to-user communication, no location sharing, no purchases, no ads.
+Misrepresenting content gets an app removed, and under-declaring is the most common reason a
+rating is rejected, so where a question is genuinely ambiguous the answer below is the one
+that declares more rather than less.
+
+**Category.** Utility, Productivity, Communication, or Other. Not the
+Social/Forums/User-Generated-Content category: nothing any user types is ever seen by another
+user, because there is no account, no server and no sharing.
+
+| Section | Answer | Why |
+|---|---|---|
+| Violence | No | The app depicts none. It ships no content of its own |
+| Sexuality and nudity | No | As above |
+| Profanity and crude humour | No | As above |
+| Controlled substances | No | As above |
+| Horror and fear | No | As above |
+| Gambling and contests | No | No wagering, no loot, no prizes, no simulated gambling |
+
+### The four that are not about depicted content
+
+These appear on the listing as interactive elements rather than raising the age band on their
+own, and they are where an app like this actually has something to declare.
+
+| Element | Answer | Why |
+|---|---|---|
+| Users interact | **No** | No accounts, no server, no messaging, no sharing. Conversations are rows in a local database and reach nobody |
+| Shares location | **No** | The app asks for no location permission and sends no location |
+| Digital purchases | **No** | No billing library, no purchases, no ads |
+| Unrestricted internet | **Yes** | `fetch_url` retrieves a public web address the model chose and shows what came back. The user does not browse, and every fetch is approved, but the content that arrives is unfiltered and that is what the question is about |
+
+### Where the draft of this document used to be wrong
+
+It said to answer **yes** to user-generated content and point at the report action. That
+conflates two separate things, and answering yes would have been inaccurate in the direction
+that costs the most:
+
+- **User-generated content**, as Play means it, is content one user creates that *another*
+  user can see. There are no other users here. Answering yes puts the app in the social
+  category and attracts moderation obligations no app without a backend can meet.
+- **AI-generated content shown to the person who asked for it** is a different declaration
+  entirely, and it lives in the Generative AI section above, where the report action is the
+  in-app flagging feature that policy requires.
+
+Declare the second. Do not declare the first.
+
+### What to expect back, and the one thing worth pre-empting
+
+With nothing depicted and unrestricted internet declared, the bands should come back low,
+around ESRB Everyone and PEGI 3 to 7, with "Unrestricted Internet" printed beside them. Do not
+tune the answers to reach a number; a rating authority can override the result, and being
+overridden means retaking the questionnaire with the reviewer already sceptical.
+
+The thing most likely to draw a question is not in the questionnaire at all: **this app runs
+weights the user chose, so the developer cannot promise what the model will say.** Google's
+AI-generated content policy makes the developer responsible for output. Say plainly, in the
+review notes, what is true:
+
+- The app ships no model and no default that produces restricted content. Every model is
+  downloaded by the user from a third-party repository they picked.
+- Output is generated on the device, shown only to the person who asked, and never
+  transmitted, published or shared by the app.
+- Every reply carries a report action, which is the in-app flagging the policy requires.
+- The listing's last paragraph already says the models are third-party and their behaviour is
+  their publishers'.
+
+Retake the questionnaire if any of this changes; a shipped model catalogue would change it.
 
 ## Release track
 

@@ -148,8 +148,14 @@ and fetch pages on the user's behalf. Every row, with the reasoning behind it, i
 [store-listing.md](store-listing.md), alongside the listing copy and the generative AI
 declaration. The policy those link to is [privacy-policy.md](privacy-policy.md).
 
-What is left needs a person rather than a commit: the upload key, the graphics, the content
-rating questionnaire, the foreground service video, and publishing the policy at a URL.
+The upload key exists, the graphics are made and checked against the spec in `play/graphics`,
+and the policy is published at <https://alpharomercoma.github.io/openweights/privacy.html>.
+The content rating answers are written out question by question in
+[store-listing.md](store-listing.md#content-rating-questionnaire).
+
+What is left genuinely needs a person in front of the Console: pasting those answers into the
+questionnaire, recording the foreground service video, and filing the generative AI
+declaration with its two open questions.
 
 ---
 

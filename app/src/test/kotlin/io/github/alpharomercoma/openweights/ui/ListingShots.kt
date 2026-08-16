@@ -68,40 +68,67 @@ object ListingShots {
         onDownload = { _, _ -> },
     )
 
+    /**
+     * The Tools screen, with the rows the real one builds.
+     *
+     * Every string here is the string `ToolsViewModel.read` would produce: the name is the
+     * definition's name with its underscore replaced and its first letter raised, the
+     * description is the definition's own, and the provenance is one of exactly two
+     * sentences chosen by `alwaysAsk`. That is a rule rather than a preference, and the
+     * first version of this file broke it in a way worth writing down: it invented friendly
+     * names, wrote provenance lines the screen has no way to render, and told the reader
+     * that a search goes to "DuckDuckGo, then Wikipedia". Wikipedia was removed as a
+     * provider deliberately, it is named nowhere in the privacy policy, and a store
+     * screenshot that says a third party receives the user's queries when it receives
+     * nothing is the kind of inaccuracy Play treats as misrepresentation.
+     *
+     * Four rows rather than the registry's eight, because four is what this screen shows
+     * with no folder shared and no plan open: `Tool.isAvailable` keeps the file tools out
+     * until there is a folder, and `advance` and `ask_user` describe themselves only inside
+     * plan mode. The shot is of a first run, which is the state a person reading a store
+     * listing is about to be in.
+     */
     @Composable
     fun tools() = ToolsScreen(
         state = ToolsUiState(
             tools = listOf(
                 tool(
                     "web_search",
-                    "Web search",
-                    "Searches the web for current information.",
-                    "Leaves the device. DuckDuckGo, then Wikipedia.",
+                    "Search the web for something that changes or is recent: news, " +
+                        "prices, schedules, results, or a named person, product or " +
+                        "organisation. Not for definitions, translations, or facts that " +
+                        "do not change.",
+                    asks = false,
                     enabled = true,
                 ),
                 tool(
                     "fetch_url",
-                    "Read a page",
-                    "Reads a page the model or you named.",
-                    "Leaves the device. Public internet only.",
-                    enabled = true,
-                ),
-                tool(
-                    "search_files",
-                    "Search your folder",
-                    "Finds files in the folder you shared.",
-                    "On device. Never leaves the phone.",
+                    "Fetch a public web page and return its readable text. Use it to read " +
+                        "a page whose address you already have, for example one that " +
+                        "web_search returned.",
+                    // The one tool that asks every time, because the address is the model's
+                    // choice rather than the user's.
+                    asks = true,
                     enabled = true,
                 ),
                 tool(
                     "run_script",
-                    "Run a calculation",
-                    "Evaluates arithmetic the model writes.",
-                    "On device. No network, no filesystem.",
+                    "Write JavaScript and run it to work something out. Use it for sums, " +
+                        "dates and going through data rather than doing it in your head. " +
+                        "Return the answer, or leave it as the last expression. Name " +
+                        "files to read as inputs['x'].",
+                    asks = false,
+                    enabled = true,
+                ),
+                tool(
+                    "search_files",
+                    "Find files in the folder the user shared. Match names with a pattern " +
+                        "like *.md, and optionally give text to look for inside them.",
+                    asks = false,
                     enabled = false,
                 ),
             ),
-            workspace = WorkspaceSummary("Documents/Notes", GrantState.READ_WRITE),
+            workspace = WorkspaceSummary(null, GrantState.NONE),
         ),
         onToggle = { _, _ -> },
         onChooseFolder = {},
@@ -118,11 +145,17 @@ object ListingShots {
         pipelineTag = "text-generation",
     )
 
-    private fun tool(
-        id: String,
-        name: String,
-        description: String,
-        provenance: String,
-        enabled: Boolean,
-    ) = ToolSummary(id, name, description, provenance, enabled)
+    /** The same row `ToolsViewModel.read` builds, derived the same way from the name. */
+    private fun tool(id: String, description: String, asks: Boolean, enabled: Boolean) =
+        ToolSummary(
+            id = id,
+            name = id.replace('_', ' ').replaceFirstChar { it.uppercase() },
+            description = description,
+            provenance = if (asks) {
+                "Built in · asks before every run"
+            } else {
+                "Built in · runs without asking"
+            },
+            isEnabled = enabled,
+        )
 }

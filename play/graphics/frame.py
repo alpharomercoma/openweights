@@ -32,7 +32,7 @@ CAPTIONS = [
     ("02-tools", "An assistant that can act", "Search the web, read a page, use your files"),
     ("03-plan", "Ask it to plan first", "It proposes the steps. You tick them off."),
     ("04-discover", "Any model, not a catalogue", "Search Hugging Face and run any GGUF"),
-    ("05-tools", "Every tool has an off switch", "And each one says where your words go"),
+    ("05-tools", "Every tool has an off switch", "And each says if it asks before running"),
 ]
 
 

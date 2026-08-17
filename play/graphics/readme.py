@@ -25,6 +25,15 @@ HERE = Path(__file__).parent
 # position, which says nothing new on a strip this size.
 SCREENS = ["01-chat", "04-discover", "02-tools", "03-plan"]
 
+# The header logo, shipped at the size it is displayed at.
+#
+# GitHub does not rewrite a relative `src` inside a raw <img> tag: the rendered README keeps
+# `play/graphics/icon-512.png`, which the browser resolves against the repository page and
+# 404s. Markdown image syntax *is* rewritten, so the README uses that, and markdown carries no
+# width attribute. Hence a second file at the display size rather than the 512 icon scaled by
+# an attribute that cannot be used.
+LOGO = 128
+
 SHOT_W = 320
 GAP = 24
 RADIUS = 26
@@ -63,7 +72,13 @@ def strip(source: Path) -> Image.Image:
 
 if __name__ == "__main__":
     source = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/shots")
-    out = HERE / "readme-screens.png"
+
+    strip_out = HERE / "readme-screens.png"
     image = strip(source)
-    image.save(out)
-    print(f"wrote {out.name}: {image.width}x{image.height}")
+    image.save(strip_out)
+    print(f"wrote {strip_out.name}: {image.width}x{image.height}")
+
+    logo_out = HERE / "readme-logo.png"
+    icon = Image.open(HERE / "icon-512.png").convert("RGBA")
+    icon.resize((LOGO, LOGO), Image.LANCZOS).save(logo_out)
+    print(f"wrote {logo_out.name}: {LOGO}x{LOGO}")

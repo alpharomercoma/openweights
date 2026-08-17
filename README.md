@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="play/graphics/icon-512.png" alt="" width="96" height="96">
+![](play/graphics/readme-logo.png)
 
 # OpenWeights
 
@@ -114,7 +114,7 @@ Issues and pull requests are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 <div align="center">
 
-<a href="play/graphics/readme-screens.png"><img src="play/graphics/readme-screens.png" width="100%" alt="Four screens: a chat with tokens per second and context fill, the Hugging Face search with a fit verdict per model, a turn that searched the web, and a plan with steps to tick off."></a>
+[![Four screens: a chat with tokens per second and context fill, the Hugging Face search with a fit verdict per model, a turn that searched the web, and a plan with steps to tick off.](play/graphics/readme-screens.png)](play/graphics/readme-screens.png)
 
 <sub>Telemetry as you chat · the Hub, filtered to what fits · a turn that used a tool · a plan you tick off<br>Tap for full size</sub>
 

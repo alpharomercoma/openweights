@@ -81,7 +81,15 @@ class GgufHeaderParser(
             embeddingLength = values.int("$arch.embedding_length") ?: 0,
             headCount = values.int("$arch.attention.head_count") ?: 0,
             keyValueHeadsPerLayer = values.keyValueHeads(arch),
-            trainingContextLength = values.int("$arch.context_length") ?: 0,
+            // Two keys, and the smaller one wins where both exist. `context_length` is
+            // `max_position_embeddings`, which is how far the positional encoding can reach
+            // rather than how far the model was trained, and a model whose RoPE was extended
+            // writes the pre-extension length here instead. Preferring it is the only
+            // machine-readable correction available.
+            trainingContextLength = listOfNotNull(
+                values.int("$arch.context_length"),
+                values.int("$arch.rope.scaling.original_context_length"),
+            ).filter { it > 0 }.minOrNull() ?: 0,
             fileType = GgufFileType.fromId(values.int(KEY_FILE_TYPE) ?: -1),
             name = values[KEY_NAME] as? String,
         )

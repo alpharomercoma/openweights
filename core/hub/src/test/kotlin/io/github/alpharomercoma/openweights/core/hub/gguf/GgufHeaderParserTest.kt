@@ -23,6 +23,42 @@ import org.junit.Test
 
 class GgufHeaderParserTest {
     @Test
+    fun `the pre-extension length wins, because it is the one that was trained`() = runTest {
+        // Real numbers off a real file. LFM2.5 1.2B Instruct writes context_length 128000 and
+        // its own model card says 32,768, because context_length is max_position_embeddings:
+        // how far the positional encoding reaches, not how far the model was trained. Where a
+        // file also states the pre-extension length, that is the honest one and this takes it.
+        val header = GgufBuilder()
+            .string("general.architecture", "lfm2")
+            .uint32("lfm2.block_count", 16)
+            .uint32("lfm2.embedding_length", 2048)
+            .uint32("lfm2.attention.head_count", 32)
+            .uint32("lfm2.attention.head_count_kv", 8)
+            .uint32("lfm2.context_length", 128_000)
+            .uint32("lfm2.rope.scaling.original_context_length", 32_768)
+            .build()
+
+        val metadata = GgufHeaderParser(header.asSource()).parse()
+
+        assertThat(metadata.trainingContextLength).isEqualTo(32_768)
+    }
+
+    @Test
+    fun `a file that states only one length still reports it`() = runTest {
+        val header = GgufBuilder()
+            .string("general.architecture", "qwen3")
+            .uint32("qwen3.block_count", 28)
+            .uint32("qwen3.embedding_length", 2048)
+            .uint32("qwen3.attention.head_count", 16)
+            .uint32("qwen3.attention.head_count_kv", 8)
+            .uint32("qwen3.context_length", 40_960)
+            .build()
+
+        assertThat(GgufHeaderParser(header.asSource()).parse().trainingContextLength)
+            .isEqualTo(40_960)
+    }
+
+    @Test
     fun `reads the fields the fit estimator needs`() = runTest {
         val header = GgufBuilder()
             .string("general.architecture", "llama")

@@ -789,6 +789,27 @@ fraction of the window: `DEFAULT_CEILING_TOKENS = 4096`, about a fifth slower th
 context on this hardware, and deliberately below what this device could bear because it is
 also what an unmeasured phone has to live with.
 
+**The header is not the trained length, and treating it as one was the bug this was meant to
+fix.** `<arch>.context_length` is `max_position_embeddings`: how far the positional encoding
+can reach, not how far the model was trained. It is systematically optimistic and the gap is
+large.
+
+| model | GGUF `context_length` | its own model card |
+| --- | ---: | ---: |
+| LFM2.5 1.2B Instruct | 128,000 | **32,768** |
+| Qwen3 1.7B | 40,960 | **32,768** |
+
+Both were read off the real files. The honest figure is prose on a web page and there is no
+key for it, so opening at the header opens past what the publisher validated, which is exactly
+the failure the automatic window was introduced to stop rather than to cause. Two changes
+follow. The parser now prefers `<arch>.rope.scaling.original_context_length` where a file
+states it, which is the one machine-readable correction that exists and is the pre-extension
+length for anything whose window was stretched. And the automatic window is capped at
+`SAFE_CONTEXT = 16384`, four times the fold ceiling, which leaves room for a long document on
+top of a folded conversation and sits inside the 32,768 both of those cards claim. The header
+remains the hard bound and the slider still runs to it. On the device the same model now opens
+at `ctx=16384` rather than `ctx=128000`.
+
 **Two things this does not answer.** Whether a/b transfers between phones: both reviewers said
 approximately and neither said exactly, because weight streaming is bandwidth-bound while
 attention reads are strided and latency-bound, and those scale differently across memory

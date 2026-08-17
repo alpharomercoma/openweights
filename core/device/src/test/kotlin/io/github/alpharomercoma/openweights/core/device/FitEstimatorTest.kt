@@ -160,18 +160,25 @@ class FitEstimatorTest {
     }
 
     @Test
-    fun `the default window is what the model was trained for when the phone can hold it`() {
-        // Measured on an MT6991 with this exact model: every width from 4k to 128k loaded and
-        // decode stayed between 15.7 and 16.5 tokens a second across the whole range. A
-        // hybrid keeps a cache for a third of its blocks, so 128k costs about two gigabytes
-        // of address space and almost none of it is ever resident.
+    fun `a header claiming a huge window does not open one`() {
+        // The header says 128,000 for this model and its own card says 32,768, because
+        // `context_length` is how far the positional encoding reaches rather than how far the
+        // model was trained. Opening at the header would be opening past what the publisher
+        // validated, so the automatic window stays well inside it whatever the file claims.
         val window = estimator.defaultContextLength(phone, hybrid, fileSizeBytes = 1670 * MIB)
 
-        // Just under what it was trained for, because the share of memory a cache may claim
-        // binds a little before the training length does. Both bounds are doing their job,
-        // which is the shape to assert rather than one exact number.
-        assertThat(window).isAtLeast(100_000)
-        assertThat(window).isAtMost(128_000)
+        assertThat(window).isAtMost(16_384)
+        assertThat(window).isAtLeast(8_192)
+    }
+
+    @Test
+    fun `a rope-extended model is read at the length it was trained at`() {
+        // The one machine-readable correction there is: a model whose window was extended
+        // writes the pre-extension length as well, and that is the honest number.
+        val extended = hybrid.copy(trainingContextLength = 4_096)
+
+        assertThat(estimator.defaultContextLength(phone, extended, fileSizeBytes = 1670 * MIB))
+            .isEqualTo(4_096)
     }
 
     @Test

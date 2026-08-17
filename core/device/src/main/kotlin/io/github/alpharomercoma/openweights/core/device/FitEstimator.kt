@@ -141,13 +141,27 @@ class FitEstimator @Inject constructor() {
         fileSizeBytes: Long,
         projectorSizeBytes: Long = 0,
     ): Int {
-        // Bounded above as well as below. A header is a claim by whoever converted the file,
-        // and nothing else checks it: a small model claiming two million tokens on a phone
-        // with room for the arithmetic would have had that honoured.
-        val trained = metadata.trainingContextLength
+        // Bounded above as well as below, and by less than the header says.
+        //
+        // `<arch>.context_length` is `max_position_embeddings`: how far the positional
+        // encoding can reach, not how far the model was trained. It is systematically
+        // optimistic and the gap is large. LFM2.5 1.2B Instruct writes 128,000 and its model
+        // card says 32,768; Qwen3 1.7B writes 40,960 and its card says 32,768. The real
+        // figure is prose on a web page and there is no key for it, so opening at the header
+        // is opening past what the publisher validated, which is the thing this was supposed
+        // to stop rather than cause.
+        //
+        // So the header stays the hard bound, and the automatic window stays well inside it.
+        // [SAFE_CONTEXT] is chosen from what the app needs rather than from a guess about
+        // other people's validation: it is four times the point at which conversations are
+        // folded, which leaves room for a long document on top of a folded conversation and
+        // is inside every trained length either of those cards claims. Anyone who wants the
+        // rest can move the slider, which still runs to what the header allows.
+        val declared = metadata.trainingContextLength
             .takeIf { it > 0 }
             ?.coerceAtMost(MAX_PLAUSIBLE_CONTEXT)
             ?: FALLBACK_CONTEXT
+        val trained = minOf(declared, SAFE_CONTEXT)
         val bytesPerToken = metadata.kvCacheBytes(contextLength = 1)
         // A header that says nothing about its cache shape can still be bounded by what the
         // model was trained for. Returning the fallback outright, which is what this did,
@@ -259,6 +273,16 @@ class FitEstimator @Inject constructor() {
          * opinion of itself.
          */
         const val MAX_PLAUSIBLE_CONTEXT = 262_144
+
+        /**
+         * The widest window to open without being told to.
+         *
+         * Four times `CompactionPolicy.DEFAULT_CEILING_TOKENS`, so a folded conversation and
+         * a long document fit together with room left, and comfortably inside the 32,768 that
+         * both recommended models' cards claim as their real trained length. Not a limit: the
+         * slider goes to whatever the header allows.
+         */
+        const val SAFE_CONTEXT = 16_384
     }
 }
 

@@ -47,8 +47,10 @@ Tokens per second, time to first token, and how full the context window is, show
 chat rather than hidden.
 
 YOURS TO TUNE
-Temperature, top-k, top-p, min-p, repeat penalty, context length, system prompt and threads,
-saved per model, with presets.
+Temperature, top-p, top-k, repeat penalty, context length, the system prompt and what the
+model is told about its tools, all saved per model. Where a model can think before it answers
+that is a switch too, and on a phone with a working GPU you can say which processor holds the
+layers.
 
 MORE THAN TEXT
 Images and audio for models that ship a projector for them, documents any model can read,

@@ -71,6 +71,15 @@ internal class LlamaBridge {
 
     external fun nativeModelDescription(handle: Long): String
 
+    /**
+     * Which backend holds the weights, as llama.cpp accounted for them at load.
+     *
+     * `"OpenCL|OpenCL:680|CPU:96"`, dominant backend first. Empty when nothing was
+     * captured. This is the only honest answer to "did the GPU toggle do anything": the
+     * layer count llama.cpp also reports is the number requested, not the number placed.
+     */
+    external fun nativeOffloadSummary(handle: Long): String
+
     /** `[vision, audio]`: what the loaded projector accepts. Both false without one. */
     external fun nativeMediaSupport(handle: Long): BooleanArray
 

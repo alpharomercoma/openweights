@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +53,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.groupByDay
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -82,12 +83,22 @@ fun ConversationDrawer(
     nowMillis: Long,
     destinations: ChatDestinations = ChatDestinations(),
 ) {
-    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer) {
+    // Narrower than Material's default, and this is not a taste decision.
+    //
+    // `ModalDrawerSheet` is 360dp wide at most, and a great many phones are exactly 360dp
+    // wide: 1080 pixels at 480dpi is the most common handset there is. On one of those the
+    // sheet covers the screen edge to edge, which leaves no scrim to tap, and tapping
+    // outside a drawer to shut it is how everybody shuts a drawer. There was nothing
+    // outside it. The fraction keeps a strip of the conversation visible at any width, and
+    // the cap keeps a tablet from handing the drawer a third of a large screen.
+    ModalDrawerSheet(
+        drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(SHEET_FRACTION).widthIn(max = SHEET_MAX),
+    ) {
         // The one filled control in the drawer, so the eye lands on it first. Lime carries
         // ink, never white, which is the rule the whole palette is built on.
-        Button(
+        AccentButton(
             onClick = onNewChat,
-            shape = RoundedCornerShape(Radius.pill),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -266,6 +277,12 @@ internal fun Long.asRelativeTime(nowMillis: Long): String {
         else -> "${days / DAYS_PER_WEEK}w ago"
     }
 }
+
+/** Enough of the conversation left showing to be worth tapping, at any screen width. */
+private const val SHEET_FRACTION = 0.85f
+
+/** Material's own maximum, which only binds on a screen wider than about 420dp. */
+private val SHEET_MAX = 360.dp
 
 private const val MINUTES_PER_HOUR = 60
 private const val HOURS_PER_DAY = 24

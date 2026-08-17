@@ -127,6 +127,8 @@ class AskUserTool @Inject constructor(private val board: AskBoard) : Tool {
         """.trimIndent(),
     )
 
+    override val isUserFacing: Boolean = false
+
     override val isAvailable: Boolean get() = board.offered
 
     /** The question is the approval: there is nothing to confirm before showing it. */

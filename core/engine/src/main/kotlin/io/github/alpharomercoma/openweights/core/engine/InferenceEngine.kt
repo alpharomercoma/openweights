@@ -125,6 +125,18 @@ data class LoadedModelInfo(
     val trainingContextSize: Int,
     val layerCount: Int,
     val contextUsed: Int,
+    /**
+     * The backend that actually holds the weights, as llama.cpp accounted for them.
+     *
+     * "CPU", "OpenCL", "Metal". Empty when the engine could not say. This is the answer to
+     * "did asking for the GPU do anything", and it is not the same question as which
+     * backends are registered or how many layers were requested: a GPU that fails to
+     * attach loads the whole model onto the CPU and reports the requested layer count
+     * regardless. Reading which buffers the tensors landed in is the only way to know.
+     */
+    val offloadedTo: String = "",
+    /** Every buffer holding weights, largest first: `[OpenCL to 680, CPU to 96]` in MiB. */
+    val offloadBuffers: List<Pair<String, Int>> = emptyList(),
     val mediaSupport: MediaSupport = MediaSupport(),
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,

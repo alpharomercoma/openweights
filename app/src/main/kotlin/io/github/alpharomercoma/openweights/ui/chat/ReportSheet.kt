@@ -27,7 +27,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -48,7 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.ReportReason
-import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 
 /**
  * Reporting a reply, without leaving the app.
@@ -151,9 +150,12 @@ fun ReportSheet(
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    text = "The model name ($modelName), the reason, your note, and the " +
-                        "reply itself. Nothing is sent anywhere: this app has no server. " +
-                        "You can read and delete your reports in Settings.",
+                    // It used to end "you can read and delete your reports in Settings",
+                    // which was a promise about a screen that was never built. The store is
+                    // real and this app has no server, so the first half was always true;
+                    // the second half was a plan.
+                    text = "The model name ($modelName), the reason, your note and the " +
+                        "reply. It stays on this phone. There is nowhere to send it.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -173,10 +175,9 @@ fun ReportSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onDismiss) { Text("Cancel") }
-                Button(
+                AccentButton(
                     onClick = { reason?.let { onSubmit(it, note) } },
                     enabled = reason != null,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Radius.sm),
                 ) {
                     Text("Report")
                 }

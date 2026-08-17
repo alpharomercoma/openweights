@@ -206,6 +206,15 @@ data class ChatUiState(
     /** The compute device the engine is actually running on, e.g. `CPU`. */
     val backend: String? = null,
     /**
+     * Every buffer holding the weights, largest first, in MiB.
+     *
+     * Shown beside the processor setting, because that setting is a request and this is
+     * what came of it. llama.cpp reports the layer count it was asked for whether or not a
+     * backend attached, so the only honest answer to "did that do anything" is which
+     * buffers the tensors ended up in.
+     */
+    val offloadBuffers: List<Pair<String, Int>> = emptyList(),
+    /**
      * True while the phone is hot enough that the thread plan has been cut back.
      *
      * Only meaningful while generating. A device cools while idle, and the reading is only
@@ -417,8 +426,16 @@ class ChatViewModel @Inject constructor(
      * that moment the old name, context size and capabilities describe nothing. The staged
      * attachments go too, whether the load succeeds or fails, because they were picked for
      * a model that is no longer there.
+     *
+     * @param replacing the model being loaded, whose name the top bar keeps while the
+     * weights are remapped. Everything that could be wrong about it is still cleared: the
+     * processor, the window, and what it can read are all properties of a load that has not
+     * happened yet. Only the name survives, and only because moving the processor took the
+     * title down to "Choose a model" for the seconds it took, which reads as having lost
+     * the model rather than as having moved it. Nothing can act on the name meanwhile, since
+     * the composer is closed for the whole of a load.
      */
-    private suspend fun forgetLoadedModel() {
+    private suspend fun forgetLoadedModel(replacing: File? = null) {
         // Cleared here as well as on the way in. A load that fails leaves nothing loaded, and
         // a stale file here would have the next turn check weights that are not in use.
         loadedFile = null
@@ -426,7 +443,7 @@ class ChatViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 staged = emptyList(),
-                modelName = null,
+                modelName = replacing?.nameWithoutExtension,
                 modelQuantization = null,
                 backend = null,
                 contextSize = 0,
@@ -477,7 +494,7 @@ class ChatViewModel @Inject constructor(
         runCatching {
             val settings = runtime.settingsFor(modelFile.name)
             val projector = runtime.projectorFor(modelFile)
-            forgetLoadedModel()
+            forgetLoadedModel(replacing = modelFile)
             runtime.load(modelFile, loadParamsFor(modelFile, settings, contextLength), projector)
             settings
         }.onSuccess { preferences ->
@@ -494,6 +511,7 @@ class ChatViewModel @Inject constructor(
                 it.copy(
                     isLoadingModel = false,
                     backend = runtime.backendName(),
+                    offloadBuffers = info?.offloadBuffers.orEmpty(),
                     hasGpu = runtime.hasGpu(),
                     modelName = modelFile.nameWithoutExtension,
                     // The filename's own quantization, not llama's verbose description:
@@ -534,7 +552,11 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }.onFailure { failure ->
-            _uiState.update { it.copy(isLoadingModel = false, error = failure.userMessage()) }
+            // The name was kept across the swap for the top bar. A load that failed holds no
+            // weights, so it goes here rather than staying to describe nothing.
+            _uiState.update {
+                it.copy(isLoadingModel = false, modelName = null, error = failure.userMessage())
+            }
         }
     }
 
@@ -1105,12 +1127,33 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Saves settings for the loaded model. Context length applies at the next load. */
+    /**
+     * Saves settings for the loaded model.
+     *
+     * Most of them are read when the next reply starts and so take effect immediately. Two
+     * are not: the context window and which processor holds the layers are both fixed when
+     * llama.cpp maps the weights, and the only way to change either is to map them again.
+     *
+     * The processor is reloaded here rather than left for whenever the model next happens to
+     * load. Left, it was indistinguishable from a broken switch: the user moved it to GPU,
+     * the top bar went on saying CPU because the weights really were still on the CPU, and
+     * nothing on screen said that the setting was waiting for an event the user had no
+     * reason to expect. The reload costs three to seven seconds on the hardware measured,
+     * and the screen already has a state for that.
+     *
+     * The context window is deliberately not reloaded with it. Growing it can fail on a
+     * phone that cannot spare the memory, and failing a load the user did not ask for would
+     * leave them with no model at all in exchange for a number they were only editing.
+     */
     fun savePreferences(preferences: ModelPreferences) {
         val model = preferencesKey ?: return
         viewModelScope.launch {
+            val movedProcessor = _uiState.value.preferences.offload != preferences.offload
             runtime.saveSettings(model, preferences)
             _uiState.update { it.copy(preferences = preferences) }
+            // The conversation is kept: only the weights move, and the transcript is text.
+            // The cache does not survive, which is why the next reply re-reads it.
+            if (movedProcessor) loadedFile?.let { loadModel(it, keepConversation = true) }
         }
     }
 

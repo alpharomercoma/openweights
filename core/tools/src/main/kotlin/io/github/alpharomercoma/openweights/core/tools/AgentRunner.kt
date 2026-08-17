@@ -89,7 +89,6 @@ sealed interface AgentDecision {
 class AgentRunner(
     private val registry: ToolRegistry,
     private val maxRounds: Int = DEFAULT_MAX_ROUNDS,
-    private val consent: ToolConsent = ToolConsent.Settled,
 ) {
     /**
      * Whether text somebody else wrote has reached the model during this turn.
@@ -243,23 +242,27 @@ class AgentRunner(
         mode: AgentMode,
         approve: suspend (ToolCall) -> Boolean,
     ): Boolean {
-        // The first thing ever to leave the device is asked about whatever the mode says, and
-        // asked once. Everything else in this app is local, so this is the moment that stops
-        // being true, and it used to pass unremarked: `web_search` ships switched on and auto
-        // runs it without asking, so a question could reach a search engine before the user
-        // had opened the Tools tab. See [OffDeviceConsent] for why the answer is not a
-        // shipped-off default instead.
+        // Nothing here asks permission to do the thing the app is for.
         //
-        // The answer stands as this call's approval too, rather than falling through to the
-        // ordinary rules and asking a second time about the call the question already showed.
-        if (tool.leavesTheDevice && !consent.isSettled) {
-            val agreed = approve(call)
-            consent.settle(tool.definition.name, agreed)
-            return agreed
-        }
-
+        // There were two more gates. One was a single question before the first thing ever
+        // left the device, so that discovery and consent would be the same event. The other
+        // was `alwaysAsk` on fetching a page, because the address is the model's choice
+        // rather than the user's. Both were reasonable and both are gone: an agent that
+        // stops to ask whether it may search is not an agent, and the answer to "did it
+        // search" is already in the transcript, where every call is a row in the reply it
+        // produced, naming the tool and the argument it was given. Disclosure after the
+        // fact, in the place you are already looking, beats a dialog before it.
+        //
+        // Tools is where this is decided instead. Every tool has a switch, the ones that
+        // leave the device sit under a heading saying so, and the screen is one tap from
+        // the drawer.
+        //
+        // What survives is the one combination neither of those covered: a model that has
+        // just read somebody else's text and now wants to send something out. That is not a
+        // matter of taste, it is the shape of an exfiltration, and it still asks whatever
+        // the mode says.
         val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
-        val autoAllows = mode == AgentMode.AUTO && !tool.alwaysAsk && !carriesSomebodyElsesText
+        val autoAllows = mode == AgentMode.AUTO && !carriesSomebodyElsesText
         return autoAllows || !tool.needsApproval || approve(call)
     }
 

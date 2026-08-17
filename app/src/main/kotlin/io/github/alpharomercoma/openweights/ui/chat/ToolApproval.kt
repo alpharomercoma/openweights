@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 
 /**
@@ -72,9 +72,8 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
         ) {
             // Declining is not an error: the model is told, and answers without the tool.
             TextButton(onClick = { onAnswer(false) }) { Text("Not now") }
-            Button(
+            AccentButton(
                 onClick = { onAnswer(true) },
-                shape = RoundedCornerShape(Radius.sm),
             ) {
                 Text("Run")
             }

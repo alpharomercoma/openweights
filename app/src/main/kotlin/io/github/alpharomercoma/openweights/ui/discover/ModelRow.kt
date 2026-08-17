@@ -20,7 +20,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,11 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import java.util.Locale
@@ -52,10 +52,10 @@ import java.util.Locale
 /**
  * One search result.
  *
- * A model repository has no picture, so the row has to make its own shape. The publisher's
- * initials in a tinted tile give the list a left edge to scan down, and the size badge
- * answers the first question anyone asks about a model on a phone before they have to open
- * anything. Everything else is one quiet line underneath.
+ * Two lines: what it is called and how big it is on the first, who published it and how
+ * many people have taken it on the second. It was three, with a tile of initials down the
+ * left, which made a list of five models as tall as a screen and gave every row the shape
+ * of a contact card.
  */
 @Composable
 fun ModelRow(
@@ -67,27 +67,53 @@ fun ModelRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
             .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        PublisherTile(owner = model.owner, avatarUrl = avatarUrl)
+        // Only when there is a real one. The slot used to hold the publisher's initials in
+        // a tinted square until the picture arrived, which is the shape an address book
+        // uses for a person with no photograph, and it read as one: five grey tiles saying
+        // M, B, U, S, L down the left of a list of language models. A logo is worth the
+        // column and a letter is not, so the letter went and the column goes with it when
+        // there is nothing to put in it.
+        avatarUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(TILE_SIZE)
+                    .clip(RoundedCornerShape(Radius.xs))
+                    // Publishers upload logos on white, which on the light theme's card is
+                    // a picture with no edge: the row looked like it had no avatar at all.
+                    .border(
+                        width = Dp.Hairline,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(Radius.xs),
+                    ),
+            )
+        }
 
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(
-                text = model.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = model.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                // Beside the name rather than under it. Size is the first question anybody
+                // asks about a model on a phone, and on its own line it cost a third of the
+                // row's height to answer a question that fits in four characters.
                 model.parameterHint?.let { Badge(text = it, emphasis = true) }
                 if (model.isVision) Badge(text = "Vision", icon = Icons.Rounded.Visibility)
                 if (model.isAudio) Badge(text = "Audio", icon = Icons.Rounded.GraphicEq)
@@ -109,59 +135,18 @@ fun ModelRow(
     }
 }
 
-/**
- * The publisher's own picture, or their initials until it arrives.
- *
- * The Hub has avatars but does not put them in search results, so each one is a separate
- * lookup and may never arrive. The initials are drawn first and stay if it does not: the
- * tile is the same size either way, so nothing moves when a picture loads.
- *
- * Neutral, and it used to be a colour hashed from the publisher's name. The doc claimed the
- * five hues came from the measurement scale; three of them were in no palette at all, they
- * had no light theme variant, and hashing a name onto a hue means the colour says something
- * it cannot back up. The initials already tell two publishers apart, and the palette now has
- * exactly one chromatic note to spend.
- */
-@Composable
-private fun PublisherTile(owner: String, avatarUrl: String?) {
-    val shape = RoundedCornerShape(Radius.sm)
-
-    Box(
-        modifier = Modifier
-            .size(TILE_SIZE)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
-            // One label for the row is enough; the tile repeats the publisher name that is
-            // already read out below it.
-            .clearAndSetSemantics { contentDescription = "" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = owner.initials(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (avatarUrl != null) {
-            AsyncImage(
-                model = avatarUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize().clip(shape),
-            )
-        }
-    }
-}
-
 @Composable
 private fun Badge(text: String, icon: ImageVector? = null, emphasis: Boolean = false) {
+    // The same recipe as a selected chip and an accent button: lime carrying ink, the same
+    // in both themes. Emphasis is for the parameter count, which is the number that decides
+    // whether a model is worth opening at all.
     val container = if (emphasis) {
-        MaterialTheme.colorScheme.primaryContainer
+        OpenWeightsColors.Lime
     } else {
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val content = if (emphasis) {
-        MaterialTheme.colorScheme.onPrimaryContainer
+        OpenWeightsColors.Ink
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -196,15 +181,7 @@ private fun Badge(text: String, icon: ImageVector? = null, emphasis: Boolean = f
 private val HubModel.displayName: String
     get() = name.removeSuffix("-GGUF").removeSuffix("-gguf").ifEmpty { name }
 
-/** Up to two initials, which is what fits in the tile at any font scale. */
-private fun String.initials(): String = split('-', '_', '.', ' ')
-    .filter { it.isNotEmpty() }
-    .take(2)
-    .map { it.first().uppercaseChar() }
-    .joinToString("")
-    .ifEmpty { "?" }
-
-private val TILE_SIZE = 40.dp
+private val TILE_SIZE = 36.dp
 
 /** Download counts run to seven figures, and nobody reads seven figures. */
 internal fun Int.compact(): String = when {

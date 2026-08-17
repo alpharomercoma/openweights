@@ -94,25 +94,14 @@ class AgentRunnerTest {
     private val registry = ToolRegistry(listOf(echo, explodes, open, reader, sender, planner))
     private val runner = AgentRunner(registry)
 
-    /** An unanswered consent, and a record of what a refusal switched off. */
-    private class Consent : ToolConsent {
-        override var isSettled: Boolean = false
-        val switchedOff = mutableListOf<String>()
-
-        override fun settle(toolName: String, allowed: Boolean) {
-            isSettled = true
-            if (!allowed) switchedOff += toolName
-        }
-    }
-
     private fun call(name: String, id: String = "c1", args: String = "{}") =
         ToolCall(id = id, name = name, argumentsJson = args)
 
     @Test
     fun `sending something away is not questioned before a file has been read`() = runTest {
         // The ordinary case, and the one that must stay free of taps: looking something up
-        // when nothing on the device has entered the turn. Consent is already settled here,
-        // which is every turn after the first; the first is the test below.
+        // when nothing on the device has entered the turn. Nothing asks about this any
+        // more, on any turn, including the first.
         var asked = false
 
         runner.step(listOf(call("sender")), round = 0, mode = AgentMode.AUTO, approve = {
@@ -122,59 +111,6 @@ class AgentRunnerTest {
 
         assertThat(asked).isFalse()
         assertThat(ran).containsExactly("sender")
-    }
-
-    @Test
-    fun `the first thing that would leave the device asks, whatever the mode says`() = runTest {
-        // Everything else in this app is local, so the first search is the moment that stops
-        // being true, and it used to happen with no prompt: web_search ships on and auto mode
-        // runs it without asking, so a question could reach a search engine before anybody had
-        // opened the Tools tab.
-        val fresh = AgentRunner(registry, consent = Consent())
-        var asked = 0
-
-        fresh.step(listOf(call("sender")), round = 0, mode = AgentMode.AUTO, approve = {
-            asked++
-            true
-        })
-
-        assertThat(asked).isEqualTo(1)
-        assertThat(ran).containsExactly("sender")
-    }
-
-    @Test
-    fun `and it is not asked twice`() = runTest {
-        // Asking every time is the failure the per-call approval mode already has: the fourth
-        // prompt is the one nobody reads. Once is the whole point.
-        val settling = Consent()
-        val fresh = AgentRunner(registry, consent = settling)
-        var asked = 0
-        val approve: suspend (ToolCall) -> Boolean = {
-            asked++
-            true
-        }
-
-        fresh.step(listOf(call("sender")), round = 0, mode = AgentMode.AUTO, approve = approve)
-        AgentRunner(registry, consent = settling)
-            .step(listOf(call("sender", id = "c2")), round = 0, mode = AgentMode.AUTO, approve)
-
-        assertThat(asked).isEqualTo(1)
-        assertThat(ran).containsExactly("sender", "sender")
-    }
-
-    @Test
-    fun `a refusal switches the tool off, where it can be found and changed`() = runTest {
-        // Kept as an invisible veto, a no would leave a tool that is on in the Tools tab and
-        // silently never runs. Switching it off puts the decision somewhere it can be seen,
-        // and turning it back on is then the consent, so nothing remembers two things.
-        val settling = Consent()
-        val fresh = AgentRunner(registry, consent = settling)
-
-        fresh.step(listOf(call("sender")), round = 0, mode = AgentMode.AUTO, approve = { false })
-
-        assertThat(ran).isEmpty()
-        assertThat(settling.isSettled).isTrue()
-        assertThat(settling.switchedOff).containsExactly("sender")
     }
 
     @Test
@@ -412,32 +348,31 @@ class AgentRunnerTest {
     }
 
     @Test
-    fun `auto still asks about a tool whose reach the model chooses`() = runTest {
+    fun `auto asks about nothing but the one combination that can leak`() = runTest {
+        // This used to assert the opposite, for a tool declaring `alwaysAsk`, on the
+        // argument that an address the model composed is an open primitive. The argument
+        // was sound and the property is gone anyway: an agent that stops to ask whether it
+        // may fetch a page is not an agent, and every call it makes is already a row in the
+        // reply, naming the tool and its argument. Tools is where a user says no, before
+        // the fact and permanently, rather than one call at a time.
         var asked = false
         val open = object : Tool {
             override val definition = ToolDefinition("fetch", "Fetches anything", "{}")
-            override val alwaysAsk = true
+            override val leavesTheDevice = true
             override suspend fun run(call: ToolCall): String {
                 ran += call.name
                 return "fetched"
             }
         }
-        val runner = AgentRunner(ToolRegistry(listOf(open)))
+        val fresh = AgentRunner(ToolRegistry(listOf(open)))
 
-        runner.step(
-            calls = listOf(call("fetch")),
-            round = 0,
-            mode = AgentMode.AUTO,
-            approve = {
-                asked = true
-                false
-            },
-        )
+        fresh.step(listOf(call("fetch")), round = 0, mode = AgentMode.AUTO, approve = {
+            asked = true
+            true
+        })
 
-        // Auto removes pointless taps. It does not remove the only check on a primitive
-        // pointed wherever the model decided.
-        assertThat(asked).isTrue()
-        assertThat(ran).isEmpty()
+        assertThat(asked).isFalse()
+        assertThat(ran).containsExactly("fetch")
     }
 
     @Test

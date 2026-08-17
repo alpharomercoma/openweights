@@ -105,6 +105,8 @@ class AdvanceTool @Inject constructor(private val board: PlanBoard) : Tool {
         """.trimIndent(),
     )
 
+    override val isUserFacing: Boolean = false
+
     override val isAvailable: Boolean
         get() = board.plan.value?.isFinished == false
 

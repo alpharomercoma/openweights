@@ -33,7 +33,6 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
-import io.github.alpharomercoma.openweights.core.tools.OffDeviceConsent
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -86,7 +85,6 @@ class TurnRunner @Inject constructor(
     private val switches: ToolSwitches,
     private val plans: PlanBoard,
     private val asks: AskBoard,
-    private val consent: OffDeviceConsent,
 ) {
 
     /**
@@ -110,7 +108,8 @@ class TurnRunner @Inject constructor(
      * of them off it was still going in, so the model was told it could search, could not,
      * and said so.
      */
-    fun hasEnabledTools(): Boolean = tools.all.any { switches.isEnabled(it.definition.name) }
+    fun hasEnabledTools(): Boolean =
+        tools.all.any { it.isUserFacing && switches.isEnabled(it.definition.name) }
 
     /**
      * Runs until the model stops asking for tools, or the budget runs out.
@@ -137,15 +136,23 @@ class TurnRunner @Inject constructor(
         // clarifying question is only useful while deciding what to do, and every tool in the
         // catalogue makes the choice between the others harder.
         asks.offered = mode == AgentMode.PLAN
-        val offered = tools.all.filter { it.isAvailable }.map { it.definition.name }
-        val active = tools.enabled(switches.enabled(offered))
+        // The switches only govern what the user was offered a switch for. Plan mode's own
+        // two tools are machinery, so they follow availability alone; a stale "off" left in
+        // the preferences by the screen that used to list them must not disable them now.
+        val offered = tools.all.filter { it.isAvailable }
+        val active = tools.enabled(
+            offered
+                .filter { !it.isUserFacing || switches.isEnabled(it.definition.name) }
+                .map { it.definition.name }
+                .toSet(),
+        )
 
         // Two rounds is search then answer, which is the whole shape of a turn that looks
         // something up. A turn that works with files is a different shape: find it, read it,
         // write it, which is three before the model has said anything. At two the last of
         // those is refused and the work is thrown away on the step that mattered.
         val maxRounds = active.roundLimit()
-        val agent = AgentRunner(active, maxRounds, consent)
+        val agent = AgentRunner(active, maxRounds)
 
         // Said once per turn, because "why did it not search" has three possible answers
         // and the per-pass line only ever showed the conclusion. withTools is the template

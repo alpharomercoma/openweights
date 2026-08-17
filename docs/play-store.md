@@ -65,7 +65,7 @@ describes methods that still exist and misses the ones that replaced them.
 
 ### R8 nearly shipped a broken app
 
-JNI resolves by name at runtime. R8 renames `io.github...ui.Destination` to `q90`, and
+JNI resolves by name at runtime. R8 renames `io.github...ui.OpenWeightsApp` to `q90`, and
 would have done the same to `LlamaBridge`, its 14 `external fun` declarations, the
 `TokenSink` and `ReplySink` callback interfaces that native code finds with `GetMethodID`,
 and `LlamaException`, which native code finds with `FindClass` in order to report a failure.

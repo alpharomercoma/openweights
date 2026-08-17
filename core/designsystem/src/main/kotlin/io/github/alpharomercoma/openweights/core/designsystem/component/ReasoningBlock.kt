@@ -18,7 +18,6 @@ package io.github.alpharomercoma.openweights.core.designsystem.component
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,15 +31,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import java.util.Locale
 
@@ -64,23 +65,39 @@ fun ReasoningBlock(
     modifier: Modifier = Modifier,
     durationMs: Long? = null,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    // Open while the model is thinking, shut once it has finished, and a tap wins in
+    // either state.
+    //
+    // It used to be collapsed always and never move, which failed in both directions at
+    // once: a reader who never tapped never saw the thinking at all, and one who did tap
+    // was left with a finished chain of thought sitting at full height above the answer
+    // that arrived under it. Watching a model think is worth seeing live and worth nothing
+    // afterwards, so it follows the generation by default.
+    //
+    // The override clears when thinking ends, which is deliberate. A block opened by hand
+    // while the model was working still folds away when it stops, because the reason to
+    // have it open has gone; the tap is about the next few seconds, not forever. Saveable
+    // and keyed to the reasoning, so scrolling the turn off screen does not reopen it.
+    var override by rememberSaveable(reasoning) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(isInProgress) { if (!isInProgress) override = null }
+    val expanded = override ?: isInProgress
+
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(200),
+        animationSpec = Motion.quick(),
         label = "chevron",
     )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
-                .clickable { expanded = !expanded }
+                .clickable { override = !expanded }
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Metric(text = reasoningLabel(isInProgress, durationMs))
+            Caption(text = reasoningLabel(isInProgress, durationMs))
             Icon(
                 imageVector = Icons.Rounded.ExpandMore,
                 contentDescription = if (expanded) "Hide reasoning" else "Show reasoning",

@@ -138,8 +138,40 @@ fun ContextMeter(used: Int, total: Int, modifier: Modifier = Modifier) {
         }
         // Printed, not only announced: a colour bar with no digits makes hue the only
         // thing a sighted user has to go on.
-        Metric(text = "$percent%", color = color, maxLines = 1)
+        // Named, not just numbered. A bare "10%" over a hairline at the bottom of a chat
+        // screen could be a download, a battery, or how much of the answer has arrived; the
+        // screen reader was told which and nobody looking at it was.
+        Metric(text = "ctx $percent%", color = color, maxLines = 1)
     }
+}
+
+/**
+ * A quiet line of words under something.
+ *
+ * The same size and colour as [Metric] and not the same face. `Metric` is monospaced, which
+ * is right for a rate, a byte count or a percentage that has to line up with the one under
+ * it, and wrong for a sentence: "tokens generated on this device" and "Verifying checksum"
+ * were both set in mono because [Metric] was the only small quiet style there was, and a
+ * screen of prose in a monospaced face reads as terminal cosplay rather than as an app.
+ *
+ * The test is what the string is mostly made of. Digits and units get [Metric]. Words get
+ * this.
+ */
+@Composable
+fun Caption(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    maxLines: Int = Int.MAX_VALUE,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /**

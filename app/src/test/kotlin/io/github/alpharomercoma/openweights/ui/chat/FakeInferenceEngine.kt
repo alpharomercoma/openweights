@@ -123,6 +123,14 @@ class FakeInferenceEngine : InferenceEngine {
     /** Load order, so a test can prove which model the engine ended up holding. */
     val loads = mutableListOf<String>()
 
+    /**
+     * What each load asked for, in the same order as [loads].
+     *
+     * Kept because the processor setting is only ever expressed as a layer count handed to
+     * one of these calls: there is no later moment at which asking for the GPU is visible.
+     */
+    val loadParams = mutableListOf<ModelLoadParams>()
+
     /** Loads wait on this many milliseconds of virtual time, to overlap two of them. */
     var loadDelayMs = 0L
 
@@ -136,6 +144,7 @@ class FakeInferenceEngine : InferenceEngine {
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
         if (loadDelayMs > 0) delay(loadDelayMs)
         loads += modelFile.name
+        loadParams += params
         if (failNextLoad) {
             failNextLoad = false
             loaded = null
@@ -229,9 +238,13 @@ class FakeInferenceEngine : InferenceEngine {
 
     override fun systemInfo(): String = "fake engine"
 
-    override fun computeDevices(): List<ComputeDevice> = listOf(
-        ComputeDevice("cpu", "Fake CPU", ComputeDeviceKind.CPU, 0),
-    )
+    /** Whether this fake device has anywhere other than the CPU to put layers. */
+    var hasGpu = false
+
+    override fun computeDevices(): List<ComputeDevice> = buildList {
+        add(ComputeDevice("cpu", "Fake CPU", ComputeDeviceKind.CPU, 0))
+        if (hasGpu) add(ComputeDevice("opencl", "Fake GPU", ComputeDeviceKind.GPU, 0))
+    }
 
     override fun close() {
         loaded = null

@@ -55,16 +55,22 @@
         android:usesCleartextTraffic="false">
 
         <!--
-             Portrait on phones only. A chat composer with the keyboard up leaves almost no
-             room in landscape, and a phone in a hand turns constantly while being read
-             from. Targeting API 36 means this is ignored on displays 600dp wide and over,
-             so tablets and unfolded foldables stay adaptive without an opt-out property,
-             and nothing has to change when API 37 removes that opt-out.
+             Any orientation, on anything.
+
+             It was portrait on phones, on the argument that a composer with the keyboard up
+             leaves almost no room in landscape. That was true, and the thing taking the room
+             was the five tab bottom bar: about 80dp of permanent chrome across the bottom
+             of a screen that is only 360dp tall to begin with once a keyboard is up. The bar
+             is gone, the conversation is the whole surface, and the composer is one row.
+
+             Targeting API 36 already ignored the lock at 600dp and over, so tablets and
+             unfolded foldables have been rotating all along and the layouts have been built
+             and screenshotted for it. What this changes is a phone on its side, which is how
+             anybody reading a long reply with a keyboard attached is holding it.
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.OpenWeights">
             <intent-filter>

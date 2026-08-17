@@ -50,12 +50,23 @@ class HubQueryTest {
 
     @Test
     fun `the filter count is what the button shows`() {
-        assertThat(HubQuery().activeCount).isEqualTo(0)
+        // One by default, because Recommended is on by default: the screen opens narrowed
+        // to a measured shortlist and the button has to say so, or the count is a lie on
+        // the first screen anybody sees.
+        assertThat(HubQuery().activeCount).isEqualTo(1)
+        assertThat(HubQuery(recommendedOnly = false).activeCount).isEqualTo(0)
         // Sort and text are not filters: they are always set and would leave the button
         // permanently claiming the list is narrowed.
-        assertThat(HubQuery(text = "qwen", sort = HubSort.LIKES).activeCount).isEqualTo(0)
         assertThat(
-            HubQuery(task = HubTask.VISION, author = "unsloth", hideGated = true).activeCount,
+            HubQuery(text = "qwen", sort = HubSort.LIKES, recommendedOnly = false).activeCount,
+        ).isEqualTo(0)
+        assertThat(
+            HubQuery(
+                task = HubTask.VISION,
+                author = "unsloth",
+                hideGated = true,
+                recommendedOnly = false,
+            ).activeCount,
         ).isEqualTo(3)
     }
 

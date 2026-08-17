@@ -30,17 +30,18 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -56,9 +57,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.StepSlider
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -76,6 +80,8 @@ fun DiscoverScreen(
     onSortChange: (HubSort) -> Unit,
     onFiltersChange: (HubQuery) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
+    onOfficialOnlyChange: (Boolean) -> Unit,
+    onRecommendedOnlyChange: (Boolean) -> Unit,
     onClearFilters: () -> Unit,
     onOpenModel: (String) -> Unit,
     onCloseModel: () -> Unit,
@@ -90,7 +96,6 @@ fun DiscoverScreen(
      */
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    /** The Installed/Discover switch, drawn under this screen's own title. */
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -102,41 +107,39 @@ fun DiscoverScreen(
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = state.detail?.model?.name ?: "Discover",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    },
-                    // One arrow, two meanings, in the order a person would expect: while a
-                    // model is open it closes the model, and only once the list is showing
-                    // does it leave the screen. Two separate arrows would be two ways out of
-                    // a place with one way in.
-                    navigationIcon = {
-                        val back: (() -> Unit)? = when {
-                            state.detail != null -> onCloseModel
-                            else -> onBack
+            TopAppBar(
+                title = {
+                    Text(
+                        text = state.detail?.model?.name ?: "Discover",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
+                // One arrow, two meanings, in the order a person would expect: while a
+                // model is open it closes the model, and only once the list is showing
+                // does it leave the screen. Two separate arrows would be two ways out of
+                // a place with one way in.
+                navigationIcon = {
+                    val back: (() -> Unit)? = when {
+                        state.detail != null -> onCloseModel
+                        else -> onBack
+                    }
+                    back?.let { pop ->
+                        IconButton(onClick = pop) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = if (state.detail != null) {
+                                    "Back to search results"
+                                } else {
+                                    "Back"
+                                },
+                            )
                         }
-                        back?.let { pop ->
-                            IconButton(onClick = pop) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = if (state.detail != null) {
-                                        "Back to search results"
-                                    } else {
-                                        "Back"
-                                    },
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-            }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
         },
     ) { padding ->
         Column(
@@ -176,6 +179,8 @@ fun DiscoverScreen(
                 parameterCeilingBillions = state.parameterCeilingBillions,
                 onSortChange = onSortChange,
                 onPhoneSizedChange = onPhoneSizedChange,
+                onOfficialOnlyChange = onOfficialOnlyChange,
+                onRecommendedOnlyChange = onRecommendedOnlyChange,
                 onOpenFilters = { filtersOpen = true },
             )
 
@@ -199,16 +204,30 @@ fun DiscoverScreen(
                 )
             }
 
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(state.results, key = { it.id }) { model ->
-                    ModelRow(
-                        model = model,
-                        onClick = { onOpenModel(model.id) },
-                        avatarUrl = state.avatars[model.owner],
-                    )
+            // One container with rules in it rather than a card per model. Five free
+            // floating cards read as five unrelated things and gave a list of search
+            // results the same shape as the settings screen; a list looks like a list.
+            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+                itemsIndexed(state.results, key = { _, model -> model.id }) { index, model ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(resultShape(index, state.results.lastIndex))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                    ) {
+                        if (index > 0) {
+                            HorizontalDivider(
+                                thickness = Dp.Hairline,
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(start = 14.dp),
+                            )
+                        }
+                        ModelRow(
+                            model = model,
+                            onClick = { onOpenModel(model.id) },
+                            avatarUrl = state.avatars[model.owner],
+                        )
+                    }
                 }
             }
         }
@@ -224,6 +243,19 @@ fun DiscoverScreen(
         )
     }
 }
+
+/**
+ * Round the outside of the list and nothing inside it.
+ *
+ * Each row is its own lazy item, so the container cannot be one shape around all of them;
+ * the corners belong to the first and last rows instead. A single result gets all four.
+ */
+private fun resultShape(index: Int, last: Int) = RoundedCornerShape(
+    topStart = if (index == 0) Radius.md else 0.dp,
+    topEnd = if (index == 0) Radius.md else 0.dp,
+    bottomStart = if (index == last) Radius.md else 0.dp,
+    bottomEnd = if (index == last) Radius.md else 0.dp,
+)
 
 /** What to say when the Hub has nothing, which on a narrow filter is most of the time. */
 @Composable
@@ -295,8 +327,8 @@ private fun ModelDetail(
                 // The slider is the point: KV cache scales with context, so the same file
                 // can be comfortable at 4k and impossible at 64k. Changing it re-runs the
                 // maths locally, with no further network use.
-                Metric("Context length: ${state.contextLength} tokens")
-                Slider(
+                Caption("Context length: ${state.contextLength} tokens")
+                StepSlider(
                     value = state.contextLength.toFloat(),
                     onValueChange = { onContextLengthChange(it.roundToInt()) },
                     valueRange = CONTEXT_RANGE,
@@ -360,6 +392,8 @@ private fun DiscoverScreenPreview() {
             onSortChange = {},
             onFiltersChange = {},
             onPhoneSizedChange = {},
+            onOfficialOnlyChange = {},
+            onRecommendedOnlyChange = {},
             onClearFilters = {},
             onOpenModel = {},
             onCloseModel = {},

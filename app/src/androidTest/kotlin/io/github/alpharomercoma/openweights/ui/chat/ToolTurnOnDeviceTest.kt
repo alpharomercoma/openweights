@@ -97,7 +97,6 @@ class ToolTurnOnDeviceTest {
                 ToolSwitches(context),
                 PlanBoard(),
                 AskBoard(),
-                settledConsent(context),
             )
         val listener = Recording()
 

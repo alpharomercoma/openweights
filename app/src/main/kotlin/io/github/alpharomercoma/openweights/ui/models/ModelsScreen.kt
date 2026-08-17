@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -81,29 +82,27 @@ fun ModelsScreen(
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text("Models", style = MaterialTheme.typography.titleMedium)
-                            Metric("${formatBytes(state.storageUsedBytes)} on this device")
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Models", style = MaterialTheme.typography.titleMedium)
+                        Metric("${formatBytes(state.storageUsedBytes)} on this device")
+                    }
+                },
+                navigationIcon = {
+                    onBack?.let { back ->
+                        IconButton(onClick = back) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                            )
                         }
-                    },
-                    navigationIcon = {
-                        onBack?.let { back ->
-                            IconButton(onClick = back) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back",
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                    ),
-                )
-            }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
+            )
         },
     ) { padding ->
         if (state.models.isEmpty() && state.downloads.isEmpty()) {
@@ -115,8 +114,9 @@ fun ModelsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "No models yet. Open Discover above. It will tell you whether a " +
-                        "model runs on this phone before you download it.",
+                    "Nothing downloaded yet. Browse models from the name at the top of a " +
+                        "chat. Each one says whether it runs on this phone before you " +
+                        "download it.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -160,7 +160,7 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
                 color = MaterialTheme.colorScheme.error,
             )
 
-            download.isVerifying -> Metric("Verifying checksum…")
+            download.isVerifying -> Caption("Verifying checksum…")
 
             else -> {
                 LinearProgressIndicator(

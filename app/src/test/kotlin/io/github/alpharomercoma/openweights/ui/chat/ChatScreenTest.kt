@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -54,24 +55,38 @@ class ChatScreenTest {
     val compose = createComposeRule()
 
     @Test
-    fun reasoningIsHiddenUntilAsked() {
-        // A reasoning model emits far more thinking than answer; showing it by default
-        // pushes the reply off the screen.
+    fun finishedReasoningIsFoldedAwayButStillReachable() {
+        // A reasoning model emits far more thinking than answer, so a chain of thought left
+        // open above the reply pushes the reply off the screen. Once thinking has finished
+        // there is no reason to hold the space, and one tap gets it back.
         showChat(
             transcript = listOf(
                 assistantEntry("<think>Working through the definition.</think>It caches keys."),
             ),
         )
 
-        compose.onNodeWithText("It caches keys.").assertIsDisplayed()
+        // Waited for, not asserted straight away. A reply body goes through
+        // `rememberMarkdownState`, which parses off the main dispatcher, so the paragraph
+        // arrives a beat after the frame that composed it. Robolectric drives the main
+        // clock and not that one, which made this assertion a race that this file has been
+        // winning by luck: the same three lines passed under one method name and failed
+        // under another, because renaming a test is enough to reorder the class.
+        //
+        // Exists rather than isDisplayed for the same reason as below: legacy graphics
+        // measures text at almost no width, so displayedness here is about the matcher
+        // rather than about the screen. Presence and absence are what this test means.
+        awaitText("It caches keys.")
         compose.onNodeWithText("Working through the definition.").assertDoesNotExist()
 
         compose.onNodeWithContentDescription("Show reasoning").performClick()
-        compose.onNodeWithText("Working through the definition.").assertIsDisplayed()
+        compose.onNodeWithText("Working through the definition.").assertExists()
     }
 
     @Test
-    fun showsThinkingWhileTheReasoningBlockIsStillOpen() {
+    fun reasoningIsOpenWhileItIsBeingWritten() {
+        // The other half of the same rule. Watching a model think is worth seeing live and
+        // worth nothing afterwards, so the block follows the generation rather than sitting
+        // shut behind a control a reader has to know to look for.
         showChat(
             transcript = listOf(
                 assistantEntry("<think>Half a thought").copy(isStreaming = true),
@@ -79,7 +94,9 @@ class ChatScreenTest {
         )
 
         compose.onNodeWithText("Thinking…").assertIsDisplayed()
-        // The unfinished thought must not be mistaken for the answer.
+        compose.onNodeWithText("Half a thought").assertExists()
+        // And it can still be shut, mid-thought, by anybody who would rather not watch.
+        compose.onNodeWithContentDescription("Hide reasoning").performClick()
         compose.onNodeWithText("Half a thought").assertDoesNotExist()
     }
 
@@ -88,6 +105,24 @@ class ChatScreenTest {
         showChat(transcript = listOf(assistantEntry("Done.")))
 
         compose.onNodeWithText("16.4 tok/s", substring = true).assertIsDisplayed()
+        // And how long the whole thing took, which shares the row with the actions and was
+        // being squeezed out of it: three 48dp touch targets cannot shrink, so at anything
+        // above the default text size the total was clipped to "9.…" and then to nothing.
+        // The row flows now. Both numbers survive because neither can be cut in half.
+        compose.onNodeWithText("2.7s", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun theComposerSurvivesTheSlashPalette() {
+        showChat(transcript = emptyList())
+
+        compose.onNodeWithContentDescription("Message").performTextInput("/")
+
+        // The palette is a lazy list above the composer, and without a ceiling it took the
+        // whole screen: every command was on show and the box being typed into was not.
+        compose.onNodeWithText("/plan", substring = true).assertExists()
+        compose.onNodeWithContentDescription("Message").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Send message").assertIsDisplayed()
     }
 
     @Test
@@ -220,6 +255,11 @@ class ChatScreenTest {
         }
     }
 
+    /** Waits for a node holding [text], for the markdown that arrives off the main clock. */
+    private fun awaitText(text: String) = compose.waitUntil(TEXT_TIMEOUT_MS) {
+        compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    }
+
     private fun assistantEntry(raw: String): TranscriptEntry {
         val parsed =
             io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply(raw)
@@ -231,9 +271,13 @@ class ChatScreenTest {
             answer = parsed.answer,
             isReasoningInProgress = parsed.isReasoningInProgress,
             reasoningMs = 1400,
+            totalMillis = 2_700,
             tokensPerSecond = 16.4,
             timeToFirstTokenMs = 274,
             generatedTokens = 38,
         )
     }
 }
+
+/** Long enough for a background parse, short enough that a real hang still fails. */
+private const val TEXT_TIMEOUT_MS = 5_000L

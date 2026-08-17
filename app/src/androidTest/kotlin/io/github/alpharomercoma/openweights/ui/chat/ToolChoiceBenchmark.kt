@@ -199,6 +199,9 @@ class ToolChoiceBenchmark {
             // not ask, and running it four times would quadruple the cost of the suite to
             // repeat an ordering and caching answer this file already has.
             val multi = score(engine, name, ARMS.first(), native, MULTI, "MULTI")
+            // One arm, for the same reason as MULTI: this asks a question the four arms do
+            // not, and asking it four times would repeat an ordering answer already here.
+            val unknown = score(engine, name, ARMS.first(), native, UNKNOWN, "UNKNOWN")
             // Only the two arms that differ in nothing on a native template. The other two
             // differ on purpose, and comparing them here would call a finding a fault.
             if (native) reportDeterminism(name, listOfNotNull(byLabel["bare"], byLabel["tagged"]))
@@ -206,7 +209,8 @@ class ToolChoiceBenchmark {
             reportDifference(name, "CACHE", byLabel["bare"], byLabel["warm"])
             return scored.flatMap { (arm, result) ->
                 List(result.tally.errored) { "$name/${arm.label} generation failed" }
-            } + List(multi.tally.errored) { "$name/multi generation failed" }
+            } + List(multi.tally.errored) { "$name/multi generation failed" } +
+                List(unknown.tally.errored) { "$name/unknown generation failed" }
         } finally {
             engine.close()
         }
@@ -520,6 +524,30 @@ class ToolChoiceBenchmark {
          * second call and the second must not have one: the answer is sitting in the tool
          * result directly above the question.
          */
+        /**
+         * Things the model cannot know, where answering anyway is the failure.
+         *
+         * Apart from [CASES] because every number in `docs/research/tool-calling.md` is out
+         * of six and a seventh case would silently invalidate all of them. Apart in meaning
+         * too: those six ask whether a model can pick the right tool from a catalogue, and
+         * these ask whether it knows that it does not know.
+         *
+         * That is the failure users actually report, and it is the one the six missed. Asked
+         * who a particular person is, Qwen3 0.6B on a Snapdragon 8 Gen 3 thought for twenty
+         * seconds and produced a fluent biography with a date of death in it, having searched
+         * for nothing. It is not a wrong tool choice, which is what an under-call usually
+         * means; it is a model with no idea that the question was outside it.
+         *
+         * A name and a date, because they fail differently. A private individual is absent
+         * from training data entirely, and a question about "this week" is about a period
+         * that postdates it: the first tests whether the model notices an unknown, the second
+         * whether it notices time passing.
+         */
+        val UNKNOWN = listOf(
+            Case("Who is Alpha Romer Coma?", "web_search"),
+            Case("What happened in the news this week?", "web_search"),
+        )
+
         val MULTI = listOf(
             Case(
                 prompt = "And what about Cebu?",

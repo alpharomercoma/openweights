@@ -26,9 +26,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HubTask
@@ -68,6 +71,8 @@ fun DiscoverFilterBar(
     parameterCeilingBillions: Int,
     onSortChange: (HubSort) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
+    onOfficialOnlyChange: (Boolean) -> Unit,
+    onRecommendedOnlyChange: (Boolean) -> Unit,
     onOpenFilters: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -103,14 +108,42 @@ fun DiscoverFilterBar(
                 containerColor = if (query.activeCount == 0) {
                     MaterialTheme.colorScheme.surfaceContainer
                 } else {
-                    MaterialTheme.colorScheme.primaryContainer
+                    OpenWeightsColors.Lime
                 },
                 labelColor = if (query.activeCount == 0) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    OpenWeightsColors.Ink
+                },
+                leadingIconContentColor = if (query.activeCount == 0) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    OpenWeightsColors.Ink
                 },
             ),
+        )
+
+        // First in the row, because it is the only one on when the screen opens and the
+        // one that makes the other three unnecessary while it is.
+        FilterChip(
+            selected = query.recommendedOnly,
+            onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
+            label = {
+                Text(
+                    text = "Recommended",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Bolt,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            colors = selectedChipColors(),
+            border = chipBorder(query.recommendedOnly),
         )
 
         val phoneSized = query.maxParametersBillions != null
@@ -141,6 +174,30 @@ fun DiscoverFilterBar(
             border = chipBorder(phoneSized),
         )
 
+        // Next to "Fits my phone", because the two answer the same kind of question: not
+        // what a model is, but whether it is worth your attention. Size is about the
+        // hardware, this is about who stands behind the weights.
+        FilterChip(
+            selected = query.officialOnly,
+            onClick = { onOfficialOnlyChange(!query.officialOnly) },
+            label = {
+                Text(
+                    text = "Official",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.Verified,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            colors = selectedChipColors(),
+            border = chipBorder(query.officialOnly),
+        )
+
         HubSort.entries.forEach { sort ->
             FilterChip(
                 selected = query.sort == sort,
@@ -155,8 +212,10 @@ fun DiscoverFilterBar(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                colors = selectedChipColors(),
-                border = chipBorder(query.sort == sort),
+                colors = sortChipColors(),
+                // Always the neutral outline: the fill is what says which one is on, and a
+                // lime ring around a grey pill is two answers to one question.
+                border = chipBorder(selected = false),
             )
         }
     }
@@ -298,12 +357,33 @@ private fun ChoiceChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /**
  * Selection is one of the accent's three jobs, and a chip whose only selected state is a
  * slightly different grey is a chip whose state has to be worked out rather than seen.
+ *
+ * Solid lime carrying ink, which is the one recipe every active thing in this app uses, and
+ * the same in both themes. It was `primaryContainer`, which is a dimmed lime on the dark
+ * canvas and a pale one on paper: two different-looking recipes for one state, and the dark
+ * one read as olive rather than as the accent.
  */
 @Composable
 private fun selectedChipColors() = FilterChipDefaults.filterChipColors(
-    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    selectedContainerColor = OpenWeightsColors.Lime,
+    selectedLabelColor = OpenWeightsColors.Ink,
+    selectedLeadingIconColor = OpenWeightsColors.Ink,
+)
+
+/**
+ * The sort, which is a choice rather than a narrowing.
+ *
+ * Quiet on purpose. One of these is always selected, so painting it lime would mean lime
+ * appears in this row whatever the user has done, and an accent that is always on says
+ * nothing. With three filters now on by default the row came out as four lime pills in a
+ * line, which is a lot of shouting for a state nobody chose. Lime here means "this is
+ * hiding results from you"; ordering them is not that.
+ */
+@Composable
+private fun sortChipColors() = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onSurface,
 )
 
 @Composable
@@ -311,5 +391,5 @@ private fun chipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
     enabled = true,
     selected = selected,
     borderColor = MaterialTheme.colorScheme.outline,
-    selectedBorderColor = MaterialTheme.colorScheme.primary,
+    selectedBorderColor = OpenWeightsColors.Lime,
 )

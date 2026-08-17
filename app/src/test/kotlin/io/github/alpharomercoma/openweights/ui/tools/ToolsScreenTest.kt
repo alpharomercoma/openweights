@@ -74,20 +74,30 @@ class ToolsScreenTest {
     fun `every tool says whether it asks before it runs`() {
         showTools()
 
-        // The two sentences ToolsViewModel picks between, and the difference between them is
-        // the whole consent model: fetch_url asks every time because the address is the
-        // model's choice, and the listing says so. Counted rather than merely found, so a
-        // screen that gave every row the same line would fail rather than pass twice over.
-        assertCount(2, "Built in · runs without asking")
-        assertCount(1, "Built in · asks before every run")
+        // Only the rows that ask say anything, which is the point: fetch_url asks every
+        // time because the address is the model's choice. A line under all three saying
+        // what two of them do by default is a line nobody reads, and the one that mattered
+        // was hidden inside it. Counted rather than found, so a screen that went back to
+        // captioning every row would fail rather than pass three times over.
+        assertCount(1, "Asks before every run")
+    }
+
+    @Test
+    fun `the two groups are what leaves the device and what does not`() {
+        showTools()
+
+        // The split is the only property of a tool anybody has to decide about, so it is a
+        // heading rather than the last line of small print in a row.
+        compose.onNodeWithText("On this device").assertIsDisplayed()
+        compose.onNodeWithText("Leaves the device").assertIsDisplayed()
     }
 
     @Test
     fun `with no folder shared the screen offers to choose one`() {
         showTools()
 
-        compose.onNodeWithText("Shared folder").assertIsDisplayed()
-        compose.onNodeWithText("Choose").assertIsDisplayed()
+        compose.onNodeWithText("No folder shared").assertIsDisplayed()
+        compose.onNodeWithText("Choose a folder").assertIsDisplayed()
     }
 
     @Test
@@ -128,21 +138,27 @@ class ToolsScreenTest {
                                 id = "web_search",
                                 name = "Web search",
                                 description = "Searches the web.",
-                                provenance = "Built in · runs without asking",
+                                leavesTheDevice = true,
+                                asksFirst = false,
+                                isReady = true,
                                 isEnabled = true,
                             ),
                             ToolSummary(
                                 id = "fetch_url",
                                 name = "Fetch url",
                                 description = "Reads a page.",
-                                provenance = "Built in · asks before every run",
+                                leavesTheDevice = true,
+                                asksFirst = true,
+                                isReady = true,
                                 isEnabled = true,
                             ),
                             ToolSummary(
                                 id = "run_script",
                                 name = "Run script",
                                 description = "Works something out.",
-                                provenance = "Built in · runs without asking",
+                                leavesTheDevice = false,
+                                asksFirst = false,
+                                isReady = true,
                                 isEnabled = false,
                             ),
                         ),

@@ -48,10 +48,14 @@ class ToolStepBlockTest {
     val compose = createComposeRule()
 
     @Test
-    fun `a tool that ran names itself`() {
+    fun `a tool that ran says what it did, in words`() {
         showStep(AgentStep.Ran(call("web_search"), result = "Manila: 31C.", millis = 1_840))
 
-        compose.onNodeWithText("web_search", substring = true).assertIsDisplayed()
+        // "web_search" is a function call; "Searched the web for" is what happened. This
+        // row is the whole of the disclosure that anything left the phone, and a
+        // disclosure the reader has to decode is not one.
+        compose.onNodeWithText("Searched the web for", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("web_search", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -62,7 +66,7 @@ class ToolStepBlockTest {
 
         compose.onNodeWithText("Manila: 31C.").assertDoesNotExist()
 
-        compose.onNodeWithText("web_search", substring = true).performClick()
+        compose.onNodeWithText("Searched the web for", substring = true).performClick()
 
         compose.onNodeWithText("Manila: 31C.").assertIsDisplayed()
     }

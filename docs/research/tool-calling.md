@@ -645,6 +645,42 @@ it honestly needs a grant taken through the system picker on the test device, wh
 person tapping a dialog, so the six-tool number will arrive from a phone somebody uses rather
 than from a device cloud instance.
 
+## The axis the six cases do not measure, found by using the app
+
+Two models were installed on a Snapdragon 8 Gen 3 on 2026-08-17 and asked one question:
+"Who is Alpha Romer Coma?" It is a private individual, absent from any training set, and the
+only correct behaviour is to search.
+
+**Hammer 2.1 1.5B Q4_0**, the best router in the table above, replied `[]`. That is its
+template's vocabulary for "no tool applies", so the app rendered a code block containing two
+brackets and called it an answer. Asked again for words, it produced sixty seconds of
+`'t"' []` repeated until the phone reported itself hot. It is a function-calling fine-tune
+and the conversation was trained out of it: it tops a routing benchmark and cannot hold a
+turn.
+
+**Qwen3 0.6B Q8_0**, a competent generalist at 33 tok/s, thought for twenty seconds and
+wrote "Alpha Romer Coma was a prominent economist and financial analyst known for his work
+in economics and finance. He passed away in 2019." No search, no hedge, a date of death
+invented. It is fluent, fast, and confidently wrong.
+
+Both failures are invisible to the six cases. Those ask whether a model picks the right tool
+from a catalogue given a question that obviously needs one; neither of these models was
+choosing badly among tools, and one of them was not conversing at all. The failure is a model
+with no idea that a question is outside it, which the weather case cannot catch because every
+model knows the weather changes.
+
+So there is a third list now, `UNKNOWN`, kept apart from the six for the same reason `MULTI`
+is: the denominators in this document are out of six and a seventh case would silently
+invalidate every row. It holds a person nobody has heard of and a question about this week,
+because they fail differently: the first tests whether a model notices an unknown, the second
+whether it notices time passing.
+
+**Nothing measured here is recommendable on both axes yet, and the recommended list says so.**
+`RECOMMENDED` in `HuggingFaceClient` carries the two Qwen3 conversions and a comment
+explaining that the routing winners are unusable as chat models and that Qwen3's own routing
+number does not exist until this suite is run again. That is the honest state: one axis
+measured, one inferred, and the inference written down where the next person will find it.
+
 ## Test practice that changed
 
 - The benchmark used to swallow a crash. A model that died mid-run left a table with a hole

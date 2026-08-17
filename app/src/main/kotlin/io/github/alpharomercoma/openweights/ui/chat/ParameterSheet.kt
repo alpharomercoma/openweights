@@ -16,24 +16,30 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,14 +52,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.StepSlider
+import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import kotlin.math.roundToInt
@@ -73,11 +87,17 @@ fun ParameterSheet(
     preferences: ModelPreferences,
     supportsThinking: Boolean,
     hasGpu: Boolean,
+    /** Where the weights of the model currently loaded actually are, largest buffer first. */
+    offloadBuffers: List<Pair<String, Int>> = emptyList(),
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var draft by remember(preferences) { mutableStateOf(preferences) }
+    // Not rememberSaveable: the sheet is dismissed on rotation with everything else in it,
+    // and a disclosure that survives its own container would only reopen on a sheet whose
+    // draft had already gone back to the saved values.
+    var advancedOpen by remember { mutableStateOf(false) }
     // Read from the composition, not Locale.getDefault(): a screen formatted with the
     // latter keeps the old decimal separator after the user changes language, because
     // nothing tells it to recompose.
@@ -97,7 +117,7 @@ fun ParameterSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(modelName, style = MaterialTheme.typography.titleMedium)
-            Metric("settings saved for this model only")
+            Caption("saved for this model only")
 
             if (supportsThinking) {
                 ThinkingSetting(
@@ -108,62 +128,24 @@ fun ParameterSheet(
 
             Setting(
                 label = "Temperature",
-                explanation = "Lower is more predictable, higher is more varied. 0 always " +
-                    "picks the most likely next word.",
+                explanation = "Lower is steadier, higher is more varied.",
                 value = String.format(locale, "%.2f", draft.temperature),
             ) {
-                Slider(
+                StepSlider(
                     value = draft.temperature,
                     onValueChange = { draft = draft.copy(temperature = it) },
                     valueRange = 0f..MAX_TEMPERATURE,
-                )
-            }
-
-            Setting(
-                label = "Top-p",
-                explanation = "Considers only the most likely words that together make up " +
-                    "this much of the probability.",
-                value = String.format(locale, "%.2f", draft.topP),
-            ) {
-                Slider(
-                    value = draft.topP,
-                    onValueChange = { draft = draft.copy(topP = it) },
-                    valueRange = MIN_TOP_P..1f,
-                )
-            }
-
-            Setting(
-                label = "Top-k",
-                explanation = "Hard limit on how many candidate words are considered at all.",
-                value = draft.topK.toString(),
-            ) {
-                Slider(
-                    value = draft.topK.toFloat(),
-                    onValueChange = { draft = draft.copy(topK = it.roundToInt()) },
-                    valueRange = 0f..MAX_TOP_K,
-                )
-            }
-
-            Setting(
-                label = "Repeat penalty",
-                explanation = "Discourages repeating itself. Too high and it avoids words " +
-                    "it needs.",
-                value = String.format(locale, "%.2f", draft.repeatPenalty),
-            ) {
-                Slider(
-                    value = draft.repeatPenalty,
-                    onValueChange = { draft = draft.copy(repeatPenalty = it) },
-                    valueRange = MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY,
+                    steps = 0,
                 )
             }
 
             Setting(
                 label = "Context length",
-                explanation = "How much conversation the model keeps in mind. Costs memory, " +
-                    "and takes effect the next time the model loads.",
+                explanation = "How much conversation it keeps in mind. Applies at the next " +
+                    "load.",
                 value = "${draft.contextLength} tokens",
             ) {
-                Slider(
+                StepSlider(
                     value = draft.contextLength.toFloat(),
                     onValueChange = { draft = draft.copy(contextLength = it.roundToInt()) },
                     valueRange = CONTEXT_RANGE,
@@ -171,37 +153,10 @@ fun ParameterSheet(
                 )
             }
 
-            if (hasGpu) {
-                Setting(
-                    label = "Processor",
-                    explanation = "The GPU reads a prompt about four times faster and " +
-                        "writes an answer about a quarter slower, so it suits questions " +
-                        "that need looking things up more than it suits long replies. " +
-                        "Auto picks from what you have used this model for. Takes effect " +
-                        "the next time the model loads.",
-                    value = Offload.fromName(draft.offload).label.lowercase(),
-                ) {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        Offload.entries.forEachIndexed { index, choice ->
-                            SegmentedButton(
-                                selected = Offload.fromName(draft.offload) == choice,
-                                onClick = { draft = draft.copy(offload = choice.name) },
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = Offload.entries.size,
-                                ),
-                            ) {
-                                Text(choice.label)
-                            }
-                        }
-                    }
-                }
-            }
-
             Column {
                 Text("System prompt", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "Standing instructions sent before every conversation. Small " +
+                    text = "Standing instructions, sent before every conversation. Small " +
                         "models follow explicit ones far better than implied ones.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -214,46 +169,121 @@ fun ParameterSheet(
                     minLines = 2,
                     maxLines = 5,
                     shape = RoundedCornerShape(Radius.sm),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
+                    colors = fieldColors(),
                 )
             }
 
-            Column {
-                Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "Sent with the tools, before your own prompt above. This is the " +
-                        "whole of what the app adds: nothing else is sent that you cannot " +
-                        "see here. Empty it and the model is told nothing about its tools.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = draft.toolPrompt,
-                    onValueChange = { draft = draft.copy(toolPrompt = it) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    placeholder = { Text("Nothing about tools") },
-                    minLines = 3,
-                    maxLines = 8,
-                    shape = RoundedCornerShape(Radius.sm),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
-                )
-                TextButton(
-                    onClick = {
-                        draft = draft.copy(toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT)
-                    },
+            // One disclosure rather than seventeen controls in a column.
+            //
+            // The sheet ran to about twelve hundred dp, and the three settings anybody
+            // touches were scattered through it: temperature at the top, context length in
+            // the middle, the system prompt near the bottom, each separated by two samplers
+            // whose defaults are correct and whose names are from a paper. Everything still
+            // here is still here, one tap away, which is the difference between simplifying
+            // an interface and removing what a developer came for.
+            AdvancedSettings(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen }) {
+                Setting(
+                    label = "Top-p",
+                    explanation = "Keeps the likeliest words, up to this share of the odds.",
+                    value = String.format(locale, "%.2f", draft.topP),
                 ) {
-                    Text("Restore the default wording")
+                    StepSlider(
+                        value = draft.topP,
+                        onValueChange = { draft = draft.copy(topP = it) },
+                        valueRange = MIN_TOP_P..1f,
+                        steps = 0,
+                    )
+                }
+
+                Setting(
+                    label = "Top-k",
+                    explanation = "Never weighs up more candidates than this.",
+                    value = draft.topK.toString(),
+                ) {
+                    StepSlider(
+                        value = draft.topK.toFloat(),
+                        onValueChange = { draft = draft.copy(topK = it.roundToInt()) },
+                        valueRange = 0f..MAX_TOP_K,
+                        steps = 0,
+                    )
+                }
+
+                Setting(
+                    label = "Repeat penalty",
+                    explanation = "Discourages repeating itself. Too high and it dodges words " +
+                        "it needs.",
+                    value = String.format(locale, "%.2f", draft.repeatPenalty),
+                ) {
+                    StepSlider(
+                        value = draft.repeatPenalty,
+                        onValueChange = { draft = draft.copy(repeatPenalty = it) },
+                        valueRange = MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY,
+                        steps = 0,
+                    )
+                }
+                if (hasGpu) {
+                    Setting(
+                        label = "Processor",
+                        explanation = "Which processor holds the layers. Changing this " +
+                            "reloads the model, which takes a few seconds. Your chat is " +
+                            "kept.",
+                        value = Offload.fromName(draft.offload).label.lowercase(),
+                        // What the request actually produced, under the request itself.
+                        // Asking for the GPU and getting it are different things: a backend
+                        // that fails to attach loads onto the CPU and reports the layer
+                        // count it was given regardless, so this is the only line in the app
+                        // that can be checked.
+                        footnote = offloadBuffers
+                            .takeIf { it.isNotEmpty() }
+                            ?.joinToString(" · ") { (name, mib) -> "$name $mib MiB" }
+                            ?.let { "loaded: $it" },
+                    ) {
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            Offload.entries.forEachIndexed { index, choice ->
+                                SegmentedButton(
+                                    selected = Offload.fromName(draft.offload) == choice,
+                                    onClick = { draft = draft.copy(offload = choice.name) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = Offload.entries.size,
+                                    ),
+                                ) {
+                                    Text(choice.label)
+                                }
+                            }
+                        }
+                    }
+                }
+                Column {
+                    Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = "Sent with the tools, before your own prompt. This is the whole " +
+                            "of what the app adds.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = draft.toolPrompt,
+                        onValueChange = { draft = draft.copy(toolPrompt = it) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        placeholder = { Text("Nothing about tools") },
+                        minLines = 3,
+                        maxLines = 8,
+                        shape = RoundedCornerShape(Radius.sm),
+                        colors = fieldColors(),
+                    )
+                    TextButton(
+                        onClick = {
+                            draft = draft.copy(toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT)
+                        },
+                    ) {
+                        Text("Restore the default wording")
+                    }
                 }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onSave(draft) }) { Text("Save") }
+                AccentButton(onClick = { onSave(draft) }) { Text("Save") }
                 TextButton(onClick = onReset) { Text("Reset to defaults") }
             }
         }
@@ -274,14 +304,17 @@ private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            // Spaced, not merely apart. SpaceBetween on its own puts the switch flush
+            // against whatever the sentence beside it happens to end with, so a
+            // description that filled its line ran into the control.
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Thinking", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "Work through the problem before answering. Slower, and better " +
-                        "on anything with steps in it.",
+                    text = "Work it through first. Slower, and better on anything with " +
+                        "steps in it.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -303,9 +336,9 @@ private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences
                             ReasoningEffort.entries.size,
                         ),
                         colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            activeBorderColor = MaterialTheme.colorScheme.primary,
+                            activeContainerColor = OpenWeightsColors.Lime,
+                            activeContentColor = OpenWeightsColors.Ink,
+                            activeBorderColor = OpenWeightsColors.Lime,
                             inactiveBorderColor = MaterialTheme.colorScheme.outline,
                         ),
                         label = { Text(effort.label, maxLines = 1) },
@@ -316,11 +349,63 @@ private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences
     }
 }
 
+/**
+ * The rest of it, behind one row.
+ *
+ * A row rather than a second sheet, because these settings are read against the ones above
+ * them: a top-p worth changing is one you are changing because of the temperature you just
+ * set, and a sheet that replaced this one would hide the number being compared with.
+ */
+@Composable
+private fun AdvancedSettings(
+    open: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (open) 180f else 0f,
+        animationSpec = Motion.quick(),
+        label = "advanced",
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .clickable(onClick = onToggle, role = Role.Button)
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Advanced", style = MaterialTheme.typography.titleSmall)
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = if (open) "Hide advanced settings" else "Show advanced",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp).rotate(rotation),
+            )
+        }
+
+        AnimatedVisibility(visible = open) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        }
+    }
+}
+
+/** Both text fields in this sheet, so the two cannot drift apart. */
+@Composable
+private fun fieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+)
+
 @Composable
 private fun Setting(
     label: String,
     explanation: String,
     value: String,
+    footnote: String? = null,
     control: @Composable () -> Unit,
 ) {
     Column {
@@ -337,6 +422,7 @@ private fun Setting(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         control()
+        footnote?.let { Metric(it) }
     }
 }
 

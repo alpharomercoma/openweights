@@ -22,8 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,8 +71,14 @@ class PlayScreenshots {
     val compose = createComposeRule()
 
     @Test
-    fun chatWithItsTelemetry() =
-        shoot("01-chat", until = "attention layers") { ChatShots.midReply() }
+    fun chatWithItsTelemetry() = shoot(
+        "01-chat",
+        until = "attention layers",
+        // Staged with something typed, the way any product screenshot stages its content.
+        // An empty composer means a disabled send button, which means the app's one accent
+        // colour appears nowhere at all on the screen the listing leads with.
+        typing = DRAFT,
+    ) { ChatShots.midReply() }
 
     @Test
     fun aToolRunAndTheAnswerItFed() =
@@ -85,7 +94,7 @@ class PlayScreenshots {
         shoot("04-discover", until = "Hammer2.1") { ListingShots.discover() }
 
     @Test
-    fun everyToolWithAnOffSwitch() = shoot("05-tools", until = "Web search") {
+    fun everyToolWithAnOffSwitch() = shoot("05-tools", until = "Search the web") {
         ListingShots.tools()
     }
 
@@ -95,7 +104,11 @@ class PlayScreenshots {
     // least four at 1080px to consider a listing for promotion.
     @Test
     @Config(qualifiers = SEVEN_INCH)
-    fun sevenInchChat() = shoot("7/01-chat", until = "attention layers") { ChatShots.midReply() }
+    fun sevenInchChat() = shoot(
+        "7/01-chat",
+        until = "attention layers",
+        typing = DRAFT,
+    ) { ChatShots.midReply() }
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
@@ -113,7 +126,11 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = TEN_INCH)
-    fun tenInchChat() = shoot("10/01-chat", until = "attention layers") { ChatShots.midReply() }
+    fun tenInchChat() = shoot(
+        "10/01-chat",
+        until = "attention layers",
+        typing = DRAFT,
+    ) { ChatShots.midReply() }
 
     @Test
     @Config(qualifiers = TEN_INCH)
@@ -129,6 +146,43 @@ class PlayScreenshots {
         ListingShots.discover()
     }
 
+    // The paper palette, which no listing asks for and which nobody had ever looked at.
+    //
+    // Both themes are meant to be built properly rather than one being a tint of the other,
+    // and the light one carries the palette's sharpest rule: lime measures 1.13:1 on white,
+    // so anything that paints the accent as a word or a line is invisible there and fine on
+    // the dark canvas the app is developed in. These go in a `light/` folder, are gated by
+    // the same environment variable, and are for looking at rather than for uploading.
+    @Test
+    @Config(qualifiers = PAPER)
+    fun paperChat() = shoot("light/01-chat", until = "attention layers", dark = false) {
+        ChatShots.midReply()
+    }
+
+    @Test
+    @Config(qualifiers = PAPER)
+    fun paperTools() = shoot("light/02-tools", until = "Search the web", dark = false) {
+        ListingShots.tools()
+    }
+
+    @Test
+    @Config(qualifiers = PAPER)
+    fun paperDiscover() = shoot("light/03-discover", until = "Hammer2.1", dark = false) {
+        ListingShots.discover()
+    }
+
+    @Test
+    @Config(qualifiers = PAPER)
+    fun paperSettings() = shoot("light/04-settings", until = "Appearance", dark = false) {
+        ListingShots.settings()
+    }
+
+    @Test
+    @Config(qualifiers = PAPER)
+    fun paperUsage() = shoot("light/05-usage", until = "By model", dark = false) {
+        ListingShots.usage()
+    }
+
     /**
      * One screen, drawn straight off its own view.
      *
@@ -137,17 +191,31 @@ class PlayScreenshots {
      * two seconds having produced nothing. Drawing the view onto a bitmap is what
      * Robolectric's native graphics mode is for, and it is the same pixels.
      */
-    private fun shoot(name: String, until: String, content: @Composable () -> Unit) {
+    private fun shoot(
+        name: String,
+        until: String,
+        dark: Boolean = true,
+        typing: String? = null,
+        content: @Composable () -> Unit,
+    ) {
         val into = System.getenv(OUTPUT) ?: return
         val directory = File(into)
 
-        compose.setContent { OpenWeightsTheme(dynamicColor = false) { content() } }
+        compose.setContent {
+            OpenWeightsTheme(
+                themeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT,
+                dynamicColor = false,
+            ) { content() }
+        }
         // Markdown is parsed off the composition and swapped in when it finishes, so a
         // capture taken at idle gets the empty slot it holds in the meantime. The first
         // attempt drew a reply with the telemetry row under it and no reply above it.
         compose.waitUntil(timeoutMillis = WAIT_MS) {
             compose.onAllNodesWithText(until, substring = true).fetchSemanticsNodes().isNotEmpty()
         }
+
+        typing?.let { compose.onNodeWithContentDescription("Message").performTextInput(it) }
+        compose.waitForIdle()
 
         val view = (compose.onRoot().fetchSemanticsNode().root as ViewRootForTest).view
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -170,5 +238,17 @@ class PlayScreenshots {
 
         /** 900 x 1600 dp at xhdpi is 1800 x 3200 px: 9:16, inside the 1080..7680 Play allows. */
         const val TEN_INCH = "w900dp-h1600dp-night-xhdpi"
+
+        /** The phone canvas again, without the night qualifier. */
+        const val PAPER = "w360dp-h640dp-xxhdpi"
+
+        /**
+         * Something typed, in every chat shot.
+         *
+         * Staged the way any product screenshot stages its content. An empty composer means
+         * a disabled send button, which means the app's one accent colour appears nowhere
+         * at all on the screen the listing leads with.
+         */
+        const val DRAFT = "And how much memory does the cache take?"
     }
 }

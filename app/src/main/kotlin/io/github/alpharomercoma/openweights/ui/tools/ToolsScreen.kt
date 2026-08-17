@@ -20,6 +20,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,13 +32,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,10 +54,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -62,11 +69,11 @@ import io.github.alpharomercoma.openweights.core.tools.GrantState
 /**
  * What the model can do, and what each one costs you.
  *
- * One list rather than a tab each for tools, skills and servers. The question anyone has
- * is "can it search the web", not "is that a tool or an MCP server", so the format is a
- * badge on the row and not a destination. What the badge is really saying is where the
- * thing came from and whether using it leaves the device, which is the only difference
- * between them that a user has to act on.
+ * One screen rather than a tab each for tools, skills and servers. The question anyone has
+ * is "can it search the web", not "is that a tool or an MCP server", so the format never
+ * becomes a destination. What did earn a heading is whether using a tool leaves the device,
+ * because that is the only difference between any two of them a user has to act on, and as
+ * a line of grey small print at the bottom of a row it was invisible.
  *
  * Called Tools rather than Capabilities, which was too long for a tab, and rather than
  * Context, which already means the window whose fill we show as a percentage two screens
@@ -117,52 +124,98 @@ fun ToolsScreen(
             )
         },
     ) { padding ->
+        // Two groups, and the split is the only thing about a tool anybody has to decide
+        // about. It used to be one flat list where a row that asks Wikipedia sat between two
+        // that read the folder you shared, distinguished by a grey line of small print.
+        val (offDevice, onDevice) = state.tools.partition { it.leavesTheDevice }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
                 Text(
-                    text = "What the model is allowed to do while answering. Everything " +
-                        "here is built in and runs on this device, except where a row " +
-                        "says otherwise.",
+                    text = "What the model may do while it answers.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = 6.dp),
                 )
             }
 
             // Above the rows it governs, because three of them can do nothing until it is
             // set and do not appear to the model at all while it is not.
             item {
-                WorkspaceRow(
+                WorkspaceCard(
                     workspace = state.workspace,
                     onChosen = onChooseFolder,
                     onForget = onForgetFolder,
                 )
             }
 
-            items(state.tools, key = { it.id }) { tool ->
-                ToolRow(
-                    tool = tool,
-                    onToggle = { enabled -> onToggle(tool.id, enabled) },
-                )
+            if (onDevice.isNotEmpty()) {
+                item { GroupHeading("On this device") }
+                item { ToolGroup(tools = onDevice, onToggle = onToggle) }
+            }
+
+            if (offDevice.isNotEmpty()) {
+                item { GroupHeading("Leaves the device") }
+                item { ToolGroup(tools = offDevice, onToggle = onToggle) }
             }
 
             item {
                 // Said plainly rather than shown as a disabled row, because an empty
                 // "Add" affordance that does nothing is worse than an honest sentence.
                 Text(
-                    text = "Skill files and remote servers are not supported yet. When " +
-                        "they are, they will appear here with a badge saying where they " +
-                        "came from and whether they leave the device.",
+                    text = "Skill files and remote servers are not supported yet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 16.dp),
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
+        }
+    }
+}
+
+/** Enough to read as waiting rather than as broken. */
+private const val DIMMED = 0.55f
+
+/** The label over a group. Quiet, because the rows under it are the content. */
+@Composable
+private fun GroupHeading(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp),
+    )
+}
+
+/**
+ * One card per group, with hairlines between the rows.
+ *
+ * Rather than a card per tool with a gap between each. Six free-floating cards read as six
+ * unrelated things; one card with rules in it reads as a list, which is what it is, and the
+ * heading above then clearly governs everything inside rather than only the first row.
+ */
+@Composable
+private fun ToolGroup(tools: List<ToolSummary>, onToggle: (String, Boolean) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.md))
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        tools.forEachIndexed { index, tool ->
+            if (index > 0) {
+                HorizontalDivider(
+                    thickness = Dp.Hairline,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(start = 14.dp),
+                )
+            }
+            ToolRow(tool = tool, onToggle = { on -> onToggle(tool.id, on) })
         }
     }
 }
@@ -176,7 +229,7 @@ fun ToolsScreen(
  * taps is the whole of what the app may reach.
  */
 @Composable
-private fun WorkspaceRow(
+private fun WorkspaceCard(
     workspace: WorkspaceSummary,
     onChosen: (Uri) -> Unit,
     onForget: () -> Unit,
@@ -185,34 +238,61 @@ private fun WorkspaceRow(
         it?.let(onChosen)
     }
 
-    Row(
+    // Outlined rather than filled, which is the whole point of the change: this is a thing
+    // you grant, and the filled cards below are things the model can do. Given the same
+    // treatment they read as one more tool that happens to have buttons instead of a switch.
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clip(RoundedCornerShape(Radius.md))
+            .border(
+                width = Dp.Hairline,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(Radius.md),
+            )
             .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "Shared folder", style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = workspace.describe(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
             )
             Text(
-                text = "On this device · you choose the folder, and can take it back",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                text = workspace.folder ?: "No folder shared",
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
-        if (workspace.folder != null) {
-            TextButton(onClick = onForget) { Text("Remove") }
-        }
-        TextButton(onClick = { pick.launch(null) }) {
-            Text(if (workspace.folder == null) "Choose" else "Change")
+        Text(
+            text = workspace.describe(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(
+                onClick = { pick.launch(null) },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(if (workspace.folder == null) "Choose a folder" else "Change")
+            }
+            if (workspace.folder != null) {
+                TextButton(
+                    onClick = onForget,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text("Remove") }
+            }
         }
     }
 }
@@ -220,39 +300,48 @@ private fun WorkspaceRow(
 /** What the row says about the folder, which is a different sentence for each way of failing. */
 private fun WorkspaceSummary.describe(): String = when (state) {
     GrantState.NONE ->
-        "None yet. Searching, reading and saving files stay switched off until you pick one."
+        "The file tools stay off until you pick one. Only that folder is shared."
     GrantState.LOST ->
-        "${folder ?: "The folder"} cannot be reached now. Choose it again to carry on."
+        "This folder cannot be reached now. Choose it again to carry on."
     GrantState.READ_ONLY ->
-        "$folder. It will not take new files, so saving is off and reading still works."
+        "Readable, but it will not take new files, so saving stays off."
     GrantState.READ_WRITE ->
-        "$folder. The model can search it, read from it, and save new files into it."
+        "The model can search it, read from it, and save new files into it."
 }
 
 @Composable
 private fun ToolRow(tool: ToolSummary, onToggle: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.sm))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(14.dp),
+        modifier = Modifier.fillMaxWidth().padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        // Dimmed while it has nowhere to work. The switch stays live, because it is the
+        // user's preference and they may well want it set before they pick a folder, but a
+        // row at full strength beside an "on" switch claims a capability that is not there.
+        Column(modifier = Modifier.weight(1f).alpha(if (tool.isReady) 1f else DIMMED)) {
             Text(text = tool.name, style = MaterialTheme.typography.titleSmall)
             Text(
                 text = tool.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = tool.provenance,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            // Only when there is something to say. "Runs without asking" under five of six
+            // rows is a line the eye learns to skip, which is the worst thing a warning can
+            // become. The two that stop and ask, and the ones with nowhere to work, say so.
+            val note = when {
+                !tool.isReady -> "Waiting for a folder"
+                tool.asksFirst -> "Asks before every run"
+                else -> null
+            }
+            note?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
         Switch(
             checked = tool.isEnabled,
@@ -274,17 +363,30 @@ private fun ToolsScreenPreview() {
             state = ToolsUiState(
                 tools = listOf(
                     ToolSummary(
-                        id = "search_wikipedia",
-                        name = "Search Wikipedia",
-                        description = "Look up people, places and definitions.",
-                        provenance = "Built in · asks Wikipedia",
+                        id = "run_script",
+                        name = "Run a script",
+                        description = "Works out sums and dates by running JavaScript.",
+                        leavesTheDevice = false,
+                        asksFirst = false,
+                        isReady = true,
                         isEnabled = true,
                     ),
                     ToolSummary(
-                        id = "fetch_url",
-                        name = "Read a page",
-                        description = "Fetch a public page and read its text.",
-                        provenance = "Built in · asks every time",
+                        id = "read_file",
+                        name = "Read a file",
+                        description = "Opens a file from that folder.",
+                        leavesTheDevice = false,
+                        asksFirst = false,
+                        isReady = false,
+                        isEnabled = true,
+                    ),
+                    ToolSummary(
+                        id = "web_search",
+                        name = "Search the web",
+                        description = "Looks up anything recent, or anything it does not know.",
+                        leavesTheDevice = true,
+                        asksFirst = true,
+                        isReady = true,
                         isEnabled = true,
                     ),
                 ),

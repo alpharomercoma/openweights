@@ -5,23 +5,23 @@ The raw renders are already the size and ratio Play wants, so the frame is not f
 compliance problem; it is the only place the listing gets to say what the screen is for. The
 caption does that job and the screen underneath proves it.
 
-Palette and type are the app's own, from docs/design/visual-language.md, so a listing page
-and a first launch look like the same product.
+Palette and type are the app's own, from core/designsystem, so a listing page and a first
+launch look like the same product.
 """
 from pathlib import Path
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1080, 1920          # the phone canvas; tablets scale from it
-CANVAS = "#0B0D0F"
-LIFT = "#232A31"          # the radial the icon and feature graphic also sit on
-TEXT = "#ECF1F4"
-MUTED = "#9AA6AF"
-EDGE = "#262D34"
+CANVAS = "#0D0E10"
+TEXT = "#F5F6F3"
+MUTED = "#A2A4AB"
+EDGE = "#26272A"
+ACCENT = "#E0FF4F"
 
-FONTS = Path("/Users/alpha/mobile-inference/core/designsystem/src/main/res/font")
-SANS = str(FONTS / "plex_sans.ttf")
-MONO = str(FONTS / "plex_mono_regular.ttf")
+FONTS = Path(__file__).resolve().parents[2] / "core/designsystem/src/main/res/font"
+DISPLAY = str(FONTS / "schibsted_grotesk.ttf")
+BODY = str(FONTS / "hanken_grotesk.ttf")
 
 SHOT_W = 828                       # 0.767 of the source, which keeps body text readable
 SHOT_TOP = 396
@@ -32,25 +32,18 @@ CAPTIONS = [
     ("02-tools", "An assistant that can act", "Search the web, read a page, use your files"),
     ("03-plan", "Ask it to plan first", "It proposes the steps. You tick them off."),
     ("04-discover", "Any model, not a catalogue", "Search Hugging Face and run any GGUF"),
-    ("05-tools", "Every tool has an off switch", "And each says if it asks before running"),
+    ("05-tools", "Every tool has an off switch", "Grouped by whether using one leaves the phone"),
 ]
 
 
 def background() -> Image.Image:
-    """Graphite with a soft lift behind the caption, drawn small and scaled for smoothness."""
-    base = ImageColor.getrgb(CANVAS)
-    lift = ImageColor.getrgb(LIFT)
-    small = Image.new("RGB", (108, 192), CANVAS)
-    pixels = small.load()
-    cx, cy, reach = 54, 30, 165
-    for y in range(192):
-        for x in range(108):
-            distance = ((x - cx) ** 2 + ((y - cy) * 0.85) ** 2) ** 0.5
-            weight = max(0.0, 1.0 - distance / reach) ** 2
-            pixels[x, y] = tuple(
-                round(a + (b - a) * weight) for a, b in zip(base, lift)
-            )
-    return small.resize((W, H), Image.LANCZOS)
+    """Flat canvas.
+
+    It was a radial lift behind the caption, matching a launcher icon that was itself a
+    radial. Both are flat now: a gradient behind a two line caption is depth that nothing
+    on the page uses, and next to a screenshot of a flat interface it read as a smudge.
+    """
+    return Image.new("RGB", (W, H), CANVAS)
 
 
 def rounded(image: Image.Image, radius: int) -> Image.Image:
@@ -60,6 +53,21 @@ def rounded(image: Image.Image, radius: int) -> Image.Image:
     out = image.convert("RGBA")
     out.putalpha(mask)
     return out
+
+
+def weighted(path: str, size: int, weight: int) -> ImageFont.FreeTypeFont:
+    """A named weight of one of the app's variable faces.
+
+    Each family in `res/font` is one variable TTF with a weight axis, which is how the app
+    declares four weights per family from a single file. Pillow reaches the same axis, so a
+    caption is set in the instance the app actually renders in.
+    """
+    face = ImageFont.truetype(path, size)
+    try:
+        face.set_variation_by_axes([weight])
+    except OSError:
+        pass  # A static build of the face. It will render at its one weight.
+    return face
 
 
 def wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, limit: int):
@@ -81,10 +89,17 @@ def frame(source: Path, out: Path, headline: str, sub: str) -> None:
     draw = ImageDraw.Draw(canvas)
 
     scale = W / 1080
-    head_font = ImageFont.truetype(SANS, round(58 * scale))
-    sub_font = ImageFont.truetype(MONO, round(27 * scale))
+    head_font = weighted(DISPLAY, round(58 * scale), 700)
+    sub_font = weighted(BODY, round(28 * scale), 400)
 
-    y = round(132 * scale)
+    # A short accent rule over the headline. The one lime thing on the page, and the only
+    # mark that says these five images belong to each other when Play shows them in a row.
+    draw.rounded_rectangle(
+        [round(126 * scale), round(104 * scale), round(180 * scale), round(109 * scale)],
+        radius=round(3 * scale), fill=ACCENT,
+    )
+
+    y = round(148 * scale)
     for line in wrap(draw, headline, head_font, W - round(2 * 126 * scale)):
         draw.text((round(126 * scale), y), line, font=head_font, fill=TEXT)
         y += round(74 * scale)

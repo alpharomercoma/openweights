@@ -79,7 +79,24 @@ class ParameterSheetTest {
     fun `a device with a second backend is offered the choice`() {
         showSheet(hasGpu = true)
 
-        compose.onNodeWithText("Processor").assertIsDisplayed()
+        // Behind Advanced, with the other four settings whose defaults are right. Still
+        // reachable, which is the difference between folding an interface up and cutting
+        // things out of it.
+        compose.onNodeWithText("Processor").assertDoesNotExist()
+        compose.onNodeWithText("Advanced").performScrollTo().performClick()
+        compose.onNodeWithText("Processor").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `the settings people actually touch are not behind the disclosure`() {
+        showSheet()
+
+        compose.onNodeWithText("Temperature").assertIsDisplayed()
+        compose.onNodeWithText("Context length").assertIsDisplayed()
+        compose.onNodeWithText("System prompt").assertIsDisplayed()
+        // And the ones whose defaults are correct are not in the way of them.
+        compose.onNodeWithText("Top-p").assertDoesNotExist()
+        compose.onNodeWithText("Repeat penalty").assertDoesNotExist()
     }
 
     @Test

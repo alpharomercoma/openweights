@@ -32,12 +32,14 @@ import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HubTask
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
-import io.github.alpharomercoma.openweights.core.hub.PublisherAvatars
+import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.core.hub.RangeByteSource
 import io.github.alpharomercoma.openweights.core.hub.gguf.GgufHeaderParser
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,7 +92,7 @@ class DiscoverViewModel @Inject constructor(
     private val estimator: FitEstimator,
     private val rangeSourceFactory: RangeByteSource.Factory,
     private val modelStore: ModelStore,
-    private val avatars: PublisherAvatars,
+    private val publishers: Publishers,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -113,6 +115,8 @@ class DiscoverViewModel @Inject constructor(
     private val inspectionLimit = Semaphore(MAX_CONCURRENT_INSPECTIONS)
 
     init {
+        // The ceiling is worked out here whether or not it is applied, because the size
+        // chip has to be able to say "Under 10B" the moment somebody reaches for it.
         val ceiling = estimator.parameterCeilingBillions(profiler.profile())
         _uiState.update { it.copy(parameterCeilingBillions = ceiling) }
         search()
@@ -158,11 +162,48 @@ class DiscoverViewModel @Inject constructor(
 
     fun clearFilters() = onQueryChange(HubQuery(text = _uiState.value.query.text))
 
+    /**
+     * Only what an organisation published, or everything.
+     *
+     * The Hub has no search parameter for this, so it is applied to the results instead,
+     * which is why it re-runs the search rather than filtering what is already on screen:
+     * a page of thirty that loses twenty is a page of ten, and the next page is where the
+     * rest of the organisations are.
+     */
+    fun onOfficialOnlyChange(enabled: Boolean) =
+        onQueryChange(_uiState.value.query.copy(officialOnly = enabled))
+
+    /**
+     * The measured shortlist, or the whole Hub.
+     *
+     * Turning it off is what opens the search up, so the other filters come on with it: a
+     * user who has just left a list of five wants the one that fits their phone next, and
+     * arriving at the unfiltered Hub sorted by trending is arriving at abliterated merges
+     * of other people's work at sizes nothing can hold.
+     */
+    fun onRecommendedOnlyChange(enabled: Boolean) = onQueryChange(
+        _uiState.value.query.copy(
+            recommendedOnly = enabled,
+            officialOnly = !enabled,
+            maxParametersBillions = _uiState.value.parameterCeilingBillions
+                .takeIf { !enabled && it > 0 },
+        ),
+    )
+
     fun search() {
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true, error = null) }
-            runCatching { client.search(_uiState.value.query) }
+            val query = _uiState.value.query
+            runCatching {
+                when {
+                    // A shortlist is fetched by name, not searched for. Typing in the box
+                    // means the shortlist is not what is being asked for any more.
+                    query.recommendedOnly && query.text.isBlank() -> client.recommended()
+                    query.officialOnly -> official(client.search(query))
+                    else -> client.search(query)
+                }
+            }
                 .onSuccess { results ->
                     _uiState.update { it.copy(isSearching = false, results = results) }
                     resolveAvatars(results)
@@ -173,6 +214,26 @@ class DiscoverViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    /**
+     * The results whose publisher is an organisation rather than a person.
+     *
+     * Resolved before the results are published rather than after, so the list appears
+     * already filtered. Filtering what is already on screen would show a page and then
+     * take two thirds of it away, which reads as a bug however correct it is.
+     *
+     * Concurrent, and cached across searches, so the cost is one round trip per publisher
+     * this session and nothing at all on the second search.
+     */
+    private suspend fun official(results: List<HubModel>): List<HubModel> = coroutineScope {
+        val kinds = results.map { it.owner }.filter { it.isNotEmpty() }.distinct()
+            .map { owner ->
+                async { owner to runCatching { publishers.lookUp(owner) }.getOrNull() }
+            }
+            .awaitAll()
+            .toMap()
+        results.filter { kinds[it.owner]?.isOrganisation == true }
     }
 
     /**
@@ -191,7 +252,8 @@ class DiscoverViewModel @Inject constructor(
 
         wanted.forEach { owner ->
             viewModelScope.launch {
-                val url = runCatching { avatars.urlFor(owner) }.getOrNull() ?: return@launch
+                val url = runCatching { publishers.lookUp(owner) }.getOrNull()?.avatarUrl
+                    ?: return@launch
                 _uiState.update { it.copy(avatars = it.avatars + (owner to url)) }
             }
         }

@@ -30,13 +30,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
-/** One row: what it does, where it came from, and whether it is on. */
+/** One row: what it does, what it costs, and whether it is on. */
 data class ToolSummary(
     val id: String,
     val name: String,
     val description: String,
-    /** Where it came from and what it costs, which is the only difference that matters. */
-    val provenance: String,
+    /**
+     * Whether using it sends anything off the phone.
+     *
+     * The one property the screen groups by. Everything else about a tool is detail; this
+     * is the difference somebody has to decide about.
+     */
+    val leavesTheDevice: Boolean,
+    /** Whether it stops and asks first, however the agent mode is set. */
+    val asksFirst: Boolean,
+    /** False while it has nothing to work with, which today means no folder has been shared. */
+    val isReady: Boolean,
     val isEnabled: Boolean,
 )
 
@@ -84,20 +93,46 @@ class ToolsViewModel @Inject constructor(
     private fun workspace(): WorkspaceSummary =
         WorkspaceSummary(folder = grant.folder?.folderLabel(), state = grant.state())
 
-    private fun read(): List<ToolSummary> = registry.all.map { tool ->
-        ToolSummary(
-            id = tool.definition.name,
-            name = tool.definition.name.replace('_', ' ').replaceFirstChar { it.uppercase() },
-            description = tool.definition.description,
-            provenance = if (tool.alwaysAsk) {
-                "Built in · asks before every run"
-            } else {
-                "Built in · runs without asking"
-            },
-            isEnabled = switches.isEnabled(tool.definition.name),
-        )
-    }
+    private fun read(): List<ToolSummary> = registry.all
+        // Plan mode's own two tools are in the registry because the model is offered them,
+        // not because anybody grants them. A switch beside "Advance" did what it said and
+        // quietly broke plan mode.
+        .filter { it.isUserFacing }
+        .map { tool ->
+            ToolSummary(
+                id = tool.definition.name,
+                name = LABELS[tool.definition.name]?.first
+                    ?: tool.definition.name.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                description = LABELS[tool.definition.name]?.second
+                    ?: tool.definition.description,
+                leavesTheDevice = tool.leavesTheDevice,
+                asksFirst = tool.alwaysAsk,
+                isReady = tool.isAvailable,
+                isEnabled = switches.isEnabled(tool.definition.name),
+            )
+        }
 }
+
+/**
+ * What each tool is called on the screen, and what it does in one line.
+ *
+ * Separate from [ToolDefinition], whose name and description are written for the model and
+ * read like it: "Use the path returned by search_files" is exactly right in a prompt and
+ * nonsense in a settings row. Deriving the label from the id gave "Fetch url".
+ *
+ * A tool with no entry falls back to its definition, so a new one shows up in the list
+ * looking rough rather than not showing up at all.
+ */
+private val LABELS: Map<String, Pair<String, String>> = mapOf(
+    "web_search" to ("Search the web" to "Looks up anything recent, or anything it does not know."),
+    "fetch_url" to ("Open a page" to "Reads the text of one public page."),
+    "search_files" to ("Find a file" to "Looks through the folder you shared."),
+    "read_file" to ("Read a file" to "Opens a file from that folder."),
+    "write_file" to ("Save a file" to "Writes a new file there. It never replaces one."),
+    "run_script" to (
+        "Run a script" to "Works out sums and dates by running JavaScript. No files, no network."
+        ),
+)
 
 /**
  * The last part of a tree's document id, which is what the folder is called.

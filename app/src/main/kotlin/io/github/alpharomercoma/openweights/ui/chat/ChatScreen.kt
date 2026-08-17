@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -50,9 +51,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
@@ -89,10 +92,13 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ReportReason
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
+import io.github.alpharomercoma.openweights.core.designsystem.component.Mark
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
@@ -168,6 +174,17 @@ fun ChatScreen(
     // Hold the id, not the entry: streaming replaces entries on every token, and a
     // captured copy would have Copy putting a half-finished reply on the clipboard.
     var actionsForId by remember { mutableStateOf<Long?>(null) }
+
+    // Back closes the drawer before it does anything else.
+    //
+    // Material's ModalNavigationDrawer does not handle this for us, and with the bottom bar
+    // gone the drawer is the only way to reach three destinations, so it is opened far more
+    // often than it used to be. Without this, back from an open drawer went straight past
+    // it and finished the activity: the app closed, which is the wrong answer to a gesture
+    // that means "not this".
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -359,6 +376,7 @@ private fun ChatContent(
                         EmptyState(
                             isLoadingModel = state.isLoadingModel,
                             hasModel = state.modelName != null,
+                            onBrowseModels = destinations.onBrowseModels,
                         )
                     } else {
                         Transcript(
@@ -396,40 +414,64 @@ private fun ChatContent(
                     it.run(onNewChat, onCompact, onRegenerate, onMode)
                 }
 
-                Composer(
-                    conversationKey = state.activeConversationId,
-                    enabled = state.canSend,
-                    isGenerating = state.isGenerating,
-                    staged = state.staged,
-                    document = state.stagedDocument,
-                    onRemoveDocument = onRemoveDocument,
-                    canAttach = state.mediaSupport.any,
-                    isAttaching = state.isAttaching,
-                    canDictate = canDictate,
-                    isListening = dictation.isListening,
-                    heard = dictation.partial,
-                    onAttach = { showAttachments = true },
-                    leading = {
-                        AttachDocumentButton(enabled = state.canSend, onPicked = onAttachDocument)
-                    },
-                    onRemoveStaged = onRemoveStaged,
-                    onDictate = onDictate,
-                    // A command that was typed out and sent runs, rather than going to the model
-                    // as text for it to answer. The palette is how these are found; it was also
-                    // the only way to run one, which anybody who already knew the word found out
-                    // by watching the model reply to "/plan".
-                    onSend = { typed ->
-                        val command = SlashCommand.typed(typed)
-                        if (command != null) {
-                            dispatch(command)
-                            true
-                        } else {
-                            onSend(typed)
-                        }
-                    },
-                    onStop = onStop,
-                    onCommand = dispatch,
-                )
+                // Not before there is a model on the phone at all.
+                //
+                // A message box that cannot send is a dead affordance: it invites typing, it
+                // takes the focus, and the keyboard comes up over a screen whose only real
+                // control is the button in the middle. Hidden on the true first run only,
+                // when nothing is installed, rather than whenever nothing happens to be
+                // loaded, so it does not flicker away while a model is coming into memory.
+                if (installedModels.isNotEmpty() || state.modelName != null) {
+                    Composer(
+                        conversationKey = state.activeConversationId,
+                        enabled = state.canSend,
+                        isGenerating = state.isGenerating,
+                        staged = state.staged,
+                        document = state.stagedDocument,
+                        onRemoveDocument = onRemoveDocument,
+                        isAttaching = state.isAttaching,
+                        canDictate = canDictate,
+                        isListening = dictation.isListening,
+                        heard = dictation.partial,
+                        onAttach = { showAttachments = true },
+                        leading = {
+                            ThinkingControl(
+                                supportsEffort = state.supportsReasoningEffort,
+                                supportsThinking = state.supportsThinking,
+                                effort = ReasoningEffort.fromName(
+                                    state.preferences.reasoningEffort,
+                                ),
+                                thinking = state.preferences.thinking,
+                                enabled = state.canSend,
+                                onEffort = {
+                                    onSavePreferences(
+                                        state.preferences.copy(reasoningEffort = it.name),
+                                    )
+                                },
+                                onThinking = {
+                                    onSavePreferences(state.preferences.copy(thinking = it))
+                                },
+                            )
+                        },
+                        onRemoveStaged = onRemoveStaged,
+                        onDictate = onDictate,
+                        // A command that was typed out and sent runs, rather than going to the model
+                        // as text for it to answer. The palette is how these are found; it was also
+                        // the only way to run one, which anybody who already knew the word found out
+                        // by watching the model reply to "/plan".
+                        onSend = { typed ->
+                            val command = SlashCommand.typed(typed)
+                            if (command != null) {
+                                dispatch(command)
+                                true
+                            } else {
+                                onSend(typed)
+                            }
+                        },
+                        onStop = onStop,
+                        onCommand = dispatch,
+                    )
+                }
             }
         }
     }
@@ -459,6 +501,7 @@ private fun ChatContent(
             support = state.mediaSupport,
             newCaptureUri = newCaptureUri,
             onPicked = onAttach,
+            onPickedDocument = onAttachDocument,
             onDismiss = { showAttachments = false },
         )
     }
@@ -554,7 +597,9 @@ private fun Transcript(
                     thermal = state.thermal,
                     celsius = state.deviceCelsius,
                     isSpeaking = isSpeaking,
-                    onLongPress = { onActionsForId(entry.id) },
+                    onMore = { onActionsForId(entry.id) },
+                    // The answer, not the reasoning and not the tool steps: what a reader
+                    // means by "copy the reply" is the reply.
                     onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
                     onReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
                     // Only the last reply can be retried: regenerating an earlier one would
@@ -590,6 +635,7 @@ private fun ChatSheets(
             preferences = state.preferences,
             supportsThinking = state.supportsThinking,
             hasGpu = state.hasGpu,
+            offloadBuffers = state.offloadBuffers,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()
@@ -676,17 +722,22 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
         }
         // A message can be attachments alone, in which case there is no bubble to draw.
         if (entry.text.isNotBlank()) {
-            Text(
-                text = entry.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .widthIn(max = 300.dp)
-                    .clip(RoundedCornerShape(Radius.md))
-                    .combinedClickable(onClick = {}, onLongClick = onLongPress)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
+            // Selectable as well, for the same reason as the reply. The long press stays,
+            // because this bubble has no action row to hang a control off; selection wins
+            // inside the text and the press opens the sheet from the padding around it.
+            SelectionContainer {
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .widthIn(max = 300.dp)
+                        .clip(RoundedCornerShape(Radius.md))
+                        .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
     }
 }
@@ -704,51 +755,65 @@ private fun AssistantTurn(
     thermal: ThermalLevel,
     celsius: Float?,
     isSpeaking: Boolean,
-    onLongPress: () -> Unit,
+    onMore: () -> Unit,
     onCopy: () -> Unit,
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
-        ) {
-            entry.reasoning?.let { reasoning ->
-                ReasoningBlock(
-                    reasoning = reasoning,
-                    isInProgress = entry.isReasoningInProgress,
-                    durationMs = entry.reasoningMs,
-                )
-            }
-            // In the order they happened, between the thinking that led to them and the
-            // answer they fed. These outlive a pass, which is what the field they replaced
-            // did not: it was overwritten by the next one, so nothing was ever visible.
-            entry.blocks.forEach { block ->
-                when (block) {
-                    is TurnBlock.Step -> ToolStepBlock(block.step)
-                    is TurnBlock.Said -> IntermediateText(block.text)
+        // Selectable, which it was not.
+        //
+        // The whole turn was one `combinedClickable`, so a long press highlighted the block
+        // end to end and opened the actions sheet: there was no way to take a sentence out
+        // of an answer, which is most of what anybody does with a model's output. A
+        // SelectionContainer gives back the ordinary Android behaviour, handles and the
+        // system toolbar included, across the reasoning and the answer together.
+        //
+        // Losing the long press means the sheet needs a way in that a reader can see, which
+        // is the "More" action in the row underneath. That is where ChatGPT and Claude both
+        // put it, and a visible control beats a gesture nobody was told about.
+        SelectionContainer {
+            Column {
+                entry.reasoning?.let { reasoning ->
+                    ReasoningBlock(
+                        reasoning = reasoning,
+                        isInProgress = entry.isReasoningInProgress,
+                        durationMs = entry.reasoningMs,
+                    )
                 }
+
+                // In the order they happened, between the thinking that led to them and the
+                // answer they fed. These outlive a pass, which is what the field they
+                // replaced did not: it was overwritten by the next one, so nothing was ever
+                // visible.
+                entry.blocks.forEach { block ->
+                    when (block) {
+                        is TurnBlock.Step -> ToolStepBlock(block.step)
+                        is TurnBlock.Said -> IntermediateText(block.text)
+                    }
+                }
+
+                if (entry.answer.isNotEmpty()) MarkdownText(entry.answer)
             }
+        }
 
-            if (entry.answer.isNotEmpty()) MarkdownText(entry.answer)
+        // Last, under whatever has been written so far, because that is where the eye
+        // already is while waiting. The top bar says the same thing, but a status two
+        // hundred pixels above the text being read is a status nobody sees.
+        activity?.takeIf { it.isBusy }?.let { ActivityLine(it, thermal, celsius) }
 
-            // Last, under whatever has been written so far, because that is where the eye
-            // already is while waiting. The top bar says the same thing, but a status two
-            // hundred pixels above the text being read is a status nobody sees.
-            activity?.takeIf { it.isBusy }?.let { ActivityLine(it, thermal, celsius) }
-
-            // Only once the reply has finished: actions on a half-written answer copy half
-            // an answer, and a retry mid-stream is a stop the user did not ask for.
-            if (!entry.isStreaming && entry.answer.isNotEmpty()) {
-                MessageActions(
-                    isSpeaking = isSpeaking,
-                    onCopy = onCopy,
-                    onReadAloud = onReadAloud,
-                    onRetry = onRetry,
-                    modifier = Modifier.padding(top = 2.dp),
-                    measurements = entry.tokensPerSecond?.let { { Measurements(entry) } },
-                )
-            }
+        // Only once the reply has finished: actions on a half-written answer copy half an
+        // answer, and a retry mid-stream is a stop the user did not ask for.
+        if (!entry.isStreaming && entry.answer.isNotEmpty()) {
+            MessageActions(
+                isSpeaking = isSpeaking,
+                onCopy = onCopy,
+                onReadAloud = onReadAloud,
+                onRetry = onRetry,
+                onMore = onMore,
+                modifier = Modifier.padding(top = 2.dp),
+                measurements = entry.tokensPerSecond?.let { { Measurements(entry) } },
+            )
         }
     }
 }
@@ -848,10 +913,20 @@ private fun ActivityLine(
         // been built. Red when it is warm, which is the moment a hot phone would otherwise
         // be indistinguishable from a slow model.
         Text(
-            // The reading if the phone will give one, the four step word if it will not.
-            text = celsius
-                ?.let { "· " + String.format(LocalConfiguration.current.locales[0], "%.1f°C", it) }
-                ?: "· ${thermal.label}",
+            // The reading if the phone will give one, and the four step word beside it once
+            // the phone claims to be warm.
+            //
+            // Both, because they are two different measurements and only one of them is
+            // ours. Android's thermal status is a policy decision made by the vendor, and
+            // this reference device reports LIGHT while sitting at 25°C, so a red "25.0°C"
+            // on its own said the number was the problem. Attached to the word it is the
+            // system's claim, in the system's own terms, with the reading as context.
+            text = listOfNotNull(
+                celsius?.let {
+                    String.format(LocalConfiguration.current.locales[0], "%.1f°C", it)
+                },
+                thermal.label.takeIf { thermal.isWarm || celsius == null },
+            ).joinToString(" · ", prefix = "· "),
             style = MetricTextStyle,
             color = if (thermal.isWarm) {
                 MaterialTheme.colorScheme.error
@@ -906,12 +981,12 @@ private fun Measurements(entry: TranscriptEntry) {
 }
 
 @Composable
-private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
+private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean, onBrowseModels: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when {
@@ -927,27 +1002,85 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean) {
                 )
             }
 
-            // This said "Nothing leaves this device", which stopped being true the day web
-            // search shipped switched on: a question can become a search, and a search is
-            // text going to somebody else's server. The sentence was the best line in the
-            // app and it was the one users had least reason to doubt, which is exactly why
-            // it could not stay. What is left is the part that is still true of every
-            // reply, and Tools is where the exception is named and can be turned off.
-            hasModel -> Text(
-                "Ready. Ask it anything. The model runs on this phone.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            else -> {
-                Text("No model yet.", style = MaterialTheme.typography.titleMedium)
+            // The mark, then a question.
+            //
+            // It was one grey sentence, "Ready. Ask it anything. The model runs on this
+            // phone.", which is three statements and no invitation: correct, cold, and the
+            // first thing anybody sees. ChatGPT opens with a question, Gemini with a
+            // greeting, Claude with both; all three understand that an empty screen is a
+            // moment to say hello rather than to file a status report.
+            //
+            // So the mark carries the brand, the question carries the invitation, and the
+            // one claim worth making survives underneath it in the small type where a
+            // claim belongs. The claim also had to change: it said "nothing leaves this
+            // device" until web search shipped switched on, and what is left is the part
+            // that is true of every reply.
+            hasModel -> {
+                Mark(size = 44.dp)
                 Text(
-                    "Find one on Hugging Face and OpenWeights will tell you whether it " +
-                        "runs on this phone before you download it.",
+                    text = "Where shall we start?",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Whatever you ask is answered on this phone.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
+                )
+            }
+
+            // A button, not a sentence pointing at one.
+            //
+            // On a fresh install there is no model, so the app can do precisely nothing,
+            // and the one thing that has to happen next was described in prose and left
+            // for the reader to go and find: "browse from the name at the top" asks
+            // somebody who has never opened this app to know that the name at the top is a
+            // control. The screen that can do nothing else should offer the one thing it
+            // can do, in the middle, where it is the only thing to press.
+            else -> {
+                Mark(size = 44.dp)
+                Text(
+                    text = "Pick a model to begin",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "Each one says whether it runs on this phone before you " +
+                        "download it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                AccentButton(
+                    onClick = onBrowseModels,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text("Browse models", modifier = Modifier.padding(start = 8.dp))
+                }
+
+                // Said here, once, and never as a wall.
+                //
+                // The app's whole claim is that it answers on the phone, and web search is
+                // on from the first run, so the one place that claim can be quietly wrong
+                // is the one place to be plain about it. A consent dialog at install would
+                // be dismissed by somebody who does not yet have a model: no context, and
+                // nothing to consent about. A line here costs nothing and defuses the
+                // surprise before it can happen.
+                Text(
+                    text = "Once a model is running, answers can search the web. " +
+                        "That is a switch in Tools.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 20.dp),
                 )
             }
         }

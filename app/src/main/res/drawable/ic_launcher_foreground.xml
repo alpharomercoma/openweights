@@ -2,16 +2,13 @@
 <!--
   Three stacked weight bars: the "open weights" mark.
 
-  Brass on graphite, which is what the rest of the app has been since the design system
-  landed. This file was not: it kept the violet the palette was moved off, and the reason
-  the palette moved is in docs/design/visual-language.md — violet is Qwen's colour, and the
-  point of brass was not to be standing in somebody else's room. The launcher was the last
-  screen still wearing the old one, which nobody sees while using the app and everybody
-  sees before they install it.
+  Lime on ink. It has been violet, then brass, and each move is argued in
+  docs/design/visual-language.md; this one comes with the rest of the palette, and lime is
+  the only chromatic note anywhere in the app now.
 
   One hue rather than three. A value ladder was tried and the third bar goes muddy against
-  graphite at launcher size; measured at 96px, flat brass is the only version where all
-  three bars still read. The rail that used to sit under them went for the same reason.
+  a dark tile at launcher size; measured at 96px, flat lime is the only version where all
+  three bars still read.
 
   Geometry answers to the adaptive mask, and the arithmetic is not the obvious one. The x in
   each M is where the straight run starts, not where the bar starts: both arcs bulge a
@@ -20,6 +17,10 @@
   a viewport whose safe circle has a radius of 33, so a circular launcher mask would have
   clipped it. Starting at 34.5 puts the bars at 29 to 79, centred on 54, with the farthest
   point 30.7 and inside the circle every launcher shape is guaranteed to keep.
+
+  That gives a longest bar of 50 in a 108 viewport, thickness 11, pitch 16. As fractions of
+  the longest bar: 1, 0.7, 0.41 long, 0.22 thick, 0.32 apart. Those five numbers are the
+  mark, and Mark.kt and play/graphics/mark.py draw it from the same five.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -27,12 +28,12 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#F0A93B"
+        android:fillColor="#E0FF4F"
         android:pathData="M34.5,32.5h39a5.5,5.5 0,0 1,0 11h-39a5.5,5.5 0,0 1,0 -11z" />
     <path
-        android:fillColor="#F0A93B"
+        android:fillColor="#E0FF4F"
         android:pathData="M34.5,48.5h24a5.5,5.5 0,0 1,0 11h-24a5.5,5.5 0,0 1,0 -11z" />
     <path
-        android:fillColor="#F0A93B"
+        android:fillColor="#E0FF4F"
         android:pathData="M34.5,64.5h9.5a5.5,5.5 0,0 1,0 11h-9.5a5.5,5.5 0,0 1,0 -11z" />
 </vector>

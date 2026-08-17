@@ -19,9 +19,15 @@
 #include <android/log.h>
 #include <dlfcn.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <regex>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "chat.h"
 #include "common.h"
@@ -58,7 +64,55 @@ int64_t now_ms() {
     return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }
 
+/**
+ * Where the weights of the model currently loading actually went.
+ *
+ * llama.cpp prints one line per backend buffer it filled, naming the backend and the
+ * megabytes in it, and that line is the only ground truth about offloading there is. The
+ * count of layers it also prints is the number that was *asked for*: it is computed from
+ * `n_gpu_layers` inside `if (llama_supports_gpu_offload())`, which is a property of the
+ * build rather than of this load, so a GPU backend that failed to attach reports the same
+ * number as one that worked.
+ *
+ * Global rather than per-session because llama.cpp's log callback is global and carries no
+ * user data we set per load. Loads are serialised behind the engine's own lock, and
+ * [Session::load] clears this before the model opens and reads it after, so the window is
+ * exactly one load.
+ */
+std::mutex g_buffers_mutex;
+std::vector<std::pair<std::string, double>> g_load_buffers;
+
+/**
+ * `load_tensors:   CPU_Mapped model buffer size =   1234.56 MiB`, which is what we are after.
+ *
+ * Unanchored, because the line opens with the function name and the buffer name is the
+ * token immediately before "model buffer size". Anchoring at the start captured
+ * `load_tensors:` instead and matched nothing, which read exactly like the GPU never being
+ * used: the summary came back empty and the caller fell through to the registered device,
+ * which is always the CPU.
+ *
+ * The names carry how the memory was obtained as well as which backend owns it, so
+ * `CPU_Mapped` and `CPU_Repack` are both the CPU. The suffix is dropped, or a model split
+ * across two CPU buffers would look like two different processors.
+ */
+void note_buffer_line(const char * text) {
+    static const std::regex pattern(R"((\S+)\s+model buffer size\s*=\s*([0-9.]+)\s*MiB)");
+    std::cmatch match;
+    if (!std::regex_search(text, match, pattern)) return;
+    std::string name = match[1].str();
+    const size_t underscore = name.find('_');
+    if (underscore != std::string::npos) name = name.substr(0, underscore);
+    std::lock_guard<std::mutex> guard(g_buffers_mutex);
+    g_load_buffers.emplace_back(name, std::strtod(match[2].str().c_str(), nullptr));
+}
+
 void log_callback(ggml_log_level level, const char * text, void * /*user_data*/) {
+    // Read before the severity switch, because these arrive at INFO and INFO is dropped.
+    // Dropping them is right: llama.cpp is chatty enough to matter on a phone. Reading one
+    // line out of the stream first is what lets the app say where a model is without
+    // turning the whole log back on.
+    if (text != nullptr) note_buffer_line(text);
+
     // GGML_LOG_LEVEL_CONT (5) marks a continuation of the previous line, not a severity 
     // matching on >= ERROR would log llama.cpp's progress dots as errors.
     switch (level) {
@@ -291,6 +345,26 @@ size_t file_size(const std::string & path) {
     return static_cast<size_t>(info.st_size);
 }
 
+/** The backend holding most of the weights, and the breakdown behind it. */
+std::string offload_summary_locked() {
+    if (g_load_buffers.empty()) return std::string();
+    // Folded by name first: one backend can own several buffers, and three CPU entries
+    // ranked apart would each lose to a single larger GPU one.
+    std::vector<std::pair<std::string, double>> sorted;
+    for (const auto & [name, mib] : g_load_buffers) {
+        auto found = std::find_if(sorted.begin(), sorted.end(),
+                                  [&](const auto & entry) { return entry.first == name; });
+        if (found == sorted.end()) sorted.emplace_back(name, mib); else found->second += mib;
+    }
+    std::sort(sorted.begin(), sorted.end(),
+              [](const auto & a, const auto & b) { return a.second > b.second; });
+    std::string summary = sorted.front().first;
+    for (const auto & [name, mib] : sorted) {
+        summary += "|" + name + ":" + std::to_string(static_cast<long>(mib));
+    }
+    return summary;
+}
+
 void init_backend() {
     std::call_once(g_backend_once, [] {
         llama_log_set(log_callback, nullptr);
@@ -361,6 +435,10 @@ Session * Session::load(
     model_params.n_gpu_layers = n_gpu_layers;
     model_params.load_mode    = use_mmap ? LLAMA_LOAD_MODE_MMAP : LLAMA_LOAD_MODE_NONE;
 
+    {
+        std::lock_guard<std::mutex> guard(g_buffers_mutex);
+        g_load_buffers.clear();
+    }
     llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (model == nullptr) {
         error = "failed to load model from " + model_path;
@@ -1115,6 +1193,11 @@ StopReason Session::generate(
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;
     stats.context_used = n_past_;
     return reason;
+}
+
+std::string Session::offload_summary() const {
+    std::lock_guard<std::mutex> guard(g_buffers_mutex);
+    return offload_summary_locked();
 }
 
 std::string Session::model_description() const {

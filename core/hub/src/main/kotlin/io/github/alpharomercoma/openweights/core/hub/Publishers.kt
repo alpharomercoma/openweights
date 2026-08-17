@@ -34,25 +34,31 @@ import javax.inject.Singleton
  * organisations are tried first and people second. Both answers are remembered, including
  * "there is no picture", which is what stops a publisher without one from being looked up
  * again on every scroll.
+ *
+ * That same lookup answers a second question at no extra cost, which is why this is no
+ * longer called PublisherAvatars: whether the publisher is an organisation or a person is
+ * decided by which of the two paths replied, and it is what the Official filter is built
+ * on. One request, two facts, cached together.
  */
 @Singleton
-class PublisherAvatars @Inject constructor(private val client: HuggingFaceClient) {
-    private val known = mutableMapOf<String, String?>()
+class Publishers @Inject constructor(private val client: HuggingFaceClient) {
+    private val known = mutableMapOf<String, Publisher>()
     private val lock = Mutex()
 
     /**
-     * The avatar URL for a publisher, or null when there is not one to be had.
+     * Who published under this name, as far as the Hub will say.
      *
-     * Null covers a publisher with no picture, a name the Hub does not know, and the
-     * network being down. None of those are worth telling the user about: the caller falls
-     * back to drawing initials, which is a complete answer on its own.
+     * An unknown publisher covers a name the Hub does not know and the network being
+     * down. Neither is worth telling the user about: the row draws without a picture, and
+     * an unknown publisher is not an organisation, so the Official filter leaves it out
+     * rather than guessing it in.
      */
-    suspend fun urlFor(owner: String): String? {
-        if (owner.isEmpty()) return null
-        lock.withLock { if (known.containsKey(owner)) return known[owner] }
+    suspend fun lookUp(owner: String): Publisher {
+        if (owner.isEmpty()) return Publisher()
+        lock.withLock { known[owner]?.let { return it } }
 
-        val url = client.avatarUrl(owner)
-        lock.withLock { known[owner] = url }
-        return url
+        val publisher = client.publisher(owner)
+        lock.withLock { known[owner] = publisher }
+        return publisher
     }
 }

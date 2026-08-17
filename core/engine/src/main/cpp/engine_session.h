@@ -226,6 +226,20 @@ public:
     std::string media_marker() const;
 
     std::string model_description() const;
+
+    /**
+     * Which backend actually holds the weights, and the breakdown behind it.
+     *
+     * `"OpenCL|OpenCL:680|CPU:96"`: the dominant backend first, then every buffer with its
+     * megabytes. Empty when nothing was captured, which means the model was not loaded
+     * through this process.
+     *
+     * This is llama.cpp's own accounting of where the tensors went, taken from the line it
+     * prints per buffer. It is not the number of layers requested: that figure is computed
+     * from `n_gpu_layers` whatever happened, so a GPU that failed to attach reports the
+     * same as one that worked, and the app spent a long time believing it.
+     */
+    std::string offload_summary() const;
     uint64_t parameter_count() const;
     uint64_t model_size_bytes() const;
     int32_t context_size() const;

@@ -106,6 +106,17 @@ class WebSearchTool @Inject constructor(
         """.trimIndent(),
     )
 
+    /**
+     * What comes back is text somebody else wrote, and that is now load bearing.
+     *
+     * It was never declared, because fetching a page carried `alwaysAsk` and so was gated
+     * whatever this said. With that gone, this flag is the only thing standing between a
+     * page holding a literal tool call and a model obligingly repeating it: the runner
+     * remembers that untrusted text has entered the turn, and anything wanting to leave
+     * the device afterwards is approved by hand.
+     */
+    override val returnsUntrustedText: Boolean = true
+
     override val leavesTheDevice: Boolean = true
 
     override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
@@ -186,15 +197,15 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
         .build()
 
     /**
-     * Always, whatever the mode says.
+     * What comes back is text somebody else wrote, and that is now load bearing.
      *
-     * [Tool.alwaysAsk] was written for this tool and describes it exactly: searching is
-     * bounded however the model phrases it, and fetching an address the model composed is
-     * not. The address usually comes from a page the model has just read, which is somebody
-     * else's text deciding where this app connects. Auto mode is for removing pointless
-     * taps, not the only check on an open primitive.
+     * It was never declared, because fetching a page carried `alwaysAsk` and so was gated
+     * whatever this said. With that gone, this flag is the only thing standing between a
+     * page holding a literal tool call and a model obligingly repeating it: the runner
+     * remembers that untrusted text has entered the turn, and anything wanting to leave
+     * the device afterwards is approved by hand.
      */
-    override val alwaysAsk: Boolean = true
+    override val returnsUntrustedText: Boolean = true
 
     override val leavesTheDevice: Boolean = true
 

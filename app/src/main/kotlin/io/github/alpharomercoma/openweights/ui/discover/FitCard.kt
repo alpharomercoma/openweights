@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +36,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
@@ -79,14 +80,14 @@ fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier
             }
 
             when {
-                inspected.isDownloaded -> Metric("On this device")
+                inspected.isDownloaded -> Caption("On this device")
                 inspected.isInspecting -> CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                 )
 
                 inspected.fit?.verdict == FitVerdict.WONT_RUN -> Unit
-                else -> Button(onClick = onDownload) { Text("Download") }
+                else -> AccentButton(onClick = onDownload) { Text("Download") }
             }
         }
 

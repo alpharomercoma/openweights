@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.dashboard
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import io.github.alpharomercoma.openweights.core.data.ModelUsage
 import io.github.alpharomercoma.openweights.core.data.UsageSummary
@@ -51,8 +52,8 @@ class DashboardScreenTest {
         // noughts, and takes the opportunity to say where the numbers will live.
         showDashboard(UsageSummary())
 
-        compose.onNodeWithText("Nothing generated yet", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("on the phone", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Nothing yet", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("stay on this phone", substring = true).assertIsDisplayed()
         // And none of the tiles, because there is nothing to put in them.
         compose.onNodeWithText("Chats").assertDoesNotExist()
     }
@@ -68,8 +69,18 @@ class DashboardScreenTest {
             ),
         )
 
+        // The hero is the tokens generated, and it appears once. It used to appear twice,
+        // in display type at the top and again in a tile labelled "Tokens written", which
+        // is why this counts rather than merely finding it.
+        assertCount(1, "128,400")
         compose.onNodeWithText("Chats").assertExists()
-        compose.onNodeWithText("Days used").assertExists()
+        compose.onNodeWithText("Days").assertExists()
+        compose.onNodeWithText("Tokens written").assertDoesNotExist()
+    }
+
+    private fun assertCount(expected: Int, text: String) {
+        val found = compose.onAllNodesWithText(text).fetchSemanticsNodes().size
+        assert(found == expected) { "expected $expected nodes saying \"$text\", found $found" }
     }
 
     @Test

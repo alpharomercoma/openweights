@@ -132,16 +132,20 @@ fun signalColor(fraction: Float, dark: Boolean = true): Color {
 private const val SCALE_MIDPOINT = 0.5f
 
 /**
- * `primary` is lime in both themes, and that needs saying out loud.
+ * `primary` is not the same colour in the two schemes, and that needs saying out loud.
  *
- * Material treats `primary` as both a fill and a text colour: a filled `Button` paints it
- * and writes `onPrimary` on top, which is exactly right here, but a `TextButton` writes
- * `primary` straight onto the surface, which on white would be lime at 1.13:1.
+ * Material treats `primary` as both a fill and an ink. A filled `Button` paints it and
+ * writes `onPrimary` on top; a `TextButton`, a `Slider` track, a caret and a progress bar
+ * all draw it straight onto the surface. On the dark canvas lime does both and measures
+ * 17:1 either way. On paper it can only be a fill, at 1.13:1 as ink, so the light scheme
+ * sets `primary` to [OpenWeightsColors.Ink] and every stock component is legible without a
+ * single call site overriding anything.
  *
- * The fill is the common case and the one the brand depends on, so `primary` stays lime and
- * text buttons carry an explicit content colour instead. Anything ghost-shaped in this app
- * uses `onSurface`; anything secondary is an outlined pill. There is no call site left that
- * paints `primary` as text on a light surface, and there must not be a new one.
+ * Lime as a fill did not go anywhere. It moved to the two places that mean it: `AccentButton`
+ * and the composer's send button, both lime on both canvases, both carrying ink.
+ *
+ * The rule this keeps is the palette's second one, and `PaletteContrastTest` measures it on
+ * every build rather than trusting this paragraph.
  */
 internal val DarkColorScheme = darkColorScheme(
     primary = OpenWeightsColors.Lime,
@@ -170,8 +174,18 @@ internal val DarkColorScheme = darkColorScheme(
 )
 
 internal val LightColorScheme = lightColorScheme(
-    primary = OpenWeightsColors.Lime,
-    onPrimary = OpenWeightsColors.Ink,
+    // Ink, not lime, and this is rule 2 above being kept rather than broken.
+    //
+    // Material paints `primary` two ways depending on the component: a filled button uses
+    // it as a container, and a text button's label, a slider's track, a caret and a
+    // progress bar all use it as ink. On the dark canvas lime is both at once and measures
+    // 17:1 either way. On paper it can only be a fill, so `primary` here is the value that
+    // works as ink and every stock component is legible without overriding anything.
+    //
+    // Lime as a fill did not go away, it moved somewhere it is said on purpose: see
+    // AccentButton, which is lime on both canvases and carries ink at 12.99:1.
+    primary = OpenWeightsColors.Ink,
+    onPrimary = OpenWeightsColors.PaperCanvas,
     primaryContainer = OpenWeightsColors.PaperLimeContainer,
     onPrimaryContainer = OpenWeightsColors.Ink,
     secondary = OpenWeightsColors.PaperTextDim,

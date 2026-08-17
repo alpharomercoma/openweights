@@ -20,6 +20,7 @@ import android.net.Uri
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -340,6 +341,42 @@ class ChatViewModelTest : ChatFixture() {
         advanceUntilIdle()
         settle()
         engine.loadDelayMs = 0
+    }
+
+    @Test
+    fun `moving the processor reloads the weights and keeps the chat`() = runTest(dispatcher) {
+        engine.hasGpu = true
+        loadModel()
+        viewModel.send("A question")
+        settle()
+        engine.finish(content = "An answer.")
+        settle()
+        val before = viewModel.uiState.value.transcript.size
+
+        viewModel.savePreferences(
+            viewModel.uiState.value.preferences.copy(offload = Offload.GPU.name),
+        )
+        settle()
+
+        // Two loads, and the second one asks for the GPU. Saving alone used to be the whole
+        // of it: the setting sat in storage until the model happened to load again, which
+        // for most people is never, and the top bar went on truthfully reporting the CPU.
+        assertThat(engine.loads).hasSize(2)
+        assertThat(engine.loadParams.last().gpuLayers).isGreaterThan(0)
+        assertThat(engine.loadParams.first().gpuLayers).isEqualTo(0)
+        // The weights moved, not the conversation.
+        assertThat(viewModel.uiState.value.transcript).hasSize(before)
+    }
+
+    @Test
+    fun `settings that are not the processor do not reload`() = runTest(dispatcher) {
+        engine.hasGpu = true
+        loadModel()
+
+        viewModel.savePreferences(viewModel.uiState.value.preferences.copy(temperature = 0.1f))
+        settle()
+
+        assertThat(engine.loads).hasSize(1)
     }
 
     @Test

@@ -17,18 +17,26 @@ not the 1220 x 2712 a modern handset actually produces.
 
 ## Making them again
 
-**The icon and the feature graphic** are HTML rendered by headless Chrome, which is what lets
-them use the app's own IBM Plex faces straight out of `core/designsystem`. The sources are in
-the session scratchpad rather than here; what is worth keeping is the recipe, since both are
-about twenty lines of CSS:
+**The icon and the feature graphic** come from `mark.py`, which needs nothing but Pillow:
 
-- Graphite `#0B0D0F` lifted by a radial to `#1A1E23`, brass `#F0A93B` on top.
-- The icon is three stadium bars, widths 272 / 190 / 112 at height 60, centred in 512.
-  One hue and no value ladder, because at 96 px a third bar dimmed against graphite goes
-  muddy and stops reading. Same geometry as `ic_launcher_foreground.xml`, scaled.
-- The feature graphic is the lockup on the left and three claims on a brass spine at
-  x=610. Asymmetric on purpose: a centred logo over a tagline is the shape every AI app
-  ships and it says nothing about this one.
+```
+python3 play/graphics/mark.py
+```
+
+It was HTML rendered by headless Chrome, with the sources in a session scratchpad that no
+longer exists, so the only record of the icon was the paragraph this replaced. What it draws:
+
+- Ink `#052B42`, flat, with lime `#E0FF4F` on top. Both were a radial over graphite and both
+  are flat now: a gradient behind a three bar mark is depth the mark does not use.
+- The icon is three stadium bars, widths 272 / 190 / 112 at height 60, centred in 512. One
+  hue and no value ladder, because at 96 px a third bar dimmed to imply depth goes muddy and
+  stops reading. The same five numbers as `ic_launcher_foreground.xml` and `Mark.kt`: bars at
+  1, 0.7 and 0.41 of the longest, 0.22 thick, 0.32 apart.
+- The feature graphic is the lockup on the left and three claims on a lime spine at x=500.
+  Asymmetric on purpose: a centred logo over a tagline is the shape every AI app ships and it
+  says nothing about this one.
+- Type is Schibsted Grotesk and Hanken Grotesk, read straight out of `core/designsystem` and
+  set through the weight axis, so the listing is in the instances the app renders in.
 
 **The screenshots** come from `PlayScreenshots`, a Robolectric run in `app/src/test`:
 

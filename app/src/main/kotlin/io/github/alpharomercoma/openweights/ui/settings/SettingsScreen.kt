@@ -33,7 +33,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -55,15 +54,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.BuildConfig
 import io.github.alpharomercoma.openweights.core.data.ThemeChoice
+import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
+import io.github.alpharomercoma.openweights.core.designsystem.component.Mark
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
@@ -141,45 +146,47 @@ fun SettingsScreen(
  * What this app is, at the bottom of the last screen.
  *
  * Last because it is the least urgent thing here and the first thing someone looks for when
- * they want to know what they installed. It says the two facts that are the whole point:
- * the models are open weights that the user chose and downloaded, and nothing they type is
- * sent anywhere. An app making that second claim should be checkable, so the licence and
- * the source are named rather than implied.
+ * they want to know what they installed. A lockup rather than four paragraphs: the mark,
+ * the name, the one sentence that is the whole point, and the two facts that make that
+ * sentence checkable.
+ *
+ * The network disclosure that used to live here in full was three paragraphs restating
+ * Tools, screen by screen and switch by switch, in a place where none of it could be acted
+ * on. One line and a pointer is more honest about where the answer lives, and the tools
+ * that reach the network now say so under their own heading.
  */
 @Composable
 private fun AboutSection() {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("About", style = MaterialTheme.typography.titleSmall)
+    val links = LocalUriHandler.current
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Mark(size = 44.dp)
+        Text("OpenWeights", style = MaterialTheme.typography.titleMedium)
         Text(
-            "OpenWeights runs open weight language models on this phone. Models come from " +
-                "Hugging Face, you choose which ones, and they run on the processor in " +
-                "your hand.",
+            text = "Open weight models, running on this phone. No account, no server of " +
+                "ours, no telemetry.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
         Text(
-            "There is no account, no server of ours, and no telemetry. The model runs " +
-                "here and your conversations are stored here.",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Searching the web and downloading a model are the parts that reach " +
+                "the network. Both are yours to switch off in Tools.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
-        Text(
-            // Said plainly, because the previous wording implied web search was something
-            // you opt into and it is on when the app is installed. A tool that sends your
-            // question somewhere is worth one sentence of its own rather than a clause at
-            // the end of a sentence about privacy.
-            "Two things do reach the network, and both are switched on in Tools where you " +
-                "can switch them off: web search sends what the model decides to look up, " +
-                "and reading a page fetches the address it found. Downloading a model " +
-                "talks to Hugging Face.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Metric("version ${BuildConfig.VERSION_NAME}")
-        Metric("Apache License 2.0")
-        Metric("github.com/alpharomercoma/openweights")
+        Metric("${BuildConfig.VERSION_NAME} · Apache License 2.0")
+        TextButton(onClick = { links.openUri(SOURCE_URL) }) { Text("View the source") }
     }
 }
+
+/** The claim above it is only worth making if this is one tap away. */
+private const val SOURCE_URL = "https://github.com/alpharomercoma/openweights"
 
 /**
  * Light, dark, or whatever the phone is doing.
@@ -201,9 +208,9 @@ private fun AppearanceSection(selected: ThemeChoice, onSelect: (ThemeChoice) -> 
                     onClick = { onSelect(choice) },
                     shape = SegmentedButtonDefaults.itemShape(index, ThemeChoice.entries.size),
                     colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
+                        activeContainerColor = OpenWeightsColors.Lime,
+                        activeContentColor = OpenWeightsColors.Ink,
+                        activeBorderColor = OpenWeightsColors.Lime,
                         inactiveBorderColor = MaterialTheme.colorScheme.outline,
                     ),
                     label = { Text(choice.label, maxLines = 1) },
@@ -228,9 +235,8 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Hugging Face access token", style = MaterialTheme.typography.titleSmall)
         Text(
-            text = "Only needed for gated or private models. It is encrypted with a key " +
-                "held in this device's hardware keystore, and is sent to huggingface.co " +
-                "and nowhere else.",
+            text = "Only for gated or private models. Encrypted with a key held in this " +
+                "phone's hardware, and sent to huggingface.co and nowhere else.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -251,7 +257,7 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
+            AccentButton(
                 onClick = {
                     onSave(draft)
                     draft = ""
@@ -283,35 +289,88 @@ private fun ComputeSection(state: SettingsUiState) {
 
         state.computeDevices.forEach { device ->
             Column {
-                Text(device.description, style = MaterialTheme.typography.bodyMedium)
-                Metric(
-                    buildString {
-                        append(device.kind.name.lowercase().replace('_', ' '))
-                        if (device.totalMemoryBytes > 0) {
-                            append(" · ")
-                            append(formatBytes(device.totalMemoryBytes))
-                        }
-                    },
-                )
+                // The name, then what it is. It used to print the description first and the
+                // kind under it, so a phone reported "8 cores, arm64" with "Processor"
+                // beneath, which is a label sitting under its own value.
+                Text(device.kind.label, style = MaterialTheme.typography.bodyMedium)
+                val detail = buildString {
+                    // llama.cpp names the CPU device "CPU", so the second line read
+                    // "Processor" over "CPU", which is a word and then the same word.
+                    if (!device.description.equals(device.kind.name, ignoreCase = true)) {
+                        append(device.description)
+                    }
+                    // A GPU's memory is its own number and worth saying. A CPU
+                    // backend's is the phone's RAM, which "This device" prints
+                    // three rows below, so it was the same figure twice.
+                    if (device.totalMemoryBytes > 0 && device.supportsOffload) {
+                        if (isNotEmpty()) append(" · ")
+                        append(formatBytes(device.totalMemoryBytes))
+                    }
+                }
+                if (detail.isNotEmpty()) Metric(detail)
             }
         }
 
         if (state.computeDevices.none { it.kind != ComputeDeviceKind.CPU }) {
             // Being explicit beats a greyed-out toggle nobody can explain.
             Text(
-                text = "No GPU or NPU backend is available in this build. On phones we have " +
-                    "measured, the tuned CPU path is faster than Vulkan anyway; NPU access " +
-                    "would need a second inference engine and per-chip model conversions.",
+                text = "This build runs on the CPU. On the phones we have measured, that " +
+                    "is the faster path anyway.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        if (state.engineInfo.isNotEmpty()) {
-            Metric(state.engineInfo)
-        }
+        EngineFeatures(state.engineInfo)
     }
 }
+
+/**
+ * What the engine was built with, as facts rather than as its own debug line.
+ *
+ * llama.cpp returns one string of `NAME = 1 | NAME = 0 | ... | backends: CPU OpenCL`, and
+ * printing it whole put a pipe-delimited dump in the middle of a settings screen: the
+ * screen's worst paragraph by a distance, and the kind of thing "technical and brutal"
+ * describes exactly. The information is worth keeping, because which kernels a build got
+ * is the difference between eight tokens a second and fourteen, so it is kept and set out
+ * rather than thrown away.
+ *
+ * Only the features that are on. A flag at zero is the absence of a thing, and a list of
+ * absences is not a fact about this phone worth six lines.
+ */
+@Composable
+private fun EngineFeatures(info: String) {
+    if (info.isBlank()) return
+
+    val parts = info.split('|').map { it.trim() }.filter { it.isNotEmpty() }
+    val backends = parts.firstOrNull { it.startsWith("backends:", ignoreCase = true) }
+        ?.substringAfter(':')?.trim()?.split(' ')?.filter { it.isNotBlank() }.orEmpty()
+    val features = parts
+        .filter { it.endsWith("= 1") }
+        .map { it.substringBefore('=').trim().removePrefix("CPU :").trim() }
+        .filter { it.isNotEmpty() }
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (backends.isNotEmpty()) Metric("backends ${backends.joinToString(", ")}")
+        if (features.isNotEmpty()) Metric(features.joinToString(" · "))
+    }
+}
+
+/**
+ * The enum, in words.
+ *
+ * It used to print `name.lowercase()`, so a phone with an integrated GPU reported
+ * "integrated gpu" in a line of otherwise ordinary prose, which is a constant leaking into
+ * the interface rather than a description of anything.
+ */
+private val ComputeDeviceKind.label: String
+    get() = when (this) {
+        ComputeDeviceKind.CPU -> "Processor"
+        ComputeDeviceKind.GPU -> "Graphics"
+        ComputeDeviceKind.INTEGRATED_GPU -> "Built in graphics"
+        ComputeDeviceKind.ACCELERATOR -> "Accelerator"
+        ComputeDeviceKind.OTHER -> "Other"
+    }
 
 @Composable
 private fun DeviceSection(state: SettingsUiState) {
@@ -320,11 +379,13 @@ private fun DeviceSection(state: SettingsUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text("This device", style = MaterialTheme.typography.titleSmall)
         Metric("${device.socModel} · ${device.cpuCores} cores")
+        // Short enough not to wrap, because a line of figures that breaks after "usable by"
+        // and orphans "a model" on its own line is a line nobody finishes reading.
         Metric(
-            "memory ${formatBytes(device.totalMemoryBytes)} total · " +
-                "${formatBytes(device.usableMemoryBytes)} usable by a model",
+            "${formatBytes(device.totalMemoryBytes)} RAM · " +
+                "${formatBytes(device.usableMemoryBytes)} usable",
         )
-        Metric("storage ${formatBytes(device.freeStorageBytes)} free")
+        Metric("${formatBytes(device.freeStorageBytes)} free")
     }
 }
 

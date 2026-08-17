@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
@@ -77,37 +78,6 @@ import java.io.File
  * download, and offering a photo to a text-only model would produce a confident answer
  * about a picture it never saw.
  */
-/**
- * Attach a document, whatever model is loaded.
- *
- * Sits where the thinking switch used to. That switch appeared on two of the four models on
- * this phone and did nothing on one of them, while a document is something every model can
- * read: it is text, and text is what they all take. A control that is always useful earns
- * the place better than one that is usually absent.
- *
- * Text types only, and deliberately not PDF. A PDF is a page layout, not a document: pulling
- * words out of one needs a parser the size of this whole app, and what it would produce for
- * a four thousand token window is a fraction of a paper. Offering it would be offering a
- * feature that disappoints on the first try.
- */
-@Composable
-fun AttachDocumentButton(enabled: Boolean, onPicked: (Uri) -> Unit) {
-    val openDocument = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri -> uri?.let(onPicked) }
-
-    IconButton(
-        onClick = { openDocument.launch(DOCUMENT_TYPES) },
-        enabled = enabled,
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.Description,
-            contentDescription = "Attach a document",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
 /** What can be read as text without a parser. */
 private val DOCUMENT_TYPES = arrayOf("text/*", "application/json", "application/xml")
 
@@ -168,9 +138,17 @@ fun AttachmentSheet(
     support: MediaSupport,
     newCaptureUri: () -> Uri,
     onPicked: (Uri) -> Unit,
+    onPickedDocument: (Uri) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val captureUri = remember { newCaptureUri() }
+
+    val openDocument = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let(onPickedDocument)
+        onDismiss()
+    }
 
     val pickMedia = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
@@ -232,12 +210,24 @@ fun AttachmentSheet(
                     onClick = { openFile.launch(arrayOf("audio/*")) },
                 )
             }
+            // Every model can read a document, including one that accepts no media at all,
+            // which is why this row is unconditional where the ones above it are not. It
+            // used to be a second icon in the composer with its own picker and its own
+            // filter, sitting beside the plus and doing a job the plus claimed to do.
             AttachmentChoice(
                 icon = Icons.Rounded.Description,
-                label = "Files",
-                detail = "Anything else this model accepts",
-                onClick = { openFile.launch(support.acceptedMimeTypes()) },
+                label = "Document",
+                detail = "Text, markdown, JSON or XML the model can read",
+                onClick = { openDocument.launch(DOCUMENT_TYPES) },
             )
+            if (support.any) {
+                AttachmentChoice(
+                    icon = Icons.Rounded.AttachFile,
+                    label = "Files",
+                    detail = "Anything else this model accepts",
+                    onClick = { openFile.launch(support.acceptedMimeTypes()) },
+                )
+            }
         }
     }
 }

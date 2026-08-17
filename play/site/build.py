@@ -26,13 +26,16 @@ REPO = "https://github.com/alpharomercoma/openweights"
 # link lands somewhere that could be anybody's.
 STYLE = """
 :root {
-  --canvas: #0B0D0F; --raised: #161A1F; --line: #262D34;
-  --text: #ECF1F4; --muted: #9AA6AF; --brass: #F0A93B;
+  --canvas: #0D0E10; --raised: #161719; --line: #26272A;
+  --text: #F5F6F3; --muted: #A2A4AB; --link: #E0FF4F;
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --canvas: #FBFBF9; --raised: #F0F0EB; --line: #DCDCD6;
-    --text: #14181B; --muted: #535E67; --brass: #8A5A0E;
+    --canvas: #FFFFFF; --raised: #F4F5F3; --line: #E7E8E4;
+    --text: #052B42; --muted: #52555B;
+    /* Not lime. Lime as text on white measures 1.13:1, which is why the design system
+       forbids it rather than merely discouraging it. Here a link is ink and underlined. */
+    --link: #052B42;
   }
 }
 * { box-sizing: border-box; }
@@ -44,14 +47,18 @@ body {
 }
 main { max-width: 46rem; margin: 0 auto; }
 header { max-width: 46rem; margin: 0 auto; padding: 56px 0 8px; }
-.mark { display: block; margin-bottom: 22px; }
-.mark i { display: block; height: 9px; border-radius: 5px; background: var(--brass);
-          margin-bottom: 4px; }
+/* The app's mark, at the app's proportions: bars at 1, 0.7 and 0.41 of the longest, 0.22
+   thick, 0.32 apart, on an ink tile. Lime on ink both ways round the theme, because a lime
+   bar on a white page is the thing the palette forbids. */
+.mark { display: flex; flex-direction: column; justify-content: center; gap: 6px;
+        width: 96px; height: 96px; padding-left: 18px; margin-bottom: 22px;
+        border-radius: 23px; background: #052B42; }
+.mark i { display: block; height: 13px; border-radius: 7px; background: #E0FF4F; }
 h1 { font-size: 2.05rem; line-height: 1.2; letter-spacing: -0.022em; margin: 0 0 6px; }
 h2 { font-size: 1.3rem; letter-spacing: -0.012em; margin: 2.6em 0 0.7em;
      padding-top: 1.4em; border-top: 1px solid var(--line); }
 h2:first-of-type { border-top: 0; padding-top: 0; }
-a { color: var(--brass); text-underline-offset: 3px; }
+a { color: var(--link); text-underline-offset: 3px; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
        background: var(--raised); padding: 1px 5px; border-radius: 4px; }
 .updated { color: var(--muted); font-size: 0.94rem; margin: 0 0 2.4em; }
@@ -66,8 +73,8 @@ footer { max-width: 46rem; margin: 4em auto 0; padding-top: 1.6em;
          border-top: 1px solid var(--line); color: var(--muted); font-size: 0.92rem; }
 """
 
-MARK = '<span class="mark"><i style="width:64px"></i><i style="width:45px"></i>' \
-       '<i style="width:26px"></i></span>'
+MARK = '<span class="mark"><i style="width:60px"></i><i style="width:42px"></i>' \
+       '<i style="width:25px"></i></span>'
 
 
 def page(title: str, description: str, body: str) -> str:

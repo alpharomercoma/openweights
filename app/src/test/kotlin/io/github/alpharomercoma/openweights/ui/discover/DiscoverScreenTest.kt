@@ -94,11 +94,38 @@ class DiscoverScreenTest {
     }
 
     @Suppress("LongParameterList")
+    @Test
+    fun `official narrows the list to organisations`() {
+        var asked: Boolean? = null
+        showDiscover(onOfficialOnlyChange = { asked = it })
+
+        // The Hub has no parameter for this, so the screen only asks; the view model does
+        // the filtering against the account kind each publisher's own endpoint reports.
+        compose.onNodeWithText("Official").performClick()
+
+        assert(asked == true) { "Official must reach the view model, got $asked" }
+    }
+
+    @Test
+    fun `recommended is the one filter the screen opens on`() {
+        var asked: Boolean? = null
+        showDiscover(onRecommendedOnlyChange = { asked = it })
+
+        // On by default, so the first tap is the one that opens the search up. What it
+        // narrows to is a shortlist this app has measured on hardware, which is a stronger
+        // claim than any of the other three and makes them unnecessary while it is on.
+        compose.onNodeWithText("Recommended").performClick()
+
+        assert(asked == false) { "Recommended starts on, so the first tap turns it off: $asked" }
+    }
+
     private fun showDiscover(
         query: HubQuery = HubQuery(text = "gguf", sort = HubSort.TRENDING),
         onQueryChange: (String) -> Unit = {},
         onSortChange: (HubSort) -> Unit = {},
         onPhoneSizedChange: (Boolean) -> Unit = {},
+        onOfficialOnlyChange: (Boolean) -> Unit = {},
+        onRecommendedOnlyChange: (Boolean) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -116,6 +143,8 @@ class DiscoverScreenTest {
                     onSortChange = onSortChange,
                     onFiltersChange = {},
                     onPhoneSizedChange = onPhoneSizedChange,
+                    onOfficialOnlyChange = onOfficialOnlyChange,
+                    onRecommendedOnlyChange = onRecommendedOnlyChange,
                     onClearFilters = {},
                     onOpenModel = {},
                     onCloseModel = {},

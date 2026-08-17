@@ -49,8 +49,8 @@ import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
 import io.github.alpharomercoma.openweights.ui.settings.SettingsViewModel
 import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /**
  * The routes, which are no longer tabs.
@@ -98,14 +98,22 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
     val mediaViewModel: MediaViewModel = hiltViewModel()
     val modelsViewModel: ModelsViewModel = hiltViewModel()
 
-    // A flow rather than two collected states, because the chat state changes with every
-    // token and nothing above here should recompose for that. What is collected is one
-    // boolean, inside a composable that draws nothing.
+    // A download, and not a reply.
+    //
+    // It used to be either, on the argument that both are a wait. They are not the same
+    // wait: a download runs for minutes and is the thing anybody leaves the app during,
+    // while a reply on this hardware is tens of seconds with the phone still in the hand.
+    // Asking during generation put a system dialog over the first finished answer a new
+    // user ever saw, which is both the worst moment for it and the moment its own reason
+    // had just stopped applying.
+    //
+    // A flow rather than a collected state, because the chat state changes with every token
+    // and nothing above here should recompose for that.
     AskAboutNotifications(
-        waiting = remember(chatViewModel, modelsViewModel) {
-            combine(chatViewModel.uiState, modelsViewModel.uiState) { chat, models ->
-                chat.isGenerating || models.downloads.isNotEmpty()
-            }.distinctUntilChanged()
+        waiting = remember(modelsViewModel) {
+            modelsViewModel.uiState
+                .map { it.downloads.isNotEmpty() }
+                .distinctUntilChanged()
         },
     )
 
@@ -228,6 +236,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSortChange = viewModel::onSortChange,
                 onFiltersChange = viewModel::onQueryChange,
                 onPhoneSizedChange = viewModel::onPhoneSizedChange,
+                onOfficialOnlyChange = viewModel::onOfficialOnlyChange,
+                onRecommendedOnlyChange = viewModel::onRecommendedOnlyChange,
                 onClearFilters = viewModel::clearFilters,
                 onOpenModel = viewModel::openModel,
                 onCloseModel = viewModel::closeModel,

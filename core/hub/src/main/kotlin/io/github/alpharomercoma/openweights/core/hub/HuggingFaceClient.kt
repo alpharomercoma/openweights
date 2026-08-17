@@ -20,6 +20,9 @@ import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName.GGUF_SUFFIX
 import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
@@ -202,6 +205,24 @@ class HuggingFaceClient @Inject constructor(
         return json.decodeFromString<List<SearchEntry>>(get(url)).map { it.toModel() }
     }
 
+    /**
+     * The recommended shortlist, fetched by name.
+     *
+     * Not a search. The Hub has no way to ask for "these five repositories", and a search
+     * that happened to surface them would be a search that could stop surfacing them, so
+     * each one is fetched by id and the failures are dropped. Concurrent, because it is a
+     * handful of requests and they are the first screen anybody sees.
+     */
+    suspend fun recommended(): List<HubModel> = coroutineScope {
+        RECOMMENDED
+            .map { id -> async { runCatching { modelById(id) }.getOrNull() } }
+            .awaitAll()
+            .filterNotNull()
+    }
+
+    private suspend fun modelById(repoId: String): HubModel =
+        json.decodeFromString<DetailEntry>(get(apiUrl("models", repoId).build())).toModel()
+
     /** Full detail for one repository, including its downloadable files. */
     suspend fun detail(repoId: String): HubModelDetail {
         val url = apiUrl("models", repoId)
@@ -232,24 +253,40 @@ class HuggingFaceClient @Inject constructor(
     }
 
     /**
-     * The picture a publisher publishes under, if it has one.
+     * Who published this, as far as the Hub will say: their picture, and which kind of
+     * account they are.
      *
      * A repository id says who published it but not whether that is an organisation or a
      * person, and the two live at different paths. Organisations are tried first because
      * the labs people go looking for are organisations; a person costs one extra request,
-     * and [PublisherAvatars] makes sure it is paid once.
+     * and [Publishers] makes sure it is paid once.
      *
-     * Returns null rather than throwing for every failure. A missing picture is not a
-     * problem the user can do anything about, and a row draws perfectly well without one.
+     * Failures come back as an unknown publisher rather than as an exception. A missing
+     * picture is not a problem the user can do anything about, and a row draws perfectly
+     * well without one.
      */
-    suspend fun avatarUrl(owner: String): String? {
-        if (owner.isBlank()) return null
-        return avatarUrlAt("organizations", owner) ?: avatarUrlAt("users", owner)
+    suspend fun publisher(owner: String): Publisher {
+        if (owner.isBlank()) return Publisher()
+        lookUp("organizations", owner)?.let {
+            return Publisher(avatarUrl = it.avatarUrl, isOrganisation = true)
+        }
+        lookUp("users", owner)?.let {
+            return Publisher(avatarUrl = it.avatarUrl, isOrganisation = false)
+        }
+        return Publisher()
     }
 
-    private suspend fun avatarUrlAt(kind: String, owner: String): String? = runCatching {
-        val payload = get(apiUrl(kind, owner, "avatar").build())
-        json.decodeFromString<AvatarEntry>(payload).avatarUrl
+    /**
+     * One lookup, distinguishing "answered without a picture" from "not this kind".
+     *
+     * It used to return the URL and nothing else, so an organisation that has never
+     * uploaded a logo was indistinguishable from a name that is not an organisation at
+     * all: both came back null and the caller fell through to the person endpoint. That
+     * was harmless while the answer was only used to draw a circle. It is not harmless now
+     * that it decides whether a model is shown.
+     */
+    private suspend fun lookUp(kind: String, owner: String): AvatarEntry? = runCatching {
+        json.decodeFromString<AvatarEntry>(get(apiUrl(kind, owner, "avatar").build()))
     }.getOrNull()
 
     /** Confirms a token works, returning the account name it belongs to. */
@@ -295,6 +332,62 @@ class HuggingFaceClient @Inject constructor(
     }
 }
 
+/**
+ * The models this app recommends, and why they are not the benchmark winners.
+ *
+ * `docs/research/tool-calling.md` ranks fifteen models on six routing cases in four
+ * orderings plus a two-turn pair, all on hardware. Its winners are purpose-built function
+ * callers: Hammer 2.1 1.5B at 5 of 6 in every arm, xLAM-2-1b at 5 of 6 and the fastest of
+ * them. Neither is here, and the reason is worth writing down because it is the whole
+ * lesson of that document read a second time.
+ *
+ * Hammer was installed on a Snapdragon 8 Gen 3 and asked who a particular person is. It
+ * replied `[]`, which its template defines as "no tool applies", and the app rendered two
+ * brackets in a code block. Asked again for an answer in words it produced sixty seconds of
+ * `'t"' []` repeated until the phone reported itself hot. It routes better than anything
+ * measured and it cannot hold a conversation, because routing is what it was fine-tuned to
+ * do and the rest was trained out of it.
+ *
+ * So the shortlist selects on the axis a user actually meets first, which is whether the
+ * thing answers, and treats routing as the second requirement rather than the first. That
+ * axis is measured here on this hardware rather than taken from a card:
+ *
+ * - **LFM2 1.2B** and **LFM2.5 2.6B**, Liquid's own conversions. The 2.6B is the model
+ *   this project has spent the most hours with, and the reason it leads is the behaviour
+ *   the six routing cases do not score: asked about the World Cup it reasoned that "my
+ *   knowledge might not be current", searched, and read a page, where the models that beat
+ *   it on the benchmark answered from memory. It is the only thing measured here that
+ *   notices an unknown. What it costs is time, up to seven and a half minutes on a turn
+ *   that searches twice, which is why the 1.2B is beside it.
+ * - **Qwen3 0.6B** answers coherently with visible reasoning at about 30 tokens a second
+ *   in 610 MB, verified on device: "explain a KV cache", "17 times 23", both correct and
+ *   both fast. It is also the one that invented a biography for a private individual
+ *   rather than searching, so it is here as the fast generalist and not as the default.
+ * - **Qwen3 1.7B** is the same family one size up, for a phone with room for it.
+ *
+ * What is still missing is a routing number for these two. Qwen 2.5 1.5B, the previous
+ * generation, scores 4 of 6 with two under-calls, which is the failure a user reports as
+ * "it answered from memory instead of searching". Until Qwen3 has been through
+ * `ToolChoiceBenchmark` the list is honest about one axis and inferring the other, and
+ * that is better than the reverse, which is what shipping Hammer would have been.
+ */
+val RECOMMENDED = listOf(
+    "LiquidAI/LFM2-1.2B-GGUF",
+    "LiquidAI/LFM2.5-2.6B-GGUF",
+    "Qwen/Qwen3-0.6B-GGUF",
+    "unsloth/Qwen3-1.7B-GGUF",
+)
+
+/**
+ * What the Hub knows about whoever published a model.
+ *
+ * [isOrganisation] is the Hub's own distinction rather than a judgement of ours: Qwen,
+ * Google, Meta and Unsloth are organisations; the accounts publishing abliterated merges
+ * of their work are people. It is the closest thing the Hub has to "official", and it is
+ * free, because the lookup that answers it is the one already made for the avatar.
+ */
+data class Publisher(val avatarUrl: String? = null, val isOrganisation: Boolean = false)
+
 /** Everything the Discover screen can ask the Hub for. */
 data class HubQuery(
     val text: String = "",
@@ -313,6 +406,29 @@ data class HubQuery(
      */
     val maxParametersBillions: Int? = null,
     val hideGated: Boolean = false,
+    /**
+     * Only the models this app has actually been measured with.
+     *
+     * On by default, and it turns off every other filter while it is on: a shortlist of
+     * five does not need narrowing by size or by publisher, and a chip row where three
+     * things are lit and only one of them is doing anything is a row that has stopped
+     * meaning anything.
+     */
+    val recommendedOnly: Boolean = true,
+    /**
+     * Only models published by an organisation, rather than by an individual account.
+     *
+     * Applied after the search rather than in it, because the Hub's model endpoint has no
+     * parameter for it: what it has is two different paths for the two kinds of account,
+     * which is the distinction itself. See `Publishers`.
+     *
+     * It was on by default, with the size ceiling, because the unfiltered Hub sorted by
+     * trending is mostly abliterated merges of other people's work at sizes no phone can
+     * hold. [recommendedOnly] now answers that better: a model published by an
+     * organisation still routes tools badly if nobody has checked, and being checked is
+     * what a first screen should be selecting for.
+     */
+    val officialOnly: Boolean = false,
 ) {
     /** How many filters are on, for the badge on the filter button. */
     val activeCount: Int = listOf(
@@ -321,6 +437,8 @@ data class HubQuery(
         parameters != ParameterRange.ANY,
         maxParametersBillions != null,
         hideGated,
+        officialOnly,
+        recommendedOnly,
     ).count { it }
 
     /** The `num_parameters` value for this query, or null when size is unconstrained. */

@@ -16,28 +16,22 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -46,8 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
-import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
-import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 
@@ -68,7 +60,7 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
-            .combinedClickable(onClick = onClick, role = Role.Button)
+            .clickable(onClick = onClick, role = Role.Button)
             // Merged, or the description is read and then every line inside it is read
             // again: the model name, the backend, the context window, one after another.
             // The whole point of composing a sentence here is that it replaces them.
@@ -79,12 +71,27 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = state.modelName ?: "Choose a model",
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = state.modelName ?: "Choose a model",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            // The chevron is the whole reason anyone discovers that the name is a button.
+            // Without it this reads as a label, and switching model becomes a thing you
+            // find by tapping the title on the off chance.
+            Icon(
+                imageVector = Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(CHEVRON.dp),
+            )
+        }
 
         // What the model is, not what it is doing. There is one place that says work is
         // in flight and it is next to the text being written, where the eye already is;
@@ -94,56 +101,6 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
             Metric(state.runtimeIdentity, maxLines = 1)
         }
     }
-}
-
-/**
- * The busy line: a dot in the state's own colour, then the state's name.
- *
- * The dot breathes while work is in flight. The one animation in the app tied to something
- * ongoing rather than to a value that has already settled. Colour is never alone
- * here; the label says the same thing in words.
- */
-@Composable
-private fun RuntimeStateLine(runtime: RuntimeState) {
-    val dark = LocalIsDarkTheme.current
-    val color = when (runtime) {
-        RuntimeState.THROTTLED ->
-            if (dark) OpenWeightsColors.SignalPoor else OpenWeightsColors.PaperSignalPoor
-
-        else -> if (dark) OpenWeightsColors.SignalGood else OpenWeightsColors.PaperSignalGood
-    }
-
-    val transition = rememberInfiniteTransition(label = "runtime")
-    val pulse by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = MIN_PULSE_ALPHA,
-        animationSpec = infiniteRepeatable(
-            animation = tween(PULSE_MS),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "pulse",
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(top = 1.dp),
-    ) {
-        Box(color = color, alpha = pulse)
-        Metric(runtime.label, color = color, maxLines = 1)
-    }
-}
-
-/** The dot. Its own composable only so the alpha applies to it and not to the label. */
-@Composable
-private fun Box(color: androidx.compose.ui.graphics.Color, alpha: Float) {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier
-            .size(DOT_SIZE.dp)
-            .alpha(alpha)
-            .clip(CircleShape)
-            .background(color),
-    )
 }
 
 /**
@@ -161,12 +118,8 @@ private fun ChatUiState.spoken(): String {
 /** Android asks interactive targets to be at least this tall. */
 private const val TOUCH_TARGET = 48
 
-/** Slow enough to read as breathing rather than blinking. */
-private const val PULSE_MS = 900
-
-private const val MIN_PULSE_ALPHA = 0.25f
-
-private const val DOT_SIZE = 6
+/** Small enough to sit under the name's cap height rather than beside it. */
+private const val CHEVRON = 18
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

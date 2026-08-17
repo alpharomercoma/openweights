@@ -72,7 +72,21 @@ class ModelRuntime @Inject constructor(
      */
     suspend fun resetContext() = engine.resetContext()
 
-    fun backendName(): String? = engine.computeDevices().firstOrNull()?.id?.uppercase()
+    /**
+     * Where the weights are, not what the phone has.
+     *
+     * This used to be `computeDevices().first()`, which is the first backend ggml
+     * registered and is always the CPU, so the top bar read "CPU" for every model on every
+     * device however the processor setting was set. Nobody could tell whether asking for
+     * the GPU had done anything, because the label was not derived from the answer.
+     *
+     * It now comes from llama.cpp's own accounting of which buffers the tensors landed in,
+     * captured at load. Falling back to the registered device keeps the line populated for
+     * a model loaded before this existed rather than blanking the bar.
+     */
+    fun backendName(): String? = engine.loadedModel?.offloadedTo?.takeIf { it.isNotBlank() }
+        ?.uppercase()
+        ?: engine.computeDevices().firstOrNull()?.id?.uppercase()
 
     /**
      * True when there is something other than the CPU to hand layers to.

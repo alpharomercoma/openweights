@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.model.StagedDocument
@@ -95,7 +96,6 @@ fun Composer(
     staged: List<MessagePart.File>,
     document: StagedDocument?,
     onRemoveDocument: () -> Unit,
-    canAttach: Boolean,
     isAttaching: Boolean,
     canDictate: Boolean,
     isListening: Boolean,
@@ -229,7 +229,6 @@ fun Composer(
             ComposerActions(
                 enabled = enabled,
                 isGenerating = isGenerating,
-                canAttach = canAttach,
                 leading = leading,
                 isAttaching = isAttaching,
                 canDictate = canDictate,
@@ -260,7 +259,6 @@ fun Composer(
 private fun ComposerActions(
     enabled: Boolean,
     isGenerating: Boolean,
-    canAttach: Boolean,
     leading: @Composable () -> Unit,
     isAttaching: Boolean,
     canDictate: Boolean,
@@ -275,13 +273,14 @@ private fun ComposerActions(
         modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (canAttach) {
-            AttachButton(
-                enabled = enabled && !isAttaching,
-                isAttaching = isAttaching,
-                onClick = onAttach,
-            )
-        }
+        // Always, not only for a model that accepts media. Every model can be handed a
+        // document, and a plus that comes and goes depending on which weights are loaded is
+        // a plus nobody trusts.
+        AttachButton(
+            enabled = enabled && !isAttaching,
+            isAttaching = isAttaching,
+            onClick = onAttach,
+        )
         // Left of the spacer, with Attach: both answer "what goes into this message",
         // while the right-hand side is for sending it.
         leading()
@@ -336,7 +335,10 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
     val container by animateColorAsState(
         targetValue = when {
             isGenerating -> MaterialTheme.colorScheme.surfaceContainerHighest
-            enabled -> MaterialTheme.colorScheme.primary
+            // Lime rather than the primary role, so the one control the thumb is heading
+            // for is the same colour on paper as it is on the dark canvas. `primary` is
+            // ink in the light theme, because Material also paints it as text.
+            enabled -> OpenWeightsColors.Lime
             else -> MaterialTheme.colorScheme.surfaceContainerHighest
         },
         animationSpec = Motion.instant(),
@@ -345,7 +347,7 @@ private fun SendButton(isGenerating: Boolean, enabled: Boolean, onClick: () -> U
     val content by animateColorAsState(
         targetValue = when {
             isGenerating -> MaterialTheme.colorScheme.onSurface
-            enabled -> MaterialTheme.colorScheme.onPrimary
+            enabled -> OpenWeightsColors.Ink
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
         animationSpec = Motion.instant(),
@@ -435,7 +437,6 @@ private fun ComposerPreview() {
                 staged = emptyList(),
                 document = null,
                 onRemoveDocument = {},
-                canAttach = true,
                 isAttaching = false,
                 canDictate = true,
                 isListening = false,

@@ -218,23 +218,37 @@ enum class Offload(val label: String) {
  * turns are, and [Offload.AUTO] answers it from the usage ledger, which has recorded both
  * totals per model since it existed and therefore needs no new bookkeeping.
  *
- * Where the two meet is a property of the model, not of the phone, which is the part that
- * cost a wrong constant here. Measured on one Adreno 830:
+ * **The constant below is known to be wrong and is kept only because nothing correct can be
+ * computed without measuring the device.** It was set from Qwen 2.5 1.5B on an Adreno 830,
+ * where it is right to within one percent, and taken to be a property of the model. It is
+ * not. `OffloadBenchmark` solved it for four models on a second chip:
  *
- * | model | prompt | answer | crossover |
- * | --- | ---: | ---: | ---: |
- * | Gemma 3 1B | 151 to 624 t/s | 45 to 34 t/s | prompt > 1.4x answer |
- * | Qwen 2.5 1.5B | 177 to 387 t/s | 32 to 16 t/s | prompt > 10x answer |
+ * | model | chip | crossover |
+ * | --- | --- | ---: |
+ * | Qwen 2.5 1.5B | Adreno 830 | 10.1x |
+ * | Qwen 2.5 1.5B | Adreno 732 | **1.68x** |
+ * | Gemma 3 1B | Adreno 830 | 1.4x |
+ * | Gemma 3 1B | Adreno 732 | 0.87x |
+ * | LFM2 1.2B | Adreno 732 | **none, the GPU is faster at both** |
+ * | LFM2.5 2.6B | Adreno 732 | **none, the GPU is faster at both** |
  *
- * Seven times apart. A threshold taken from the friendlier of the two picks the GPU for
- * Qwen at five hundred prompt tokens against a hundred and fifty of answer, where the CPU
- * is three seconds faster.
+ * The same model moves by six times across two phones, because GPU decode hardly changes
+ * between them while CPU decode tracks the CPU. Ten is the largest figure in that table, so
+ * this rule sends every model to the CPU on the weaker chip, including the two recommended
+ * ones for which the CPU never wins any turn at all.
  *
- * So the demanding end is what ships. Two things make being wrong towards the CPU much
- * cheaper than being wrong towards the GPU: loading onto the GPU takes twelve seconds
- * against under one, paid on every cold start, so a marginal win never repays it; and the
- * CPU is never catastrophically wrong, while the GPU writing at half speed is felt on every
- * token of a long answer.
+ * It still ships because the alternative is not a better constant. The four rates have to be
+ * measured on the device that will run the model, and the arithmetic then compares seconds
+ * rather than a ratio, with the cost of the switch inside it:
+ *
+ * ```
+ * GPU iff  prompt * (1/pp_cpu - 1/pp_gpu)  >  switchCost + answer * (1/tg_gpu - 1/tg_cpu)
+ * ```
+ *
+ * That is `docs/CONTEXT.md`, "The crossover is not a constant". Until it is built, being
+ * wrong towards the CPU is the cheaper mistake: the GPU load costs three to nine seconds
+ * against under one, paid on every cold start, and a GPU that writes at half speed is felt
+ * on every token of a long answer.
  *
  * Decided at load, because llama.cpp assigns layers when the weights are mapped. A model
  * with nothing recorded stays on the CPU.
@@ -255,6 +269,12 @@ fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long
 /** More layers than any model has, which is llama.cpp's way of saying all of them. */
 private const val ALL_LAYERS = 99
 
-/** A prompt worth ten answers: the demanding end of the models measured. */
+/**
+ * A prompt worth ten answers.
+ *
+ * The largest crossover ever measured, not a value that is right anywhere except Qwen 2.5 on
+ * an Adreno 830. See the note above `layersFor` before changing it: a different constant is
+ * not the fix, measuring is.
+ */
 private const val CROSSOVER_NUMERATOR = 10L
 private const val CROSSOVER_DENOMINATOR = 1L

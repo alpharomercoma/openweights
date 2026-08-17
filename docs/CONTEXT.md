@@ -33,6 +33,7 @@ Fully open source under **Apache-2.0**, aimed at a developer audience.
 |---|---|---|---|
 | Poco X8 Pro Max (primary dev device) | MediaTek **MT6991** | 11.5 GiB total | Measured on-device, see below |
 | Qualcomm Device Cloud `sun` (second test device) | Qualcomm **SM8750** (Snapdragon 8 Elite) | 14.8 GiB total | Adreno 830; OpenCL backend verified here, see below |
+| Qualcomm Device Cloud `pineapple` (mid-range test device) | Qualcomm **SM7675** (Snapdragon 7+ Gen 3) | 11 GiB total | Adreno 732. Worth keeping in the rotation: it is the device that showed the offload crossover is not a property of the model, because the weaker CPU moves it by six times |
 
 ### Measured facts for the dev device (adb, 2026-08-09)
 
@@ -643,6 +644,68 @@ faster of the two, and the warm-up demonstrably lands in first prefill instead. 
 this run accounts for the gap, and the earlier device is gone, so it stands as a difference
 between two instances rather than a property of the chip. Treat 3 s as the load cost on this
 hardware and 12 s as evidence that it is not guaranteed.
+
+#### The crossover is not a constant, and 10 is the worst value it has ever taken (2026-08-17)
+
+`OffloadBenchmark` now solves the crossover instead of printing a table to solve by hand. It
+warms each backend before measuring, so the OpenCL kernel build lands on a throwaway turn
+rather than inside the prompt rate, and it reports what a switch costs and how many turns of
+each shape repay it. Every `.gguf` in `/data/local/tmp/openweights` is measured, because the
+answer differs per model and the whole point is to see that.
+
+Run on a **Snapdragon 7+ Gen 3 (SM7675, Adreno 732)**, all Q4_K_M, all four models in one
+session:
+
+| model | prefill CPU to GPU | decode CPU to GPU | crossover | switch |
+| --- | --- | --- | --- | ---: |
+| LFM2 1.2B | 117.4 to 202.9 t/s | 28.8 to **31.2** t/s | **none, GPU wins both** | 3.2 s |
+| LFM2.5 2.6B | 50.7 to 90.0 t/s | 14.4 to **15.3** t/s | **none, GPU wins both** | 6.7 s |
+| Qwen 2.5 1.5B | 70.8 to 129.9 t/s | 20.9 to 17.0 t/s | prompt > **1.68x** answer | 4.5 s |
+| Gemma 3 1B | 63.4 to 222.4 t/s | 22.7 to 18.6 t/s | prompt > **0.87x** answer | 3.5 s |
+
+**Qwen's crossover is 1.68 here and 10.1 on the Snapdragon 8 Elite.** Same model, same
+quantisation, same engine, same benchmark: six times apart from the chip alone. The claim
+recorded above, that the crossover is a property of the model rather than of the phone, is
+wrong and this measurement is what refutes it. It is a property of both, and the mechanism is
+visible in the rows: GPU decode barely moves between the two chips (17.0 t/s here against
+16.4 on the 8 Elite) while CPU decode tracks the CPU (20.9 against 32). The Adreno is not the
+variable. The CPU it is being compared against is.
+
+**Both recommended models have no crossover at all on this chip.** They read faster *and*
+write faster on the GPU, so there is no turn shape where the CPU wins, and `CROSSOVER_NUMERATOR
+= 10` sends them to the CPU on every load. Ten is not a conservative choice here; it is the
+largest value ever measured anywhere, and it is applied to models for which the correct value
+does not exist.
+
+**What a switch costs, decomposed.** The GPU load for LFM2 1.2B was 18.3 s the first time the
+app ever used OpenCL on that install and 4.2 s on every run after it, with no code change in
+between and across separate processes. The likely explanation, not proven here, is the
+Qualcomm driver's own program cache being cold once per install: llama.cpp's cache is not
+what does it. llama.cpp has one, in `cl-program-cache.cpp`, keyed to the device and
+enabled by `GGML_OPENCL_KERNEL_CACHE_DIR`; unset, `default_cache_dir()` falls through to
+`fs::temp_directory_path()`, which an Android app process has no usable value for, so that
+layer is off and the driver's is doing the work. The rest is weight upload: within one process
+the 2.6 B model loaded in 8.6 s against the 1.2 B model's 4.2 s, which is about 200 MB/s for
+the extra bytes and is not shader compilation at all. Kernel build shows up separately as the
+warm-up column, 1.3 to 2.3 s on first prefill.
+
+**Moving the processor did nothing until now.** `savePreferences` wrote the choice to DataStore
+and returned. Layers are assigned when llama.cpp maps the weights, so the setting waited for
+the next load, which for most people never comes: the user moved it to GPU, the top bar went
+on saying CPU because the weights really were still on the CPU, and nothing said the setting
+was queued behind an event they had no reason to expect. It now reloads on the spot, keeping
+the conversation, and the screen shows the state it already had for this. Driven on the same
+SM7675 with LFM2 1.2B, the top bar goes `CPU · 4096 ctx` to `OPENCL · 4096 ctx`
+and back, through "Loading the model into memory" each way. **19.4 s the first time the app
+ever used OpenCL on that install, 4.4 s every time after.** The context window deliberately
+still waits for the next load: growing it can fail for want of memory, and failing a load
+nobody asked for would take the model away in exchange for a number being edited.
+
+**What this means for `Offload.AUTO`.** A compiled-in ratio cannot be right: the correct value
+ranges from "no threshold exists" to 10 across four models and two chips. The rates are not
+predictable from the GGUF header either, since the two models with the closest geometry in the
+set, Gemma 3 1B at 26 layers and Qwen 2.5 1.5B at 28, are the two furthest apart on the 8 Elite.
+They have to be measured on the device that will run them, once, and kept.
 
 ### The tool loop, proven on hardware (2026-08-14)
 

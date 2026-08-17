@@ -616,7 +616,6 @@ class TurnRunnerTest {
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = PlanBoard(),
             asks = AskBoard(),
-            consent = settledConsent(ApplicationProvider.getApplicationContext()),
         )
         val steps = mutableListOf<AgentStep>()
         runner.run(
@@ -638,7 +637,6 @@ class TurnRunnerTest {
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = plans,
             asks = asks,
-            consent = settledConsent(ApplicationProvider.getApplicationContext()),
         )
         val steps = mutableListOf<AgentStep>()
         runner.run(

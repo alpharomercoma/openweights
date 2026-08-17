@@ -117,6 +117,20 @@ interface Tool {
     val returnsUntrustedText: Boolean get() = false
 
     /**
+     * Whether this is a capability the user grants, rather than machinery of the turn.
+     *
+     * Everything in the registry appeared on the Tools screen with a switch beside it,
+     * including the two tools plan mode is built out of. Switching off `advance` did
+     * exactly what it said and left plan mode unable to mark a step finished, with nothing
+     * on the screen connecting the two. It also made "are any tools on" answer yes when
+     * the user had turned every real one off, because these two were still counted.
+     *
+     * The test is whether a user would recognise it as something the model can go and do.
+     * Searching the web is. Ticking off a step of a plan the app itself is running is not.
+     */
+    val isUserFacing: Boolean get() = true
+
+    /**
      * Whether running this sends what it is given to somebody else.
      *
      * The pair of these two is the whole rule: reading untrusted text is safe, sending

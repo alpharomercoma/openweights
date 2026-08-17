@@ -22,13 +22,15 @@ import android.content.Context
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.Icon
@@ -56,41 +58,55 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
  *   regenerating anything other than the last turn would silently discard what came after.
  */
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun MessageActions(
     isSpeaking: Boolean,
     onCopy: () -> Unit,
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
+    /** Opens the sheet with the rarer actions, which the long press used to. */
+    onMore: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** Drawn at the end of the row, after the actions, when the reply has finished. */
     measurements: (@Composable () -> Unit)? = null,
 ) {
-    Row(
+    // A flow row, not a row, and the difference is the whole of a bug worth writing down.
+    //
+    // The measurements share the action row, because they used to sit above the reply on a
+    // line of their own that ran out of width and wrapped, pushing the answer down. Sharing
+    // the row fixed that at the default font scale and broke it at every other one: the
+    // three actions are 48dp touch targets that cannot shrink, so at 150 percent text the
+    // measurements were squeezed until "36.7 tok/s 11.4s" came out as "35.4 tok/s 9.…", and
+    // at 200 percent the time was gone altogether. Anyone who has turned their text up is
+    // the last person who should lose a number.
+    //
+    // Flowing, they sit at the far end of the row when they fit and drop to a line of their
+    // own when they do not. Nothing is ever clipped, and the common case is unchanged.
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
     ) {
-        Action(Icons.Rounded.ContentCopy, "Copy reply", onCopy)
-        Action(
-            icon = if (isSpeaking) {
-                Icons.Rounded.StopCircle
-            } else {
-                Icons.AutoMirrored.Rounded.VolumeUp
-            },
-            description = if (isSpeaking) "Stop reading aloud" else "Read aloud",
-            onClick = onReadAloud,
-        )
-        onRetry?.let { Action(Icons.Rounded.Refresh, "Try again", it) }
-
-        // The measurements share the action row rather than taking a line of their own.
-        // They used to sit above the reply on a line that ran out of width and wrapped,
-        // which on a narrow phone pushed the answer down and read as broken. Here they
-        // occupy space the row already had and cannot wrap, because they are the last
-        // thing in it and they ellipsize.
-        measurements?.let {
-            Spacer(Modifier.weight(1f))
-            it()
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Action(Icons.Rounded.ContentCopy, "Copy reply", onCopy)
+            Action(
+                icon = if (isSpeaking) {
+                    Icons.Rounded.StopCircle
+                } else {
+                    Icons.AutoMirrored.Rounded.VolumeUp
+                },
+                description = if (isSpeaking) "Stop reading aloud" else "Read aloud",
+                onClick = onReadAloud,
+            )
+            onRetry?.let { Action(Icons.Rounded.Refresh, "Try again", it) }
+            onMore?.let { Action(Icons.Rounded.MoreHoriz, "More actions", it) }
         }
+
+        measurements?.invoke()
     }
 }
 

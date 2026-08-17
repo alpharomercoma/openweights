@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
@@ -166,7 +167,7 @@ private fun SheetAction(label: String, detail: String, icon: ImageVector, onClic
         Icon(icon, contentDescription = null, modifier = Modifier.size(TICK))
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.titleSmall)
-            Metric(detail)
+            Caption(detail)
         }
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,

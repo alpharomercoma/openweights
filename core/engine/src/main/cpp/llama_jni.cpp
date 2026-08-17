@@ -341,6 +341,19 @@ catch (const std::exception & failure) {
 }
 
 JNIEXPORT jstring JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeOffloadSummary(
+    JNIEnv * env, jobject /*thiz*/, jlong handle) try {
+    return to_jstring(env, as_session(handle)->offload_summary());
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeOffloadSummary failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeOffloadSummary failed for an unknown reason");
+    return nullptr;
+}
+
+JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeModelDescription(
     JNIEnv * env, jobject /*thiz*/, jlong handle) try {
     return to_jstring(env, as_session(handle)->model_description());

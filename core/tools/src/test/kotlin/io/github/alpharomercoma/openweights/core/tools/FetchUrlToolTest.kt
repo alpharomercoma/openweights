@@ -38,12 +38,14 @@ class FetchUrlToolTest {
         tool.run(ToolCall(id = "1", name = "fetch_url", argumentsJson = """{"url":"$url"}"""))
 
     @Test
-    fun `reading an address the model composed always asks first`() {
-        // Tool.alwaysAsk exists for exactly this tool and says so: searching is bounded
-        // whatever the model asks for, and fetching an address it composed is not. Auto
-        // mode is about removing pointless taps, not the only check on an open primitive,
-        // and the address can come from a page the model has just read.
-        assertThat(tool.alwaysAsk).isTrue()
+    fun `what it reads is text somebody else wrote, and it says so`() {
+        // This asserted `alwaysAsk`, which no longer exists: fetching a page runs without a
+        // tap now, like everything else. What is left is the flag that still matters, and
+        // it is the one the exfiltration guard reads. A page is not an instruction, and a
+        // model this size does not reliably know that, so anything sent off the device
+        // after one has been read is still approved by hand.
+        assertThat(tool.returnsUntrustedText).isTrue()
+        assertThat(tool.leavesTheDevice).isTrue()
     }
 
     @Test

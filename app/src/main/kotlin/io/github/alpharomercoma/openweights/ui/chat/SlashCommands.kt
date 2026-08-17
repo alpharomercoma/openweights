@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -116,10 +117,21 @@ fun SlashCommandPalette(
 ) {
     if (commands.isEmpty()) return
 
+    // Capped, and this is the whole bug it fixes.
+    //
+    // The palette is a lazy list in a column above the composer, and with no ceiling it
+    // took every pixel it wanted: six commands with their descriptions come to more than a
+    // phone is tall, so typing "/" pushed the message box off the bottom of the screen. The
+    // commands were there and the thing you were typing into was not, which is why this
+    // read as the commands disappearing.
+    //
+    // Four rows or so, then it scrolls. The list is short, the first match is the one
+    // wanted almost always, and a palette taller than this is a menu.
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
+            .heightIn(max = PALETTE_MAX)
             .clip(RoundedCornerShape(Radius.md))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
@@ -143,6 +155,9 @@ fun SlashCommandPalette(
         }
     }
 }
+
+/** Tall enough for four commands, short enough to leave the composer where it was. */
+private val PALETTE_MAX = 260.dp
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

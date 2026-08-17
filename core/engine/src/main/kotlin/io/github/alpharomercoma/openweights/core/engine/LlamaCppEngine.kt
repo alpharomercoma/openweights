@@ -295,6 +295,8 @@ class LlamaCppEngine internal constructor(
 
     private fun readModelInfo(activeHandle: Long): LoadedModelInfo {
         val info = bridge.nativeModelInfo(activeHandle)
+        // Read once: llama.cpp accounted for these at load and nothing moves afterwards.
+        val offload = runCatching { bridge.nativeOffloadSummary(activeHandle) }.getOrDefault("")
         return LoadedModelInfo(
             description = bridge.nativeModelDescription(activeHandle),
             parameterCount = info[0],
@@ -303,6 +305,15 @@ class LlamaCppEngine internal constructor(
             trainingContextSize = info[3].toInt(),
             layerCount = info[4].toInt(),
             contextUsed = info[5].toInt(),
+            offloadedTo = offload.substringBefore('|'),
+            offloadBuffers = offload.substringAfter('|', "")
+                .split('|')
+                .filter { it.isNotBlank() }
+                .mapNotNull { entry ->
+                    val name = entry.substringBefore(':')
+                    val mib = entry.substringAfter(':', "").toIntOrNull() ?: return@mapNotNull null
+                    name to mib
+                },
             mediaSupport = bridge.nativeMediaSupport(activeHandle).let { support ->
                 MediaSupport(vision = support[0], audio = support[1])
             },

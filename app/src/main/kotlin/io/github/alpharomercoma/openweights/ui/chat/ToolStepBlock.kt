@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -69,6 +71,14 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
             .padding(vertical = 2.dp)
             .clip(RoundedCornerShape(Radius.xs))
             .background(MaterialTheme.colorScheme.surfaceContainer)
+            // A hairline, because this sits inside a reply rather than on the canvas: at
+            // one step of raise off a near-black background it had no edge at all and read
+            // as a smudge under the sentence above it.
+            .border(
+                width = Dp.Hairline,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(Radius.xs),
+            )
             .clickable(enabled = detail.isNotBlank()) { expanded = !expanded }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
@@ -122,17 +132,42 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
     }
 }
 
-/** One line saying what happened, with the argument that makes it specific. */
+/**
+ * One line saying what happened, with the argument that makes it specific.
+ *
+ * The tool is named in words rather than by its identifier. `web_search("Manila weather")`
+ * is a function call; "Searched the web" is what actually happened, and this row is the
+ * whole of the disclosure that anything left the phone. An app whose claim is that it
+ * answers on the device cannot make that disclosure in an identifier the reader has to
+ * decode, so the ones that reach the network say so in the verb.
+ */
 private fun AgentStep.headline(): String = when (this) {
-    is AgentStep.Requested -> "${call.name} requested"
+    is AgentStep.Requested -> "${call.name.asVerb()} requested"
 
     is AgentStep.Ran -> {
         val seconds = String.format(Locale.getDefault(), "%.1fs", millis / MILLIS_PER_SECOND)
-        "${call.name}(${call.argumentsJson.summarise()}) · $seconds"
+        "${call.name.asVerb()} ${call.argumentsJson.summarise()} · $seconds"
     }
 
-    is AgentStep.Skipped -> "${call.name} skipped · $why"
+    is AgentStep.Skipped -> "${call.name.asVerb()} skipped · $why"
 }
+
+/**
+ * What a tool did, in the past tense.
+ *
+ * Unknown names fall back to the identifier with its underscores opened out, so a tool
+ * added later reads roughly right rather than not at all.
+ */
+private fun String.asVerb(): String = VERBS[this] ?: replace('_', ' ')
+
+private val VERBS = mapOf(
+    "web_search" to "Searched the web for",
+    "fetch_url" to "Opened",
+    "search_files" to "Looked through your folder for",
+    "read_file" to "Read",
+    "write_file" to "Saved",
+    "run_script" to "Worked out",
+)
 
 /** What it returned, shown only when asked for. */
 private fun AgentStep.detail(): String = when (this) {
@@ -144,13 +179,24 @@ private fun AgentStep.detail(): String = when (this) {
 /**
  * The arguments, short enough for one line.
  *
- * The whole JSON is in the expanded view for anything that ran; the headline only has to
- * say which search this was.
+ * Values only, without their keys. It used to print the object with its braces taken off,
+ * so a search read `web_search("query":"Manila weath…` : a key nobody needed, eating the
+ * width of the one thing that says which search this was, and then a cut through the middle
+ * of a word. The whole JSON is in the expanded view for anything that ran.
+ *
+ * Cut at a space rather than mid-word, because a truncation that lands inside a word reads
+ * as an overflow bug rather than as an ellipsis.
  */
 private fun String.summarise(): String {
-    val trimmed = trim().removePrefix("{").removeSuffix("}").trim()
-    return if (trimmed.length <= ARGUMENT_CHARS) trimmed else trimmed.take(ARGUMENT_CHARS) + "…"
+    val values = VALUES.findAll(this).map { it.groupValues[1] }.filter { it.isNotBlank() }
+    val joined = values.joinToString(", ").ifEmpty { trim().removeSurrounding("{", "}").trim() }
+    if (joined.length <= ARGUMENT_CHARS) return joined
+    val cut = joined.take(ARGUMENT_CHARS)
+    return (cut.substringBeforeLast(' ', cut).trimEnd()) + "…"
 }
 
-private const val ARGUMENT_CHARS = 48
+/** Each value in a flat arguments object, quoted strings kept whole, escapes included. */
+private val VALUES = Regex(""":\s*("(?:[^"\\]|\\.)*"|[^,}\s]+)""")
+
+private const val ARGUMENT_CHARS = 44
 private const val MILLIS_PER_SECOND = 1000.0

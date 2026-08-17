@@ -31,7 +31,6 @@ import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
-import io.github.alpharomercoma.openweights.core.tools.OffDeviceConsent
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -112,7 +111,6 @@ abstract class ChatFixture {
                 ToolSwitches(context),
                 PlanBoard(),
                 AskBoard(),
-                settledConsent(context),
             ),
             notifier = ReplyNotifier(context),
             savedState = state,
@@ -138,8 +136,14 @@ abstract class ChatFixture {
         // number of passes started failing the moment one more round trip was added: send
         // was then called while the model was still loading, refused, and the test failed
         // somewhere else entirely.
+        //
+        // Both halves are checked, and the second half is why: the name is now set on the
+        // way in so the top bar keeps it while weights are remapped, so a name on its own no
+        // longer means a model is loaded. Waiting on the name alone returned here mid-load
+        // and every send that followed was refused.
         repeat(AWAIT_STEPS) {
-            if (viewModel.uiState.value.modelName != null) return
+            val state = viewModel.uiState.value
+            if (state.modelName != null && !state.isLoadingModel) return
             settle(steps = 2)
         }
     }
@@ -255,5 +259,3 @@ abstract class ChatFixture {
  *
  * The first one is [AgentRunnerTest]'s business: what it does is ask.
  */
-internal fun settledConsent(context: android.content.Context): OffDeviceConsent =
-    OffDeviceConsent(context, ToolSwitches(context)).apply { settle("web_search", true) }

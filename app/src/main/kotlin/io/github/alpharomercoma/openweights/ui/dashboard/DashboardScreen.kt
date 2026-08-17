@@ -20,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -50,15 +51,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.data.DailyUsage
 import io.github.alpharomercoma.openweights.core.data.GrowthPoint
 import io.github.alpharomercoma.openweights.core.data.ModelUsage
 import io.github.alpharomercoma.openweights.core.data.UsageSummary
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
+import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
@@ -121,8 +125,8 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Nothing generated yet. Once you chat, this is where the totals live: " +
-                        "and they stay here, on the phone.",
+                    "Nothing yet. Once you chat, the totals appear here, and stay " +
+                        "on this phone.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -140,60 +144,69 @@ fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Headline(summary)
-            GrowthChart(summary.growth)
+            Hero(summary)
             WeekChart(summary.growth)
+            StatGrid(summary)
             ModelBreakdown(summary.perModel)
         }
     }
 }
 
+/**
+ * The one number this screen is about, and what today did to it.
+ *
+ * One total, not two. This used to print `lifetimeGeneratedTokens` here in display type and
+ * then again eighty pixels lower in a box labelled "Tokens written", which reads as two
+ * findings that happen to agree rather than as one number shown twice.
+ */
 @Composable
-private fun Headline(summary: UsageSummary) {
+private fun Hero(summary: UsageSummary) {
     Column {
         Text(
             text = summary.lifetimeGeneratedTokens.grouped(),
             style = MaterialTheme.typography.displaySmall,
         )
-        Metric("tokens generated on this device")
+        Caption("tokens generated on this device")
         DayChange(summary)
     }
+}
 
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Stat("Replies", summary.replies.toLong().grouped(), Modifier.weight(1f))
-        Stat("Chats", summary.conversations.toLong().grouped(), Modifier.weight(1f))
-        Stat("Days used", summary.activeDays.toLong().grouped(), Modifier.weight(1f))
-    }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Stat(
-            label = "Average speed",
-            value = summary.averageTokensPerSecond
-                ?.let { String.format(Locale.getDefault(), "%.1f tok/s", it) }
-                ?: " ",
-            modifier = Modifier.weight(1f),
-        )
-        Stat(
-            label = "Time computing",
-            value = summary.lifetimeInferenceMs.asDuration(),
-            modifier = Modifier.weight(1f),
-        )
-    }
-
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        // The ledger has counted these since the first reply and nothing showed them.
-        // Reading is the other half of the work: a long conversation spends most of its
-        // time here, and it is why replies get slower as a chat grows.
-        Stat(
-            label = "Tokens read",
-            value = summary.lifetimePromptTokens.grouped(),
-            modifier = Modifier.weight(1f),
-        )
-        Stat(
-            label = "Tokens written",
-            value = summary.lifetimeGeneratedTokens.grouped(),
-            modifier = Modifier.weight(1f),
-        )
+/**
+ * The rest of the ledger, six boxes, no repeats.
+ *
+ * Everything the hero and the chart do not already say. "Tokens read" earns its place next
+ * to a total of tokens written because reading is the other half of the work and the reason
+ * a long conversation slows down; the written figure itself is upstairs in display type and
+ * does not appear again here.
+ */
+@Composable
+private fun StatGrid(summary: UsageSummary) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.height(IntrinsicSize.Min),
+        ) {
+            Stat("Replies", summary.replies.toLong().grouped(), Modifier.weight(1f))
+            Stat("Chats", summary.conversations.toLong().grouped(), Modifier.weight(1f))
+            Stat("Days", summary.activeDays.toLong().grouped(), Modifier.weight(1f))
+        }
+        // Matched heights, or a label that wraps to two lines makes its own tile taller
+        // than the two beside it and the grid stops looking like a grid.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.height(IntrinsicSize.Min),
+        ) {
+            Stat("Tokens read", summary.lifetimePromptTokens.grouped(), Modifier.weight(1f))
+            Stat(
+                label = "Speed",
+                value = summary.averageTokensPerSecond
+                    ?.let { String.format(Locale.getDefault(), "%.1f", it) }
+                    ?.plus(" tok/s")
+                    ?: "not yet",
+                modifier = Modifier.weight(1f),
+            )
+            Stat("Computing", summary.lifetimeInferenceMs.asDuration(), Modifier.weight(1f))
+        }
     }
 }
 
@@ -218,17 +231,20 @@ private fun DayChange(summary: UsageSummary) {
     }
 
     Row(
-        modifier = Modifier.padding(top = 4.dp),
+        modifier = Modifier.padding(top = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            text = "+${summary.tokensToday.grouped()} today",
-            style = MaterialTheme.typography.labelLarge,
+            // Metric type, like the line above it. Two captions under one number in two
+            // different treatments read as two captions that happened to end up together;
+            // in the same type they read as one sentence with a coloured first clause.
+            text = "+${summary.tokensToday.grouped()} today ·",
+            style = MetricTextStyle,
             // Coloured against yesterday, which is the only thing this line claims. A
             // quiet day is grey, not red: not using your phone is not a fault.
             color = signalColor(fraction = changeFraction(change), dark = dark),
         )
-        Metric(comparison)
+        Caption(comparison)
     }
 }
 
@@ -251,12 +267,13 @@ private fun Double.asPercent(): String =
 private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
+            .fillMaxHeight()
             .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(12.dp),
     ) {
         Text(value, style = MaterialTheme.typography.titleMedium)
-        Metric(label)
+        Caption(label)
     }
 }
 
@@ -283,13 +300,12 @@ private fun WeekChart(growth: List<GrowthPoint>) {
         val day = latest - back
         day to (tokensByDay[day] ?: 0L)
     }
-    val dark = LocalIsDarkTheme.current
     val locale = LocalConfiguration.current.locales[0]
     val peak = week.maxOf { it.second }.coerceAtLeast(1)
 
     Column {
         Text("This week", style = MaterialTheme.typography.titleSmall)
-        Metric("tokens a day · best day ${peak.grouped()}")
+        Caption("tokens a day · best day ${peak.grouped()}")
 
         Row(
             modifier = Modifier
@@ -299,22 +315,24 @@ private fun WeekChart(growth: List<GrowthPoint>) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            week.forEach { (_, tokens) ->
+            week.forEachIndexed { index, (_, tokens) ->
                 val fraction = tokens.toFloat() / peak
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(fraction.coerceAtLeast(EMPTY_DAY_BAR))
                         .clip(RoundedCornerShape(Radius.xs))
-                        // A day with nothing on it is drawn in the outline colour, not on
-                        // the speed scale. The scale runs from slow to fast, and the bottom
-                        // of it is red: a day the phone was not used came out looking like
-                        // a day something went wrong with it.
+                        // Not on the signal scale, which is the same rule the model table
+                        // below keeps: a token count is volume, not health. Painted by size
+                        // it said a quiet Sunday had gone wrong, in the red at the bottom of
+                        // a scale that runs slow to fast, and that a busy Friday had been a
+                        // fast one. Height already says how much. The accent says which day
+                        // is today, which is the only distinction this chart has to make.
                         .background(
-                            if (tokens == 0L) {
-                                MaterialTheme.colorScheme.outlineVariant
-                            } else {
-                                signalColor(fraction, dark)
+                            when {
+                                tokens == 0L -> MaterialTheme.colorScheme.outlineVariant
+                                index == week.lastIndex -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.outline
                             },
                         ),
                 )
@@ -346,24 +364,39 @@ private fun WeekChart(growth: List<GrowthPoint>) {
 private fun ModelBreakdown(models: List<ModelUsage>) {
     if (models.isEmpty()) return
     val locale = LocalConfiguration.current.locales[0]
+    val dark = LocalIsDarkTheme.current
     val total = models.sumOf { it.generatedTokens }.coerceAtLeast(1)
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("By model", style = MaterialTheme.typography.titleSmall)
 
-        val dark = LocalIsDarkTheme.current
-
         models.forEach { model ->
-            Column {
-                Text(model.modelName, style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Metric(
-                        buildString {
-                            append("${model.generatedTokens.grouped()} tokens")
-                            append(" · ${(model.generatedTokens * 100 / total)}%")
-                            append(" · ${model.replies} replies")
-                        },
+            val share = model.generatedTokens.toFloat() / total
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = model.modelName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
+                    Metric(String.format(locale, "%.0f%%", share * PERCENT))
+                }
+
+                // The share, drawn. Three models at 60, 30 and 10 percent are a shape you
+                // read at a glance and three percentages you have to hold in your head.
+                // Neutral on purpose: this is how much, not how well, and the signal scale
+                // is reserved for the one measurement below that is actually a rate.
+                ShareBar(fraction = share)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Metric("${model.generatedTokens.grouped()} tokens · ${model.replies} replies")
                     // The one measurement on this screen, so the one thing that earns the
                     // data scale. Token counts are volume, not health: colouring those by
                     // size would say a busy day was a fast one.
@@ -379,14 +412,45 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
     }
 }
 
+/** A hairline of a bar: enough to compare two models, not enough to become the screen. */
+@Composable
+private fun ShareBar(fraction: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(SHARE_BAR.dp)
+            .clip(RoundedCornerShape(Radius.xs))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction.coerceIn(MIN_SHARE, 1f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(Radius.xs))
+                .background(MaterialTheme.colorScheme.onSurfaceVariant),
+        )
+    }
+}
+
+/** Thin enough to read as a rule under the name rather than as a chart of its own. */
+private const val SHARE_BAR = 4
+
+/** A model with almost nothing on it still shows, or the row looks like a rendering bug. */
+private const val MIN_SHARE = 0.01f
+
 /** Seven bars: a week is the unit people actually think in. */
 private const val DAYS_IN_WEEK = 7
 
 /** Tall enough to compare two quiet days, short enough to leave the totals above visible. */
 private const val WEEK_CHART_HEIGHT = 96
 
-/** A day with nothing on it still gets a sliver, so the week reads as seven days. */
-private const val EMPTY_DAY_BAR = 0.02f
+/**
+ * A day with nothing on it still gets a stub, so the week reads as seven days.
+ *
+ * It was 0.02, which is two pixels at this height: enough to be there and not enough to be
+ * seen, so a quiet Sunday looked like a rendering fault rather than a quiet Sunday.
+ */
+private const val EMPTY_DAY_BAR = 0.06f
 
 /** The middle of the signal scale, which is where "no change since yesterday" belongs. */
 private const val UNCHANGED = 0.5

@@ -119,6 +119,9 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
      */
     override val returnsUntrustedText: Boolean = true
 
+    /** And by the same argument, the single point where the user's own text enters it. */
+    override val readsPrivateData: Boolean = true
+
     override suspend fun run(call: ToolCall): String =
         workspace.unavailable().ifEmpty { read(call) }
 

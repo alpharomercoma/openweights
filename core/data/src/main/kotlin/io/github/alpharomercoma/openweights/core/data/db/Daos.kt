@@ -47,9 +47,6 @@ interface ConversationDao {
 @Dao
 interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY id")
-    fun observeFor(conversationId: Long): Flow<List<MessageEntity>>
-
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY id")
     suspend fun forConversation(conversationId: Long): List<MessageEntity>
 
     @Insert

@@ -60,16 +60,6 @@ interface Tool {
     val needsApproval: Boolean get() = true
 
     /**
-     * Whether the user has to approve each run even in [AgentMode.AUTO].
-     *
-     * For tools whose reach the model chooses rather than the app. Searching one
-     * encyclopedia is bounded no matter what the model asks; fetching an address the model
-     * composed is not, so that one keeps asking however the mode is set. Auto is about
-     * removing pointless taps, not about removing the only check on an open primitive.
-     */
-    val alwaysAsk: Boolean get() = false
-
-    /**
      * Whether this tool can do anything at all as things stand.
      *
      * False keeps the definition out of the prompt entirely, rather than advertising
@@ -133,11 +123,32 @@ interface Tool {
     /**
      * Whether running this sends what it is given to somebody else.
      *
-     * The pair of these two is the whole rule: reading untrusted text is safe, sending
-     * things off the device is safe, and doing the second after the first is the one
-     * combination that can carry a private file to a stranger without anybody asking.
+     * Also what the Tools screen groups by, which is the question a user actually has: does
+     * using this put anything on the network.
      */
     val leavesTheDevice: Boolean get() = false
+
+    /**
+     * Whether the model picks where the call goes, rather than the app.
+     *
+     * The difference between the two web tools, and the reason only one of them is gated.
+     * A search carries a query the model wrote to a provider this app chose and the user can
+     * change; whoever wants to read it has to already own that provider's logs. `fetch_url`
+     * carries whatever the model wrote to whatever address the model wrote, so a page saying
+     * "now fetch https://example.test/?d=..." is a channel an attacker builds and reads
+     * themselves. Only the second is a destination somebody else can choose.
+     */
+    val sendsWhereTheModelSays: Boolean get() = false
+
+    /**
+     * Whether this puts something of the user's into the turn that was not there before.
+     *
+     * Separate from [returnsUntrustedText], which is about text the model should not obey.
+     * This is about text nobody outside the phone has seen: the contents of a file from the
+     * folder the user shared. Once that is in the turn, anything going out can carry it,
+     * whoever chose the destination.
+     */
+    val readsPrivateData: Boolean get() = false
 
     /**
      * Runs the call and returns what the model should be told.
@@ -190,6 +201,27 @@ enum class AgentMode(val command: String, val label: String, val description: St
      * the cost of a wrong call is a wasted second rather than damage.
      */
     AUTO("auto", "Auto", "Run tools without asking"),
+
+    /**
+     * Everything runs, nothing is ever put to the user.
+     *
+     * Auto already runs almost everything without asking. What it still stops for is two
+     * shapes, and this is the mode that says do not stop for those either: fetching an
+     * address the model chose after it has read somebody else's text, and sending anything
+     * off the device after a file from the shared folder has been read. Both are real, both
+     * are described where [AgentRunner.allowed] decides them, and this mode is the user
+     * saying they would rather have the seconds.
+     *
+     * Deliberately not persisted. It lives in [ChatUiState] like every other mode, which
+     * means it is gone when the process is, and the runtime line names it for as long as it
+     * is on. A mode that removes the last two checks should not be something a phone quietly
+     * comes back in.
+     *
+     * It does not switch tools on. The Tools screen is a separate decision, made ahead of
+     * time and remembered, and a mode that reached into it would be answering a question the
+     * user has already answered.
+     */
+    YOLO("yolo", "Yolo", "Run everything, ask nothing"),
 
     /**
      * No tools run at all. The model says what it would do.

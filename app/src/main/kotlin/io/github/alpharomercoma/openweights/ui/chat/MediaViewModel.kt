@@ -55,8 +55,6 @@ class MediaViewModel @Inject constructor(
         if (dictation.state.value.isListening) dictation.stop() else dictation.start(onFinal)
     }
 
-    fun dismissDictationError() = dictation.dismissError()
-
     val isSpeaking: StateFlow<Boolean> = speech.isSpeaking
 
     /**

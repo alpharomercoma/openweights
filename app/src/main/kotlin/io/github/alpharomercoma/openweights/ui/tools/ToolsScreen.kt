@@ -328,12 +328,14 @@ private fun ToolRow(tool: ToolSummary, onToggle: (Boolean) -> Unit) {
             )
             // Only when there is something to say. "Runs without asking" under five of six
             // rows is a line the eye learns to skip, which is the worst thing a warning can
-            // become. The two that stop and ask, and the ones with nowhere to work, say so.
-            val note = when {
-                !tool.isReady -> "Waiting for a folder"
-                tool.asksFirst -> "Asks before every run"
-                else -> null
-            }
+            // become. The ones with nowhere to work say so.
+            //
+            // There used to be a second case here, for tools that stopped and asked however
+            // the agent mode was set. Nothing has done that since the consent gate came out,
+            // so the branch could not be reached by any registered tool and only the preview
+            // ever showed it. Whether a run is approved is now a property of the turn rather
+            // than of the tool, so there is nothing true this row could say about it.
+            val note = if (tool.isReady) null else "Waiting for a folder"
             note?.let {
                 Text(
                     text = it,
@@ -367,7 +369,6 @@ private fun ToolsScreenPreview() {
                         name = "Run a script",
                         description = "Works out sums and dates by running JavaScript.",
                         leavesTheDevice = false,
-                        asksFirst = false,
                         isReady = true,
                         isEnabled = true,
                     ),
@@ -376,7 +377,6 @@ private fun ToolsScreenPreview() {
                         name = "Read a file",
                         description = "Opens a file from that folder.",
                         leavesTheDevice = false,
-                        asksFirst = false,
                         isReady = false,
                         isEnabled = true,
                     ),
@@ -385,7 +385,6 @@ private fun ToolsScreenPreview() {
                         name = "Search the web",
                         description = "Looks up anything recent, or anything it does not know.",
                         leavesTheDevice = true,
-                        asksFirst = true,
                         isReady = true,
                         isEnabled = true,
                     ),

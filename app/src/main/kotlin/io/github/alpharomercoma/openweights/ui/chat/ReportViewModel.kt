@@ -21,9 +21,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.data.ContentReportRepository
 import io.github.alpharomercoma.openweights.core.data.ReportReason
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,11 +34,6 @@ import javax.inject.Inject
 @HiltViewModel
 class ReportViewModel @Inject constructor(private val reports: ContentReportRepository) :
     ViewModel() {
-    private val _confirmation = MutableStateFlow<String?>(null)
-
-    /** Set once a report is filed, so the screen can say so and then forget. */
-    val confirmation: StateFlow<String?> = _confirmation.asStateFlow()
-
     /**
      * Files a report against something a model said.
      *
@@ -60,11 +52,6 @@ class ReportViewModel @Inject constructor(private val reports: ContentReportRepo
                 replyText = replyText,
                 note = note,
             )
-            _confirmation.value = "Reported. It stays on this device."
         }
-    }
-
-    fun dismissConfirmation() {
-        _confirmation.value = null
     }
 }

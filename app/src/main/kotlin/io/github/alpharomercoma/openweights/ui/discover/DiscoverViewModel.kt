@@ -29,7 +29,6 @@ import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
-import io.github.alpharomercoma.openweights.core.hub.HubTask
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
 import io.github.alpharomercoma.openweights.core.hub.Publishers
@@ -139,13 +138,6 @@ class DiscoverViewModel @Inject constructor(
     }
 
     fun onSortChange(sort: HubSort) = onQueryChange(_uiState.value.query.copy(sort = sort))
-
-    fun onTaskChange(task: HubTask?) = onQueryChange(_uiState.value.query.copy(task = task))
-
-    /** Picking a band turns off the device ceiling: they answer the same question. */
-    fun onParameterRangeChange(range: ParameterRange) = onQueryChange(
-        _uiState.value.query.copy(parameters = range, maxParametersBillions = null),
-    )
 
     /**
      * Narrows the search to models this phone can hold, or widens it again.
@@ -348,8 +340,6 @@ class DiscoverViewModel @Inject constructor(
             )
         }
     }
-
-    fun dismissError() = _uiState.update { it.copy(error = null) }
 
     private companion object {
         const val MAX_CONCURRENT_INSPECTIONS = 3

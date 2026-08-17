@@ -52,8 +52,15 @@ than yours.
 **Files you share.** If you give the app access to a folder, its contents are read on the
 device and are never uploaded on their own. They can leave only through the two tools above,
 and only if you approve it: once the assistant has read a file during a turn, any search or
-page fetch in that same turn asks you first, in every mode. Answering yes is you choosing to
-send it.
+page fetch in that same turn asks you first. Answering yes is you choosing to send it.
+
+**The one exception, and you have to type it.** Sending `/yolo` puts the conversation in a
+mode where nothing is put to you at all, including that. It is off unless you turn it on, it
+is named in the line under the model's name for as long as it is on, and it is gone the next
+time the app starts. In that mode, a file the assistant has read can leave with a search or a
+fetch without a prompt, and a page the assistant has read can choose the address of the next
+fetch. Nothing else changes: tools you have switched off stay off, and every call is still a
+row in the reply that names it.
 
 ## Third parties
 

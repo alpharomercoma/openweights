@@ -89,7 +89,6 @@ class ReportViewModelTest {
         assertThat(stored.reason).isEqualTo("offensive")
         assertThat(stored.replyText).isEqualTo("something it should not have said")
         assertThat(stored.note).isEqualTo("not acceptable")
-        assertThat(viewModel.confirmation.value).isNotNull()
     }
 
     @Test
@@ -100,7 +99,6 @@ class ReportViewModelTest {
             advanceUntilIdle()
 
             assertThat(database.reports().observeAll().first()).isEmpty()
-            assertThat(viewModel.confirmation.value).isNull()
         }
 
     @Test

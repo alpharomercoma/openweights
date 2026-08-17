@@ -107,7 +107,6 @@ object ListingShots {
                     "web_search",
                     "Search the web",
                     "Looks up anything recent, or anything it does not know.",
-                    asks = false,
                     enabled = true,
                     offDevice = true,
                 ),
@@ -115,9 +114,6 @@ object ListingShots {
                     "fetch_url",
                     "Open a page",
                     "Reads the text of one public page.",
-                    // The one tool that asks every time, because the address is the model's
-                    // choice rather than the user's.
-                    asks = true,
                     enabled = true,
                     offDevice = true,
                 ),
@@ -125,14 +121,12 @@ object ListingShots {
                     "run_script",
                     "Run a script",
                     "Works out sums and dates by running JavaScript. No files, no network.",
-                    asks = false,
                     enabled = true,
                 ),
                 tool(
                     "search_files",
                     "Find a file",
                     "Looks through the folder you shared.",
-                    asks = false,
                     enabled = false,
                     ready = false,
                 ),
@@ -212,12 +206,10 @@ object ListingShots {
     )
 
     /** The same row `ToolsViewModel.read` builds, from the same table of labels. */
-    @Suppress("LongParameterList")
     private fun tool(
         id: String,
         name: String,
         description: String,
-        asks: Boolean,
         enabled: Boolean,
         offDevice: Boolean = false,
         ready: Boolean = true,
@@ -226,7 +218,6 @@ object ListingShots {
         name = name,
         description = description,
         leavesTheDevice = offDevice,
-        asksFirst = asks,
         isReady = ready,
         isEnabled = enabled,
     )

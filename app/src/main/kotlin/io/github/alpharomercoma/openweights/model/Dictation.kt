@@ -161,10 +161,6 @@ class Dictation @Inject constructor(@param:ApplicationContext private val contex
         }
     }
 
-    fun dismissError() {
-        _state.value = _state.value.copy(error = null)
-    }
-
     private fun listener(token: Int, onFinal: (String) -> Unit) = object : RecognitionListener {
         override fun onPartialResults(results: Bundle?) {
             if (token != session) return

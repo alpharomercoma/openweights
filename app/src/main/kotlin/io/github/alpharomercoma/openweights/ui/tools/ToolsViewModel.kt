@@ -42,8 +42,6 @@ data class ToolSummary(
      * is the difference somebody has to decide about.
      */
     val leavesTheDevice: Boolean,
-    /** Whether it stops and asks first, however the agent mode is set. */
-    val asksFirst: Boolean,
     /** False while it has nothing to work with, which today means no folder has been shared. */
     val isReady: Boolean,
     val isEnabled: Boolean,
@@ -106,7 +104,6 @@ class ToolsViewModel @Inject constructor(
                 description = LABELS[tool.definition.name]?.second
                     ?: tool.definition.description,
                 leavesTheDevice = tool.leavesTheDevice,
-                asksFirst = tool.alwaysAsk,
                 isReady = tool.isAvailable,
                 isEnabled = switches.isEnabled(tool.definition.name),
             )

@@ -97,8 +97,11 @@ isolation, not concurrency.
 The foundation for everything in section 4. llama.cpp's chat templates already accept tool
 definitions, and models trained for tool use emit calls in their own format. Work:
 plumb tool schemas into template rendering, parse calls out of the stream, model
-`ToolCall`/`ToolResult` as message parts, render them in the transcript as inspectable
-steps, and gate execution behind permission. Built-in tools come first (device clock, math,
+`ToolCall` as a message part, render calls and their results in the transcript as
+inspectable steps, and gate execution behind permission. What a tool gave back is carried
+as a `ChatMessage` under `ChatRole.TOOL`, which is what the templates render; the separate
+`ToolResult` shape this section originally called for was written, never constructed, and
+has been removed. Built-in tools come first (device clock, math,
 file read within app storage); user-defined and MCP-style tools later.
 
 ## 6. Composer affordances: **done**

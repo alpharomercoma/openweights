@@ -209,6 +209,15 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
 
     override val leavesTheDevice: Boolean = true
 
+    /**
+     * The address comes from the model, which is what makes this the gated one.
+     *
+     * A page can name its own server here and read what arrives. It cannot do that through
+     * a search, which goes to the provider the app is configured with whatever the query
+     * says.
+     */
+    override val sendsWhereTheModelSays: Boolean = true
+
     override val definition = ToolDefinition(
         name = "fetch_url",
         description = "Fetch a public web page and return its readable text. Use it to " +

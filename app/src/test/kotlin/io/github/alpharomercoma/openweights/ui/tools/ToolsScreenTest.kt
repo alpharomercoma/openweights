@@ -71,15 +71,17 @@ class ToolsScreenTest {
     }
 
     @Test
-    fun `every tool says whether it asks before it runs`() {
+    fun `a row says nothing extra unless there is something to say`() {
         showTools()
 
-        // Only the rows that ask say anything, which is the point: fetch_url asks every
-        // time because the address is the model's choice. A line under all three saying
-        // what two of them do by default is a line nobody reads, and the one that mattered
-        // was hidden inside it. Counted rather than found, so a screen that went back to
-        // captioning every row would fail rather than pass three times over.
-        assertCount(1, "Asks before every run")
+        // This used to assert that exactly one row said "Asks before every run", on the
+        // basis that fetching a page asked every time whatever the mode. Nothing has done
+        // that since the consent gate was removed, so the caption could not appear for any
+        // registered tool and the test was only proving that its own fixture had set a flag.
+        // What survives is the rule the caption existed for: a note under a row means
+        // something, so three ordinary rows produce none. Counted, so a screen that went
+        // back to captioning every row fails rather than passes three times over.
+        assertCount(0, "Waiting for a folder")
     }
 
     @Test
@@ -139,7 +141,6 @@ class ToolsScreenTest {
                                 name = "Web search",
                                 description = "Searches the web.",
                                 leavesTheDevice = true,
-                                asksFirst = false,
                                 isReady = true,
                                 isEnabled = true,
                             ),
@@ -148,7 +149,6 @@ class ToolsScreenTest {
                                 name = "Fetch url",
                                 description = "Reads a page.",
                                 leavesTheDevice = true,
-                                asksFirst = true,
                                 isReady = true,
                                 isEnabled = true,
                             ),
@@ -157,7 +157,6 @@ class ToolsScreenTest {
                                 name = "Run script",
                                 description = "Works something out.",
                                 leavesTheDevice = false,
-                                asksFirst = false,
                                 isReady = true,
                                 isEnabled = false,
                             ),

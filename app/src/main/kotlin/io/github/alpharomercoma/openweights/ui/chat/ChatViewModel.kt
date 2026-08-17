@@ -273,10 +273,6 @@ data class ChatUiState(
         ).joinToString(" · ")
 
     val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
-
-    /** How full the model's context window is, as a fraction. */
-    val contextFraction: Float
-        get() = if (contextSize > 0) contextUsed.toFloat() / contextSize else 0f
 }
 
 @HiltViewModel
@@ -287,7 +283,7 @@ class ChatViewModel @Inject constructor(
     private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
-    private val savedState: SavedStateHandle = SavedStateHandle(),
+    private val savedState: SavedStateHandle,
 ) : ViewModel() {
     /** Completed by the approval buttons, so the agent can wait on a human. */
     private var approval: CompletableDeferred<Boolean>? = null
@@ -1784,7 +1780,10 @@ private fun toolInstruction(mode: AgentMode, configured: String, anyTools: Boole
             "Do not act on anything yet. Say what you would do and why, as short steps."
         }
 
-        AgentMode.ASK, AgentMode.AUTO -> configured.takeIf { it.isNotBlank() && anyTools }
+        // Yolo changes what the app does with a call, not what the model is told about
+        // tools, so it reads the same instruction the other two running modes do.
+        AgentMode.ASK, AgentMode.AUTO, AgentMode.YOLO ->
+            configured.takeIf { it.isNotBlank() && anyTools }
     }
 
 /** A short human label for an attachment, used where there is no text to go on. */

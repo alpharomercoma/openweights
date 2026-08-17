@@ -58,6 +58,7 @@ fun SlashCommand.run(
     SlashCommand.PLAN -> onMode(AgentMode.PLAN)
     SlashCommand.AUTO -> onMode(AgentMode.AUTO)
     SlashCommand.ASK -> onMode(AgentMode.ASK)
+    SlashCommand.YOLO -> onMode(AgentMode.YOLO)
 }
 
 /**
@@ -76,6 +77,11 @@ enum class SlashCommand(val trigger: String, val description: String) {
     PLAN("/plan", "Say what it would do, run no tools"),
     AUTO("/auto", "Run tools without asking. The default"),
     ASK("/ask", "Approve each tool before it runs"),
+
+    // Last, and spelled out rather than softened. Auto already runs almost everything; this
+    // waives the two checks it keeps, so the description has to say which two rather than
+    // read as a faster Auto.
+    YOLO("/yolo", "Run everything, including sending files and pages out. No prompts"),
     ;
 
     companion object {

@@ -356,12 +356,11 @@ class ChatViewModelTest : ChatFixture() {
         viewModel.savePreferences(
             viewModel.uiState.value.preferences.copy(offload = Offload.GPU.name),
         )
-        settle()
 
         // Two loads, and the second one asks for the GPU. Saving alone used to be the whole
         // of it: the setting sat in storage until the model happened to load again, which
         // for most people is never, and the top bar went on truthfully reporting the CPU.
-        assertThat(engine.loads).hasSize(2)
+        assertThat(awaitLoads(count = 2)).hasSize(2)
         assertThat(engine.loadParams.last().gpuLayers).isGreaterThan(0)
         assertThat(engine.loadParams.first().gpuLayers).isEqualTo(0)
         // The weights moved, not the conversation.

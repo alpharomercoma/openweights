@@ -115,7 +115,6 @@ class ReplyNotifier @Inject constructor(@param:ApplicationContext private val co
     }
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService<NotificationManager>() ?: return
         if (manager.getNotificationChannel(CHANNEL) != null) return
         manager.createNotificationChannel(

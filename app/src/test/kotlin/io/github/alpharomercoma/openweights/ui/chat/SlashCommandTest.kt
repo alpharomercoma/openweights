@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import com.google.common.truth.Truth.assertThat
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import org.junit.Test
 
 class SlashCommandTest {
@@ -67,6 +68,40 @@ class SlashCommandTest {
         assertThat(SlashCommand.typed("/plan the migration")).isNull()
         assertThat(SlashCommand.typed("/tmp is full")).isNull()
         assertThat(SlashCommand.typed("what is a KV cache?")).isNull()
+    }
+
+    @Test
+    fun `every mode command sets the mode it names`() {
+        // The palette is the only way into a mode, so a command wired to the wrong one would
+        // be a mode nobody could reach and a mode nobody could leave.
+        val chosen = mutableListOf<AgentMode>()
+        val modes = listOf(
+            SlashCommand.PLAN to AgentMode.PLAN,
+            SlashCommand.AUTO to AgentMode.AUTO,
+            SlashCommand.ASK to AgentMode.ASK,
+            SlashCommand.YOLO to AgentMode.YOLO,
+        )
+
+        val nothing = {}
+        modes.forEach { (command, _) ->
+            command.run(
+                onNewChat = nothing,
+                onCompact = nothing,
+                onRegenerate = nothing,
+                onMode = { chosen += it },
+            )
+        }
+
+        assertThat(chosen).containsExactlyElementsIn(modes.map { it.second }).inOrder()
+    }
+
+    @Test
+    fun `yolo says what it waives rather than reading as a faster auto`() {
+        // The one command that removes a check has to be legible in a list where every other
+        // line is about convenience. If this ever reads like "auto but quicker", the user
+        // who taps it has not been told what they turned off.
+        assertThat(SlashCommand.YOLO.description).ignoringCase().contains("everything")
+        assertThat(SlashCommand.YOLO.description).ignoringCase().contains("files")
     }
 
     @Test

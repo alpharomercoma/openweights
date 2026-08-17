@@ -165,7 +165,7 @@ What actually leaves the device:
 | The Hugging Face access token, if the user set one | Every Hub request, as an `Authorization` header | Credentials |
 | **What the model decides to search for** | Whenever it uses `web_search`, which is on by default | App activity, and treat it as user content |
 | **A page address the model chose, and the request for it** | Whenever it uses `fetch_url`, which is on by default | App activity |
-| **Text out of a file in the shared folder** | Only if the user approves a search or fetch after `read_file` has run in the same turn | **Files and docs**, and treat it as user content |
+| **Text out of a file in the shared folder** | Only if the user approves a search or fetch after `read_file` has run in the same turn, or has typed `/yolo` | **Files and docs**, and treat it as user content |
 | Standard request metadata, including IP | Every request above | Handled by the recipient |
 
 **Files and docs is the row that came with the file tools, and it is the one to be careful
@@ -179,9 +179,17 @@ they run, in every mode, for the rest of that turn. Answering yes is the user tr
 their own file, which is a reasonable thing to let somebody do and not a reasonable thing to
 do on their behalf. `search_files` is not part of this: it reports paths and never contents.
 
+**`/yolo` waives that prompt, and the row is written to cover it.** It is a mode the user
+types, it is named on screen while it is on, and it does not survive the process, but while
+it is on a file that has been read can leave with a search or a fetch and nobody is asked.
+That is why the row says "or has typed `/yolo`" rather than describing the prompt as the only
+route: a declaration that holds only in the default mode is a declaration that is wrong for
+whoever changed the mode.
+
 Declare Files and docs anyway. The control makes the transfer deliberate; it does not make
 it impossible, and "the user had to tap" is a fact about consent rather than a reason to
-leave the row off the form.
+leave the row off the form. That argument is stronger, not weaker, once a mode exists that
+skips the tap.
 
 The two bold rows above it are the ones this document previously got wrong, and they are the ones
 that matter most. It used to say that chats and prompts never leave the device. That has

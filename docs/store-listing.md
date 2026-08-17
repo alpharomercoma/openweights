@@ -65,10 +65,11 @@ Your conversations, your models and your usage stay on the device. There is no a
 no crash reporter, and no backend of ours. Automatic backup and device transfer are switched
 off, so a new phone does not inherit your chats. Uninstalling removes everything.
 
-Two tools do reach the internet, because they have to: web search and page fetching. The
-first time either would send anything, the app asks and shows you the request, and both can
-be switched off in the Tools tab. Your Hugging Face token, if you set one, is encrypted with
-a key held in the Android Keystore and is sent only to Hugging Face.
+Two tools do reach the internet, because they have to: web search and page fetching. Both are
+listed under a heading that says they leave the device, both can be switched off, and every
+call one makes is a row in the reply that names it and what it was given. Your Hugging Face
+token, if you set one, is encrypted with a key held in the Android Keystore and is sent only
+to Hugging Face.
 
 WHAT YOU NEED
 Android 12 or newer, a 64-bit ARM device, and enough memory for the model you choose. The app
@@ -161,8 +162,9 @@ Reasoning for each row, so the declaration can be defended rather than remembere
 - **Personal info** covers the access token. Optional: public repositories work without one.
 - **Files and docs** is declared even though no file is uploaded by itself. Once the
   assistant has read a file in a turn, a search or fetch in that same turn can carry its
-  contents, and the app asks first. That the user had to tap is a fact about consent, not a
-  reason to leave the row off.
+  contents, and the app asks first unless the user has typed `/yolo`. That the user had to
+  tap is a fact about consent, not a reason to leave the row off, and the mode that skips the
+  tap is a reason to keep it on.
 - **Messages** covers the same exposure for conversation text: the assistant composes its
   search query out of the conversation, so what you typed can reach a search engine.
 
@@ -259,7 +261,7 @@ own, and they are where an app like this actually has something to declare.
 | Users interact | **No** | No accounts, no server, no messaging, no sharing. Conversations are rows in a local database and reach nobody |
 | Shares location | **No** | The app asks for no location permission and sends no location |
 | Digital purchases | **No** | No billing library, no purchases, no ads |
-| Unrestricted internet | **Yes** | `fetch_url` retrieves a public web address the model chose and shows what came back. The user does not browse, and every fetch is approved, but the content that arrives is unfiltered and that is what the question is about |
+| Unrestricted internet | **Yes** | `fetch_url` retrieves a public web address the model chose and shows what came back. The user does not browse, and a fetch asks first once anything has been read in that turn, but the content that arrives is unfiltered and that is what the question is about |
 
 ### Two separate declarations, and only one of them is user-generated content
 

@@ -101,6 +101,15 @@ class AgentRunner(
     private var readUntrustedText = false
 
     /**
+     * Whether something of the user's has reached the model during this turn.
+     *
+     * Same scope and the same reasoning as [readUntrustedText], and tracked apart from it
+     * because the two guard different things. Untrusted text is a risk about who is giving
+     * the orders; private data is a risk about what could be carried out.
+     */
+    private var readPrivateData = false
+
+    /**
      * Calls this turn has already answered, and what to say if one is asked for again.
      *
      * A small model that has just been handed a tool result frequently asks for the same
@@ -214,6 +223,7 @@ class AgentRunner(
         // Set after the run rather than before it, so a tool that failed to read anything
         // does not spend the turn's freedom on text that never arrived.
         if (tool.returnsUntrustedText) readUntrustedText = true
+        if (tool.readsPrivateData) readPrivateData = true
         // Pointed at rather than repeated. The result is already in the conversation as a
         // tool message, so sending it a second time would spend the context twice over to
         // tell the model something it can see.
@@ -231,10 +241,9 @@ class AgentRunner(
     /**
      * Whether this call runs, asking the user if the mode and the tool both say to.
      *
-     * Auto is about removing pointless taps. A tool that would carry off the device text that
-     * something else wrote is not a pointless tap, and until a file has actually been read
-     * there is nothing for it to carry, so the question only ever arises on the one boundary
-     * where it means something.
+     * Auto is about removing pointless taps, and the test for pointless is whether anything
+     * about this turn has changed what the call could do. Nothing has read anything yet, so
+     * the first call of a turn never asks whatever it is.
      */
     private suspend fun allowed(
         tool: Tool,
@@ -257,12 +266,31 @@ class AgentRunner(
         // leave the device sit under a heading saying so, and the screen is one tap from
         // the drawer.
         //
-        // What survives is the one combination neither of those covered: a model that has
-        // just read somebody else's text and now wants to send something out. That is not a
-        // matter of taste, it is the shape of an exfiltration, and it still asks whatever
-        // the mode says.
-        val carriesSomebodyElsesText = readUntrustedText && tool.leavesTheDevice
-        val autoAllows = mode == AgentMode.AUTO && !carriesSomebodyElsesText
+        // What survives is two shapes of exfiltration, and neither is a matter of taste.
+        //
+        // The first is a page choosing where the next call goes: read something, be told
+        // "now fetch https://example.test/?d=...", and the attacker reads their own server.
+        // That needs the destination to be the model's to pick, which is `fetch_url` and
+        // nothing else. It used to be written as "anything that leaves the device", and that
+        // swept up `web_search`, whose destination is the provider this app is configured
+        // with however the query reads. The cost of the wider rule was paid every turn: two
+        // searches is an ordinary way to answer one question, and the second one stopped and
+        // asked. A prompt that appears in the normal case is a prompt that gets tapped
+        // through, which leaves the app slower and no safer.
+        //
+        // The second is the user's own text going out, and there the destination does not
+        // matter: a file read from the shared folder can be carried by a search as easily as
+        // by a fetch. So that one is still gated on anything leaving the device at all.
+        //
+        // Yolo is those two waived, and nothing else: it is the user saying they know what
+        // the checks are for and would rather have the seconds. It has to be typed, it is
+        // named in the runtime line while it is on, and it is gone when the process is.
+        if (mode == AgentMode.YOLO) return true
+        val couldBeToldWhereToGo = readUntrustedText && tool.sendsWhereTheModelSays
+        val couldCarryPrivateData = readPrivateData && tool.leavesTheDevice
+        val autoAllows = mode == AgentMode.AUTO &&
+            !couldBeToldWhereToGo &&
+            !couldCarryPrivateData
         return autoAllows || !tool.needsApproval || approve(call)
     }
 

@@ -208,6 +208,23 @@ abstract class ChatFixture {
     }
 
     /**
+     * Waits for the engine to have been asked to load [count] times.
+     *
+     * For the same reason as [awaitMessages], and one step further removed: a reload driven
+     * by a setting is decided only after the setting has been written to DataStore, which
+     * runs on a real dispatcher. Asserting straight after a fixed number of drains passed
+     * alone and failed inside the full suite, which is the least useful way for a test to
+     * fail.
+     */
+    protected suspend fun TestScope.awaitLoads(count: Int): List<String> {
+        repeat(AWAIT_STEPS) {
+            if (engine.loads.size >= count) return engine.loads
+            settle(steps = 2)
+        }
+        return engine.loads
+    }
+
+    /**
      * Runs the view model's work until the state stops changing.
      *
      * advanceUntilIdle alone is not enough here. The view model reads preferences from

@@ -151,12 +151,13 @@ class FitEstimator @Inject constructor() {
         // is opening past what the publisher validated, which is the thing this was supposed
         // to stop rather than cause.
         //
-        // So the header stays the hard bound, and the automatic window stays well inside it.
-        // [SAFE_CONTEXT] is chosen from what the app needs rather than from a guess about
-        // other people's validation: it is four times the point at which conversations are
-        // folded, which leaves room for a long document on top of a folded conversation and
-        // is inside every trained length either of those cards claims. Anyone who wants the
-        // rest can move the slider, which still runs to what the header allows.
+        // So the header stays the hard bound and the automatic window stays inside it, at
+        // [SAFE_CONTEXT]. The argument for that number is that the cap can only ever bite on
+        // a model whose header claims more than it: anything trained to 2,048 or 4,096 writes
+        // that and the minimum takes it, cap or no cap. What is left is models claiming more
+        // than 32,768, and those are recent ones whose cards state at least 32,768, both of
+        // the two checked here included. Anyone who wants the rest can move the slider, which
+        // still runs to what the header allows.
         val declared = metadata.trainingContextLength
             .takeIf { it > 0 }
             ?.coerceAtMost(MAX_PLAUSIBLE_CONTEXT)
@@ -277,12 +278,20 @@ class FitEstimator @Inject constructor() {
         /**
          * The widest window to open without being told to.
          *
-         * Four times `CompactionPolicy.DEFAULT_CEILING_TOKENS`, so a folded conversation and
-         * a long document fit together with room left, and comfortably inside the 32,768 that
-         * both recommended models' cards claim as their real trained length. Not a limit: the
-         * slider goes to whatever the header allows.
+         * A safety bound rather than a claim about competence, and the difference matters.
+         * It says this much can be addressed and held; it does not say the model is any good
+         * that far out, because nothing machine-readable says that and this number cannot
+         * invent it.
+         *
+         * 32,768 because a cap only bites on a model claiming more than it. Anything trained
+         * to 2,048 or 4,096 says so in its header and the minimum takes it. What is left is
+         * the recent models claiming six figures, and their cards, where they say anything,
+         * say 32,768: LFM2.5 1.2B Instruct and Qwen3 1.7B both do, against headers of 128,000
+         * and 40,960. Memory is bounded before this and lands far below it on a small phone,
+         * so raising it from 16,384 changes nothing where memory is tight and costs about
+         * fifty megabytes where it is not.
          */
-        const val SAFE_CONTEXT = 16_384
+        const val SAFE_CONTEXT = 32_768
     }
 }
 

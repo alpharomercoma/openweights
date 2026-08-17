@@ -167,8 +167,8 @@ class FitEstimatorTest {
         // validated, so the automatic window stays well inside it whatever the file claims.
         val window = estimator.defaultContextLength(phone, hybrid, fileSizeBytes = 1670 * MIB)
 
-        assertThat(window).isAtMost(16_384)
-        assertThat(window).isAtLeast(8_192)
+        assertThat(window).isAtMost(32_768)
+        assertThat(window).isAtLeast(16_384)
     }
 
     @Test

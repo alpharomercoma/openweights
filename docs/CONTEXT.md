@@ -799,16 +799,44 @@ large.
 | LFM2.5 1.2B Instruct | 128,000 | **32,768** |
 | Qwen3 1.7B | 40,960 | **32,768** |
 
-Both were read off the real files. The honest figure is prose on a web page and there is no
-key for it, so opening at the header opens past what the publisher validated, which is exactly
-the failure the automatic window was introduced to stop rather than to cause. Two changes
-follow. The parser now prefers `<arch>.rope.scaling.original_context_length` where a file
-states it, which is the one machine-readable correction that exists and is the pre-extension
-length for anything whose window was stretched. And the automatic window is capped at
-`SAFE_CONTEXT = 16384`, four times the fold ceiling, which leaves room for a long document on
-top of a folded conversation and sits inside the 32,768 both of those cards claim. The header
-remains the hard bound and the slider still runs to it. On the device the same model now opens
-at `ctx=16384` rather than `ctx=128000`.
+Both were read off the real files. Everything else a program can read is worse:
+
+| source | LFM2.5 1.2B Instruct | Qwen3 1.7B |
+| --- | ---: | ---: |
+| GGUF `<arch>.context_length` | 128,000 | 40,960 |
+| `config.json` `max_position_embeddings` | 128,000 | 40,960 |
+| `tokenizer_config.json` `model_max_length` | 1e30 sentinel | 131,072 |
+| `config.json` `rope_scaling` | null | null |
+| **the model card, in prose** | **32,768** | **32,768** |
+
+Four machine-readable numbers for Qwen3 and not one of them is what its own card says.
+`model_max_length` is a tokenizer truncation default, which is why one model writes "do not
+truncate" and the other writes its extended figure. `rope_scaling` is silent exactly where it
+would help, because "we did not extend" and "we did not say" look the same. Llama 3.1 8B, the
+model this correction was written for, was trained at 8k and stretched to 128k and its GGUF
+still writes only `context_length = 131072` with no `rope.scaling.original_context_length` at
+all, so the parser change below is correct and very nearly inert.
+
+**There is no fifth field, and a prose parser is not the answer.** Both reviewers rejected it
+independently and for the same two reasons. A card is unstructured, so a downward-only parse
+throttles a capable model the first time a benchmark table mentions a smaller number, and it
+fails silently rather than loudly. And a sideloaded GGUF has no card at all, which an app whose
+whole claim is that it runs any file cannot treat as an edge case.
+
+So: the parser prefers `<arch>.rope.scaling.original_context_length` where a file states it,
+since that is free and right when present, and the automatic window is capped at
+`SAFE_CONTEXT = 32768`. The argument for that number is that a cap can only bite on a model
+claiming more than it. Anything trained to 2,048 or 4,096 writes that in its header and the
+minimum takes it. What is left is the recent models claiming six figures, whose cards say
+32,768 where they say anything. Memory is bounded before the cap and lands near 5,900 tokens
+on a 4 GB phone, so the cap never binds where memory is tight and costs about fifty megabytes
+where it is not. The header stays the hard bound and the slider still runs to it.
+
+**The number is a safety bound and not a claim about competence**, and the sampler sheet used
+to blur exactly that: it said the automatic window was "as much as the model was trained for",
+which is the one thing it is not. Serving degraded output under a label implying the model is
+good that far out is worse than picking the cap wrong, because nothing about it is visible to
+the person reading the answer.
 
 **Two things this does not answer.** Whether a/b transfers between phones: both reviewers said
 approximately and neither said exactly, because weight streaming is bandwidth-bound while

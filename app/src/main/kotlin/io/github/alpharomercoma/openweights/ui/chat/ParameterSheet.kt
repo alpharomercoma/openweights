@@ -144,9 +144,14 @@ fun ParameterSheet(
             val isAutomatic = draft.contextLength == ModelPreferences.AUTOMATIC
             Setting(
                 label = "Context length",
-                explanation = "How much conversation it keeps in mind. Left alone, this is " +
-                    "as much as the model was trained for and this phone can hold. Applies " +
-                    "at the next load.",
+                // Careful with this sentence. It used to say "as much as the model was
+                // trained for", which is the one thing the number is not: a file states how
+                // far it can address, not how far it was trained, and the two differ by four
+                // times on models this app recommends. Saying the wider thing would be the
+                // app vouching for output it has no way to check.
+                explanation = "How much conversation it keeps in mind. Left alone, as much " +
+                    "as this phone can hold. Models are often poorer near the top of their " +
+                    "range than the file admits. Applies at the next load.",
                 // The loaded window when it is being chosen for you, because a slider reading
                 // zero is not a setting anybody can act on, and the number that matters is
                 // the one the model is actually running with.

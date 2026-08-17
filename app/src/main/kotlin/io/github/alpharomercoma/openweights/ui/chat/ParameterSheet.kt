@@ -89,6 +89,8 @@ fun ParameterSheet(
     hasGpu: Boolean,
     /** Where the weights of the model currently loaded actually are, largest buffer first. */
     offloadBuffers: List<Pair<String, Int>> = emptyList(),
+    /** The window the model is actually running with, shown while the setting is automatic. */
+    loadedContext: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH,
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
@@ -139,16 +141,31 @@ fun ParameterSheet(
                 )
             }
 
+            val isAutomatic = draft.contextLength == ModelPreferences.AUTOMATIC
             Setting(
                 label = "Context length",
-                explanation = "How much conversation it keeps in mind. Applies at the next " +
-                    "load.",
-                value = "${draft.contextLength} tokens",
+                explanation = "How much conversation it keeps in mind. Left alone, this is " +
+                    "as much as the model was trained for and this phone can hold. Applies " +
+                    "at the next load.",
+                // The loaded window when it is being chosen for you, because a slider reading
+                // zero is not a setting anybody can act on, and the number that matters is
+                // the one the model is actually running with.
+                value = if (isAutomatic) {
+                    "$loadedContext tokens, automatic"
+                } else {
+                    "${draft.contextLength} tokens"
+                },
+                footnote = "Move the slider to fix it, or reset to go back to automatic"
+                    .takeIf { isAutomatic },
             ) {
                 StepSlider(
-                    value = draft.contextLength.toFloat(),
+                    value = (draft.contextLength.takeIf { it > 0 } ?: loadedContext).toFloat(),
                     onValueChange = { draft = draft.copy(contextLength = it.roundToInt()) },
-                    valueRange = CONTEXT_RANGE,
+                    // Up to what this model is actually running with rather than a constant.
+                    // The constant was 32768, and automatic now opens LFM2.5 at 128000, so the
+                    // sheet read "128000 tokens" beside a thumb pinned at the end of a shorter
+                    // scale: one touch dropped the window by three quarters with no drag.
+                    valueRange = contextRange(loadedContext),
                     steps = ModelLoadParams.CONTEXT_STEPS,
                 )
             }
@@ -449,5 +466,15 @@ private fun ParameterSheetPreview() {
 }
 
 /** The context lengths a user may pick, as the slider wants them. */
-private val CONTEXT_RANGE =
-    ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..ModelLoadParams.MAX_CONTEXT_LENGTH.toFloat()
+
+/**
+ * The widths the slider offers, which end where this model actually runs.
+ *
+ * A constant ended at 32768, and automatic opens LFM2.5 at 128000, so the sheet read
+ * "128000 tokens" beside a thumb pinned at the end of a shorter scale and one touch dropped
+ * the window by three quarters with no drag.
+ */
+private fun contextRange(loadedContext: Int): ClosedFloatingPointRange<Float> {
+    val top = maxOf(loadedContext, ModelLoadParams.MAX_CONTEXT_LENGTH)
+    return ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..top.toFloat()
+}

@@ -111,6 +111,73 @@ class FitEstimator @Inject constructor() {
     }
 
     /**
+     * The window to open a model with when nobody has chosen one.
+     *
+     * The app shipped 4096 for every model on every phone, which is three separate mistakes
+     * at once. It is far below what a modern small model was trained for, so a conversation
+     * folds long before it had to. It takes no account of the device, so a phone with twelve
+     * gigabytes gets what a phone with four gets. And it is not bounded above by the model
+     * either: a model trained to 2048 was being asked for 4096, and llama.cpp allows that,
+     * so past its training length the answers quietly degrade.
+     *
+     * So: as much as the model was trained for, as much as this phone can hold, whichever is
+     * smaller. Both halves matter. Measured on an MT6991 with LFM2.5 2.6B, every width from
+     * 4k to 128k loaded, decode stayed between 15.7 and 16.5 tokens a second across the whole
+     * range, and load time moved by two and a half seconds over a thirty-two-fold increase.
+     * A wide window that nobody has filled costs almost nothing, because the cache is
+     * allocated lazily and only the pages a conversation reaches are ever resident.
+     *
+     * What stops it simply being the trained maximum is the phone rather than the model. A
+     * hybrid like LFM2.5 keeps a cache for eight of its thirty layers, which is 16 KB a
+     * token; a transformer of half the size with attention everywhere is seven times that,
+     * and its trained window would ask for more memory than the device has. [KV_FRACTION] is
+     * what keeps the difference from becoming a promise the phone cannot keep, and it is a
+     * share of usable memory rather than a fixed number of tokens because the thing that
+     * varies between two phones is the memory, not the arithmetic.
+     */
+    fun defaultContextLength(
+        device: DeviceProfile,
+        metadata: GgufMetadata,
+        fileSizeBytes: Long,
+        projectorSizeBytes: Long = 0,
+    ): Int {
+        // Bounded above as well as below. A header is a claim by whoever converted the file,
+        // and nothing else checks it: a small model claiming two million tokens on a phone
+        // with room for the arithmetic would have had that honoured.
+        val trained = metadata.trainingContextLength
+            .takeIf { it > 0 }
+            ?.coerceAtMost(MAX_PLAUSIBLE_CONTEXT)
+            ?: FALLBACK_CONTEXT
+        val bytesPerToken = metadata.kvCacheBytes(contextLength = 1)
+        // A header that says nothing about its cache shape can still be bounded by what the
+        // model was trained for. Returning the fallback outright, which is what this did,
+        // ignored the device entirely on exactly the files least worth trusting.
+        if (bytesPerToken <= 0) return minOf(trained, FALLBACK_CONTEXT)
+
+        // Two ceilings, and the smaller wins. One is the share of the phone a cache may
+        // claim; the other is what is actually left once the weights are in memory, which on
+        // a device that barely fits this model is the tighter of the two.
+        val share = ((device.usableMemoryBytes * KV_FRACTION).toLong() / bytesPerToken).toInt()
+        val remaining = maxContextLength(device, metadata, fileSizeBytes + projectorSizeBytes)
+
+        // Rounded down to a whole number of blocks, because a window is a buffer and an odd
+        // size reads as a sum rather than a size.
+        val chosen = minOf(trained, share, remaining) / CONTEXT_BLOCK * CONTEXT_BLOCK
+
+        // The floor is a floor only where there is room for it, and never above what the
+        // model was trained for. Written as coerceIn, it threw: coerceIn requires its minimum
+        // to be at or below its maximum, and a model trained to 1024 makes 2048..1024, which
+        // is an IllegalArgumentException out of a load rather than a small window. And a
+        // device that cannot hold the weights at all must not be handed a floor it also
+        // cannot hold, on top of a model that was never going to fit.
+        // The floor stands even where nothing fits. A model whose weights alone exhaust the
+        // device is not going to load at any width, and handing back zero would make the
+        // engine choose its own default instead of failing with something the user can read.
+        val floor = minOf(MIN_CONTEXT, trained)
+        return maxOf(chosen, floor).coerceAtMost(trained)
+    }
+
+    /**
      * The longest context this device can hold for this model, capped by what the model
      * was trained for: offering more than that produces gibberish, not a longer memory.
      */
@@ -163,6 +230,35 @@ class FitEstimator @Inject constructor() {
 
         /** Above this fraction of usable memory, other apps start getting evicted. */
         const val TIGHT_FRACTION = 0.8
+
+        /**
+         * The share of usable memory a KV cache may claim by default.
+         *
+         * A third, so the weights, the cache and everything else each have room and the
+         * process stays a size the platform will let sit in the background. Chosen rather
+         * than measured: what was measured is that a wide window costs nothing until it is
+         * filled, which says the ceiling should be about what happens when it *is* filled,
+         * and that is when the app is killed rather than when it is slow.
+         */
+        const val KV_FRACTION = 0.33
+
+        /** What to open with when the header says nothing useful: what the app always did. */
+        const val FALLBACK_CONTEXT = 4_096
+
+        /** Short enough to be cheap, long enough to answer a question in. */
+        const val MIN_CONTEXT = 2_048
+
+        /** Windows are rounded down to this, so the number reads as a size rather than a sum. */
+        const val CONTEXT_BLOCK = 1_024
+
+        /**
+         * Past this, a header is claiming something no phone will reach in a conversation.
+         *
+         * A million tokens at the measured 27 tokens a second of prefill is ten hours, so the
+         * number stops describing anything a user can do and starts describing a file's own
+         * opinion of itself.
+         */
+        const val MAX_PLAUSIBLE_CONTEXT = 262_144
     }
 }
 

@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
+import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
@@ -101,6 +102,7 @@ abstract class ChatFixture {
                 modelStore = ModelStore(context),
                 preferences = ModelPreferencesRepository(context),
                 thermal = ThermalPolicy(context, DeviceProfiler(context)),
+                windows = ContextWindows(FitEstimator(), DeviceProfiler(context)),
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             staging = Staging(AttachmentStore(context)),

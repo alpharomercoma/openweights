@@ -43,6 +43,8 @@ class ModelRuntime @Inject constructor(
     private val modelStore: ModelStore,
     private val preferences: ModelPreferencesRepository,
     private val thermal: ThermalPolicy,
+    /** How wide a window to open a model with, when nobody has chosen one. */
+    val windows: ContextWindows,
 ) {
     val loadedModel: LoadedModelInfo? get() = engine.loadedModel
 

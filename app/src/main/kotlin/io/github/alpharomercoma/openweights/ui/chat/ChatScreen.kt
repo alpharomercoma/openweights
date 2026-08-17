@@ -652,6 +652,7 @@ private fun ChatSheets(
             supportsThinking = state.supportsThinking,
             hasGpu = state.hasGpu,
             offloadBuffers = state.offloadBuffers,
+            loadedContext = state.contextSize,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()

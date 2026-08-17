@@ -40,6 +40,24 @@ data class Compaction(val summary: String, val foldedThroughIndex: Int, val fold
 class CompactionPolicy(
     private val triggerFraction: Float = DEFAULT_TRIGGER_FRACTION,
     private val keepRecentEntries: Int = DEFAULT_KEEP_RECENT,
+    /**
+     * The most conversation to carry unfolded, however wide the window is.
+     *
+     * A fraction on its own was right while every model opened at 4096 and is wrong now that
+     * the window is worked out per model: three quarters of 128,000 is 96,000 tokens, and a
+     * conversation is never folded before then.
+     *
+     * The reason that matters is not memory. Measured on an MT6991 with LFM2.5 2.6B, decode
+     * falls from 16.7 tokens a second on an empty context to 14.3 at about 1,300 tokens, 12.4
+     * at 5,100 and 9.6 at 10,300. Attention reads the whole cache for every token produced,
+     * so a conversation nobody folds gets slower with every turn, and the window is what
+     * decides when folding is allowed to help. A wide window is still worth having, because
+     * it is what lets a long document be pasted at all; what it must not do is defer folding
+     * until the thing is unusable.
+     *
+     * Eight thousand is where the measured loss is about a quarter and still climbing.
+     */
+    private val ceilingTokens: Int = DEFAULT_CEILING_TOKENS,
 ) {
     init {
         require(triggerFraction in MIN_TRIGGER..MAX_TRIGGER) {
@@ -53,6 +71,9 @@ class CompactionPolicy(
         if (contextSize <= 0) return false
         // Folding needs something to fold beyond the turns that must stay verbatim.
         if (entryCount <= keepRecentEntries + MIN_FOLDABLE_ENTRIES) return false
+        // Either bound is reason enough. The fraction is about running out of room; the
+        // ceiling is about the answer arriving at half the speed it used to.
+        if (contextUsed >= ceilingTokens) return true
         return contextUsed.toFloat() / contextSize >= triggerFraction
     }
 
@@ -90,6 +111,9 @@ class CompactionPolicy(
          * early enough to leave room for the summarization call itself.
          */
         const val DEFAULT_TRIGGER_FRACTION = 0.75f
+
+        /** See [CompactionPolicy.ceilingTokens]: where decode has lost about a quarter. */
+        const val DEFAULT_CEILING_TOKENS = 8_192
 
         /** Two exchanges: enough that follow-up questions still resolve their referents. */
         const val DEFAULT_KEEP_RECENT = 4

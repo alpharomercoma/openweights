@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.data
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -61,7 +62,16 @@ data class ModelPreferences(
      * uncapped. Raise the number to allow a longer reply.
      */
     val maxTokens: Int = DEFAULT_MAX_TOKENS,
-    val contextLength: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH,
+    /**
+     * How much conversation the model keeps in mind, or [AUTOMATIC] to let the app decide.
+     *
+     * Zero rather than a number, so "never chosen" and "chose 4096" are distinguishable. The
+     * app shipped 4096 for every model on every phone, which was below what a modern small
+     * model is trained for, blind to how much memory the device has, and not bounded by the
+     * model either: a model trained to 2048 was still asked for 4096. Automatic reads the
+     * file's own header and the phone's own memory. See `FitEstimator.defaultContextLength`.
+     */
+    val contextLength: Int = AUTOMATIC,
     val systemPrompt: String = "",
     /**
      * Standing instructions about the tools, kept separate from the user's own prompt.
@@ -78,6 +88,15 @@ data class ModelPreferences(
     val reasoningEffort: String = ReasoningEffort.DEFAULT.name,
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val offload: String = Offload.AUTO.name,
+    /**
+     * Which build wrote this file, so a migration can tell what it is looking at.
+     *
+     * Absent from anything written before automatic context sizing, which decodes as zero and
+     * is exactly the signal the migration needs. Without it, reading a stored 4096 as "never
+     * chosen" had no way to stop being true: somebody who dragged the slider to 4096 on
+     * purpose had it quietly turned back to automatic on every load, forever.
+     */
+    val version: Int = 0,
 ) {
     fun toSamplerParams() = SamplerParams(
         thinking = thinking,
@@ -90,8 +109,14 @@ data class ModelPreferences(
         maxTokens = if (maxTokens > 0) maxTokens else DEFAULT_MAX_TOKENS,
     )
 
-    fun toLoadParams(gpuLayers: Int = 0) =
-        ModelLoadParams(contextLength = contextLength, gpuLayers = gpuLayers)
+    /**
+     * @param automatic what to use when the user has not chosen a window themselves.
+     */
+    fun toLoadParams(gpuLayers: Int = 0, automatic: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH) =
+        ModelLoadParams(
+            contextLength = if (contextLength == AUTOMATIC) automatic else contextLength,
+            gpuLayers = gpuLayers,
+        )
 
     companion object {
         /**
@@ -103,6 +128,9 @@ data class ModelPreferences(
          * seconds, and it had still not finished making its point.
          */
         const val DEFAULT_MAX_TOKENS: Int = 1024
+
+        /** [contextLength] meaning "work it out from the model and the phone". */
+        const val AUTOMATIC: Int = 0
 
         /**
          * When to look something up.
@@ -148,6 +176,32 @@ data class ModelPreferences(
 }
 
 /**
+ * Reads a stored 4096 as "never chosen".
+ *
+ * Every install that predates automatic sizing has 4096 written against every model it has
+ * opened, because that was the default and settings are saved whole rather than by field.
+ * Without this, the sentinel would work only for people who had never opened the sheet, and
+ * the change would ship to nobody.
+ *
+ * What it costs is somebody who deliberately set 4096 and meant it. That is a real person
+ * and this overrules them once, which is the trade: the number they lose is the one the app
+ * would have chosen for them anyway on a phone too small for more, and the slider is still
+ * there. A migration cannot tell a choice from a default when the choice was the default.
+ */
+private fun ModelPreferences.migratedFromTheOldDefault(): ModelPreferences =
+    if (version == 0 && contextLength == OLD_DEFAULT_CONTEXT_LENGTH) {
+        copy(contextLength = ModelPreferences.AUTOMATIC, version = CURRENT)
+    } else {
+        this
+    }
+
+/** What [ModelPreferences.contextLength] defaulted to before it was worked out per model. */
+private const val OLD_DEFAULT_CONTEXT_LENGTH = 4_096
+
+/** The build that knows what every field means. Anything older reads as zero. */
+private const val CURRENT = 1
+
+/**
  * Stores per-model settings.
  *
  * Keyed by model file name, which is what the user recognises and what survives the app
@@ -167,7 +221,9 @@ class ModelPreferencesRepository @Inject constructor(
             preferences[key(modelName)]?.let { stored ->
                 // A settings file written by an older build must not stop the model
                 // loading; falling back to defaults is always safe.
-                runCatching { json.decodeFromString<ModelPreferences>(stored) }.getOrNull()
+                runCatching { json.decodeFromString<ModelPreferences>(stored) }
+                    .getOrNull()
+                    ?.migratedFromTheOldDefault()
             } ?: ModelPreferences()
         }
 
@@ -175,12 +231,25 @@ class ModelPreferencesRepository @Inject constructor(
 
     suspend fun save(modelName: String, preferences: ModelPreferences) {
         context.settingsDataStore.edit { store ->
-            store[key(modelName)] = json.encodeToString(preferences)
+            // Stamped on the way out, so what is read back is known to have been written by a
+            // build that meant every field in it, this one included.
+            store[key(modelName)] = json.encodeToString(preferences.copy(version = CURRENT))
         }
     }
 
     suspend fun reset(modelName: String) {
         context.settingsDataStore.edit { store -> store.remove(key(modelName)) }
+    }
+
+    /**
+     * Writes a settings file exactly as given, for a test that needs one an older build wrote.
+     *
+     * The migration only fires on a file with no version stamp, and [save] stamps everything
+     * it writes, so there is otherwise no way to construct the input the migration exists for.
+     */
+    @VisibleForTesting
+    suspend fun saveRaw(modelName: String, encoded: String) {
+        context.settingsDataStore.edit { store -> store[key(modelName)] = encoded }
     }
 
     private fun key(modelName: String) = stringPreferencesKey("$PREFIX$modelName")

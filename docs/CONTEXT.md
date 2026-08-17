@@ -707,6 +707,77 @@ predictable from the GGUF header either, since the two models with the closest g
 set, Gemma 3 1B at 26 layers and Qwen 2.5 1.5B at 28, are the two furthest apart on the 8 Elite.
 They have to be measured on the device that will run them, once, and kept.
 
+### 4096 was three mistakes in one number (2026-08-17)
+
+`SamplerParams.DEFAULT_CONTEXT_LENGTH = 4096` opened every model on every phone. It is far
+below what a modern small model is trained for, it takes no account of the device, and it is
+not bounded above by the model either: a model trained to 2048 was still asked for 4096, and
+llama.cpp allows that, so past the training length the answers quietly degrade.
+
+`ContextLengthBenchmark` loaded LFM2.5 2.6B Q4_K_M on the MT6991 at six widths, CPU only:
+
+| window | load | RSS | prefill | decode |
+| ---: | ---: | ---: | ---: | ---: |
+| 4,096 | 7127 ms (cold) | 2717 MiB | 25.6 t/s | 15.8 t/s |
+| 8,192 | 3720 ms | 3291 MiB | 64.7 t/s | 15.7 t/s |
+| 16,384 | 3960 ms | 3339 MiB | 65.7 t/s | 16.5 t/s |
+| 32,768 | 3985 ms | 3432 MiB | 28.6 t/s | 16.2 t/s |
+| 65,536 | 4316 ms | 3588 MiB | 31.3 t/s | 16.3 t/s |
+| 131,072 | 6365 ms | 3484 MiB | 29.7 t/s | 16.5 t/s |
+
+**Nothing refused, and decode is flat.** 15.7 to 16.5 tokens a second across a thirty-two-fold
+range of widths, so a wide window costs nothing per token. Load moves by about two and a half
+seconds over the same range. Resident memory grows by roughly 200 MiB from 8k to 128k while
+the cache reserved at 128k is about two gigabytes, which says what matters most here: **the
+cache is allocated lazily and only the pages a conversation reaches are ever resident.** A
+wide window is a promise about what the phone could hold, not a bill it pays at load.
+
+The prefill column is noise rather than signal. The prompt is ten tokens, so the rate is
+measured over almost nothing, and the 4096 row is the first load in the process.
+
+So the default is now computed: as much as the model was trained for, as much as this phone
+can hold, whichever is smaller, and never more than a third of usable memory for the cache.
+`FitEstimator.defaultContextLength` does the arithmetic and `ContextWindows` reads the local
+file's header with the same parser Discover uses over the network, so the window the app
+opens with is the one the fit card promised before the download.
+
+What bounds it is bytes per token rather than parameters, and that is why one number could
+never have worked. LFM2.5 2.6B keeps a cache for ten of thirty blocks, which is 20 KB a token.
+Qwen3 1.7B, a smaller model, has attention everywhere and 128-wide heads: 112 KB a token,
+nearly six times as much. On this phone the first gets its full 128k and the second gets about
+21k, and both are right.
+
+Verified on the device: LFM2.5 1.2B Instruct opens at `ctx=128000` where it opened at 4096,
+and the top bar says so.
+
+**A wide window that is full is a different thing from a wide window that is empty**, and the
+sweep above only measures the second. Measured separately, one load at 32k and a conversation
+grown into it:
+
+| context in use | prompt | prefill | decode |
+| ---: | ---: | ---: | ---: |
+| empty | 33 | 0.5 s | **16.7 t/s** |
+| ~1,300 | 1,309 | 20 s | **14.3 t/s** |
+| ~5,100 | 5,149 | 122 s | **12.4 t/s** |
+| ~10,300 | 10,264 | 380 s | **9.6 t/s** |
+
+**Decode loses 43% by ten thousand tokens**, because attention reads the whole cache for
+every token produced. So the cost of a long conversation is real and is paid on every token
+of every turn, and it has nothing to do with how wide the window was declared.
+
+That is what makes the window and the folding one decision rather than two. Compaction fired
+at three quarters of the window, which was right while every model opened at 4096 and folds a
+conversation at about 3,000 tokens. At an automatic 128,000 the same rule folds at 96,000,
+which this table says is far past unusable. `CompactionPolicy` now takes an absolute ceiling
+as well, `DEFAULT_CEILING_TOKENS = 8192`, and folds at whichever comes first. The window is
+still worth opening wide, because it is what lets a long document be pasted at all; what it
+must not do is defer folding until the answers arrive at half speed.
+
+Two figures corrected while checking this: the trigger is 0.75 rather than the 0.83 recorded
+earlier, and the earlier claim that a hybrid re-prefills its whole conversation every
+follow-up turn describes the code before `cached_` began counting generated tokens. On a
+straight-line conversation the prefix now matches and no rollback is attempted.
+
 ### The tool loop, proven on hardware (2026-08-14)
 
 `ToolCallingTest` had skipped since the day it was written, because the model pushed to

@@ -160,6 +160,99 @@ class FitEstimatorTest {
     }
 
     @Test
+    fun `the default window is what the model was trained for when the phone can hold it`() {
+        // Measured on an MT6991 with this exact model: every width from 4k to 128k loaded and
+        // decode stayed between 15.7 and 16.5 tokens a second across the whole range. A
+        // hybrid keeps a cache for a third of its blocks, so 128k costs about two gigabytes
+        // of address space and almost none of it is ever resident.
+        val window = estimator.defaultContextLength(phone, hybrid, fileSizeBytes = 1670 * MIB)
+
+        // Just under what it was trained for, because the share of memory a cache may claim
+        // binds a little before the training length does. Both bounds are doing their job,
+        // which is the shape to assert rather than one exact number.
+        assertThat(window).isAtLeast(100_000)
+        assertThat(window).isAtMost(128_000)
+    }
+
+    @Test
+    fun `a transformer of half the size gets a much smaller window, and that is the point`() {
+        // Attention in every block rather than a third of them. The same phone, a smaller
+        // file, and a window an order of magnitude shorter, because what bounds it is bytes
+        // per token rather than parameters. A fixed default cannot be right for both of
+        // these, which is the whole argument for computing it.
+        // Qwen3 1.7B's real shape: 28 blocks, 16 heads over 2048, 8 of them keeping a cache.
+        // That is 112 KB a token against the hybrid's 20 KB.
+        val transformer = hybrid.copy(
+            architecture = "qwen3",
+            blockCount = 28,
+            headCount = 16,
+            keyValueHeadsPerLayer = List(28) { 8 },
+            trainingContextLength = 32_768,
+        )
+
+        val window = estimator.defaultContextLength(phone, transformer, fileSizeBytes = 1100 * MIB)
+
+        assertThat(window).isLessThan(32_768)
+        assertThat(window).isAtLeast(4_096)
+    }
+
+    @Test
+    fun `a model trained short is never opened wider than it was trained`() {
+        // The bug in the other direction, and the one nobody would have noticed: the app
+        // asked for 4096 whatever the model said, llama.cpp allowed it, and past its training
+        // length the answers quietly get worse.
+        val short = hybrid.copy(trainingContextLength = 2_048)
+
+        val window = estimator.defaultContextLength(phone, short, fileSizeBytes = 500 * MIB)
+
+        assertThat(window).isEqualTo(2_048)
+    }
+
+    @Test
+    fun `a model trained shorter than the floor is opened at what it was trained for`() {
+        // coerceIn throws when its minimum is above its maximum, so a model trained to less
+        // than the floor took the load down with an IllegalArgumentException rather than
+        // opening small. Tiny models do exist and this is the one input nobody would try.
+        val tiny = hybrid.copy(trainingContextLength = 1_024)
+
+        assertThat(estimator.defaultContextLength(phone, tiny, fileSizeBytes = 100 * MIB))
+            .isEqualTo(1_024)
+    }
+
+    @Test
+    fun `a header that says nothing about training length falls back rather than guessing`() {
+        val silent = hybrid.copy(trainingContextLength = 0)
+
+        assertThat(estimator.defaultContextLength(phone, silent, fileSizeBytes = 500 * MIB))
+            .isEqualTo(4_096)
+    }
+
+    @Test
+    fun `a low-RAM phone gets a shorter window for the same model`() {
+        val small = phone.copy(totalMemoryBytes = 4L * GIB, isLowRamDevice = true)
+
+        val onSmall = estimator.defaultContextLength(small, hybrid, fileSizeBytes = 1670 * MIB)
+        val onBig = estimator.defaultContextLength(phone, hybrid, fileSizeBytes = 1670 * MIB)
+
+        assertThat(onSmall).isLessThan(onBig)
+        assertThat(onSmall).isAtLeast(2_048)
+    }
+
+    @Test
+    fun `the projector counts, because it is loaded too`() {
+        val withEyes = estimator.defaultContextLength(
+            phone,
+            hybrid,
+            fileSizeBytes = 1670 * MIB,
+            projectorSizeBytes = 600 * MIB,
+        )
+
+        assertThat(withEyes).isAtMost(
+            estimator.defaultContextLength(phone, hybrid, fileSizeBytes = 1670 * MIB),
+        )
+    }
+
+    @Test
     fun `throughput is only predicted when there is a measurement behind it`() {
         val withoutCalibration =
             estimator.estimate(phone, hybrid, fileSizeBytes = 1670 * MIB, contextLength = 4096)

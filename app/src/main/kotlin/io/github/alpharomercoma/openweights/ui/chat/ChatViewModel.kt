@@ -478,9 +478,16 @@ class ChatViewModel @Inject constructor(
         val (prompted, generated) = writer.inOrder { turnShape(modelFile.nameWithoutExtension) }
         val layers = Offload.fromName(preferences.offload)
             .layersFor(runtime.hasGpu(), prompted, generated)
-        return contextLength
-            ?.let { ModelLoadParams(contextLength = it, gpuLayers = layers) }
-            ?: preferences.toLoadParams(layers)
+        contextLength?.let { return ModelLoadParams(contextLength = it, gpuLayers = layers) }
+        // Only computed when it will be used. Reading the header is cheap but it is still a
+        // file read on the path a cold start always takes, and a user who has chosen a window
+        // has already answered the question this asks.
+        val automatic = if (preferences.contextLength == ModelPreferences.AUTOMATIC) {
+            runtime.windows.defaultFor(modelFile, runtime.projectorFor(modelFile))
+        } else {
+            ModelLoadParams.DEFAULT_CONTEXT_LENGTH
+        }
+        return preferences.toLoadParams(layers, automatic)
     }
 
     private suspend fun performLoad(

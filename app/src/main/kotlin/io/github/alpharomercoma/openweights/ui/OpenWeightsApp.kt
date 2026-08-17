@@ -152,6 +152,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             // already a flow, and a second copy would be a second thing to keep in step.
             val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
             val question by chatViewModel.asking.pending.collectAsStateWithLifecycle()
+            val chatSearch by chatViewModel.search.state.collectAsStateWithLifecycle()
 
             LaunchedEffect(Unit) {
                 // The view model outlives the composition, so returning to this tab
@@ -177,8 +178,21 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSelectModel = { model ->
                     chatViewModel.loadModel(model.file, keepConversation = true)
                 },
-                onOpenConversation = chatViewModel::openConversation,
-                onDeleteConversation = chatViewModel::deleteConversation,
+                onOpenConversation = {
+                    // The search has done its job once a chat is open, and leaving it set
+                    // meant reopening the drawer later showed a list still filtered by a
+                    // word the user had stopped thinking about.
+                    chatViewModel.search.clear()
+                    chatViewModel.openConversation(it)
+                },
+                chatSearch = chatSearch,
+                onSearchConversations = chatViewModel.search::search,
+                onDeleteConversation = {
+                    chatViewModel.deleteConversation(it)
+                    // Results are a list rather than a live query, so the row it just deleted
+                    // would otherwise stay on screen, tappable, opening nothing.
+                    chatViewModel.search.forget(it)
+                },
                 onSavePreferences = chatViewModel::savePreferences,
                 onResetPreferences = chatViewModel::resetPreferences,
                 onAttach = chatViewModel::attach,

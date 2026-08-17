@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.discover
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -98,6 +99,13 @@ fun DiscoverScreen(
     modifier: Modifier = Modifier,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
+
+    // The system back gesture, which the toolbar arrow has always handled correctly and this
+    // did not. Opening a model replaces the list with its files rather than pushing a route,
+    // so back went to the NavHost, popped Discover entirely, and left somebody who was
+    // choosing a quantisation looking at the conversation. Here it means the same thing the
+    // arrow means: close the model first, and only leave once the list is showing.
+    BackHandler(enabled = state.detail != null) { onCloseModel() }
 
     Scaffold(
         modifier = modifier,

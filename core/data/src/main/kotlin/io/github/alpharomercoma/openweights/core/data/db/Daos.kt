@@ -42,6 +42,44 @@ interface ConversationDao {
 
     @Query("SELECT COUNT(*) FROM conversations")
     fun observeCount(): Flow<Int>
+
+    /**
+     * Conversations whose title or whose text anywhere matches [term].
+     *
+     * `messages.text` is raw model output with its reasoning and tool markup still in it,
+     * which is deliberate here: a search that could not find a word because the model
+     * happened to say it while thinking would be a search the user cannot trust. What is
+     * shown is cleaned before it reaches the screen; what is matched is everything.
+     *
+     * The inner select is wrapped because SQLite cannot filter on a result alias, and the
+     * snippet has to be computed once rather than twice: it is the same subquery either way
+     * and this shape makes it obvious that the row is only kept when something matched.
+     *
+     * LIKE rather than FTS. FTS would need a second table, a trigger to keep it in step and
+     * a migration to create it, and it earns that on corpora far larger than a phone's chat
+     * history. This scans a few thousand short rows, which is faster than the keystroke that
+     * asked for it.
+     *
+     * `ESCAPE` because LIKE reads `%` and `_` as wildcards, so a search for "100%" would
+     * otherwise match every conversation and a search for "a_b" would match "aXb". The
+     * caller escapes them; this is the half that makes the escape character mean anything.
+     */
+    @Query(
+        """
+        SELECT * FROM (
+            SELECT c.id AS id, c.title AS title, c.modelName AS modelName,
+                   c.updatedAt AS updatedAt,
+                   (SELECT m.text FROM messages m
+                     WHERE m.conversationId = c.id
+                       AND m.text LIKE '%' || :term || '%' ESCAPE '\'
+                     ORDER BY m.id LIMIT 1) AS snippet
+            FROM conversations c
+        )
+        WHERE title LIKE '%' || :term || '%' ESCAPE '\' OR snippet IS NOT NULL
+        ORDER BY updatedAt DESC
+        """,
+    )
+    suspend fun search(term: String): List<ConversationMatch>
 }
 
 @Dao

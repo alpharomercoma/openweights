@@ -352,18 +352,29 @@ class HuggingFaceClient @Inject constructor(
  * thing answers, and treats routing as the second requirement rather than the first. That
  * axis is measured here on this hardware rather than taken from a card:
  *
- * - **LFM2 1.2B** and **LFM2.5 2.6B**, Liquid's own conversions. The 2.6B is the model
- *   this project has spent the most hours with, and the reason it leads is the behaviour
- *   the six routing cases do not score: asked about the World Cup it reasoned that "my
- *   knowledge might not be current", searched, and read a page, where the models that beat
- *   it on the benchmark answered from memory. It is the only thing measured here that
- *   notices an unknown. What it costs is time, up to seven and a half minutes on a turn
- *   that searches twice, which is why the 1.2B is beside it.
- * - **Qwen3 0.6B** answers coherently with visible reasoning at about 30 tokens a second
- *   in 610 MB, verified on device: "explain a KV cache", "17 times 23", both correct and
- *   both fast. It is also the one that invented a biography for a private individual
- *   rather than searching, so it is here as the fast generalist and not as the default.
- * - **Qwen3 1.7B** is the same family one size up, for a phone with room for it.
+ * - **LFM2.5 1.2B Instruct** leads, as the smallest thing here that still behaves like the
+ *   2.6B rather than like a 0.6B. Same family, same conversion by the same publisher, and
+ *   the size a phone loads without thinking about it.
+ * - **LFM2.5 2.6B**, and the model this project has spent the most hours with. The reason it
+ *   is here is the behaviour the six routing cases do not score:
+ *   asked about the World Cup it reasoned that "my knowledge might not be current",
+ *   searched, and read a page, where the models that beat it on the benchmark answered from
+ *   memory. It is the only thing measured here that notices an unknown. What it costs is
+ *   time, up to seven and a half minutes on a turn that searches twice.
+ * - **LFM2.5 VL 3B** is the same family again with eyes, and the only entry here that can be
+ *   handed a photograph. It ships its own `mmproj` projector, which the app pairs with the
+ *   weights automatically, and it is the one model on the list that demonstrates the part of
+ *   this app a text model cannot reach.
+ * - **Qwen3 1.7B** is the generalist from another family, so the list is not one publisher's
+ *   opinion of itself.
+ *
+ * **Two were dropped after use rather than after measurement, which is the point of a list
+ * like this.** LFM2 1.2B and Qwen3 0.6B were here as the fast options and both are worse at
+ * the thing the list is sorted by. The 0.6B invented a biography for a private individual
+ * rather than searching, which is the exact failure the shortlist exists to keep off a first
+ * run, and being quick about it is not a mitigation. A recommendation is a claim that this
+ * is the one to start with, and a model that answers confidently and wrongly costs a new
+ * user more than a slow one does.
  *
  * What is still missing is a routing number for these two. Qwen 2.5 1.5B, the previous
  * generation, scores 4 of 6 with two under-calls, which is the failure a user reports as
@@ -372,9 +383,9 @@ class HuggingFaceClient @Inject constructor(
  * that is better than the reverse, which is what shipping Hammer would have been.
  */
 val RECOMMENDED = listOf(
-    "LiquidAI/LFM2-1.2B-GGUF",
+    "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
     "LiquidAI/LFM2.5-2.6B-GGUF",
-    "Qwen/Qwen3-0.6B-GGUF",
+    "LiquidAI/LFM2.5-VL-3B-GGUF",
     "unsloth/Qwen3-1.7B-GGUF",
 )
 

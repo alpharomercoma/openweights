@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
+import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -52,6 +53,24 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
      * reach the tables without going past the ordering this object exists to provide.
      */
     open fun conversations(): Flow<List<ConversationEntity>> = chats.observeConversations()
+
+    /**
+     * Conversations matching what was typed, which needs no queue for the same reason the
+     * list does not: it is a read, and the worst a search running beside a write can be is
+     * one message out of date.
+     *
+     * Deliberately not behind [inOrder]. A search runs on keystrokes and a turn writes a row
+     * at the end of every reply, so queueing them together would make the drawer wait on the
+     * disk exactly while the model is streaming, which is the one moment the app must not
+     * stutter.
+     *
+     * That the read also does not block on the write is SQLite's doing rather than ours, and
+     * only in write-ahead logging. Room picks the journal mode automatically and drops WAL on
+     * a device the platform calls low-RAM, where a write does take the file and this read
+     * would wait behind it. Bounded rather than fixed: what it waits on is one insert per
+     * reply, not one per token, and the alternative costs those phones the memory WAL wants.
+     */
+    open suspend fun search(term: String): List<ConversationMatch> = chats.searchConversations(term)
 
     /** Runs [work] with the queue held, for the reads and writes with no method here. */
     open suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T = mutex.withLock {

@@ -18,8 +18,11 @@ package io.github.alpharomercoma.openweights.core.data
 
 import androidx.room.withTransaction
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
+import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.db.CompactionEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
+import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import kotlinx.coroutines.flow.Flow
@@ -190,13 +193,98 @@ class ChatRepository @Inject constructor(
         }
     }
 
+    /**
+     * Conversations matching [term], newest first, each with the text that matched.
+     *
+     * Blank returns nothing rather than everything: a search box with nothing typed in it is
+     * not a request for the whole history, and the drawer already shows that.
+     *
+     * The snippet is trimmed to a readable length here rather than in the query, because a
+     * message can be thousands of characters and only the query knows nothing about which
+     * part of it matched. Around the match is what a person is looking for.
+     */
+    suspend fun searchConversations(term: String): List<ConversationMatch> {
+        val needle = term.trim()
+        if (needle.isEmpty()) return emptyList()
+        // Escaped for the query, plain for the snippet: one is a LIKE pattern and the other
+        // is the text the user typed, and conflating them is how "100%" came to match every
+        // conversation while highlighting nothing in any of them.
+        return database.conversations().search(needle.escapedForLike()).map { row ->
+            row.copy(snippet = row.snippet?.let { snippetAround(it, needle) })
+        }
+    }
+
     private suspend fun touch(conversationId: Long) {
         val conversation = database.conversations().byId(conversationId) ?: return
         database.conversations().upsert(conversation.copy(updatedAt = clock.nowMillis()))
     }
 }
 
+/**
+ * The term as a LIKE pattern that matches itself and nothing else.
+ *
+ * The backslash first, or escaping the wildcards would then escape their escapes.
+ */
+private fun String.escapedForLike(): String = this
+    .replace("\\", "\\\\")
+    .replace("%", "\\%")
+    .replace("_", "\\_")
+
+/**
+ * The part of a matching message worth showing, around the word that matched.
+ *
+ * Two passes, because the answer alone is not always where the match was. First the answer,
+ * which is what a preview should be; then everything with its markup taken out, for a word
+ * the model only said while thinking, which is still a word the user watched go past and
+ * expects to be able to find.
+ *
+ * What never happens is showing the tags. The first version fell back to the raw row, so a
+ * match inside a reasoning block put `<think>` on screen, and it ran `parseAssistantReply`
+ * over user messages too, which mangled anyone who had typed the word `<think>` themselves.
+ */
+private fun snippetAround(raw: String, needle: String): String? {
+    val answer = parseAssistantReply(raw).answer.withoutToolMarkup().trim()
+    val everything = raw.withoutReasoningTags().withoutToolMarkup().trim()
+    val source = when {
+        answer.contains(needle, ignoreCase = true) -> answer
+        everything.contains(needle, ignoreCase = true) -> everything
+        else -> everything
+    }
+    // Nothing rather than the raw row. A message that is entirely a tool call leaves both
+    // cleaned forms empty, and falling back to the raw text put the call's own arguments in
+    // the drawer: a file path out of somebody's shared folder, on a list, for a word they
+    // searched. The row still appears under its title, which is the honest amount to show.
+    if (source.isEmpty()) return null
+    val at = source.indexOf(needle, ignoreCase = true)
+    if (at < 0) return source.take(SNIPPET_CHARS)
+
+    // A little before the match rather than starting at it, so the word has the sentence it
+    // came from around it and the eye lands on the reason this row is here.
+    val from = (at - SNIPPET_LEAD).coerceAtLeast(0)
+    val to = (from + SNIPPET_CHARS).coerceAtMost(source.length)
+    return buildString {
+        if (from > 0) append("…")
+        append(source.substring(from, to).trim())
+        if (to < source.length) append("…")
+    }
+}
+
 private const val MAX_TITLE_LENGTH = 60
+
+/** Two lines at the drawer's width, which is what the row has room for. */
+private const val SNIPPET_CHARS = 120
+
+/** Enough before the match to carry the start of its sentence. */
+private const val SNIPPET_LEAD = 32
+
+/**
+ * The text with the reasoning markers gone but the reasoning still in it.
+ *
+ * Different from [parseAssistantReply], which separates the two so one can be hidden. Here
+ * everything is wanted and only the angle brackets are not.
+ */
+private fun String.withoutReasoningTags(): String =
+    replace("<think>", " ").replace("</think>", " ").trim()
 
 private fun String.toTitle(): String {
     val cleaned = trim().replace(Regex("\\s+"), " ")

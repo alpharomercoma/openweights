@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,11 +31,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -42,16 +47,25 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.groupByDay
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -74,6 +88,7 @@ import java.util.concurrent.TimeUnit
  * alternative is a column of identical dates.
  */
 @Composable
+@Suppress("LongParameterList")
 fun ConversationDrawer(
     conversations: List<ConversationSummary>,
     activeId: Long?,
@@ -82,6 +97,10 @@ fun ConversationDrawer(
     onNewChat: () -> Unit,
     nowMillis: Long,
     destinations: ChatDestinations = ChatDestinations(),
+    search: String = "",
+    results: List<ConversationMatch> = emptyList(),
+    hasSearchAnswer: Boolean = false,
+    onSearch: (String) -> Unit = {},
 ) {
     // Narrower than Material's default, and this is not a taste decision.
     //
@@ -107,11 +126,26 @@ fun ConversationDrawer(
             Text("New chat", modifier = Modifier.padding(start = 8.dp))
         }
 
+        // Under New chat rather than above it. Starting one is the thing people come here to
+        // do; finding an old one is the thing they come here to do when they cannot remember
+        // its name, which is exactly when a box that says so is worth the row it costs.
+        SearchField(value = search, onValueChange = onSearch)
+
         // Weighted, so the footer stays pinned to the bottom whether there are no chats or
         // forty. The empty case used to return early from the sheet, which after the footer
         // arrived would have left somebody with no conversations no route to Settings at all.
         Box(modifier = Modifier.weight(1f)) {
-            if (conversations.isEmpty()) {
+            if (search.isNotBlank()) {
+                SearchResults(
+                    results = results,
+                    term = search,
+                    hasAnswer = hasSearchAnswer,
+                    activeId = activeId,
+                    onOpen = onOpen,
+                    onDelete = onDelete,
+                    nowMillis = nowMillis,
+                )
+            } else if (conversations.isEmpty()) {
                 Text(
                     text = "Nothing here yet. Whatever you ask is saved on this device only.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -216,6 +250,7 @@ private fun ConversationRow(
     nowMillis: Long,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
+    snippet: AnnotatedString? = null,
 ) {
     Row(
         modifier = Modifier
@@ -239,6 +274,18 @@ private fun ConversationRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // Why this row is in the list, when it is here because of something said in it
+            // rather than because of its name. Two lines, because one is often half a word.
+            snippet?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
             Metric(
                 listOfNotNull(
                     conversation.updatedAt.asRelativeTime(nowMillis),
@@ -252,6 +299,124 @@ private fun ConversationRow(
                 contentDescription = "Delete ${conversation.title}",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/**
+ * The snippet with the word that matched picked out of it.
+ *
+ * Two lines of prose with the reason for the row somewhere inside them is a row the eye has
+ * to read rather than scan. Bold rather than a colour: the palette keeps lime for actions,
+ * and a coloured word in a preview reads as a link to somewhere.
+ */
+private fun String.highlighting(term: String): AnnotatedString {
+    val at = indexOf(term, ignoreCase = true)
+    if (term.isBlank() || at < 0) return AnnotatedString(this)
+    return buildAnnotatedString {
+        append(this@highlighting.take(at))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+            append(this@highlighting.substring(at, at + term.length))
+        }
+        append(this@highlighting.substring(at + term.length))
+    }
+}
+
+/**
+ * The box that searches every conversation.
+ *
+ * One field, no button and no separate screen. The drawer is already the list of chats, so
+ * searching it in place is the shortest route between "I know I asked this once" and the
+ * answer, and it leaves the list exactly where it was when the box is cleared.
+ */
+@Composable
+private fun SearchField(value: String, onValueChange: (String) -> Unit) {
+    val focus = LocalFocusManager.current
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 8.dp),
+        placeholder = { Text("Search chats") },
+        leadingIcon = {
+            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon = {
+            // Only once there is something to clear. A permanent × on an empty field is a
+            // control that does nothing, next to a placeholder that says what the field is.
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Clear the search",
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        // Search rather than a newline, and the keyboard goes when it is pressed: the results
+        // are directly under the box, and a keyboard covering them is the one thing a search
+        // on a phone must not do.
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+        shape = RoundedCornerShape(Radius.md),
+    )
+}
+
+/**
+ * What a search found, newest first, each with the line that matched.
+ *
+ * Not grouped by day. A day heading answers "when was this", which is the question the
+ * unsearched list is for; a result list answers "which one said this", and the snippet is
+ * what answers it. Sorting stays by recency because two chats about the same thing are
+ * usually distinguished by which was last.
+ */
+@Composable
+@Suppress("LongParameterList")
+private fun SearchResults(
+    results: List<ConversationMatch>,
+    term: String,
+    hasAnswer: Boolean,
+    activeId: Long?,
+    onOpen: (Long) -> Unit,
+    onDelete: (Long) -> Unit,
+    nowMillis: Long,
+) {
+    // Nothing at all until the read has answered for this exact term. Saying "no chat
+    // mentions that" while the answer is still being fetched is a wrong answer shown
+    // confidently, and on a fast phone it appeared and vanished on every first keystroke.
+    if (!hasAnswer) return
+    if (results.isEmpty()) {
+        Text(
+            text = "No chat mentions that.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        items(results, key = { it.id }) { match ->
+            ConversationRow(
+                conversation = ConversationSummary(
+                    id = match.id,
+                    title = match.title,
+                    modelName = match.modelName,
+                    updatedAt = match.updatedAt,
+                ),
+                isActive = match.id == activeId,
+                nowMillis = nowMillis,
+                onOpen = { onOpen(match.id) },
+                onDelete = { onDelete(match.id) },
+                snippet = match.snippet?.highlighting(term),
             )
         }
     }

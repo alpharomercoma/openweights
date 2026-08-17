@@ -53,6 +53,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Search
@@ -137,6 +138,9 @@ fun ChatScreen(
     onSelectModel: (LocalModel) -> Unit = {},
     modifier: Modifier = Modifier,
     onOpenConversation: (Long) -> Unit = {},
+    /** The drawer's chat search, which is its own flow rather than part of [state]. */
+    chatSearch: ChatSearchState = ChatSearchState(),
+    onSearchConversations: (String) -> Unit = {},
     onDeleteConversation: (Long) -> Unit = {},
     onSavePreferences: (ModelPreferences) -> Unit = {},
     onResetPreferences: () -> Unit = {},
@@ -218,6 +222,10 @@ fun ChatScreen(
                     scope.launch { drawerState.close() }
                 },
                 nowMillis = System.currentTimeMillis(),
+                search = chatSearch.query,
+                results = chatSearch.results,
+                hasSearchAnswer = chatSearch.hasAnswer,
+                onSearch = onSearchConversations,
             )
         },
     ) {
@@ -325,6 +333,14 @@ private fun ChatContent(
                 },
                 actions = {
                     if (state.modelName != null) {
+                        // Starting a chat was only in the drawer, which is two taps and a
+                        // slide for the thing people do most often between questions. Left of
+                        // the sampler icon so the pair reads outermost-first: begin something,
+                        // then adjust it. It only starts one when there is something to say
+                        // to, which is the same condition the sampler is under.
+                        IconButton(onClick = onNewChat) {
+                            Icon(Icons.Rounded.Add, contentDescription = "New chat")
+                        }
                         IconButton(onClick = { showParameters = true }) {
                             Icon(Icons.Rounded.Tune, contentDescription = "Model settings")
                         }

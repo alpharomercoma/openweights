@@ -117,6 +117,21 @@ data class MessageEntity(
 )
 
 /**
+ * One conversation that matched a search, and the text that made it match.
+ *
+ * Not an entity: it is the shape of one query's answer and belongs to nothing else. The
+ * snippet is null when the title matched and no message did, which the screen reads as
+ * "this is here because of its name" and shows nothing under it.
+ */
+data class ConversationMatch(
+    val id: Long,
+    val title: String,
+    val modelName: String?,
+    val updatedAt: Long,
+    val snippet: String?,
+)
+
+/**
  * Lifetime usage, one row per day per model.
  *
  * Append-only and separate from the conversations: a user who deletes a chat

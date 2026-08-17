@@ -303,6 +303,14 @@ class ChatViewModel @Inject constructor(
 
     private var generationJob: Job? = null
     private var thermalJob: Job? = null
+
+    /**
+     * Searching the history, collected beside this state rather than inside it.
+     *
+     * Built here rather than injected because it needs this view model's scope: a search in
+     * flight when the screen goes should go with it.
+     */
+    val search = ChatSearch(writer, viewModelScope)
     private var nextEntryId = 0L
 
     /**

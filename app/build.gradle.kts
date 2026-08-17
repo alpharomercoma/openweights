@@ -33,14 +33,14 @@ plugins {
  * in CI while returning a hundred and something locally. That is why the shallow case throws
  * rather than falling back, and why the workflow asks for the full history.
  */
-val gitCommitCount: Int by lazy {
+val gitCommitCount: Int = run {
     val git = { args: List<String> ->
         runCatching {
             providers.exec {
                 commandLine(args)
                 isIgnoreExitValue = true
             }.standardOutput.asText.get().trim()
-        }.getOrNull()
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     if (git(listOf("git", "rev-parse", "--is-shallow-repository")) == "true") {
@@ -51,9 +51,19 @@ val gitCommitCount: Int by lazy {
         )
     }
 
+    val counted = git(listOf("git", "rev-list", "--count", "HEAD"))?.toIntOrNull()
+
     // Absent git entirely, which is a source archive rather than a checkout. One is the
-    // lowest code Play accepts and nothing built this way is publishable anyway.
-    git(listOf("git", "rev-list", "--count", "HEAD"))?.toIntOrNull()?.takeIf { it > 0 } ?: 1
+    // lowest code Play accepts and nothing built this way is publishable anyway. Only that
+    // case falls back: a checkout that has git and still cannot be counted is a broken
+    // build, not a source archive, and the difference decides what gets uploaded.
+    if (counted == null && rootProject.file(".git").exists()) {
+        throw GradleException(
+            "There is a .git here but the commit count could not be read, so the version " +
+                "code would silently be 1. Build again and check that git runs.",
+        )
+    }
+    counted?.takeIf { it > 0 } ?: 1
 }
 
 android {

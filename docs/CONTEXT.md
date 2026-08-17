@@ -913,11 +913,18 @@ takes the same path. It does not: zero over-calls and eleven under-calls, the op
 failure. So the bias belongs to the model rather than to the route, and choosing a wording by
 route would have been the wrong fix for a plausible reason.
 
-**Also found, and not yet fixed.** LFM2 1.2B fails with `llama_decode returned 1` partway
-through a sustained run, after something like thirty generations on one loaded engine. The
-other two families ran a hundred and sixty each without it. It is a real defect in the engine
-or in that model's cache handling rather than anything to do with tool choice, and it is what
-stopped the benchmark before LFM's remaining arms.
+**Also found here, and fixed the next day.** LFM2 1.2B fails with `llama_decode returned 1`
+partway through a sustained run, after something like thirty generations on one loaded
+engine. The other two families ran a hundred and sixty each without it. It is a real defect
+in the engine or in that model's cache handling rather than anything to do with tool choice,
+and it is what stopped the benchmark before LFM's remaining arms.
+
+That was written before the cause was known and this line said "not yet fixed" for longer
+than it was true. Both halves were found on 2026-08-15 and are below: the benchmark was
+accumulating context between cases, and underneath that, `llama_memory_seq_rm` returns false
+on recurrent and hybrid models and the engine ignored the answer. `engine_session.cpp` starts
+over when a rollback is refused, and `SustainedUseTest` reproduces the field error against
+the old code in about ninety seconds and is flat against this one.
 
 ### The wording is finished, and two models were never the problem (2026-08-15)
 

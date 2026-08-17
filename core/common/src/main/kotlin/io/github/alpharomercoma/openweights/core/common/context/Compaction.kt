@@ -47,15 +47,21 @@ class CompactionPolicy(
      * the window is worked out per model: three quarters of 128,000 is 96,000 tokens, and a
      * conversation is never folded before then.
      *
-     * The reason that matters is not memory. Measured on an MT6991 with LFM2.5 2.6B, decode
-     * falls from 16.7 tokens a second on an empty context to 14.3 at about 1,300 tokens, 12.4
-     * at 5,100 and 9.6 at 10,300. Attention reads the whole cache for every token produced,
-     * so a conversation nobody folds gets slower with every turn, and the window is what
-     * decides when folding is allowed to help. A wide window is still worth having, because
-     * it is what lets a long document be pasted at all; what it must not do is defer folding
-     * until the thing is unusable.
+     * The reason that matters is not memory. Attention reads the whole cache for every token
+     * produced, so decode slows as the conversation grows whatever the window was declared
+     * as, and the window is only what decides when folding is allowed to help.
      *
-     * Eight thousand is where the measured loss is about a quarter and still climbing.
+     * Measured on an MT6991 with LFM2.5 2.6B, and the shape is affine in the context length:
+     * seconds per token = a + b*n, with a the weight-bound floor and b the cost of one more
+     * token of history. Fitted on a bracketed run, empty then full then empty again after
+     * resting, so that heat is ruled out rather than assumed: a = 0.0600, b = 3.42e-6, which
+     * puts decode at 90% of its empty speed by 1,900 tokens, 80% by 4,400 and 75% by 5,800.
+     *
+     * So the ceiling is the answer to "how much slower than new is acceptable", and 4096 is
+     * about a fifth slower on that hardware. It is deliberately below what this device could
+     * bear, because it is also the number a phone nobody has measured has to live with. The
+     * app already records decode milliseconds, tokens and context fill on every reply, so a
+     * and b can be fitted from ordinary use and this constant become only a first guess.
      */
     private val ceilingTokens: Int = DEFAULT_CEILING_TOKENS,
 ) {
@@ -112,8 +118,8 @@ class CompactionPolicy(
          */
         const val DEFAULT_TRIGGER_FRACTION = 0.75f
 
-        /** See [CompactionPolicy.ceilingTokens]: where decode has lost about a quarter. */
-        const val DEFAULT_CEILING_TOKENS = 8_192
+        /** See [CompactionPolicy.ceilingTokens]: about a fifth slower than an empty context. */
+        const val DEFAULT_CEILING_TOKENS = 4_096
 
         /** Two exchanges: enough that follow-up questions still resolve their referents. */
         const val DEFAULT_KEEP_RECENT = 4

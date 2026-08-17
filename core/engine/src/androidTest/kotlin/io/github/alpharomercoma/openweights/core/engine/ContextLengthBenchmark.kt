@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -85,26 +86,78 @@ class ContextLengthBenchmark {
      */
     @Test
     fun measuresWhatAFullWindowCosts() = runBlocking {
+        // Every model pushed, not only one. Whether the point at which decode falls by a
+        // quarter is a property of the model or of the phone is the question a second model
+        // on the same phone actually answers.
+        val models = listOfNotNull(
+            modelFile.takeIf { it.exists() },
+            File(modelFile.parentFile, "small.gguf").takeIf { it.exists() },
+        )
+        assumeTrue("no model pushed", models.isNotEmpty())
+
+        for (model in models) {
+            LlamaCppEngine().use { engine ->
+                engine.load(model, ModelLoadParams(contextLength = WIDE, gpuLayers = 0))
+                engine.turn("Say hello.", WARM_UP_TOKENS)
+
+                for (fill in FILLS) {
+                    engine.resetContext()
+                    val stats = engine.turn(filler(fill), ANSWER_TOKENS)
+                    Log.i(
+                        TAG,
+                        "%s fill≈%d prompt=%d prefill=%dms %.2f tg/s".format(
+                            model.name,
+                            fill,
+                            stats.promptTokens,
+                            stats.prefillMs,
+                            stats.generatedTokens * MILLIS /
+                                stats.decodeMs.coerceAtLeast(1).toDouble(),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether the slowdown with context is context, or is the chip getting hot.
+     *
+     * The sweep above runs from an empty cache upwards, so context length and elapsed wall
+     * clock increase together and the two are confounded: 380 seconds of sustained decode is
+     * long enough to throttle a phone, and a throttling curve fits a straight line just as
+     * well as a real one does. The first evidence that this matters is that an empty context
+     * measured 16.7 tokens a second on a cool phone and 13.6 on the same phone after an hour
+     * of benchmarks, which is a fifth of the effect being attributed to context.
+     *
+     * So: empty, full, rest, empty again. If the last reading returns to the first, the
+     * middle one is context. If it does not, part of what was measured is heat.
+     */
+    @Test
+    fun separatesContextFromHeat() = runBlocking {
         assumeTrue("model.gguf not pushed", modelFile.exists())
         LlamaCppEngine().use { engine ->
             engine.load(modelFile, ModelLoadParams(contextLength = WIDE, gpuLayers = 0))
             engine.turn("Say hello.", WARM_UP_TOKENS)
 
-            for (fill in FILLS) {
-                engine.resetContext()
-                val stats = engine.turn(filler(fill), ANSWER_TOKENS)
-                Log.i(
-                    TAG,
-                    "fill≈%d prompt=%d prefill=%dms %.1f tg/s".format(
-                        fill,
-                        stats.promptTokens,
-                        stats.prefillMs,
-                        stats.generatedTokens * MILLIS /
-                            stats.decodeMs.coerceAtLeast(1).toDouble(),
-                    ),
-                )
-            }
+            report(engine, "empty, first", fill = 0)
+            report(engine, "full", fill = BRACKET_FILL)
+            Log.i(TAG, "resting ${REST_MS / MILLIS.toLong()}s")
+            delay(REST_MS)
+            report(engine, "empty, after resting", fill = 0)
         }
+    }
+
+    private suspend fun report(engine: InferenceEngine, label: String, fill: Int) {
+        engine.resetContext()
+        val stats = engine.turn(filler(fill), ANSWER_TOKENS)
+        Log.i(
+            TAG,
+            "%s: prompt=%d %.2f tg/s".format(
+                label,
+                stats.promptTokens,
+                stats.generatedTokens * MILLIS / stats.decodeMs.coerceAtLeast(1).toDouble(),
+            ),
+        )
     }
 
     /** Roughly [tokens] tokens of ordinary prose, since that is what a conversation is. */
@@ -185,5 +238,11 @@ class ContextLengthBenchmark {
 
         /** The filler block is about twelve tokens, so this is close enough to aim with. */
         const val WORDS_PER_BLOCK = 12
+
+        /** Big enough to show the effect, small enough not to cook the phone measuring it. */
+        const val BRACKET_FILL = 4_096
+
+        /** Long enough for a phone to shed the heat of one long decode. */
+        const val REST_MS = 180_000L
     }
 }

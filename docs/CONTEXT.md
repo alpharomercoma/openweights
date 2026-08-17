@@ -751,32 +751,54 @@ Verified on the device: LFM2.5 1.2B Instruct opens at `ctx=128000` where it open
 and the top bar says so.
 
 **A wide window that is full is a different thing from a wide window that is empty**, and the
-sweep above only measures the second. Measured separately, one load at 32k and a conversation
-grown into it:
+sweep above only measures the second. The window is a ceiling; what costs is what goes into
+it. Measured separately, one load at 32k with a conversation grown into it:
 
-| context in use | prompt | prefill | decode |
-| ---: | ---: | ---: | ---: |
-| empty | 33 | 0.5 s | **16.7 t/s** |
-| ~1,300 | 1,309 | 20 s | **14.3 t/s** |
-| ~5,100 | 5,149 | 122 s | **12.4 t/s** |
-| ~10,300 | 10,264 | 380 s | **9.6 t/s** |
+| context in use | prefill | decode |
+| ---: | ---: | ---: |
+| empty | 0.5 s | 16.7 t/s |
+| ~1,300 | 20 s | 14.3 t/s |
+| ~5,100 | 122 s | 12.4 t/s |
+| ~10,300 | 380 s | 9.6 t/s |
 
-**Decode loses 43% by ten thousand tokens**, because attention reads the whole cache for
-every token produced. So the cost of a long conversation is real and is paid on every token
-of every turn, and it has nothing to do with how wide the window was declared.
+**Decode cost is affine in the context length**, which is what the mechanism predicts: every
+token streams the whole of the weights once, a constant, and reads the whole cache once, which
+grows linearly. So `seconds per token = a + b*n`.
 
-That is what makes the window and the folding one decision rather than two. Compaction fired
-at three quarters of the window, which was right while every model opened at 4096 and folds a
-conversation at about 3,000 tokens. At an automatic 128,000 the same rule folds at 96,000,
-which this table says is far past unusable. `CompactionPolicy` now takes an absolute ceiling
-as well, `DEFAULT_CEILING_TOKENS = 8192`, and folds at whichever comes first. The window is
-still worth opening wide, because it is what lets a long document be pasted at all; what it
-must not do is defer folding until the answers arrive at half speed.
+**That first sweep was thermally confounded and the slope it gave was 26% too steep.** Context
+and elapsed wall clock rise together in it, and 380 s of sustained decode is long enough to
+throttle a phone: the same empty context measured 16.7 t/s on a cool device and 13.6 t/s after
+an hour of benchmarks. `separatesContextFromHeat` brackets it instead, empty then full then
+empty again after resting:
 
-Two figures corrected while checking this: the trigger is 0.75 rather than the 0.83 recorded
-earlier, and the earlier claim that a hybrid re-prefills its whole conversation every
-follow-up turn describes the code before `cached_` began counting generated tokens. On a
-straight-line conversation the prefix now matches and no rollback is attempted.
+| | decode |
+| --- | ---: |
+| empty, first | 16.59 t/s |
+| full, 5,149 tokens | 12.89 t/s |
+| empty, after resting 180 s | **16.77 t/s** |
+
+Returning to where it started is the proof that the middle reading is context rather than
+heat. Refitted on those points: **a = 0.0600 s/token, b = 3.42e-6 s/token per token of
+context**, so a/b is 17,500 tokens, which is where attention costs as much as the weights do.
+Decode is at 90% of its empty speed by 1,900 tokens, 80% by 4,400 and 75% by 5,800.
+
+**What follows for the defaults.** The window stays at the maximum, because a ceiling nobody
+reaches is nearly free and it is what lets a long document be pasted at all. The number that
+matters is when the conversation is folded, and that is now an absolute ceiling as well as a
+fraction of the window: `DEFAULT_CEILING_TOKENS = 4096`, about a fifth slower than an empty
+context on this hardware, and deliberately below what this device could bear because it is
+also what an unmeasured phone has to live with.
+
+**Two things this does not answer.** Whether a/b transfers between phones: both reviewers said
+approximately and neither said exactly, because weight streaming is bandwidth-bound while
+attention reads are strided and latency-bound, and those scale differently across memory
+subsystems. And prefill, which is the cost this leaves unguarded: 380 s for ten thousand
+tokens is not a window problem and shrinking the window does not fix it, it only makes the
+paste impossible instead of slow. The guard belongs on prefill itself, and is not built.
+
+Both figures the app needs, a and b, are already in every reply it finishes: decode
+milliseconds, tokens generated, and how full the context was. Fitting them from ordinary use
+would make the ceiling this device's own number rather than this one.
 
 ### The tool loop, proven on hardware (2026-08-14)
 

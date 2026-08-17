@@ -96,8 +96,17 @@ def feature_graphic() -> None:
     # The spine sits at 500 rather than at the halfway line: the claims are the longer
     # column and running them past 1000 is how the first pass lost the end of two of them.
     draw.rounded_rectangle([500, 130, 504, 376], radius=2, fill=LIME)
+    # The first line has to say where the work happens without repeating the subtitle two
+    # inches to its left, which already says "on your phone". Naming the processor is what
+    # does that, and it is also the one the app can be held to: the top bar says CPU or
+    # OPENCL for the model in memory, and the sampler sheet lets you move it.
+    #
+    # It read "Runs on the processor in your hand", which is a phrase about a phone rather
+    # than about this app, and is the sort of line that sounds like a claim while making
+    # none. "or" rather than "and": layers go to one or the other, never to both at once,
+    # and that is a distinction this project spent a week measuring.
     claims = [
-        "Runs on the processor in your hand",
+        "Runs on your CPU or GPU",
         "No account, no server, no telemetry",
         "Any GGUF on Hugging Face",
     ]

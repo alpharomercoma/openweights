@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.flow.first
@@ -623,6 +624,7 @@ class TurnRunnerTest {
             params = SamplerParams(),
             mode = mode,
             withTools = withTools,
+            notes = ToolNotes(),
             listener = Collecting(steps),
         )
         return steps
@@ -644,6 +646,7 @@ class TurnRunnerTest {
             params = SamplerParams(),
             mode = AgentMode.PLAN,
             withTools = true,
+            notes = ToolNotes(),
             listener = Collecting(steps),
         )
         return steps

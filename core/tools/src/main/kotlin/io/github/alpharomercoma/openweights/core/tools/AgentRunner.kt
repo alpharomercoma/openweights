@@ -89,16 +89,29 @@ sealed interface AgentDecision {
 class AgentRunner(
     private val registry: ToolRegistry,
     private val maxRounds: Int = DEFAULT_MAX_ROUNDS,
+    /**
+     * Whether a stranger's words are already in the prompt when this turn opens.
+     *
+     * False for a turn that begins with nothing but the conversation, which is why the
+     * suspicion below is per turn. It is true when [ToolNotes] has carried a page or a file
+     * from an earlier turn into this question, because then the text is in the window again
+     * and a guard that reset with the turn would be a guard those notes walked around.
+     */
+    carriesUntrustedText: Boolean = false,
+    /** And the same for the user's own text. See [carriesUntrustedText]. */
+    carriesPrivateData: Boolean = false,
 ) {
     /**
      * Whether text somebody else wrote has reached the model during this turn.
      *
-     * State on the instance, and the instance is one turn: [TurnRunner] builds a runner per
-     * turn, so this resets when the turn does. That is the right scope. A file read an hour
-     * ago is not in the window any more, and holding the suspicion across a whole
-     * conversation would ask about every search anyone ever made afterwards.
+     * State on the instance, and the instance is one turn: a runner is built per turn, so this
+     * resets when the turn does, except where the constructor says it does not. The scope
+     * follows the text rather than the clock. A file read an hour ago is usually out of the
+     * window, and holding the suspicion across a whole conversation would ask about every
+     * search anyone made afterwards; but where [ToolNotes] has kept that file in the prompt,
+     * the turn it reaches starts suspicious, because the thing being guarded is still there.
      */
-    private var readUntrustedText = false
+    private var readUntrustedText = carriesUntrustedText
 
     /**
      * Whether something of the user's has reached the model during this turn.
@@ -107,7 +120,7 @@ class AgentRunner(
      * because the two guard different things. Untrusted text is a risk about who is giving
      * the orders; private data is a risk about what could be carried out.
      */
-    private var readPrivateData = false
+    private var readPrivateData = carriesPrivateData
 
     /**
      * Calls this turn has already answered, and what to say if one is asked for again.

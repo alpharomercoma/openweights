@@ -47,6 +47,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
@@ -136,6 +137,14 @@ data class ChatUiState(
     val isLoadingModel: Boolean = false,
     val isGenerating: Boolean = false,
     val transcript: List<TranscriptEntry> = emptyList(),
+    /**
+     * What the tools returned earlier in this chat, kept because the transcript does not.
+     *
+     * Held here rather than in the turn loop because it outlives a turn, and rather than in
+     * storage because it is not part of the conversation: nothing shows it, nothing edits it,
+     * and a chat reopened from disk starts it again empty. See [ToolNotes].
+     */
+    val toolNotes: ToolNotes = ToolNotes(),
     val contextUsed: Int = 0,
     val contextSize: Int = 0,
     /**
@@ -533,6 +542,7 @@ class ChatViewModel @Inject constructor(
                     contextUsed = info?.contextUsed ?: 0,
                     preferences = preferences,
                     transcript = if (keepConversation) it.transcript else emptyList(),
+                    toolNotes = if (keepConversation) it.toolNotes else ToolNotes(),
                     compaction = if (keepConversation) it.compaction else null,
                     mediaSupport = support,
                     // Two hurdles, and a model has to clear both. The template must render
@@ -834,8 +844,15 @@ class ChatViewModel @Inject constructor(
                     settled = applyCompletion(event, raw) to event.stats
                 }
 
-                override fun onSteps(steps: List<AgentStep>) =
+                override fun onSteps(steps: List<AgentStep>) {
                     updateLastEntry { it.copy(blocks = it.blocks + steps.map(TurnBlock::Step)) }
+                    // Kept for the turns after this one. Within this turn the results are
+                    // already in the loop's own messages, which is why nothing here is sent
+                    // twice: the prompt is built before the first tool runs.
+                    _uiState.update {
+                        it.copy(toolNotes = it.toolNotes.withSteps(steps, turns::toolNamed))
+                    }
+                }
 
                 override fun onIntermediate(text: String) =
                     updateLastEntry { it.copy(blocks = it.blocks + TurnBlock.Said(text)) }
@@ -871,6 +888,11 @@ class ChatViewModel @Inject constructor(
                     // and deciding here that they cannot have tools is what made that
                     // silent.
                     withTools = state.toolsAvailable,
+                    // The same notes the prompt was built with, read from the same snapshot.
+                    // Taking them from the live state instead would seed the guard from
+                    // whatever this turn had already found, which is not what is in the
+                    // question the model is about to answer.
+                    notes = state.toolNotes,
                     listener = listener,
                 )
                 // Here, so a turn that used a tool is written down once. Skipped by both
@@ -1046,6 +1068,9 @@ class ChatViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     transcript = emptyList(),
+                    // Emptied with the transcript it belongs to. A record of what a tool
+                    // returned in one chat is not evidence in the next one.
+                    toolNotes = ToolNotes(),
                     compaction = null,
                     contextUsed = 0,
                     error = null,
@@ -1116,6 +1141,9 @@ class ChatViewModel @Inject constructor(
 
         _uiState.update { state ->
             val reopened = state.copy(
+                // Nothing restores this: the notes were never written down, so a chat opened
+                // from storage starts with none and behaves as it did before they existed.
+                toolNotes = ToolNotes(),
                 transcript = messages.toTranscript(
                     conversation.compactionSummary?.let { conversation.compactionThroughIndex },
                 ),
@@ -1596,7 +1624,36 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         ?.let { transcript.drop(it.foldedThroughIndex + 1) }
         ?: transcript
 
-    return (system + remaining.map { it.toChatMessage() }).asExchange()
+    return (system + remaining.map { it.toChatMessage() }).asExchange().withToolNotes(toolNotes)
+}
+
+/**
+ * The notes put in front of the question, inside the message that carries it.
+ *
+ * Inside a user turn rather than beside one, because the prompt is a strict alternation and a
+ * turn of its own would be a second user message in a row: the templates that enforce this
+ * refuse to render it, which is the same wall the compaction summary hit before it moved into
+ * the instructions.
+ *
+ * And in the last message rather than the first, which is the part that matters on a phone. The
+ * instructions are the root of the KV cache and every token of the conversation sits behind
+ * them, so a record that grows with each tool call would invalidate the whole prefix every turn
+ * and re-prefill a conversation that had not changed. The final user turn is new anyway.
+ *
+ * Before the question and not after it. Whatever is nearest the end is what a small model
+ * answers, and a page of notes in that position gets summarised back instead of used.
+ */
+private fun List<ChatMessage>.withToolNotes(notes: ToolNotes): List<ChatMessage> {
+    val rendered = notes.render() ?: return this
+    val last = lastOrNull()?.takeIf { it.role == ChatRole.USER } ?: return this
+    // Rebuilt from the whole message rather than by editing its last part: asExchange joins
+    // neighbours of one role, so a user turn can arrive here carrying several pieces of text,
+    // and prepending to the last of them would file the notes in the middle of the question.
+    // Joined only when there is a question to join to. A message that is nothing but an
+    // attachment has no text, and the blank line then trailed off the end of the prompt.
+    val question = last.text
+    val joined = if (question.isBlank()) rendered else "$rendered\n\n$question"
+    return dropLast(1) + last.copy(parts = last.files + MessagePart.Text(joined))
 }
 
 /**

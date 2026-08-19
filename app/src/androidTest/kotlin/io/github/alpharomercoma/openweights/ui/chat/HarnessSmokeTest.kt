@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.runBlocking
@@ -100,6 +101,7 @@ class HarnessSmokeTest {
             params = SamplerParams(temperature = 0.1f, maxTokens = BUDGET, seed = 7),
             mode = AgentMode.AUTO,
             withTools = false,
+            notes = ToolNotes(),
             listener = Recording(passes),
         )
 

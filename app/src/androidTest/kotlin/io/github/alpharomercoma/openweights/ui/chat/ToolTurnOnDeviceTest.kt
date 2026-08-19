@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.runBlocking
@@ -120,6 +121,7 @@ class ToolTurnOnDeviceTest {
             params = SamplerParams(temperature = 0f, maxTokens = BUDGET, seed = 1),
             mode = AgentMode.AUTO,
             withTools = true,
+            notes = ToolNotes(),
             listener = listener,
         )
 

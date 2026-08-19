@@ -34,6 +34,8 @@ import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
+import io.github.alpharomercoma.openweights.core.tools.Tool
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -108,6 +110,12 @@ class TurnRunner @Inject constructor(
      * of them off it was still going in, so the model was told it could search, could not,
      * and said so.
      */
+    /**
+     * The tool of that name, for a caller that has a result and needs to know where it came
+     * from. Null for a name no longer registered, which a stored note can outlive.
+     */
+    fun toolNamed(name: String): Tool? = tools.find(name)
+
     fun hasEnabledTools(): Boolean =
         tools.all.any { it.isUserFacing && switches.isEnabled(it.definition.name) }
 
@@ -121,6 +129,7 @@ class TurnRunner @Inject constructor(
         params: SamplerParams,
         mode: AgentMode,
         withTools: Boolean,
+        notes: ToolNotes,
         listener: TurnListener,
     ): String {
         // Read once per turn, not once per app start: a tool switched off mid-conversation
@@ -152,7 +161,15 @@ class TurnRunner @Inject constructor(
         // write it, which is three before the model has said anything. At two the last of
         // those is refused and the work is thrown away on the step that mattered.
         val maxRounds = active.roundLimit()
-        val agent = AgentRunner(active, maxRounds)
+        val agent = AgentRunner(
+            active,
+            maxRounds,
+            // The notes put an earlier turn's page back into this question, so the guard that
+            // asks before anything leaves the device has to know it is there. Without this the
+            // suspicion died with the turn that earned it while the text it was about did not.
+            carriesUntrustedText = notes.carriesUntrustedText,
+            carriesPrivateData = notes.carriesPrivateData,
+        )
 
         // Said once per turn, because "why did it not search" has three possible answers
         // and the per-pass line only ever showed the conclusion. withTools is the template

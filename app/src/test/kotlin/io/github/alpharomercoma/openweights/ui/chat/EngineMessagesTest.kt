@@ -20,8 +20,11 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import org.junit.Test
 
 class EngineMessagesTest {
@@ -278,6 +281,74 @@ class EngineMessagesTest {
 
         assertThat(stats.charsPerToken(chars = 400)).isNull()
     }
+
+    @Test
+    fun `what the tools found rides in the question, not in a turn of its own`() {
+        // A turn of its own would be a second user message in a row, which is the wall the
+        // compaction summary already hit: the templates that enforce alternation refuse to
+        // render it rather than ignoring it.
+        val state = ChatUiState(transcript = transcript(1), toolNotes = notes())
+
+        val messages = state.engineMessages()
+
+        assertThat(messages.count { it.role == ChatRole.USER }).isEqualTo(1)
+        assertThat(messages.last().role).isEqualTo(ChatRole.USER)
+        assertThat(messages.last().text).contains("Vaughan")
+    }
+
+    @Test
+    fun `the question comes last, after the notes`() {
+        // Whatever is nearest the end is what a small model answers. Notes in that position
+        // get summarised back instead of used.
+        val state = ChatUiState(transcript = transcript(1), toolNotes = notes())
+
+        val text = state.engineMessages().last().text
+
+        assertThat(text.indexOf("Vaughan")).isLessThan(text.indexOf("turn 0"))
+    }
+
+    @Test
+    fun `the instructions do not carry them, so the cache survives a tool call`() {
+        // The instructions are the root of the KV cache and the whole conversation sits
+        // behind them. A record that grows with every tool call would invalidate the lot and
+        // re-prefill a conversation that had not changed.
+        val state = ChatUiState(transcript = transcript(1), toolNotes = notes())
+
+        val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
+
+        assertThat(system.text).doesNotContain("Vaughan")
+    }
+
+    @Test
+    fun `a chat where no tool has run is sent exactly what it was before`() {
+        val state = ChatUiState(transcript = transcript(3))
+
+        val withoutNotes = state.engineMessages()
+
+        assertThat(withoutNotes.last().text).isEqualTo("turn 2")
+    }
+
+    @Test
+    fun `notes with nothing to attach to are dropped rather than sent alone`() {
+        // A transcript whose last turn is the model's reaches this on the regenerate path.
+        // Appending there would put the record in the model's mouth as though it had said it.
+        val state = ChatUiState(transcript = transcript(2), toolNotes = notes())
+
+        val messages = state.engineMessages()
+
+        assertThat(messages.last().role).isEqualTo(ChatRole.ASSISTANT)
+        assertThat(messages.none { it.text.contains("Vaughan") }).isTrue()
+    }
+
+    private fun notes() = ToolNotes().withSteps(
+        listOf(
+            AgentStep.Ran(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"lovelace"}"""),
+                "Ada Lovelace, collaborators included Vaughan and Babbage.",
+                millis = 1,
+            ),
+        ),
+    ) { null }
 
     private fun transcript(count: Int) = List(count) { index ->
         TranscriptEntry(

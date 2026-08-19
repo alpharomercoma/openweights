@@ -387,9 +387,70 @@ internal fun redirectTarget(response: Response, from: HttpUrl): HttpUrl? {
 }
 
 /** Everything between tags, with the tags and the unreadable parts taken out. */
-private fun String.readable(): String = this
-    .replace(Regex("""(?is)<(script|style|nav|header|footer)[^>]*>.*?</\1>"""), " ")
-    .stripTags()
+private fun String.readable(): String = withoutFurniture().stripTags()
+
+/**
+ * The page reduced to the part worth reading, still as markup.
+ *
+ * Separate from [stripTags] because that one decodes entities through the platform and so
+ * cannot run off a device, while everything interesting here is string work that can be tested
+ * on its own.
+ */
+internal fun String.withoutFurniture(): String = mainContent().replace(FURNITURE, " ")
+
+/**
+ * The part of the page somebody came to read, when the page says which part that is.
+ *
+ * What comes back is capped at four thousand characters, and on a modern page those first four
+ * thousand are frequently not the article: they are a cookie notice, a
+ * subscription offer, a menu of everything else on the site. The model then answers out of the
+ * furniture, or says the page does not mention what it plainly does. Raising the ceiling is the
+ * wrong fix, because every one of those characters is also decode time on a phone.
+ *
+ * So: if the document names its own content with `<article>` or `<main>`, take that and discard
+ * the rest of the file. This is the one heuristic from the readability literature that needs no
+ * document tree to apply, and it is the one that pays: it is a landmark the page author wrote
+ * deliberately, not a guess about where the prose is.
+ *
+ * The largest match rather than the first, because an index page is a list of `<article>` cards
+ * and the largest is the nearest thing on it to a body. `<article>` before `<main>` when it is
+ * substantial, since `<main>` usually contains it along with whatever sits beside it. A page
+ * with neither is returned whole and cleaned the way it always was.
+ */
+private fun String.mainContent(): String {
+    val article = LANDMARKS.getValue("article").findAll(this).maxByOrNull { it.value.length }
+    if (article != null && article.value.length >= ENOUGH_TO_BE_THE_BODY) return article.value
+    val main = LANDMARKS.getValue("main").findAll(this).maxByOrNull { it.value.length }
+    return main?.value ?: this
+}
+
+/**
+ * The elements whose contents are never what was being looked for.
+ *
+ * Whole elements rather than a class-name guess: nesting of these is rare enough that a
+ * non-greedy match ends where the element does, whereas the cookie banners and sidebars that
+ * make up the rest of the furniture are `div`s indistinguishable by shape from the article. A
+ * class-name pattern over `div` would remove the body of some page nobody here will ever see,
+ * and this cannot be allowed to remove content: too little is a longer read, too much is a
+ * confident wrong answer.
+ */
+private val FURNITURE = Regex(
+    "(?is)<(script|style|nav|header|footer|aside|form|noscript|iframe|svg|template|dialog)" +
+        """[^>]*>.*?</\1>""",
+)
+
+/** The two elements a page uses to say which part of it is the point. */
+private val LANDMARKS = listOf("article", "main").associateWith {
+    Regex("(?is)<$it\\b[^>]*>.*?</$it>")
+}
+
+/**
+ * Below this an `<article>` is a teaser rather than a body, so the page is better read whole.
+ *
+ * A card on an index page carries a headline and a sentence. A short real article still clears
+ * this, and one that does not loses nothing: falling through returns the fuller text.
+ */
+private const val ENOUGH_TO_BE_THE_BODY = 500
 
 private fun String.stripTags(): String = this
     .replace(Regex("<[^>]+>"), " ")

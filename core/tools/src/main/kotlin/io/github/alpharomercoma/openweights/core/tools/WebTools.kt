@@ -269,10 +269,19 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
             when (hop) {
                 is Hop.Read -> {
                     val body = hop.text
-                    return@withContext if (body.length <= MAX_CHARS) {
-                        body
-                    } else {
-                        body.take(MAX_CHARS) + "\n[truncated]"
+                    return@withContext when {
+                        // A page that answered and left nothing to read is almost always one
+                        // that builds itself in the browser: the file holds a script and an
+                        // empty div, and the words arrive later from somewhere this cannot
+                        // follow. Returning the empty string said none of that, and a model
+                        // handed nothing reports that the page does not mention the thing,
+                        // which is a wrong answer rather than a missing one.
+                        body.isBlank() ->
+                            "That page has no readable text in it. It is " +
+                                "probably built in the browser, so there is nothing in the file " +
+                                "to read. Try a different source."
+                        body.length <= MAX_CHARS -> body
+                        else -> body.take(MAX_CHARS) + "\n[truncated]"
                     }
                 }
                 is Hop.Moved -> {
@@ -418,11 +427,52 @@ internal fun String.withoutFurniture(): String = mainContent().replace(FURNITURE
  * with neither is returned whole and cleaned the way it always was.
  */
 private fun String.mainContent(): String {
-    val article = LANDMARKS.getValue("article").findAll(this).maxByOrNull { it.value.length }
-    if (article != null && article.value.length >= ENOUGH_TO_BE_THE_BODY) return article.value
-    val main = LANDMARKS.getValue("main").findAll(this).maxByOrNull { it.value.length }
-    return main?.value ?: this
+    val article = blocks("article").maxByOrNull { it.textLength() }
+    if (article != null && article.textLength() >= ENOUGH_TO_BE_THE_BODY) return article
+    return blocks("main").maxByOrNull { it.textLength() } ?: this
 }
+
+/**
+ * Every outermost `<tag>...</tag>` in the document, counting depth rather than matching lazily.
+ *
+ * A regex cannot do this and the first version of this code tried. `<article>.*?</article>` is
+ * left anchored and stops at the first close tag it meets, so an article holding a nested one,
+ * which is legal HTML and is what a related-items card or a comment thread is, matched from the
+ * outer open tag to the INNER close and returned a fragment. Where that fragment cleared the
+ * threshold below, the body of the page was silently dropped and the model answered out of the
+ * teaser. Reproduced before it was fixed: a six hundred character excerpt card in front of a
+ * twelve hundred character body returned the card.
+ *
+ * Depth counting has the further advantage of failing safe. A document whose open tag is never
+ * closed never returns to depth zero, emits nothing, and falls through to the fuller text.
+ */
+private fun String.blocks(tag: String): List<String> {
+    val found = mutableListOf<String>()
+    var depth = 0
+    var start = -1
+    for (mark in Regex("(?is)<(/?)$tag\\b[^>]*>").findAll(this)) {
+        if (mark.groupValues[1].isEmpty()) {
+            if (depth == 0) start = mark.range.first
+            depth++
+        } else if (depth > 0) {
+            depth--
+            if (depth == 0) {
+                found += substring(start, mark.range.last + 1)
+            }
+        }
+    }
+    return found
+}
+
+/**
+ * How much of a candidate is words rather than markup.
+ *
+ * The first version compared candidates by the length of their markup, which is the wrong
+ * quantity by a wide margin: twenty cards of thumbnails and class lists outweigh a clean body,
+ * so an index page beat an article. Tags are dropped rather than decoded, because decoding
+ * entities is a platform call and this has to be answerable off a device.
+ */
+private fun String.textLength(): Int = replace(TAGS, " ").replace(RUNS_OF_SPACE, " ").trim().length
 
 /**
  * The elements whose contents are never what was being looked for.
@@ -439,21 +489,20 @@ private val FURNITURE = Regex(
         """[^>]*>.*?</\1>""",
 )
 
-/** The two elements a page uses to say which part of it is the point. */
-private val LANDMARKS = listOf("article", "main").associateWith {
-    Regex("(?is)<$it\\b[^>]*>.*?</$it>")
-}
-
 /**
- * Below this an `<article>` is a teaser rather than a body, so the page is better read whole.
+ * Below this much text an `<article>` is a teaser rather than a body, so the page is better
+ * read whole.
  *
  * A card on an index page carries a headline and a sentence. A short real article still clears
  * this, and one that does not loses nothing: falling through returns the fuller text.
  */
 private const val ENOUGH_TO_BE_THE_BODY = 500
 
+private val TAGS = Regex("<[^>]+>")
+private val RUNS_OF_SPACE = Regex("""\s+""")
+
 private fun String.stripTags(): String = this
-    .replace(Regex("<[^>]+>"), " ")
+    .replace(TAGS, " ")
     .let { android.text.Html.fromHtml(it, android.text.Html.FROM_HTML_MODE_LEGACY).toString() }
-    .replace(Regex("""\s+"""), " ")
+    .replace(RUNS_OF_SPACE, " ")
     .trim()

@@ -122,6 +122,55 @@ class PageFurnitureTest {
         assertThat(read).doesNotContain("Search")
     }
 
+    @Test
+    fun `an article holding a nested one keeps the body after it`() {
+        // The bug the first version of this shipped with. A lazy match runs from the outer open
+        // tag to the INNER close tag, so a related-items card in front of the piece returned
+        // the card and dropped everything after it. Reproduced at these sizes before the fix.
+        val card = "Related. ".repeat(70)
+        val page = "<article><article>$card</article>$PROSE</article>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains("Ada Lovelace")
+    }
+
+    @Test
+    fun `comments nested inside an article do not cut it short`() {
+        val page =
+            "<article>$PROSE<article>First</article><article>Second</article></article>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains("Ada Lovelace")
+    }
+
+    @Test
+    fun `a body of prose beats a card dense with markup`() {
+        // Candidates used to be compared by the length of their markup, so twenty thumbnails
+        // and their class lists outweighed the article. What counts is the words.
+        val cards = (1..20).joinToString("") {
+            """<article><img src="/img/$it.png" class="card-thumb card-thumb--lg lazy" """ +
+                """data-src="/img/$it@2x.png" srcset="/img/$it.png 1x"><h3 class="t">$it</h3></article>"""
+        }
+        val page = "<body><article>$cards</article><main>$PROSE</main></body>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains("Ada Lovelace")
+    }
+
+    @Test
+    fun `an article whose tag is never closed does not swallow the page`() {
+        // Failing safe: depth never returns to zero, nothing is emitted, and the fuller text
+        // is what comes back.
+        val page = "<body><article><div>$PROSE</div></body>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains("Ada Lovelace")
+    }
+
     private companion object {
         /**
          * Long enough to clear the threshold that separates a body from a teaser, and dull

@@ -168,15 +168,22 @@ class DiscoverViewModel @Inject constructor(
     /**
      * The measured shortlist, or the whole Hub.
      *
-     * Turning it off is what opens the search up, so the other filters come on with it: a
-     * user who has just left a list of five wants the one that fits their phone next, and
-     * arriving at the unfiltered Hub sorted by trending is arriving at abliterated merges
-     * of other people's work at sizes nothing can hold.
+     * Turning it off brings the size ceiling on, because arriving at the unfiltered Hub
+     * sorted by trending is arriving at models nothing in a pocket can hold, and because
+     * the chip says "Under 10B" once it is on, so the narrowing is on screen and one tap
+     * from being undone.
+     *
+     * It used to switch Official on at the same time, and that was a trap. Official is the
+     * fourth chip in a row that scrolls, so on a 360dp phone it is past the right edge:
+     * leaving the shortlist silently enabled a filter the user could not see, and the two
+     * lit chips they could see were the only two they knew to turn off. What Official
+     * removes is every account the Hub calls a person, which for any model released this
+     * month is everybody who has converted it, so the result was an empty screen with no
+     * visible cause. A filter this app turns on by itself has to be one the user can see.
      */
     fun onRecommendedOnlyChange(enabled: Boolean) = onQueryChange(
         _uiState.value.query.copy(
             recommendedOnly = enabled,
-            officialOnly = !enabled,
             maxParametersBillions = _uiState.value.parameterCeilingBillions
                 .takeIf { !enabled && it > 0 },
         ),

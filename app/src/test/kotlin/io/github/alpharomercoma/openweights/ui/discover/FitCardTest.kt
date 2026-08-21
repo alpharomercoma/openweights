@@ -94,7 +94,32 @@ class FitCardTest {
         compose.onNodeWithText("tok/s", substring = true).assertDoesNotExist()
     }
 
-    private fun showFit(verdict: FitVerdict, tokensPerSecond: Double? = 13.8) {
+    @Test
+    fun `an architecture this build cannot load withholds the download`() {
+        // The reason the submodule moved: Ling 3.0 is bailingmoe3, which llama.cpp learned
+        // after the previous pin was cut. An install that predates it can still find the
+        // model, so the card has to refuse before several gigabytes rather than let the
+        // load fail afterwards, and it has to say which way out there is.
+        showFit(FitVerdict.COMFORTABLE, unsupportedArchitecture = "bailingmoe3")
+
+        compose.onNodeWithText("cannot load bailingmoe3", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Download").assertDoesNotExist()
+    }
+
+    @Test
+    fun `an unloadable file does not also claim to run comfortably`() {
+        // Memory is not the binding constraint when the engine cannot read the format, and
+        // a card carrying both sentences is a card arguing with itself.
+        showFit(FitVerdict.COMFORTABLE, unsupportedArchitecture = "bailingmoe3")
+
+        compose.onNodeWithText("Runs comfortably").assertDoesNotExist()
+    }
+
+    private fun showFit(
+        verdict: FitVerdict,
+        tokensPerSecond: Double? = 13.8,
+        unsupportedArchitecture: String? = null,
+    ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
                 FitCard(
@@ -114,6 +139,7 @@ class FitCardTest {
                             fileType = GgufFileType.Q4_K_M,
                             name = "LFM2.5-2.6B",
                         ),
+                        unsupportedArchitecture = unsupportedArchitecture,
                         fit = FitReport(
                             verdict = verdict,
                             requiredMemoryBytes = 2_100_000_000L,

@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
+import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
@@ -58,6 +59,15 @@ data class InspectedFile(
     val isInspecting: Boolean = false,
     val inspectionError: String? = null,
     val isDownloaded: Boolean = false,
+    /**
+     * The architecture this file declares, when the engine in this build cannot load it.
+     *
+     * Read from the GGUF header rather than from the Hub's summary, because the header is
+     * the file that would actually be downloaded and the summary is derived. Null covers
+     * both "supported" and "not read yet", which is deliberate: a check that has not run
+     * must not withhold a download.
+     */
+    val unsupportedArchitecture: String? = null,
 )
 
 data class DiscoverUiState(
@@ -320,8 +330,20 @@ class DiscoverViewModel @Inject constructor(
             GgufHeaderParser(source).parse()
         }.onSuccess { metadata ->
             val fit = estimate(metadata, file, _uiState.value.contextLength)
+            // The one question the fit report cannot answer. Memory says whether there is
+            // room for the weights; this says whether the engine in this APK knows the
+            // shape of them at all, and a model released after this build was cut is the
+            // case where the answer is no. Asked here, over a couple of kilobytes of
+            // header, rather than after several gigabytes of download.
+            val architecture = metadata.architecture
+                .takeUnless { EngineArchitectures.supports(it) }
             updateFile(file.path) {
-                it.copy(isInspecting = false, metadata = metadata, fit = fit)
+                it.copy(
+                    isInspecting = false,
+                    metadata = metadata,
+                    fit = fit,
+                    unsupportedArchitecture = architecture,
+                )
             }
         }.onFailure { failure ->
             if (failure is CancellationException) throw failure

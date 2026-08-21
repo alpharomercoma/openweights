@@ -86,9 +86,26 @@ fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier
                     strokeWidth = 2.dp,
                 )
 
+                // Before the fit verdict, because it outranks it: a file this engine
+                // cannot parse will not run at any context length, and offering the
+                // slider as a way out would be a lie.
+                inspected.unsupportedArchitecture != null -> Unit
                 inspected.fit?.verdict == FitVerdict.WONT_RUN -> Unit
                 else -> AccentButton(onClick = onDownload) { Text("Download") }
             }
+        }
+
+        inspected.unsupportedArchitecture?.let { architecture ->
+            Text(
+                text = "Needs a newer OpenWeights: this version cannot load " +
+                    "$architecture models.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = signal(
+                    OpenWeightsColors.SignalPoor,
+                    OpenWeightsColors.PaperSignalPoor,
+                    LocalIsDarkTheme.current,
+                ),
+            )
         }
 
         inspected.inspectionError?.let { error ->
@@ -99,7 +116,13 @@ fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier
             )
         }
 
-        inspected.fit?.let { fit -> VerdictLine(fit) }
+        // Only when the file could be loaded at all. "Runs comfortably" under "this
+        // version cannot load bailingmoe3 models" is the card contradicting itself, and
+        // the memory arithmetic is beside the point once the engine cannot read the
+        // format: there is no context length at which it becomes true.
+        if (inspected.unsupportedArchitecture == null) {
+            inspected.fit?.let { fit -> VerdictLine(fit) }
+        }
         // One line each, and each short enough to be one line. Both of these used to run
         // past the card and wrap, which on a list of eight files turned a scannable column
         // into a wall: the eye cannot compare quantisations down a page whose rows are

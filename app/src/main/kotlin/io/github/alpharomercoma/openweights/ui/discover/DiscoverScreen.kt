@@ -67,6 +67,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.StepSlid
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
@@ -313,6 +314,21 @@ private fun ModelDetail(
                         detail.architecture,
                         detail.parameterCount?.let { "${it / 1_000_000} M params" },
                     ).joinToString(" · "),
+                )
+            }
+        }
+
+        // Said at the top, from the Hub's own summary, so it arrives with the screen
+        // rather than after every file header has been read over the network. The cards
+        // below repeat it per file from the header itself, which is the authority; this is
+        // the early warning, and on a repository the Hub has no summary for it stays quiet
+        // and the cards answer alone.
+        detail.architecture?.takeUnless { EngineArchitectures.supports(it) }?.let { arch ->
+            item {
+                Callout(
+                    "This version of OpenWeights cannot load $arch models. The engine that " +
+                        "reads them ships inside the app, so an update is what adds them. " +
+                        "You can still browse the files here.",
                 )
             }
         }

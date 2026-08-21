@@ -74,7 +74,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 
 AGP 9.3.1 · Kotlin 2.3.20 (AGP 9 compiles Kotlin itself: do **not** apply
 `org.jetbrains.kotlin.android`) · KSP 2.3.11 · Hilt 2.60.1 · Compose BOM 2026.06.01 ·
-Material3 1.4.0 · OkHttp 5.4.0 · llama.cpp pinned at tag **b10333** (submodule).
+Material3 1.4.0 · OkHttp 5.4.0 · llama.cpp pinned at tag **b10549** (submodule).
 Single source of truth: `gradle/libs.versions.toml`.
 
 ## Module map

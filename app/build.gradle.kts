@@ -169,6 +169,12 @@ dependencies {
     // fetcher for an https model, fails silently, and every publisher tile in Discover fell
     // back to drawing initials: the avatars were being looked up correctly and thrown away.
     implementation(libs.coil.network.okhttp)
+    // Hugging Face gives an account that never uploaded a picture a generated identicon,
+    // served from /avatars/<hash>.svg. Coil decodes no SVG without this artifact, so those
+    // publishers drew an empty slot: on a trending page of GGUF repositories that is nine
+    // of the thirty-eight individual accounts and none of the nineteen organisations,
+    // which is why it read as personal publishers having no logo at all.
+    implementation(libs.coil.svg)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     // Downloads outlive the screen that started them, so they run as WorkManager jobs and

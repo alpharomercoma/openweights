@@ -16,13 +16,17 @@
 
 package io.github.alpharomercoma.openweights.ui
 
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -36,6 +40,7 @@ import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /**
  * The app, driven the way a person drives it.
@@ -49,8 +54,19 @@ import org.junit.runner.RunWith
  * So this launches the real activity, with the real graph, the real view model and the real
  * engine. It asserts on what is on screen and on nothing else.
  *
- * Most of it needs no model. The two that do are marked, and they need one installed the way
- * the app installs one, which for a test means putting it where the model store looks:
+ * Two things about the device, both of which fail in a way that points at the wrong place.
+ *
+ * The phone has to be awake with the lock screen down, or every case here fails with
+ * `No compose hierarchies found in the app`. That reads as a `setContent` problem and is
+ * not one: behind a keyguard the activity reaches RESUMED and is PAUSED milliseconds
+ * later, and a window that is never visible never composes.
+ * ```
+ * adb shell input keyevent KEYCODE_WAKEUP && adb shell wm dismiss-keyguard
+ * ```
+ *
+ * And a model has to be where the app looks, which is not where the engine tests look.
+ * Without one the app opens on "Pick a model to begin", a screen with no composer, so the
+ * cases below hunt a "Message" field the app is right not to be showing.
  * ```
  * adb shell mkdir -p /sdcard/Android/data/io.github.alpharomercoma.openweights.debug/files/models
  * adb shell cp /data/local/tmp/openweights/model.gguf \
@@ -92,9 +108,25 @@ class ChatFlowTest {
     @Test
     fun everyDestinationOpens() {
         // Nothing here had a test of any kind. A navigation graph that fails to build fails
-        // at the moment a tab is tapped, which is to say in front of a person.
-        listOf("Models", "Tools", "Usage", "Settings", "Chat").forEach { destination ->
-            rule.onNodeWithText(destination).performClick()
+        // at the moment a destination is tapped, which is to say in front of a person.
+        //
+        // These used to be five tabs on a bottom bar and are now three rows in the drawer,
+        // pushed over the conversation rather than swapped with it. Models left the list
+        // entirely: it is reached from the model name in the top bar, which is a different
+        // gesture and belongs in a different test.
+        listOf("Tools", "Usage", "Settings").forEach { destination ->
+            rule.onNodeWithContentDescription("Past chats").performClick()
+            rule.waitForIdle()
+
+            // The drawer sheet stays composed while closed, so its own row and the title of
+            // the screen it opens are two nodes carrying the same word. Take the drawer's.
+            rule.onAllNodesWithText(destination).onFirst().performClick()
+            rule.waitForIdle()
+
+            // Pushed, not swapped: the conversation is gone rather than behind a tab.
+            rule.onNodeWithContentDescription("Message").assertDoesNotExist()
+
+            goBack()
             rule.waitForIdle()
         }
         rule.onNodeWithContentDescription("Message").assertIsDisplayed()
@@ -102,9 +134,29 @@ class ChatFlowTest {
 
     @Test
     fun theDrawerOpensAndCloses() {
+        // It asserted on a "Chats" heading, which the drawer no longer has: it opens on the
+        // New chat pill and a search field, because a list of past conversations does not
+        // need a word telling you it is a list of past conversations.
         rule.onNodeWithContentDescription("Past chats").performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("Chats").assertIsDisplayed()
+        rule.onNodeWithText("New chat").assertIsDisplayed()
+
+        // And closes, which the name has always promised and the body never checked.
+        goBack()
+        rule.waitForIdle()
+        rule.onNodeWithText("New chat").assertIsNotDisplayed()
+        rule.onNodeWithContentDescription("Message").assertIsDisplayed()
+    }
+
+    /**
+     * The system back gesture, which is how every pushed screen and the drawer are left.
+     *
+     * Through the activity's own dispatcher rather than Espresso, so this suite keeps its
+     * one dependency on Compose testing and does not grow a second on a UI framework it
+     * otherwise never touches.
+     */
+    private fun goBack() = rule.runOnUiThread {
+        rule.activity.onBackPressedDispatcher.onBackPressed()
     }
 
     @Test
@@ -173,5 +225,77 @@ class ChatFlowTest {
                 "android.permission.POST_NOTIFICATIONS",
             )
         }
+
+        /**
+         * The lock screen, which fails exactly the way the permission dialog above did.
+         *
+         * A window behind a keyguard is never visible, so the activity reaches RESUMED and
+         * is PAUSED milliseconds later and Compose never attaches. The error says "No
+         * compose hierarchies found in the app", which sends you looking at `setContent`.
+         * A cloud device arrives locked and a desk device locks itself while you are
+         * reading, so this is not an unusual state to be in.
+         *
+         * Fixed here rather than written down for the same reason the permission is: a
+         * setup step in a document is a step somebody runs once and then forgets on the
+         * machine where it matters.
+         */
+        @JvmStatic
+        @BeforeClass
+        fun unlockTheScreen() {
+            shell("input keyevent KEYCODE_WAKEUP")
+            shell("wm dismiss-keyguard")
+        }
+
+        /**
+         * A model, moved from where the engine tests keep one to where the app looks.
+         *
+         * These are two different places and nothing bridged them. `/data/local/tmp` is
+         * outside any package, survives an uninstall, and is where a pushed GGUF lands; the
+         * app reads its own external files directory, which Gradle's
+         * `connectedAndroidTest` deletes every run when it uninstalls afterwards. So the
+         * fixture had to be re-copied by hand between every single run, which is not a
+         * thing anybody remembers to do.
+         *
+         * It matters more than it used to. Before the redesign most of this suite ran
+         * without a model; now the app opens on "Pick a model to begin" instead of a
+         * conversation, and a screen with no composer fails every case that reaches for
+         * one. Copied through the shell rather than with Kotlin file APIs because the app's
+         * own uid cannot read shell-owned storage, and `-n` so a real download is never
+         * overwritten by a test fixture.
+         */
+        @JvmStatic
+        @BeforeClass
+        fun installAModelIfOneWasPushed() {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val models = File(
+                context.getExternalFilesDir(null) ?: context.filesDir,
+                "models",
+            )
+            if (!File(PUSHED_MODEL).isFile && !models.isDirectory) return
+            shell("mkdir -p ${models.absolutePath}")
+            shell("cp -n $PUSHED_MODEL ${models.absolutePath}/$FIXTURE_NAME")
+        }
+
+        /**
+         * One shell command, run to completion.
+         *
+         * `executeShellCommand` returns as soon as the command is spawned, so the pipe has
+         * to be drained: a keyguard dismissed after the activity launched is a keyguard
+         * that was not dismissed.
+         */
+        private fun shell(command: String) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation
+                .executeShellCommand(command)
+                .use { descriptor ->
+                    ParcelFileDescriptor.AutoCloseInputStream(descriptor)
+                        .use { it.readBytes() }
+                }
+        }
+
+        /** Where a pushed GGUF lives, outside any package and safe from an uninstall. */
+        private const val PUSHED_MODEL = "/data/local/tmp/openweights/model.gguf"
+
+        /** What it is called once it is somewhere the app can see it. */
+        private const val FIXTURE_NAME = "qwen.gguf"
     }
 }

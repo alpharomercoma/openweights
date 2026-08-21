@@ -474,6 +474,34 @@ adb shell am instrument -w -r \
 
 Note the class name has no `.test` suffix even though the APK's application id does.
 
+### Two things the suite needs and never says so
+
+Both cost a run each to discover, because the error they produce points somewhere else.
+
+**Wake the phone and drop the lock screen first.**
+
+```sh
+adb shell input keyevent KEYCODE_WAKEUP && adb shell wm dismiss-keyguard
+```
+
+Every `ChatFlowTest` case fails with `No compose hierarchies found in the app` when the
+keyguard is up. The message reads as a Compose or a `setContent` problem and is neither:
+the activity reaches RESUMED and is PAUSED a few milliseconds later, because the window
+behind a lock screen is never visible, so nothing composes. A QDC device arrives locked.
+
+**Put a model where the app itself looks, not just where the engine tests look.**
+
+```sh
+adb shell mkdir -p /sdcard/Android/data/io.github.alpharomercoma.openweights.debug/files/models
+adb shell cp /data/local/tmp/openweights/model.gguf \
+  /sdcard/Android/data/io.github.alpharomercoma.openweights.debug/files/models/qwen.gguf
+```
+
+`/data/local/tmp/openweights` is where the engine tests read from and the app never looks
+there. With no model installed the app opens on "Pick a model to begin", which has no
+composer at all, so four `ChatFlowTest` cases fail hunting a "Message" field that the
+screen is right not to be showing.
+
 The same recipe runs `:app`'s instrumentation. Four classes there need a device, and each
 asks a different question:
 

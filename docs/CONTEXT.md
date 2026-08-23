@@ -3149,6 +3149,40 @@ test is a real turn. Driving the app, sending a question, then pressing home:
 decoding at full speed with the app off the screen. Before the change the same measurement
 was zero.
 
+## Download survival, which was written and never tested (2026-08-24)
+
+The resume logic was already there and it is careful: partial bytes go to a `.part` file, a
+retry sends `Range: bytes=N-`, a `.part` longer than the file is discarded because resuming
+past the end returns 416 and the retry would loop on it forever, and a `.part` of exactly the
+right length skips the transfer because asking to resume from the end is the same 416.
+WorkManager keeps the request across process death and reboot, keyed uniquely by destination
+so two repositories offering the same filename cannot write over each other.
+
+**None of it had a test.** It is the riskiest code in the app, a gigabyte or two over a phone
+connection where the interesting path is never the happy one, and the whole file was covered
+by nothing.
+
+`ModelDownloaderResumeTest` drives it against a real HTTP server rather than a stub, because
+the mechanism under test is a `Range` request and a `Content-Range` reply and a stub that
+answered them the way this code expects would only be testing the expectation. The host is
+redirected by an interceptor, so the hardcoded Hugging Face host stays hardcoded, which is
+worth keeping: an app that can be told to fetch weights from anywhere is a worse app.
+
+| Case | What must happen |
+| --- | --- |
+| died halfway | asks `bytes=800-`, keeps the 800, ends with the whole file |
+| nothing on disk | **no `Range` header at all** |
+| `.part` longer than the file | thrown away, restarted, no 416 |
+| `.part` already complete | verified without a single request |
+| file already in place | not downloaded again |
+| server stops early | retryable failure, and the bytes are still there |
+| checksum wrong | never moved into place |
+
+One expectation in that table was mine and wrong before it was right: a fresh download sends
+no range rather than `bytes=0-`. That is the better behaviour and worth naming, since some
+mirrors answer a zero range with a 206 and others with a 200, and asking for the whole file
+is the one phrasing they all agree on.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

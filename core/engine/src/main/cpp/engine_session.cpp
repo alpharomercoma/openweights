@@ -789,6 +789,42 @@ bool Session::supports_reasoning_effort() const {
     return !low.empty() && low != high;
 }
 
+/**
+ * Moves a leading `<think>...</think>` out of an assistant message and into its own field.
+ *
+ * This is about the KV cache rather than about presentation, and it is worth twelve seconds
+ * a turn on the models this app recommends.
+ *
+ * LFM2.5's template pre-opens the thinking block in the generation prompt, so the tokens the
+ * engine actually decoded for turn one end `<|im_start|>assistant\n<think>` followed by the
+ * reply. When turn two re-renders the same conversation, the reply is now a history message,
+ * and `common_chat_params_init_lfm2` only emits that `<think>` if the message carries
+ * `reasoning_content`: it copies that field into the `thinking` variable the template reads.
+ * Handing the template a message whose content still has the tags inside it is not the same
+ * thing, because `common_chat_templates_apply` parses them straight back out again.
+ *
+ * So one token went missing from the re-render, at the position where the assistant turn
+ * begins. Measured on an SM8650 with LFM2.5 2.6B, that one token cost the entire cache:
+ * the prefix matched 1,158 of 1,204 tokens, the rollback to 1,158 was refused because a
+ * hybrid model cannot erase part of its recurrent state, and the engine correctly started
+ * over. A second turn re-read 1,220 tokens and took 9.6 seconds to do it. With this in
+ * place the same turn re-reads 17 and takes 189 ms.
+ *
+ * The app writes this shape itself, in `assistantHistoryText`, so this is reading back
+ * something the codebase produced rather than guessing at a model's. Anything that is not
+ * that shape is left alone, which is what keeps it inert for a model whose template opens
+ * no thinking block of its own.
+ */
+static void split_thinking(std::string & content, std::string & reasoning) {
+    static const std::string OPEN  = "<think>";
+    static const std::string CLOSE = "</think>";
+    if (content.rfind(OPEN, 0) != 0) return;
+    const size_t end = content.find(CLOSE, OPEN.size());
+    if (end == std::string::npos) return;
+    reasoning = content.substr(OPEN.size(), end - OPEN.size());
+    content = content.substr(end + CLOSE.size());
+}
+
 bool Session::render_prompt(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
@@ -808,6 +844,10 @@ bool Session::render_prompt(
     // reasoning_content instead of leaving tags in the answer.
     inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
     inputs.enable_thinking = reasoning.enabled;
+    // Send a reply's thinking back with it. LFM2.5's template drops thinking from every
+    // assistant turn before the last user turn unless this is set, and dropping it is what
+    // breaks the KV cache: see split_thinking above for the measurement.
+    inputs.chat_template_kwargs["preserve_thinking"] = "true";
     if (!reasoning.effort.empty()) {
         // A template argument rather than a field, because only some models read it. The
         // rest ignore the extra key.
@@ -818,6 +858,11 @@ bool Session::render_prompt(
         common_chat_msg msg;
         msg.role = message.role;
         msg.content = message.content;
+        // A reply that was thought about has to go back the way it came, or the prefix
+        // stops matching and the whole conversation is read again. See split_thinking.
+        if (message.role == "assistant") {
+            split_thinking(msg.content, msg.reasoning_content);
+        }
         if (!message.tool_call_id.empty()) {
             msg.tool_call_id = message.tool_call_id;
         }

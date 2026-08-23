@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
@@ -95,6 +96,16 @@ data class TranscriptEntry(
     val blocks: List<TurnBlock> = emptyList(),
     /** Wall clock from send to finished, which is what the wait actually felt like. */
     val totalMillis: Long? = null,
+    /**
+     * The reply exactly as it was decoded, kept only for as long as the process lives.
+     *
+     * [text] is what is shown and stored, and it is not the same string: see
+     * [assistantHistoryText]. This is what goes back to the engine as history, because it
+     * is the only version that matches the tokens still sitting in the KV cache. Null on a
+     * turn that was reloaded from storage, where the cache is empty anyway and there is
+     * nothing to match.
+     */
+    val history: String? = null,
 )
 
 /** A past conversation, as shown in the drawer. */
@@ -1281,6 +1292,9 @@ class ChatViewModel @Inject constructor(
         updateLastEntry {
             it.copy(
                 text = canonical,
+                // Blank only when the pass produced nothing, and then there is nothing in
+                // the cache to match either: null keeps [text] as the fallback.
+                history = raw.takeIf { it.isNotBlank() }?.let(::assistantHistoryText),
                 answer = answer,
                 reasoning = reasoning,
                 isStreaming = false,
@@ -1802,7 +1816,9 @@ internal fun GenerationStats.charsPerToken(chars: Int): Float? =
  */
 private fun TranscriptEntry.toChatMessage(): ChatMessage = ChatMessage(
     role = role,
-    parts = attachments + MessagePart.Text(text),
+    // [history] where there is one, because [text] has been through the parser and the
+    // engine's cache holds what came out of the model. See assistantHistoryText.
+    parts = attachments + MessagePart.Text(history ?: text),
 )
 
 /**

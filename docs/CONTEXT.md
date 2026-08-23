@@ -33,7 +33,7 @@ Fully open source under **Apache-2.0**, aimed at a developer audience.
 |---|---|---|---|
 | Poco X8 Pro Max (primary dev device) | MediaTek **MT6991** | 11.5 GiB total | Measured on-device, see below |
 | Qualcomm Device Cloud `sun` (second test device) | Qualcomm **SM8750** (Snapdragon 8 Elite) | 14.8 GiB total | Adreno 830; OpenCL backend verified here, see below |
-| Qualcomm Device Cloud `pineapple` (mid-range test device) | Qualcomm **SM7675** (Snapdragon 7+ Gen 3) | 11 GiB total | Adreno 732. Worth keeping in the rotation: it is the device that showed the offload crossover is not a property of the model, because the weaker CPU moves it by six times |
+| Qualcomm Device Cloud `pineapple` (second Qualcomm test device) | Qualcomm **SM8650** (Snapdragon 8 Gen 3) | 11 GiB total | Adreno 750. Corrected from SM7675 / Adreno 732: `pineapple` is Qualcomm's codename for SM8650, and the reservation reports `ro.soc.model=SM8650` against `ro.board.platform=pineapple`. It is a flagship, not a mid-range part. The offload crossover measured here is still real, but the explanation that went with it, that a weaker CPU moves it, does not survive the correction and the cause is unattributed until something re-measures it |
 
 ### Measured facts for the dev device (adb, 2026-08-09)
 
@@ -681,7 +681,7 @@ rather than inside the prompt rate, and it reports what a switch costs and how m
 each shape repay it. Every `.gguf` in `/data/local/tmp/openweights` is measured, because the
 answer differs per model and the whole point is to see that.
 
-Run on a **Snapdragon 7+ Gen 3 (SM7675, Adreno 732)**, all Q4_K_M, all four models in one
+Run on a **Snapdragon 8 Gen 3 (SM8650, Adreno 750)**, all Q4_K_M, all four models in one
 session:
 
 | model | prefill CPU to GPU | decode CPU to GPU | crossover | switch |
@@ -723,7 +723,7 @@ the next load, which for most people never comes: the user moved it to GPU, the 
 on saying CPU because the weights really were still on the CPU, and nothing said the setting
 was queued behind an event they had no reason to expect. It now reloads on the spot, keeping
 the conversation, and the screen shows the state it already had for this. Driven on the same
-SM7675 with LFM2 1.2B, the top bar goes `CPU · 4096 ctx` to `OPENCL · 4096 ctx`
+SM8650 with LFM2 1.2B, the top bar goes `CPU · 4096 ctx` to `OPENCL · 4096 ctx`
 and back, through "Loading the model into memory" each way. **19.4 s the first time the app
 ever used OpenCL on that install, 4.4 s every time after.** The context window deliberately
 still waits for the next load: growing it can fail for want of memory, and failing a load
@@ -1302,11 +1302,707 @@ Two traps found while wiring this up:
   thinks for 50+ seconds; a 256-token budget truncates mid-thought and looks exactly like
   a parser bug.
 
+## What on-device reasoning is for, and what tool wording is worth (2026-08-23)
+
+Two suites were built and run off-device against the real GGUFs, because tool-calling
+behaviour is a property of the weights and the prompt rather than of the phone. A 142 case
+suite over a 14 tool registry, and a 48 case suite over this app's own eight tools with its
+real system message. Prompts were verified byte identical to `llama-server /apply-template`,
+grading is deterministic with no LLM judge, and a call written inside `<think>` is not
+counted because the runtime never executes one. Both suites and the grader were reviewed
+adversarially before any run, which is where the think-block hole was caught.
+
+### Reasoning is load bearing for exactly one thing
+
+The 2.6B template ends every generation prompt with `<|im_start|>assistant\n<think>`, so
+thinking is not optional and `enable_thinking=false` is a no-op, which `Session::supports_thinking`
+already detects. Forcing the block shut with a `</think>` prefill costs 15.5 points, and the
+loss is not spread out:
+
+| category | thinking on | thinking off |
+|---|---|---|
+| argument fidelity | 20/20 | 20/20 |
+| tool selection | 14/16 | 15/16 |
+| parallel calls | 12/12 | 12/12 |
+| chaining | 8/8 | 8/8 |
+| **no-call detection** | **17/18** | **5/18** |
+| **missing argument** | **7/10** | **0/10** |
+
+Every mechanical skill survives. Only judgement dies. Three separate prompt-side
+interventions all land on the same ~73% floor, so abstention has to be computed and cannot
+be instructed. About 470 characters of planning per turn, roughly 117 tokens, which at the
+Poco's measured 16.8 tok/s is **seven seconds before the answer starts streaming**. That
+wait is what the judgement costs.
+
+### Tool wording is the strongest lever found, and it is model specific
+
+Three rules, each traceable to the category it fixed: say what the tool is **not** for
+(no-call 17/18 to 18/18), say what to do when a required argument is **missing** rather than
+just naming it (missing argument 7/10 to 10/10, where a bare "requires X" made the model
+invent X), and pair near-miss tools **contrastively** (selection 14/16 to 16/16).
+
+| configuration | 142 case suite |
+|---|---|
+| 8B-A1B, plain discipline prompt | 138/142 |
+| 2.6B QAD-Q4_0, rewritten descriptions | 135/142 |
+| 8B-A1B, template default | 134/142 |
+| 2.6B QAD-Q4_0, template default | 127/142 |
+| 8B-A1B, **rewritten** descriptions | 127/142 |
+
+The last row is the warning. Wording tuned on the 2.6B **costs the 8B 7.8 points**, with
+out-of-scope handling falling 8/8 to 4/8, and does nothing at all on Q4_K_M. Changing the
+default model means re-running the suite; the prompt work does not travel.
+
+Statistically: 20 variants were scored against the 142 case suite and the winner was tuned
+on it, so its p = 0.02 does not survive correction for the comparisons. What the claim rests
+on is replication, +5.6 in sample and +6.2 then +4.2 on a different registry at greedy and
+at production sampling.
+
+### Measured dead ends, so nobody spends a day on them again
+
+- **Quantised KV cache.** Only 8 of 30 layers attend, head_dim 64, so 16 KB per token.
+  Q8_0 saves about 30 MB at 4K context. Not worth the backend risk.
+- **The model's own sampling.** The GGUF ships `general.sampling.temp = 0.2` and nothing
+  reads it, but 0.2 scores 69.4% against the app's 0.8 at 71.5%. The mismatch is real and
+  is not costing anything.
+- **Raising `DEFAULT_MAX_ROUNDS`.** Measured with a closed loop and real tool execution:
+  9/10 tasks complete at a cap of 2, 4 and 6 alike. The one failure had budget to spare.
+- **A grammar-gated micro-verification prefix.** 81.7% at 50 tokens, but the gate's own
+  yes/no is right only 63% of the time. A slot to record a decision does not create the
+  computation needed to reach it.
+- **Logit bias on `<|tool_call_start|>`.** Swept -0.5 to -3.0, no effect at greedy.
+- **A hard reasoning budget.** Free on the 48 case suite, costs 5.7 points on the 142 case
+  one. The smaller suite has fewer hard abstention cases.
+- **Routing through the 1.2B.** The cascade scores 37/48 against the 2.6B's 39. The 1.2B is
+  not better at judging, it is quieter: d' of 1.05 against 2.41 for the 2.6B and 2.95 for
+  the 8B, whose recall matches the 2.6B at half the false alarm rate.
+- **Renaming `web_search`.** Over-calling redirected to `ask_user` rather than reducing.
+  Forbidding one route makes the model find another; a "do not fetch" clause in a tool
+  result made it invent `web_fetch_url`.
+
+### Python in the sandbox is viable
+
+MicroPython's `ports/embed` cross-compiles for Android arm64 with the NDK already installed,
+unmodified: **292 KB**, with a caller-supplied heap via `mp_embed_init(heap, heap_size,
+stack_top)` and a per-call teardown via `mp_embed_deinit`. So the integration is easy.
+
+It should still not be done. Twelve code tasks, same tool, only the language named, and the
+model's own programs executed:
+
+| the model's code, run for real | correct |
+|---|---|
+| Python on CPython | 11/12 |
+| JavaScript on node, the QuickJS analogue | 10/12 |
+| **Python on real MicroPython** | **4/12** |
+
+The model writes full Python and MicroPython is a subset: `ImportError` for `re` and `json`,
+`SyntaxError: decimal numbers not supported` on float formatting, and syntax the subset does
+not carry. Shipping it would take code execution from 10/12 to 4/12. Keep QuickJS. Full
+CPython is ~15 MB plus a stdlib, which is a different conversation.
+
+### What was actually missing was the loop, not the language
+
+`run_script` required inline `source`, and `files` were read in as data rather than run, so
+a program the model saved with `write_file` could never be executed. Authoring and running
+are two turns and the second had no way to refer to the first. `run_script` now also takes
+`path`, reading a saved `.js` file as the program, bounded at 16 KB because a program is
+not a dataset. Measured: both halves of the loop fire, and on the fifty cases that predate
+the change the score is unmoved at 38/50, two moving each way, which is greedy noise. No
+unit test: `Sandbox` and `Workspace` are concrete classes over an Android `Context` and this
+module has no mocking framework, so the verification is behavioural through the suite.
+
+### Where the shipped configuration landed
+
+Re-measured from the source as it stands, after every trim, on the app's own tools at
+greedy: **40/48 against 35/48** at the start of the work, six cases fixed and one lost. At
+production sampling over three seeds it is 75.7% against 71.5%, with no-call detection
+18/36 to 24/36 and the searches that should happen still 18/18. The trimming done to fit
+the catalogue budget cost nothing: the last 177 characters removed gained two cases rather
+than losing any, which is the second time wording that read as load bearing turned out not
+to be. Nothing here is significant once the twenty variants tried are accounted for; the
+case rests on the same direction in three suites and two sampling regimes.
+
+### Still unmeasured
+
+Thread pinning, the 8B-A1B's real decode rate at 4.8 GB resident, and wall-clock
+confirmation of the ratios above. `llama-bench` already accepts `--cpu-mask`, `--cpu-strict`
+and `--prio`, so pinning needs no app change to test. All three run from one script once a
+device is reachable.
+
+**All three were measured on 2026-08-23. See the section below.**
+
+## The phone answered, and it moved the prefill thread count (2026-08-23)
+
+A Snapdragon 8 Gen 3 came back on the cloud rack, so the questions left open above are no
+longer arithmetic. Everything below is `llama-bench` from the flags the app ships
+(`GGML_CPU_ALL_VARIANTS`, `GGML_BACKEND_DL`, `GGML_CPU_KLEIDIAI`, `-O3`), LFM2.5 2.6B QAD
+Q4_0, and **every reading was started with the hottest thermal zone below 56 C**, which is
+6 C over this device's idle floor. The first setting of each sweep is repeated last, so
+drift is visible rather than assumed.
+
+The chip, read off the device rather than off a spec sheet: `ro.soc.model` SM8650, eight
+cores, `CPU part` 0xd80 twice at 2.27 GHz (Cortex-A520), 0xd81 five times at 2.96 GHz
+(A720), 0xd82 once at 3.19 GHz (X4). `/proc/cpuinfo` Features carries `i8mm` and `bf16` and
+carries **no `sve` and no `sve2`**, so ggml loads `libggml-cpu-android_armv8.6_1.so` and the
+two Armv9 variants in the APK are correctly declined. That is the right choice: i8mm is what
+KleidiAI's Q4_0 microkernels use, and QAD Q4_0 is what the recommended checkpoints ship.
+Backend variant dispatch, in other words, is already doing its job and needs nothing.
+
+### Prompt processing was being given two cores that slow it down
+
+`ThermalPolicy.plan()` handed prompt processing every core the phone reports. On a chip whose
+cores are not all the same core, that costs a quarter of the throughput.
+
+| threads | prefill, pp512 |
+| ---: | ---: |
+| 3 | 91.17 |
+| 4 | 104.90 |
+| 5 | 121.70 |
+| **6** | **138.98** |
+| 7 | 125.59 |
+| 8 | 105.19 |
+
+Bracket: the same six thread setting read 142.35 at the start of the sweep and 137.32 at the
+end, so 3.5% of drift sits under a 32% spread. The ordering is not in doubt.
+
+The mechanism is the barrier at the end of every operation. ggml gives each thread an equal
+slice and the step costs whatever the slowest thread costs, so adding an A520 does not add
+its throughput, it imposes its latency on the other seven.
+
+**Pinning is not the fix, and this is the reading that says so.** Six threads restricted to
+cores 2 to 7 with `--cpu-strict 1` gave 138.81 against 137.32 to 142.35 unpinned: no
+difference worth a threadpool. Given six busy threads the Linux scheduler already puts them
+on the six fast cores. What it cannot do is refuse the seventh and eighth, and that is the
+whole of the problem. Pinning does rescue a count that is already wrong, eight threads pinned
+across all eight cores gave 122.04 against 105.19 unpinned, but it never reaches what simply
+asking for six does. The caveat is that `llama-bench` had the device to itself; an app also
+running a UI is a case this cannot see, and if scheduler contention ever shows up in a real
+turn, affinity is the tool for it.
+
+So `CpuTopology` reads `cpuinfo_max_freq` per core and **drops the slowest cluster when at
+least half the cores are left without it**: six here, eight on the all big core MT6991 where
+eight was already measured fastest, four on the commonest 4 + 4 Android phone, and all eight
+on a 2 + 6 phone where two cores cannot carry the work. The threshold falls at half because
+that is where `k` times the speed of the k-th fastest core stops improving, given a little
+core doing about half a big core's work per step.
+
+`cpuinfo_max_freq` rather than `scaling_max_freq`: the second moves with heat and with
+whatever else is running, and a thread count that changes because a background app woke up is
+not a thread count. Any core that will not answer discards the whole reading and every core
+is used, because a partial table makes a heterogeneous chip look uniform exactly when the
+refused cores are the ones that differ. Whether an ordinary app process can read that file at
+all is a question an adb shell cannot answer, so `CpuTopologyOnDeviceTest` asks it from
+inside one.
+
+### Decode was already right
+
+| threads | decode, tg128 |
+| ---: | ---: |
+| 2 | 17.26 |
+| 3 | 22.68 |
+| **4** | **24.95, 24.98, 24.99** |
+| 5 | 25.97 |
+| 6 | 22.93 |
+
+Four is what `cores / 2` picks here and it is inside the noise of the best reading. Five is
+one standard deviation away and costs a core's worth of power for it. Pinning again did
+nothing: 24.71 on cores 4 to 7, 23.90 on cores 2 to 5, against 24.99 unpinned.
+
+Seven and eight are not in the table because they are nowhere near the answer and they are
+expensive to measure. In an earlier uncooled pass seven gave 11.11 and eight did not finish
+128 tokens in five minutes, with the big cores clocked down to 1.7 GHz at 72 C while the two
+A520s held their full 2.27. That is the same barrier seen from the other side.
+
+### OpenCL on the Adreno 750 is not worth having for this model
+
+The note above from 2026-08-17 says both recommended models have no crossover on this chip,
+that the GPU is faster at reading and at writing, and that `CROSSOVER_NUMERATOR = 10`
+therefore sends them to the wrong processor on every load. **That is no longer true of what
+ships.** Two things changed under it: the recommended checkpoints moved from Q4_K_M to QAD
+Q4_0, and the measurement now includes a context that is not empty.
+
+One binary, built with both backends, so every row below comes from the same process image.
+Six threads for CPU prefill and four for CPU decode, which is what the sweeps above chose.
+
+| shape | GPU, all layers | CPU |
+| --- | ---: | ---: |
+| prefill 64, empty context | 159.2 (sd 16.1) | 152.5 (sd 7.0) |
+| prefill 128, empty context | **223.9** (sd 6.8) | 145.7 (sd 2.1) |
+| prefill 512, empty context | 144.8 (sd 49.3) | **139.5** (sd 1.1) |
+| prefill 512, depth 1024 | 82.9 | **122.1** |
+| prefill 512, depth 4096 | 66.1 | **91.4** |
+| decode, empty context | 21.7 | **25.0** |
+| decode, depth 1024 | 8.2 | **23.3** |
+| decode, depth 4096 | 4.5 | **19.4** |
+
+**The one thing the GPU wins is a burst that a real prompt exhausts.** A 128 token batch into
+an empty context runs at 223.9 and does it stably. Stretch the same work to a 512 token batch
+and it falls to 144.8 with a standard deviation of 49.3 on the mean, level with the CPU and no
+longer a measurement of anything steady. The first prefill of the whole session read 264.79,
+and the same setting gave 144.54 at the end of that run and 144.77 on a cooled rerun. A
+128 token batch takes about half a second and a 512 token batch about three and a half, which
+is the difference between staying in the Adreno's boost state and stepping out of it. It is
+not kernel compilation, which would have made the first reading slower rather than faster.
+
+Everything else is one-sided. With a thousand tokens of context, which is where every real
+turn of this app starts because the system message and eight tool definitions are about that
+size before the user has typed anything, the GPU reads at 68% of the CPU's rate and writes at
+35% of it. At four thousand tokens it writes at 23%.
+
+One more reading makes the shape of that collapse plain without any depth argument at all.
+Asked for 256 tokens instead of 128, from the same empty context, the GPU falls from 21.67 to
+**8.15** while the CPU holds at 24.37. The context it is decaying against is the one it is
+writing itself.
+
+Three controls, so the decode collapse is not left as a mystery. Flash attention made it worse
+rather than better (4.98 with `-fa on` against 9.03 with `-fa off` at depth 1024), and a q8_0
+KV cache made it worse again (5.01), so the `auto` default is already choosing correctly and
+there is no missing kernel to switch on.
+
+**This is a fact about llama.cpp's OpenCL backend on Adreno, not about the silicon.** The
+Adreno 750 is not short of bandwidth or of integer throughput. What happened is that the CPU
+side received a vendor's hand written microkernels for exactly the format the app ships, and
+the GPU side did not: KleidiAI's i8mm path lifted CPU decode from the 14.4 t/s measured on
+Q4_K_M to 25.0 t/s on QAD Q4_0, while the GPU went from 15.3 to 21.7 and lost the race it
+used to win. A crossover measured on Q4_K_M does not describe a Q4_0 model, and the 2026-08-17
+table should be read as being about Q4_K_M rather than about this app.
+
+**So the conservative default was right, and for a reason nobody had measured.**
+`Offload.AUTO` keeps its constant. Solving for the crossover at an empty context gives 1.80,
+so even the most favourable shape needs a turn that reads nearly twice what it writes; at
+depth 1024 there is no crossover at all in the GPU's favour, because it is behind on both
+halves.
+
+The two CPU columns were taken through the OpenCL build at `-ngl 0` and reproduce the CPU
+only build to within one percent (139.48 against 138.98 prefill, 24.98 against 24.98 decode),
+which is what says the two halves of the comparison are comparable.
+
+**And it is not a fact about one model.** All three recommended models, same binary, same
+session:
+
+| model | prefill CPU | prefill GPU | decode CPU | decode GPU |
+| --- | ---: | ---: | ---: | ---: |
+| LFM2.5 1.2B QAD Q4_0 | **323.7** | 209.3 | **54.2** | 15.9 |
+| LFM2.5 2.6B QAD Q4_0 | 139.5 | 144.8 | **25.0** | 21.7 |
+| LFM2.5 8B-A1B Q4_K_M | **76.3** | 56.0 | **24.8** | 5.2 |
+
+The CPU wins every cell but one, and that one is a tie. The 1.2B is the clearest of the
+three and the one that most directly overturns the earlier table: on Q4_K_M it read 117.4 on the CPU and 202.9 on the GPU, and on QAD Q4_0 it reads
+323.7 on the CPU and 209.3 on the GPU. Decode went the same way, 28.8 against 31.2 before and
+54.2 against 15.9 now. Nothing about the GPU changed. The CPU got vendor microkernels for the
+format the app downloads.
+
+### The three recommended models, timed on the same phone in one session
+
+The 8B-A1B went on the recommended list on a routing score, with the mixture-of-experts
+claim taken on trust: thirty-two experts with four used per token, so a phone should pay
+roughly a 1B model's arithmetic for an 8B model's judgement. That had never been timed.
+
+Six threads for prefill, four for decode, except where noted. The device had been
+benchmarking for hours, so these are hot readings and belong beside each other rather than
+beside the cooled sweeps earlier in this section.
+
+| model | on disk | prefill, pp512 | decode, tg128 |
+| --- | ---: | ---: | ---: |
+| LFM2.5 1.2B, QAD Q4_0 | 661 MiB | 323.7 | 54.2 |
+| LFM2.5 2.6B, QAD Q4_0 | 1.48 GiB | 138.98 (cooled) | 25.0 |
+| LFM2.5 8B-A1B, Q4_K_M | 4.79 GiB | 76.3 | **24.8** at six threads |
+
+**The mixture of experts delivers what the listing claims.** An 8.47 billion parameter model
+writes at the same rate as a 2.7 billion parameter dense one, 24.8 against 25.0, which is
+what four active experts predicts and is the entire reason it is worth 4.8 GB of a phone.
+Reading is slower, 76.3 against 139, because a prefill batch touches every expert.
+
+Two things about it that the listing should carry and did not.
+
+**It wants six decode threads, not four.** At four it read 17.03 with a standard deviation of
+17.97, which is two repetitions that disagreed by a factor of several: the first faults 4.8 GB
+of weights in from storage while `MemFree` sits at 74 MB, and the second runs warm. At six it
+settles at 24.79. The app's `cores / 2` gives four. For a dense model that is right; for this
+one it is not, and nothing in the current heuristic knows the difference.
+
+**It is a memory decision before it is a speed decision.** Resident, it leaves this
+eleven-and-a-half gigabyte phone with under a hundred megabytes free, and the fit card is the
+only thing standing between a user and a load that gets the app killed.
+
+### One real turn, end to end, which is the number a person feels
+
+Throughput tables are not seconds. So: the exact system message `ChatViewModel` builds today,
+the eight shipped tool definitions serialised the way `common_chat_tools_to_json_oaicompat`
+serialises them, one ordinary question, greedy, 128 tokens of answer, through
+`llama-completion` on the device. **The prompt is 1,238 tokens before the user has typed
+anything**, which is the fact the rest of this rests on.
+
+| | prefill | prefill rate | whole turn |
+| --- | ---: | ---: | ---: |
+| CPU, 8 batch threads, what shipped | 13.11 s | 94.5 t/s | 18.50 s |
+| CPU, 8 batch threads, repeat | 13.52 s | 91.6 t/s | 18.83 s |
+| **CPU, 6 batch threads, the change** | **9.19 s** | **134.8 t/s** | **14.54 s** |
+| GPU, all layers | 6.04 s | 204.9 t/s | 23.00 s |
+
+**Four seconds off the first token of every new conversation**, and four seconds off the whole
+turn, from one line that stops handing the batch two A520s. The two readings of the shipped
+setting bracket each other to within 2%, so this is the change and not the weather.
+
+And the GPU row is the whole GPU argument in one line. It reads the prompt fastest of
+anything here, three seconds quicker than the best CPU configuration, and then spends
+seventeen seconds writing 127 tokens at 7.5 a second and finishes eight and a half seconds
+behind. A turn would have to ask for almost no answer at all before that trade paid.
+
+### Four knobs the engine hard-codes, and none of them was wrong
+
+`engine_session.cpp` fixes `n_batch` and `n_ubatch` at 512, leaves flash attention at `auto`
+and the KV cache at f16, and none of those had been measured on a chip like this. All four
+were swept. The device had been benchmarking for hours by this point and its idle floor had
+risen from 50 C to about 60 C, so these readings are lower than the cooled ones earlier in
+this section and are only compared with each other.
+
+**Logical batch size.** A 1,024 token prompt at six threads: 128.0 t/s with the shipped
+`n_batch = 512`, which puts it in as two calls, against 122.0 with `n_batch = 2048`, which
+puts it in as one. Fewer, larger calls are not faster here, and the smaller one keeps peak
+compute-buffer memory down, which is what it was chosen for.
+
+**Micro-batch size**, which is what actually decides the shape of the matrix multiply:
+
+| n_ubatch | pp1024 |
+| ---: | ---: |
+| 128 | 97.8 |
+| 256 | 98.7 |
+| 512 | 96.6 |
+| 1024 | 95.9 |
+
+Flat. There is nothing here, and 512 stays for the memory it does not use.
+
+**Flash attention.** `pp512` reads 99.5 with `-fa on` against 96.0 with `-fa off`, and
+`tg128` at depth 4,096 reads 15.82 against 15.91, which is the same number twice. So it
+helps prefill slightly, does nothing to decode, and `auto` is already turning it on. On the
+Adreno the same control goes the other way and turning it on is a mistake, which is recorded
+in the OpenCL section above. Both of those are arguments for leaving `auto` alone.
+
+**KV cache type.** At depth 8,192, where the cache is finally large enough for its type to
+matter, f16 decodes at 13.02 t/s and q8_0 at 11.51. Quantising it is 12% slower and buys
+memory that `ContextWindows` already showed is allocated lazily and never touched. f16 stays.
+
+**A long answer, which the peak figure does not describe.** 512 tokens in one run, no
+cooling: 20.01 t/s at four threads and 22.04 at five. The cooled 128 token sweep put five
+marginally ahead too, 25.97 against 24.98. Two readings both favouring five by 4 to 10% is
+suggestive and it is not enough: the long run is a single repetition, the short one is inside
+one standard deviation, and `cores / 2` gives four on the MT6991 where four was measured
+fastest. Left at four, written down as the next small thing to bracket properly.
+
+**Does the thread count move with the prompt length?** No, and this is the check that says
+the six thread finding is not an artefact of one prompt size:
+
+| prompt | 6 threads | 8 threads |
+| ---: | ---: | ---: |
+| 128 | 99.1 | 90.5 |
+| 512 | 138.98 (cooled) | 105.19 (cooled) |
+| 1,024 | 128.0 | not run |
+| 2,048 | 92.7 | 86.7 |
+
+Six wins at every length measured. The margin is smaller in the hot readings than in the
+cooled ones, which is the throttle compressing the difference rather than the difference
+going away.
+
+#### The thermal back-off is calibrated on the wrong chip
+
+`ThermalPolicy`'s docstring rests on a measurement from the dev device: cold, prefill scaled
+to eight threads at 69.5 t/s; after a long run the same benchmark gave **73.6 t/s at two
+threads and 28.0 at eight**. Fewer threads win once the big cores are throttled, so the
+policy cuts hard as the phone warms.
+
+That is not what this chip does. The same sweep run with no cooling between conditions, on a
+device sitting at 62 to 74 C after hours of benchmarking:
+
+| threads | prefill, hot |
+| ---: | ---: |
+| 2 | 43.42 |
+| 3 | 51.91 |
+| 4 | 69.50 |
+| **6** | **98.90** |
+| 8 | 90.28 |
+
+**Six still wins, and two is 2.3 times slower than six.** Backing off to `MIN_THREADS = 2`
+here would not protect throughput, it would halve it twice over, and it would do it at the
+moment the user is already waiting longest.
+
+Two caveats keep this from being a licence to delete the back-off. This sweep was hot but it
+was not throttled by Android: the policy fires on `PowerManager.currentThermalStatus`, and a
+rack unit with real cooling may never report `THERMAL_STATUS_LIGHT` at all, so nothing here
+describes the state the policy actually acts in. And a phone in a hand is a different thermal
+system from a phone in a rack.
+
+What did change is an accident this session introduced. `LIGHT` halved the batch count, which
+was written when that count was the core count; once `CpuTopology` started answering six it
+began asking for three, a number the table above puts at 52% of six. It now backs off to the
+generate count instead, which is four on both phones measured and is exactly what `LIGHT` gave
+before any of this. The premise itself is left alone and is in the open questions.
+
+### Every follow-up turn was re-reading the whole conversation
+
+This is the largest thing on the list and it had been invisible, because a slow second turn
+looks exactly like a slow model.
+
+`Session::generate` compares the freshly rendered prompt against the tokens already in the
+KV cache and decodes only what is new. On an SM8650, with LFM2.5 2.6B and a system message
+the size of the real one, it was decoding all of it, every turn:
+
+```
+turn 1: prompt=1159 tokens prefill=8633ms
+turn 2: prompt=1220 tokens prefill=9568ms      <- the whole conversation, again
+```
+
+`PrefixReuseOnDeviceTest` prints the comparison that explains it. The cache held 1,204
+tokens, the new prompt was 1,220, and 1,158 of them matched. Here are the two sequences at
+the token where they stop:
+
+```
+cached: [\n][<|im_start|>][assistant][\n][<think>][The][ user][ is][ asking]
+prompt: [\n][<|im_start|>][assistant][\n][The][ user][ is][ asking][ about]
+```
+
+**One token.** LFM2.5's template pre-opens the thinking block in the generation prompt, so
+what the engine decoded for turn one ends `<|im_start|>assistant\n<think>` and then the
+reply. When turn two re-renders the same conversation that reply is a history message, and
+the template drops thinking from history unless it is told otherwise, so the `<think>` is
+simply not there. The prefix diverges at the head of the assistant turn.
+
+**And one token cost all 1,158 of them**, because of the second half of the mechanism. The
+engine asks `llama_memory_seq_rm` to roll the cache back to the divergence. A transformer
+cache can be cut anywhere; LFM2 is a hybrid and carries a running convolution state rather
+than a row per token, so it refuses, and the engine correctly starts over rather than
+decode against a cache that no longer describes the prompt. A one token mismatch and a
+total loss are the same event here.
+
+Three things had to agree before the cache could be kept, and none of them did:
+
+1. **The reply that goes back as history has to be the reply that was decoded.**
+   `parseAssistantReply` trims the thinking and drops a leading newline from the answer,
+   for the screen, and `canonicalText` reassembles those trimmed parts with the tool syntax
+   already lifted out. Every one of those is right for the transcript and wrong for the
+   cache. `assistantHistoryText` now keeps the raw stream, and `TranscriptEntry.history`
+   carries it for as long as the process lives. It is not persisted: a chat reopened from
+   storage has an empty cache anyway, so there is nothing for it to match.
+2. **The opening tag has to be put back.** It was in the prompt rather than in the output,
+   so the reply arrives with a closing tag and no opening one. That is exactly the case
+   `parseAssistantReply` already recognises, and it is what tells `assistantHistoryText`
+   when to prepend one.
+3. **The template has to be willing to render it.** LFM2.5's reads
+   `message.thinking or message.reasoning or message.reasoning_content` and emits it only
+   when `preserve_thinking` is set or the message is after the last user turn. So
+   `render_prompt` splits the leading `<think>...</think>` into `common_chat_msg::
+   reasoning_content` and passes `preserve_thinking` as a template argument. Templates
+   that do not know the argument ignore it.
+
+Measured after, same device, same conversation, same test:
+
+| | turn 2 prompt | turn 2 prefill |
+| --- | ---: | ---: |
+| before | 1,220 tokens | 9,568 ms |
+| **after** | **17 tokens** | **189 ms** |
+
+**Fifty times faster to the first token of a follow-up**, and the 17 tokens are the new
+question and its turn markers, which is exactly what should have been paid all along.
+
+Two things this costs, stated rather than buried. The thinking now stays in the context, so
+a conversation reaches the compaction ceiling sooner; it was always in the KV cache, so it
+costs window rather than time. And the model sees its own earlier reasoning on later turns,
+which is not what a template that drops it assumes. That is a change to the prompt and it
+was measured rather than argued: see the loop task comparison below.
+
+#### The same thing was happening inside every tool turn, and it is worth more
+
+A turn that calls a tool runs the model two to four times, and each round re-renders the
+conversation so far. `TurnRunner` put the asking turn back as `pass.raw.withoutReasoning()`,
+which strips the thinking the model produced and which the cache therefore holds, so every
+round after the first paid a full prefill of a conversation that was getting longer.
+
+`ToolLoopReuseOnDeviceTest` measures both forms against each other through the shipping
+engine, one loaded model, one session:
+
+| second round of a tool turn | prompt decoded | prefill |
+| --- | ---: | ---: |
+| the asking turn with its thinking stripped | 1,222 tokens | 9,586 ms |
+| **the asking turn as it was decoded** | **48 tokens** | **488 ms** |
+
+Forty-eight tokens is the tool result and its turn markers, which is all that is new. The
+round budget is two by default and four when a chaining tool is present, so on this device
+the stripping was costing somewhere between nine and twenty-eight seconds of every agentic
+turn.
+
+The comment that forbade sending it whole was right when it was written and is not any more.
+It said that replaying a literal `<think>` block into a template that opens one itself is
+nonsense the model tries to continue, which is what happens when the tags arrive as content.
+With `reasoning_content` and `preserve_thinking` the template renders a proper block instead,
+and the closed loop suite says completion does not move: 9 of 10 either way, the same task
+failing. What it does cost is length, 44% more generated tokens, which at 23 tokens a second
+is about six seconds a task against the nine a round this buys back.
+
+**One gap is left.** The transcript entry for a tool turn keeps only the final answer, so the
+turn *after* one still re-renders a single assistant message where the cache holds four or
+five. Closing that means the entry carrying the whole loop rather than its last pass, which
+is a change to the transcript model and not only to what is sent, and no measurement here
+covers what the model does when it sees a previous turn's tool calls and results.
+
+The diagnosis generalises past this one tag. Any divergence between the decoded tokens and
+the re-rendered ones costs the whole cache on a hybrid model, so a tool result that is
+reformatted, an answer that is cleaned up, or a template that renders a turn differently in
+history than it did live will all do the same thing. `llama.cpp` has a bounded escape hatch
+for this, `llama_context_params::n_rs_seq`, which keeps N per-token snapshots of the
+recurrent state and makes a rollback of up to N tokens succeed; `llm_arch_supports_rs_rollback`
+lists LFM2 and LFM2MOE among the architectures that support it. It is marked experimental
+upstream and it is not free: at 255 snapshots with a 512 micro-batch, the graph allocator
+aborted the process on this device with `ggml_new_object: not enough space in the context's
+memory pool`. Left alone for now, and worth revisiting as a safety net rather than as the
+fix.
+
+#### What keeping the thinking costs, measured rather than assumed
+
+Sending a reply back whole is a change to the prompt, and the prompt is what the earlier
+work in this document spent a week on. So it was run through the closed loop tasks, which
+are the only suite here that generates its own history instead of being handed a scripted
+one: ten tasks against the app's real eight tools, a fake filesystem and web, greedy, round
+cap four.
+
+The comparison is deliberately harsher than what ships. In "kept" the model's thinking goes
+back on **every** assistant turn including the ones inside a single tool loop, which the app
+does not do: `TurnRunner` still strips reasoning from within-turn messages, for the reason
+written above the line that does it. So this is an upper bound on the change.
+
+| | completed | rounds used | tokens generated |
+| --- | ---: | ---: | ---: |
+| thinking dropped, as before | 9 / 10 | 24 | 3,202 |
+| thinking kept, upper bound | 9 / 10 | 23 | 4,620 |
+
+**Completion does not move**, and the one task that fails, `L4-budget-total`, fails both
+ways for the same reason. Nine of the ten final answers are worded differently, which is
+what changing a prompt does.
+
+**What does move is length: 44% more tokens generated.** Two tasks account for most of it,
+`L8-missing-then-ask` at 462 to 1,339 and `L10-no-tool` at 523 to 1,059, both of them cases
+where the model has seen itself reasoning and then reasons about that. At 23 tokens a second
+that is real time, and it is the reason the within-turn half of this was left alone rather
+than shipped on the same evidence: the cross-turn case was measured on the device and is
+worth four to nine seconds a turn, the within-turn case has only this harness behind it, and
+the comment in `TurnRunner` that forbids it records a failure someone actually saw.
+
+### A prompt cache on disk would take the first turn from twelve seconds to under two
+
+The fix above makes the *second* turn nearly free. The first one still pays for 1,238 tokens
+of system message and tool definitions, and so does every new chat, and so does every cold
+start. llama.cpp can already serialise a sequence's KV cache to a file
+(`llama_state_seq_save_file` / `llama_state_load_file`); the engine uses neither, and
+`llama-completion` exposes the same thing as `--prompt-cache`, which is what makes this
+measurable without writing the feature first.
+
+Same device, same prompt, 32 tokens of answer:
+
+| | prefill | whole turn |
+| --- | ---: | ---: |
+| cold, no cache | 10.74 s | 12.29 s |
+| the run that writes the cache | 12.21 s | 14.02 s |
+| **reading the cache** | **0.00 s** | **1.68 s** |
+| reading it again | 0.00 s | 1.68 s |
+
+The cache file is **20.6 MB** for 1,238 tokens, which is 16.7 KB a token and agrees with the
+20 KB a token this model's geometry predicts. Writing it costs about a second and a half on
+the turn that does it.
+
+So the ceiling on a shipped version of this is a first turn that answers in under two
+seconds instead of twelve. What it needs to be correct rather than fast is invalidation: the
+cache is only valid for an exact token prefix, so it is keyed on the model, the context
+length, and the rendered system message, and the system message contains today's date, which
+means it is rebuilt daily and whenever a tool is switched on or off. Twenty megabytes for one
+slot is affordable; a slot per conversation is not.
+
+Not implemented here. Measured, sized, and left with the number that says whether it is worth
+writing.
+
+### Energy per token could not be measured on this device
+
+Throughput hides the axis a phone actually lives on, so the CPU and GPU runs above were
+repeated with `/sys/class/power_supply/battery/current_now` sampled once a second. The
+readings are not usable and it is worth writing down why rather than quietly dropping them.
+The rack unit reports `status = Discharging` at `capacity = 100`, which is a tethered device
+with charging suspended rather than one running off its battery; the sampled mean during a
+256 token decode came out **below** the idle mean, 3,631 against 4,150 in whatever units this
+kernel is using, and the node's own resolution moves in steps of several seconds. Joules per
+token needs a phone that is genuinely on battery, and this is not one.
+
+It stays on the list because it is the one argument that could still favour the GPU. Losing
+by 15% on decode while drawing half the power would be a different trade from losing by 15%
+at the same power, and nothing here can tell those apart.
+
+### llama.cpp has an NPU backend for this exact chip and the app does not build it
+
+"Are we fully leveraging llama.cpp" has one clear answer and it is no. The vendored tree
+carries `ggml/src/ggml-hexagon`, a Qualcomm Hexagon (HTP) backend, with `docs/backend/snapdragon`
+and prebuilt-per-architecture kernel libraries `libggml-htp-v73/75/79/81.so`. `GGML_HEXAGON`
+defaults to OFF and `core/engine/build.gradle.kts` does not turn it on.
+
+What is already in our favour:
+
+- **The ops are there.** `ggml_backend_hexagon_device_supports_op` covers `MUL_MAT`,
+  `MUL_MAT_ID`, `FLASH_ATTN_EXT`, `ROPE`, `SOFT_MAX`, `RMS_NORM`, `GLU`, and `SSM_CONV`,
+  which is the one that matters: LFM2's short convolution block is built on `ggml_ssm_conv`
+  (`src/models/lfm2.cpp`), so the recommended architecture is not excluded by construction.
+- **The quantisation is there.** The backend repacks Q4_0, Q8_0 and MXFP4, and the
+  recommended checkpoints ship QAD Q4_0.
+- **The size fits.** An HTP session maps about 3.5 GB, and the models this app recommends
+  are 0.7 to 1.6 GB. Only the 8B-A1B at 4.8 GB would need the multi-session split.
+- **Upstream's own numbers are not small.** Llama 3.2 1B Q4_0 on a v79 HTP: 136 t/s prefill
+  and **51.6 t/s decode**. This device's CPU does 25.0 t/s decode on a 2.6B.
+
+What stands in the way, honestly:
+
+- It needs the **Hexagon SDK** to build, which upstream distributes through a Docker image
+  (`ghcr.io/snapdragon-toolchain/arm64-android`) rather than as a package. That is a
+  reproducibility question for an open source Android build, not merely a setup step.
+- It is marked **experimental** upstream.
+- Nothing here has run it. Every number above is upstream's or is read off the source.
+
+This is the largest unexplored lever in the product and it is the honest answer to "can we
+use a better engine": the better engine is the one already vendored, with a backend switched
+off.
+
 ## Open questions
 
-- GPU offload: Vulkan on this GPU is expected to be slower than the tuned CPU path;
-  OpenCL on the Snapdragon device is the more promising experiment. Revisit after P2.
+Ordered by what a measurement here would be worth, largest first.
+
+- **The Hexagon NPU backend**, which is vendored and switched off. See the section above.
+  Upstream reports 51.6 tokens a second of decode on a 1B where this device's CPU does 25.0
+  on a 2.6B. The blockers are the Hexagon SDK as a build dependency and an experimental
+  label, not the model architecture, whose one unusual operation the backend implements.
+- **A prompt cache on disk.** Measured at twelve seconds to 1.7 for a first turn, 20.6 MB
+  a slot, needs an invalidation key and nothing else that is hard.
+- **Carrying a tool turn's whole loop into the next turn's history.** Within a turn this is
+  done and is worth nine seconds a round; across turns the transcript entry still keeps only
+  the final answer, so the turn after an agentic one re-reads everything. Needs the entry to
+  hold the loop rather than its last pass, and needs someone to check what a model does when
+  it sees a previous turn's tool calls and results, which nothing here measured.
+- **Per-device rates for `Offload.AUTO`.** The crossover has now been measured at 1.80 for
+  the shipped model and quantisation on an Adreno 750, against a compiled-in 10, and against
+  "no crossover exists" for the same model in Q4_K_M. One constant cannot cover that. The
+  probe is cheap: sixteen decoded tokens on each backend after a warm-up, which decides the
+  sign, and only a negative sign needs the full ratio.
+- **Whether the thermal back-off helps or hurts.** Measured hot on an SM8650, fewer threads
+  are strictly worse, which is the opposite of what the MT6991 reading the policy was built
+  on says. Neither reading was taken in the state the policy actually fires in, because
+  `THERMAL_STATUS_LIGHT` needs a phone that is genuinely throttling and a rack unit is not.
+  Needs a device in a hand.
+- **Five decode threads rather than four**, worth 4 to 10% on this chip in two readings that
+  are individually too weak to act on. One bracketed sweep would settle it.
 - Whether inference needs a foreground service (currently foreground-app only, to avoid
   Play's `specialUse` review path).
-- Thread defaults are calibrated on one device; the P2 benchmark should measure and store
-  per-device values rather than relying on the core-count heuristic.
+- Over-calling on general knowledge: the 2.6B still searches for the capital of Peru, and
+  eleven interventions moved it once. It looks like a disposition of the checkpoint rather
+  than a wording that has not been found. Reproduced again on the device on 2026-08-23:
+  asked for the population of Tokyo it thinks for one paragraph and then calls `web_search`.
+
+Closed by the 2026-08-23 device session: thread pinning (measured, no effect, the count was
+the whole problem), OpenCL offload for the recommended models on an Adreno 750 (measured,
+not worth having), micro-batch size (measured, flat from 128 to 1024), logical batch size
+(measured, 512 is right), flash attention (measured, `auto` is already choosing right on both
+backends), a quantised KV cache (measured, 12% slower and buys nothing), and whether an
+ordinary app process can read `cpuinfo_max_freq` (it can, `CpuTopologyOnDeviceTest` says so
+from inside one).

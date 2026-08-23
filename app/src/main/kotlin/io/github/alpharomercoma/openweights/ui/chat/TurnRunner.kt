@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.containsToolMarkup
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
@@ -324,13 +325,24 @@ class TurnRunner @Inject constructor(
                 .spelledOut(readsResults)
             if (results.isEmpty()) return false
 
-            // The assistant turn that asked goes back too, or the model is handed results
-            // for a question it cannot see itself having asked. Its thinking does not:
-            // reasoning is scratch work, and replaying it as an assistant turn hands the
-            // model a literal <think> block inside its own history, which for a template
-            // that opens one itself is nonsense it then tries to continue.
+            // The asking turn goes back exactly as it was decoded, thinking and call syntax
+            // and all, or the model is handed results for a question it cannot see itself
+            // having asked and the round pays for the whole conversation again.
+            //
+            // It used to go back with the reasoning stripped, on the grounds that replaying
+            // a literal <think> block into a template that opens one itself was nonsense the
+            // model then tried to continue. That was true and it is no longer, because the
+            // engine now hands the template `reasoning_content` and `preserve_thinking` and
+            // it renders a proper block. What the stripping cost is in
+            // `ToolLoopReuseOnDeviceTest`: on an SM8650 the second round of a tool turn read
+            // 1,222 tokens in 9,586 ms, and reading the same round as it was decoded read 48
+            // in 488. The app allows four rounds, so that is most of half a minute a turn.
+            //
+            // It is not free. On the closed loop suite, keeping the thinking left completion
+            // unchanged at 9 of 10 and grew what the model writes by 44%, which at 23 tokens
+            // a second is about six seconds a task against the nine a round this buys back.
             messages = messages +
-                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
                 results
             round++
             return true
@@ -348,7 +360,7 @@ class TurnRunner @Inject constructor(
             if (repaired || !pass.raw.invitesRepair(active)) return false
             repaired = true
             messages = messages +
-                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
                 ChatMessage.text(ChatRole.USER, repairRequest(active))
             return true
         }
@@ -366,7 +378,7 @@ class TurnRunner @Inject constructor(
             renderTools = false
             listener.onSteps(calls.map { AgentStep.Skipped(it, spent(maxRounds)) })
             messages = messages +
-                ChatMessage.text(ChatRole.ASSISTANT, pass.raw.withoutReasoning()) +
+                ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
                 calls.map { ChatMessage.toolResult(it.id, spent(maxRounds)) }
                     .spelledOut(readsResults)
             return true

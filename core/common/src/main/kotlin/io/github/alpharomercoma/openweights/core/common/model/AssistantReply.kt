@@ -87,6 +87,38 @@ fun parseAssistantReply(raw: String): AssistantReply {
     )
 }
 
+/**
+ * The reply exactly as the model wrote it, ready to be sent back as history.
+ *
+ * Not the same string as the one shown or stored, and the difference is worth about nine
+ * seconds a turn.
+ *
+ * The engine reuses whatever prefix of the prompt is already in its KV cache, which for a
+ * follow-up should be everything except the new question. That only works if re-rendering
+ * the conversation reproduces the tokens that were actually decoded. What is shown and
+ * stored does not: [parseAssistantReply] trims the thinking and drops a leading newline
+ * from the answer for the sake of the screen, and the answer has tool syntax lifted out of
+ * it so that reopening a chat does not change what it says.
+ *
+ * Every one of those is right for its purpose and wrong for this one. Measured on an
+ * SM8650 with LFM2.5 2.6B, a single character of difference at the head of the assistant
+ * turn cost the whole cache: the prefix matched 1,158 of 1,204 tokens, the rollback to
+ * 1,158 was refused because a hybrid model cannot erase part of its recurrent state, and
+ * the engine started over. The second turn re-read 1,220 tokens and took 9.6 seconds to do
+ * it, against about a tenth of a second for the sixteen tokens that were actually new.
+ *
+ * So history goes back untouched. The one thing added is the opening `<think>`, and only
+ * when the model's own template pre-filled it: the tag was in the prompt rather than in the
+ * output, so the output arrives with a closing tag and no opening one, and putting it back
+ * is what makes the string equal to the tokens in the cache.
+ */
+fun assistantHistoryText(raw: String): String {
+    val open = raw.indexOf(OPEN_TAG)
+    val close = raw.indexOf(CLOSE_TAG)
+    val templateOpenedIt = close >= 0 && (open < 0 || close < open)
+    return if (templateOpenedIt) OPEN_TAG + raw else raw
+}
+
 private const val OPEN_TAG = "<think>"
 private const val CLOSE_TAG = "</think>"
 

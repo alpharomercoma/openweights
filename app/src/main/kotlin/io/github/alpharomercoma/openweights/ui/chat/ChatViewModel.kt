@@ -54,6 +54,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.GoalBoard
+import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.model.StagedDocument
@@ -260,6 +261,14 @@ data class ChatUiState(
      * clearly in the transcript what ran.
      */
     val mode: AgentMode = AgentMode.AUTO,
+    /**
+     * What earlier conversations left behind, already rendered, or null when memory is off
+     * or empty.
+     *
+     * Rendered upstream rather than read here so that [engineMessages] stays a function of
+     * its state and can be tested without a store behind it.
+     */
+    val memories: String? = null,
     /** A tool waiting for the user to allow it. Null when nothing is waiting. */
     val pendingApproval: ToolCall? = null,
 ) {
@@ -326,6 +335,7 @@ class ChatViewModel @Inject constructor(
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
     private val goals: GoalBoard,
+    private val memory: Memory,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -829,8 +839,16 @@ class ChatViewModel @Inject constructor(
             compactIfNeeded()
 
             // Read here rather than held: the user can switch a tool off in another tab
-            // between one question and the next, and the instruction has to follow.
-            _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
+            // between one question and the next, and the instruction has to follow. Memory
+            // is read in the same breath and for the same reason, and only when its own
+            // tool is on: switching it off has to stop the app remembering and stop it
+            // repeating what it already remembered.
+            _uiState.update {
+                it.copy(
+                    toolsAvailable = turns.hasEnabledTools(),
+                    memories = memory.asPrompt().takeIf { _ -> turns.remembers() },
+                )
+            }
 
             val state = _uiState.value
             val conversation = state.engineMessages()
@@ -1833,6 +1851,11 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
+        // After the user's own instructions and before anything about tools, because it is
+        // background rather than an order. It is also the same tokens on every turn, so it
+        // sits in the stable part of the prompt where the KV cache keeps it and it is paid
+        // for once rather than per question. See Memory.
+        memories,
         // Plan mode says its piece whether or not any tool is switched on, because it is a
         // mode the user chose and it changes how the model is meant to answer. Gated on
         // tools being available, "/plan" with everything switched off sent no instruction

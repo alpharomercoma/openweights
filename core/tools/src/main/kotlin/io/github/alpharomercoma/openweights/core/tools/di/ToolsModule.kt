@@ -27,6 +27,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
+import io.github.alpharomercoma.openweights.core.tools.RememberTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -65,7 +66,13 @@ object ToolsModule {
         runScript: RunScriptTool,
         advance: AdvanceTool,
         askUser: AskUserTool,
+        // Last, and off unless asked for. It is the only one that carries anything out of
+        // one conversation and into the next.
+        remember: RememberTool,
     ): ToolRegistry = ToolRegistry(
-        listOf(search, fetch, searchFiles, readFile, writeFile, runScript, advance, askUser),
+        listOf(
+            search, fetch, searchFiles, readFile, writeFile, runScript, advance, askUser,
+            remember,
+        ),
     )
 }

@@ -121,6 +121,17 @@ interface Tool {
     val isUserFacing: Boolean get() = true
 
     /**
+     * Whether this tool is on for somebody who has never opened the Tools screen.
+     *
+     * True for everything that only reads what the turn already reaches: a search the user
+     * asked for, a file in a folder they chose. False for anything that carries something
+     * out of one conversation and into another, because that is a decision about the app's
+     * memory of them rather than about one question, and it is not the sort of thing to
+     * switch on quietly on somebody's behalf.
+     */
+    val defaultsOn: Boolean get() = true
+
+    /**
      * Whether running this sends what it is given to somebody else.
      *
      * Also what the Tools screen groups by, which is the question a user actually has: does

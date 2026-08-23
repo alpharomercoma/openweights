@@ -117,8 +117,11 @@ class TurnRunner @Inject constructor(
      */
     fun toolNamed(name: String): Tool? = tools.find(name)
 
-    fun hasEnabledTools(): Boolean =
-        tools.all.any { it.isUserFacing && switches.isEnabled(it.definition.name) }
+    /** Whether the user has switched memory on, which decides if facts reach the prompt. */
+    fun remembers(): Boolean =
+        tools.all.any { it.definition.name == "remember" && switches.isEnabled(it) }
+
+    fun hasEnabledTools(): Boolean = tools.all.any { it.isUserFacing && switches.isEnabled(it) }
 
     /**
      * Runs until the model stops asking for tools, or the budget runs out.
@@ -172,7 +175,7 @@ class TurnRunner @Inject constructor(
                 // measured on the 2.6B. In the mode whose whole purpose is to think before
                 // acting, that is the right side to err on.
                 .filter { mode != AgentMode.PLAN || !it.isUserFacing }
-                .filter { !it.isUserFacing || switches.isEnabled(it.definition.name) }
+                .filter { !it.isUserFacing || switches.isEnabled(it) }
                 .map { it.definition.name }
                 .toSet(),
         )

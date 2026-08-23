@@ -37,8 +37,20 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
 
     fun isEnabled(name: String): Boolean = store.getBoolean(name, true)
 
+    /**
+     * The same question asked of a tool, which is the only way to honour [Tool.defaultsOn].
+     *
+     * Taking a name alone cannot: the default has to come from somewhere, this used to
+     * assume true, and a tool that must start off would have started on for everybody who
+     * never opened the screen.
+     */
+    fun isEnabled(tool: Tool): Boolean = store.getBoolean(tool.definition.name, tool.defaultsOn)
+
     fun setEnabled(name: String, enabled: Boolean) = store.edit { putBoolean(name, enabled) }
 
     /** The names that are on, for filtering the registry before a turn. */
     fun enabled(all: List<String>): Set<String> = all.filter(::isEnabled).toSet()
+
+    /** The same, asked of tools, so each one's own default is used. */
+    fun enabledAmong(all: List<Tool>): Set<Tool> = all.filter(::isEnabled).toSet()
 }

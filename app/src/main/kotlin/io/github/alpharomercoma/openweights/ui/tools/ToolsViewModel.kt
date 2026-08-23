@@ -105,7 +105,7 @@ class ToolsViewModel @Inject constructor(
                     ?: tool.definition.description,
                 leavesTheDevice = tool.leavesTheDevice,
                 isReady = tool.isAvailable,
-                isEnabled = switches.isEnabled(tool.definition.name),
+                isEnabled = switches.isEnabled(tool),
             )
         }
 }

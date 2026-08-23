@@ -101,10 +101,39 @@ data class ModelLoadParams(
     /** Layers to offload to the GPU. 0 = CPU only, which is the fastest path on most phones. */
     val gpuLayers: Int = 0,
     /**
-     * Memory-map the weights instead of reading them into the heap. Keeps resident memory
-     * low and load times short; the kernel can evict pages under pressure.
+     * Memory-map the weights instead of reading them into the heap.
+     *
+     * Off, which is the opposite of what this said and of what mmap is usually for. The
+     * claim here was that mapping keeps resident memory low. Measured on the test phone
+     * with a 1.48 GiB Q4_0 model, through `llama-bench` so nothing of this app is in the
+     * number:
+     *
+     * | | peak RSS | private clean | private dirty |
+     * | --- | --- | --- | --- |
+     * | mapped | 3.24 GB | 1.47 GB | 1.62 GB |
+     * | read | **1.95 GB** | 6.7 MB | 1.77 GB |
+     *
+     * The weights are resident twice when they are mapped. KleidiAI's kernels want Q4_0 in
+     * a blocked layout, so the CPU backend repacks every accelerated tensor into a buffer
+     * of its own, and the mapped pages it read them from stay resident behind it. Reading
+     * instead of mapping pays for one copy.
+     *
+     * What it costs: about 245 ms on a warm load, measured over five runs each, 1,140 ms
+     * mapped against 1,385 ms read. Throughput is the same to within noise, pp256 106.7
+     * against 104.6 and tg64 24.1 against 23.8. The cold case could not be measured because
+     * dropping the page cache needs root, and it should be close either way since the
+     * repack faults in every page regardless.
+     *
+     * Through the app rather than the bench, over the same six turn conversation: peak PSS
+     * 3.32 GB mapped against **2.06 GB** read, and decode 15.78 t/s against 16.15. Not
+     * slower, 1.27 GB lighter, and 2.06 GB is what `FitEstimator` predicts for this model at
+     * this window, so the estimate was right and mapping was the whole discrepancy.
+     *
+     * A quarter of a second against 1.27 GB is not a close call on a phone. It also
+     * changes the failure mode on a small device from thrashing on evicted pages to
+     * needing less memory in the first place.
      */
-    val useMmap: Boolean = true,
+    val useMmap: Boolean = false,
 ) {
     init {
         require(contextLength > 0) { "contextLength must be > 0" }

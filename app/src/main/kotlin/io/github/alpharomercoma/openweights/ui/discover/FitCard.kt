@@ -57,7 +57,20 @@ import java.util.Locale
  * building, so the verdict leads and the numbers behind it are right underneath.
  */
 @Composable
-fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+fun FitCard(
+    inspected: InspectedFile,
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * How far this file's download has got, or null when it is not being fetched.
+     *
+     * Without it this card offered "Download" for a file already downloading. Starting one
+     * pushes the installed list, so the progress was there to see, but coming back to this
+     * screen showed a button that invited the same download a second time and said nothing
+     * about the one already running.
+     */
+    downloadFraction: Float? = null,
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -91,6 +104,22 @@ fun FitCard(inspected: InspectedFile, onDownload: () -> Unit, modifier: Modifier
                 // slider as a way out would be a lie.
                 inspected.unsupportedArchitecture != null -> Unit
                 inspected.fit?.verdict == FitVerdict.WONT_RUN -> Unit
+                downloadFraction != null -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(
+                        progress = { downloadFraction },
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "Downloading ${(downloadFraction * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 else -> AccentButton(onClick = onDownload) { Text("Download") }
             }
         }

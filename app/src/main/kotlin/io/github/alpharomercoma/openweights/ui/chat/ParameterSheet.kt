@@ -479,7 +479,32 @@ private fun ParameterSheetPreview() {
  * "128000 tokens" beside a thumb pinned at the end of a shorter scale and one touch dropped
  * the window by three quarters with no drag.
  */
-private fun contextRange(loadedContext: Int): ClosedFloatingPointRange<Float> {
+internal fun contextRange(loadedContext: Int): ClosedFloatingPointRange<Float> {
     val top = maxOf(loadedContext, ModelLoadParams.MAX_CONTEXT_LENGTH)
-    return ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..top.toFloat()
+    val bottom = ModelLoadParams.MIN_CONTEXT_LENGTH
+    return bottom.toFloat()..integralTop(bottom, top).toFloat()
+}
+
+/**
+ * The top of the scale, moved down until every stop on it is a whole number of tokens.
+ *
+ * A `Slider` with `steps` snaps to evenly spaced stops, and this one's value is stored as an
+ * `Int`, so the value that comes back out has been rounded. When a stop is not a whole
+ * number those two disagree: the slider snaps to 4,195.1, the sheet stores 4,195, the slider
+ * is handed 4,195 and snaps again, and the thumb sits between two stops jittering between
+ * them instead of settling.
+ *
+ * Whether that happens is pure arithmetic on the range. With [ModelLoadParams.CONTEXT_STEPS]
+ * at 30 there are 31 intervals, and 1,024 to 32,768 divides into exactly 1,024 apiece, which
+ * is why this was never seen at the default. A model that reports 131,072, which is what most
+ * 128K models report, gives 4,195.1 and bounces. LFM2.5's 128,000 gives exactly 4,096 and
+ * does not, which is the sort of luck that keeps a bug hidden.
+ *
+ * Trimming the top costs at most 30 tokens of a range that runs to six figures, and it is the
+ * only fix that leaves the slider's own snapping alone.
+ */
+private fun integralTop(bottom: Int, top: Int): Int {
+    val intervals = ModelLoadParams.CONTEXT_STEPS + 1
+    val span = (top - bottom) / intervals * intervals
+    return if (span <= 0) top else bottom + span
 }

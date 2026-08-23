@@ -22,11 +22,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
@@ -81,7 +82,6 @@ fun ModelPickerSheet(
     ) {
         Column(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(bottom = 12.dp),
         ) {
@@ -94,12 +94,23 @@ fun ModelPickerSheet(
                 )
             }
 
-            models.forEach { model ->
-                ModelRow(
-                    model = model,
-                    isActive = model.name == activeName,
-                    onSelect = { onSelect(model) },
-                )
+            // The list scrolls inside its own bounds and the two ways out sit under it,
+            // always on screen.
+            //
+            // It used to be one scrolling column with the actions at the bottom, which is
+            // the right order to read and the wrong one to reach: somebody with a dozen
+            // models had to scroll past all of them to get to "Browse models", and the
+            // sheet gave no sign there was anything below. Capping the list is what lets
+            // the footer stay put, and the cap is high enough that the common case of two
+            // or three models still shows every one without scrolling at all.
+            LazyColumn(modifier = Modifier.heightIn(max = LIST_MAX)) {
+                items(models, key = { it.file.absolutePath }) { model ->
+                    ModelRow(
+                        model = model,
+                        isActive = model.name == activeName,
+                        onSelect = { onSelect(model) },
+                    )
+                }
             }
 
             HorizontalDivider(
@@ -180,3 +191,12 @@ private fun SheetAction(label: String, detail: String, icon: ImageVector, onClic
 
 /** The tick, the leading icons and the chevron all share it, so three columns line up. */
 private val TICK = 20.dp
+
+/**
+ * How tall the list of installed models is allowed to get inside the sheet.
+ *
+ * Roughly five rows. Past that the list scrolls and the actions below it stay where they
+ * are, which is the whole point: the way out of this sheet must not be something you have
+ * to scroll to find.
+ */
+private val LIST_MAX = 300.dp

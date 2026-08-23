@@ -242,6 +242,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         composable(Routes.DISCOVER) {
             val viewModel: DiscoverViewModel = hiltViewModel()
             val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val modelsState by modelsViewModel.uiState.collectAsStateWithLifecycle()
 
             DiscoverScreen(
                 state = state,
@@ -256,6 +257,12 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onOpenModel = viewModel::openModel,
                 onCloseModel = viewModel::closeModel,
                 onContextLengthChange = viewModel::onContextLengthChange,
+                // What is already being fetched, so this screen stops offering a download
+                // for a file it has one running for. Keyed by destination filename, which
+                // is what ModelsViewModel keys a download by.
+                downloading = modelsState.downloads
+                    .filterNot { it.error != null }
+                    .associate { it.key to it.fraction },
                 onDownload = { repoId, path ->
                     state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
                         modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)

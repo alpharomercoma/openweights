@@ -286,11 +286,15 @@ private fun ConversationRow(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            // One line, because a model name is long and this is a narrow column. Metric
+            // wraps by default, so on a small screen "LFM2.5-2.6B-QAD-Q4_0" took a second
+            // line, broke mid-token, and made every row in the history a different height.
             Metric(
                 listOfNotNull(
                     conversation.updatedAt.asRelativeTime(nowMillis),
                     conversation.modelName,
                 ).joinToString(" · "),
+                maxLines = 1,
             )
         }
         IconButton(onClick = onDelete) {

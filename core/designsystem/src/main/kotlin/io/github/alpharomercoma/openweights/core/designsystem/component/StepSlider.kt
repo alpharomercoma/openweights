@@ -20,6 +20,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 
 /**
@@ -50,9 +55,28 @@ fun StepSlider(
     steps: Int,
     modifier: Modifier = Modifier,
 ) {
+    // The thumb follows the finger; the caller hears whole numbers.
+    //
+    // Every caller here stores an Int, so a drag is a loop: the slider proposes a value, the
+    // caller rounds it, and the rounded one comes back as the thumb's position. Where the
+    // rounding moves the value the thumb is pulled back under the finger on every frame,
+    // which is the jitter this exists to stop. Holding the raw position for the length of a
+    // drag breaks the loop without changing what anybody is told.
+    var raw by remember { mutableFloatStateOf(value) }
+    var dragging by remember { mutableStateOf(false) }
+    if (!dragging && raw != value) raw = value
+
     Slider(
-        value = value,
-        onValueChange = onValueChange,
+        value = raw,
+        onValueChange = {
+            dragging = true
+            raw = it
+            onValueChange(it)
+        },
+        onValueChangeFinished = {
+            dragging = false
+            raw = value
+        },
         valueRange = valueRange,
         steps = steps,
         modifier = modifier,

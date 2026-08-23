@@ -89,6 +89,8 @@ fun DiscoverScreen(
     onCloseModel: () -> Unit,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
+    /** Downloads already running, by destination filename, so a started one says so. */
+    downloading: Map<String, Float> = emptyMap(),
     /**
      * Pops back to the conversation, when this screen was pushed from it.
      *
@@ -160,6 +162,7 @@ fun DiscoverScreen(
                     state = state,
                     onContextLengthChange = onContextLengthChange,
                     onDownload = { path -> onDownload(state.detail.model.id, path) },
+                    downloading = downloading,
                 )
                 return@Scaffold
             }
@@ -298,6 +301,7 @@ private fun ModelDetail(
     state: DiscoverUiState,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String) -> Unit,
+    downloading: Map<String, Float> = emptyMap(),
 ) {
     val detail = state.detail ?: return
 
@@ -362,7 +366,11 @@ private fun ModelDetail(
         }
 
         items(state.files, key = { it.file.path }) { inspected ->
-            FitCard(inspected = inspected, onDownload = { onDownload(inspected.file.path) })
+            FitCard(
+                inspected = inspected,
+                onDownload = { onDownload(inspected.file.path) },
+                downloadFraction = downloading[inspected.file.fileName],
+            )
         }
     }
 }

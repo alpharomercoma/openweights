@@ -16,13 +16,16 @@
 
 package io.github.alpharomercoma.openweights.core.tools.di
 
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
+import io.github.alpharomercoma.openweights.core.tools.AndroidReachability
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
@@ -30,6 +33,15 @@ import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
 import io.github.alpharomercoma.openweights.core.tools.WriteFileTool
 import javax.inject.Singleton
+
+/** Binds the platform's answer to "is the internet up" behind the interface tools ask. */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class ReachabilityModule {
+    @Binds
+    @Singleton
+    abstract fun reachability(real: AndroidReachability): Reachability
+}
 
 @Module
 @InstallIn(SingletonComponent::class)

@@ -77,7 +77,11 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
 class WebSearchTool @Inject constructor(
     private val httpClient: OkHttpClient,
     private val settings: SearchSettings,
+    private val reachability: Reachability,
 ) : Tool {
+    /** Not described to the model when it cannot work. See [Reachability]. */
+    override val isAvailable: Boolean get() = reachability.isOnline()
+
     override val definition = ToolDefinition(
         name = "web_search",
         // Named for what it does, not for where it looks. The name is the strongest hint a
@@ -181,7 +185,13 @@ class WebSearchTool @Inject constructor(
     }
 }
 
-class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
+class FetchUrlTool @Inject constructor(
+    httpClient: OkHttpClient,
+    private val reachability: Reachability,
+) : Tool {
+    /** Not described to the model when it cannot work. See [Reachability]. */
+    override val isAvailable: Boolean get() = reachability.isOnline()
+
     /**
      * The shared client, refusing to dial anything off the public internet.
      *

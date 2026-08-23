@@ -2763,6 +2763,60 @@ The general lesson is worth keeping. Every clause in a system prompt is paid on 
 every model, and the small ones follow a length instruction more literally than the large ones
 do. An instruction that reads as a style hint to a 2.6B reads as a rule to a 1.2B.
 
+## Five of eight ordinary questions came back empty (2026-08-24)
+
+The short-output complaint had a second cause, larger than the prompt wording, and it
+explains a multiturn failure at the same time.
+
+A tool call carries no content. So a turn that calls a tool instead of answering produces an
+empty reply, and in a conversation the previous answer is still the last thing on screen.
+Measured against the app's own system prompt and the shipped eight tool catalogue, on eight
+ordinary questions including "What is the capital of France?":
+
+| Model | | Empty replies | Tool calls | Average reply |
+| --- | --- | ---: | ---: | ---: |
+| 2.6B | tools offered | **5 of 8** | 5 of 8 | 399 chars |
+| 2.6B | tools absent | 0 of 8 | 0 of 8 | **948** |
+| 1.2B | tools offered | **5 of 8** | 5 of 8 | 275 |
+| 1.2B | tools absent | 0 of 8 | 0 of 8 | **470** |
+
+Offering the tools costs more than half the answers and shortens the ones that survive to a
+half or a third. This is the over-calling this repository has recorded for months, and the
+number is worse than "it searches for the capital of Peru" made it sound.
+
+### What moves it, and what does not
+
+Wording has been tried eleven times against this. So this varied what wording cannot reach.
+
+| Variant | 2.6B empty | 1.2B empty |
+| --- | ---: | ---: |
+| shipped, eight tools | 5 of 8 | 5 of 8 |
+| firmer wording | 3 of 8 | 5 of 8 |
+| without `ask_user` | 4 of 8 | 4 of 8 |
+| firmer, without `ask_user` | 4 of 8 | 3 of 8 |
+| **without `web_search` and `fetch_url`** | **2 of 8** | **1 of 8** |
+| `tool_choice: auto` stated explicitly | 5 of 8 | 5 of 8 |
+
+The wording deltas are one task on eight and do not agree across the two models, so they are
+not worth acting on. The web tools are a large effect in the same direction on both. A tool
+in the prompt is an invitation, and "who is this person" accepts it.
+
+### The fix is not to remove them, it is to stop offering them when they cannot work
+
+`web_search` and `fetch_url` were described to the model on every turn whether or not there
+was a network. Offering them offline is the worst of both: the invitation is made, accepted,
+the call fails, and the reply is an apology or nothing. The file tools have never had this
+problem because they already gate on whether a folder was shared.
+
+So the web tools now report `isAvailable` from a `Reachability` reading, which asks for
+`NET_CAPABILITY_VALIDATED` rather than merely connected, because a captive portal answers
+every request with a login page and to a search tool that looks like results.
+
+**What this does not fix.** Online, the model still calls a tool for five questions in eight,
+and that is where the remaining work is. What it fixes is the case where the call was never
+going to return anything, which on an offline-first app is the case that matters most and is
+the one behind "asking about a second person returns the first person's answer".
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

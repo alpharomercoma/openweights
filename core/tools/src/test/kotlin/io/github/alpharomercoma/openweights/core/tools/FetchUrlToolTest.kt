@@ -32,7 +32,7 @@ import org.junit.Test
  * so none of these tests touch the network.
  */
 class FetchUrlToolTest {
-    private val tool = FetchUrlTool(OkHttpClient())
+    private val tool = FetchUrlTool(OkHttpClient(), Reachability { true })
 
     private suspend fun fetch(url: String): String =
         tool.run(ToolCall(id = "1", name = "fetch_url", argumentsJson = """{"url":"$url"}"""))

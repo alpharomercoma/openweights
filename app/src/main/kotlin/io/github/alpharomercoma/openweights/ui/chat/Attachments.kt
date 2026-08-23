@@ -51,7 +51,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -295,14 +298,24 @@ fun StagedAttachments(
 /** Attachments as they appear on a sent message, above its text. */
 @Composable
 fun SentAttachments(attachments: List<MessagePart.File>, modifier: Modifier = Modifier) {
+    // What a tap opens, or null. A thumbnail is 64dp and the attachment is what the turn is
+    // about, so until this existed a picture could only be looked at in the app it came from.
+    var opened by remember { mutableStateOf<MessagePart.File?>(null) }
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         attachments.forEach { attachment ->
-            AttachmentThumbnail(attachment, size = SENT_SIZE)
+            AttachmentThumbnail(
+                attachment = attachment,
+                size = SENT_SIZE,
+                onClick = { opened = attachment },
+            )
         }
     }
+
+    opened?.let { MediaViewer(attachment = it, onDismiss = { opened = null }) }
 }
 
 /**
@@ -312,15 +325,23 @@ fun SentAttachments(attachments: List<MessagePart.File>, modifier: Modifier = Mo
  * thumbnail for an audio file communicates less than the filename does.
  */
 @Composable
-private fun AttachmentThumbnail(attachment: MessagePart.File, size: Int) {
+private fun AttachmentThumbnail(
+    attachment: MessagePart.File,
+    size: Int,
+    onClick: (() -> Unit)? = null,
+) {
     val shape = RoundedCornerShape(Radius.sm)
+    // Only where a caller offered one. The composer's own row uses these too, and there the
+    // tap belongs to removing the attachment rather than to looking at it.
+    val tappable = onClick?.let { Modifier.clickable(onClick = it) } ?: Modifier
     if (attachment.kind == MediaKind.IMAGE) {
         AsyncImage(
             model = File(attachment.path),
             contentDescription = attachment.describe(),
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(size.dp).clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .then(tappable),
         )
         return
     }
@@ -330,6 +351,7 @@ private fun AttachmentThumbnail(attachment: MessagePart.File, size: Int) {
             .size(size.dp)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .then(tappable)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,

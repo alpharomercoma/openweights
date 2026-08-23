@@ -22,6 +22,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
@@ -63,8 +64,10 @@ class ToolCatalogueTest {
         val client = OkHttpClient()
         val workspace = Workspace(context, WorkspaceGrant(context))
         listOf(
-            WebSearchTool(client, SearchSettings(context)),
-            FetchUrlTool(client),
+            // Online, because this test is about what the catalogue says rather than about
+            // when it is offered.
+            WebSearchTool(client, SearchSettings(context), Reachability { true }),
+            FetchUrlTool(client, Reachability { true }),
             SearchFilesTool(workspace),
             ReadFileTool(workspace),
             WriteFileTool(workspace),

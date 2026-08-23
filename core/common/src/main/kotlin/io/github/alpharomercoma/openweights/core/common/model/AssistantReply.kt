@@ -111,6 +111,27 @@ fun parseAssistantReply(raw: String): AssistantReply {
  * when the model's own template pre-filled it: the tag was in the prompt rather than in the
  * output, so the output arrives with a closing tag and no opening one, and putting it back
  * is what makes the string equal to the tokens in the cache.
+ *
+ * @param thinkingPrefilled from [GenerationStats], and the whole reason this overload
+ *   exists. The version below infers it from the presence of a closing tag, which is right
+ *   whenever the model finished thinking and wrong when it did not. A reply cut off by the
+ *   token limit mid-thought has no closing tag either, is indistinguishable from a reply
+ *   that never thought, and so kept its opening tag off. That one turn then sat in the
+ *   history not matching the cache, and every turn after it re-read the conversation: 233,
+ *   605, 786 and 967 prompt tokens where 18, 26, 27 and 22 were new. Told rather than
+ *   guessed, the same run re-reads only what is new and prefill goes from 1.7 to 9.7
+ *   seconds down to 176 to 280 milliseconds.
+ */
+fun assistantHistoryText(raw: String, thinkingPrefilled: Boolean): String {
+    if (thinkingPrefilled) return if (raw.startsWith(OPEN_TAG)) raw else OPEN_TAG + raw
+    return assistantHistoryText(raw)
+}
+
+/**
+ * The same, for a caller with no engine to ask.
+ *
+ * Infers from a closing tag, which is correct for every reply that finished thinking. Prefer
+ * the overload above wherever the stats are to hand.
  */
 fun assistantHistoryText(raw: String): String {
     val open = raw.indexOf(OPEN_TAG)

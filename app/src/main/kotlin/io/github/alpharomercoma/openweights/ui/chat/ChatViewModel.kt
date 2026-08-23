@@ -1294,7 +1294,9 @@ class ChatViewModel @Inject constructor(
                 text = canonical,
                 // Blank only when the pass produced nothing, and then there is nothing in
                 // the cache to match either: null keeps [text] as the fallback.
-                history = raw.takeIf { it.isNotBlank() }?.let(::assistantHistoryText),
+                history = raw.takeIf { it.isNotBlank() }?.let {
+                    assistantHistoryText(it, event.stats.thinkingPrefilled)
+                },
                 answer = answer,
                 reasoning = reasoning,
                 isStreaming = false,

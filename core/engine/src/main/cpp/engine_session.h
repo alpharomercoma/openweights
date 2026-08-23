@@ -130,6 +130,17 @@ struct GenerationStats {
     int64_t time_to_first_token_ms = 0;
     int32_t context_used      = 0;
     int32_t context_size      = 0;
+    /**
+     * Whether the template opened a thinking block that the reply continues from.
+     *
+     * The caller needs this to store a reply that will match the cache next turn. LFM2.5's
+     * template ends an assistant opener with `<think>`, so the tag is in the prompt and
+     * never in the stream, and the stored reply has to have it put back. Guessing from the
+     * text works only when a closing tag arrived: a reply cut off mid-thought has neither
+     * tag, is indistinguishable from a reply that never thought, and silently costs a full
+     * re-prefill on every turn after it.
+     */
+    bool thinking_prefilled   = false;
 };
 
 /**
@@ -293,6 +304,8 @@ private:
     /** How the last prompt was rendered, which is what the reply must be parsed against. */
     int last_format_ = 0;
     std::string last_generation_prompt_;
+    /** Set when the rendered prompt ends with the template's own thinking open tag. */
+    bool thinking_prefilled_ = false;
 
     GrammarSpec last_grammar_;
 

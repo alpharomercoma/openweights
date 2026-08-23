@@ -615,7 +615,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
         return nullptr;
     }
 
-    jlong values[8] = {
+    jlong values[9] = {
         stop_reason_ordinal(reason),
         stats.prompt_tokens,
         stats.generated_tokens,
@@ -624,9 +624,10 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
         stats.time_to_first_token_ms,
         stats.context_used,
         stats.context_size,
+        stats.thinking_prefilled ? 1 : 0,
     };
-    jlongArray result = env->NewLongArray(8);
-    env->SetLongArrayRegion(result, 0, 8, values);
+    jlongArray result = env->NewLongArray(9);
+    env->SetLongArrayRegion(result, 0, 9, values);
     return result;
 }
 // A function try block, so the body below is untouched: C++ exceptions must not

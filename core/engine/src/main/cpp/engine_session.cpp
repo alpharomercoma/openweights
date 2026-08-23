@@ -52,6 +52,10 @@ constexpr size_t MAX_ATTACHMENT_BYTES = 64u * 1024u * 1024u;
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
+/** How much text either side of a divergence is enough to see what differs. */
+constexpr size_t kDiffBack = 12;
+constexpr size_t kDiffForward = 24;
+
 #define LOG_TAG "OpenWeights"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -880,10 +884,44 @@ bool Session::render_prompt(
         // block. params.generation_prompt is the same text, kept separately so the parser
         // can account for it; appending it here would duplicate the turn header.
         out = params.prompt;
+        last_generation_prompt_ = params.generation_prompt;
+
+        // Being told not to think, on a template that opens the block anyway.
+        //
+        // LFM2.5's template ends the generation prompt with "<think>" whatever
+        // `enable_thinking` says, so asking for no thinking did nothing at all: the model
+        // began inside the block and reasoned for as long as it liked. Closing the block in
+        // the prompt is the one thing that does work, and llama.cpp hands over the tags to
+        // do it with, so this is not a guess about any particular model's syntax.
+        //
+        // Measured on the compaction call, which is where it matters most: LFM2.5 2.6B spent
+        // 541 tokens producing a summary with the block open and 132 with it closed, for a
+        // summary of comparable content that finished its last sentence instead of running
+        // into the token cap. That is four times less generation on the app's longest pause.
+        // Recorded whether or not thinking is on, because the caller needs it to store a
+        // reply that will still match the cache next turn. See GenerationStats.
+        thinking_prefilled_ = !params.thinking_start_tag.empty() &&
+                              out.size() >= params.thinking_start_tag.size() &&
+                              out.compare(out.size() - params.thinking_start_tag.size(),
+                                          params.thinking_start_tag.size(),
+                                          params.thinking_start_tag) == 0;
+
+        if (!reasoning.enabled && !params.thinking_start_tag.empty() &&
+            !params.thinking_end_tags.empty()) {
+            const std::string & open = params.thinking_start_tag;
+            const std::string & close = params.thinking_end_tags.front();
+            if (out.size() >= open.size() &&
+                out.compare(out.size() - open.size(), open.size(), open) == 0) {
+                out += close;
+                // The parser is given the generation prompt to line its rules up against,
+                // so it has to see the same thing the model did.
+                last_generation_prompt_ += close;
+            }
+        }
+
         // The reply has to be parsed with the same format it was rendered in, so both are
         // remembered here rather than recomputed later from a guess.
         last_format_ = static_cast<int>(params.format);
-        last_generation_prompt_ = params.generation_prompt;
         last_grammar_ = GrammarSpec{};
         last_grammar_.grammar = params.grammar;
         last_grammar_.lazy = params.grammar_lazy;
@@ -1049,6 +1087,46 @@ StopReason Session::generate(
         // Never reuse the entire prompt: at least one token must be decoded for logits.
         if (reusable == prompt_tokens.size() && reusable > 0) {
             --reusable;
+        }
+
+        // Where the cache stopped matching, in tokens.
+        //
+        // Worth a line of log because the alternative is inferring it. A turn that re-reads
+        // the whole conversation can be a history that does not match what was generated, a
+        // template that renders a rebuilt turn a token differently, or anything volatile
+        // near the head of the prompt, and those want different fixes. The number says
+        // which: a divergence a few hundred tokens in is the tail of the conversation, one
+        // at twenty is the system message or the tool block.
+        if (reusable < cached_.size()) {
+            LOGI("kv: diverged at %zu of %zu cached, prompt %zu, re-reading %zu",
+                 reusable, cached_.size(), prompt_tokens.size(),
+                 prompt_tokens.size() - reusable);
+
+            // And what the difference actually is.
+            //
+            // The index alone said the prefix stopped matching about a hundred tokens from
+            // the end and two fixes were built on guesses about why. Both were wrong. This
+            // prints the text either side of the split from each sequence, which turns the
+            // question into a diff instead of a hypothesis.
+            const llama_vocab * vocab = llama_model_get_vocab(model_);
+            const auto window = [&](const std::vector<llama_token> & tokens) {
+                const size_t from = reusable > kDiffBack ? reusable - kDiffBack : 0;
+                const size_t to = std::min(tokens.size(), reusable + kDiffForward);
+                std::string out;
+                for (size_t i = from; i < to; ++i) {
+                    char piece[64];
+                    const int n = llama_token_to_piece(
+                        vocab, tokens[i], piece, sizeof(piece), 0, true);
+                    if (n <= 0) continue;
+                    if (i == reusable) out += " >>|";
+                    for (int c = 0; c < n; ++c) {
+                        out += piece[c] == '\n' ? '?' : piece[c];
+                    }
+                }
+                return out;
+            };
+            LOGI("kv: cached  ...%s", window(cached_).c_str());
+            LOGI("kv: prompt  ...%s", window(prompt_tokens).c_str());
         }
         // Compared against the cache position rather than the token count, because a
         // previous turn with an attachment leaves positions filled that no token describes.
@@ -1237,6 +1315,7 @@ StopReason Session::generate(
     const int64_t decode_end = now_ms();
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;
     stats.context_used = n_past_;
+    stats.thinking_prefilled = thinking_prefilled_;
     return reason;
 }
 

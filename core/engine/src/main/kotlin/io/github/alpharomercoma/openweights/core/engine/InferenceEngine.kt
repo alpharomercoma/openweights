@@ -46,6 +46,21 @@ data class GenerationStats(
     val timeToFirstTokenMs: Long,
     val contextUsed: Int,
     val contextSize: Int,
+    /**
+     * Whether the chat template opened a thinking block that this reply continued from.
+     *
+     * Needed to store a reply that will still match the KV cache on the next turn. A
+     * template like LFM2.5's ends the assistant opener with `<think>`, so that tag is in the
+     * prompt and never in the reply, and the stored history has to have it put back.
+     *
+     * Reported rather than guessed from the text because the text cannot tell you. A reply
+     * that finished thinking has a closing tag to infer it from; a reply cut off mid-thought
+     * has neither tag and looks exactly like a reply that never thought. Getting that one
+     * case wrong left a turn in the history that no longer matched the cache, which on a
+     * hybrid model costs a full re-prefill of the whole conversation, measured at eleven to
+     * nineteen seconds on every turn after it.
+     */
+    val thinkingPrefilled: Boolean = false,
 ) {
     /** Prompt-processing throughput, or null when nothing needed decoding (full cache hit). */
     val prefillTokensPerSecond: Double?

@@ -255,6 +255,7 @@ class LlamaCppEngine internal constructor(
             timeToFirstTokenMs = stats[5],
             contextUsed = stats[CONTEXT_USED].toInt(),
             contextSize = stats[7].toInt(),
+            thinkingPrefilled = stats.getOrElse(8) { 0L } == 1L,
         ),
     )
 

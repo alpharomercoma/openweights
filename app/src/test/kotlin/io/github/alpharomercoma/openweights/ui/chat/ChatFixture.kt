@@ -115,6 +115,10 @@ abstract class ChatFixture {
                 AskBoard(),
             ),
             notifier = ReplyNotifier(context),
+            // Robolectric has no service to start, and GenerationService swallows the
+            // failure on purpose: a turn that cannot raise its own priority still has to
+            // produce the reply.
+            appContext = context,
             savedState = state,
         )
     }

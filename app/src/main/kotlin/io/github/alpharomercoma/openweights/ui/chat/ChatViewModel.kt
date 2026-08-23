@@ -16,12 +16,14 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
@@ -51,6 +53,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.model.StagedDocument
+import io.github.alpharomercoma.openweights.runtime.GenerationService
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -318,6 +321,7 @@ class ChatViewModel @Inject constructor(
     private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
+    @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
     /** Completed by the approval buttons, so the agent can wait on a human. */
@@ -806,6 +810,10 @@ class ChatViewModel @Inject constructor(
 
     private fun generate() {
         startThermalSampling()
+        // Before the work, because a foreground service cannot be started from the
+        // background and the tap that got here was the foreground. See GenerationService:
+        // without it, leaving the app during a reply stops the reply dead.
+        GenerationService.start(appContext, "Answering")
 
         val job = viewModelScope.launch {
             // Folded before the turn as well as after it. Compaction only ever ran at the
@@ -1007,6 +1015,10 @@ class ChatViewModel @Inject constructor(
      */
     private fun releaseTurn(cause: Throwable?) {
         thermalJob?.cancel()
+        // Here rather than at the end of the body, for the reason this function exists:
+        // two of the three ways a turn ends never reach the last line, and a notification
+        // left up for work that stopped is worse than none.
+        GenerationService.stop(appContext)
         if (cause != null) {
             _uiState.update { it.copy(isGenerating = false, pendingApproval = null) }
         }

@@ -3100,6 +3100,55 @@ background execution, automation hooks and a CLI. That is a fair description of 
 it is not something a session of engineering resolves. It is the frame the roadmap should
 argue with.
 
+## Background generation did not work, and now does (2026-08-24)
+
+Asked to confirm background generation, the answer was no, and it is not a subtlety. On an
+Android 14 phone with the app backgrounded mid-reply:
+
+| | `oom_score_adj` | `curProcState` | CPU ticks over 10 s |
+| --- | ---: | ---: | ---: |
+| on screen | 0 | 2, top | 125 |
+| backgrounded, before | 400 to 700 | 16, cached | **0** |
+
+Zero. Android freezes cached processes, so a reply in flight did not slow down when the user
+left the app, it stopped, and resumed only when they came back. Survivable for a chat app
+where every reply is watched. Fatal for anything that runs on its own, which is what a goal
+is, so this had to be fixed before the goal could exist.
+
+### `GenerationService`, and why `specialUse`
+
+None of the other foreground service types describe running a language model. `dataSync` is
+for moving data and is what the downloader legitimately uses; borrowing it for arithmetic
+would be a misdeclaration, and Android 15 caps it at six hours a day besides. `shortService`
+stops at three minutes, which is shorter than one long answer on a phone. The rest are about
+media, location and calls.
+
+`specialUse` is the type for exactly this and it carries a cost: Play asks in writing what the
+special use is. The declared subtype is in the manifest and the answer is the honest one, that
+the app runs a language model on the device's own processor and a reply the user asked for has
+to be allowed to finish.
+
+The service holds no work. Generation stays in the view model's scope; this raises the
+process and puts up a notification. A service that owned the turn would have to own the
+engine, the transcript and the database with it.
+
+It starts in `generate()` and stops in `releaseTurn()`, which is the seam that already runs on
+every way a turn can end, including the two that never reach the end of the body.
+
+### Verified through the app, because the service is not exported
+
+`exported="false"` means adb cannot start it, which is correct and also means the only honest
+test is a real turn. Driving the app, sending a question, then pressing home:
+
+| | `oom_score_adj` | `curProcState` | CPU ticks over 10 s |
+| --- | ---: | ---: | ---: |
+| generating, on screen | 0 | 2, top | |
+| generating, backgrounded | **50** | **4, foreground service** | **1,440** |
+
+1,440 ticks in ten seconds of wall clock is 14.4 seconds of CPU, which is several threads
+decoding at full speed with the app off the screen. Before the change the same measurement
+was zero.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

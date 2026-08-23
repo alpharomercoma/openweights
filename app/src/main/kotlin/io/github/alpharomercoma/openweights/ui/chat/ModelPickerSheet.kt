@@ -51,6 +51,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
+import io.github.alpharomercoma.openweights.ui.models.PublisherHeading
+import io.github.alpharomercoma.openweights.ui.models.byPublisher
 
 /**
  * Which model is answering, and how to change it.
@@ -70,6 +72,8 @@ import io.github.alpharomercoma.openweights.ui.models.LocalModel
 fun ModelPickerSheet(
     models: List<LocalModel>,
     activeName: String?,
+    /** Publisher logos, when the Hub has been asked. Empty offline, and that is fine. */
+    avatars: Map<String, String> = emptyMap(),
     onSelect: (LocalModel) -> Unit,
     onBrowse: () -> Unit,
     onManage: () -> Unit,
@@ -104,12 +108,22 @@ fun ModelPickerSheet(
             // the footer stay put, and the cap is high enough that the common case of two
             // or three models still shows every one without scrolling at all.
             LazyColumn(modifier = Modifier.heightIn(max = LIST_MAX)) {
-                items(models, key = { it.file.absolutePath }) { model ->
-                    ModelRow(
-                        model = model,
-                        isActive = model.name == activeName,
-                        onSelect = { onSelect(model) },
-                    )
+                // Grouped the same way Manage Models groups them, because they are the same
+                // list and a person who learns one order should not have to learn a second.
+                models.byPublisher().forEach { group ->
+                    item(key = "head:${group.heading}") {
+                        PublisherHeading(
+                            heading = group.heading,
+                            avatarUrl = group.publisher?.let(avatars::get),
+                        )
+                    }
+                    items(group.models, key = { it.file.absolutePath }) { model ->
+                        ModelRow(
+                            model = model,
+                            isActive = model.name == activeName,
+                            onSelect = { onSelect(model) },
+                        )
+                    }
                 }
             }
 

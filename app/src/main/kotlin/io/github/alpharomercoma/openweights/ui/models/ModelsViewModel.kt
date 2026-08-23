@@ -28,6 +28,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.hub.HubFile
+import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.download.ModelDownloadWorker
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,15 @@ data class LocalModel(
     val file: File,
     /** The projector paired with this model, when one has been downloaded. */
     val projector: File? = null,
+    /**
+     * Who published it, when the app was the one that fetched it.
+     *
+     * Null for a file put here by hand, or downloaded by a build that did not record it.
+     * Those group under a heading of their own rather than being guessed at from the
+     * filename: "LFM2.5-2.6B" does not say LiquidAI to anybody who does not already know,
+     * and a wrong attribution is worse than none.
+     */
+    val publisher: String? = null,
 ) {
     val name: String get() = file.nameWithoutExtension
 
@@ -76,12 +86,24 @@ data class ModelsUiState(
     val models: List<LocalModel> = emptyList(),
     val downloads: List<ActiveDownload> = emptyList(),
     val storageUsedBytes: Long = 0,
-)
+    /**
+     * Publisher name to logo, filled in as the lookups come back.
+     *
+     * Best effort and often empty. The lookup needs the network and this app is used
+     * offline, so a heading with no logo beside it is the normal case rather than a
+     * failure, and nothing here waits for one.
+     */
+    val avatars: Map<String, String> = emptyMap(),
+) {
+    /** The installed models under the name of whoever published them. */
+    val grouped: List<PublisherGroup> get() = models.byPublisher()
+}
 
 @HiltViewModel
 class ModelsViewModel @Inject constructor(
     private val workManager: WorkManager,
     private val modelStore: ModelStore,
+    private val publishers: Publishers,
 ) : ViewModel() {
     private val local = MutableStateFlow(ModelsUiState())
 
@@ -145,11 +167,33 @@ class ModelsViewModel @Inject constructor(
 
     fun refresh() {
         val models = modelStore.availableModels().map { file ->
-            LocalModel(file, modelStore.projectorFor(file))
+            LocalModel(file, modelStore.projectorFor(file), modelStore.publisherOf(file.name))
         }
         local.update {
             it.copy(models = models, storageUsedBytes = models.sumOf { model -> model.sizeBytes })
         }
+        resolveAvatars(models)
+    }
+
+    /**
+     * Fetches a logo per publisher, once per process, without holding anything up.
+     *
+     * The same directory Discover uses, so a session that has browsed already has these and
+     * pays nothing. A failure is silent on purpose: an offline phone showing headings with
+     * no logos is the app working, and a message about it would be noise on the one screen
+     * a person opens when they are trying to free up space.
+     */
+    private fun resolveAvatars(models: List<LocalModel>) {
+        models.mapNotNull { it.publisher }
+            .filter { it !in local.value.avatars }
+            .distinct()
+            .forEach { owner ->
+                viewModelScope.launch {
+                    val url = runCatching { publishers.lookUp(owner) }.getOrNull()?.avatarUrl
+                        ?: return@launch
+                    local.update { it.copy(avatars = it.avatars + (owner to url)) }
+                }
+            }
     }
 
     /**
@@ -178,6 +222,9 @@ class ModelsViewModel @Inject constructor(
 
     private fun start(repoId: String, file: HubFile, destination: File) {
         val key = destination.name
+        // The one moment the app knows where a file came from. Once it has landed it is a
+        // .gguf in a folder and the name says nothing about who published it.
+        modelStore.rememberPublisher(key, repoId.substringBefore('/', missingDelimiterValue = ""))
 
         val request = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
             .setInputData(
@@ -214,6 +261,7 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun delete(model: LocalModel) {
+        modelStore.forgetPublisher(model.file.name)
         model.file.delete()
         // The projector is useless without its model and is often the larger of the two,
         // so leaving it behind would quietly keep hundreds of megabytes.

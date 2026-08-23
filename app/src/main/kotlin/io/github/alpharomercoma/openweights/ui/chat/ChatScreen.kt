@@ -136,6 +136,7 @@ fun ChatScreen(
     destinations: ChatDestinations = ChatDestinations(),
     /** What is on the phone, for the picker the model name raises. */
     installedModels: List<LocalModel> = emptyList(),
+    publisherAvatars: Map<String, String> = emptyMap(),
     onSelectModel: (LocalModel) -> Unit = {},
     modifier: Modifier = Modifier,
     onOpenConversation: (Long) -> Unit = {},
@@ -243,6 +244,7 @@ fun ChatScreen(
             onCompact = onCompact,
             destinations = destinations,
             installedModels = installedModels,
+            publisherAvatars = publisherAvatars,
             onSelectModel = onSelectModel,
             onOpenHistory = { scope.launch { drawerState.open() } },
             onSavePreferences = onSavePreferences,
@@ -285,6 +287,7 @@ private fun ChatContent(
     onCompact: () -> Unit,
     destinations: ChatDestinations,
     installedModels: List<LocalModel>,
+    publisherAvatars: Map<String, String>,
     onSelectModel: (LocalModel) -> Unit,
     onOpenHistory: () -> Unit,
     onSavePreferences: (ModelPreferences) -> Unit,
@@ -497,6 +500,7 @@ private fun ChatContent(
         ModelPickerSheet(
             models = installedModels,
             activeName = state.modelName,
+            avatars = publisherAvatars,
             onSelect = {
                 onSelectModel(it)
                 showModelPicker = false

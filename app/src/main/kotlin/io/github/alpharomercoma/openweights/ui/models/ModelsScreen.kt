@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.models
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -50,9 +52,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
@@ -134,8 +140,22 @@ fun ModelsScreen(
             items(state.downloads, key = { it.key }) { download ->
                 DownloadRow(download = download, onCancel = { onCancelDownload(download.key) })
             }
-            items(state.models, key = { it.file.absolutePath }) { model ->
-                ModelRow(model = model, onUse = { onUse(model) }, onDelete = { onDelete(model) })
+            // Under the name of whoever published it, rather than in the order the files
+            // came off disk. Disk order is download order, which is a fact about the past.
+            state.grouped.forEach { group ->
+                item(key = "head:${group.heading}") {
+                    PublisherHeading(
+                        heading = group.heading,
+                        avatarUrl = group.publisher?.let(state.avatars::get),
+                    )
+                }
+                items(group.models, key = { it.file.absolutePath }) { model ->
+                    ModelRow(
+                        model = model,
+                        onUse = { onUse(model) },
+                        onDelete = { onDelete(model) },
+                    )
+                }
             }
         }
     }
@@ -235,3 +255,45 @@ private fun ModelsScreenPreview() {
         )
     }
 }
+
+/**
+ * A publisher's name, with their logo when the Hub has been asked and answered.
+ *
+ * The logo is the point: a list of files named after architectures is hard to scan, and the
+ * mark people recognise does more than the word beside it. It is also optional, because the
+ * lookup needs the network and this app is used without one, so the heading has to read
+ * correctly with the picture missing.
+ */
+@Composable
+internal fun PublisherHeading(heading: String, avatarUrl: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        avatarUrl?.let { url ->
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(HEADING_LOGO)
+                    .clip(RoundedCornerShape(Radius.xs))
+                    .border(
+                        width = Dp.Hairline,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(Radius.xs),
+                    ),
+            )
+        }
+        Text(
+            text = heading,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private val HEADING_LOGO = 18.dp

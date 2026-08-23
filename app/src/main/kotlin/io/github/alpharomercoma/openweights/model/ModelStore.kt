@@ -84,6 +84,28 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         store.edit().putBoolean(KEY_IGNORES_THINKING + model, true).apply()
     }
 
+    /**
+     * Who published the model in this file, as the Hub repository's owner.
+     *
+     * Recorded when a download starts, because it is the only moment the app knows: a
+     * finished download is a `.gguf` in a folder and the filename says nothing about where
+     * it came from. Null for a file put here by hand or downloaded before this was kept,
+     * which is a real case and is why every reader has to cope with not knowing.
+     */
+    fun publisherOf(model: String): String? =
+        store.getString(KEY_PUBLISHER + model, null)?.takeIf { it.isNotBlank() }
+
+    /** Remembers it, at the one moment it is known. */
+    fun rememberPublisher(model: String, publisher: String) {
+        if (publisher.isBlank()) return
+        store.edit().putString(KEY_PUBLISHER + model, publisher).apply()
+    }
+
+    /** Forgets it along with the file, so a redownload is not answered from a stale note. */
+    fun forgetPublisher(model: String) {
+        store.edit().remove(KEY_PUBLISHER + model).apply()
+    }
+
     private val store =
         context.getSharedPreferences("model_store", Context.MODE_PRIVATE)
 
@@ -122,6 +144,9 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
 
         /** Prefix, because the answer is per model file rather than per install. */
         const val KEY_IGNORES_THINKING = "ignores_thinking:"
+
+        /** Prefixed per file, the way the thinking note above is. */
+        const val KEY_PUBLISHER = "publisher:"
         const val MODELS_DIRECTORY = "models"
         const val GGUF_EXTENSION = GgufFileName.GGUF_SUFFIX
     }

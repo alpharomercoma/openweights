@@ -143,6 +143,11 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             val installedModels by modelsViewModel.uiState
                 .collectAsStateWithLifecycle()
                 .let { state -> remember { derivedStateOf { state.value.models } } }
+            // Derived the same way and for the same reason: the picker wants logos and the
+            // shell must not recompose because one arrived.
+            val publisherAvatars by modelsViewModel.uiState
+                .collectAsStateWithLifecycle()
+                .let { state -> remember { derivedStateOf { state.value.avatars } } }
 
             val state by chatViewModel.uiState.collectAsStateWithLifecycle()
             val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
@@ -175,6 +180,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onManageModels = { navController.push(Routes.MODELS) },
                 ),
                 installedModels = installedModels,
+                publisherAvatars = publisherAvatars,
                 onSelectModel = { model ->
                     chatViewModel.loadModel(model.file, keepConversation = true)
                 },

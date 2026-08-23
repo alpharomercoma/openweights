@@ -24,8 +24,12 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import io.github.alpharomercoma.openweights.core.hub.HubTokenSource
+import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
+import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -136,5 +140,16 @@ class ModelsViewModelTest {
     private fun gguf(name: String, bytes: Int = 1_024): File =
         File(store.directory, name).apply { writeBytes(ByteArray(bytes)) }
 
-    private fun viewModel() = ModelsViewModel(WorkManager.getInstance(context), store)
+    /**
+     * Publisher lookups never leave the process here.
+     *
+     * The view model asks for a logo per publisher, best effort, and nothing waits on the
+     * answer. With no token and no network the lookup fails and the map stays empty, which
+     * is the same state an offline phone is in and the one these tests care about.
+     */
+    private fun viewModel() = ModelsViewModel(
+        WorkManager.getInstance(context),
+        store,
+        Publishers(HuggingFaceClient(OkHttpClient(), HubTokenSource { null })),
+    )
 }

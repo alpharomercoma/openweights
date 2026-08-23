@@ -114,17 +114,45 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
                 // kilobytes; a megabyte is generous and still finite.
                 if (response.code != HTTP_OK) null else response.peekBody(MAX_PAGE_BYTES).string()
             }
+        }.getOrNull()
+
+        val hits = page?.let { parseDuckDuckGo(it, limit) }.orEmpty()
+        if (hits.isNotEmpty()) return hits
+
+        // Nothing from the html endpoint, so try the lite one before giving up.
+        //
+        // Both are DuckDuckGo, so this is not a second opinion, it is a second door into
+        // the same index. That is deliberate: the failure this guards against is not the
+        // web having no answer, it is this app's own parsing. Results are read out of
+        // scraped markup by regex, and the day `result__a` is renamed, search returns
+        // nothing and the model is told the web has nothing on the subject, which is a
+        // confident lie. The lite endpoint is a different page with different class names,
+        // so one markup change no longer takes search down. It does not help when
+        // DuckDuckGo itself is rate limiting, and nothing here pretends otherwise.
+        val lite = runCatching {
+            client.newCall(liteRequest(query)).execute().use { response ->
+                if (response.code != HTTP_OK) null else response.peekBody(MAX_PAGE_BYTES).string()
+            }
         }.getOrNull() ?: return null
 
-        val hits = parseDuckDuckGo(page, limit)
-        // Zero results from this endpoint is almost always the rate limiter rather than an
+        // Zero results from both endpoints is almost always the rate limiter rather than an
         // empty web, so it is reported as "could not answer" and the next provider runs.
-        return hits.ifEmpty { null }
+        return parseDuckDuckGoLite(lite, limit).ifEmpty { null }
     }
+
+    /** The no-JavaScript endpoint, which takes the same POST and answers with a table. */
+    private fun liteRequest(query: String): Request = Request.Builder()
+        .url(LITE_ENDPOINT)
+        .post(FormBody.Builder().add("q", query).build())
+        .header("User-Agent", SEARCH_USER_AGENT_BROWSER)
+        .header("Referer", "$HOME/")
+        .header("Accept", "text/html")
+        .build()
 
     internal companion object {
         const val HOME = "https://duckduckgo.com"
         const val HTML_ENDPOINT = "https://html.duckduckgo.com/html/"
+        const val LITE_ENDPOINT = "https://lite.duckduckgo.com/lite/"
         const val HTTP_OK = 200
 
         /** Far more than a results page needs, and an end where there was none. */
@@ -135,6 +163,36 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
             setOf(RegexOption.DOT_MATCHES_ALL),
         )
         private val TAG = Regex("<[^>]+>")
+
+        /**
+         * The lite endpoint's markup, which is a table rather than a list of divs.
+         *
+         * A row carries the link, and the snippet arrives in a later cell, so the two are
+         * matched in sequence rather than by one expression spanning both: the rows for
+         * advertisements and for "no results" carry a link with no snippet after it, and a
+         * single pattern that insisted on both would silently drop the first real result.
+         */
+        private val LITE_LINK = Regex(
+            """<a[^>]*href="([^"]+)"[^>]*class=['"]result-link['"][^>]*>(.*?)</a>""",
+            setOf(RegexOption.DOT_MATCHES_ALL),
+        )
+        private val LITE_SNIPPET = Regex(
+            """<td[^>]*class=['"]result-snippet['"][^>]*>(.*?)</td>""",
+            setOf(RegexOption.DOT_MATCHES_ALL),
+        )
+
+        fun parseDuckDuckGoLite(page: String, limit: Int): List<SearchHit> {
+            val links = LITE_LINK.findAll(page).toList()
+            val snippets = LITE_SNIPPET.findAll(page).toList()
+            return links.take(limit).mapIndexed { index, match ->
+                val (href, title) = match.destructured
+                SearchHit(
+                    title = title.stripTags(),
+                    snippet = snippets.getOrNull(index)?.groupValues?.get(1)?.stripTags().orEmpty(),
+                    url = href.unwrapRedirect(),
+                )
+            }.filter { it.url.startsWith("http") }
+        }
 
         fun parseDuckDuckGo(page: String, limit: Int): List<SearchHit> =
             RESULT.findAll(page).take(limit).map { match ->

@@ -212,12 +212,30 @@ class Workspace @Inject constructor(
      * already exists is the load-bearing line: without it a model that read half a long file
      * would write that half back over the whole, and report success for having done it.
      */
-    suspend fun put(path: String, text: String): String {
+    suspend fun put(path: String, text: String, replace: Boolean = false): String {
         val segments = path.workspaceSegments()
             ?: return "$path is not a path inside the shared folder. Try one like notes/todo.md."
-        if (resolve(path) != null) {
-            return "$path already exists, and this tool does not replace files. " +
-                "Choose a name that is not taken."
+        val existing = resolve(path)
+        if (existing != null) {
+            // Still refused by default, for the reason above. What changed is that a caller
+            // can now say it means it. The danger the default guards against is a model
+            // writing back the half of a file it happened to read; a caller that passes
+            // replace has decided to, and the transcript records that it did. Without this
+            // there is no way to fix a script and run it again, which is the loop the
+            // sandbox exists for.
+            if (!replace) {
+                return "$path already exists, and this tool does not replace files unless " +
+                    "asked. Call it again with replace set to true to overwrite it, or " +
+                    "choose a name that is not taken."
+            }
+            if (existing.isDirectory) return "$path is a folder, not a file."
+            val uri = uriFor(existing)
+                ?: return "$path could not be opened for writing."
+            return if (overwrite(uri, text)) {
+                "Replaced $path with ${text.length} characters."
+            } else {
+                "$path could not be written."
+            }
         }
         val parentPath = segments.dropLast(1).joinToString("/")
         val parent = if (parentPath.isEmpty()) {
@@ -236,6 +254,23 @@ class Workspace @Inject constructor(
         } else {
             "$path was created but nothing could be written into it."
         }
+    }
+
+    /**
+     * Replaces a document's contents, truncating whatever was there.
+     *
+     * Separate from [write] because the mode matters. A provider opening in its default
+     * mode is not obliged to truncate, so writing eight hundred characters over two
+     * thousand leaves the tail of the old file behind and reports success, which is the
+     * silent half-overwrite this class refuses to allow by accident. "wt" says truncate.
+     */
+    suspend fun overwrite(uri: Uri, text: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                stream.writer().use { it.write(text) }
+                true
+            } ?: false
+        }.getOrDefault(false)
     }
 
     /** Puts text into a document that was just created, and says whether all of it landed. */

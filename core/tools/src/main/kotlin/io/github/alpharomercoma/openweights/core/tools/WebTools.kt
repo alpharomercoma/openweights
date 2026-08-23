@@ -89,9 +89,16 @@ class WebSearchTool @Inject constructor(
         // system message beside it, which says to answer settled facts directly, and a model
         // told two things follows the one attached to the tool it is looking at. Gemma 3 1B
         // over-called on twelve of twelve chances with that pairing in place.
-        description = "Search the web for something that changes or is recent: news, " +
-            "prices, schedules, results, or a named person, product or organisation. " +
-            "Not for definitions, translations, or facts that do not change.",
+        // The exemplary form of this clause was not enough: measured on a 48 case suite,
+        // "capital of Peru", "who wrote Pride and Prejudice", "translate thank you" and
+        // four more all called this tool, and the model's own reasoning showed it deciding
+        // to "verify with a web search" a fact it had already stated correctly. The list
+        // is now exhaustive, and the double check is named as the thing not to do.
+        description = "Search the web, only for what you cannot already know: what " +
+            "changed, what is recent, or the present state of a named person, product or " +
+            "organisation. Not for definitions, translations, grammar, history, " +
+            "arithmetic, opinions or explanations, and not to double check something you " +
+            "already know. Answer those yourself.",
         parametersJson = """
             {
               "type": "object",
@@ -220,9 +227,9 @@ class FetchUrlTool @Inject constructor(httpClient: OkHttpClient) : Tool {
 
     override val definition = ToolDefinition(
         name = "fetch_url",
-        description = "Fetch a public web page and return its readable text. Use it to " +
-            "read a page whose address you already have, for example one that " +
-            "web_search returned.",
+        description = "Fetch a public web page and return its readable text, when you were " +
+            "given the address. Not for finding a page, and not when a search result " +
+            "already answers it.",
         parametersJson = """
             {
               "type": "object",

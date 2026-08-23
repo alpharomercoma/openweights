@@ -90,4 +90,22 @@ class ToolArgumentsTest {
 
         assertThat(call(json).textArgument("path")).isEqualTo("notes/todo.md")
     }
+
+    @Test
+    fun `a flag is true only when the model said true`() {
+        fun call(args: String) = ToolCall(id = "1", name = "write_file", argumentsJson = args)
+
+        // The shapes that actually arrive: JSON from the harness, Pythonic from the model.
+        assertThat(call("""{"path":"a.js","replace":true}""").flag("replace")).isTrue()
+        assertThat(call("""{"path":"a.js","replace":"true"}""").flag("replace")).isTrue()
+        assertThat(call("""{"path":"a.js","overwrite":true}""").flag("replace", "overwrite"))
+            .isTrue()
+
+        // Everything else is false, because this flag lets a model destroy a file and the
+        // default has to be the safe one when the call is ambiguous.
+        assertThat(call("""{"path":"a.js","replace":false}""").flag("replace")).isFalse()
+        assertThat(call("""{"path":"a.js"}""").flag("replace")).isFalse()
+        assertThat(call("""{"path":"a.js","replace":"maybe"}""").flag("replace")).isFalse()
+        assertThat(call("not json at all").flag("replace")).isFalse()
+    }
 }

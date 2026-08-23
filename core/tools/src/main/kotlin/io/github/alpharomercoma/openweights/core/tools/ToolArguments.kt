@@ -42,6 +42,34 @@ internal fun ToolCall.textArgument(vararg names: String): String? =
     argument(*names) ?: names.firstNotNullOfOrNull { argumentsJson.scavenge(it) }
 
 /** Pulls one named value out of an envelope that is no longer valid JSON. */
+/**
+ * A boolean argument, true only when the model actually said so.
+ *
+ * Absent, malformed, and anything that is not a plain `true` all read as false, because
+ * every flag reaching this helper guards something a caller should have to ask for rather
+ * than fall into. A JSON boolean is unquoted, so [scavenge] cannot see it: that one looks
+ * for a quoted value and would find nothing here.
+ */
+internal fun ToolCall.flag(vararg names: String): Boolean =
+    names.any { argumentsJson.booleanNamed(it) == true }
+
+private fun String.booleanNamed(name: String): Boolean? {
+    val key = indexOf("\"$name\"")
+    if (key < 0) return null
+
+    val colon = indexOf(':', startIndex = key + name.length + QUOTES)
+    if (colon < 0) return null
+
+    // Quoted or bare, because a model writing Pythonic calls and a harness rendering JSON
+    // do not always agree on whether a boolean wears quotes.
+    val rest = substring(colon + 1).trimStart().removePrefix("\"")
+    return when {
+        rest.startsWith("true", ignoreCase = true) -> true
+        rest.startsWith("false", ignoreCase = true) -> false
+        else -> null
+    }
+}
+
 private fun String.scavenge(name: String): String? {
     val key = indexOf("\"$name\"")
     if (key < 0) return null

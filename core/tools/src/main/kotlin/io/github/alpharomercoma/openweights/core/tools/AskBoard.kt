@@ -103,7 +103,8 @@ class AskUserTool @Inject constructor(private val board: AskBoard) : Tool {
     override val definition = ToolDefinition(
         name = "ask_user",
         description = "Ask the user a question when the request could mean more than one " +
-            "thing, and wait for the answer. Suggest up to four options if you have them.",
+            "thing, or when a detail a tool needs was never given. Suggest up to four " +
+            "options. Not for a request no tool can carry out: say plainly that you cannot.",
         parametersJson = """
             {
               "type": "object",

@@ -57,10 +57,13 @@ class EngineMessagesTest {
 
         val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
 
-        // The wording that measured best names the kinds of question rather than asking
-        // the model whether it can recall something. Pinned on the tool's own name, which is
-        // the part the model has to match up with what it was offered.
-        assertThat(system.text).contains("web_search")
+        // The wording that measured best states a default rather than a rule with two
+        // halves. It used to name web_search and say when to prefer it, and the model was
+        // measured reading both halves back to itself and choosing the wrong one: it
+        // searched for the author of Pride and Prejudice after stating the answer
+        // correctly. So the pin moved off the tool's name and onto the clause that
+        // replaced it, which is the part that has to survive an edit.
+        assertThat(system.text).contains("Do not search to double check")
         assertThat(system.text).contains("Today is")
     }
 
@@ -112,7 +115,7 @@ class EngineMessagesTest {
         // was folded away.
         val system = messages.single { it.role == ChatRole.SYSTEM }
         assertThat(system.text).contains("Answer from what you know")
-        assertThat(system.text).contains("web_search")
+        assertThat(system.text).contains("Do not search to double check")
         assertThat(system.text).contains("The user is porting a parser.")
         assertThat(system.text).doesNotContain("$")
     }

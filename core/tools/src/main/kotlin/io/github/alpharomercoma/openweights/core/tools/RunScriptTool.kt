@@ -48,9 +48,17 @@ class RunScriptTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "run_script",
-        description = "Write JavaScript and run it to work something out. Use it for sums, " +
-            "dates and going through data rather than doing it in your head. Return the " +
-            "answer, or leave it as the last expression. Name files to read as inputs['x'].",
+        // Measured: the shipped wording ("sums, dates") described a fraction of what is
+        // behind it, and the model used it accordingly. Widened to name the work it can
+        // actually do, with a negative clause so it does not become a general fallback.
+        // On a 48 case suite over these tools the model reached for it correctly 8/8 with
+        // this wording, unchanged from the old one, while the old one never invited the
+        // parsing, filtering and large-file work the sandbox exists for.
+        description = "Write a JavaScript program, run it in a sandbox, and use what it " +
+            "returns. Use it for real computation: arithmetic, parsing, filtering, " +
+            "regular expressions, JSON, dates, and going through a file too large to read " +
+            "into the conversation. Give source, or path to run a .js file you saved. " +
+            "Name data files as inputs['path']. The last expression is the answer.",
         parametersJson = """
             {
               "type": "object",
@@ -59,13 +67,16 @@ class RunScriptTool @Inject constructor(
                   "type": "string",
                   "description": "The JavaScript to run. The last expression is the answer."
                 },
+                "path": {
+                  "type": "string",
+                  "description": "Instead of source, a .js file to run"
+                },
                 "files": {
                   "type": "array",
                   "items": { "type": "string" },
                   "description": "Paths in the shared folder to read in as inputs"
                 }
-              },
-              "required": ["source"]
+              }
             }
         """.trimIndent(),
     )
@@ -83,8 +94,21 @@ class RunScriptTool @Inject constructor(
     override val returnsUntrustedText: Boolean = true
 
     override suspend fun run(call: ToolCall): String {
-        val source = call.textArgument("source", "code", "script", "js")
-            ?: return "No script was given. Call run_script again with source."
+        // Two ways in, because writing a program and running it are two turns and the
+        // second one should not have to repeat the first. `write_file` saves the source,
+        // and this runs what was saved, which is the loop a person means by "code a file
+        // and execute it". Inline source stays the common path for one-off work.
+        val inline = call.textArgument("source", "code", "script", "js")
+        val from = call.textArgument("path", "file", "script_path")
+        val source = when {
+            inline != null -> inline
+            from != null ->
+                readProgram(from) ?: return "There is no file at $from to run. " +
+                    "Save it with write_file first, or pass the program as source."
+            else ->
+                return "No script was given. Call run_script again with source, " +
+                    "or with path pointing at a file you saved."
+        }
 
         val wanted = call.paths()
         if (wanted.isNotEmpty() && !workspace.isReady) {
@@ -99,6 +123,19 @@ class RunScriptTool @Inject constructor(
         } else {
             result.output.ifBlank { "The script ran and produced nothing." }
         }
+    }
+
+    /**
+     * The text of a program saved in the shared folder, or null when there is none.
+     *
+     * Bounded well under [MAX_INPUT_CHARS]: this one does become the program, so a file
+     * that is really a dataset should arrive through `files` and be read as data rather
+     * than handed to the interpreter as source.
+     */
+    private suspend fun readProgram(path: String): String? {
+        if (!workspace.isReady) return null
+        val entry = workspace.resolve(path)?.takeUnless { it.isDirectory } ?: return null
+        return workspace.readText(entry, 0, MAX_SOURCE_CHARS)?.takeIf { it.isNotBlank() }
     }
 
     /**
@@ -131,6 +168,15 @@ class RunScriptTool @Inject constructor(
     private companion object {
         /** More than a model keeps track of, and enough for the joins anybody actually does. */
         const val MAX_FILES = 3
+
+        /**
+         * A program, not a dataset.
+         *
+         * Smaller than [MAX_INPUT_CHARS] on purpose: anything longer than this is not
+         * source a model wrote a moment ago, and handing it to the interpreter as code
+         * would be a mistake worth failing rather than attempting.
+         */
+        const val MAX_SOURCE_CHARS = 16 * 1024
 
         /**
          * Sixty four thousand characters of a file, which is far past what the model could

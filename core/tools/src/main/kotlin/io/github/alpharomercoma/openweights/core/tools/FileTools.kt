@@ -36,8 +36,13 @@ import javax.inject.Singleton
 class SearchFilesTool @Inject constructor(private val workspace: Workspace) : Tool {
     override val definition = ToolDefinition(
         name = "search_files",
+        // The "not for" half is load-bearing and was measured twice. Removing it to save
+        // tokens put "read that file for me" back to calling this tool with a guessed
+        // pattern instead of asking which file, so it went back in.
         description = "Find files in the folder the user shared. Match names with a " +
-            "pattern like *.md, and optionally give text to look for inside them.",
+            "pattern like *.md, and optionally give text to look for inside them. Not for " +
+            "reading a file whose path you have. If nothing was named to look for, ask " +
+            "rather than guess.",
         parametersJson = """
             {
               "type": "object",
@@ -87,7 +92,8 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
     override val definition = ToolDefinition(
         name = "read_file",
         description = "Read the text of a file in the folder the user shared. Use the path " +
-            "exactly as search_files gave it.",
+            "exactly as search_files gave it. If no path is known, ask which file rather " +
+            "than inventing one.",
         parametersJson = """
             {
               "type": "object",
@@ -176,8 +182,9 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
 class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool {
     override val definition = ToolDefinition(
         name = "write_file",
-        description = "Save a new file into the folder the user shared. It will not " +
-            "replace a file that already exists.",
+        description = "Save a file into the folder the user shared. Pass replace to " +
+            "overwrite one that exists, which is how to fix and re-save a script. If no " +
+            "path is given, ask where.",
         parametersJson = """
             {
               "type": "object",
@@ -189,6 +196,10 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
                 "content": {
                   "type": "string",
                   "description": "The whole text of the file"
+                },
+                "replace": {
+                  "type": "boolean",
+                  "description": "True to overwrite an existing file"
                 }
               },
               "required": ["path", "content"]
@@ -213,7 +224,7 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
             return "That is longer than this tool writes at once. Keep it under " +
                 "$MAX_WRITE_CHARS characters, or save it in parts."
         }
-        return workspace.put(path, content)
+        return workspace.put(path, content, replace = call.flag("replace", "overwrite"))
     }
 }
 

@@ -167,24 +167,51 @@ class ToolCatalogueTest {
         /**
          * What the three tools every install has cost to describe, with room to edit.
          *
-         * Measured at 378 tokens for web_search, fetch_url and run_script together. On the
-         * 2048 token window these models are given that is already a sixth of it, spent on
-         * every pass of every turn before the user has said a word. The margin is there so a
-         * copy edit does not fail the build, and it is small enough that a fourth tool will.
+         * Was 378 tokens for web_search, fetch_url and run_script, ceiling 448. Now about
+         * 445, and the ceiling moved with it rather than the descriptions being shaved to
+         * fit, because the growth is the point rather than an accident.
+         *
+         * What bought it: each description gained a clause saying what the tool is not for,
+         * and each tool with a required argument gained one saying to ask when it is
+         * missing. On the app's own eight tools that took the score from 36/48 to 40/48,
+         * and no-call detection from 5/12 to 9/12. Seven settled questions, including who
+         * wrote Pride and Prejudice, stopped reaching for the network. On a 2048 token
+         * window the extra 67 tokens is about three per cent of it, which is the right
+         * trade for a model that was otherwise searching the web to check things it had
+         * already answered correctly.
+         *
+         * The property this ceiling exists for is unchanged: the margin absorbs a copy
+         * edit, and a fourth default tool, which costs 40 to 90 tokens, still trips it.
          */
-        const val DEFAULT_CEILING = 448
+        const val DEFAULT_CEILING = 512
 
         /**
-         * And what all six cost, once a folder has been shared: 672 tokens, a third of that
-         * window.
+         * And what all of them cost, once a folder has been shared: was 672 tokens, now
+         * about 781.
          *
          * A ceiling rather than a target, and a number worth being uncomfortable about. It is
          * the reason [io.github.alpharomercoma.openweights.core.tools.Tool.isAvailable] keeps
          * the file tools out of the prompt until there is a folder for them to work in, and
-         * the reason a seventh tool is not free: choosing among tools gets measurably worse
+         * the reason the next tool is not free: choosing among tools gets measurably worse
          * as the list grows, so each addition costs twice, once in tokens and once in
          * accuracy.
+         *
+         * The rise was paid for and then argued down. Every description first gained a
+         * clause saying what the tool is not for and, where an argument is required, one
+         * saying to ask when it is missing. Then the three file tools were measured at 5/5
+         * both before and after, so their added prose was bought back out and only the
+         * ask clause kept, which is the part that made "read that file" ask which file
+         * rather than invent a path. What is left is the growth that showed up in a score.
+         *
+         * Then two capabilities were added and it went to 832 exactly, which is no margin
+         * at all: `run_script` gained `path`, so a program saved with `write_file` can be
+         * run rather than only written, and `write_file` gained `replace`, so a script can
+         * be fixed and saved again. Without both, authoring a program and running it was a
+         * loop with no second turn. Every description was trimmed again first, 177
+         * characters of wording that was not carrying a measurement, and the ceiling then
+         * moved by 32 to restore the margin the comment above promises. The property it
+         * exists for still holds: a ninth default tool costs 40 to 90 tokens and trips it.
          */
-        const val FULL_CEILING = 768
+        const val FULL_CEILING = 864
     }
 }

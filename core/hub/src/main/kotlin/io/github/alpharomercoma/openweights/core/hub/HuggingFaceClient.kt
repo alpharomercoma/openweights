@@ -385,6 +385,45 @@ class HuggingFaceClient @Inject constructor(
 val RECOMMENDED = listOf(
     "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
     "LiquidAI/LFM2.5-2.6B-GGUF",
+    // Added on a routing number rather than on its parameter count, which is what the
+    // paragraph above asks for and what the 8B is easiest to get wrong about.
+    //
+    // On a 142 case agentic suite, greedy, prompt rendered by the model's own template, it
+    // scores 134/142 against the 2.6B's 127/142, and 138/142 once the tool prompt tells it
+    // to answer from its own knowledge. It is the only model measured here that got every
+    // multi-turn case right, 30 of 30, and it did not miss a single out-of-scope request.
+    // Those are the two things a small model usually fails at, so the size is buying
+    // exactly what it should.
+    //
+    // It is a mixture of experts, 32 of them with 4 used per token, so a phone pays roughly
+    // a 1B model's arithmetic per token for an 8B model's judgement. What it does not
+    // escape is memory: every expert has to be resident, and Q4_K_M is 4.8 GB, so this
+    // belongs on a flagship and the fit card is what says so per device. There is no QAD
+    // checkpoint at this size, unlike the 1.2B and 2.6B, so it cannot take the Q4_0 fast
+    // path without the quantisation damage that made plain Q4_0 unusable elsewhere.
+    //
+    // The evidence is not one-sided and the list should say so. On a second suite of 48
+    // cases built from this app's own eight tools it scored 38/48 against the 2.6B's 39,
+    // and it reaches for web_search on general knowledge questions more often, six of
+    // twelve against four.
+    //
+    // Separating the two rates changes the reading, though, and it is the reason this is
+    // listed at all. Of the cases where a tool IS the right answer it calls one on 18 of
+    // 18, the same as the 2.6B. Of the cases where no tool is right it calls one on 8 of
+    // 30, against the 2.6B's 14. So it has the 2.6B's recall and half its false alarm
+    // rate, which is a strictly better decision boundary rather than a quieter model:
+    // d' of 2.95 against 2.41, and against 1.05 for the 1.2B, whose apparent restraint is
+    // only a lower call rate and costs it a third of the calls it should make.
+    //
+    // The right pick for work that runs several steps deep. Its weakness is narrow and
+    // known: it will look up a fact it already has.
+    //
+    // One trap if it is ever made the default. The tool descriptions in core:tools were
+    // rewritten against the 2.6B and gain 5.6 points there, but they cost this model 7.8:
+    // 135/142 against 127/142, with out-of-scope handling falling from 8/8 to 4/8. Wording
+    // that helps a smaller model is not neutral on a larger one, so a change of default
+    // model means re-running the suite rather than assuming the prompt work carries over.
+    "LiquidAI/LFM2.5-8B-A1B-GGUF",
     "LiquidAI/LFM2.5-VL-3B-GGUF",
     "unsloth/Qwen3-1.7B-GGUF",
 )

@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import org.junit.Rule
@@ -125,10 +126,46 @@ class ParameterSheetTest {
         assert(reset) { "Reset must reach the caller" }
     }
 
+    @Test
+    fun `a speech model is not offered the settings it cannot read`() {
+        // Verified against the engine rather than assumed: `mtmd_helper_gen_audio_inp` has
+        // fields for top-k, top-p and a seed, and none for any of these. Drawing them would
+        // put four controls on screen with nothing on the other end of them.
+        showSheet(supportsThinking = true, outputModality = OutputModality.SPEECH)
+
+        compose.onNodeWithText("Temperature").assertDoesNotExist()
+        compose.onNodeWithText("Answer length").assertDoesNotExist()
+        compose.onNodeWithText("System prompt").assertDoesNotExist()
+        compose.onNodeWithText("Thinking", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun `a speech model keeps the two samplers it does read`() {
+        // The counterweight, and the reason this is a table rather than a blanket rule: a
+        // sheet that hid everything for speech would be as wrong as one that hid nothing.
+        showSheet(outputModality = OutputModality.SPEECH)
+
+        compose.onNodeWithText("Advanced").performScrollTo().performClick()
+        compose.onNodeWithText("Top-p").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Top-k").performScrollTo().assertIsDisplayed()
+        // Not in the struct, so not on the sheet, even under Advanced.
+        compose.onNodeWithText("Repeat penalty").assertDoesNotExist()
+    }
+
+    @Test
+    fun `the sheet no longer claims settings are per model`() {
+        // They stopped being per model when hyperparameters went global, and the caption
+        // saying otherwise outlived the change.
+        showSheet()
+
+        compose.onNodeWithText("saved for this model only").assertDoesNotExist()
+    }
+
     @Suppress("LongParameterList")
     private fun showSheet(
         supportsThinking: Boolean = false,
         hasGpu: Boolean = false,
+        outputModality: OutputModality = OutputModality.TEXT,
         onSave: (ModelPreferences) -> Unit = {},
         onReset: () -> Unit = {},
     ) {
@@ -138,6 +175,7 @@ class ParameterSheetTest {
                     modelName = "LFM2.5-2.6B-Q4_K_M",
                     preferences = ModelPreferences(),
                     supportsThinking = supportsThinking,
+                    outputModality = outputModality,
                     hasGpu = hasGpu,
                     onSave = onSave,
                     onReset = onReset,

@@ -2963,6 +2963,266 @@ and teaching the turn loop to carry media in a `TOOL` message, which the engine'
 media handling could probably support. Measured need first: nothing here says how often
 somebody asks about a picture already on their phone rather than attaching it.
 
+## Watching: periodic checks, and the fifteen minute wall (2026-08-24)
+
+Asked for as "if the user says check something every 5 minutes, have a monitor fire every 5
+minutes". Claude Code calls this capability a **Monitor**, and the distinction it draws is
+the useful one: a *background task* ends when its condition first becomes true and notifies
+once, a *monitor* keeps emitting until stopped. A goal is the first kind and was already
+here. This is the second, called a watch in the code and "Watching" on screen.
+
+### The constraint that decided the design
+
+`PeriodicWorkRequest.MIN_PERIODIC_INTERVAL_MILLIS` is fifteen minutes. It is not
+configurable, and asking for less does not fail: WorkManager rounds it up **silently**. A
+watch set to five minutes would quietly run every fifteen and nothing on screen would say
+so, which is worse than refusing outright.
+
+So there are two regimes and the interface names which one a watch is in:
+
+| cadence | mechanism | cost |
+| --- | --- | --- |
+| 15 minutes or more | `PeriodicWorkRequest` | nothing held open, tick may arrive late |
+| under 15 minutes | in-process ticker, process held up by the foreground service | a notification for as long as it runs |
+
+The second is the honest trade rather than a workaround: the user asked to be woken sooner
+than the system wakes anyone, and the notification is what pays for it and what they cancel
+it from. A scheduled job is registered alongside as a backstop for a process that dies.
+
+### The race, which was real
+
+The engine holds one model and one KV cache, so two turns at once is not slow, it is wrong:
+the second one's prefill lands on the first one's context. Nothing needed a lock while the
+only caller was a screen a person was looking at. A watch comes due on a timer with no idea
+what the user is doing.
+
+`TurnRunner` now owns a mutex. `run` waits for it; `tryRun` returns null rather than waiting,
+and a watch uses that. Skipping is deliberate: a queue of checks whose moment has passed all
+run at once when the user puts the phone down, and the thing being checked has moved on.
+
+### Guardrails
+
+Every one of these is a rule about when an unattended thing must stop spending battery.
+
+- At most four active, refused in the store so the tool and the command cannot disagree.
+- Three *consecutive* failures stop the watch. Consecutive, not total: one that fails twice a
+  day for a week is working.
+- Too hot or under 15% battery records a skip. A skip is not a failure and does not count as
+  a run, so three busy minutes cannot stop a healthy watch.
+- No model loaded records a skip rather than loading one. A scheduled tick can arrive in a
+  process that started for this alone, and opening two gigabytes of weights to answer a
+  question nobody is waiting for is how an app gets uninstalled.
+- History is capped at twenty runs per watch, or a one minute watch is a database that grows
+  for as long as the phone is on.
+- The tool asks for approval. It is the only tool besides `remember` whose effect outlives
+  the conversation.
+- Each tick is a standalone turn, not an appended conversation. A check that carried its own
+  history would drift: every tick would compare itself to the last twenty answers instead of
+  to the world, and the context would grow without end.
+
+Watches live in the database rather than in memory, and the schedule is rebuilt from it at
+startup. The scheduled half would come back on its own; the in-process ticker would not, and
+that is the half a user notices stopping.
+
+## The sandbox was not rejecting JavaScript, it was rejecting how models write it (2026-08-24)
+
+Reported as "the coding tool throws a syntax error at runtime, which is embarrassing". Both
+halves of that sentence turned out to name a separate defect, and neither was the engine.
+
+The engine is QuickJS-NG **0.16.1**, which is current ECMAScript: optional chaining, class
+fields with private members, `Array.at`, `findLast`, `replaceAll`, `Object.groupBy`, BigInt
+and named capture groups all run untouched. Nothing here is a language subset.
+
+### What was actually failing
+
+`quickjs_jni.cpp` evaluated every program as a **classic global script**, retried once inside
+a function on a syntax error, and reported the *first* failure. A harness built against the
+vendored source, replicating that path exactly, on fourteen programs of the kind a model
+actually emits:
+
+| | shipped | after |
+| --- | --- | --- |
+| correct | **5 / 14** | **14 / 14** |
+
+The nine it got wrong, and why:
+
+- **A fenced code block.** The model returns ```` ```javascript ... ``` ```` inside the JSON
+  string argument, because that is what it was trained to hand a human. The engine reads the
+  fence as a tagged template literal, so the error is not even a syntax error: it is
+  `TypeError: not a function`, naming a function the model never wrote. Four of the nine.
+- **Top-level `await`.** Legal in a module, a syntax error in a classic script. Almost all
+  the JavaScript a model has read lives in a module.
+- **A runtime error behind a top-level `return`.** This is the reported bug exactly. The
+  program failed to parse, was read again as a function body, ran, and threw a real
+  `TypeError`, and the host reported the *parse* complaint it had saved from the first
+  attempt. **A runtime error arrived labelled SyntaxError**, and the model spent its next
+  turn hunting for a grammar mistake that never existed.
+- **Curly quotes**, which come back as "unexpected character" naming neither the character
+  nor where it is.
+
+### What replaced it
+
+A four rung ladder, climbing only on a syntax error, because a syntax error means nothing
+ran and there is no work to repeat: raw, wrapped in a function, raw with
+`JS_EVAL_FLAG_ASYNC`, wrapped in an async function. The first that compiles wins, and the
+failure reported is the **last** one rather than the first.
+
+Allowing `await` is only half of that: an async evaluation hands back a promise, and it
+resolves to `{value: ...}` rather than to the value. Both layers are unwrapped, plus a third
+when an async wrapper resolves to the inner function's own promise. Reporting
+"[object Promise]" would have been barely better than the SyntaxError.
+
+Fence stripping and quote normalisation happen in Kotlin, before the Node shim is prepended,
+because they are facts about model output rather than about the engine. Only a fence opening
+on the first non-blank line is unwrapped, so a program that merely contains a template
+literal is left exactly as written.
+
+### Is it "just JavaScript"? No, and the description said so wrongly
+
+The tool advertised "Plain JavaScript only: no require, no file system, no network" and then
+prepended a shim providing `require('fs')` and `require('path')` over the files the caller
+was given. It is QuickJS classic-script syntax plus a small Node compatibility layer, and the
+description now says that.
+
+### Ephemeral or saved
+
+The runtime stays ephemeral: one `JSRuntime` per call, no state carried between them. That is
+the right call for a sandbox and it is not the interesting question. What an iterating agent
+needs is not a warm interpreter but durable *artifacts*, and those already have a home in the
+shared workspace through `write_file`, which `run_script` can then run by path. What is still
+missing is a work ledger, source hash, inputs, output, exit status, so a reopened
+conversation can audit what was run rather than trusting a summary of it.
+
+## What two adversarial reviewers found, and which of it was true (2026-08-24)
+
+codex and agy were pointed at the same brief. Where they agreed they were mostly right; where
+they disagreed at least one was wrong, and checking is what separated them.
+
+**Confirmed and fixed:**
+
+- `run_script` gathered files named in generated source and handed their contents to the
+  sandbox without declaring `readsPrivateData`, which is the only flag the egress guard
+  believes. A page could talk the model into running a script over a private file and then
+  searching for what it found, ungated. Now declared unconditionally: whether a path matched
+  is decided by a regular expression over model-written source, which is not a boundary worth
+  resting an egress decision on.
+- The goal loop ticked the first unfinished step after every turn, so when the model had
+  already called `advance`, one turn closed two steps. A four step plan could report itself
+  finished having done half of it.
+- `GoalBoard.takeSteering` read and then cleared, so a message typed in the window between
+  the two was lost. That window is exactly when someone redirects a running goal.
+- Memory's budget was understated. Measured through the LFM2.5 tokenizer rather than
+  estimated: 24 facts at the 160 character ceiling is **3,725 characters and 750 tokens** of
+  prefill on every future turn, against a documented 250. A real aggregate cap now enforces
+  the number that was always meant.
+- `remember` wrote to the permanent system prefix with no approval. It is the only tool whose
+  effect outlives the conversation, so one unattended call from a hostile page is a persistent
+  prompt injection that clearing the chat does not undo. It asks now.
+- Filename publisher inference credited every `llama*` file to Meta. Meta trained Llama; the
+  GGUF was converted by whoever uploaded the repository. Deleted, in favour of the recorded
+  repository owner and no heading where there is none.
+- `editAndResend` and `branchFrom` existed with no call sites, so they were code rather than
+  features. Both are now in the message actions sheet.
+
+**Checked and not true:**
+
+- agy said restoring the user's mode before the goal loop meant steps ran in "chat mode
+  instead of agent mode". `AgentMode` is ASK / AUTO / PLAN / YOLO, a tool approval policy;
+  there is no agent mode. Restoring it is correct and respects the user's choice.
+- agy said `remember`'s description was disproportionately long; codex said it was not.
+  Measured across all nine tool descriptions: `remember` is 288 characters, third longest,
+  against a mean of 227 and `run_script`'s 463. Codex was right, and it was left alone.
+
+
+## Generating something other than text, and what it costs the settings sheet (2026-08-24)
+
+The question asked was whether the hyperparameters for multimodal output differ from text
+generation, and if so to make the UI and the backend follow. They do differ, the answer is in
+the vendored engine rather than in anyone's opinion, and the difference is larger than
+expected: most of the sheet does not apply.
+
+### What the engine actually accepts
+
+`tools/mtmd/mtmd-helper.h` declares one struct for generating audio, and it is the whole
+contract:
+
+```c
+struct mtmd_helper_gen_audio_inp {
+    llama_seq_id  seq_id;
+    const char *  prompt;
+    size_t        prompt_len;
+    mtmd_bitmap * speaker_ref; // optional reference wav, for the voice
+    const char *  lang;        // optional
+    int32_t       top_k;
+    float         top_p;
+    uint32_t      seed;        // UINT32_MAX for random
+    enum mtmd_helper_gen_audio_outtype out_type;
+};
+```
+
+`tools/tts/tts.cpp` confirms it from the calling side: it fills `top_k`, `top_p` and `seed`
+out of `params.sampling` and touches nothing else in it.
+
+| setting | text | speech |
+| --- | --- | --- |
+| top-k | yes | yes |
+| top-p | yes | yes |
+| seed | yes | yes |
+| temperature | yes | **no field** |
+| min-p | yes | **no field** |
+| repeat penalty and window | yes | **no field** |
+| max tokens | yes | **no field** |
+| thinking, reasoning effort | yes | **no template** |
+| system prompt, tool instructions | yes | **no template** |
+
+So three of the nine sampling settings survive, and the two prompts do not survive either:
+speech is not a chat turn, the prompt field is the text to say, and no template is rendered
+around it, so there is no system role to carry standing instructions and no tools to declare.
+
+Two settings exist in the other direction that text has no concept of, a speaker reference
+wav that clones a voice and a language hint. Neither is on the sheet, because nothing in this
+build can yet play what a speech model produces, and a control for a pipeline that does not
+run is the same defect in the opposite direction.
+
+### What was built
+
+`OutputModality` in `:core:common`, with `TEXT` and `SPEECH` and a `Tunable` enum it can
+answer questions about. `ParameterSheet` asks it per control and draws nothing for a setting
+the loaded model cannot read, rather than greying one out: a disabled control still occupies
+the sheet and still has no way to explain itself.
+
+Detection is `mtmd_gen_audio_get_info`, whose `type` is `MTMD_GEN_AUDIO_TYPE_NONE` unless the
+projector is a Qwen3-TTS or Pocket-TTS pipeline. It rides along in `nativeMediaSupport`, which
+now returns `[vision, audio, speech]` from one call, because one projector file answers all
+three and the alternative was interrogating the same object twice.
+
+Note that the third flag is not the second one. `mtmd_support_audio` says a wav can be sent
+**in**, and a speech model needs both that encoder and a generative decoder; conflating them
+would offer a microphone to a model that can only talk.
+
+### There is no IMAGE and no VIDEO, deliberately
+
+llama.cpp does not generate either, at any quantization, on any backend. Pictures come from a
+diffusion runtime, usually `stable-diffusion.cpp`, which is a separate project this app does
+not vendor. Enum cases for them would be promises the engine cannot keep that every
+exhaustive `when` would then have to answer for. `OutputModalityTest` asserts the enum has
+exactly two entries so that adding a third is a decision rather than a drift.
+
+### Detecting speech without generating it is the point
+
+Nothing in this build plays a speech model's output, and `SPEECH` can still be reported today.
+That is deliberate, and it is the better of the two failures available. A text pipeline
+pointed at a TTS model does not fail, it succeeds at the wrong thing: audio codes come back
+as tokens and render as text. Knowing the modality is what lets the app stop rather than
+produce confident garbage, and it is the piece the generation path will need first anyway.
+
+### One thing this found on the way
+
+The sheet's caption still read "saved for this model only". It stopped being true when the
+hyperparameters went global, which is the same batch of work; the string outlived the change
+by a commit. It now says what is actually the case, that the settings are shared and that
+context length and the processor are the two exceptions.
+
 ## Answer length is a preference, not a cap (2026-08-24)
 
 There was no length control at all: a chat turn runs with `maxTokens = 0`, which means until

@@ -32,6 +32,8 @@ package io.github.alpharomercoma.openweights.ui.chat
 data class ChatDestinations(
     val onOpenTools: () -> Unit = {},
     val onOpenUsage: () -> Unit = {},
+    /** Everything running on its own, and the one place to stop it. */
+    val onOpenWatches: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     /** From inside the model picker, since browsing is what you do when none of yours fit. */
     val onBrowseModels: () -> Unit = {},

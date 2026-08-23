@@ -60,7 +60,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
+import io.github.alpharomercoma.openweights.core.common.model.Tunable
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
@@ -88,6 +90,14 @@ fun ParameterSheet(
     preferences: ModelPreferences,
     supportsThinking: Boolean,
     hasGpu: Boolean,
+    /**
+     * What the loaded model emits, which decides what is worth showing.
+     *
+     * A speech model reads three of these settings and ignores the rest, so the rest are
+     * not drawn. See [OutputModality]: the list is the fields of the engine's own audio
+     * input struct rather than a judgement about what is useful.
+     */
+    outputModality: OutputModality = OutputModality.TEXT,
     /** Where the weights of the model currently loaded actually are, largest buffer first. */
     offloadBuffers: List<Pair<String, Int>> = emptyList(),
     /** The window the model is actually running with, shown while the setting is automatic. */
@@ -120,9 +130,17 @@ fun ParameterSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(modelName, style = MaterialTheme.typography.titleMedium)
-            Caption("saved for this model only")
+            // Said "saved for this model only" until settings went global, which made it
+            // exactly wrong: changing temperature here changes it everywhere.
+            Caption(
+                if (outputModality == OutputModality.SPEECH) {
+                    "shared by every model, and this one reads few of them"
+                } else {
+                    "shared by every model, except the two below that reload it"
+                },
+            )
 
-            if (supportsThinking) {
+            if (supportsThinking && outputModality.accepts(Tunable.THINKING)) {
                 ThinkingSetting(
                     draft = draft,
                     onChange = { draft = it },
@@ -133,6 +151,7 @@ fun ParameterSheet(
             // know what a sampler is still wants.
             Setting(
                 label = "Answer length",
+                shown = outputModality.accepts(Tunable.ANSWER_LENGTH),
                 explanation = "How much the model writes when the question does not say.",
                 value = AnswerLength.fromName(draft.answerLength).label,
             ) {
@@ -159,6 +178,7 @@ fun ParameterSheet(
 
             Setting(
                 label = "Temperature",
+                shown = outputModality.accepts(Tunable.TEMPERATURE),
                 explanation = "Lower is steadier, higher is more varied.",
                 value = String.format(locale, "%.2f", draft.temperature),
             ) {
@@ -204,24 +224,43 @@ fun ParameterSheet(
                 )
             }
 
-            Column {
-                Text("System prompt", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = "Standing instructions, sent before every conversation. Small " +
-                        "models follow explicit ones far better than implied ones.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Setting(
+                label = "Summarise at",
+                explanation = "How full the conversation gets before earlier turns are " +
+                    "folded into a summary. Lower is faster and forgets sooner, higher " +
+                    "remembers more and slows down as it fills.",
+                value = "${draft.compactAtPercent}% full",
+            ) {
+                val lowest = ModelPreferences.MIN_COMPACT_AT_PERCENT.toFloat()
+                val highest = ModelPreferences.MAX_COMPACT_AT_PERCENT.toFloat()
+                StepSlider(
+                    value = draft.compactAtPercent.toFloat(),
+                    onValueChange = { draft = draft.copy(compactAtPercent = it.roundToInt()) },
+                    valueRange = lowest..highest,
+                    steps = 0,
                 )
-                OutlinedTextField(
-                    value = draft.systemPrompt,
-                    onValueChange = { draft = draft.copy(systemPrompt = it) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                    placeholder = { Text("Optional") },
-                    minLines = 2,
-                    maxLines = 5,
-                    shape = RoundedCornerShape(Radius.sm),
-                    colors = fieldColors(),
-                )
+            }
+
+            if (outputModality.accepts(Tunable.SYSTEM_PROMPT)) {
+                Column {
+                    Text("System prompt", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = "Standing instructions, sent before every conversation. Small " +
+                            "models follow explicit ones far better than implied ones.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = draft.systemPrompt,
+                        onValueChange = { draft = draft.copy(systemPrompt = it) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        placeholder = { Text("Optional") },
+                        minLines = 2,
+                        maxLines = 5,
+                        shape = RoundedCornerShape(Radius.sm),
+                        colors = fieldColors(),
+                    )
+                }
             }
 
             // One disclosure rather than seventeen controls in a column.
@@ -235,6 +274,7 @@ fun ParameterSheet(
             AdvancedSettings(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen }) {
                 Setting(
                     label = "Top-p",
+                    shown = outputModality.accepts(Tunable.TOP_P),
                     explanation = "Keeps the likeliest words, up to this share of the odds.",
                     value = String.format(locale, "%.2f", draft.topP),
                 ) {
@@ -248,6 +288,7 @@ fun ParameterSheet(
 
                 Setting(
                     label = "Top-k",
+                    shown = outputModality.accepts(Tunable.TOP_K),
                     explanation = "Never weighs up more candidates than this.",
                     value = draft.topK.toString(),
                 ) {
@@ -261,6 +302,7 @@ fun ParameterSheet(
 
                 Setting(
                     label = "Repeat penalty",
+                    shown = outputModality.accepts(Tunable.REPEAT_PENALTY),
                     explanation = "Discourages repeating itself. Too high and it dodges words " +
                         "it needs.",
                     value = String.format(locale, "%.2f", draft.repeatPenalty),
@@ -305,30 +347,34 @@ fun ParameterSheet(
                         }
                     }
                 }
-                Column {
-                    Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = "Sent with the tools, before your own prompt. This is the whole " +
-                            "of what the app adds.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = draft.toolPrompt,
-                        onValueChange = { draft = draft.copy(toolPrompt = it) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        placeholder = { Text("Nothing about tools") },
-                        minLines = 3,
-                        maxLines = 8,
-                        shape = RoundedCornerShape(Radius.sm),
-                        colors = fieldColors(),
-                    )
-                    TextButton(
-                        onClick = {
-                            draft = draft.copy(toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT)
-                        },
-                    ) {
-                        Text("Restore the default wording")
+                if (outputModality.accepts(Tunable.TOOL_PROMPT)) {
+                    Column {
+                        Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = "Sent with the tools, before your own prompt. This is " +
+                                "the whole of what the app adds.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = draft.toolPrompt,
+                            onValueChange = { draft = draft.copy(toolPrompt = it) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            placeholder = { Text("Nothing about tools") },
+                            minLines = 3,
+                            maxLines = 8,
+                            shape = RoundedCornerShape(Radius.sm),
+                            colors = fieldColors(),
+                        )
+                        TextButton(
+                            onClick = {
+                                draft = draft.copy(
+                                    toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT,
+                                )
+                            },
+                        ) {
+                            Text("Restore the default wording")
+                        }
                     }
                 }
             }
@@ -457,8 +503,17 @@ private fun Setting(
     explanation: String,
     value: String,
     footnote: String? = null,
+    /**
+     * False draws nothing at all.
+     *
+     * A parameter the loaded model cannot read is not disabled, it is absent. Greying it
+     * out would keep a control on screen that has no correct position and no way to explain
+     * itself, and leave the sheet the same length for a model with a third of the settings.
+     */
+    shown: Boolean = true,
     control: @Composable () -> Unit,
 ) {
+    if (!shown) return
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),

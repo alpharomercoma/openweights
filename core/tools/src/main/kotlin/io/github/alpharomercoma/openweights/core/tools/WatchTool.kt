@@ -1,0 +1,109 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.core.tools
+
+import io.github.alpharomercoma.openweights.core.common.context.Watch
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+
+/**
+ * What a watch needs from whoever stores it, so this module does not need a database.
+ *
+ * `core:tools` deliberately owns no storage, and a tool that reached for Room would drag the
+ * whole data layer in behind it. The app supplies this.
+ */
+fun interface Watches {
+    /** Starts a watch, or returns null when there are already [Watch.MAX_ACTIVE]. */
+    suspend fun start(task: String, everyMinutes: Int): Watch?
+}
+
+/**
+ * Lets the model set something up to be checked again later.
+ *
+ * The one tool here whose effect continues after the conversation ends, which is why it asks
+ * first. "Tell me if the price drops" is a reasonable thing to say to an assistant and an
+ * unreasonable thing for an assistant to arrange silently: it costs battery on a schedule for
+ * as long as it runs, and the user is the one paying.
+ */
+class WatchTool(private val watches: Watches) : Tool {
+    override val definition = ToolDefinition(
+        name = NAME,
+        description = "Check something again on a schedule, for as long as the user wants. " +
+            "Use it when they ask to be told about a change, or to look again every so " +
+            "often. Not for anything you can answer now.",
+        parametersJson = """
+            {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "string",
+                  "description": "What to check each time, as an instruction"
+                },
+                "every_minutes": {
+                  "type": "integer",
+                  "description": "Minutes between checks, ${Watch.MIN_MINUTES} to ${Watch.MAX_MINUTES}"
+                }
+              },
+              "required": ["task", "every_minutes"]
+            }
+        """.trimIndent(),
+    )
+
+    /** Nothing that keeps running afterwards should start without being seen. */
+    override val needsApproval: Boolean = true
+
+    override suspend fun run(call: ToolCall): String {
+        val task = call.argument("task", "what", "check")
+        val minutes = call.intArgument("every_minutes", "minutes", "interval")
+        refusal(task, minutes)?.let { return it }
+
+        val started = watches.start(task!!, minutes!!)
+            ?: return "There are already ${Watch.MAX_ACTIVE} checks running, which is the " +
+                "limit. Ask the user to stop one first."
+
+        // Says what will actually happen rather than what was asked for. A watch faster than
+        // the scheduler's floor keeps a notification up, and the model should be able to
+        // tell the user that without having to know why.
+        return if (started.needsForegroundService) {
+            "Checking every $minutes minutes, with a notification showing while it runs."
+        } else {
+            "Checking every $minutes minutes."
+        }
+    }
+
+    /**
+     * Why this call cannot become a watch, in a sentence the model can act on.
+     *
+     * Separated from [run] so that the arguments are checked in one place and the sentence
+     * says what to do next rather than only what was wrong. A model that is told "no
+     * interval was given" calls again with one; one told "invalid arguments" apologises.
+     */
+    private fun refusal(task: String?, minutes: Int?): String? = when {
+        task.isNullOrBlank() ->
+            "No task was given. Call $NAME again saying what to check."
+        minutes == null ->
+            "No interval was given. Call $NAME again with every_minutes."
+        minutes !in Watch.MIN_MINUTES..Watch.MAX_MINUTES ->
+            "That interval is outside what this can do. Use between ${Watch.MIN_MINUTES} " +
+                "and ${Watch.MAX_MINUTES} minutes."
+        else -> null
+    }
+
+    companion object {
+        const val NAME = "watch"
+    }
+}

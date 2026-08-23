@@ -40,6 +40,8 @@ import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -98,6 +100,20 @@ class TurnRunner @Inject constructor(
      * The view model is at both of detekt's limits for a class and has been since before this
      * feature; adding a seventh constructor parameter to it would be the wrong way to pay.
      */
+    /**
+     * One turn at a time, whoever is asking.
+     *
+     * The engine holds one model and one KV cache, so two turns at once is not slow, it is
+     * wrong: the second one's prefill lands on the first one's context. Nothing needed this
+     * while the only caller was a screen a person is looking at, and then watches arrived,
+     * which come due on a timer with no idea what the user is doing.
+     *
+     * Held here rather than in the engine because this is the boundary a turn has: the
+     * engine's own calls are individual decodes, and a lock down there would serialise
+     * tokens rather than turns.
+     */
+    private val engineInUse = Mutex()
+
     val planning: PlanBoard get() = plans
 
     /** The question the model is waiting on, for the screen to answer. See [planning]. */
@@ -129,6 +145,41 @@ class TurnRunner @Inject constructor(
      * @return the raw text of the last pass, which is what a cancellation should keep.
      */
     suspend fun run(
+        conversation: List<ChatMessage>,
+        params: SamplerParams,
+        mode: AgentMode,
+        withTools: Boolean,
+        notes: ToolNotes,
+        listener: TurnListener,
+    ): String = engineInUse.withLock {
+        turn(conversation, params, mode, withTools, notes, listener)
+    }
+
+    /**
+     * Runs only if nothing else is using the engine, and returns null rather than waiting.
+     *
+     * For a caller whose work has a moment: a watch coming due while the user is mid
+     * conversation should record that it was skipped, not join a queue. By the time it
+     * reached the front the thing it was checking would have moved on, and every skipped
+     * tick would run at once when the user put the phone down.
+     */
+    suspend fun tryRun(
+        conversation: List<ChatMessage>,
+        params: SamplerParams,
+        mode: AgentMode,
+        withTools: Boolean,
+        notes: ToolNotes,
+        listener: TurnListener,
+    ): String? {
+        if (!engineInUse.tryLock()) return null
+        return try {
+            turn(conversation, params, mode, withTools, notes, listener)
+        } finally {
+            engineInUse.unlock()
+        }
+    }
+
+    private suspend fun turn(
         conversation: List<ChatMessage>,
         params: SamplerParams,
         mode: AgentMode,

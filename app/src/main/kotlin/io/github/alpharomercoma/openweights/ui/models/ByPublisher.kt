@@ -34,6 +34,21 @@ data class PublisherGroup(
      * So a group with nobody to name has no heading, and the models simply sit at the end of
      * the list. Nothing is lost: a heading that says nothing was never telling anyone
      * anything.
+     *
+     * ### Why nothing is guessed from the filename
+     *
+     * The first attempt at filling those gaps read the family off the name, so `llama*`
+     * became Meta and `gemma*` became Google. That is a different question answered
+     * confidently. Meta trained Llama; the GGUF on the phone was almost certainly converted
+     * and quantized by somebody else, and `bartowski/Llama-3.2-3B-Instruct-GGUF` is
+     * published by bartowski. Putting Meta's name over that file credits the wrong party
+     * and tells the user the file came from somewhere it did not, which matters here more
+     * than in most apps because the whole download path is about knowing what you are
+     * running. `llamaindex-*` would have matched the same rule and been credited to Meta on
+     * no evidence at all.
+     *
+     * The repository owner recorded at download is the answer, it is already stored, and it
+     * is correct by construction. Where it is absent the honest heading is none.
      */
     val heading: String? get() = publisher
 }
@@ -51,46 +66,6 @@ data class PublisherGroup(
  * reason. Unattributed files go last, since they are the exception and putting them first
  * would push the common case down the screen.
  */
-fun List<LocalModel>.byPublisher(): List<PublisherGroup> =
-    groupBy { it.publisher ?: it.name.publisherFromName() }
-        .map { (publisher, models) -> PublisherGroup(publisher, models.sortedBy { it.name }) }
-        .sortedWith(compareBy({ it.publisher == null }, { it.publisher?.lowercase() }))
-
-/**
- * Who published a model, read off its filename, for the ones that can be read off reliably.
- *
- * The app records the publisher when it downloads something, which is the right answer and
- * the only certain one. It is also blank for every model that was already on a phone before
- * that recording existed, and for anything side loaded, and the first version of this put all
- * of them under a heading reading "Added by hand" that was wrong twice: it names something
- * the user did not do, and on an existing install it was the heading over every model.
- *
- * A filename is weaker evidence, and for this handful it is not weak. `LFM2.5-2.6B-QAD-Q4_0`
- * is a Liquid model in the same way `Qwen3-1.7B` is a Qwen one: the family name is the
- * publisher's own and nobody else ships under it. Matched on the start of the name, so a fine
- * tune called `my-qwen-experiment` is attributed to nobody, and anything unrecognised still
- * gets no heading rather than a guess.
- */
-private fun String.publisherFromName(): String? {
-    val name = substringAfterLast('/').lowercase()
-    return FAMILIES.entries.firstOrNull { (prefix, _) -> name.startsWith(prefix) }?.value
-}
-
-/**
- * Family name to publisher, for families whose name is the publisher's own.
- *
- * Deliberately short. Every entry is a claim the app makes on a publisher's behalf, so the
- * bar is that the family name is unambiguous and the publisher is the one who ships it.
- */
-private val FAMILIES = mapOf(
-    "lfm" to "LiquidAI",
-    "qwen" to "Qwen",
-    "gemma" to "Google",
-    "llama" to "Meta",
-    "phi" to "Microsoft",
-    "smollm" to "HuggingFaceTB",
-    "granite" to "IBM",
-    "mistral" to "Mistral AI",
-    "deepseek" to "DeepSeek",
-    "olmo" to "AllenAI",
-)
+fun List<LocalModel>.byPublisher(): List<PublisherGroup> = groupBy { it.publisher }
+    .map { (publisher, models) -> PublisherGroup(publisher, models.sortedBy { it.name }) }
+    .sortedWith(compareBy({ it.publisher == null }, { it.publisher?.lowercase() }))

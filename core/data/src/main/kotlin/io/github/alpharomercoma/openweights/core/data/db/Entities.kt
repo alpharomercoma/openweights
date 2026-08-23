@@ -174,3 +174,51 @@ data class ContentReportEntity(
     val note: String,
     val reportedAt: Long,
 )
+
+/**
+ * A watch: something to check again on a schedule.
+ *
+ * Persisted rather than held in memory, which is the difference between a feature that keeps
+ * running and one that stops the first time Android reclaims the process. The scheduler is
+ * rebuilt from this table at startup.
+ */
+@Entity(tableName = "watches")
+data class WatchEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val task: String,
+    val everyMinutes: Int,
+    /** [io.github.alpharomercoma.openweights.core.common.context.WatchState], by name. */
+    val state: String,
+    val createdAt: Long,
+    val lastRunAt: Long? = null,
+    val lastSummary: String? = null,
+    val runs: Int = 0,
+    val consecutiveFailures: Int = 0,
+)
+
+/**
+ * One tick of a watch, kept so the user can see what it has been doing.
+ *
+ * Bounded per watch by the store rather than by a trigger: an unbounded log of a check that
+ * runs every minute is a database that grows for as long as the phone is on.
+ */
+@Entity(
+    tableName = "watch_runs",
+    foreignKeys = [
+        ForeignKey(
+            entity = WatchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["watchId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("watchId")],
+)
+data class WatchRunEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val watchId: Long,
+    val at: Long,
+    /** [io.github.alpharomercoma.openweights.core.common.context.WatchOutcome], by name. */
+    val outcome: String,
+    val summary: String,
+)

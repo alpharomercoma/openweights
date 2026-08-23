@@ -173,3 +173,49 @@ interface CompactionDao {
     @Insert
     suspend fun insert(compaction: CompactionEntity): Long
 }
+
+/** Watches and their history. */
+@Dao
+interface WatchDao {
+    @Query("SELECT * FROM watches ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<WatchEntity>>
+
+    @Query("SELECT * FROM watches WHERE state = :state")
+    suspend fun inState(state: String): List<WatchEntity>
+
+    @Query("SELECT * FROM watches WHERE id = :id")
+    suspend fun byId(id: Long): WatchEntity?
+
+    @Query("SELECT COUNT(*) FROM watches WHERE state = :state")
+    suspend fun countInState(state: String): Int
+
+    @Insert
+    suspend fun insert(watch: WatchEntity): Long
+
+    @Upsert
+    suspend fun upsert(watch: WatchEntity)
+
+    @Query("DELETE FROM watches WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM watch_runs WHERE watchId = :watchId ORDER BY at DESC LIMIT :limit")
+    fun observeRuns(watchId: Long, limit: Int): Flow<List<WatchRunEntity>>
+
+    @Insert
+    suspend fun insertRun(run: WatchRunEntity)
+
+    /**
+     * Drops all but the newest [keep] runs of one watch.
+     *
+     * By id rather than by timestamp, because two ticks of a one minute watch can land in
+     * the same millisecond and a timestamp cut would then keep both or neither.
+     */
+    @Query(
+        """
+        DELETE FROM watch_runs WHERE watchId = :watchId AND id NOT IN (
+            SELECT id FROM watch_runs WHERE watchId = :watchId ORDER BY id DESC LIMIT :keep
+        )
+        """,
+    )
+    suspend fun trimRuns(watchId: Long, keep: Int)
+}

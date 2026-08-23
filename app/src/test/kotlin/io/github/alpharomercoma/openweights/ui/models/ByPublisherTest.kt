@@ -41,21 +41,36 @@ class ByPublisherTest {
     }
 
     @Test
-    fun `a model with no recorded publisher is read off its family name`() {
-        // Every install that predates the app recording publishers has none of them, which
-        // is what put "Added by hand" over every model on somebody's phone.
+    fun `nothing is credited to a publisher on the strength of a filename`() {
+        // These were read off the family name and credited to Google, Liquid and Qwen. The
+        // family is not the publisher: Meta trained Llama, and the GGUF of it on a phone was
+        // converted and quantized by whoever uploaded that repository. Crediting the wrong
+        // party is worse than saying nothing, in an app whose whole download path is about
+        // knowing what you are running.
         val groups = listOf(
             model("LFM2.5-2.6B-QAD-Q4_0", null),
             model("Qwen3-1.7B-Instruct", null),
             model("gemma-3-4b-it", null),
         ).byPublisher()
 
-        assertThat(groups.map { it.heading })
-            .containsExactly("Google", "LiquidAI", "Qwen").inOrder()
+        assertThat(groups).hasSize(1)
+        assertThat(groups.single().heading).isNull()
+        assertThat(groups.single().models).hasSize(3)
     }
 
     @Test
-    fun `a name nobody can be read off gets no heading rather than a guess`() {
+    fun `the recorded repository owner is what a heading names`() {
+        // The one answer that is correct by construction: it is who the file came from.
+        val groups = listOf(
+            model("Llama-3.2-3B-Instruct-Q4_K_M", "bartowski"),
+            model("LFM2.5-2.6B-QAD-Q4_0", "LiquidAI"),
+        ).byPublisher()
+
+        assertThat(groups.map { it.heading }).containsExactly("bartowski", "LiquidAI").inOrder()
+    }
+
+    @Test
+    fun `an unattributed file gets no heading rather than a guess`() {
         val groups = listOf(
             model("my-qwen-experiment", null),
             model("finetune-v3", null),

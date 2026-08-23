@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.engine
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
@@ -153,6 +154,14 @@ data class LoadedModelInfo(
     /** Every buffer holding weights, largest first: `[OpenCL to 680, CPU to 96]` in MiB. */
     val offloadBuffers: List<Pair<String, Int>> = emptyList(),
     val mediaSupport: MediaSupport = MediaSupport(),
+    /**
+     * What this model emits, which decides which sampler settings reach it.
+     *
+     * [MediaSupport] is the inbound half of the same question. A model can read pictures
+     * and write words, or read words and speak, and the two are answered by different
+     * encoders in the same projector file.
+     */
+    val outputModality: OutputModality = OutputModality.TEXT,
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,
     /**

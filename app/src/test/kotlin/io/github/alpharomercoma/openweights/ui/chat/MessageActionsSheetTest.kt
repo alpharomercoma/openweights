@@ -92,19 +92,75 @@ class MessageActionsSheetTest {
         compose.onNodeWithText("to first token", substring = true).assertIsDisplayed()
     }
 
+    @Test
+    fun `a question can be asked again, changed`() {
+        // The affordance every chat app has and this one had only in the view model: the
+        // method existed with no call site, so it was not a feature, it was code.
+        var edited = false
+        showSheet(role = ChatRole.USER, canEdit = true, onEdit = { edited = true })
+
+        compose.onNodeWithText("Edit and resend").performClick()
+
+        assert(edited) { "editing must reach the caller" }
+    }
+
+    @Test
+    fun `a reply cannot be edited, only a question can`() {
+        // Editing rewrites what was asked. There is nothing to rewrite on the model's side,
+        // and the action for a reply people want is Regenerate, which is already here.
+        showSheet(role = ChatRole.ASSISTANT, canEdit = false)
+
+        compose.onNodeWithText("Edit and resend").assertDoesNotExist()
+    }
+
+    @Test
+    fun `a conversation can be branched from a turn`() {
+        var branched = false
+        showSheet(canBranch = true, onBranch = { branched = true })
+
+        compose.onNodeWithText("Branch from here").performClick()
+
+        assert(branched) { "branching must reach the caller" }
+    }
+
+    @Test
+    fun `every action still fits on the smallest screen`() {
+        // This column is deliberately not scrollable, and was sized when it held four rows.
+        // It now holds six, and a sheet that hands the leftover space to its content drops
+        // the last row off the bottom with nothing on screen to say it is there.
+        showSheet(canRegenerate = true, canEdit = true, canBranch = true)
+
+        compose.onNodeWithText("Copy text").assertIsDisplayed()
+        compose.onNodeWithText("Report this reply").assertIsDisplayed()
+    }
+
+    @Test
+    fun `neither is offered while the model is answering`() {
+        // Both change the transcript under a turn that is still writing into it.
+        showSheet(canEdit = false, canBranch = false)
+
+        compose.onNodeWithText("Edit and resend").assertDoesNotExist()
+        compose.onNodeWithText("Branch from here").assertDoesNotExist()
+    }
+
     @Suppress("LongParameterList")
     private fun showSheet(
         canRegenerate: Boolean = true,
         isSpeaking: Boolean = false,
         onRegenerate: () -> Unit = {},
         onReport: () -> Unit = {},
+        role: ChatRole = ChatRole.ASSISTANT,
+        canEdit: Boolean = false,
+        canBranch: Boolean = false,
+        onEdit: () -> Unit = {},
+        onBranch: () -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
                 MessageActionsSheet(
                     entry = TranscriptEntry(
                         id = 1,
-                        role = ChatRole.ASSISTANT,
+                        role = role,
                         text = "A KV cache stores past attention tensors.",
                         tokensPerSecond = 13.8,
                         timeToFirstTokenMs = 412,
@@ -112,9 +168,13 @@ class MessageActionsSheetTest {
                         totalMillis = 4_800,
                     ),
                     canRegenerate = canRegenerate,
+                    canEdit = canEdit,
+                    canBranch = canBranch,
                     isSpeaking = isSpeaking,
                     onRegenerate = onRegenerate,
                     onToggleReadAloud = {},
+                    onEdit = onEdit,
+                    onBranch = onBranch,
                     onReport = onReport,
                     onDismiss = {},
                 )

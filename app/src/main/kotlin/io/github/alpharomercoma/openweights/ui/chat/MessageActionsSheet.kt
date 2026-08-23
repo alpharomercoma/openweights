@@ -29,7 +29,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
@@ -59,9 +61,15 @@ import java.util.Locale
 fun MessageActionsSheet(
     entry: TranscriptEntry,
     canRegenerate: Boolean,
+    canEdit: Boolean,
+    canBranch: Boolean,
     isSpeaking: Boolean,
     onRegenerate: () -> Unit,
     onToggleReadAloud: () -> Unit,
+    /** Puts the question back in the composer and drops everything after it. */
+    onEdit: () -> Unit,
+    /** Opens a new conversation carrying everything up to and including this turn. */
+    onBranch: () -> Unit,
     onReport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -124,6 +132,33 @@ fun MessageActionsSheet(
                     icon = Icons.Rounded.Refresh,
                     label = "Regenerate reply",
                     onClick = onRegenerate,
+                )
+            }
+            if (canEdit) {
+                // Asking again, better. The reply that followed a question is what a person
+                // is reacting to when they want to change the question, so editing has to
+                // drop it: leaving the old answer under a new prompt would be a transcript
+                // of a conversation that never happened.
+                ActionRow(
+                    icon = Icons.Rounded.Edit,
+                    label = "Edit and resend",
+                    onClick = {
+                        onEdit()
+                        onDismiss()
+                    },
+                )
+            }
+            if (canBranch) {
+                // The other way to change direction, and the one that keeps both. Everything
+                // up to here is copied into a new conversation, so the thread that was going
+                // well is still there when the detour does not work out.
+                ActionRow(
+                    icon = Icons.Rounded.CallSplit,
+                    label = "Branch from here",
+                    onClick = {
+                        onBranch()
+                        onDismiss()
+                    },
                 )
             }
             if (entry.role == ChatRole.ASSISTANT) {

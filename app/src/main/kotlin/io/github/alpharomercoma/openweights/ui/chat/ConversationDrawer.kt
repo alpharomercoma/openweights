@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -184,6 +185,7 @@ private fun DrawerFooter(destinations: ChatDestinations) {
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         DrawerDestination("Tools", Icons.Rounded.Build, destinations.onOpenTools)
         DrawerDestination("Usage", Icons.Rounded.BarChart, destinations.onOpenUsage)
+        DrawerDestination("Watching", Icons.Rounded.Visibility, destinations.onOpenWatches)
         DrawerDestination("Settings", Icons.Rounded.Settings, destinations.onOpenSettings)
     }
 }

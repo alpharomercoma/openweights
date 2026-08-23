@@ -29,8 +29,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UsageEntity::class,
         ContentReportEntity::class,
         CompactionEntity::class,
+        WatchEntity::class,
+        WatchRunEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -39,6 +41,7 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun usage(): UsageDao
     abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
+    abstract fun watches(): WatchDao
 
     companion object {
         const val NAME = "openweights.db"
@@ -50,6 +53,48 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * point of the app, and losing them to a schema change would be unforgivable for
          * data that exists nowhere else.
          */
+        /**
+         * Adds watches and their run history.
+         *
+         * Two new tables and nothing touched, so this is the safe kind of migration. The
+         * runs table cascades on delete, which is what keeps a cancelled watch from leaving
+         * an orphaned log behind.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS watches (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        task TEXT NOT NULL,
+                        everyMinutes INTEGER NOT NULL,
+                        state TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        lastRunAt INTEGER,
+                        lastSummary TEXT,
+                        runs INTEGER NOT NULL DEFAULT 0,
+                        consecutiveFailures INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS watch_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        watchId INTEGER NOT NULL,
+                        at INTEGER NOT NULL,
+                        outcome TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        FOREIGN KEY(watchId) REFERENCES watches(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_watch_runs_watchId ON watch_runs(watchId)",
+                )
+            }
+        }
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN attachments TEXT")

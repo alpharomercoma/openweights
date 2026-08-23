@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,6 +107,14 @@ fun Composer(
     onSend: (String) -> Boolean,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
+    /**
+     * A message being edited, dropped into the field for the user to change.
+     *
+     * Editing happens here rather than in a dialog because this is where the keyboard, the
+     * attachments and the send button already are, and because a question being asked again
+     * is the same act as asking it the first time.
+     */
+    editing: String? = null,
     /** The thinking control, drawn beside Attach. Empty when the model offers no choice. */
     leading: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -116,6 +125,13 @@ fun Composer(
     // model that never saw the conversation it was answering.
     var draft by rememberSaveable(conversationKey) { mutableStateOf("") }
     var isFocused by remember { mutableStateOf(false) }
+
+    // Keyed on the text itself rather than on a flag, so choosing a different message to
+    // edit refills the field, and so a user who has started changing the text does not have
+    // it overwritten on every recomposition.
+    LaunchedEffect(editing) {
+        if (editing != null) draft = editing
+    }
     val commands = SlashCommand.match(draft)
     val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty() || document != null
 

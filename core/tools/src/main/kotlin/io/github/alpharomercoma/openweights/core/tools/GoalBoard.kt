@@ -22,6 +22,7 @@ import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -102,10 +103,14 @@ class GoalBoard @Inject constructor() {
         pending.update { it + message }
     }
 
-    /** Takes what was typed, leaving nothing behind for the step after this one. */
-    fun takeSteering(): List<String> {
-        val taken = pending.value
-        pending.value = emptyList()
-        return taken
-    }
+    /**
+     * Takes what was typed, leaving nothing behind for the step after this one.
+     *
+     * `getAndUpdate` rather than a read followed by a write, because the two are not the
+     * same thing here. Steering arrives from the user's thread while the goal loop reads it
+     * between steps, and anything typed in the window between the read and the clear was
+     * silently dropped: the one message a person sends to redirect a running goal is exactly
+     * the message that arrives while a step is ending.
+     */
+    fun takeSteering(): List<String> = pending.getAndUpdate { emptyList() }
 }

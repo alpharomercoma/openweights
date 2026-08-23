@@ -83,10 +83,30 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
 
         // Oldest first, so the cap costs the least recent thing rather than refusing the
         // most recent one. A memory that stops accepting is a memory nobody trusts.
-        val kept = (known.value + Remembered(fact, now)).takeLast(MAX_FACTS)
+        val kept = (known.value + Remembered(fact, now)).takeLast(MAX_FACTS).withinBudget()
         known.value = kept
         write(kept)
         return "Remembered."
+    }
+
+    /**
+     * Drops from the oldest until the block fits [MAX_TOTAL_CHARS].
+     *
+     * A count on its own was not a budget. Twenty four facts at the per-fact ceiling is
+     * 3,725 characters, which the LFM2.5 tokenizer turns into 750 tokens of prefill on
+     * every turn of every future conversation, against the 250 this was documented as
+     * costing. Two limits that multiply need a third that does not.
+     *
+     * The newest fact always survives: it is the one somebody just asked for.
+     */
+    private fun List<Remembered>.withinBudget(): List<Remembered> {
+        var total = sumOf { it.text.length }
+        if (total <= MAX_TOTAL_CHARS) return this
+        val kept = toMutableList()
+        while (kept.size > 1 && total > MAX_TOTAL_CHARS) {
+            total -= kept.removeAt(0).text.length
+        }
+        return kept
     }
 
     fun forget(text: String) {
@@ -133,11 +153,26 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
         /**
          * How many facts are carried.
          *
-         * Twenty four, which at the length below is about a thousand characters and roughly
-         * 250 tokens of prefill on every turn. ChatGPT keeps a comparable number for the
-         * same reason: past a point the list stops being a profile and becomes a transcript.
+         * ChatGPT keeps a comparable number for the same reason: past a point the list
+         * stops being a profile and becomes a transcript.
+         *
+         * This used to be the only limit, alongside [MAX_CHARS], and the pair was described
+         * as costing about a thousand characters and 250 tokens. They multiply, so the
+         * enforced worst case was 24 x 160, and measured rather than estimated, that is
+         * 3,725 characters and **750 tokens** through the LFM2.5 tokenizer, on every turn
+         * of every future conversation. [MAX_TOTAL_CHARS] is what makes the claim true.
          */
         const val MAX_FACTS = 24
+
+        /**
+         * The real budget: what every fact together may cost.
+         *
+         * A thousand characters, which the same measurement puts at roughly 230 tokens for
+         * ordinary sentences, so this is the number the documentation always meant. Reached
+         * long before [MAX_FACTS] for verbose facts and never for terse ones, which is the
+         * right way round.
+         */
+        const val MAX_TOTAL_CHARS = 1_000
 
         /** One fact, one sentence. Anything longer is a summary and belongs in a chat. */
         const val MAX_CHARS = 160

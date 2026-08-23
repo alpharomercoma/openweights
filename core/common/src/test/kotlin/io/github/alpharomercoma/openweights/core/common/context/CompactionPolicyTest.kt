@@ -119,4 +119,40 @@ class CompactionPolicyTest {
         val threw = runCatching(block).isFailure
         assertThat(threw).isTrue()
     }
+
+    @Test
+    fun `the user's own threshold decides, not the built in one`() {
+        // The setting exists because the trade is a preference. Half full is early folding:
+        // faster decode, shorter memory. The policy default would not have folded here.
+        val policy = CompactionPolicy()
+
+        assertThat(
+            policy.shouldCompact(
+                contextUsed = 2_600,
+                contextSize = 4_096,
+                entryCount = 12,
+                triggerFraction = 0.5f,
+            ),
+        ).isTrue()
+
+        assertThat(
+            policy.shouldCompact(contextUsed = 2_600, contextSize = 4_096, entryCount = 12),
+        ).isFalse()
+    }
+
+    @Test
+    fun `a threshold outside what the policy allows is clamped rather than obeyed`() {
+        // A slider cannot send anything silly, but a stored preference from a future build
+        // can, and a fraction of zero would fold before every single turn.
+        val policy = CompactionPolicy()
+
+        assertThat(
+            policy.shouldCompact(
+                contextUsed = 1,
+                contextSize = 4_096,
+                entryCount = 12,
+                triggerFraction = 0f,
+            ),
+        ).isFalse()
+    }
 }

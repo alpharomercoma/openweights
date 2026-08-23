@@ -518,6 +518,12 @@ Session::MediaSupport Session::media_support() const {
     return { mtmd_support_vision(ctx), mtmd_support_audio(ctx) };
 }
 
+bool Session::generates_speech() const {
+    if (mtmd_ == nullptr) return false;
+    auto * ctx = static_cast<mtmd_context *>(mtmd_);
+    return mtmd_gen_audio_get_info(ctx).type != MTMD_GEN_AUDIO_TYPE_NONE;
+}
+
 std::string Session::media_marker() const {
     if (mtmd_ == nullptr) return mtmd_default_marker();
     return mtmd_get_marker(static_cast<mtmd_context *>(mtmd_));

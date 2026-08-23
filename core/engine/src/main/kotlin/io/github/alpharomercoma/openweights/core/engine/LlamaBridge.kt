@@ -80,7 +80,13 @@ internal class LlamaBridge {
      */
     external fun nativeOffloadSummary(handle: Long): String
 
-    /** `[vision, audio]`: what the loaded projector accepts. Both false without one. */
+    /**
+     * `[vision, audio, speech]`: everything the loaded projector can do.
+     *
+     * The first two are what it reads, the third is whether it can speak, which is a
+     * generative decoder rather than the encoder behind the audio flag. All false without a
+     * projector. One call rather than three because one file answers all of it.
+     */
     external fun nativeMediaSupport(handle: Long): BooleanArray
 
     /** True when the loaded chat template understands being told whether to think. */

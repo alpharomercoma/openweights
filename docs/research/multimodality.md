@@ -78,11 +78,18 @@ devices; the alternative makes the app's central claim untrue for one button.
 This is the part most "any-to-any" messaging obscures. A GGUF language model emits tokens.
 Everything else is a second model.
 
-- **Speech out.** True speech-generating open models exist: Qwen3-Omni talks, and
-  LFM2-Audio does speech-to-speech, but llama.cpp does not implement their audio decoders,
-  and Qwen3-Omni is a 30B MoE, far past what a phone can hold. Android's own
-  `TextToSpeech` runs on-device, needs no network, and gives the user the thing they
-  actually wanted: the reply read aloud. That is what OpenWeights ships.
+- **Speech out.** Half of this has changed and the conclusion has not, yet. It was true
+  that llama.cpp implemented no audio decoders; the vendored tree now carries `tools/tts`
+  and generative pipelines for Qwen3-TTS and Pocket-TTS in `libmtmd`, so the engine is no
+  longer the obstacle. Qwen3-Omni is still a 30B MoE far past what a phone can hold, and
+  the app still has no JNI for `mtmd_helper_gen_audio` and nowhere to play a wav. Android's
+  own `TextToSpeech` runs on-device, needs no network, and gives the user the thing they
+  actually wanted: the reply read aloud. That is what OpenWeights ships today, and a real
+  speech model is now a build rather than a wait.
+
+  What such a build inherits from the current sheet is almost nothing: three sampling
+  fields out of nine, and no chat template, so no system prompt and no tools. That is
+  already modelled by `OutputModality`, and CONTEXT.md carries the table.
 - **Image out.** Would need a diffusion runtime, `stable-diffusion.cpp` or MNN, as a
   second engine with its own weights, its own memory budget and its own UI. Defensible
   later; out of scope for a chat app whose promise is running *language* models.
@@ -93,7 +100,9 @@ Everything else is a second model.
 Qwen3-Omni and Qwen3.5-Omni accept text, image, audio and video and emit text and
 speech. They are also 30B-class mixture-of-experts models. Quantized to 4 bits the weights
 alone exceed what a 12 GB phone can spare, and llama.cpp implements their *understanding*
-path, not their speech decoder. Any-to-any is real, and it is a server capability.
+path, not their speech decoder. Any-to-any is real, and at that size it is a server
+capability. The smaller speech pipelines llama.cpp has since added are a different and much
+more plausible thing than any-to-any, and they are what a phone could actually run.
 
 ## The message shape: following the Vercel AI SDK
 

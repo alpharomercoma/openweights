@@ -133,6 +133,10 @@ fun ChatScreen(
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
     onGoal: (String) -> Unit = {},
+    /** Resend an earlier question, changed, dropping everything that followed it. */
+    onEditAndResend: (Long, String) -> Unit = { _, _ -> },
+    /** Carry this conversation up to a turn into a new one. */
+    onBranchFrom: (Long) -> Unit = {},
     /** Everywhere you can go from here. See [ChatDestinations]. */
     destinations: ChatDestinations = ChatDestinations(),
     /** What is on the phone, for the picker the model name raises. */
@@ -215,6 +219,10 @@ fun ChatScreen(
                         scope.launch { drawerState.close() }
                         destinations.onOpenUsage()
                     },
+                    onOpenWatches = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenWatches()
+                    },
                     onOpenSettings = {
                         scope.launch { drawerState.close() }
                         destinations.onOpenSettings()
@@ -238,6 +246,8 @@ fun ChatScreen(
             followTail = followTail,
             actionsForId = actionsForId,
             onActionsForId = { actionsForId = it },
+            onEditAndResend = onEditAndResend,
+            onBranchFrom = onBranchFrom,
             onSend = onSend,
             onStop = onStop,
             onRegenerate = onRegenerate,
@@ -281,6 +291,8 @@ private fun ChatContent(
     listState: androidx.compose.foundation.lazy.LazyListState,
     followTail: io.github.alpharomercoma.openweights.core.designsystem.component.FollowTailState,
     actionsForId: Long?,
+    onEditAndResend: (Long, String) -> Unit,
+    onBranchFrom: (Long) -> Unit,
     onActionsForId: (Long?) -> Unit,
     onSend: (String) -> Boolean,
     onStop: () -> Unit,
@@ -315,6 +327,11 @@ private fun ChatContent(
     modifier: Modifier = Modifier,
 ) {
     val actionsFor = actionsForId?.let { id -> state.transcript.firstOrNull { it.id == id } }
+
+    // Held by id rather than by entry, so a transcript that changes under it resolves to
+    // nothing instead of to a stale copy of a turn that has since been dropped.
+    var editingId by remember { mutableStateOf<Long?>(null) }
+    val editing = editingId?.let { id -> state.transcript.firstOrNull { it.id == id } }
     var showParameters by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
     var showAttachments by remember { mutableStateOf(false) }
@@ -484,14 +501,18 @@ private fun ChatContent(
                         // as text for it to answer. The palette is how these are found; it was also
                         // the only way to run one, which anybody who already knew the word found out
                         // by watching the model reply to "/plan".
+                        editing = editing?.text,
                         onSend = { typed ->
-                            val command = SlashCommand.typed(typed)
-                            if (command != null) {
-                                dispatch(command, SlashCommand.argument(typed))
-                                true
-                            } else {
-                                onSend(typed)
-                            }
+                            submit(
+                                typed = typed,
+                                editingId = editingId,
+                                onDispatch = dispatch,
+                                onEdit = { id, text ->
+                                    editingId = null
+                                    onEditAndResend(id, text)
+                                },
+                                onSend = onSend,
+                            )
                         },
                         onStop = onStop,
                         // From the palette there is no message yet, so a command that
@@ -546,6 +567,8 @@ private fun ChatContent(
         onToggleReadAloud = onToggleReadAloud,
         isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
+        onEdit = { editingId = it.id },
+        onBranch = { onBranchFrom(it.id) },
         onReport = onReport,
     )
 }
@@ -696,6 +719,9 @@ private fun ChatSheets(
     onToggleReadAloud: (String) -> Unit,
     isSpeaking: Boolean,
     onDismissActions: () -> Unit,
+    /** Puts this turn's text back in the composer. The resend happens from there. */
+    onEdit: (TranscriptEntry) -> Unit,
+    onBranch: (TranscriptEntry) -> Unit,
     onReport: (TranscriptEntry, ReportReason, String) -> Unit,
 ) {
     var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
@@ -705,6 +731,7 @@ private fun ChatSheets(
             modelName = state.modelName,
             preferences = state.preferences,
             supportsThinking = state.supportsThinking,
+            outputModality = state.outputModality,
             hasGpu = state.hasGpu,
             offloadBuffers = state.offloadBuffers,
             loadedContext = state.contextSize,
@@ -740,12 +767,19 @@ private fun ChatSheets(
             canRegenerate = entry.role == ChatRole.ASSISTANT &&
                 !state.isGenerating &&
                 entry.id == state.transcript.lastOrNull()?.id,
+            // Editing and branching are not limited to the last turn, because both are
+            // explicit about the transcript changing: editing says it drops what followed,
+            // and branching leaves this conversation exactly as it is.
+            canEdit = entry.role == ChatRole.USER && !state.isGenerating,
+            canBranch = !state.isGenerating,
             isSpeaking = isSpeaking,
             onToggleReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
             onRegenerate = {
                 onRegenerate()
                 onDismissActions()
             },
+            onEdit = { onEdit(entry) },
+            onBranch = { onBranch(entry) },
             onReport = {
                 onDismissActions()
                 reportFor = entry
@@ -753,6 +787,34 @@ private fun ChatSheets(
             onDismiss = onDismissActions,
         )
     }
+}
+
+/**
+ * What the send button means, which is three different things.
+ *
+ * A typed slash command runs rather than being sent to the model, which is how the palette's
+ * commands are reachable by anyone who already knows the word. A message being edited
+ * replaces the turn it came from. Everything else is an ordinary send.
+ */
+private fun submit(
+    typed: String,
+    editingId: Long?,
+    onDispatch: (SlashCommand, String) -> Unit,
+    onEdit: (Long, String) -> Unit,
+    onSend: (String) -> Boolean,
+): Boolean {
+    val command = SlashCommand.typed(typed)
+    if (command != null) {
+        onDispatch(command, SlashCommand.argument(typed))
+        return true
+    }
+    // Resending, not sending: the turn being replaced and everything after it goes. See
+    // ChatViewModel.editAndResend.
+    if (editingId != null) {
+        onEdit(editingId, typed)
+        return true
+    }
+    return onSend(typed)
 }
 
 /**

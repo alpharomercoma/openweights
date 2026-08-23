@@ -20,6 +20,7 @@ import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.device.CpuTopology
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ParsedToolCalls
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -299,6 +300,9 @@ class LlamaCppEngine internal constructor(
         val info = bridge.nativeModelInfo(activeHandle)
         // Read once: llama.cpp accounted for these at load and nothing moves afterwards.
         val offload = runCatching { bridge.nativeOffloadSummary(activeHandle) }.getOrDefault("")
+        // `[vision, audio, speech]`. Read once, for the same reason: the projector is fixed
+        // at load, and two of these three used to cost a JNI crossing each.
+        val projector = bridge.nativeMediaSupport(activeHandle)
         return LoadedModelInfo(
             description = bridge.nativeModelDescription(activeHandle),
             parameterCount = info[0],
@@ -316,9 +320,8 @@ class LlamaCppEngine internal constructor(
                     val mib = entry.substringAfter(':', "").toIntOrNull() ?: return@mapNotNull null
                     name to mib
                 },
-            mediaSupport = bridge.nativeMediaSupport(activeHandle).let { support ->
-                MediaSupport(vision = support[0], audio = support[1])
-            },
+            mediaSupport = MediaSupport(vision = projector[0], audio = projector[1]),
+            outputModality = if (projector[2]) OutputModality.SPEECH else OutputModality.TEXT,
             supportsThinking = bridge.nativeSupportsThinking(activeHandle),
             supportsTools = bridge.nativeSupportsTools(activeHandle),
             supportsToolResults = bridge.nativeSupportsToolResults(activeHandle),
@@ -333,6 +336,7 @@ class LlamaCppEngine internal constructor(
                     "thinking=${it.supportsThinking} " +
                     "effort=${it.supportsReasoningEffort} " +
                     "vision=${it.mediaSupport.vision} audio=${it.mediaSupport.audio} " +
+                    "emits=${it.outputModality.name.lowercase()} " +
                     "ctx=${it.contextSize}",
             )
         }

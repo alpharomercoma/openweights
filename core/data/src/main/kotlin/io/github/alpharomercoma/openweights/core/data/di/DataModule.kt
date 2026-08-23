@@ -39,6 +39,7 @@ object DataModule {
                 OpenWeightsDatabase.MIGRATION_1_2,
                 OpenWeightsDatabase.MIGRATION_2_3,
                 OpenWeightsDatabase.MIGRATION_3_4,
+                OpenWeightsDatabase.MIGRATION_4_5,
             )
             .build()
 

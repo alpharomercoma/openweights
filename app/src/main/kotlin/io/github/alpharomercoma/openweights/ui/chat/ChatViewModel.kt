@@ -28,6 +28,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.context.Goal
+import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
@@ -36,6 +37,7 @@ import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
@@ -48,6 +50,7 @@ import io.github.alpharomercoma.openweights.core.data.layersFor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
+import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
@@ -182,6 +185,8 @@ data class ChatUiState(
     val preferences: ModelPreferences = ModelPreferences(),
     /** What the loaded model can read. All false without a projector. */
     val mediaSupport: MediaSupport = MediaSupport(),
+    /** What the loaded model writes, which decides which settings are worth offering. */
+    val outputModality: OutputModality = OutputModality.TEXT,
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,
     /**
@@ -508,6 +513,7 @@ class ChatViewModel @Inject constructor(
                 contextSize = 0,
                 contextUsed = 0,
                 mediaSupport = MediaSupport(),
+                outputModality = OutputModality.TEXT,
                 supportsThinking = false,
                 supportsTools = false,
                 supportsReasoningEffort = false,
@@ -590,20 +596,12 @@ class ChatViewModel @Inject constructor(
                     transcript = if (keepConversation) it.transcript else emptyList(),
                     toolNotes = if (keepConversation) it.toolNotes else ToolNotes(),
                     compaction = if (keepConversation) it.compaction else null,
-                    mediaSupport = support,
-                    // Two hurdles, and a model has to clear both. The template must render
-                    // differently when told not to think, and the weights must not have
-                    // been caught ignoring that in a previous reply.
-                    supportsThinking = info?.supportsThinking == true &&
-                        !runtime.ignoresThinkingSwitch(modelFile.name),
-                    supportsTools = info?.supportsTools == true,
-                    supportsReasoningEffort = info?.supportsReasoningEffort == true,
                     error = if (keepConversation) {
                         it.transcript.unreadableWarning(support)
                     } else {
                         null
                     },
-                )
+                ).withCapabilities(info, runtime.ignoresThinkingSwitch(modelFile.name))
             }
             // Only ever on the startup load, so switching model still starts fresh.
             if (!keepConversation) {
@@ -1251,6 +1249,7 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun work(task: String) {
         val wasMode = _uiState.value.mode
+        var failures = 0
         try {
             setMode(AgentMode.PLAN)
             if (!turn("$GOAL_PLAN_PREFIX\n\n$task")) return
@@ -1263,27 +1262,78 @@ class ChatViewModel @Inject constructor(
 
             setMode(wasMode)
             while (true) {
-                val goal = goals.goal.value ?: return
-                if (!goal.isRunning) return
-                val step = goal.currentStep ?: return
-                tooHotOrFlat()?.let {
-                    goals.halt(it)
-                    return
+                when (step(proposed, failures)) {
+                    StepOutcome.DONE -> failures = 0
+                    StepOutcome.RETRY -> failures++
+                    StepOutcome.STOP -> return
                 }
-
-                val steering = goals.takeSteering()
-                if (!turn(stepPrompt(step.text, steering))) return
-                // Ticked by the app rather than by the model. Asking a 2.6B to report its
-                // own completion is asking the thing that just failed whether it succeeded,
-                // and a goal that never ticks never ends.
-                val index = turns.planning.plan.value?.steps?.indexOfFirst { !it.done } ?: -1
-                if (index >= 0) turns.planning.tick(index)
-                goals.advanced(turns.planning.plan.value ?: proposed)
             }
         } finally {
             setMode(wasMode)
             GenerationService.release(appContext, GenerationService.GOAL)
         }
+    }
+
+    /**
+     * One step of a goal: check it may run, run it, and decide what the result means.
+     *
+     * Split out of the loop rather than left inline because a loop body with four ways to
+     * stop in it stops being readable as a loop. The three outcomes are the whole contract.
+     */
+    private suspend fun step(proposed: TaskPlan, failures: Int): StepOutcome {
+        val goal = goals.goal.value ?: return StepOutcome.STOP
+        if (!goal.isRunning) return StepOutcome.STOP
+        val step = goal.currentStep ?: return StepOutcome.STOP
+        tooHotOrFlat()?.let {
+            goals.halt(it)
+            return StepOutcome.STOP
+        }
+
+        val steering = goals.takeSteering()
+        val doneBefore = turns.planning.plan.value?.steps?.count { it.done } ?: 0
+        _uiState.update { it.copy(error = null) }
+        if (!turn(stepPrompt(step.text, steering))) return StepOutcome.STOP
+
+        val failure = _uiState.value.error
+        if (failure != null) {
+            // A step that ended in an error has not been done, whatever the plan says. One
+            // retry, because the common failure is a tool call the model can repair once it
+            // reads the message, and then a halt: a loop that retries forever on a phone is
+            // a flat battery rather than an answer.
+            if (failures + 1 >= MAX_STEP_FAILURES) {
+                goals.halt(
+                    "Stopped after $MAX_STEP_FAILURES steps in a row that did not finish. " +
+                        "The last problem was: $failure",
+                )
+                return StepOutcome.STOP
+            }
+            return StepOutcome.RETRY
+        }
+        tickIfTheModelDidNot(doneBefore)
+        goals.advanced(turns.planning.plan.value ?: proposed)
+        return StepOutcome.DONE
+    }
+
+    /**
+     * Closes the step just finished, unless the model closed it itself.
+     *
+     * Ticked by the app rather than by the model, because asking a 2.6B whether it succeeded
+     * is asking the thing that just failed to mark its own work, and a goal that never ticks
+     * never ends.
+     *
+     * The condition is the bug this replaces. `advance` is a tool the model can call, and
+     * when it did, the host went looking for the first unfinished step and found the *next*
+     * one, so a single turn closed two. A four step plan could report itself finished having
+     * done half of it, and the step it skipped was as likely to be "check the result" as
+     * anything else.
+     *
+     * @param doneBefore how many steps were closed before the turn ran.
+     */
+    private fun tickIfTheModelDidNot(doneBefore: Int) {
+        val steps = turns.planning.plan.value?.steps ?: return
+        if (steps.count { it.done } != doneBefore) return
+        val index = steps.indexOfFirst { !it.done }
+        if (index >= 0) turns.planning.tick(index)
     }
 
     /** One step, run and waited for. False when it did not run at all. */
@@ -1775,6 +1825,27 @@ class ChatViewModel @Inject constructor(
  * Proof that this model ignores the switch, which is worth one wrong reply to learn and
  * nothing after that: the finding is kept against the file rather than the session.
  */
+/**
+ * Everything the loaded model turned out to be able to do, folded on in one place.
+ *
+ * Five fields interrogating the same nullable, which read as five null checks in the middle
+ * of a function whose subject is opening a file. Kept top level rather than made a method so
+ * that answering "what can this model do" does not enlarge the view model.
+ */
+private fun ChatUiState.withCapabilities(
+    info: LoadedModelInfo?,
+    /** Whether this model has already been caught generating a chain of thought anyway. */
+    ignoresThinkingSwitch: Boolean,
+) = copy(
+    mediaSupport = info?.mediaSupport ?: MediaSupport(),
+    outputModality = info?.outputModality ?: OutputModality.TEXT,
+    // Two hurdles, and a model has to clear both. The template must render differently when
+    // told not to think, and the weights must not have been caught ignoring that already.
+    supportsThinking = info?.supportsThinking == true && !ignoresThinkingSwitch,
+    supportsTools = info?.supportsTools == true,
+    supportsReasoningEffort = info?.supportsReasoningEffort == true,
+)
+
 private fun ChatUiState.thinkingSwitchWasIgnored(reasoning: String?): Boolean =
     supportsThinking && !preferences.thinking && reasoning != null
 
@@ -1955,6 +2026,26 @@ private const val GOAL_STEP_PREFIX: String =
  * because nobody is watching the screen.
  */
 private const val MIN_BATTERY_PERCENT = 15
+
+/**
+ * Consecutive failed steps before a goal gives up.
+ *
+ * Two, so the common case of a tool call the model can repair once it reads the error gets
+ * its retry, and a goal that is simply stuck stops rather than working through the battery.
+ */
+private const val MAX_STEP_FAILURES = 2
+
+/** What one step of a goal turned out to mean for the loop running it. */
+private enum class StepOutcome {
+    /** It finished, and the plan moved on. */
+    DONE,
+
+    /** It failed in a way worth trying once more. */
+    RETRY,
+
+    /** The goal is over, whether finished, halted, or cancelled. */
+    STOP,
+}
 
 private const val MARKDOWN_STYLE: String =
     "Use Markdown when it makes the answer easier to read: headings for sections, bullets " +

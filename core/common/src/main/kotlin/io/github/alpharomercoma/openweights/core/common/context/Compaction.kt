@@ -116,11 +116,20 @@ class CompactionPolicy(
         contextSize: Int,
         entryCount: Int,
         foldableTokens: Int = Int.MAX_VALUE,
+        /**
+         * The user's own threshold, when they have moved it.
+         *
+         * Passed per call rather than held on the policy because the policy is a singleton
+         * and this is a setting: one is constructed for the process, the other changes while
+         * it runs.
+         */
+        triggerFraction: Float = this.triggerFraction,
     ): Boolean {
         if (contextSize <= 0) return false
         // Folding needs something to fold beyond the turns that must stay verbatim.
         if (entryCount <= keepRecentEntries + MIN_FOLDABLE_ENTRIES) return false
-        if (contextUsed.toFloat() / contextSize >= triggerFraction) return true
+        val trigger = triggerFraction.coerceIn(MIN_TRIGGER, MAX_TRIGGER)
+        if (contextUsed.toFloat() / contextSize >= trigger) return true
         if (contextUsed < ceilingTokens) return false
         return foldableTokens >= MIN_WORTHWHILE_SAVING
     }

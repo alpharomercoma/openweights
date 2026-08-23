@@ -66,14 +66,24 @@ class RememberTool @Inject constructor(private val memory: Memory) : Tool {
     override val defaultsOn: Boolean = false
 
     /**
-     * Writing to memory reads nothing, so it cannot be the step that leaks anything.
+     * Asks first, and the old reasoning for not asking had the threat backwards.
      *
-     * The reverse is a real risk and is handled where it belongs. What comes back out of
-     * memory arrives in the system message rather than through a tool, so a page that talks
-     * the model into remembering something cannot then talk it into sending that somewhere:
-     * the send is still gated by whether a file has been read this turn.
+     * It said writing to memory reads nothing, so it cannot be the step that leaks
+     * anything, and that much is true. Leaking was never the risk. This is the only tool
+     * whose effect outlives the conversation: what it writes is replayed into the system
+     * message of every future turn, ahead of the user's own words, in the part of the
+     * prompt the cache keeps stable.
+     *
+     * So a page or a file that talks the model into calling this once has written itself
+     * into the app's instructions permanently, and clearing the chat does not undo it. That
+     * is a persistent prompt injection with a single unattended tool call as its whole cost,
+     * and no other tool here can be made to do anything comparable.
+     *
+     * One tap, showing the exact sentence, is what the industry does for the same reason:
+     * a memory the user did not agree to is not their memory. It is also cheap, because
+     * this tool is off by default and fires rarely when on.
      */
-    override val needsApproval: Boolean = false
+    override val needsApproval: Boolean = true
 
     override suspend fun run(call: ToolCall): String {
         val fact = call.argument("fact", "text", "note")

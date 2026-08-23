@@ -233,6 +233,15 @@ public:
 
     MediaSupport media_support() const;
 
+    /**
+     * True when the projector carries a generative audio decoder, so the model speaks.
+     *
+     * Separate from `MediaSupport::audio`, which is the opposite direction: that one says a
+     * wav can be sent in. A speech model needs both and they are not the same encoder, and
+     * conflating them would have the app offer a microphone on a model that only talks.
+     */
+    bool generates_speech() const;
+
     /** The marker the projector expects where a file belongs in the prompt. */
     std::string media_marker() const;
 

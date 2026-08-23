@@ -366,17 +366,25 @@ catch (const std::exception & failure) {
     return nullptr;
 }
 
-/** Returns [vision, audio]: what the loaded projector can accept. */
+/**
+ * Returns [vision, audio, speech]: everything the loaded projector can do.
+ *
+ * The first two are what it accepts and the third is what it produces, packed together
+ * because one projector file answers all three and a second crossing would interrogate the
+ * same object twice. The Kotlin side splits them apart again.
+ */
 JNIEXPORT jbooleanArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeMediaSupport(
     JNIEnv * env, jobject /*thiz*/, jlong handle) try {
-    const auto support = as_session(handle)->media_support();
-    jboolean values[2] = {
+    auto * session = as_session(handle);
+    const auto support = session->media_support();
+    jboolean values[3] = {
         static_cast<jboolean>(support.vision),
         static_cast<jboolean>(support.audio),
+        static_cast<jboolean>(session->generates_speech()),
     };
-    jbooleanArray result = env->NewBooleanArray(2);
-    env->SetBooleanArrayRegion(result, 0, 2, values);
+    jbooleanArray result = env->NewBooleanArray(3);
+    env->SetBooleanArrayRegion(result, 0, 3, values);
     return result;
 }
 catch (const std::exception & failure) {

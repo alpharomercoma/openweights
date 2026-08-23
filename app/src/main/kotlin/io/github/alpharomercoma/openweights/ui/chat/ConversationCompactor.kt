@@ -45,6 +45,7 @@ class ConversationCompactor @Inject constructor(
         contextSize = state.contextSize,
         entryCount = state.transcript.size,
         foldableTokens = state.foldableTokens(),
+        triggerFraction = state.preferences.compactAtPercent / 100f,
     )
 
     /**

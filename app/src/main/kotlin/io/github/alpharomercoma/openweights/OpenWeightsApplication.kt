@@ -25,6 +25,11 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import dagger.hilt.android.HiltAndroidApp
+import io.github.alpharomercoma.openweights.watch.WatchScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -43,10 +48,32 @@ class OpenWeightsApplication :
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var watches: WatchScheduler
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    /**
+     * Puts every active watch back on its schedule.
+     *
+     * A watch lives on disk precisely so it survives the process, and a process that comes
+     * back without rebuilding the schedule has a row in a table that does nothing. The
+     * scheduled half would be restored by WorkManager on its own; the in-process ticker for
+     * the fast ones would not, and that is the half a user notices stopping.
+     *
+     * On a background scope because `onCreate` blocks the first frame, and reading a table
+     * is not worth a frame.
+     */
+    override fun onCreate() {
+        super.onCreate()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { watches.sync() }
+                .onFailure { android.util.Log.w("OpenWeights", "watches not restored", it) }
+        }
+    }
 
     /**
      * The image loader, with SVG decoding named rather than discovered.

@@ -84,6 +84,24 @@ data class ModelPreferences(
      * file's own header and the phone's own memory. See `FitEstimator.defaultContextLength`.
      */
     val contextLength: Int = AUTOMATIC,
+    /**
+     * How full the context may get before earlier turns are summarised, as a percentage.
+     *
+     * A speed control before it is a memory one, and the direction is not the obvious one.
+     * A larger window is not free: decode slows roughly linearly with how much of it is
+     * occupied, measured on this app's own hardware at about 2.82e-6 seconds per token per
+     * token of depth, so a conversation that is allowed to fill a 128k window is slower at
+     * the end than one folded at half of it, whatever the window can hold.
+     *
+     * Folding is not free either: it costs a summarisation pass now to save decode later,
+     * which is why the policy also refuses to fold when it would free too little to pay for
+     * itself. This setting is the other half, and it is a preference rather than a fact:
+     * folding early is faster and forgets sooner, folding late is slower and remembers.
+     *
+     * Shared like the other sampler settings, because it is about how the user wants the
+     * app to behave rather than about any one model.
+     */
+    val compactAtPercent: Int = DEFAULT_COMPACT_AT_PERCENT,
     val systemPrompt: String = "",
     /**
      * Standing instructions about the tools, kept separate from the user's own prompt.
@@ -142,6 +160,24 @@ data class ModelPreferences(
          * seconds, and it had still not finished making its point.
          */
         const val DEFAULT_MAX_TOKENS: Int = 1024
+
+        /**
+         * Fold at three quarters full, which is where the policy already folded.
+         *
+         * Unchanged as a default on purpose: this setting exists to be moved by someone who
+         * knows which way they want the trade, not to quietly alter what everyone gets.
+         */
+        const val DEFAULT_COMPACT_AT_PERCENT: Int = 75
+
+        /** Below this the app would fold constantly and remember almost nothing. */
+        const val MIN_COMPACT_AT_PERCENT: Int = 30
+
+        /**
+         * Not 100. Folding is triggered *before* a turn, and the turn still has to fit, so a
+         * threshold at the very top would first be reached by a prompt that has already
+         * overflowed.
+         */
+        const val MAX_COMPACT_AT_PERCENT: Int = 95
 
         /** [contextLength] meaning "work it out from the model and the phone". */
         const val AUTOMATIC: Int = 0

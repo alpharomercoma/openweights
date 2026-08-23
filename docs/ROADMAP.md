@@ -130,9 +130,18 @@ Android side because libmtmd's own video path needs an `ffmpeg` binary no app ca
 Attachments reach the composer through a button beside the message field, and the button
 only appears when the loaded model can actually read something.
 
-Output is text plus `TextToSpeech` read-aloud. Speech-generating open models exist but are
-30B-class and llama.cpp does not implement their audio decoders; image generation would be a
-second engine. `docs/research/multimodality.md` has the full reasoning and the numbers.
+Output is text plus `TextToSpeech` read-aloud. The line that used to sit here, that llama.cpp
+does not implement the audio decoders, has stopped being true: the vendored tree carries
+`tools/tts` and generative pipelines for Qwen3-TTS and Pocket-TTS in `libmtmd`, so speech out
+is now an app-side gap rather than an engine one. What is missing is the playback path and
+the JNI for `mtmd_helper_gen_audio`, not the decoder.
+
+What that path will not inherit is the settings sheet. Its input struct has three sampling
+fields, `top_k`, `top_p` and `seed`, and no temperature, no penalties, no token cap and no
+chat template, so `OutputModality` already reports what a loaded projector emits and the
+sheet already draws only what applies; CONTEXT.md has the table. Image generation is still a
+second engine and still out of scope: llama.cpp generates no pictures at any quantization.
+`docs/research/multimodality.md` has the rest of the reasoning and the numbers.
 
 Dictation uses Android's on-device recogniser only, so the "nothing leaves this device"
 promise holds for the microphone too. Audio input is proven with LFM2.5-Audio-1.5B.

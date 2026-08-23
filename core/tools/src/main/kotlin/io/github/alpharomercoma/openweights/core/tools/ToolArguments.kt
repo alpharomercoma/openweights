@@ -42,6 +42,18 @@ internal fun ToolCall.textArgument(vararg names: String): String? =
     argument(*names) ?: names.firstNotNullOfOrNull { argumentsJson.scavenge(it) }
 
 /** Pulls one named value out of an envelope that is no longer valid JSON. */
+
+/** A whole number argument, however the model chose to write it. */
+internal fun ToolCall.intArgument(vararg names: String): Int? =
+    textArgument(*names)?.trim()?.let { written ->
+        // Takes the digits out rather than requiring a bare number, because a model writing
+        // an interval writes "5", 5, and "5 minutes" in roughly equal measure, and refusing
+        // the third would be refusing a call that said exactly what it meant.
+        written.toIntOrNull() ?: DIGITS.find(written)?.value?.toIntOrNull()
+    }
+
+private val DIGITS = Regex("\\d+")
+
 /**
  * A boolean argument, true only when the model actually said so.
  *

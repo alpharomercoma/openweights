@@ -34,6 +34,7 @@ import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
 import io.github.alpharomercoma.openweights.core.tools.CallFormat
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
@@ -418,8 +419,8 @@ class ToolChoiceBenchmark {
         val workspace = Workspace(context, WorkspaceGrant(context))
         return ToolRegistry(
             listOf(
-                WebSearchTool(client, SearchSettings(context)),
-                FetchUrlTool(client),
+                WebSearchTool(client, SearchSettings(context), Reachability { true }),
+                FetchUrlTool(client, Reachability { true }),
                 SearchFilesTool(workspace),
                 ReadFileTool(workspace),
                 WriteFileTool(workspace),

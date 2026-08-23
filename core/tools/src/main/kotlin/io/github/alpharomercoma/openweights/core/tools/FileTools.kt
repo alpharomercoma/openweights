@@ -100,7 +100,7 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
               "properties": {
                 "path": {
                   "type": "string",
-                  "description": "The file's path inside the shared folder, like notes/todo.md"
+                  "description": "The file's path inside the shared folder, like notes/todo.md. Text only"
                 },
                 "offset": {
                   "type": "integer",
@@ -144,6 +144,21 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         if (entry.isDirectory) {
             return "$path is a folder, not a file. Use search_files to see what is in it."
         }
+        // A picture is not a failed text file, and saying so is the difference between a
+        // model that asks for it and one that gives up.
+        //
+        // This tool reads text and only text. A model that can see, which here means one
+        // loaded with its projector, still cannot be shown anything through a tool result:
+        // a result is a string, and there is no path from a tool back into the prompt for
+        // an image. So the honest answer names the file, says what it is, and says the one
+        // thing that would work, which is the user attaching it to a message.
+        entry.mediaType.substringBefore('/').let { family ->
+            if (family in NOT_TEXT) {
+                return "$path is $family rather than text, so read_file cannot show it to " +
+                    "you. Ask the user to attach it to a message if you need to see it."
+            }
+        }
+
         // One character past the window, so whether anything follows is a fact rather than an
         // inference from having filled the buffer exactly.
         val text = workspace.readText(entry, skip, WINDOW_CHARS + 1)
@@ -247,6 +262,9 @@ private fun String.asNameMatcher(): (String) -> Boolean {
 }
 
 /** What one read_file call hands back, well inside what the tool budget will keep. */
+/** Media families a text tool has nothing useful to say about. */
+private val NOT_TEXT = setOf("image", "audio", "video")
+
 private const val WINDOW_CHARS = 1_500
 
 /**

@@ -2884,6 +2884,85 @@ The question UI was already built for this and did not need changing: `QuestionC
 single select, multiple select and a free text field, and the free text field is always
 there. What was missing was a model that ever called the tool behind it.
 
+## Is it only tuned for the phone it was built on (2026-08-24)
+
+Every performance number here was taken on a Snapdragon 8 Gen 3, and every layout number at
+360 x 640dp. Both are reasonable places to measure and poor places to stop.
+
+### The chips
+
+Nothing in the code names a chip. The CPU backend is chosen by calling `ggml_backend_score()`
+on each variant, which inspects the running processor; the thread count comes from reading
+`cpuinfo_max_freq` per core; the thermal policy reads `PowerManager`. Every mention of
+"Snapdragon" or "SM8650" in this repository is in a comment recording where a measurement was
+taken.
+
+The one piece of judgement is `CpuTopology`'s rule, drop the slowest cluster when at least
+half the cores survive without it, and it was fitted on two phones this project happens to
+own. So it is now checked against the published core layouts of twelve chips across five
+vendors:
+
+| Chip | Clusters | Threads picked |
+| --- | --- | ---: |
+| Snapdragon 8 Gen 3 | 1 + 5 + 2 | 6 |
+| Snapdragon 8 Elite | 2 + 6 | 8 |
+| Snapdragon 7 Gen 3 | 1 + 3 + 4 | 4 |
+| Snapdragon 695 | 2 + 6 | 8 |
+| Dimensity 9400 | 8 at one speed | 8 |
+| Dimensity 9300 | 4 + 4 | 4 |
+| Dimensity 8300 | 1 + 3 + 4 | 4 |
+| Helio G99 | 2 + 6 | 8 |
+| Tensor G4 | 1 + 3 + 4 | 4 |
+| Tensor G3 | 1 + 4 + 4 | 5 |
+| Exynos 2400 | 1 + 5 + 4 | 6 |
+| Unisoc T612 | 2 + 6 | 8 |
+
+Three properties hold on all of them: never zero threads, never more than the phone has, and
+never a minority of the cores. The 1 + 7 layout is called out separately because it is the
+shape where naively taking the fast cluster strands the phone on one thread.
+
+### The screens
+
+`AcrossScreensTest` renders the real chat screen at seven sizes: a 320dp phone, the 360dp
+canvas everything else was measured on, a 412 x 915 tall phone, an open book foldable at
+674dp, seven and ten inch tablets, and a phone in landscape at 915 x 412. Each asserts the
+three things that break: **nothing wider than the window**, the composer still reachable, and
+the reply still on screen. All seven pass. Content wider than the window is the failure a
+taller screen never reveals and no amount of scrolling fixes.
+
+## Multimodal, asked of the engine rather than the documentation (2026-08-24)
+
+Three claims hide inside "the model is multimodal" and only the last matters: that the file
+says vision, that the projector loads, and that a picture changes the answer. A model loaded
+without its projector reports no vision and refuses every attachment; one loaded with the
+wrong projector loads without complaint and answers about nothing.
+
+`VisionOnDeviceTest` draws a red square with a black circle, sends it, and asks the colour in
+one word. On the device, LFM2.5-VL-3B with `mmproj-LFM2.5-VL-3B-Q8_0`:
+
+```
+loaded: tools=true results=true thinking=false vision=true audio=false ctx=4096
+with the picture: Red
+without it:       Black
+```
+
+The control is the point. The same question with no picture answers "Black", so the picture
+is what changed the answer rather than the model guessing a common colour.
+
+### What `read_file` cannot do, and now says
+
+It reads text and only text. A picture came back as "could not be read. It may not be text",
+which is both wrong and useless: it is a picture, and the model has no way to learn that from
+the sentence. It now names the family and says the one thing that would work, which is the
+user attaching the file to a message.
+
+The reason it cannot do better is structural rather than a missing feature. `Tool.run`
+returns a `String`, and a tool result becomes a text message, so there is no path from a tool
+back into the prompt for an image. Giving one to a tool means changing what a tool may return
+and teaching the turn loop to carry media in a `TOOL` message, which the engine's per-message
+media handling could probably support. Measured need first: nothing here says how often
+somebody asks about a picture already on their phone rather than attaching it.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

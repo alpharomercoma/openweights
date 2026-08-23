@@ -21,6 +21,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
@@ -82,6 +83,8 @@ data class ModelPreferences(
      * its tools, which is a legitimate thing to want.
      */
     val toolPrompt: String = DEFAULT_TOOL_PROMPT,
+    /** How long an answer should be, as a name from [AnswerLength]. */
+    val answerLength: String = AnswerLength.BALANCED.name,
     /** Whether the model may think before answering, where its template allows it. */
     val thinking: Boolean = true,
     /** Stored by name so an unknown value from a newer build falls back to the default. */

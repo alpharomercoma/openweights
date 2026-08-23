@@ -23,6 +23,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
+import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -1618,29 +1619,14 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * sentence produced 286 tokens where the uncapped original produced 2,900.
  */
 /**
- * How long an answer should be, which is a question rather than a constant.
+ * The answer style now lives in [AnswerLength], because it became a setting.
  *
- * This used to say "in a few sentences", and a cap in the system message is a cap on every
- * turn including the ones that asked for the opposite. Measured against the shipped eight
- * tool catalogue, on five prompts split between ones that want length and ones that do not:
- *
- * | | refusals | long answers | short answers |
- * | --- | ---: | ---: | ---: |
- * | 1.2B, "in a few sentences" | **1 of 3** | 631 chars | 33 |
- * | 1.2B, this wording | 0 | 602 | 33 |
- * | 2.6B, "in a few sentences" | 0 | 662 | 0 |
- * | 2.6B, this wording | 0 | **1,687** | 15 |
- *
- * The refusal is the reason this changed. Asked for five paragraphs, the 1.2B reconciled
- * the request with the instruction by declining it: "I'm sorry, but I don't have a tool
- * that can automatically generate a set of paragraphs for you." It is not that the model
- * could not write them, it is that the prompt talked it out of trying, and it blamed the
- * tools while doing so. The 2.6B never refused, which is why this looked model-specific and
- * was not: the same instruction shortened its long answers to a third.
- *
- * Naming the length as a decision rather than a limit keeps the short case short, 33
- * characters either way on the smaller model, and gives the long case back.
+ * It used to be a constant here reading "in a few sentences", which capped every answer
+ * including the ones that asked for the opposite: the 1.2B refused five paragraphs outright,
+ * blaming the tools, and the 2.6B quietly wrote a third of what it would have. The wording
+ * that replaced it is Balanced, and the other two are the control that was missing.
  */
+
 /**
  * That the answer may be formatted, which the model does not assume.
  *
@@ -1655,21 +1641,13 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * | 1.2B, without this | 0 of 4 | 0 of 4 | 0 of 4 | 379 |
  * | 1.2B, with it | 0 of 4 | 0 of 4 | 1 of 4 | 490 |
  *
- * Headings from none to every one is the change worth the thirty five tokens this costs on
- * every turn. The 1.2B barely moves, which is the pattern everything else here shows too: a
- * smaller model follows the instructions it can and ignores the rest.
- *
- * Worded as permission rather than instruction on purpose. "Use headings and tables" gets
- * headings on a one sentence answer, which is worse than plain text.
+ * Headings from none to every one is worth the thirty five tokens this costs on every turn.
+ * Worded as permission rather than instruction: "use headings and tables" gets headings on a
+ * one sentence answer, which is worse than plain text.
  */
 private const val MARKDOWN_STYLE: String =
     "Use Markdown when it makes the answer easier to read: headings for sections, bullets " +
         "for lists, and a table when you are comparing things across the same few fields."
-
-private const val ANSWER_STYLE: String =
-    "Answer from what you know. Reply with the answer itself, at the length the question " +
-        "calls for: a sentence for a simple one, and as long as it takes for one that asks " +
-        "for detail."
 
 /**
  * What actually gets sent to the model: the compaction summary, if any, followed by the
@@ -1682,7 +1660,7 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         // tokens, and on the routing set it was most of the difference between eleven right
         // out of twenty four and eighteen.
         "Today is ${LocalDate.now()}.",
-        ANSWER_STYLE,
+        AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
         // Plan mode says its piece whether or not any tool is switched on, because it is a

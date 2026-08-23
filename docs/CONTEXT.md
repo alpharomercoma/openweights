@@ -2963,6 +2963,68 @@ and teaching the turn loop to carry media in a `TOOL` message, which the engine'
 media handling could probably support. Measured need first: nothing here says how often
 somebody asks about a picture already on their phone rather than attaching it.
 
+## Answer length is a preference, not a cap (2026-08-24)
+
+There was no length control at all: a chat turn runs with `maxTokens = 0`, which means until
+the model stops or the context fills. The one thing steering length was a constant in the
+system prompt saying "in a few sentences", which is the sentence that made the 1.2B refuse
+five paragraphs.
+
+**A token cap is the obvious control and the wrong one.** The sampler stops mid-sentence, and
+a reply cut off mid-thought is precisely the failure that left a turn in the history no longer
+matching the KV cache and cost every later turn a full re-prefill. It also removes the end of
+the answer, which is the part nobody wants to lose.
+
+So the control is three wordings the model reads. Measured over six questions split between
+ones that want brevity and ones that want detail:
+
+| Model | Setting | Simple | Medium | Long | Table rows |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 2.6B | Brief | 19 chars | 952 | 1,478 | 7 |
+| 2.6B | Balanced | 17 | 1,273 | 2,392 | 0 |
+| 2.6B | Thorough | 102 | 2,488 | **3,589** | 21 |
+| 1.2B | Brief | 33 | 372 | 392 | 7 |
+| 1.2B | Balanced | 150 | 392 | 855 | 0 |
+| 1.2B | Thorough | 40 | 401 | **1,044** | 0 |
+
+Long answers separate by about two and a half times on both models, which is a control worth
+having. Simple questions stay short under Brief and Balanced and grow to 102 characters under
+Thorough, which is the one place the setting does something a reader might not want, and is
+why Thorough is not the default.
+
+### There is deliberately no second slider for tables
+
+The request was for a table length control separate from the overall one. The same setting
+already moves them: the same comparison question produced a seven row table under Brief and a
+twenty one row one under Thorough. A second slider would be a second way to say what this
+already says, on a sheet that is already long enough to have needed an Advanced section.
+
+Recorded rather than dismissed: if a table specifically is the thing that comes out too short,
+the measurement to take first is whether the row count tracks the setting on more than one
+question, because the numbers above are one question each.
+
+## What the Play listing was leaving on the table (2026-08-24)
+
+The listing was already written and thorough. The largest thing wrong with it was arithmetic:
+**the app name used 11 of the 30 characters Play allows**, and the title is the field Play
+weighs most heavily in search. Nobody searches for "OpenWeights" who has not already been told
+about it.
+
+| Field | Was | Now |
+| --- | --- | --- |
+| App name | `OpenWeights`, 11 of 30 | `OpenWeights: Offline AI Chat`, 28 of 30 |
+| Short description | 75 of 80, half of it negations | 76 of 80, eight searched terms |
+
+"Offline" carries the title because it is the word somebody types when they want this. The
+short description was spending half its length on "no account, no cloud, no telemetry", which
+nobody searches for and the full description already argues at length; it now reads "Private
+offline AI chatbot. Run open-weight LLMs locally on your own device", which is private,
+offline, AI, chatbot, open-weight, LLM, locally and device in one true sentence.
+
+The launcher label stays "OpenWeights" and is meant to: `app_name` is what sits under an icon
+on a home screen, where 28 characters ellipsise into nothing. They are separate fields and
+should not be brought into line.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

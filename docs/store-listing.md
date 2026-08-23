@@ -14,14 +14,38 @@ Console; how the page is built and republished is in `play/site/README.md`.
 **App name** (30 characters)
 
 ```
-OpenWeights
+OpenWeights: Offline AI Chat
 ```
+
+28 of the 30. The name was "OpenWeights" alone, which is 11, and the title is the field Play
+weighs most heavily in search: leaving nineteen characters unused is the single largest thing
+wrong with this listing. Nobody searches for "OpenWeights" who has not already been told about
+it, and the words that carry the search are the ones after the colon.
+
+"Offline" rather than "local" or "private" in the title, because it is the one a person types
+when they want this and it is unambiguously true here. The other two go in the short
+description, which is also indexed.
+
+**The launcher label stays "OpenWeights"** and is meant to. `app_name` in `strings.xml` is
+what sits under the icon on a home screen, where anything past about a dozen characters is
+ellipsised into nonsense. Play's listing title and the launcher label are separate fields and
+this is the ordinary reason they differ; they are not out of sync and should not be brought
+into line.
 
 **Short description** (80 characters)
 
 ```
-Run open-weight AI models on your phone. No account, no cloud, no telemetry.
+Private offline AI chatbot. Run open-weight LLMs locally on your own device.
 ```
+
+76 of the 80, and every word is a term somebody searches: private, offline, AI, chatbot,
+open-weight, LLM, locally, device. The previous line, "Run open-weight AI models on your
+phone. No account, no cloud, no telemetry", spent half its length on three negations that
+nobody searches for and that the full description already makes at length.
+
+Not keyword stuffing, which Play's metadata policy prohibits and which reads as spam to a
+person: it is one sentence saying what the app is and one saying what it does, and each claim
+is true of the build.
 
 **Full description** (4000 characters)
 
@@ -44,7 +68,9 @@ will run at all on your phone.
 
 REAL NUMBERS, IN FRONT OF YOU
 Tokens per second, time to first token, and how full the context window is, shown while you
-chat rather than hidden.
+chat rather than hidden. On a 2024 flagship a 2.6B model answers at 16 to 25 tokens a second
+and a follow-up question starts replying in under half a second, because the conversation
+already in memory is not read twice.
 
 YOURS TO TUNE
 Temperature, top-p, top-k, repeat penalty, context length, the system prompt and what the

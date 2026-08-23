@@ -58,6 +58,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
@@ -126,6 +127,34 @@ fun ParameterSheet(
                     draft = draft,
                     onChange = { draft = it },
                 )
+            }
+
+            // Above temperature, because it is the one on this sheet a person who does not
+            // know what a sampler is still wants.
+            Setting(
+                label = "Answer length",
+                explanation = "How much the model writes when the question does not say.",
+                value = AnswerLength.fromName(draft.answerLength).label,
+            ) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    AnswerLength.entries.forEachIndexed { index, length ->
+                        SegmentedButton(
+                            selected = draft.answerLength == length.name,
+                            onClick = { draft = draft.copy(answerLength = length.name) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index,
+                                AnswerLength.entries.size,
+                            ),
+                            colors = SegmentedButtonDefaults.colors(
+                                activeContainerColor = OpenWeightsColors.Lime,
+                                activeContentColor = OpenWeightsColors.Ink,
+                                activeBorderColor = OpenWeightsColors.Lime,
+                                inactiveBorderColor = MaterialTheme.colorScheme.outline,
+                            ),
+                            label = { Text(length.label, maxLines = 1) },
+                        )
+                    }
+                }
             }
 
             Setting(

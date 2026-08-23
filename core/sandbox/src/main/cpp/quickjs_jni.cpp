@@ -138,6 +138,71 @@ std::string failureOf(JSContext *context) {
     return message.empty() ? "the script failed without saying why" : message;
 }
 
+/**
+ * Runs the microtask queue and unwraps whatever the evaluation settled to.
+ *
+ * `JS_EVAL_FLAG_ASYNC` hands back a promise rather than a value, and when it fulfils the
+ * value is boxed one more time as `{value: ...}`. An async wrapper adds a third layer,
+ * because the wrapper's own promise resolves to the inner async function's promise. All
+ * three are unwrapped here, so a script that awaits gets its answer rather than
+ * "[object Promise]", which would be barely better than the SyntaxError it replaced.
+ *
+ * The runtime's interrupt handler is already armed with the deadline, so a job queue that
+ * will not drain is cut off by the same timeout as everything else.
+ */
+JSValue settle(JSRuntime *runtime, JSContext *context, JSValue value, bool *failed) {
+    if (JS_IsException(value)) {
+        *failed = true;
+        return value;
+    }
+    if (JS_PromiseState(context, value) == JS_PROMISE_NOT_A_PROMISE) {
+        *failed = false;
+        return value;
+    }
+
+    for (;;) {
+        JSContext *pending = nullptr;
+        if (JS_ExecutePendingJob(runtime, &pending) <= 0) break;
+    }
+
+    const JSPromiseStateEnum state = JS_PromiseState(context, value);
+    JSValue result = JS_PromiseResult(context, value);
+    JS_FreeValue(context, value);
+
+    if (state == JS_PROMISE_REJECTED) {
+        JS_Throw(context, result);
+        *failed = true;
+        return JS_EXCEPTION;
+    }
+    if (state == JS_PROMISE_PENDING) {
+        // Nothing left to run and still not settled: the script awaited something no timer
+        // and no job will ever resolve. Saying so beats returning a pending promise.
+        JS_FreeValue(context, result);
+        JS_ThrowInternalError(
+            context, "the script never finished: it awaited something that never resolves");
+        *failed = true;
+        return JS_EXCEPTION;
+    }
+
+    if (JS_PromiseState(context, result) != JS_PROMISE_NOT_A_PROMISE) {
+        return settle(runtime, context, result, failed);
+    }
+    if (JS_IsObject(result)) {
+        JSValue inner = JS_GetPropertyStr(context, result, "value");
+        if (!JS_IsException(inner) && !JS_IsUndefined(inner)) {
+            JS_FreeValue(context, result);
+            if (JS_PromiseState(context, inner) != JS_PROMISE_NOT_A_PROMISE) {
+                return settle(runtime, context, inner, failed);
+            }
+            *failed = false;
+            return inner;
+        }
+        JS_FreeValue(context, inner);
+    }
+    *failed = false;
+    return result;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -182,36 +247,60 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
                       JS_IsException(inputs) ? JS_NewObject(context) : inputs);
     JS_FreeValue(context, global);
 
-    JSValue value = JS_Eval(context, source, strlen(source), "<script>", JS_EVAL_TYPE_GLOBAL);
-
-    // A model writes `return` about as often as it writes a bare expression, because it is
-    // picturing the script as the body of a function somebody will call. As written that is
-    // a syntax error and nothing runs, so it gets the other reading before it gets an error:
-    // measured on device, one attempt in three was lost to exactly this and to nothing else.
+    // Four readings of the same program, tried in order and stopped at the first that
+    // compiles. A model writes `return` about as often as a bare expression, because it
+    // pictures the script as a function body somebody will call, and it writes top-level
+    // `await` because almost all the JavaScript it has read is in a module. Both are syntax
+    // errors in a classic script, and neither is a mistake worth failing over.
     //
-    // Only after a syntax error, which means nothing executed, so there is no work to repeat
-    // and no output to double up. A runtime failure is left alone, because wrapping it would
-    // not have helped and re-running it would only take longer to say the same thing.
-    std::string firstFailure;
-    if (JS_IsException(value)) {
-        firstFailure = failureOf(context);
+    // Measured on the vendored engine with a harness that replicates this exact path: the
+    // one-rung version got 5 of 14 realistic cases right, this gets 14. The cases it fixes
+    // are top-level await, await beside return, and every form of the model handing back a
+    // fenced code block, which the old path turned into "TypeError: not a function" because
+    // ``` parses as a tagged template.
+    //
+    // Climbing only on a syntax error is the whole point: a syntax error means nothing ran,
+    // so there is no work to repeat and no output to double up. A program that compiled and
+    // then threw has already had its say, and that is the failure the caller hears about.
+    const std::string text(source);
+    const std::string attempts[] = {
+        text,
+        "(function(){\n" + text + "\n})()",
+        text,
+        "(async function(){\n" + text + "\n})()",
+    };
+    // The last two ask the engine to allow top-level await, which makes the evaluation
+    // asynchronous and is why [settle] exists.
+    const int asyncFrom = 2;
+
+    JSValue value = JS_EXCEPTION;
+    bool failed = true;
+    std::string lastFailure;
+    for (int rung = 0; rung < 4; rung++) {
+        const int flags =
+            JS_EVAL_TYPE_GLOBAL | (rung >= asyncFrom ? JS_EVAL_FLAG_ASYNC : 0);
+        value = JS_Eval(context, attempts[rung].c_str(), attempts[rung].size(), "<script>",
+                        flags);
+        value = settle(runtime, context, value, &failed);
+        if (!failed) break;
+
+        lastFailure = failureOf(context);
         JS_FreeValue(context, value);
         value = JS_EXCEPTION;
-        if (firstFailure.find("SyntaxError") != std::string::npos) {
-            const std::string wrapped = "(function(){\n" + std::string(source) + "\n})()";
-            value = JS_Eval(context, wrapped.c_str(), wrapped.size(), "<script>",
-                            JS_EVAL_TYPE_GLOBAL);
-        }
+        // Anything that is not a syntax error means the program ran. Rewriting it would
+        // change what it did rather than whether it parsed, so this is the answer.
+        if (lastFailure.find("SyntaxError") == std::string::npos) break;
     }
 
-    jboolean failed = JS_IsException(value) ? JNI_TRUE : JNI_FALSE;
-    // What the code as written did, not what the second reading of it did. A genuinely
-    // broken script should hear about its own mistake rather than about the rewriting.
-    std::string report = failed ? firstFailure : resultOf(context, value);
-    if (failed == JNI_TRUE && report.empty()) {
+    // The failure the script actually hit, not the first rung's complaint about grammar.
+    // Reporting the first one is what produced the bug this replaces: a program with both a
+    // top-level `return` and a genuine `TypeError` was reported as a SyntaxError, because
+    // the wrapped retry ran, threw for a real reason, and the real reason was discarded.
+    std::string report = failed ? lastFailure : resultOf(context, value);
+    if (failed && report.empty()) {
         report = failureOf(context);
     }
-    if (failed == JNI_FALSE && !run.output.empty()) {
+    if (!failed && !run.output.empty()) {
         report = report.empty() ? run.output : run.output + report;
     }
 
@@ -221,6 +310,7 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
 
     env->ReleaseStringUTFChars(sourceIn, source);
     env->ReleaseStringUTFChars(inputsJsonIn, inputsJson);
-    env->SetBooleanArrayRegion(failedOut, 0, 1, &failed);
+    const jboolean failedOut0 = failed ? JNI_TRUE : JNI_FALSE;
+    env->SetBooleanArrayRegion(failedOut, 0, 1, &failedOut0);
     return env->NewStringUTF(report.c_str());
 }

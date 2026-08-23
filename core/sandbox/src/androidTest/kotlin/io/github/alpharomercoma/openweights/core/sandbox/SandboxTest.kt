@@ -86,6 +86,51 @@ class SandboxTest {
     }
 
     @Test
+    fun aRuntimeFailureIsNotReportedAsASyntaxError() = runBlocking {
+        // The bug this replaces, and the one users actually saw. A program with a top-level
+        // `return` fails to parse, gets read again as a function body, runs, and throws for
+        // a real reason. The old path kept the *first* complaint and threw the real one
+        // away, so a TypeError arrived labelled SyntaxError and the model spent its next
+        // turn hunting for a grammar mistake that was never there.
+        val result = sandbox.run("const d = {};\nreturn d.user.id;")
+
+        assertThat(result.failed).isTrue()
+        assertThat(result.output).contains("TypeError")
+        assertThat(result.output).doesNotContain("SyntaxError")
+    }
+
+    @Test
+    fun topLevelAwaitIsAllowedBecauseTheModelWritesIt() = runBlocking {
+        // Almost all the JavaScript a model has read lives in a module, where this is legal.
+        // In a classic script it is a syntax error, which is a fact about the evaluation
+        // mode rather than about the program.
+        val result = sandbox.run("const v = await Promise.resolve(7);\nv * 6")
+
+        assertThat(result.failed).isFalse()
+        assertThat(result.output).contains("42")
+    }
+
+    @Test
+    fun awaitBesideReturnIsAlsoRead() = runBlocking {
+        // Both rewrites at once, which is the combination the four rung ladder exists for.
+        val result = sandbox.run("const v = await Promise.resolve(6);\nreturn v * 7;")
+
+        assertThat(result.failed).isFalse()
+        assertThat(result.output).contains("42")
+    }
+
+    @Test
+    fun anAwaitedValueComesBackRatherThanAPromise() = runBlocking {
+        // Allowing await is only half of it. The evaluation then hands back a promise, and
+        // reporting "[object Promise]" would be barely better than the syntax error.
+        val result = sandbox.run("await Promise.all([1, 2, 3].map(async n => n * 2))")
+
+        assertThat(result.failed).isFalse()
+        assertThat(result.output).doesNotContain("Promise")
+        assertThat(result.output).contains("6")
+    }
+
+    @Test
     fun aLoopWithNoEndIsStoppedRatherThanWaitedFor() = runBlocking {
         // The case a memory limit cannot catch, because it allocates nothing. Without the
         // interrupt handler this hangs the turn rather than failing it.

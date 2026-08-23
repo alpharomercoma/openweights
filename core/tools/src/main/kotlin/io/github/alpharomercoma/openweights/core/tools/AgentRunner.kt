@@ -33,6 +33,23 @@ sealed interface AgentStep {
     data class Skipped(val call: ToolCall, val why: String) : AgentStep
 }
 
+/**
+ * The program a step ran, or null when the step did not run one.
+ *
+ * Lives here rather than in the UI because reading a tool call's arguments is this module's
+ * job and it already owns the parser: the same argument is spelled `source`, `code`,
+ * `script` or `js` depending on the model, and the interface should not have to know that.
+ *
+ * The UI needs it because a program is not a tool result. Rendered as one it is a paragraph
+ * of monospaced prose with no language, no colours and no way to copy it, which is the wrong
+ * shape for the one kind of output somebody might want to keep.
+ */
+fun AgentStep.scriptSource(): String? {
+    val call = (this as? AgentStep.Ran)?.call ?: return null
+    if (call.name != RunScriptTool.NAME) return null
+    return call.textArgument("source", "code", "script", "js")?.takeIf { it.isNotBlank() }
+}
+
 /** The call a step belongs to, whatever became of it. */
 internal fun AgentStep.callId(): String = when (this) {
     is AgentStep.Requested -> call.id

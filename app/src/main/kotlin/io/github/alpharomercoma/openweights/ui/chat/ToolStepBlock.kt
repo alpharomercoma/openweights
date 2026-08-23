@@ -46,9 +46,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.scriptSource
 import java.util.Locale
 
 /**
@@ -122,12 +124,44 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
         }
 
         AnimatedVisibility(visible = expanded) {
+            val program = step.scriptSource()
+            if (program == null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            } else {
+                // A program is not a tool result and should not read as one. Rendered
+                // through the same Markdown path the model's own replies use, which brings
+                // the language header, the syntax colours and the copy button with it: the
+                // point of showing generated code at all is that somebody might want to
+                // keep it, and a paragraph of monospaced prose cannot be kept.
+                CodeStep(program = program, output = detail)
+            }
+        }
+    }
+}
+
+/**
+ * A program and what running it produced.
+ *
+ * Two blocks rather than one, because they are two different things and the model gets the
+ * first one wrong often enough that the second is usually the interesting half.
+ */
+@Composable
+private fun CodeStep(program: String, output: String) {
+    Column(modifier = Modifier.padding(top = 6.dp)) {
+        MarkdownText(content = "```javascript\n$program\n```")
+        if (output.isNotBlank()) {
             Text(
-                text = detail,
-                style = MaterialTheme.typography.bodySmall,
+                text = "Result",
+                style = MetricTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
             )
+            MarkdownText(content = "```text\n$output\n```")
         }
     }
 }

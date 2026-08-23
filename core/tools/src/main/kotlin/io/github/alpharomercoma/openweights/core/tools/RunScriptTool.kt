@@ -47,7 +47,7 @@ class RunScriptTool @Inject constructor(
     private val workspace: Workspace,
 ) : Tool {
     override val definition = ToolDefinition(
-        name = "run_script",
+        name = NAME,
         // Measured: the shipped wording ("sums, dates") described a fraction of what is
         // behind it, and the model used it accordingly. Widened to name the work it can
         // actually do, with a negative clause so it does not become a general fallback.
@@ -66,8 +66,8 @@ class RunScriptTool @Inject constructor(
             "returns. Use it for real computation: arithmetic, parsing, filtering, " +
             "regular expressions, JSON, dates, and going through a file too large to read " +
             "into the conversation. Give source, or path to run a .js file you saved. " +
-            "Plain JavaScript only: no require, no file system, no network. To use a file, " +
-            "name it in files and read it from inputs['path']. " +
+            "Modern JavaScript including await. No network, and the only modules are " +
+            "require('fs') and require('path'), which read files you named in files. " +
             "The last expression is the answer.",
         parametersJson = """
             {
@@ -103,17 +103,35 @@ class RunScriptTool @Inject constructor(
      */
     override val returnsUntrustedText: Boolean = true
 
+    /**
+     * True, and the reason is a hole this had before it was set.
+     *
+     * The egress guard decides whether an outbound call needs a tap by asking which tools
+     * ran, and it believes only this flag. `read_file` sets it; this did not, while quietly
+     * doing the same thing: it gathers every path the generated source names, reads those
+     * files, and hands the contents to the script. A page or file could therefore talk the
+     * model into running a script over a private file and then searching for what it found,
+     * and the search would not be gated, because nothing in the turn had admitted to
+     * reading anything.
+     *
+     * Set unconditionally rather than only when a file was gathered. Whether a path was
+     * matched is decided by a regular expression over model-written source, which is not a
+     * boundary worth resting an egress decision on, and the cost of being wrong in the safe
+     * direction is one confirmation.
+     */
+    override val readsPrivateData: Boolean = true
+
     override suspend fun run(call: ToolCall): String {
         // Two ways in, because writing a program and running it are two turns and the
         // second one should not have to repeat the first. `write_file` saves the source,
         // and this runs what was saved, which is the loop a person means by "code a file
         // and execute it". Inline source stays the common path for one-off work.
-        val inline = call.textArgument("source", "code", "script", "js")
+        val inline = call.textArgument("source", "code", "script", "js")?.asProgram()
         val from = call.textArgument("path", "file", "script_path")
         val source = when {
             inline != null -> inline
             from != null ->
-                readProgram(from) ?: return "There is no file at $from to run. " +
+                readProgram(from)?.asProgram() ?: return "There is no file at $from to run. " +
                     "Save it with write_file first, or pass the program as source."
             else ->
                 return "No script was given. Call run_script again with source, " +
@@ -230,7 +248,10 @@ class RunScriptTool @Inject constructor(
             .orEmpty()
     }.getOrDefault(emptyList())
 
-    private companion object {
+    companion object {
+        /** The name the model calls, and the one the interface matches a step against. */
+        const val NAME = "run_script"
+
         /**
          * A quoted string that is shaped like a path in the shared folder.
          *
@@ -322,5 +343,58 @@ class RunScriptTool @Inject constructor(
          * appetite rather than the context window's.
          */
         const val MAX_INPUT_CHARS = 64 * 1024
+    }
+}
+
+/** A fenced block, with or without a language tag, whatever follows the closing fence. */
+private val FENCED = Regex(
+    "^```[A-Za-z0-9+#._-]*[ \\t]*\\r?\\n(.*?)(?:\\r?\\n```|```|$)",
+    RegexOption.DOT_MATCHES_ALL,
+)
+
+/**
+ * Typography a chat model emits that an engine cannot parse.
+ *
+ * Curly quotes are the common one and not a rare accident: the model has read a great deal
+ * of prose *about* code as well as code, and the quotation mark is the character most often
+ * prettified in between. A non-breaking space is here for the same reason.
+ */
+private val TYPOGRAPHY = mapOf(
+    '\u201C' to '"',
+    '\u201D' to '"',
+    '\u201E' to '"',
+    '\u2018' to '\'',
+    '\u2019' to '\'',
+    '\u201A' to '\'',
+    '\u00A0' to ' ',
+)
+
+/**
+ * The program inside what the model actually sent.
+ *
+ * A chat model hands back a fenced code block because that is what it was trained to produce
+ * for a human, and a JSON string argument does not stop it. The engine then reads the fence
+ * as source, and the failure is not even a syntax error: ``` opens a tagged template
+ * literal, so it comes back as `TypeError: not a function` and sends the model looking for a
+ * function it never called.
+ *
+ * Measured against the vendored engine on fourteen realistic programs, the sandbox handled
+ * five before this and the retry ladder beside it, and fourteen after. Four of the nine it
+ * gained were a fence.
+ *
+ * Deliberately conservative. Only a block that opens on the first non-blank line is
+ * unwrapped, so a program that merely contains a backtick string is left exactly as written.
+ */
+internal fun String.asProgram(): String {
+    val trimmed = trim()
+    val unfenced = if (trimmed.startsWith("```")) {
+        FENCED.find(trimmed)?.groupValues?.get(1)?.trim() ?: trimmed
+    } else {
+        trimmed
+    }
+    return if (unfenced.none { it in TYPOGRAPHY }) {
+        unfenced
+    } else {
+        unfenced.map { TYPOGRAPHY[it] ?: it }.joinToString("")
     }
 }

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -94,5 +95,74 @@ class ToolStepBlockTest {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) { ToolStepBlock(step = step) }
         }
+    }
+
+    @Test
+    fun `a program is shown as code rather than as a paragraph`() {
+        // The complaint this answers: the sandbox's output read like a web search result.
+        // A program rendered as prose has no language, no colours and nothing to copy, and
+        // copying is the whole reason to show generated code to a person at all.
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ToolStepBlock(
+                    step = AgentStep.Ran(
+                        call = ToolCall(
+                            id = "1",
+                            name = "run_script",
+                            argumentsJson = """{"source":"const total = 6 * 7;\ntotal"}""",
+                        ),
+                        result = "42",
+                        millis = 12,
+                    ),
+                )
+            }
+        }
+
+        compose.onNodeWithText("Worked out", substring = true).performClick()
+
+        // The program itself, which the old rendering never showed: the plain path printed
+        // only what came back, so a script that failed was a message with no code beside it.
+        // Waited for rather than asserted straight away: Markdown parses off the composition
+        // and keeps the previous render while it does, so a bare assertion here passes or
+        // fails on timing rather than on behaviour.
+        compose.waitUntil(WAIT_MS) {
+            compose.onAllNodesWithText("const total", substring = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Result", substring = true).assertExists()
+        compose.waitUntil(WAIT_MS) {
+            compose.onAllNodesWithText("42", substring = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
+    fun `an ordinary tool still shows its result as text`() {
+        // The counterweight. Only the sandbox gets the editor treatment; a search result is
+        // prose and should stay prose.
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ToolStepBlock(
+                    step = AgentStep.Ran(
+                        call = ToolCall(
+                            id = "1",
+                            name = "web_search",
+                            argumentsJson = """{"query":"tides"}""",
+                        ),
+                        result = "High tide is at four.",
+                        millis = 12,
+                    ),
+                )
+            }
+        }
+
+        compose.onNodeWithText("Searched", substring = true).performClick()
+
+        compose.onNodeWithText("High tide is at four.", substring = true).assertExists()
+    }
+
+    private companion object {
+        /** Long enough for a Markdown parse on a slow build agent, short enough to fail fast. */
+        const val WAIT_MS = 5_000L
     }
 }

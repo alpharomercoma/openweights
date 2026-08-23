@@ -83,6 +83,56 @@ class ChatViewModelTest : ChatFixture() {
         }
 
     @Test
+    fun `a question asked after a stop is answered`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Tell me something long")
+        settle()
+        engine.emit("Partial ")
+        settle()
+
+        viewModel.stop()
+        settle()
+
+        // The reported failure: the composer takes the next question and nothing happens.
+        // Stopping clears isGenerating, which is already covered; what was never covered is
+        // that the turn after it runs at all.
+        assertThat(viewModel.uiState.value.canSend).isTrue()
+
+        engine.hold = false
+        viewModel.send("Now something short")
+        settle()
+
+        val transcript = viewModel.uiState.value.transcript
+        assertThat(transcript.map { it.text }).contains("Now something short")
+        val reply = transcript.last()
+        assertThat(reply.role).isEqualTo(ChatRole.ASSISTANT)
+        assertThat(reply.isStreaming).isFalse()
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
+    fun `a question asked after a stop during the prompt is answered`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.send("Tell me something long")
+        // Not settled: stopped before a single token, which is the other way a person
+        // discards a prompt and the one that has no partial reply to fall back on.
+        viewModel.stop()
+        settle()
+
+        assertThat(viewModel.uiState.value.canSend).isTrue()
+
+        engine.hold = false
+        viewModel.send("Now something short")
+        settle()
+
+        assertThat(viewModel.uiState.value.transcript.map { it.text })
+            .contains("Now something short")
+        assertThat(viewModel.uiState.value.isGenerating).isFalse()
+    }
+
+    @Test
     fun `stopping keeps the tokens produced since the last publish`() = runTest(dispatcher) {
         loadModel()
         engine.hold = true

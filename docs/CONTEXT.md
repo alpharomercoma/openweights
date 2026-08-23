@@ -2710,6 +2710,59 @@ lost. Recall probes now fold whitespace.
 Summary lengths across five folds were 997, 2089, 1403 and 210 characters. A later run of
 twenty six turns took it to ten folds and settled it: see below.
 
+## The prompt was telling the model not to answer (2026-08-24)
+
+Two reports, one cause. The 1.2B gave short answers whatever was asked, and refused a request
+for five paragraphs on the grounds that it lacked the tools. The 2.6B did neither, so it
+looked model-specific and was not.
+
+### Reproducing it
+
+Against a clean prompt neither happens: asked for five paragraphs with nothing but a date in
+the system message, both models write five paragraphs. Adding the app's own `ANSWER_STYLE`
+and the shipped eight tool catalogue reproduces it exactly:
+
+> I'm sorry, but I don't have a tool that can automatically generate a set of paragraphs for
+> you. However, I can still help by writing a clear, well structured passage about why
+> tomatoes need a lot of sun.
+
+The instruction was `"Answer from what you know, in a few sentences. Reply with the answer
+itself."`, sent on every turn. A cap in the system message is a cap on the turns that asked
+for the opposite, and the 1.2B reconciled "in a few sentences" with "write five paragraphs"
+by declining and blaming the tools. It could write them. The prompt talked it out of trying.
+
+### Which wording, measured
+
+Five prompts, three wanting length and two wanting brevity, against the shipped catalogue.
+
+| Model | Style | Refusals | Long answers | Short answers |
+| --- | --- | ---: | ---: | ---: |
+| 1.2B | "in a few sentences" | **1 of 3** | 631 chars | 33 |
+| 1.2B | length as a decision | 0 | 602 | 33 |
+| 1.2B | no style at all | 0 | 601 | 33 |
+| 2.6B | "in a few sentences" | 0 | 662 | 0 |
+| 2.6B | length as a decision | 0 | **1,687** | 15 |
+| 2.6B | no style at all | 0 | 762 | 0 |
+
+The refusal is the reason to change it and the 2.6B row is the size of the prize: the same
+instruction was cutting its long answers to **a third**. Short answers stay short either way,
+33 characters on the 1.2B, so nothing is traded for it.
+
+**A second wording was tried and dropped because it did nothing.** The tool instruction was
+the obvious suspect, given what the model said, so a clause was added telling it that having
+no tool for a request is not a reason to decline. Refusals went from 1 to 1. The tools were
+never the cause; the model reached for them as an excuse.
+
+### What it costs
+
+The seventeen closed-loop tool tasks, two seeds at production sampling: **30 of 34 against 31
+of 34**, which is inside the run-to-run variance already measured for this suite. Tokens a
+task went from 456 to 518, about 14% more, which is the change working rather than a cost.
+
+The general lesson is worth keeping. Every clause in a system prompt is paid on every turn by
+every model, and the small ones follow a length instruction more literally than the large ones
+do. An instruction that reads as a style hint to a 2.6B reads as a rule to a 1.2B.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

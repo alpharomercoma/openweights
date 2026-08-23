@@ -1617,8 +1617,34 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * which one applied, on the page, with thinking off. Against the same model on a Mac this
  * sentence produced 286 tokens where the uncapped original produced 2,900.
  */
+/**
+ * How long an answer should be, which is a question rather than a constant.
+ *
+ * This used to say "in a few sentences", and a cap in the system message is a cap on every
+ * turn including the ones that asked for the opposite. Measured against the shipped eight
+ * tool catalogue, on five prompts split between ones that want length and ones that do not:
+ *
+ * | | refusals | long answers | short answers |
+ * | --- | ---: | ---: | ---: |
+ * | 1.2B, "in a few sentences" | **1 of 3** | 631 chars | 33 |
+ * | 1.2B, this wording | 0 | 602 | 33 |
+ * | 2.6B, "in a few sentences" | 0 | 662 | 0 |
+ * | 2.6B, this wording | 0 | **1,687** | 15 |
+ *
+ * The refusal is the reason this changed. Asked for five paragraphs, the 1.2B reconciled
+ * the request with the instruction by declining it: "I'm sorry, but I don't have a tool
+ * that can automatically generate a set of paragraphs for you." It is not that the model
+ * could not write them, it is that the prompt talked it out of trying, and it blamed the
+ * tools while doing so. The 2.6B never refused, which is why this looked model-specific and
+ * was not: the same instruction shortened its long answers to a third.
+ *
+ * Naming the length as a decision rather than a limit keeps the short case short, 33
+ * characters either way on the smaller model, and gives the long case back.
+ */
 private const val ANSWER_STYLE: String =
-    "Answer from what you know, in a few sentences. Reply with the answer itself."
+    "Answer from what you know. Reply with the answer itself, at the length the question " +
+        "calls for: a sentence for a simple one, and as long as it takes for one that asks " +
+        "for detail."
 
 /**
  * What actually gets sent to the model: the compaction summary, if any, followed by the

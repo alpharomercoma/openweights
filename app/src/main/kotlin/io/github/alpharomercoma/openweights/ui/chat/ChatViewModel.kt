@@ -1962,12 +1962,16 @@ private fun List<TranscriptEntry>.unreadableWarning(support: MediaSupport): Stri
  * Plan mode is the one exception, and it is one the user selected by typing `/plan`: the
  * instruction is the mode.
  */
-private fun toolInstruction(mode: AgentMode, configured: String, anyTools: Boolean): String? =
+internal fun toolInstruction(mode: AgentMode, configured: String, anyTools: Boolean): String? =
     when (mode) {
         // Two wordings, because the first one is a lie when nothing is switched on, and a
         // model told it has tools it does not have writes a plan around using them.
+        // No longer says "do not call them", because there is now nothing in the prompt to
+        // call: plan mode is handed the machinery and nothing else. See TurnRunner.
         AgentMode.PLAN -> if (anyTools) {
-            "You have tools available. Do not call them. Say which you would use and why."
+            "Do not act on anything yet. Say what you would do and why, as short steps. If " +
+                "the request could mean more than one thing, or a detail you would need was " +
+                "never given, ask before planning."
         } else {
             "Do not act on anything yet. Say what you would do and why, as short steps."
         }

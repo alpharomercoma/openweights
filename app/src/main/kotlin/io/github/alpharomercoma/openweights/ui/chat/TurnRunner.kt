@@ -152,6 +152,26 @@ class TurnRunner @Inject constructor(
         val offered = tools.all.filter { it.isAvailable }
         val active = tools.enabled(
             offered
+                // Plan mode gets the machinery and nothing else.
+                //
+                // It used to be handed the whole catalogue alongside an instruction not to
+                // call any of it, and measured on five ambiguous requests it called one
+                // anyway two times in five on the 2.6B and four in five on the 1.2B: a mode
+                // that does not do what it says. It also rarely asked, which is the one
+                // thing plan mode is for.
+                //
+                // Writing the exception into the instruction was tried first and made it
+                // worse, 2 of 5 down to 1. Taking the tools out of the prompt fixed both at
+                // once: questions asked went to 4 of 5 and 2 of 5, and tools run went to
+                // none on either model. The wording then made no difference at all, which
+                // is the same result the web tools gave. A tool in the prompt is an
+                // invitation and an instruction not to accept it is weaker than not making
+                // it.
+                //
+                // The cost is one clarifying question on an unambiguous request in two,
+                // measured on the 2.6B. In the mode whose whole purpose is to think before
+                // acting, that is the right side to err on.
+                .filter { mode != AgentMode.PLAN || !it.isUserFacing }
                 .filter { !it.isUserFacing || switches.isEnabled(it.definition.name) }
                 .map { it.definition.name }
                 .toSet(),

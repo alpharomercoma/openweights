@@ -2862,10 +2862,27 @@ mode, which is the mode that has just said not to call anything, and the obvious
 to write the exception into the instruction. **Measured, that made it worse**: 2 of 5 became
 1 of 5 on the 2.6B and stayed at 0 on the 1.2B. Not shipped.
 
-The lesson from the web tools applies here and is being tested rather than assumed: a tool in
-the prompt is an invitation, and an instruction not to accept it is weaker than not making
-it. Plan mode should offer `ask_user` and the plan board's own step tool and nothing else,
-at which point "do not call them" describes a prompt that contains nothing to call.
+The lesson from the web tools applies here, and it was tested rather than assumed. Plan mode
+now offers `ask_user` and the plan board's step tool and nothing else:
+
+| Variant | 2.6B asked | 2.6B ran a tool | 1.2B asked | 1.2B ran a tool |
+| --- | ---: | ---: | ---: | ---: |
+| shipped, all eight | 2 of 5 | 2 of 5 | 0 of 5 | 4 of 5 |
+| exception wording, all eight | 1 of 5 | 3 of 5 | 0 of 5 | 4 of 5 |
+| **shipped wording, ask only** | **4 of 5** | **0 of 5** | **2 of 5** | **0 of 5** |
+| exception wording, ask only | 4 of 5 | 0 of 5 | 2 of 5 | 0 of 5 |
+
+Restricting the catalogue doubles the questions and stops the tool running entirely, and once
+it is restricted **the wording makes no difference at all**, which is the third time today
+that structure beat wording. The sentence "You have tools available. Do not call them" is
+gone, because there is nothing left in the prompt for it to describe.
+
+The cost is one clarifying question on an unambiguous request in two, on the 2.6B. In the
+mode whose whole purpose is to think before acting, that is the right side to err on.
+
+The question UI was already built for this and did not need changing: `QuestionCard` offers
+single select, multiple select and a free text field, and the free text field is always
+there. What was missing was a model that ever called the tool behind it.
 
 ## Is it overloading the phone (2026-08-23)
 

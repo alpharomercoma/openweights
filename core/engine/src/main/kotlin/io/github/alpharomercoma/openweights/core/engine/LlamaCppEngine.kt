@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.engine
 
 import android.util.Log
+import io.github.alpharomercoma.openweights.core.common.device.CpuTopology
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.ParsedToolCalls
@@ -375,10 +376,16 @@ class LlamaCppEngine internal constructor(
             (Runtime.getRuntime().availableProcessors() / 2).coerceIn(MIN_THREADS, MAX_GEN_THREADS)
 
         /**
-         * Prompt processing is compute-bound and keeps scaling to every core, on the same
-         * device, 8 threads gave 69.5 tok/s prefill versus 55.3 at 4.
+         * Prompt processing is compute-bound and scales with cores, but only with cores of
+         * the same speed. On the MT6991, where all eight are, 8 threads gave 69.5 tok/s
+         * against 55.3 at 4. On an SM8650, where two of the eight are A520s, 8 threads gave
+         * 105.2 t/s against 139.0 at 6: the barrier at the end of each operation waits for
+         * the slowest thread, and a slice on a little core takes about twice as long.
+         *
+         * [CpuTopology] is what tells the two chips apart, and it answers "every core" for
+         * the first one, so this is the same number it always was wherever it was right.
          */
         fun recommendedBatchThreadCount(): Int =
-            Runtime.getRuntime().availableProcessors().coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
+            CpuTopology.performanceCores().coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
     }
 }

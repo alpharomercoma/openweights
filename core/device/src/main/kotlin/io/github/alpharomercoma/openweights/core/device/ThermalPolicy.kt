@@ -100,18 +100,30 @@ class ThermalPolicy @Inject constructor(
      * assemble it differently.
      */
     fun plan(): ThreadPlan {
-        val cores = profiler.profile().cpuCores
-        val generate = (cores / 2).coerceIn(MIN_THREADS, MAX_GENERATE_THREADS)
-        val batch = cores.coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
+        val profile = profiler.profile()
+        val generate = (profile.cpuCores / 2).coerceIn(MIN_THREADS, MAX_GENERATE_THREADS)
+        // Not every core: on a chip whose slow cluster is a minority, the extra workers
+        // cost the other threads more than they contribute. CpuTopology has the numbers.
+        val batch = profile.performanceCores.coerceIn(MIN_THREADS, MAX_BATCH_THREADS)
 
         return when (level()) {
             ThermalLevel.NONE -> ThreadPlan(generate, batch)
 
             // Backing off early keeps throughput up and slows further heating, which is
             // what actually gets a long conversation finished.
+            //
+            // The batch count backs off to the generate count rather than to half of
+            // itself. Halving was written when the two were the same number, and once
+            // CpuTopology started answering six rather than eight on a heterogeneous chip
+            // it began asking for three, which is not a back-off any measurement supports:
+            // on an SM8650 already at 62 to 74 C, prefill read 98.9 t/s at six threads,
+            // 69.5 at four, 51.9 at three and 43.4 at two. Fewer is not faster on that
+            // chip even hot. This keeps the number both phones measured before, and the
+            // whole premise is flagged in docs/CONTEXT.md as wanting a device that
+            // actually reaches THERMAL_STATUS_LIGHT.
             ThermalLevel.LIGHT -> ThreadPlan(
                 generateThreads = (generate - 1).coerceAtLeast(MIN_THREADS),
-                batchThreads = (batch / 2).coerceAtLeast(MIN_THREADS),
+                batchThreads = generate.coerceAtLeast(MIN_THREADS),
             )
 
             ThermalLevel.HEAVY -> ThreadPlan(MIN_THREADS, MIN_THREADS)

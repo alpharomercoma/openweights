@@ -22,6 +22,7 @@ import android.os.Build
 import android.os.StatFs
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.core.common.device.CpuTopology
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +33,14 @@ data class DeviceProfile(
     val availableMemoryBytes: Long,
     val freeStorageBytes: Long,
     val cpuCores: Int,
+    /**
+     * The cores worth handing a prompt-processing thread, which is not always [cpuCores].
+     *
+     * Defaults to all of them, which is both what the code did before this existed and the
+     * right answer for a phone whose cores are all the same speed. See [CpuTopology] for
+     * the measurement that separated the two.
+     */
+    val performanceCores: Int = cpuCores,
     val socModel: String,
     val isLowRamDevice: Boolean,
 ) {
@@ -66,7 +75,8 @@ class DeviceProfiler @Inject constructor(@ApplicationContext private val context
             totalMemoryBytes = memoryInfo.totalMem,
             availableMemoryBytes = memoryInfo.availMem,
             freeStorageBytes = storage.availableBlocksLong * storage.blockSizeLong,
-            cpuCores = Runtime.getRuntime().availableProcessors(),
+            cpuCores = CpuTopology.allCores,
+            performanceCores = CpuTopology.performanceCores(),
             socModel = Build.SOC_MODEL.takeIf { it.isNotBlank() && it != Build.UNKNOWN }
                 ?: Build.HARDWARE,
             isLowRamDevice = activityManager?.isLowRamDevice ?: false,

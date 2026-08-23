@@ -24,6 +24,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.ThemeMode
@@ -80,9 +81,12 @@ class PlayScreenshots {
         typing = DRAFT,
     ) { ChatShots.midReply() }
 
+    // Opened, because a finished tool run now folds to one line and the listing is the one
+    // place the folded state is the wrong one to show: what is behind the line is the whole
+    // reason to install this rather than a hosted assistant.
     @Test
     fun aToolRunAndTheAnswerItFed() =
-        shoot("02-tools", until = "thunderstorms") { ChatShots.toolRound() }
+        shoot("02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
 
     @Test
     fun aPlanYouCanTick() = shoot("03-plan", until = "Write the summary") {
@@ -112,7 +116,8 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
-    fun sevenInchTools() = shoot("7/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
+    fun sevenInchTools() =
+        shoot("7/02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
@@ -134,7 +139,8 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = TEN_INCH)
-    fun tenInchTools() = shoot("10/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
+    fun tenInchTools() =
+        shoot("10/02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
 
     @Test
     @Config(qualifiers = TEN_INCH)
@@ -196,6 +202,7 @@ class PlayScreenshots {
         until: String,
         dark: Boolean = true,
         typing: String? = null,
+        tap: String? = null,
         content: @Composable () -> Unit,
     ) {
         val into = System.getenv(OUTPUT) ?: return
@@ -214,6 +221,7 @@ class PlayScreenshots {
             compose.onAllNodesWithText(until, substring = true).fetchSemanticsNodes().isNotEmpty()
         }
 
+        tap?.let { compose.onNodeWithContentDescription(it).performClick() }
         typing?.let { compose.onNodeWithContentDescription("Message").performTextInput(it) }
         compose.waitForIdle()
 
@@ -229,6 +237,9 @@ class PlayScreenshots {
 
     private companion object {
         const val OUTPUT = "OPENWEIGHTS_SCREENSHOTS"
+
+        /** The header a finished tool run folds behind. See `WorkBlock`. */
+        const val SHOW_STEPS = "Show the steps"
 
         /** Long enough for a markdown parse on a cold host JVM, short enough to fail fast. */
         const val WAIT_MS = 10_000L

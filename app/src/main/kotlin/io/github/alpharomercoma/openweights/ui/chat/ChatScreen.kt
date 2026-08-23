@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -540,9 +541,19 @@ private fun ChatContent(
 /**
  * The narrow band between the transcript and the composer.
  *
- * Everything here is transient. An error, a compaction in progress, how full the context
- * is, and all of it belongs next to the composer rather than in the transcript, because
- * none of it is something the model said.
+ * Everything here is transient. An error, a compaction in progress, how full the context is,
+ * and all of it belongs next to the composer rather than in the transcript, because none of
+ * it is something the model said.
+ *
+ * **It is one slot of one height, and that is the whole point.** These used to be three
+ * independent rows, each appearing and disappearing on its own: the meter arrived with the
+ * first reply, the folding line arrived and left every few turns, and each time the band grew
+ * or shrank it moved the composer under a thumb already reaching for Send and shifted the
+ * transcript under the reader's eye. A band whose height never changes cannot do either.
+ *
+ * The error is deliberately left outside the slot. It is the one thing here that is not
+ * routine, it can be longer than a line, and moving the layout to demand attention is what an
+ * error is for. Everything that happens during ordinary use is inside a fixed height.
  */
 @Composable
 private fun StatusStrip(state: ChatUiState, dictationError: String?) {
@@ -555,18 +566,46 @@ private fun StatusStrip(state: ChatUiState, dictationError: String?) {
         )
     }
 
-    if (state.isCompacting) {
-        Metric(
-            text = "Folding earlier turns into a summary…",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-        )
+    // Reserved from the moment there is a model rather than from the first reply, so the
+    // slot is never introduced mid-conversation. Empty until there is something to say.
+    if (state.modelName == null) return
+    Box(
+        modifier = Modifier.fillMaxWidth().height(STATUS_SLOT),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        when {
+            state.isCompacting -> FoldingLine()
+            state.contextUsed > 0 && state.contextSize > 0 ->
+                ContextMeter(used = state.contextUsed, total = state.contextSize)
+        }
     }
+}
 
-    // Only once there is something to report. An empty meter is a hairline that reads as a
-    // stray divider above the composer.
-    if (state.contextUsed > 0 && state.contextSize > 0) {
-        ContextMeter(used = state.contextUsed, total = state.contextSize)
+/**
+ * What a fold looks like while it is happening, which is for tens of seconds.
+ *
+ * With the elapsed count, for the same reason [ActivityLine] carries one: a static label
+ * through a thirty second pause is indistinguishable from a hang, and the seconds are the
+ * only thing on screen that says otherwise. Measured folds on an SM8650 run from eight
+ * seconds to about forty.
+ */
+@Composable
+private fun FoldingLine() {
+    var seconds by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1.seconds)
+            seconds++
+        }
     }
+    Metric(
+        text = if (seconds == 0) {
+            "Making room by summarising earlier turns"
+        } else {
+            "Making room by summarising earlier turns · ${seconds}s"
+        },
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
 }
 
 /**
@@ -605,6 +644,10 @@ private fun Transcript(
 
                 else -> AssistantTurn(
                     entry = entry,
+                    // What decides whether the steps are folded. Not "has it finished":
+                    // folding a turn the moment its last token lands moves the answer out
+                    // from under the reader. See WorkBlock.
+                    isLatest = entry.id == lastId,
                     // Only the reply being written says what the runtime is doing. On an
                     // older one it would be describing work for a different message.
                     activity = state.runtimeState.takeIf {
@@ -768,6 +811,7 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
 @Suppress("LongParameterList")
 private fun AssistantTurn(
     entry: TranscriptEntry,
+    isLatest: Boolean,
     activity: RuntimeState?,
     thermal: ThermalLevel,
     celsius: Float?,
@@ -802,13 +846,13 @@ private fun AssistantTurn(
                 // In the order they happened, between the thinking that led to them and the
                 // answer they fed. These outlive a pass, which is what the field they
                 // replaced did not: it was overwritten by the next one, so nothing was ever
-                // visible.
-                entry.blocks.forEach { block ->
-                    when (block) {
-                        is TurnBlock.Step -> ToolStepBlock(block.step)
-                        is TurnBlock.Said -> IntermediateText(block.text)
-                    }
-                }
+                // visible. Open while the turn runs and one line once it has finished, for
+                // the reason WorkBlock's own documentation measures.
+                WorkBlock(
+                    blocks = entry.blocks,
+                    isStreaming = entry.isStreaming,
+                    isLatest = isLatest,
+                )
 
                 if (entry.answer.isNotEmpty()) MarkdownText(entry.answer)
             }
@@ -955,7 +999,7 @@ private fun ActivityLine(
 }
 
 @Composable
-private fun IntermediateText(text: String, modifier: Modifier = Modifier) {
+internal fun IntermediateText(text: String, modifier: Modifier = Modifier) {
     // Alpha rather than a colour, so the markdown renderer keeps styling its own code
     // spans and links and only the whole block recedes.
     MarkdownText(
@@ -1162,3 +1206,12 @@ private const val PULSE_DIM = 0.25f
 
 /** One breath, roughly. Faster reads as urgency, slower reads as stalled. */
 private const val PULSE_MS = 700
+
+/**
+ * The height the band between the transcript and the composer always occupies.
+ *
+ * Sized for one line of [Metric] with the meter's own padding, which is the tallest thing it
+ * holds. A constant, because the whole reason it exists is that this number never changes:
+ * see [StatusStrip].
+ */
+private val STATUS_SLOT = 28.dp

@@ -141,7 +141,7 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
  * answers on the device cannot make that disclosure in an identifier the reader has to
  * decode, so the ones that reach the network say so in the verb.
  */
-private fun AgentStep.headline(): String = when (this) {
+internal fun AgentStep.headline(): String = when (this) {
     is AgentStep.Requested -> "${call.name.asVerb()} requested"
 
     is AgentStep.Ran -> {

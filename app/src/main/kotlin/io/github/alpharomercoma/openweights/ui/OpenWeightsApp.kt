@@ -172,6 +172,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onRegenerate = chatViewModel::regenerate,
                 onNewChat = chatViewModel::newChat,
                 onCompact = chatViewModel::compactNow,
+                onGoal = chatViewModel::startGoal,
                 destinations = ChatDestinations(
                     onOpenTools = { navController.push(Routes.TOOLS) },
                     onOpenUsage = { navController.push(Routes.USAGE) },

@@ -58,6 +58,8 @@ class EverySlashCommandTest {
                 onCompact = { fired += "compact" },
                 onRegenerate = { fired += "retry" },
                 onMode = { fired += "mode:${it.name}" },
+                onGoal = { fired += "goal:$it" },
+                argument = "a task",
             )
 
             assertThat(fired).hasSize(1)
@@ -69,6 +71,7 @@ class EverySlashCommandTest {
                 SlashCommand.AUTO -> "mode:${AgentMode.AUTO.name}"
                 SlashCommand.ASK -> "mode:${AgentMode.ASK.name}"
                 SlashCommand.YOLO -> "mode:${AgentMode.YOLO.name}"
+                SlashCommand.GOAL -> "goal:a task"
             }
             assertThat(fired.single()).isEqualTo(expected)
         }
@@ -87,5 +90,17 @@ class EverySlashCommandTest {
         assertThat(SlashCommand.match("/plan something")).isNull()
         assertThat(SlashCommand.typed("/plan the garden")).isNull()
         assertThat(SlashCommand.typed("tell me about /plan")).isNull()
+    }
+
+    @Test
+    fun `only the command that takes an argument survives having one`() {
+        SlashCommand.entries.forEach { command ->
+            val withTail = SlashCommand.typed("${command.trigger} and then some")
+            if (command.takesArgument) {
+                assertThat(withTail).isEqualTo(command)
+            } else {
+                assertThat(withTail).isNull()
+            }
+        }
     }
 }

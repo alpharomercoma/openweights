@@ -132,6 +132,7 @@ fun ChatScreen(
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
+    onGoal: (String) -> Unit = {},
     /** Everywhere you can go from here. See [ChatDestinations]. */
     destinations: ChatDestinations = ChatDestinations(),
     /** What is on the phone, for the picker the model name raises. */
@@ -242,6 +243,7 @@ fun ChatScreen(
             onRegenerate = onRegenerate,
             onNewChat = onNewChat,
             onCompact = onCompact,
+            onGoal = onGoal,
             destinations = destinations,
             installedModels = installedModels,
             publisherAvatars = publisherAvatars,
@@ -285,6 +287,7 @@ private fun ChatContent(
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
+    onGoal: (String) -> Unit,
     destinations: ChatDestinations,
     installedModels: List<LocalModel>,
     publisherAvatars: Map<String, String>,
@@ -430,8 +433,10 @@ private fun ChatContent(
                     ToolApproval(call = call, onAnswer = onApproval)
                 }
 
-                val dispatch: (SlashCommand) -> Unit = {
-                    it.run(onNewChat, onCompact, onRegenerate, onMode)
+                // The argument travels with the command, because "/goal" is the one that
+                // has one and the palette hands over a command with no message attached.
+                val dispatch: (SlashCommand, String) -> Unit = { command, argument ->
+                    command.run(onNewChat, onCompact, onRegenerate, onMode, onGoal, argument)
                 }
 
                 // Not before there is a model on the phone at all.
@@ -482,14 +487,17 @@ private fun ChatContent(
                         onSend = { typed ->
                             val command = SlashCommand.typed(typed)
                             if (command != null) {
-                                dispatch(command)
+                                dispatch(command, SlashCommand.argument(typed))
                                 true
                             } else {
                                 onSend(typed)
                             }
                         },
                         onStop = onStop,
-                        onCommand = dispatch,
+                        // From the palette there is no message yet, so a command that
+                        // wants one leaves its trigger in the composer to be finished
+                        // rather than running with nothing.
+                        onCommand = { command -> dispatch(command, "") },
                     )
                 }
             }

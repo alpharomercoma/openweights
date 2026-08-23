@@ -18,13 +18,16 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.content.Context
 import android.net.Uri
+import android.os.BatteryManager
 import android.util.Log
+import androidx.core.content.getSystemService
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
+import io.github.alpharomercoma.openweights.core.common.context.Goal
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
@@ -50,6 +53,7 @@ import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.GoalBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.model.StagedDocument
@@ -321,6 +325,7 @@ class ChatViewModel @Inject constructor(
     private val writer: ChatWriter,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
+    private val goals: GoalBoard,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -342,6 +347,7 @@ class ChatViewModel @Inject constructor(
 
     private var generationJob: Job? = null
     private var thermalJob: Job? = null
+    private var goalJob: Job? = null
 
     /**
      * Searching the history, collected beside this state rather than inside it.
@@ -1059,7 +1065,127 @@ class ChatViewModel @Inject constructor(
     /** The question the model is waiting on. See [planning]. */
     val asking: AskBoard get() = turns.asking
 
+    /** What the goal is doing, for the screen to show and the user to stop. */
+    val goal: StateFlow<Goal?> get() = goals.goal
+
     fun setMode(mode: AgentMode) = _uiState.update { it.copy(mode = mode) }
+
+    /**
+     * Works through a task without being asked again, until it is done or a bound stops it.
+     *
+     * Each step is an ordinary turn. That is the whole design: the step goes through `send`
+     * like anything the user typed, so it is written to the conversation, folded when the
+     * context fills, shown on screen as it streams and cancelled by the same Stop. A runner
+     * that drove the engine directly would have to reimplement all of that and would drift
+     * from it.
+     *
+     * The first turn is plan mode, which since it was restricted to the two planning tools
+     * runs nothing and asks when the request is ambiguous. Everything after it is the mode
+     * the user was already in.
+     */
+    fun startGoal(task: String) {
+        if (task.isBlank() || goals.isRunning) return
+        if (!_uiState.value.canSend) {
+            _uiState.value.refusalReason()?.let { why -> reportError(why) }
+            return
+        }
+        goals.start(task)
+        goalJob = viewModelScope.launch { work(task) }
+    }
+
+    /** Always allowed, and the only control a goal needs to offer. */
+    fun stopGoal() {
+        goals.stop()
+        goalJob?.cancel()
+        stop()
+    }
+
+    /**
+     * What the user typed while it was running, kept for the next step.
+     *
+     * Not sent as a turn of its own. A goal reading a message the moment it arrives would
+     * have to interrupt a turn already streaming; holding it until the step boundary is the
+     * first point where reading it cannot corrupt anything.
+     */
+    fun steerGoal(message: String) = goals.steer(message)
+
+    private suspend fun work(task: String) {
+        val wasMode = _uiState.value.mode
+        try {
+            setMode(AgentMode.PLAN)
+            if (!turn("$GOAL_PLAN_PREFIX\n\n$task")) return
+            val proposed = turns.planning.plan.value
+            if (proposed == null || proposed.steps.isEmpty()) {
+                goals.halt("No plan came back, so there is nothing to work through.")
+                return
+            }
+            goals.planned(proposed)
+
+            setMode(wasMode)
+            while (true) {
+                val goal = goals.goal.value ?: return
+                if (!goal.isRunning) return
+                val step = goal.currentStep ?: return
+                tooHotOrFlat()?.let {
+                    goals.halt(it)
+                    return
+                }
+
+                val steering = goals.takeSteering()
+                if (!turn(stepPrompt(step.text, steering))) return
+                // Ticked by the app rather than by the model. Asking a 2.6B to report its
+                // own completion is asking the thing that just failed whether it succeeded,
+                // and a goal that never ticks never ends.
+                val index = turns.planning.plan.value?.steps?.indexOfFirst { !it.done } ?: -1
+                if (index >= 0) turns.planning.tick(index)
+                goals.advanced(turns.planning.plan.value ?: proposed)
+            }
+        } finally {
+            setMode(wasMode)
+        }
+    }
+
+    /** One step, run and waited for. False when it did not run at all. */
+    private suspend fun turn(prompt: String): Boolean {
+        if (!send(prompt)) {
+            goals.halt(_uiState.value.error ?: "The turn could not be started.")
+            return false
+        }
+        generationJob?.join()
+        return goals.goal.value?.isRunning == true
+    }
+
+    /**
+     * Whether the phone can take another step.
+     *
+     * Checked between steps rather than during one, because stopping halfway through a
+     * reply wastes the whole step. Heat first: sustained decode was measured falling from
+     * about 25 to about 19 tokens a second over three and a half minutes, and a goal is the
+     * one thing here that runs long enough to reach the top of that curve.
+     */
+    private fun tooHotOrFlat(): String? {
+        if (runtime.thermalLevel() == ThermalLevel.CRITICAL) {
+            return "Paused: the phone is too hot to keep going. Start it again when it has " +
+                "cooled down."
+        }
+        val battery = appContext.getSystemService<BatteryManager>()
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: return null
+        if (battery in 1..<MIN_BATTERY_PERCENT) {
+            return "Paused at $battery% battery. Working on its own uses a lot of it, so " +
+                "this stops rather than flattening the phone."
+        }
+        return null
+    }
+
+    private fun stepPrompt(step: String, steering: List<String>): String = buildString {
+        append(GOAL_STEP_PREFIX)
+        append("\n\n")
+        append(step)
+        if (steering.isNotEmpty()) {
+            append("\n\nSince you started, I have said: ")
+            append(steering.joinToString(" "))
+        }
+    }
 
     /**
      * Re-plans threads for this reply, and says whether to go ahead.
@@ -1657,6 +1783,38 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * Worded as permission rather than instruction: "use headings and tables" gets headings on a
  * one sentence answer, which is worse than plain text.
  */
+/**
+ * What a goal's first turn asks for.
+ *
+ * A plan and nothing else. Plan mode already refuses to run tools and asks when the request
+ * is ambiguous; this only says what shape the answer should take, because the steps are
+ * parsed back out of it and a paragraph is not a list.
+ */
+private const val GOAL_PLAN_PREFIX: String =
+    "Plan this out as a short numbered list of steps, five at most, each one a single " +
+        "action you could carry out on this phone. Do not do any of them yet."
+
+/**
+ * What every later turn asks for.
+ *
+ * Pointed at one step rather than the whole goal, because a small model handed the whole
+ * list re-plans instead of working: measured elsewhere in this repository, the model is at
+ * its best when the next action is the only thing in front of it.
+ */
+private const val GOAL_STEP_PREFIX: String =
+    "Carry out this one step of the plan and report what happened. Do not do the other " +
+        "steps."
+
+/**
+ * Where a goal stops rather than flatten the phone.
+ *
+ * Fifteen percent, which is the band Android itself starts warning in. Working on its own is
+ * the most expensive thing this app does: sustained decode holds several cores at full clock
+ * for minutes, and a goal left running is the one case where nobody is watching the battery
+ * because nobody is watching the screen.
+ */
+private const val MIN_BATTERY_PERCENT = 15
+
 private const val MARKDOWN_STYLE: String =
     "Use Markdown when it makes the answer easier to read: headings for sections, bullets " +
         "for lists, and a table when you are comparing things across the same few fields."

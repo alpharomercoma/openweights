@@ -51,7 +51,10 @@ fun SlashCommand.run(
     onCompact: () -> Unit,
     onRegenerate: () -> Unit,
     onMode: (AgentMode) -> Unit,
+    onGoal: (String) -> Unit = {},
+    argument: String = "",
 ) = when (this) {
+    SlashCommand.GOAL -> onGoal(argument)
     SlashCommand.NEW_CHAT -> onNewChat()
     SlashCommand.COMPACT -> onCompact()
     SlashCommand.REGENERATE -> onRegenerate()
@@ -82,7 +85,17 @@ enum class SlashCommand(val trigger: String, val description: String) {
     // waives the two checks it keeps, so the description has to say which two rather than
     // read as a faster Auto.
     YOLO("/yolo", "Run everything, including sending files and pages out. No prompts"),
+
+    /**
+     * The one command that takes an argument, which is why it is last and why [typed] alone
+     * cannot find it: everything else here is a whole message, and this one is a prefix
+     * followed by the task.
+     */
+    GOAL("/goal", "Work through a task on its own, and stop when it is done"),
     ;
+
+    /** True for a command whose message continues past the trigger. */
+    val takesArgument: Boolean get() = this == GOAL
 
     companion object {
         /**
@@ -110,7 +123,28 @@ enum class SlashCommand(val trigger: String, val description: String) {
          */
         fun typed(message: String): SlashCommand? {
             val trimmed = message.trim()
-            return entries.firstOrNull { it.trigger.equals(trimmed, ignoreCase = true) }
+            entries.firstOrNull { it.trigger.equals(trimmed, ignoreCase = true) }
+                ?.let { return it }
+            // A command with an argument is the trigger, a space, and the rest. Checked
+            // after the exact match so "/goal" on its own is still the command rather than
+            // a command with an empty task.
+            return entries.firstOrNull {
+                it.takesArgument && trimmed.startsWith("${it.trigger} ", ignoreCase = true)
+            }
+        }
+
+        /**
+         * The task after a command that takes one, or empty.
+         *
+         * Split here rather than at the call site so that the one place which knows a
+         * command has an argument is the same place that knows how to find it.
+         */
+        fun argument(message: String): String {
+            val trimmed = message.trim()
+            val command = entries.firstOrNull {
+                it.takesArgument && trimmed.startsWith("${it.trigger} ", ignoreCase = true)
+            } ?: return ""
+            return trimmed.removeRange(0, command.trigger.length).trim()
         }
     }
 }

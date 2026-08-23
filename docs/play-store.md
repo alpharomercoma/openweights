@@ -125,10 +125,19 @@ who opens the app to look at it is never asked at all. `android.hardware.microph
 is declared `required="false"`, because `RECORD_AUDIO` otherwise makes Play hide the app
 from every device without a microphone, and dictation is one optional way to enter text.
 
-### The foreground service declaration
+### The foreground service declarations
 
-There is one, of type `dataSync`, and it needs the Play Console declaration form and a
-video. What to say on it:
+There are **two**, of different types, and Play asks about each one separately. Both need
+the declaration form and a video.
+
+| Type | Service | What it is for |
+| --- | --- | --- |
+| `dataSync` | WorkManager's `SystemForegroundService` | Downloading a model the user chose |
+| `specialUse` | `runtime.GenerationService` | Letting a reply finish when the app is not on screen |
+
+#### 1. `dataSync`, for downloads
+
+What to say on it:
 
 - **What the service does.** Downloads a model file the user has explicitly chosen, from
   Hugging Face to the app's own storage. One to eight gigabytes, which is minutes on a phone
@@ -148,6 +157,47 @@ video. What to say on it:
 
 The video needs to show: tapping download in Discover, the notification appearing, leaving
 the app, the notification still counting up, and Cancel stopping it.
+
+#### 2. `specialUse`, for generation
+
+Added when the app learned to keep answering after the user leaves the screen. `specialUse`
+is the type Play scrutinises hardest, because it is the one with no fixed meaning, so the
+declaration has to carry the measurement rather than an assertion.
+
+The manifest already states the subtype, and the Console answer should match it:
+
+```
+On-device language model inference the user started and is waiting for
+```
+
+- **What the service does.** Keeps the app's process running while a language model, loaded
+  from the user's own storage, produces a reply the user asked for. It transfers nothing and
+  contacts nothing: all of the work is arithmetic on this device's own processor.
+- **Why it has to run in the foreground.** Measured on an Android 14 phone: backgrounding
+  the app mid-reply takes its `oom_score_adj` from 0 to between 400 and 700, puts it in the
+  cached process state, and the process then accumulates **zero** CPU ticks. Android freezes
+  cached processes, so a reply in flight does not slow down, it stops. With the service the
+  same measurement reads `oom_score_adj` 50, process state 4, and 1,440 CPU ticks over ten
+  seconds. A reply takes tens of seconds on a phone and a goal takes minutes; without this
+  the user has to watch the screen for the whole of it.
+- **Why no other type fits.** `dataSync` is for transferring data, which this does not do,
+  and misdeclaring it would be worse than asking; Android 15 also caps it at six hours a
+  day. `shortService` ends after three minutes, which is shorter than one long answer on a
+  mid-range chip. `mediaPlayback`, `camera`, `location`, `phoneCall`, `connectedDevice`,
+  `mediaProjection`, `health` and `remoteMessaging` describe things the app does not do.
+- **Why not WorkManager instead.** The work is not deferrable and not restartable. It is one
+  reply, in progress, holding the model's KV cache in memory; a worker that was killed and
+  retried would start the answer again from nothing, and the cache it rebuilt would cost the
+  user the eleven to nineteen seconds of prefill measured elsewhere in this repository.
+- **User visibility and control.** A low-importance notification says what is happening and
+  opens the app when tapped. It appears only while the model is producing something the user
+  started, and it is taken down the moment the turn ends, however it ends, including when it
+  is cancelled or fails.
+
+The video needs to show: asking a question, the notification appearing, leaving the app, the
+reply still arriving when you come back, and the notification gone once it has finished. If
+the goal feature is being demonstrated in the same video, show it advancing through more
+than one step with the app off screen, since that is the case the service exists for.
 
 ## Data safety form
 
@@ -320,7 +370,7 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 3. Make the feature graphic and the phone screenshots. Sizes are in the listing document.
 4. Answer the content rating questionnaire.
 5. File the generative AI content declaration, and ask review the two open questions in it.
-6. Record the foreground service video and submit that declaration.
+6. Record both foreground service videos, download and generation, and submit both declarations.
 7. Internal testing track, then read the pre-launch report. It runs the app on real
    devices and is the cheapest way to find a crash on hardware we do not own.
 8. Decide the launch countries and whether an age rating gate is needed.

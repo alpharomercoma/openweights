@@ -64,22 +64,65 @@ import io.github.alpharomercoma.openweights.R
 class GenerationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val label = intent?.getStringExtra(EXTRA_LABEL) ?: "Working"
+    /**
+     * Promotes the service the instant it exists, before anything can stop it.
+     *
+     * In `onStartCommand` this was a crash, and a real one rather than a test artefact.
+     * `startForegroundService` promises the system that `startForeground` will follow, and
+     * the system kills the process if it does not. A turn that ends immediately, an error, an
+     * empty reply, a question refused, calls `stopService` in the same breath as the start,
+     * and the platform logs "Bringing down service while still waiting for start foreground"
+     * and throws `ForegroundServiceDidNotStartInTimeException` into the app.
+     *
+     * `onCreate` runs as part of the start and before any stop can be delivered, so
+     * promoting here keeps the promise whatever happens next. The label follows in
+     * `onStartCommand`, which is only ever a notification update.
+     */
+    override fun onCreate() {
+        super.onCreate()
         ensureChannel()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification(label),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            } else {
-                0
-            },
-        )
+        promote(DEFAULT_LABEL)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A stop arrives as a start, which reads oddly and is the only safe way to do it.
+        // See [release]: stopping from outside races the promise this service makes when it
+        // is created, and losing that race kills the app.
+        if (intent?.action == ACTION_STOP) {
+            if (!isHeld()) {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+            return START_NOT_STICKY
+        }
+
+        intent?.getStringExtra(EXTRA_LABEL)?.let { promote(it) }
         // Not sticky. If the system kills the process the turn died with it, and restarting
         // an empty service would put a notification on screen for work nobody is doing.
         return START_NOT_STICKY
+    }
+
+    /**
+     * Keeps the promise, and survives the platform refusing.
+     *
+     * `startForeground` can throw where the app is not allowed a foreground service at that
+     * moment. Swallowed rather than propagated for the same reason [hold] swallows: the
+     * reply is what the user asked for, and a turn that might be frozen is better than a
+     * crash.
+     */
+    private fun promote(label: String) {
+        runCatching {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification(label),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                } else {
+                    0
+                },
+            )
+        }.onFailure { android.util.Log.e("OpenWeights", "startForeground refused", it) }
     }
 
     private fun notification(label: String) = NotificationCompat.Builder(this, CHANNEL)
@@ -117,6 +160,12 @@ class GenerationService : Service() {
         private const val CHANNEL = "generation"
         private const val NOTIFICATION_ID = 4201
         private const val EXTRA_LABEL = "label"
+
+        /** Asks the service to stop itself, once it has promoted and once nobody holds it. */
+        private const val ACTION_STOP = "io.github.alpharomercoma.openweights.STOP_GENERATION"
+
+        /** What the notification says until the caller's own label arrives. */
+        private const val DEFAULT_LABEL = "Working"
 
         /** A turn holds this for as long as it is generating. */
         const val TURN = "turn"
@@ -159,14 +208,32 @@ class GenerationService : Service() {
             }
         }
 
-        /** Lets go on [holder]'s behalf, stopping the service only once nobody needs it. */
+        /**
+         * Lets go on [holder]'s behalf, stopping the service only once nobody needs it.
+         *
+         * The stop is sent to the service rather than done to it, and that is the fix for a
+         * crash rather than a matter of taste. `startForegroundService` is a promise that
+         * `startForeground` will follow, and the system kills the app if it does not. Calling
+         * `stopService` from outside races that promise: measured on a device, the stop
+         * arrived two milliseconds after `onCreate` began and two before it finished, and the
+         * platform logged "Bringing down service while still waiting for start foreground"
+         * and threw. Any turn that ends within a few milliseconds of starting, a refusal, a
+         * validation error, an immediate failure, can lose that race in production.
+         *
+         * Routing it through `onStartCommand` means the stop is delivered after `onCreate`
+         * has promoted, always, because the platform orders them.
+         */
         fun release(context: Context, holder: String) {
             val idle = synchronized(holders) {
                 holders -= holder
                 holders.isEmpty()
             }
             if (!idle) return
-            runCatching { context.stopService(Intent(context, GenerationService::class.java)) }
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, GenerationService::class.java).setAction(ACTION_STOP),
+                )
+            }
         }
 
         /** Whether anything is currently holding the process up. For tests and for logs. */

@@ -143,11 +143,19 @@ fun ModelsScreen(
             // Under the name of whoever published it, rather than in the order the files
             // came off disk. Disk order is download order, which is a fact about the past.
             state.grouped.forEach { group ->
-                item(key = "head:${group.heading}") {
-                    PublisherHeading(
-                        heading = group.heading,
-                        avatarUrl = group.publisher?.let(state.avatars::get),
-                    )
+                // No heading for a group with nobody to name. A label over everything is
+                // not a category, and the one this used to show named something the user
+                // had not done.
+                group.heading?.let { heading ->
+                    item(key = "head:$heading") {
+                        PublisherHeading(
+                            heading = heading,
+                            avatarUrl = group.publisher?.let(state.avatars::get),
+                            // Lines the logo up with the text of the rows below, which are
+                            // inset by their own padding inside the list's content padding.
+                            startPadding = ROW_TEXT_INSET,
+                        )
+                    }
                 }
                 items(group.models, key = { it.file.absolutePath }) { model ->
                     ModelRow(
@@ -265,9 +273,18 @@ private fun ModelsScreenPreview() {
  * correctly with the picture missing.
  */
 @Composable
-internal fun PublisherHeading(heading: String, avatarUrl: String?) {
+internal fun PublisherHeading(
+    heading: String,
+    avatarUrl: String?,
+    // The inset the rows under it use. Without this the logo sat flush against the edge of
+    // the screen while every model name began twenty density pixels in, which reads as the
+    // heading belonging to something else.
+    startPadding: Dp = 0.dp,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = startPadding, top = 6.dp, bottom = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -297,3 +314,6 @@ internal fun PublisherHeading(heading: String, avatarUrl: String?) {
 }
 
 private val HEADING_LOGO = 18.dp
+
+/** What a row's own padding insets its text by, which the heading has to match. */
+private val ROW_TEXT_INSET = 14.dp

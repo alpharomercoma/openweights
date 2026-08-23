@@ -118,15 +118,39 @@ class GenerationService : Service() {
         private const val NOTIFICATION_ID = 4201
         private const val EXTRA_LABEL = "label"
 
+        /** A turn holds this for as long as it is generating. */
+        const val TURN = "turn"
+
+        /** A goal holds this from its first step to its last, across the gaps between. */
+        const val GOAL = "goal"
+
         /**
-         * Raises the process while [label] is happening.
+         * Who currently needs the process raised.
+         *
+         * Counted rather than a bare start and stop, and the reason is a bug this shipped
+         * with. A turn raised the process in `generate` and dropped it in `releaseTurn`,
+         * which is right for one question and wrong for a goal: a goal is many turns, so
+         * the service stopped at the end of every step and started again at the beginning
+         * of the next. In the gap between them the process has no foreground service, and
+         * the gap is exactly where a goal does its own work, deciding the next step and
+         * folding the context. Backgrounded, Android is free to freeze it there, and a goal
+         * frozen between steps never reaches the code that would start the service again.
+         *
+         * So the goal takes its own hold for its whole life and the per-turn hold nests
+         * inside it. The service stops when the last holder lets go.
+         */
+        private val holders = mutableSetOf<String>()
+
+        /**
+         * Raises the process on [holder]'s behalf while [label] is happening.
          *
          * Failures are swallowed on purpose. Starting a foreground service can be refused,
          * most often because the app is already in the background when the turn begins,
          * and the right response is to generate anyway: the reply is what the user asked
          * for and a crash is worse than a turn that might be frozen.
          */
-        fun start(context: Context, label: String) {
+        fun hold(context: Context, holder: String, label: String) {
+            synchronized(holders) { holders += holder }
             runCatching {
                 context.startForegroundService(
                     Intent(context, GenerationService::class.java)
@@ -135,8 +159,17 @@ class GenerationService : Service() {
             }
         }
 
-        fun stop(context: Context) {
+        /** Lets go on [holder]'s behalf, stopping the service only once nobody needs it. */
+        fun release(context: Context, holder: String) {
+            val idle = synchronized(holders) {
+                holders -= holder
+                holders.isEmpty()
+            }
+            if (!idle) return
             runCatching { context.stopService(Intent(context, GenerationService::class.java)) }
         }
+
+        /** Whether anything is currently holding the process up. For tests and for logs. */
+        fun isHeld(): Boolean = synchronized(holders) { holders.isNotEmpty() }
     }
 }

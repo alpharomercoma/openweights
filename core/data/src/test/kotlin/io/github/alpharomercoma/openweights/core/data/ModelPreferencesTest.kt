@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.data
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -34,6 +35,17 @@ import org.robolectric.RobolectricTestRunner
 class ModelPreferencesTest {
     private val repository =
         ModelPreferencesRepository(ApplicationProvider.getApplicationContext())
+
+    /**
+     * Clears the shared record between tests.
+     *
+     * The settings store is one file and Robolectric keeps it for the length of the class, so
+     * without this a test that saves anything defines the shared settings for every test
+     * after it. That is correct behaviour and a poor test fixture: it made the migration
+     * test read another test's temperature.
+     */
+    @After
+    fun clearShared() = runTest { repository.reset("nothing-in-particular.gguf") }
 
     @Test
     fun `the window the app used to default to is read as never having been chosen`() = runTest {
@@ -80,5 +92,51 @@ class ModelPreferencesTest {
 
         assertThat(read.temperature).isEqualTo(0.2f)
         assertThat(read.systemPrompt).isEqualTo("Be terse")
+    }
+
+    @Test
+    fun `a sampler setting follows the user to the next model`() = runTest {
+        // The reason these stopped being per model. Somebody who turns the temperature down
+        // wants it down while they try a different model for one question, and the old
+        // storage silently put it back on every switch.
+        repository.save(
+            "first.gguf",
+            ModelPreferences(temperature = 0.2f, systemPrompt = "Be terse"),
+        )
+
+        val other = repository.current("second.gguf")
+        assertThat(other.temperature).isEqualTo(0.2f)
+        assertThat(other.systemPrompt).isEqualTo("Be terse")
+    }
+
+    @Test
+    fun `a window chosen for one model is not applied to another`() = runTest {
+        // The two fields that stay with the model. A 32k window chosen for a 1.2B is not a
+        // claim about an 8B, and on some phones it is not survivable for one.
+        repository.save("small.gguf", ModelPreferences(contextLength = 32_768))
+
+        assertThat(repository.current("large.gguf").contextLength)
+            .isEqualTo(ModelPreferences.AUTOMATIC)
+        assertThat(repository.current("small.gguf").contextLength).isEqualTo(32_768)
+    }
+
+    @Test
+    fun `where the layers run stays with the model it was measured for`() = runTest {
+        repository.save("small.gguf", ModelPreferences(offload = Offload.GPU.name))
+
+        assertThat(repository.current("large.gguf").offload).isEqualTo(Offload.AUTO.name)
+        assertThat(repository.current("small.gguf").offload).isEqualTo(Offload.GPU.name)
+    }
+
+    @Test
+    fun `settings written before they were shared are still read`() = runTest {
+        // An install that predates this has everything under the per-model key and nothing
+        // under the shared one. The first launch after the change has to look like the last
+        // launch before it.
+        repository.save("only.gguf", ModelPreferences(temperature = 0.15f, contextLength = 8_192))
+
+        val read = repository.current("only.gguf")
+        assertThat(read.temperature).isEqualTo(0.15f)
+        assertThat(read.contextLength).isEqualTo(8_192)
     }
 }

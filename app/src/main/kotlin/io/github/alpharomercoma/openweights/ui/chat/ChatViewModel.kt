@@ -798,6 +798,121 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Rewrites a question that was already asked, and answers the new one.
+     *
+     * The conversation ends at the edited turn. Everything the old wording produced, and
+     * everything said after it, is dropped from the screen and from storage before the new
+     * question is sent, because a transcript holding both is a conversation the user never
+     * had and the model would read it as one.
+     *
+     * Nothing here touches the KV cache on purpose. The engine compares the new prompt
+     * against the tokens it is holding and keeps the longest common prefix, which is
+     * everything before the edited turn; on a hybrid model, where a partial rollback is
+     * refused, it starts over instead. Either way the cache is a function of the prompt, and
+     * a second mechanism reaching in to purge it could only disagree with the first.
+     */
+    fun editAndResend(entryId: Long, text: String) {
+        val edited = text.trim()
+        if (edited.isEmpty()) return
+        val state = _uiState.value
+        if (state.isGenerating || state.isCompacting) return
+        if (loadedModelHasGone()) return
+
+        val at = state.transcript.indexOfFirst { it.id == entryId }
+        if (at < 0 || state.transcript[at].role != ChatRole.USER) return
+
+        val kept = state.transcript.take(at)
+        _uiState.update { it.copy(transcript = kept, error = null, isGenerating = true) }
+
+        viewModelScope.launch {
+            val trimmed = runCatching {
+                writer.inOrder {
+                    conversationId?.let { id ->
+                        // By position rather than by id: the transcript's ids are the app's
+                        // and the stored rows have their own, and the two only line up
+                        // while nothing has been dropped from either.
+                        messages(id).getOrNull(at)?.let { deleteFrom(id, it.id) }
+                    }
+                }
+            }
+            if (trimmed.isFailure) {
+                Log.w(
+                    "OpenWeights",
+                    "an edited turn could not be trimmed",
+                    trimmed.exceptionOrNull(),
+                )
+                _uiState.update { it.copy(isGenerating = false, error = STORAGE_FAILED) }
+                return@launch
+            }
+            // Released before send, which claims it again. Leaving it set would make send
+            // refuse the very question this was called to ask.
+            _uiState.update { it.copy(isGenerating = false) }
+            send(edited)
+        }
+    }
+
+    /**
+     * Carries this conversation up to a point into a new one, and opens it there.
+     *
+     * For the moment somebody wants to try a different direction without losing the one they
+     * are on. The alternative people actually use is to scroll up, copy their question and
+     * paste it into a new chat, which loses everything before it.
+     *
+     * Copied rather than shared. Two conversations pointing at the same rows would diverge
+     * the moment either was folded, and a summary written for one would appear in the other
+     * describing turns it does not have.
+     */
+    fun branchFrom(entryId: Long) {
+        val state = _uiState.value
+        if (state.isGenerating || state.isCompacting) return
+        val upTo = state.transcript.indexOfFirst { it.id == entryId }
+        if (upTo < 0) return
+        val carried = state.transcript.take(upTo + 1)
+        if (carried.isEmpty()) return
+
+        viewModelScope.launch {
+            val branched = runCatching {
+                writer.inOrder {
+                    val title = carried.first { it.role == ChatRole.USER }.text
+                    val id = startConversation(title, state.modelName)
+                    // Skipped rather than carried, because the summary belongs to the
+                    // conversation it was written for: the new one has every turn the old
+                    // one folded away, so there is nothing for it to stand in for.
+                    carried.forEach { entry ->
+                        addMessage(
+                            conversationId = id,
+                            role = entry.role.wireName,
+                            text = entry.history ?: entry.text,
+                            attachments = entry.attachments,
+                        )
+                    }
+                    id
+                }
+            }.getOrNull()
+
+            if (branched == null) {
+                reportError(STORAGE_FAILED)
+                return@launch
+            }
+            // Straight over, with the cache cleared: the new conversation shares a prefix
+            // with the old one but the engine is about to be asked about a different
+            // conversation id, and leaving a stale cache to be matched against is how a
+            // reply ends up answering the chat somebody just left.
+            runtime.resetContext()
+            conversationId = branched
+            _uiState.update {
+                it.copy(
+                    transcript = carried,
+                    compaction = null,
+                    toolNotes = ToolNotes(),
+                    contextUsed = 0,
+                    error = null,
+                )
+            }
+        }
+    }
+
+    /**
      * Keeps the thermal reading current for as long as a reply is being written.
      *
      * Sampled while working rather than once at the end: a phone warms up over the course
@@ -829,7 +944,7 @@ class ChatViewModel @Inject constructor(
         // Before the work, because a foreground service cannot be started from the
         // background and the tap that got here was the foreground. See GenerationService:
         // without it, leaving the app during a reply stops the reply dead.
-        GenerationService.start(appContext, "Answering")
+        GenerationService.hold(appContext, GenerationService.TURN, "Answering")
 
         val job = viewModelScope.launch {
             // Folded before the turn as well as after it. Compaction only ever ran at the
@@ -1042,7 +1157,11 @@ class ChatViewModel @Inject constructor(
         // Here rather than at the end of the body, for the reason this function exists:
         // two of the three ways a turn ends never reach the last line, and a notification
         // left up for work that stopped is worse than none.
-        GenerationService.stop(appContext)
+        //
+        // Releases the turn's hold and not the goal's. A goal is many turns and does its own
+        // work in the gaps between them; dropping the process there is what let it freeze
+        // mid-goal.
+        GenerationService.release(appContext, GenerationService.TURN)
         if (cause != null) {
             _uiState.update { it.copy(isGenerating = false, pendingApproval = null) }
         }
@@ -1108,6 +1227,9 @@ class ChatViewModel @Inject constructor(
             return
         }
         goals.start(task)
+        // Held across the whole goal, including the gaps between steps where the turn's own
+        // hold is not in force. Released in work()'s finally, whatever ends it.
+        GenerationService.hold(appContext, GenerationService.GOAL, "Working on a goal")
         goalJob = viewModelScope.launch { work(task) }
     }
 
@@ -1160,6 +1282,7 @@ class ChatViewModel @Inject constructor(
             }
         } finally {
             setMode(wasMode)
+            GenerationService.release(appContext, GenerationService.GOAL)
         }
     }
 

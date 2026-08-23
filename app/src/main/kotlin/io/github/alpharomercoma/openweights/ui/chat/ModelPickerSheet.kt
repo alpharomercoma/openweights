@@ -111,11 +111,16 @@ fun ModelPickerSheet(
                 // Grouped the same way Manage Models groups them, because they are the same
                 // list and a person who learns one order should not have to learn a second.
                 models.byPublisher().forEach { group ->
-                    item(key = "head:${group.heading}") {
-                        PublisherHeading(
-                            heading = group.heading,
-                            avatarUrl = group.publisher?.let(avatars::get),
-                        )
+                    group.heading?.let { heading ->
+                        item(key = "head:$heading") {
+                            PublisherHeading(
+                                heading = heading,
+                                avatarUrl = group.publisher?.let(avatars::get),
+                                // The same inset the rows here use, so the logo and the
+                                // model names share a left edge.
+                                startPadding = ROW_INSET,
+                            )
+                        }
                     }
                     items(group.models, key = { it.file.absolutePath }) { model ->
                         ModelRow(
@@ -214,3 +219,6 @@ private val TICK = 20.dp
  * to scroll to find.
  */
 private val LIST_MAX = 300.dp
+
+/** The horizontal padding a row in this sheet uses, which the headings match. */
+private val ROW_INSET = 20.dp

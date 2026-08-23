@@ -25,7 +25,7 @@ class ByPublisherTest {
         LocalModel(File("/models/$name.gguf"), null, publisher)
 
     @Test
-    fun `publishers are alphabetical and unattributed files go last`() {
+    fun `publishers are alphabetical and unattributed files go last with no heading`() {
         val groups = listOf(
             model("Qwen3-1.7B", "Qwen"),
             model("something-i-built", null),
@@ -35,9 +35,43 @@ class ByPublisherTest {
         ).byPublisher()
 
         assertThat(groups.map { it.heading })
-            .containsExactly("LiquidAI", "Qwen", "Added by hand").inOrder()
+            .containsExactly("LiquidAI", "Qwen", null).inOrder()
         assertThat(groups.first().models.map { it.name })
             .containsExactly("LFM2.5-1.2B", "LFM2.5-2.6B").inOrder()
+    }
+
+    @Test
+    fun `a model with no recorded publisher is read off its family name`() {
+        // Every install that predates the app recording publishers has none of them, which
+        // is what put "Added by hand" over every model on somebody's phone.
+        val groups = listOf(
+            model("LFM2.5-2.6B-QAD-Q4_0", null),
+            model("Qwen3-1.7B-Instruct", null),
+            model("gemma-3-4b-it", null),
+        ).byPublisher()
+
+        assertThat(groups.map { it.heading })
+            .containsExactly("Google", "LiquidAI", "Qwen").inOrder()
+    }
+
+    @Test
+    fun `a name nobody can be read off gets no heading rather than a guess`() {
+        val groups = listOf(
+            model("my-qwen-experiment", null),
+            model("finetune-v3", null),
+        ).byPublisher()
+
+        assertThat(groups).hasSize(1)
+        assertThat(groups.single().heading).isNull()
+        assertThat(groups.single().models).hasSize(2)
+    }
+
+    @Test
+    fun `a recorded publisher beats the filename`() {
+        // Somebody's fork of a Qwen model, downloaded from their repository, belongs to them.
+        val groups = listOf(model("Qwen3-1.7B-mine", "alpharomercoma")).byPublisher()
+
+        assertThat(groups.single().heading).isEqualTo("alpharomercoma")
     }
 
     @Test

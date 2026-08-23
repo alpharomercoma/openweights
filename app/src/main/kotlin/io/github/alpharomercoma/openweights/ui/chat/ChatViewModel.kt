@@ -292,7 +292,21 @@ data class ChatUiState(
             mode.takeIf { it != ChatUiState().mode }?.label,
         ).joinToString(" · ")
 
-    val canSend: Boolean get() = modelName != null && !isGenerating && !isLoadingModel
+    /**
+     * Whether the composer may start a turn.
+     *
+     * [isCompacting] belongs here and was missing, which is a race rather than a nicety.
+     * Folding runs after a reply, while the user is reading it, and it runs the model for
+     * twenty to thirty seconds. Send during that window passed this check, reached
+     * [ChatViewModel.generate], found `Folding` already busy and skipped its own fold, and
+     * then called the engine while the summary was still streaming into it. Two turns on one
+     * engine: the single-threaded executor keeps it from corrupting anything, and what comes
+     * out is a turn that re-reads the whole conversation because the cache holds the summary
+     * prompt, answered from a history the screen has already replaced. Nothing crashes and
+     * nothing is right.
+     */
+    val canSend: Boolean get() =
+        modelName != null && !isGenerating && !isLoadingModel && !isCompacting
 }
 
 @HiltViewModel
@@ -1624,11 +1638,6 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         // tools being available, "/plan" with everything switched off sent no instruction
         // at all and the mode was a silent no-op.
         toolInstruction(mode, preferences.toolPrompt, anyTools = toolsAvailable),
-        // Part of the instructions, not a turn of its own. Sent separately this was a second
-        // system message beside them, and Gemma 3's template raises rather than renders when
-        // the roles do not alternate: every turn after the first fold came back as an error,
-        // and kept coming back, because the next turn rebuilt the same prompt.
-        compaction?.let { "Summary of the earlier conversation:\n${it.summary}" },
     ).joinToString("\n\n")
 
     val system = instructions
@@ -1640,7 +1649,45 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         ?.let { transcript.drop(it.foldedThroughIndex + 1) }
         ?: transcript
 
-    return (system + remaining.map { it.toChatMessage() }).asExchange().withToolNotes(toolNotes)
+    return (system + recap(compaction) + remaining.map { it.toChatMessage() })
+        .asExchange().withToolNotes(toolNotes)
+}
+
+/**
+ * The folded turns, handed back as a turn rather than as an instruction.
+ *
+ * The summary used to be appended to the system message, and the reason given was that a
+ * second system message beside the first made Gemma 3's template raise: it enforces strict
+ * user-then-assistant alternation. That reason is real and it argues against a *system*
+ * turn, not against a turn. An ordinary exchange alternates correctly and renders on every
+ * template here.
+ *
+ * The position turned out to matter a great deal more than the wording. Given a summary that
+ * contained the answer, and the eight shipped tools, the model was asked seven questions the
+ * summary answers:
+ *
+ * | summary in | answered from it | reached for a tool anyway |
+ * | --- | ---: | ---: |
+ * | the system message | 4 of 7 | **7 of 7** |
+ * | a turn, as here | 6 of 7 | **3 of 7** |
+ * | prefixed to the question | 1 of 3 | 2 of 3 |
+ *
+ * The tool column is the honest one, because a search whose query quotes the fact counts as
+ * "answered" on a string match and is not an answer. Seven of seven means that after a fold
+ * the model looked for what it had just been told, every time, and on a phone with a shared
+ * folder that search comes back empty.
+ *
+ * The reply is put in the model's own mouth, which is a prompt-construction device and not
+ * something it said. That is the same liberty [withToolNotes] takes, and it is what makes the
+ * difference: a question with the summary merely prefixed to it scored no better than the
+ * system message. What works is the conversation having already acknowledged it.
+ */
+private fun recap(compaction: Compaction?): List<ChatMessage> {
+    val summary = compaction?.summary?.takeIf { it.isNotBlank() } ?: return emptyList()
+    return listOf(
+        ChatMessage.text(ChatRole.USER, "Earlier in this conversation:\n$summary"),
+        ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
+    )
 }
 
 /**
@@ -1718,6 +1765,9 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
 private fun ChatUiState.refusalReason(): String? = when {
     isLoadingModel -> "The model is still loading. Ask again in a moment."
     modelName == null -> "No model is loaded yet. Choose one in Models."
+    // Reached only if the composer let a tap through anyway. The Send button is disabled
+    // for the same condition, so this is the belt to that pair of braces.
+    isCompacting -> "Making room by summarising earlier turns. This takes a few seconds."
     else -> null
 }
 

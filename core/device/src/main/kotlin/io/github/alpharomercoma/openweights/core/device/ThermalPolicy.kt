@@ -147,11 +147,32 @@ class ThermalPolicy @Inject constructor(
     /**
      * How hot the system says the device is.
      *
-     * The operating system's own assessment, which is the only thermal reading an ordinary
-     * app can have of the chip itself: degrees from the SoC need HardwarePropertiesManager,
-     * which is privileged, and `/sys/class/thermal` is refused under SELinux. See [celsius]
-     * for the number that can be read. This is the one to act on, because it is the same
-     * signal the scheduler uses when it slows the phone down.
+     * The operating system's own assessment, and **it does not see the part of the phone
+     * doing the work.**
+     *
+     * This was described here as "the same signal the scheduler uses when it slows the phone
+     * down". It is not. `dumpsys thermalservice` on an SM8650 during a thirty turn
+     * conversation, with the app pinned on the big cores:
+     *
+     * ```
+     * Thermal Status: 0
+     *   Temperature{mValue=95.0, mName=CPU2, mStatus=3}
+     *   Temperature{mValue=95.0, mName=CPU3, mStatus=3}   ... CPU4, CPU5, CPU7 the same
+     *   Temperature{mValue=25.0, mName=battery, mStatus=0}
+     * ```
+     *
+     * Five of eight cores at 95 C, each flagged severe by the platform, and the device level
+     * status an app is allowed to read is zero. That number tracks the skin rather than the
+     * silicon, and a device with cooling never warms its skin. So on hardware like this every
+     * rung of the ladder below is unreachable, including the one that stops generating.
+     *
+     * `PowerManager.getThermalHeadroom` is the other signal and is public from API 30.
+     * `ThermalSignalOnDeviceTest` prints both, so the question can be settled per device
+     * rather than argued about. It is deliberately **not** wired in here yet, because the
+     * response would be wrong: measured on this chip while hot, prefill ran at 98.9 t/s on
+     * six threads and 43.4 on two, so backing off further would cost throughput at the moment
+     * the user is already waiting longest. A more sensitive trigger for a response that is
+     * measurably backwards makes the product worse. Both halves are in docs/CONTEXT.md.
      */
     fun level(): ThermalLevel {
         val status = context.getSystemService<PowerManager>()?.currentThermalStatus

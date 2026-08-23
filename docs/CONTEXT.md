@@ -1965,6 +1965,1056 @@ This is the largest unexplored lever in the product and it is the honest answer 
 use a better engine": the better engine is the one already vendored, with a backend switched
 off.
 
+## Twenty turns, nine folds, and what compaction was really doing (2026-08-23)
+
+The prefix cache fix above was measured over two turns. This is the same question asked of a
+conversation: twenty and thirty turns against a real model on the SM8650, through the app's
+own prompt assembly and its own `CompactionPolicy`, one row per turn.
+`LongConversationOnDeviceTest` runs it and takes the window and the length as instrumentation
+arguments, because one shape cannot ask both questions.
+
+### A long conversation does not get slower, and the reason it does not is arithmetic
+
+Twenty turns at a 4,096 token window, the shape a phone of this class actually opens with:
+
+| | turn 1 | turns 2 to 20 |
+| --- | ---: | ---: |
+| prompt decoded | 712 tokens | **18 to 24 tokens** |
+| prefill | 4,289 ms | 157 to 287 ms |
+
+Nineteen consecutive follow-ups, every one of them reading the question and nothing else. The
+cache holds across a real conversation, which is what the earlier two-turn measurement could
+only suggest.
+
+**What does grow is decode.** 18.6 tokens a second at 834 tokens of context, 14.6 at 3,145.
+Fitted on that run, `seconds per token = a + b*n` with a = 0.0485 and b = 6.36e-6. **That
+slope is wrong and the next section is why**: context and elapsed time rise together in a
+conversation, and the cores reached 95 C by the end of this one. Held at one depth and swept
+properly, b is 3.47e-6 over the first two thousand tokens and 6.92e-6 beyond them, and about a
+fifth of what this run showed was the chip rather than the cache.
+
+**Twenty ordinary turns never folded.** Context reached 3,145 against a 3,072 trigger that is
+checked before the turn, so the fold would have landed on turn 21. That is the honest picture
+of compaction on this device: rare.
+
+### The decay slope was fitted through rising heat, and it was about a quarter too steep
+
+The twenty turn run gave `seconds per token = 0.0485 + 6.36e-6 * n`, and an adversarial
+review pointed out the obvious problem with it: in a conversation, context and elapsed wall
+clock rise together, and by the end of that run five of the eight cores were at 95 C. The
+slope could have been the cache growing or the chip slowing, and the run cannot tell them
+apart. The review's conclusion was that it was all heat and that nothing derived from it
+survives. That is testable, so it was tested.
+
+**Fixed depth, repeated, with no cooling in between.** Twelve runs of 64 tokens at a depth of
+1,024, back to back, starting from 47.7 C: **22.92 t/s, standard deviation 0.63**. Cooled and
+run once more: 22.85. Over thirty six seconds of work, sustained decode does not decay.
+
+**The same, for minutes rather than seconds.** Eight runs of 512 tokens at the same fixed
+depth, no cooling, 58.8 C rising to 71.9 C: **19.28 t/s, standard deviation 1.43**. So heat
+does cost something once a run is long enough to matter, about 15% over three and a half
+minutes, and the deviation is the decline across the eight repetitions.
+
+**Depth swept, each reading started from the same temperature.** This is the measurement that
+isolates the thing wanted:
+
+| depth | decode, tg64 | slope over the preceding 2k |
+| ---: | ---: | ---: |
+| 0 | 24.73 | |
+| 1,024 | 22.36 | |
+| 2,048 | 21.03 | 3.47e-6 |
+| 4,096 | **16.20** | **6.92e-6** |
+
+Two things fall out of that, and the second is the more interesting.
+
+**The slope is real, and the honest accounting is not "half and half".** Over the twenty turn
+run decode fell from 18.6 to 14.6 t/s as context went 834 to 3,145, a change in seconds per
+token of 0.01473. Reading that same span off the cooled curve above gives 0.01180 of it, so
+**context explains about 80% of what that conversation showed and heat about 20%**. The
+conversation's single straight line came out at 6.37e-6 where the cooled curve averages
+5.11e-6 over the same span: a quarter too steep, not twice.
+
+Over the first two thousand tokens specifically, b is 3.47e-6, which is where the MT6991's
+independently fitted 3.42e-6 sits almost exactly. The two phones only appeared to disagree
+because one figure was a chord across a curve and the other was not.
+
+**And the decay is not affine.** The slope doubles in the second two thousand tokens: 3.47e-6
+from 0 to 2,048 and 6.92e-6 from 2,048 to 4,096, with every reading started within two degrees
+of the others, so that is not heat either. `seconds per token = a + b*n` is a fair description
+to about 2k and an optimistic one past it, which matters because the compaction ceiling lives
+out there. Whatever the mechanism, and a cache hierarchy the KV no longer fits in is the
+obvious suspect, the practical consequence is that folding pays *more* the deeper the
+conversation is, not less.
+
+Fitted over all four points the single-slope value is 5.19e-6, which is a compromise between
+two regimes rather than a description of either. The break-even a fold must clear is 3,126
+tokens on the shallow slope and 2,303 on the all-points fit; `MIN_WORTHWHILE_SAVING` is 3,000,
+which sits between them and errs towards folding less.
+
+Checked against the case it exists for: a fold at a 4,096 ceiling frees about 1,726 tokens,
+which on the deep slope saves 0.0119 seconds a token and buys about sixteen turns, so it
+returns 2,500 generated tokens worth of saving against a forty second pause and does not
+repay. Freeing 3,000 saves 0.0208 a token over twenty-seven turns and repays about twice
+over. The threshold is on the right side of both.
+
+**So the review was right that the number was contaminated and wrong that nothing survives.**
+Context decay is the larger term, heat is the smaller one, and the affine model everything
+here was built on is only affine to about two thousand tokens.
+
+**What none of this settles.** Every reading here is `llama-bench` with the device to itself.
+A phone in a hand has a screen on, a launcher, and a body that holds heat rather than shedding
+it into a rack, and the 15% measured over three and a half minutes is a floor for what that
+costs rather than an estimate of it.
+
+### At a small window it folded nine times in thirty turns, and each one cost forty seconds
+
+The same conversation at a 2,048 window, which is what a cheaper phone gets:
+
+| | |
+| --- | --- |
+| folds in 30 turns | **9** |
+| entries folded per fold | 12, then 6, then 6, 6, 6, **4, 4**, 6, **4** |
+| summarising | 24 to 34 s |
+| reading the rewritten prompt back | 9.7 to 13.7 s |
+| turns bought per fold | 3 at first, **2 by the twentieth turn** |
+
+By turn 21 the app was folding every other turn and spending about forty seconds each time to
+buy two turns of conversation. More than half the wall clock of that run was compaction.
+
+The mechanism is a fixed cost that does not shrink. Post-fold the prompt is the system block
+and tool definitions (712 tokens here), the summary, and the four entries kept verbatim.
+Whatever the fold removes, that floor stays, and when the floor is close to the trigger the
+next fold arrives almost immediately.
+
+### The summary was the model's chain of thought, cut off mid-sentence
+
+This is the part that was invisible, because something plausible-looking went into the prompt
+either way. `parseAssistantReply` takes what follows `</think>`, and LFM2.5's template opens
+that block in the generation prompt, so the summary is only a summary if a `</think>` ever
+arrives. Probed against the real model on the real compaction prompt:
+
+| budget | tokens used | closed the block | what was stored |
+| ---: | ---: | --- | --- |
+| 204 | 204, capped | **no** | 900 characters of "The user wants me to summarize…" |
+| 400, what shipped | 400, capped | yes | 220 characters, cut off mid sentence |
+| 900 | 541, finished | yes | **917 characters, complete** |
+
+So the shipped 400 stored a fragment. A budget scaled down to fit small windows, which is
+what this session tried first, stored the reasoning verbatim and called it the conversation.
+
+The budget is now 768 and the reason is that **a generous budget costs nothing when it is not
+needed**: generation stops at the end of turn, and it only ever matters when it truncates.
+Larger is strictly safer, and it makes the stored summary *smaller*, because prose is shorter
+than the reasoning that precedes it.
+
+### Being told not to think, on a template that opens the block anyway
+
+The remaining cost is that most of those tokens are thinking. `enable_thinking` does nothing
+here: LFM2.5's template ends the generation prompt with `<think>` whatever it is told, which
+is why the app detects `supportsThinking = false` and hides the control. What does work is
+closing the block in the prompt, and llama.cpp hands over `thinking_start_tag` and
+`thinking_end_tags` to do it with, so this is not a guess about one model's syntax.
+
+Same prompt, same model, back to back:
+
+| | tokens generated | summary |
+| --- | ---: | --- |
+| block left open | 541 | 917 characters, complete |
+| **block closed in the prompt** | **132** | 677 characters, complete |
+
+Four times less generation for a summary of comparable content. `render_prompt` now does this
+whenever thinking is switched off and the prompt still ends with the open tag, and
+compaction switches it off, because a summary is a transcription job rather than a reasoning
+one.
+
+**It did not make the fold four times faster, and the reason is worth writing down.** On the
+device a fold is dominated by *reading* the folded transcript, not by writing the summary:
+about 1,600 tokens prefilled cold at roughly 100 t/s is sixteen seconds before a word is
+generated. The summarisation prompt is built fresh and shares no prefix with the conversation
+that is already in the cache, which the code knows and comments on. Phrasing it as a
+continuation of what is already cached would remove that sixteen seconds, and is the largest
+thing still on the table here.
+
+### Where the summary goes decides whether the model reads it
+
+After a fold the app appended the summary to the system message. Asked, on the device, a
+question the summary answered, the model called `search_files(pattern='garden')`. Three
+probes, three tool calls, no answers: it went looking in the user's files for something it
+had been told a moment earlier, and on a phone with a shared folder that search comes back
+empty.
+
+Isolated on the host with a complete hand-written summary, the eight shipped tools, and seven
+questions the summary answers:
+
+| summary in | answered from it | reached for a tool anyway |
+| --- | ---: | ---: |
+| the system message | 4 of 7 | **7 of 7** |
+| a turn of the conversation | 6 of 7 | **3 of 7** |
+| prefixed to the question | 1 of 3 | 2 of 3 |
+
+The tool column is the honest one: a search whose query quotes the fact counts as "answered"
+on a string match and is not an answer.
+
+So the summary is now a turn: a user turn carrying it, and an assistant turn acknowledging
+it. The acknowledgement is a prompt-construction device rather than something the model said,
+which is the same liberty the tool notes take, and it is what makes the difference. Prefixing
+the summary to the question, which invents nothing, scored no better than the system message.
+
+The original reason for the system message was real and does not apply: a second *system*
+turn made Gemma 3's template raise, because it enforces strict alternation. An ordinary
+exchange alternates correctly.
+
+**On the device this moved recall from 0 of 3 to 1 of 3, not to 3 of 3**, and the reason is
+the other half of the problem: the summaries the model actually writes are worse than the one
+the probe used. One fold produced 1,277 characters, the next produced 22. Placement is fixed;
+summary quality under repeated folding is not, and the recursive shape is the suspect: each
+fold summarises the previous summary plus new turns.
+
+### Compaction for speed does not pay for itself
+
+Folding has two triggers and they are not the same kind of thing. The fraction of the window
+is survival: past it the next answer may not fit. The absolute ceiling is an optimisation, and
+an optimisation has to pay.
+
+Folding for speed buys `b * freed` seconds on every token generated until the next fold, and
+costs one long pause now. With a fold at 40 seconds, b = 6.36e-6, about 110 tokens of context
+added per turn and 160 generated:
+
+```
+b * freed * (freed / 110) * 160  >  40      =>      freed > 2,080 tokens
+```
+
+A fold that frees less than that is slower than not folding. At a 4,096 ceiling with a 1,240
+token system block, a 530 token summary and four kept entries, it freed about 1,800 and lost
+time every time it fired. `shouldCompact` now asks what the fold would actually free and
+declines when the answer is not enough to matter; the context then keeps growing until either
+the fold does pay or the fraction takes over, which is the right order.
+
+### Send was enabled while the model was busy summarising
+
+Folding runs after a reply, while the user is reading it, and it runs the model for tens of
+seconds. `canSend` checked `isGenerating` and `isLoadingModel` and not `isCompacting`, so a
+tap in that window reached `generate`, found `Folding` already busy, skipped its own fold, and
+called the engine while the summary was still streaming into it. The single-threaded executor
+keeps that from corrupting anything; what comes out is a turn that re-reads the whole
+conversation, because the cache holds the summarisation prompt, answered from a history the
+screen has already replaced. Nothing crashes and nothing is right. Fixed, with a sentence
+saying why.
+
+## Seventeen closed-loop tasks, and what the tools actually do (2026-08-23)
+
+The loop harness now executes what the model asks for against a filesystem that changes and a
+JavaScript sandbox that really runs the program. `write_file` writes, `run_script` evaluates
+in node with Node's own host objects shadowed out, so a script that reaches for `require` or
+`fs` fails the way QuickJS in an isolated process would rather than the way node does. Seven
+file and script tasks were added to the ten that existed, because that is where the app's own
+users say it goes wrong.
+
+Greedy, round cap four, the shipped eight tools, LFM2.5 2.6B QAD Q4_0.
+
+### The file tools are not the problem
+
+| task | rounds needed | rounds used | |
+| --- | ---: | ---: | --- |
+| read a named file | 1 | 1 | ok |
+| find a file, then read it | 2 | 2 | ok |
+| find, read, count | 2 | 2 | ok |
+| find, read, write a new file | 3 | 3 | ok |
+| read two files in one answer | 3 | **1** | ok, both calls in one round |
+| which file mentions X | 2 | **1** | ok, `search_files(contains=)` |
+| a file that does not exist | 1 | 4 | ok, but three rounds to accept it |
+| list what files there are | 1 | 1 | ok, `search_files(pattern='*')` |
+| append to a list, keeping it | 2 | 3 | ok, read then write with replace |
+| a path with a leading slash | 1 | 1 | ok |
+| "open my notes", ambiguous | 1 | 4 | ok, read all three |
+
+Eleven of eleven. Two of them beat the minimum by issuing both calls in one round, which is
+efficiency rather than luck. The impression that the model cannot work the file tools is not
+what this measures; what it cannot do is the two things below.
+
+### It writes Node, and three prompt-side interventions did not stop it
+
+Asked to write a script, save it and run it, the model writes `require('fs')` and
+`require('csv-parser')` and `fs.readFileSync('data/sales.csv')`. That is the reasonable guess:
+almost all the JavaScript it has read runs in Node.
+
+Measured in order, each on top of the last:
+
+| | write-then-run task | second script task |
+| --- | --- | --- |
+| as shipped | fail | fail |
+| description says "no require, no file system, no network" | fail | fail |
+| the failure returns a named hint | pass, by abandoning the script | pass |
+| the hint names the repair route as well | fail | pass |
+| **the sandbox answers to `require`** | fail on budget | **pass** |
+
+The first three are wording, and wording did not dislodge it: told there was no `require`, the
+model dropped one import, wrote `require('fs')` again, and ran out of rounds. Where it
+"passed", it had abandoned the script and answered from a file it had read earlier, correctly
+and by luck.
+
+So the sandbox answers to the name instead. `RunScriptTool` prepends a shim in which
+`require('fs')` returns a `readFileSync` over the inputs the tool already gathered, and
+`require('path')` returns `join`, `basename` and `extname`; anything else throws a sentence
+saying what is not here. The tool also reads what the program mentions: a quoted string shaped
+like a path is gathered whether or not the model filled in `files`, bounded by the same three
+files and 64 KB the argument was already bounded by. Nothing it returns was not already
+available by naming the file properly.
+
+With that, the second script task runs the model's own natural code and answers correctly in
+three rounds. The first still fails, and it fails on `require('csv-parser')`, which is a module
+and not an operation: the shim cannot invent one. Given six rounds instead of four it wrote a
+corrected file and then wrote it twice more instead of running it, which is a model getting
+stuck rather than a budget being short.
+
+### Arithmetic in its head, and the answer is wrong
+
+Asked for the total of three amounts in a file it had just read, the model answered 1720, then
+1,729, then 1,725 across runs. The true answer is 1,725. It has `run_script` and used it
+correctly for the same shape of task elsewhere; here it did the sum itself. This is the
+clearest case in the suite where a tool exists, is described for exactly this, and is not
+reached for.
+
+### Four rounds is enough, and it is not the constraint
+
+The round budget was capped at four with the reasoning that "every extra round re-reads a
+prompt that has grown". That is no longer true: since the tool loop keeps its cache, a further
+round reads the tool result and nothing else, 48 tokens. So the cap was re-measured now that
+it is cheap:
+
+| cap | completed | tokens generated |
+| ---: | ---: | ---: |
+| 4 | 15 of 17 | 7,221 |
+| 6 | 15 of 17 | 7,757 |
+
+Identical, at 7% more tokens. The three tasks that took the extra rounds spent them without
+changing their outcome. Four stays, and the reason for it is now "the model does not use more
+usefully" rather than "more is expensive".
+
+### The over-calling is still there and is now measurable in a worse form
+
+Asked the capital of Peru with tools available, the model spends the whole round budget:
+`web_search`, `web_search` again, `fetch_url`, `web_search`. That is the disposition recorded
+above and eleven interventions have moved it once.
+
+What is new is the same behaviour aimed at the conversation itself. After a fold, asked
+something the summary answers, it called `search_files` for it. Moving the summary out of the
+system message took the tool calls from 7 of 7 to 3 of 7, which is the largest single
+improvement anything here has made to it, and it is a placement rather than a wording.
+
+### What a bigger catalogue costs, replicated (2026-08-23)
+
+The standing question is whether tools added later will cost the eight already shipped
+anything. It was priced by running the same seventeen tasks against a registry of sixteen:
+the eight real ones plus eight plausible future ones, none of which is the right answer to
+any task in the suite.
+
+The first run of that said 17 of 17 against the shipped catalogue's 15, which would have
+meant a bigger catalogue helps. **It does not replicate, and the suite that produced it could
+not have replicated anything**: it runs at temperature 0 with `top_k` 1, so the `--seed` it
+was varied over changed nothing, and the identical token counts across seeds were the
+giveaway. Repeated properly at temperature 0.7, three seeds, both arms:
+
+| | seed 11 | seed 22 | seed 33 | total |
+| --- | ---: | ---: | ---: | ---: |
+| eight tools | 15/17 | 16/17 | 16/17 | **47/51** |
+| sixteen tools | 14/17 | 14/17 | 15/17 | **43/51** |
+
+So a bigger catalogue is four tasks worse rather than two better. Six of the fifty one pairs
+disagreed, five of them against the bigger catalogue, which on a sign test is p ≈ 0.22: this
+is a hint of a cost, not a demonstration of one. What it does demonstrate is that the earlier
+result is dead, and the direction of the effect is the opposite of what it claimed.
+
+Two other things were priced in the same runs. Doubling the catalogue did not make the model
+reach for the new tools: **one call to a future tool in 135**, a `set_reminder` on a task that
+passed anyway. And it did not cost tokens or rounds, 416 tok and 2.33 rounds a task against
+459 and 2.41, which is the arm that finished fewer tasks doing slightly less work.
+
+The practical reading: eight more tool definitions are affordable, and they are not free. The
+thing to watch when adding one is not prefill cost, which was already measured and is small,
+but whether the tasks that were already marginal stay passing.
+
+### Can it search and read files: yes, and here is the shape of what fails
+
+The complaint behind this was that the model does not seem to know what to do with the
+filesystem tools. Measured against a real mutable directory with a real Node sandbox, three
+seeds at production sampling, fifty one attempts a catalogue, that is not what the failures
+look like.
+
+| Task | Eight tools | What it exercises |
+| --- | ---: | --- |
+| L1-read | 3/3 | read a named file |
+| L2-search-read | 3/3 | find it, then read it |
+| L3-search-read-count | 3/3 | find, read, count |
+| L5-search-read-write | 3/3 | find, read, write the result |
+| L7-two-files | 3/3 | two files in one answer |
+| L9-search-contains | 3/3 | search by content, not by name |
+| F1-list | 3/3 | list a folder |
+| F2-append | 3/3 | read, modify, write back |
+| F4-csv-compute | 3/3 | parse a CSV and compute |
+| F5-leading-slash | 3/3 | a path the model wrote wrong |
+| F7-count-script | 3/3 | write a script that counts, run it |
+| L8-missing-then-ask | 3/3 | a file that is not there, ask rather than invent |
+| L10-no-tool | 3/3 | do not reach for a tool at all |
+| L6-web-then-answer | 3/3 | the other kind of tool |
+| F6-ambiguous | 3/3 | an underspecified request |
+| **F3-write-then-run** | **2/3** | save a `.js` and execute it by path |
+| **L4-budget-total** | **0/3** | add up numbers from a file |
+
+**Fifteen of seventeen shapes are perfect and the two that fail are not filesystem
+comprehension.** L4 fails because the model does arithmetic in its head and gets it wrong
+rather than because it cannot reach the file: it reads the right file every time. F3 is the
+one genuine tool defect left, and it is about writing JavaScript that the sandbox will accept
+rather than about the filesystem.
+
+So the answer to "can it be used for coding scripts that will be saved and executed" is a
+qualified yes: F7 writes a script and runs it three times out of three, and F3 saves one and
+runs it by path two times out of three. And the answer to "can it search and read files" is
+yes, on eleven shapes out of eleven.
+
+What was missing until 2026-08-23 was any of this **inside a long conversation with folds in
+it**, which is the case the goal is actually about. The multi-turn harness now answers tool
+calls from a real directory under the app's own cache, with `search_files` walking it,
+`read_file` failing when the file is not there, and `write_file` putting bytes on disk that a
+later `read_file` has to find, so the model can be wrong and the conversation can be wrong
+later because of it. The SAF layer underneath is a separate question and is covered by
+`WorkspaceOnDeviceTest`, which cannot run without a folder a person picked.
+
+### A note on how not to run this suite
+
+Two of these six runs had to be thrown away and redone. A shell from an earlier killed
+command had never actually died and was running the same six configurations, writing the same
+six files, on the same machine. Both suites shared the Mac's cores and each overwrote the
+other's logs, so nothing from that round could be attributed to a configuration at all, and
+the timings were meaningless on top of it. `pkill -f` on a pattern that appears in the killing
+command's own command line does not do what it looks like it does.
+
+## The cache throws away a thousand tokens to drop a hundred (2026-08-23)
+
+This is the largest thing measured in this repository and it was invisible until the test
+harness was fixed, because the broken harness happened to avoid it.
+
+### First, the instrument
+
+`LongConversationOnDeviceTest` called `engine.chat` once a turn and stored whatever came
+back. With the tool definitions in the prompt the model asks for tools, nothing ran them, and
+the raw call syntax became the turn's text. Two consequences, in opposite directions. It
+poisoned compaction, which is where the 178 character "summary" that was nothing but two web
+searches came from. And it accidentally made the cache look perfect: the text it re-sent as
+history was byte-identical to what the model had generated, so the prefix always matched.
+
+It now runs the loop: ask, run what was asked for against a fixed fixture, feed the results
+back, ask again, up to the app's own cap of four. Half the questions need a tool, so half the
+facts in the transcript arrive through a tool result, which is the harder case for both
+compaction and the cache.
+
+The moment it did that, follow-up turns went from 18 to 24 prompt tokens to **1,153 to 1,758**,
+and from 157 to 287 ms to **11 to 19 seconds**. Eighteen of eighteen. Not one cheap turn after
+the first tool call.
+
+### What the cache is actually doing
+
+The obvious reading is that the history no longer matches, and it does not, but the size of
+the mismatch is the point. The engine now logs where the prefix scan stopped:
+
+```
+kv: diverged at 1277 of 1359 cached, prompt 1402, re-reading  125
+kv: diverged at 1417 of 1533 cached, prompt 1559, re-reading  142
+kv: diverged at 1672 of 1787 cached, prompt 1823, re-reading  151
+kv: diverged at    2 of 1604 cached, prompt  616, re-reading  614   <- a fold
+```
+
+**Every divergence outside a fold is 55 to 180 tokens from the end of the cache.** The prefix
+is good almost all the way. What should be re-read is a hundred tokens or so. What is actually
+re-read is the whole prompt, 1,168 to 1,823 tokens, and the row for that turn shows twelve to
+nineteen seconds of prefill.
+
+The reason is four lines in `engine_session.cpp`:
+
+```cpp
+if (static_cast<int32_t>(reusable) < n_past_) {
+    const bool rolled_back = llama_memory_seq_rm(...);
+    if (!rolled_back) { reset(); reusable = 0; }
+}
+```
+
+A hybrid model refuses partial rollback, because a convolutional or recurrent state is a
+running state rather than a row per token and there are no snapshots by default. So to drop
+the last 115 tokens the engine discards the 1,672 in front of them. **A ten to twelve fold
+amplification of a small mistake into a total one**, and the code is right: keeping a state
+that claims to be shorter than it is was the LFM2 corruption bug, and that cure is not
+negotiable.
+
+### It is not the tool loop. It is the assistant turn, about half the time
+
+The comparison that was supposed to be about throughput settled the diagnosis instead. Ten
+turns with **tools switched off entirely**, so no turn can be missing a call or a result:
+
+```
+turn  prompt re-read
+  2      233
+  3       26     <- the cache worked
+  4      605
+  5      786
+  6      967
+  7     1147
+  8       27     <- and again
+  9     1519
+ 10       24     <- and again
+```
+
+Three turns cost the question. The rest cost the conversation, and they grow by about 180 a
+turn, which is the whole prompt being re-read every time. **With no tools in the picture at
+all.**
+
+So the tool loop was never the cause. It is a way of reaching a more general fault: an
+assistant turn does not always go back the way it came out. Something about roughly half of
+them re-renders differently, the prefix stops matching a hundred or so tokens from the end,
+and the hybrid rollback turns that into a full re-prefill. The tool-call round trip and the
+thinking block were each implemented and each changed nothing because neither was the
+difference.
+
+That also explains the number this repository has quoted for months. The twenty-turn run that
+produced "18 to 24 tokens, every follow-up" is real, and so is this. They are the same app on
+the same model, and which one a conversation gets depends on something not yet identified.
+
+The remaining suspect is the thinking block, because `assistantHistoryText` exists precisely
+to put back an opening tag the template emitted and the stream did not, and a turn that
+thought and a turn that did not are exactly the kind of pair that would split a run in half
+like this. That is a guess. Guessing has failed twice already and the instrument is the same
+as before: print the tokens either side of the divergence index and read them.
+
+### The divergence is one token, it is `<think>`, and it is fixed
+
+Guessing failed four times, so the engine was made to print the text either side of the index
+it already computed. It said the same thing on every divergent turn:
+
+```
+kv: cached  ...Where should I start?<|im_end|>?<|im_start|>assistant? >>|<think>The user is asking for advice
+kv: prompt  ...Where should I start?<|im_end|>?<|im_start|>assistant? >>|The user is asking for advice
+```
+
+One token. Then a second probe, inside `render_prompt`, said which turns and why:
+
+```
+tmpl: assistant reasoning=0   content=737 head=[The user is asking for advice on startin]
+tmpl: assistant reasoning=573 content=175 head=[A small vegetable garden typically needs]
+```
+
+The second turn split correctly. The first did not, and its content is 737 characters of pure
+thinking with no answer in it: **the model hit the token limit while it was still thinking**.
+
+That is the whole bug. LFM2.5's template ends an assistant opener with
+`<|im_start|>assistant\n<think>`, so the opening tag is in the prompt and never in the output.
+`assistantHistoryText` puts it back by looking for a closing tag, which is correct for every
+reply that finished thinking and wrong for one that was cut off: a truncated reply has neither
+tag and is indistinguishable from a reply that never thought at all. So it kept its opening tag
+off, sat in the history no longer matching the cache, and **every turn after it re-read the
+whole conversation** for the rest of the session. One truncated reply poisons a conversation
+permanently.
+
+**The fix is to be told rather than to infer.** `GenerationStats` gained
+`thinkingPrefilled`, set in C++ by comparing the rendered prompt's tail against the template's
+own `thinking_start_tag`, carried out through the existing stats array as a ninth element, and
+used by a new `assistantHistoryText(raw, thinkingPrefilled)` overload. The old single-argument
+form stays for callers with no engine to ask and still infers from the closing tag.
+
+Sixteen turns at a 2,048 window with tools running and three folds:
+
+| | Before | After |
+| --- | --- | --- |
+| follow-up prompt tokens | 1,393 to 1,931, every turn | **20, 28, 28, 28, 28, 28, 28, 28, 28, 38, 45** |
+| prefill on those turns | 11 to 19 s | **376 to 594 ms** |
+
+Roughly fifty times, on every ordinary turn of a conversation that uses tools. The one
+remaining expensive turn in that run is the one after a fold, which is architectural and is
+the next section.
+
+`AssistantHistoryTest` pins all four cases, including the one that was wrong: a truncated
+reply, a finished one, a tag the model wrote itself, and a model whose template opens nothing.
+
+### What the four earlier attempts were, and why they all missed
+
+Worth keeping, because each was a plausible reading of the same evidence and each was wrong.
+
+| What was tried | Result |
+| --- | --- |
+| Send the tool calls back, via `ChatMessage.toolCalls`, four JNI arrays and `msg.tool_calls` | 82 tokens discarded, then 78 |
+| Wrap the reasoning back into the content so `split_thinking` recovers it | unchanged |
+| Skip `split_thinking` and hand the template the turn verbatim | unchanged |
+| Build the history from the parsed halves rather than the raw stream | unchanged |
+
+All four were reverted. The tell, which took too long to notice, was that three of them
+produced prompts of byte-identical length run after run: varying what the app put in the
+history was changing nothing, because the string was already right for every turn except the
+truncated ones and no amount of restructuring fixes a turn you cannot identify.
+
+The lesson is the one this session kept relearning. The index alone supported four stories.
+Printing the tokens ended it in one run, and printing what the template received ended the
+second question in one more.
+
+### So the fix is not to roll back better, it is not to diverge
+
+Two things diverge, and they are different problems.
+
+**The tool loop, every turn.** The cache holds `[user][assistant asks for a tool][tool
+result][assistant answers]`. The next turn sends `[user][assistant answers][user]`.
+`toChatMessage()` emits one message an entry, and `asExchange()` builds a strict alternation,
+so the call and the result are never sent back. That is the 55 to 180 tokens, and it is worth
+ten to nineteen seconds a turn for the whole rest of the conversation. The data needed to fix
+it is already kept: `TranscriptEntry.blocks` holds the `AgentStep`s, each with its `ToolCall`
+and its result. What is missing is emitting them, and letting `asExchange` carry a `TOOL`
+role through. **Not done here.** It is prompt assembly, which is the most dangerous code in
+the app, and the round trip has to be byte-exact or the history is worse than the one it
+replaces. It is measured, located, and left for a session that can validate it properly.
+
+**A fold, which diverges at token 2 and always will.** The summary goes in near the front, so
+everything behind it moves. On a hybrid model there is no version of this that keeps the
+cache, and the adversarial review is right that this is not an implementation limit but an
+architectural one: attention keys could in principle be shifted, a running convolution state
+cannot be patched in the middle. A fold that reclaims context in a hybrid model costs a full
+prefill by definition. What can be avoided is paying it *twice*, and it is currently paid
+twice: once for the summarisation call and once for the first turn on the folded prompt.
+
+### What this says about the two questions behind it
+
+**Does the KV mechanism go hand in hand with compaction?** No. It is excellent at the thing
+compaction is not: an unchanged prefix. Prefix reuse is worth 50x on an ordinary turn and
+exactly nothing on a fold, and on this architecture it cannot be made to survive one. They do
+not fight so much as fail to meet.
+
+**Is the CPU/GPU choice relevant to it?** Not to this. Prefill is where the GPU could help and
+prefill is exactly what a broken prefix forces, so a device that offloaded prefill would feel
+this less, which is a reason to fix the prefix rather than a reason to offload. The measured
+answer for the recommended models on an Adreno 750 is still that offload is not worth having.
+
+### Ten folds, a real folder, and the thing the recall number was actually measuring
+
+Twenty six turns at a 2,048 window, tools on and answered from a real directory: `search_files`
+walks it, `read_file` fails when the file is not there, `write_file` puts bytes on disk that a
+later `read_file` has to find.
+
+| | |
+| --- | --- |
+| folds | **10** |
+| turns that used a tool | 22 of 26, 51 tool rounds, none left unexecuted |
+| recall | 8 of 10 |
+| follow-up prompt cost | **1,393 to 1,931 tokens**, every turn |
+| decode | 16.7 to 17.3 t/s |
+| summary length, fold 1 / 3 / 4 / 10 | 806 / 3,323 / 1,261 / **48** characters |
+
+Two things fall out of this that the shorter runs could not show.
+
+**The summary collapse is real.** The adversarial review was right that four samples from a
+polluted harness proved nothing. Ten folds from a clean one, ending at forty eight characters,
+is not noise. Recursive summarisation of a summary drifts and then gives up.
+
+**And recall did not care**, which is the more interesting result. Eight of ten facts survived
+ten folds including one taken after the summary had collapsed to forty eight characters, and
+the reason is visible in the answers: *"The file notes/garden.md contains the information:
+'Tomatoes need 8 hours of sun.'"* The model did not remember it. It read the file again.
+
+So the recall probe was not measuring compaction. It was measuring the agent's ability to
+recover a fact that a tool can reach, and every probe in that suite named something written
+in a file. The review's caveat about recency was right and this is a sharper version of it:
+**a fact that is recoverable by tool cannot test whether the summary kept it.** Measuring
+compaction needs facts that exist only in the conversation, and the suite does not have any.
+
+That is not a bad outcome for the product. An agent that re-reads the file when it needs the
+number is more robust than one that trusts a summary, and it explains why the app stays useful
+with a broken summariser. It does mean the honest claim is narrower than "compaction preserves
+quality": what is measured is that a conversation with files behind it survives ten folds, and
+what is not measured is a conversation without them.
+
+### What the adversarial review took off the table, and what it added
+
+The review's first move was to refuse the diagnosis and demand the divergence index, which is
+why there is one. It was right to: the story was "the history does not match" and the number
+turned it into "the history barely does not match, and barely is the same as totally". Three
+of its alternatives are now ruled out by that log. Divergence is never near the head, so it
+is not a volatile system prompt or a dynamic tool schema. It is never at the last token, so
+it is not stop-token trimming.
+
+One it raised is real and is visible in the same log: divergence also happens **inside** a
+turn, two or three times per tool round, 55 to 275 tokens back. The loop appends and should
+be a pure extension, so something is re-rendering an earlier message differently on the way
+back through the template. That is a second, smaller instance of the same disease and it is
+not diagnosed here.
+
+Its best contribution is a design this had not considered. **Snapshot the state after the
+system message and the tool block.** They are a fixed prefix of roughly 600 to 1,000 tokens,
+they are re-read in full on every fold, and `llama_state_seq_save_file` can save and restore
+a hybrid state whole even though `llama_memory_seq_rm` cannot cut one. Restoring that
+snapshot instead of resetting to zero would take a fold's unavoidable prefill down by the
+size of the tool block. The divergence log already shows the summarisation call finding a
+604 token common prefix and then throwing it away, which is exactly that saving being left on
+the floor.
+
+Two of its warnings are recorded without being measured. A conversation of eleven to nineteen
+second prefills is minutes of pegged cores, so the numbers here are a floor and a phone in a
+hand will be slower. And at a 2,048 window with a thousand tokens of tool definitions, a
+single realistic `read_file` payload could push a turn past the trigger and fold on every
+turn; `TurnRunner` truncates a tool result that will not fit, which is what stops that being
+a crash, but nothing here has tested the shape.
+
+### How close the app runs to the engine, which is the only class comparison available
+
+ChatGPT, Gemini and Claude run in a datacentre, so there is no throughput comparison to make
+against them that means anything. The comparison that does mean something is against the same
+model on the same silicon with none of this app around it: `llama-bench` is the ceiling, and
+the gap is what the app costs.
+
+Cooled to 54.5 C, ten turns through the app, then the bench immediately afterwards with no
+cooling in between, so both are measured at the same temperature: 67.5 C after the app, 67.3
+after the bench.
+
+| Depth | The app | `llama-bench` | |
+| --- | ---: | ---: | ---: |
+| ~579 | 17.7 t/s | 18.48 at d512 | 96% |
+| ~1127 | 15.8 t/s | 17.02 at d1024 | 93% |
+| ~1858 | 13.4 t/s | 16.3 interpolated | **82%** |
+
+**The app decodes at 82 to 96% of what the engine can do on this phone**, and the gap widens
+with depth. Everything in that gap is the app: streaming into Compose, re-parsing markdown as
+tokens arrive, updating state, writing the turn to storage. Nothing here says which, and the
+number is small enough that it has never been worth chasing and large enough that it should
+not be forgotten.
+
+It is also the honest answer to whether this is the best of its class. Against the engine's
+own ceiling it gives up between four and eighteen per cent, and against a hosted assistant
+the question does not have units. What can be said without qualification is that the two
+things a local app can be measurably bad at, memory and heat, are now measured: 2.06 GB of
+11, nothing killed, nothing trimmed, and 96 C on a rack unit with no case around it.
+
+### The compaction numbers, from the fixed harness
+
+Twenty four turns, a 2,048 window, tools on and running.
+
+| | |
+| --- | --- |
+| folds | 5, at 17.1, 17.1, 31.3, 22.7 and 21.0 seconds |
+| recall across up to five folds | **9 of 10**, including three facts that only entered through a tool result |
+| decode | 13.1 to 13.7 t/s throughout |
+
+**Read this number with the caveat the review attached to it.** The policy keeps the four
+most recent entries verbatim, so a probe whose fact was mentioned inside that window is
+testing the transcript rather than the summary, and single facts test retrieval rather than
+whether two facts from different folds can still be combined. What it does establish is the
+weaker claim that the folds are not dropping things wholesale.
+
+One recall miss was the model answering before it had read the right file, which is a tool
+failure and not a compaction one. A second apparent miss was **the probe's fault**: the model
+wrote "14 September" with a non-breaking space and a whitespace-sensitive match called it
+lost. Recall probes now fold whitespace.
+
+Summary lengths across five folds were 997, 2089, 1403 and 210 characters. A later run of
+twenty six turns took it to ten folds and settled it: see below.
+
+## Is it overloading the phone (2026-08-23)
+
+A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and
+every thermal zone once every four seconds for the whole run.
+
+| | |
+| --- | --- |
+| the app's own PSS | peak **3.33 GB**, mean 3.29, with a 1.59 GB model at a 2,048 window |
+| the app's own PSS, after the mmap change below | peak **2.06 GB** |
+| the app's own RSS | peak 3.47 GB |
+| system memory free | never below **6.22 GB** of 11.01, over 53 good samples |
+| CPU zones | **73.2 to 96.2 C** |
+| GPU zones | 41 to 47 C, unused |
+| killed, ANR, out of memory, or trimmed | none, and the run passed in 543 s |
+
+Memory is not the problem. Nothing was killed, nothing was near being killed, the low-memory
+killer never looked at the process, and no `onTrimMemory` ever arrived.
+
+### The weights were resident twice, and turning off mmap gave back 1.27 GB
+
+The 3.33 GB wanted explaining, because the fit card estimates 2.08 GB for this model at this
+window and being 1.25 GB out is the difference between a warning and a kill on a 4 GB phone.
+The breakdown at the peak says where it went:
+
+```
+Native Heap  1831890 kB   private dirty
+Other mmap   1539490 kB   private clean      <- the model file, all of it, resident
+.apk mmap      86904 kB
+everything else ~26000 kB
+TOTAL        3484322 kB
+```
+
+A 1.48 GiB model, 1.47 GB of clean file-backed pages, and 1.75 GB of native heap. The weights
+are in memory twice.
+
+**It is the engine, not the app.** `llama-bench` on the same phone with the same file, which
+has none of this app around it:
+
+| | peak RSS | private clean | private dirty |
+| --- | --- | --- | --- |
+| `-mmp 1`, mapped | 3.24 GB | 1.47 GB | 1.62 GB |
+| `-mmp 0`, read | **1.95 GB** | 6.7 MB | 1.77 GB |
+
+KleidiAI's i8mm kernels want Q4_0 in a blocked layout, so the CPU backend repacks every
+accelerated tensor into a buffer of its own and the mapped pages it read them from stay
+resident behind it. Reading instead of mapping pays for one copy of the weights rather than
+two.
+
+**What mapping was buying.** Nothing measurable. pp256 106.7 against 104.6 and tg64 24.1
+against 23.8, both within noise, and about 245 ms on a warm load, 1,140 ms mapped against
+1,385 ms read over five runs each. The cold case could not be measured, since dropping the
+page cache needs root, and it should be close either way because the repack faults in every
+page regardless.
+
+`SamplerParams.useMmap` now defaults to false. Through the app, over the same six turn
+conversation:
+
+| | peak PSS | decode, mean of six turns |
+| --- | --- | --- |
+| mapped | 3.32 GB | 15.78 t/s |
+| read | **2.06 GB** | 16.15 t/s |
+
+Not slower, 1.27 GB lighter, and 2.06 GB is what `FitEstimator` predicts. The estimate was
+right the whole time and mapping was the entire discrepancy, which also means the 450 MB
+`RUNTIME_OVERHEAD_BYTES` needs no adjustment.
+
+The doc comment on the flag said mapping "keeps resident memory low", which is what mmap
+usually does and is the opposite of what it does here. That is worth remembering as a shape:
+the received wisdom was about a build without a repacking backend in it.
+
+**Two earlier readings of this table were wrong and are corrected above.** `TOTAL PSS:` is one
+line carrying three numbers, PSS then RSS then swap, so stripping every non-digit from it
+concatenates them into a seventeen digit number that is none of the three; the first pass
+reported "34032484015059 MB" and the second silently took a prefix of that and reported
+3.30 GB, which happened to be about right for the wrong reason. The "lowest free 63 MB" in
+the same run was a short read from a `dumpsys` that had not answered yet. Both are now read by
+field rather than by digit, and a sample that fails to parse is dropped rather than counted as
+zero, which is what `stress3.sh` does and the two before it did not.
+
+The 3.33 GB is worth carrying elsewhere: Discover's fit card estimates 2.08 GB for this model
+at this window, and the process actually costs 1.25 GB more than that. The estimate is of the
+weights and the cache, and the difference is the rest of an Android process. It is not a
+crash risk on an 11 GB phone and it would be one on a 4 GB phone, which is the configuration
+the fit card exists to warn.
+
+**Two things in that table deserve their own line.**
+
+### The chip runs at 95 C and the app is not told
+
+`dumpsys thermalservice` during the run:
+
+```
+Thermal Status: 0
+  Temperature{mValue=95.0, mType=0, mName=CPU2, mStatus=3}
+  Temperature{mValue=95.0, mType=0, mName=CPU3, mStatus=3}   ... CPU4, CPU5, CPU7 the same
+  Temperature{mValue=57.1, mType=0, mName=CPU0, mStatus=0}
+  Temperature{mValue=25.0, mType=2, mName=battery, mStatus=0}
+  GPU0..GPU7 41 to 47 C
+```
+
+Five of the eight cores at 95 C, each individually flagged **severe** by the platform, while
+the device-level `Thermal Status` an app is allowed to read stays at **0**. That number tracks
+the skin, and a rack unit with cooling never warms its skin. The two cores that are cool are
+the A520s, which `CpuTopology` now correctly declines to use.
+
+So on this device every rung of `ThermalPolicy`'s ladder is unreachable, including the one
+that stops generating at critical. The policy is not wrong; it is deaf.
+`PowerManager.getThermalHeadroom` is the signal that would hear it, public since API 30, and
+`ThermalSignalOnDeviceTest` prints both so this can be settled per device.
+
+**It is deliberately not wired in.** The response would be wrong: measured hot on this chip,
+prefill ran at 98.9 t/s on six threads and 43.4 on two, so a more sensitive trigger for the
+existing back-off would cost throughput exactly when the user is already waiting longest.
+Both halves need fixing together, and the response is the half with no measurement behind it.
+
+### The app is bigger than the estimator thinks
+
+`FitEstimator` predicts `weights + kvCache + 450 MB`. For this model and window that is about
+2.08 GB. Measured PSS was **3.30 GB**, of which 1.65 GB is native heap.
+
+That is an upper bound rather than a refutation: this was measured under instrumentation, so
+the test APK's dex and the JUnit runner are in the same process, and PSS counts shared
+framework pages the phone would have paid for anyway. What it does say is that the constant
+has not been checked since it was written, and that on a 6 GB phone, where `usableMemoryBytes`
+is 3.9 GB, the difference between 2.08 and 3.30 decides whether the fit card says a 2.6B model
+will run. Worth re-measuring on a plain run before changing the number.
+
+## The chat screen against the conventions, and where it should not follow them (2026-08-23)
+
+The three apps this one is compared to on a phone are ChatGPT, Gemini and Claude. What they
+have converged on is worth knowing before diverging from it, and what they have never had to
+solve is worth knowing too, because that is where there is nothing to copy.
+
+### What they converged on, and where this app already agrees
+
+- **Streaming with a visible cursor is the default**, to the point that a reply arriving all
+  at once now reads as a fault. This app streams, and coalesces frames rather than publishing
+  every token, because re-parsing markdown per token on a phone that is also running the model
+  costs more than a frame.
+- **Stop is available throughout, and a stopped reply is kept**, marked as interrupted, with
+  Continue and Regenerate offered as the two next moves. This app keeps the partial reply and
+  offers Regenerate. It offers no Continue and marks nothing as interrupted, so a reply the
+  user cut off is stored, redisplayed and re-sent to the model as though the model had chosen
+  to end there. Continue is now reachable: llama.cpp's `continue_final_message` is the same
+  mechanism the thinking prefill above uses.
+- **Long press opens a contextual menu on Android.** This app does that, through
+  `MessageActionsSheet`.
+
+### What none of them has, because none of them runs on the phone
+
+Everything in the status band is a category those apps do not have. Their context management
+is server side and invisible; there is no compaction state to show, no context meter, no
+thermal state, and no tokens per second. So the question is not "does this match the
+convention" but "is each of these earning its place".
+
+- **The context meter.** Kept. It is the one number that predicts the app's worst moment, and
+  a user who can see the bar filling can start a new chat instead of being surprised by a
+  forty second fold. It is also the only honest way to say why an old conversation answers
+  more slowly than a new one.
+- **Per-reply telemetry: tokens a second, time to first token, generated tokens, wall clock.**
+  Four numbers under every answer is a lot for a Play Store audience, and the adversarial
+  review argued for a single consolidated pill by default with the rest behind a tap. That is
+  a product decision rather than a defect and it is recorded here rather than taken: the app's
+  stated position is that feeling the hardware is the point, and there is no measurement here
+  that says otherwise. What would settle it is a number nobody has: how many people open the
+  sampler sheet.
+- **The fold.** This is the genuinely novel state and it was the worst thing on the screen: an
+  eight to forty second pause behind a static line of text. Three things changed. It now
+  counts the seconds it has been running, because a static label through a thirty second wait
+  is indistinguishable from a hang and the count is the only thing on screen that says
+  otherwise. Send is disabled while it runs, which it was not, and says why. And the band it
+  lives in no longer changes height.
+
+### The layout shift, which was the clearest defect
+
+The band between the transcript and the composer held three independent rows: an error, the
+folding line, and the context meter, each appearing and disappearing on its own. The meter
+arrived with the first reply and the folding line came and went every few turns, and each
+time the band grew or shrank it moved the composer under a thumb already reaching for Send
+and shifted the transcript under the reader's eye.
+
+It is now one slot of one fixed height, reserved from the moment a model is loaded, showing
+the fold while folding and the meter otherwise. The error is deliberately left outside it:
+it is the one thing there that is not routine, it can run to more than a line, and moving the
+layout to demand attention is what an error is for.
+
+### The assistant turn, measured rather than argued about (2026-08-23)
+
+The review's fourth question was what the stack of reasoning, intermediate text, tool chips
+and answer does on a six inch screen, and the first answer given here was that it needed
+looking at rather than reasoning about. `PlayScreenshots` already renders the real
+`ChatScreen`, the real theme and the real type at 360 x 640dp on the host, so it can be
+looked at in numbers. `AssistantStackTest` stages a turn that thought, then searched, then
+read a file per round, and reports where the answer's first line lands.
+
+| Rounds | Preamble above the answer | Answer starts |
+| --- | --- | --- |
+| 1 | 273px of 1,920 (14%) | 45% down |
+| 2 | 486px (25%) | 56% down |
+| 3 | 771px (40%) | 70% down |
+| 4 | 1,056px (55%) | 85% down |
+
+Four is the agent's round cap, so the last row is the worst a shipped turn can be, and it is
+bad: on the turn a reader is waiting for, the reply is below the fold and what fills the
+screen is the app talking about its own work. The collapsed reasoning block is not the
+problem, it costs 168px whatever the model thought; each round costs a further 285px, a
+dimmed sentence and a chip.
+
+**What changed.** `WorkBlock` gives the steps the behaviour `ReasoningBlock` already had, for
+the same reason: open while the turn streams, folded to one line on the frame it finishes,
+and a tap wins in either direction. Live, the steps are the progress report and there is
+nothing better to show. Afterwards they are a record, and a record belongs behind a line.
+The line reuses the chip's own headline when there was one step, so a single search still
+reads "Searched the web for kv cache · 1.8s" rather than "Used 1 tool", and counts past that.
+A refused call says so without being opened, because the answer underneath was written
+without whatever the user declined.
+
+The preamble is now 168px at every round count, and the answer starts 34% down whether the
+turn used one tool or four. Nothing is discarded: the same test taps the header open again
+and counts the chips.
+
+This is also the convention rather than a departure from it. ChatGPT and Claude both collapse
+a finished tool run behind a one line disclosure and both leave it open while it runs. The
+difference here is only that this app has more to show, because the work happened on the
+phone.
+
+### The fold I shipped was the layout shift I had just fixed (2026-08-23)
+
+The adversarial comparative review's first charge was that collapsing a tool run when the
+turn finishes is the status strip's defect moved somewhere worse: the steps are open while
+the answer streams, they shut on the frame the last token lands, and the answer the reader
+has just started reading is pulled up by whatever they occupied.
+
+It was right, and the number is worse than the one that justified the original fix.
+
+| | Answer's position |
+| --- | --- |
+| last token still streaming | 1,647px |
+| folded on "finished" | 660px |
+| **jump** | **987px, half a screen** |
+
+So the trigger was wrong. It is not "has this turn finished", it is "is this still the turn
+the reader is looking at". `WorkBlock` now folds when the entry stops being the newest, which
+is when the next question is asked. While a turn is the latest, streaming or not, nothing
+moves. By the time it folds it is above the fold and the collapse is something a reader
+scrolls back to rather than something that happens under their eye. Both properties that
+justified the change survive: the answer on a stale turn still starts 34% down at every round
+count, and the whole run is still one tap back.
+
+**441px of shift remains and it is not this block's.** A finished turn also loses its activity
+line and gains a row of actions, and the transcript sits at the bottom, so content changing
+height below the answer moves the answer. Every chat app does that when a reply lands. What
+the test now asserts is the part that is ours: a turn with four tool rounds in it shifts no
+more than one with none.
+
+The general lesson is the one this repository keeps relearning. A collapse is a layout shift
+wearing a useful hat, and the question is never whether the collapsed state is better. It is
+what the reader was doing at the instant it collapsed.
+
+### The comparative review, and what was not taken from it
+
+The review named four conventions this app breaks. Two are now fixed or were never real, one
+is recorded as a decision, and one is a genuine disagreement.
+
+- **Auto-collapsing disclosures.** Correct, and fixed above.
+- **A persistent slot above the composer**, which the review says the three of them reserve
+  for input modifiers. Kept, and this is the decision rather than an oversight: those apps
+  have nothing to put there because their context management is server side. A local app's
+  worst moment is a fold and the meter is the only warning a user gets before one.
+- **Tools, Usage and Settings in the chat drawer**, called an outdated Android architecture.
+  Recorded, not acted on. It is a real convention and the alternative is a top-bar overflow;
+  it belongs with the interface work already planned rather than bolted on.
+- **Per-message telemetry alienating a Play Store audience.** This is the same argument the
+  first review made and the answer has not changed: feeling the hardware is the product, and
+  nothing measured says otherwise. What would settle it is how many people open the sampler
+  sheet, which nobody counts.
+
+Its layout-shift list turned up three this repository had not written down, none of them
+measured yet: markdown that renders as plain text until its closing fence arrives and then
+snaps, a composer that grows upward as a long question is typed, and a status slot whose text
+can wrap to two lines inside a fixed height.
+
+On the palette it is right about the rule and wrong about the risk. Lime on white is 1.13:1
+and that is exactly why the app's rule is that lime is never text or a meaningful mark on a
+light surface; it is a fill with ink on it. The sharper point is the one about semantics:
+lime is the action colour, so it cannot also mean "good", which is why the telemetry scale
+was given a teal of its own and why that decision is written down in the visual language doc.
+
+### What was reviewed and not changed, with the reason
+
+- **The model name with a chevron in the top bar.** A chevron is the idiom for an instant
+  switch, and switching here costs a four to nineteen second reload and possibly a download.
+  The review wants a sheet that states the cost before committing. `ModelsScreen` already owns
+  that information; the change is which surface shows it, and it belongs with the interface
+  work already planned rather than bolted on here.
+- **Queuing a message typed during a fold** instead of disabling Send. Better, and it is a
+  behaviour change to the composer that deserves its own measurement of how often the window
+  is actually hit. With the fold now finishing in eight to fourteen seconds in the common
+  case rather than thirty to forty, the window is much narrower than it was.
+
+Sources for the convention summary: [IntuitionLabs conversational AI UI
+comparison](https://intuitionlabs.ai/articles/conversational-ai-ui-comparison-2025),
+[Setproduct, designing AI chat interfaces](https://www.setproduct.com/blog/ai-chat-interface-ui-design),
+[GetStream chat UX best practices](https://getstream.io/blog/chat-ux/).
+
 ## Open questions
 
 Ordered by what a measurement here would be worth, largest first.
@@ -1975,11 +3025,44 @@ Ordered by what a measurement here would be worth, largest first.
   label, not the model architecture, whose one unusual operation the backend implements.
 - **A prompt cache on disk.** Measured at twelve seconds to 1.7 for a first turn, 20.6 MB
   a slot, needs an invalidation key and nothing else that is hard.
-- **Carrying a tool turn's whole loop into the next turn's history.** Within a turn this is
-  done and is worth nine seconds a round; across turns the transcript entry still keeps only
-  the final answer, so the turn after an agentic one re-reads everything. Needs the entry to
-  hold the loop rather than its last pass, and needs someone to check what a model does when
-  it sees a previous turn's tool calls and results, which nothing here measured.
+- **Summarising as a continuation of what is already cached.** A fold is dominated by
+  prefilling the folded transcript into a fresh prompt, about sixteen seconds of the thirty
+  to forty a fold takes. The conversation is already in the KV cache; a summarisation phrased
+  as the next turn of it would prefill the instruction and nothing else. The cache still has
+  to be reset afterwards, so this is worth the reading and not the rest.
+- **Why the summaries collapse.** Now demonstrated rather than suspected: ten folds in one
+  clean run went 806, 3,323, 1,261 and finally **48** characters. Recursive summarisation of
+  a summary drifts and then gives up. What is still unknown is the mechanism, and the
+  instrument for it is a recursive summarisation bench with no conversation around it.
+- **A recall probe that a tool cannot answer.** Every fact probed so far is written in a file
+  the model can re-read, so 8 of 10 across ten folds measures the agent and not the summary.
+  Until there are probes for facts that exist only in the conversation, nothing here can say
+  whether compaction preserves quality.
+- **The old wording, kept because the instrument story is still worth reading.**
+  One fold produced 1,277 characters and the next produced 22. On 2026-08-23 a run made the
+  mechanism visible and disqualified the evidence at the same time: the second fold's summary
+  was `<|tool_call_start|>[web_search(query='...'), web_search(query='...')]<|tool_call_end|>`
+  and nothing else. `LongConversationOnDeviceTest` has no agent loop. It calls `engine.chat`
+  directly with the tool definitions in the prompt, so the prefill cost is the real one, and
+  when the model calls a tool nothing runs it and the raw syntax becomes the turn's text. The
+  first fold then summarises prose and the second summarises tool-call syntax and produces
+  more of it. **The app does not do this**, because `TurnRunner` runs the loop and stores the
+  prose. So every reading this harness has produced about summary quality after the first
+  fold, and about recall after it, is about the harness. It now counts those turns and says
+  so in the log. Answering the real question needs the loop in the harness.
+- **A summary the app can check.** There is no test that a summary is a summary. The failure
+  mode found here, storing the model's chain of thought, was silent for as long as it existed
+  and would have stayed silent; a cheap assertion that the stored text does not begin "The
+  user wants me to" would have caught it the first time.
+- **Carrying a tool turn's whole loop into the next turn's history.** No longer a nicety.
+  Measured on 2026-08-23 at ten to nineteen seconds a turn for the rest of the conversation,
+  because the hundred token mismatch it causes makes a hybrid model throw away the whole
+  prefix. See "The cache throws away a thousand tokens to drop a hundred". The data is
+  already in `TranscriptEntry.blocks`. Emitting the calls and the results was tried on
+  2026-08-23 and did not close the gap, and neither did adding the thinking back; both were
+  reverted, along with two more, and then the real cause was found and fixed: a reply cut off
+  mid-thought kept no `<think>` tag, so it never matched the cache again. Follow-ups went from
+  1,393 to 1,931 prompt tokens to 20 to 45. **Closed 2026-08-24.**
 - **Per-device rates for `Offload.AUTO`.** The crossover has now been measured at 1.80 for
   the shipped model and quantisation on an Adreno 750, against a compiled-in 10, and against
   "no crossover exists" for the same model in Q4_K_M. One constant cannot cover that. The
@@ -1998,6 +3081,27 @@ Ordered by what a measurement here would be worth, largest first.
   eleven interventions moved it once. It looks like a disposition of the checkpoint rather
   than a wording that has not been found. Reproduced again on the device on 2026-08-23:
   asked for the population of Tokyo it thinks for one paragraph and then calls `web_search`.
+
+Also closed on 2026-08-23: whether a bigger round budget helps now that rounds are cheap (it
+does not, 15 of 17 at both four and six, at 7% more tokens), and whether the file tools are
+understood (they are, eleven of eleven shapes; what fails is writing sandbox JavaScript and
+doing arithmetic in the head).
+
+Closed later the same day, all by measurement:
+
+- **Whether a bigger tool catalogue costs the tools already in it.** 47 of 51 against 43 of
+  51 over three seeds at production sampling. The 17 of 17 that suggested it helps was a
+  single run of a suite that could not vary, and it does not replicate.
+- **Where the assistant turn's preamble puts the answer on a phone.** 85% down the screen at
+  the round cap, now a flat 34%, measured on the same canvas the listing shots use.
+- **What the app costs the phone.** Peak PSS 2.06 GB of 11.01, never below 6.2 GB free,
+  nothing killed or trimmed across thirty turns and 543 seconds at 96 C.
+- **Why the app cost 1.27 GB more than the fit card said.** The weights were resident twice,
+  mapped and repacked, and turning off mmap costs 245 ms and nothing else.
+- **Whether the decode decay slope was a thermal artefact.** Partly. Context is about 80% of
+  it and heat about 20%, the affine model holds only to about two thousand tokens, and
+  sustained decode at a fixed depth loses 15% over three and a half minutes while losing
+  nothing over thirty six seconds.
 
 Closed by the 2026-08-23 device session: thread pinning (measured, no effect, the count was
 the whole problem), OpenCL offload for the recommended models on an Adreno 750 (measured,

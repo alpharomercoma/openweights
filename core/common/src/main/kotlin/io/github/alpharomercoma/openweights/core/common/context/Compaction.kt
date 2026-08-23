@@ -72,15 +72,57 @@ class CompactionPolicy(
         require(keepRecentEntries >= 2) { "at least one full exchange must stay verbatim" }
     }
 
-    /** True when the KV cache is full enough that the next turn risks hitting the wall. */
-    fun shouldCompact(contextUsed: Int, contextSize: Int, entryCount: Int): Boolean {
+    /**
+     * True when the KV cache is full enough that the next turn risks hitting the wall.
+     *
+     * Two triggers, and they are not the same kind of thing.
+     *
+     * **The fraction is survival.** Past it the next answer may not fit, and a turn that runs
+     * out of context mid-sentence is the worst outcome available. It fires whatever folding
+     * costs and whatever it frees, because the alternative is worse.
+     *
+     * **The ceiling is an optimisation**, and an optimisation has to pay. Folding for speed
+     * buys `b * freed` seconds on every token generated until the next fold, and costs one
+     * long pause now. Measured on an SM8650 with LFM2.5 2.6B: a fold takes 24 to 34 seconds
+     * to summarise and another 10 to 14 to read the rewritten prompt back, call it 40; a turn
+     * adds about 110 tokens of context and generates about 160. Repaying 40 seconds before
+     * the next fold needs
+     *
+     *     b * freed * (freed / 110) * 160  >  40
+     *
+     * **`b` is the number to be careful about, and the first value used here was wrong.** A
+     * twenty turn conversation gave 6.36e-6 seconds per token per token, but context and
+     * elapsed wall clock rise together in a conversation and the cores were at 95 C by the
+     * end of it, so most of that slope was the chip slowing down rather than the cache
+     * growing. Refitted on the depth sweep instead, where every reading was started below
+     * 56 C and only the depth changed: **b = 2.82e-6**, with `a = 0.0399`, so `a/b` is 14,170
+     * tokens. That agrees with the MT6991's independently fitted 3.42e-6 far better than the
+     * confounded figure did, which is the other reason to believe it.
+     *
+     * At b = 2.82e-6 the break-even is `freed > 3,126` tokens rather than 2,080. A fold that
+     * frees less is slower than not folding, and the app was doing exactly this: on a 4,096
+     * ceiling with a 1,240 token system block, a 530 token summary and four kept entries, it
+     * freed about 1,800 and lost time every time. So the ceiling now asks what the fold would
+     * actually free, and declines when the answer is "not enough to matter". The context then
+     * keeps growing until either the fold does pay or the fraction takes over, which is the
+     * right order.
+     *
+     * @param foldableTokens what folding would remove, less what the summary will add back.
+     *   Unknown by default, which keeps the old behaviour for callers that cannot estimate
+     *   it: an unknown saving is treated as a large one.
+     */
+    fun shouldCompact(
+        contextUsed: Int,
+        contextSize: Int,
+        entryCount: Int,
+        foldableTokens: Int = Int.MAX_VALUE,
+    ): Boolean {
         if (contextSize <= 0) return false
         // Folding needs something to fold beyond the turns that must stay verbatim.
         if (entryCount <= keepRecentEntries + MIN_FOLDABLE_ENTRIES) return false
-        // Either bound is reason enough. The fraction is about running out of room; the
-        // ceiling is about the answer arriving at half the speed it used to.
-        if (contextUsed >= ceilingTokens) return true
-        return contextUsed.toFloat() / contextSize >= triggerFraction
+        if (contextUsed.toFloat() / contextSize >= triggerFraction) return true
+        if (contextUsed < ceilingTokens) return false
+        return foldableTokens >= MIN_WORTHWHILE_SAVING
     }
 
     /**
@@ -126,6 +168,16 @@ class CompactionPolicy(
 
         /** Folding fewer than this buys back less than the summary costs. */
         const val MIN_FOLDABLE_ENTRIES = 2
+
+        /**
+         * The tokens a fold has to free before folding for speed is worth the pause.
+         *
+         * Solved rather than chosen: see [CompactionPolicy.shouldCompact] for the arithmetic,
+         * the measurements it rests on, and why the first version of this number was 2,000
+         * and too small. Rounded down from 3,126 to something that is not pretending to more
+         * precision than a wall clock and a fitted slope can carry.
+         */
+        const val MIN_WORTHWHILE_SAVING = 3_000
 
         /** Below this the summary would fire constantly; above it there is no room left. */
         private const val MIN_TRIGGER = 0.1f

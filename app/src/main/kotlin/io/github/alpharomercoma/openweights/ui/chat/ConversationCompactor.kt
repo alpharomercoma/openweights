@@ -44,7 +44,29 @@ class ConversationCompactor @Inject constructor(
         contextUsed = state.contextUsed,
         contextSize = state.contextSize,
         entryCount = state.transcript.size,
+        foldableTokens = state.foldableTokens(),
     )
+
+    /**
+     * What a fold would actually free: the turns it would replace, less the summary that
+     * replaces them.
+     *
+     * Estimated from the same measured characters-per-token ratio the fold threshold uses,
+     * so the two agree about how big a conversation is. Zero when there is nothing to fold,
+     * which is the honest answer and the one that stops a pointless fold.
+     */
+    private fun ChatUiState.foldableTokens(): Int {
+        val range = policy.foldRange(
+            entryCount = transcript.size,
+            alreadyFoldedThrough = compaction?.foldedThroughIndex ?: -1,
+        ) { index -> transcript[index].role == ChatRole.ASSISTANT } ?: return 0
+        val chars = transcript.slice(range).sumOf { it.text.length }
+        val removed = (chars / charsPerToken()).toInt()
+        // What the summary will occupy once it is in the prompt, which is the prose after
+        // the thinking rather than the generation budget above it. Measured at about 230
+        // tokens; rounded up, because guessing high here only makes folding more cautious.
+        return (removed - EXPECTED_SUMMARY_TOKENS).coerceAtLeast(0)
+    }
 
     /**
      * Summarizes the foldable range of [state], or returns null when there is nothing to
@@ -73,6 +95,7 @@ class ConversationCompactor @Inject constructor(
         val summary = summarize(
             previousSummary = state.compaction?.summary,
             entries = state.transcript.slice(range),
+            budget = MAX_SUMMARY_TOKENS,
         )
 
         // The summarization call has replaced the conversation in the KV cache. Clear it
@@ -90,6 +113,7 @@ class ConversationCompactor @Inject constructor(
     private suspend fun summarize(
         previousSummary: String?,
         entries: List<TranscriptEntry>,
+        budget: Int,
     ): String? {
         val turns = entries.joinToString("\n\n") { entry ->
             "${entry.role.wireName}: ${entry.answer.ifEmpty { entry.text }}"
@@ -103,7 +127,7 @@ class ConversationCompactor @Inject constructor(
 
         return runCatching {
             buildString {
-                engine.chat(request, SUMMARY_PARAMS).collect { event ->
+                engine.chat(request, SUMMARY_PARAMS.copy(maxTokens = budget)).collect { event ->
                     if (event is GenerationEvent.Token) append(event.text)
                 }
             }
@@ -113,7 +137,62 @@ class ConversationCompactor @Inject constructor(
     }
 
     private companion object {
-        /** Low temperature: a summary that invents detail is worse than no summary. */
-        val SUMMARY_PARAMS = SamplerParams(temperature = 0.2f, maxTokens = 400)
+        /**
+         * Low temperature: a summary that invents detail is worse than no summary.
+         *
+         * And no thinking. A summary is a transcription job, not a reasoning one, and on the
+         * models this app recommends the thinking is most of the cost: 541 generated tokens
+         * against 132 for the same summary with the block closed. The engine honours this
+         * even on a template that opens the block regardless, by closing it in the prompt.
+         */
+        val SUMMARY_PARAMS = SamplerParams(
+            temperature = 0.2f,
+            maxTokens = MAX_SUMMARY_TOKENS,
+            thinking = false,
+        )
+
+        /**
+         * How long the summarisation call may run for, which is not how long the summary is.
+         *
+         * Nearly all of this budget is spent thinking. LFM2.5's template pre-opens a `<think>`
+         * block, so the reply starts inside one, and `parseAssistantReply` can only take the
+         * part after `</think>` if a `</think>` ever arrives. Probed against the real model on
+         * the real compaction prompt:
+         *
+         * | budget | tokens used | closed the block | summary kept |
+         * | ---: | ---: | --- | ---: |
+         * | 204 | 204, capped | **no** | 0 characters, the whole reply was thinking |
+         * | 400 | 400, capped | yes | 220 characters, cut off mid sentence |
+         * | 900 | 541, finished | yes | **917 characters, complete** |
+         *
+         * So the shipped 400 was storing a fragment, and scaling the budget down to fit small
+         * windows stored the model's chain of thought verbatim and called it a summary of the
+         * conversation. Both were invisible: something plausible-looking went into the system
+         * message either way.
+         *
+         * A generous budget costs nothing when it is not needed, because generation stops at
+         * the end of turn: 541 of 900 were used here. It only ever matters when it truncates,
+         * and truncating is the failure. Larger is therefore strictly safer, and it makes the
+         * summary that reaches the context *smaller*, 230 tokens of prose rather than 530 of
+         * cut-off reasoning.
+         *
+         * A model that does not think will stop far earlier and never see this number.
+         */
+        const val MAX_SUMMARY_TOKENS = 768
+
+        /** What lands in the prompt, once the thinking has been taken off the front. */
+        const val EXPECTED_SUMMARY_TOKENS = 280
+
+        /**
+         * Characters to a token when nothing has been measured yet.
+         *
+         * The same pessimism [ChatUiState.estimatedPromptTokens] uses: a low ratio reads the
+         * conversation as bigger than it is, which errs towards folding rather than towards
+         * running out of room.
+         */
+        const val ASSUMED_CHARS_PER_TOKEN = 3f
     }
+
+    private fun ChatUiState.charsPerToken(): Float =
+        charsPerToken?.takeIf { it > 0f } ?: ASSUMED_CHARS_PER_TOKEN
 }

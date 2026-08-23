@@ -109,15 +109,18 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // One system turn carrying all of it. The summary used to be a second one, which
-        // is what templates requiring strict alternation refuse. Every part is
-        // load-bearing: today's date, answer from memory, when to go and look, and what
-        // was folded away.
+        // One system turn for the instructions, and the summary as a turn of the
+        // conversation rather than part of them. In the system message the model answered
+        // 4 of 7 questions the summary covered and reached for a tool on all 7; as a turn it
+        // answered 6 and reached for a tool on 3. See `recap`.
         val system = messages.single { it.role == ChatRole.SYSTEM }
         assertThat(system.text).contains("Answer from what you know")
         assertThat(system.text).contains("Do not search to double check")
-        assertThat(system.text).contains("The user is porting a parser.")
+        assertThat(system.text).doesNotContain("The user is porting a parser.")
         assertThat(system.text).doesNotContain("$")
+        assertThat(messages.map { it.text }).contains(
+            "Earlier in this conversation:\nThe user is porting a parser.",
+        )
     }
 
     @Test
@@ -131,9 +134,11 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // The instructions, which now carry the summary, plus the two turns after the fold.
-        assertThat(messages).hasSize(3)
-        assertThat(messages.drop(1).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        // The instructions, the recap exchange that stands in for what was folded, and the
+        // two turns after the fold. The folded turns themselves appear nowhere.
+        assertThat(messages).hasSize(5)
+        assertThat(messages.drop(3).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        assertThat(messages.map { it.text }.none { it.contains("turn 0") }).isTrue()
     }
 
     @Test
@@ -153,8 +158,10 @@ class EngineMessagesTest {
         // second system turn beside the instructions.
         assertThat(messages.count { it.role == ChatRole.SYSTEM }).isEqualTo(1)
         assertThat(messages.first().role).isEqualTo(ChatRole.SYSTEM)
-        assertThat(messages.first().text).contains("summary")
         assertThat(messages.first().text).contains("Answer from what you know")
+        // The summary is a turn now, and the alternation it has to keep is the whole reason
+        // it is a user turn followed by an assistant one rather than a system turn of its own.
+        assertThat(messages[1].text).contains("summary")
         assertAlternates(messages)
     }
 

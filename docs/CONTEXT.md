@@ -2817,6 +2817,56 @@ and that is where the remaining work is. What it fixes is the case where the cal
 going to return anything, which on an offline-first app is the case that matters most and is
 the one behind "asking about a second person returns the first person's answer".
 
+## The app rendered Markdown and the models were not writing any (2026-08-24)
+
+The renderer has drawn headings, lists, code and tables for as long as it has drawn replies.
+Nothing ever told the model it could use them.
+
+Measured on four questions that invite structure, with no tools in the prompt so an empty
+reply could not be mistaken for an unformatted one:
+
+| | Tables | Headings | Bullets | Length |
+| --- | ---: | ---: | ---: | ---: |
+| 2.6B, shipped prompt | 1 of 4 | 0 of 4 | 2 of 4 | 1,279 chars |
+| 2.6B, told it may | **3 of 4** | **4 of 4** | **4 of 4** | **1,698** |
+| 1.2B, shipped prompt | 0 of 4 | 0 of 4 | 0 of 4 | 379 |
+| 1.2B, told it may | 0 of 4 | 0 of 4 | 1 of 4 | 490 |
+
+Headings from none to every one is worth the thirty five tokens it costs on every turn. The
+1.2B barely moves, which is the pattern everything here shows: a smaller model follows the
+instructions it can and ignores the rest.
+
+Worded as permission rather than instruction on purpose. "Use headings and tables" gets
+headings on a one sentence answer, which is worse than plain text.
+
+**An earlier run of this said 0 of 4 everywhere and was wrong**, because it ran with the tool
+catalogue in the prompt and five of eight replies were empty tool calls. An empty reply has
+no headings in it. That is the same confound as the section above, found twice in one day.
+
+`MarkdownRenderTest` now checks the other half: that a table reaches the screen as cells
+rather than as pipes and hyphens, and a heading as a heading rather than as hashes. A table
+the app cannot draw is worse than the prose it replaced.
+
+## Plan mode runs the tools it says it will not (2026-08-24)
+
+Plan mode's instruction is "You have tools available. Do not call them. Say which you would
+use and why." Measured on five ambiguous requests:
+
+| Model | Asked a question | Ran a tool anyway |
+| --- | ---: | ---: |
+| 2.6B | 2 of 5 | 2 of 5 |
+| 1.2B | 0 of 5 | 4 of 5 |
+
+So the mode does not do what it says, and it rarely asks. `ask_user` is offered only in plan
+mode, which is the mode that has just said not to call anything, and the obvious repair was
+to write the exception into the instruction. **Measured, that made it worse**: 2 of 5 became
+1 of 5 on the 2.6B and stayed at 0 on the 1.2B. Not shipped.
+
+The lesson from the web tools applies here and is being tested rather than assumed: a tool in
+the prompt is an invitation, and an instruction not to accept it is weaker than not making
+it. Plan mode should offer `ask_user` and the plan board's own step tool and nothing else,
+at which point "do not call them" describes a prompt that contains nothing to call.
+
 ## Is it overloading the phone (2026-08-23)
 
 A thirty turn conversation at a 2,048 window, sampling the app's memory, the system's, and

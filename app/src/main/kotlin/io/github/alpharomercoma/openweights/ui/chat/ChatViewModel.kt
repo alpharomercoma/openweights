@@ -1641,6 +1641,31 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * Naming the length as a decision rather than a limit keeps the short case short, 33
  * characters either way on the smaller model, and gives the long case back.
  */
+/**
+ * That the answer may be formatted, which the model does not assume.
+ *
+ * The app has rendered Markdown for as long as it has rendered replies, and the models were
+ * not producing any. Measured on four questions that invite structure, with no tools in the
+ * prompt so an empty reply could not be mistaken for an unformatted one:
+ *
+ * | | tables | headings | bullets | length |
+ * | --- | ---: | ---: | ---: | ---: |
+ * | 2.6B, without this | 1 of 4 | 0 of 4 | 2 of 4 | 1,279 chars |
+ * | 2.6B, with it | **3 of 4** | **4 of 4** | **4 of 4** | **1,698** |
+ * | 1.2B, without this | 0 of 4 | 0 of 4 | 0 of 4 | 379 |
+ * | 1.2B, with it | 0 of 4 | 0 of 4 | 1 of 4 | 490 |
+ *
+ * Headings from none to every one is the change worth the thirty five tokens this costs on
+ * every turn. The 1.2B barely moves, which is the pattern everything else here shows too: a
+ * smaller model follows the instructions it can and ignores the rest.
+ *
+ * Worded as permission rather than instruction on purpose. "Use headings and tables" gets
+ * headings on a one sentence answer, which is worse than plain text.
+ */
+private const val MARKDOWN_STYLE: String =
+    "Use Markdown when it makes the answer easier to read: headings for sections, bullets " +
+        "for lists, and a table when you are comparing things across the same few fields."
+
 private const val ANSWER_STYLE: String =
     "Answer from what you know. Reply with the answer itself, at the length the question " +
         "calls for: a sentence for a simple one, and as long as it takes for one that asks " +
@@ -1658,6 +1683,7 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         // out of twenty four and eighteen.
         "Today is ${LocalDate.now()}.",
         ANSWER_STYLE,
+        MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
         // Plan mode says its piece whether or not any tool is switched on, because it is a
         // mode the user chose and it changes how the model is meant to answer. Gated on

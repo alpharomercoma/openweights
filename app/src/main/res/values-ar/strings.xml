@@ -198,4 +198,21 @@
     <string name="about_network_detail">البحث في الويب وتنزيل نموذج هما الجزءان اللذان يصلان إلى الشبكة. ويمكنك إيقاف كليهما من الأدوات.</string>
     <string name="access_token_detail">للنماذج المقيّدة أو الخاصة فقط. مشفَّر بمفتاح محفوظ داخل عتاد هذا الهاتف، ويُرسل إلى huggingface.co ولا شيء غيره.</string>
     <string name="cpu_only_build">هذه النسخة تعمل على المعالج. على الهواتف التي قسناها، هذا هو المسار الأسرع على أي حال.</string>
+    <string name="gallery">المعرض</string>
+    <string name="gallery_count">%1$d من %2$d</string>
+    <string name="delete_output_title">حذف المخرج؟</string>
+    <string name="delete_output_message">حذف هذا المخرج وملفه؟ سيؤدي هذا إلى إزالة الملف نهائيًا من هذا الجهاز.</string>
+    <string name="sort_by">ترتيب حسب</string>
+    <string name="search_prompts">البحث في التعليمات</string>
+    <string name="favourites">المفضلة</string>
+    <string name="remove_favourite">إزالة من المفضلة</string>
+    <string name="add_favourite">إضافة إلى المفضلة</string>
+    <string name="gallery_empty">لم يتم إنشاء أي شيء بعد. كل ما يتم إنشاؤه سيظهر هنا.</string>
+    <string name="gallery_no_matches">لم يتم العثور على نتائج</string>
+    <string name="sort_newest">الأحدث</string>
+    <string name="sort_oldest">الأقدم</string>
+    <string name="sort_fastest">الأسرع</string>
+    <string name="sort_slowest">الأبطأ</string>
+    <string name="modality_image">الصور</string>
+    <string name="modality_speech">الكلام</string>
 </resources>

@@ -210,4 +210,21 @@
     <string name="about_network_detail">Buscar en la web y descargar un modelo son las partes que salen a la red. Ambas puedes desactivarlas en Herramientas.</string>
     <string name="access_token_detail">Solo para modelos restringidos o privados. Cifrado con una clave guardada en el hardware de este teléfono, y enviado a huggingface.co y a ningún otro sitio.</string>
     <string name="cpu_only_build">Esta versión funciona en la CPU. En los teléfonos que hemos medido, esa es la vía más rápida de todos modos.</string>
+    <string name="gallery">Galería</string>
+    <string name="gallery_count">%1$d de %2$d</string>
+    <string name="delete_output_title">¿Eliminar resultado?</string>
+    <string name="delete_output_message">¿Eliminar este resultado y su archivo? Esto eliminará permanentemente el archivo de este dispositivo.</string>
+    <string name="sort_by">Ordenar por</string>
+    <string name="search_prompts">Buscar peticiones</string>
+    <string name="favourites">Favoritos</string>
+    <string name="remove_favourite">Quitar de favoritos</string>
+    <string name="add_favourite">Añadir a favoritos</string>
+    <string name="gallery_empty">Aún no hay nada creado. Lo que generes aparecerá aquí.</string>
+    <string name="gallery_no_matches">No se encontraron coincidencias</string>
+    <string name="sort_newest">Más reciente</string>
+    <string name="sort_oldest">Más antiguo</string>
+    <string name="sort_fastest">Más rápido</string>
+    <string name="sort_slowest">Más lento</string>
+    <string name="modality_image">Imágenes</string>
+    <string name="modality_speech">Voz</string>
 </resources>

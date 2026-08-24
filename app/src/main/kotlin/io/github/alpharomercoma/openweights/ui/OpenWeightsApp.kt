@@ -43,6 +43,8 @@ import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverViewModel
+import io.github.alpharomercoma.openweights.ui.gallery.GalleryScreen
+import io.github.alpharomercoma.openweights.ui.gallery.GalleryViewModel
 import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
 import io.github.alpharomercoma.openweights.ui.models.ModelsViewModel
 import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
@@ -68,6 +70,7 @@ import kotlinx.coroutines.flow.map
  */
 private object Routes {
     const val CHAT = "chat"
+    const val GALLERY = "gallery"
     const val MODELS = "models"
     const val DISCOVER = "discover"
     const val TOOLS = "tools"
@@ -181,6 +184,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onEditAndResend = chatViewModel::editAndResend,
                 onBranchFrom = chatViewModel::branchFrom,
                 destinations = ChatDestinations(
+                    onOpenGallery = { navController.push(Routes.GALLERY) },
                     onOpenTools = { navController.push(Routes.TOOLS) },
                     onOpenUsage = { navController.push(Routes.USAGE) },
                     onOpenWatches = { navController.push(Routes.WATCHES) },
@@ -241,6 +245,23 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         note = note,
                     )
                 },
+            )
+        }
+
+        composable(Routes.GALLERY) {
+            val viewModel: GalleryViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+            GalleryScreen(
+                state = state,
+                onSort = viewModel::sortBy,
+                onToggleModality = viewModel::toggleModality,
+                onToggleFavourites = viewModel::toggleFavouritesOnly,
+                onSearch = viewModel::search,
+                onClearFilters = viewModel::clearFilters,
+                onSetFavourite = viewModel::setFavourite,
+                onDelete = viewModel::delete,
+                onBack = navController::popBackStack,
             )
         }
 

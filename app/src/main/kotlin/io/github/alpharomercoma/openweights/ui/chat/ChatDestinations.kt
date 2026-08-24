@@ -30,6 +30,7 @@ package io.github.alpharomercoma.openweights.ui.chat
  * switch to.
  */
 data class ChatDestinations(
+    val onOpenGallery: () -> Unit = {},
     val onOpenTools: () -> Unit = {},
     val onOpenUsage: () -> Unit = {},
     /** Everything running on its own, and the one place to stop it. */

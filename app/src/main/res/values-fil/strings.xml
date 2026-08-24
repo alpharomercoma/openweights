@@ -196,4 +196,21 @@
     <string name="about_network_detail">Ang paghahanap sa web at ang pag-download ng modelo ang mga bahaging umaabot sa network. Parehong puwede mong patayin sa Mga tool.</string>
     <string name="access_token_detail">Para lang sa mga gated o pribadong modelo. Naka-encrypt gamit ang susing nasa hardware ng teleponong ito, at ipinapadala sa huggingface.co at wala nang iba.</string>
     <string name="cpu_only_build">Sa CPU tumatakbo ang build na ito. Sa mga teleponong nasukat namin, iyon din naman ang mas mabilis na daan.</string>
+    <string name="gallery">Galerya</string>
+    <string name="gallery_count">%1$d sa %2$d</string>
+    <string name="delete_output_title">Tanggalin ang ginawa?</string>
+    <string name="delete_output_message">Tanggalin ang ginawang ito at ang file nito? Permanenteng aalisin nito ang file sa device na ito.</string>
+    <string name="sort_by">Ayusin ayon sa</string>
+    <string name="search_prompts">Maghanap sa mga prompt</string>
+    <string name="favourites">Mga Paborito</string>
+    <string name="remove_favourite">Alisin sa paborito</string>
+    <string name="add_favourite">Idagdag sa paborito</string>
+    <string name="gallery_empty">Wala pang nagagawa. Ang anumang malikha ay lilitaw dito.</string>
+    <string name="gallery_no_matches">Walang nahanap na tugma</string>
+    <string name="sort_newest">Pinakabago</string>
+    <string name="sort_oldest">Pinakaluma</string>
+    <string name="sort_fastest">Pinakamabilis</string>
+    <string name="sort_slowest">Pinakamabagal</string>
+    <string name="modality_image">Mga Larawan</string>
+    <string name="modality_speech">Boses</string>
 </resources>

@@ -231,4 +231,21 @@
     <string name="about_network_detail">Searching the web and downloading a model are the parts that reach the network. Both are yours to switch off in Tools.</string>
     <string name="access_token_detail">Only for gated or private models. Encrypted with a key held in this phone\'s hardware, and sent to huggingface.co and nowhere else.</string>
     <string name="cpu_only_build">This build runs on the CPU. On the phones we have measured, that is the faster path anyway.</string>
+    <string name="gallery">Gallery</string>
+    <string name="gallery_count">%1$d of %2$d</string>
+    <string name="delete_output_title">Delete output?</string>
+    <string name="delete_output_message">Delete this output and its file? This permanently removes the file from this device.</string>
+    <string name="sort_by">Sort by</string>
+    <string name="search_prompts">Search prompts</string>
+    <string name="favourites">Favourites</string>
+    <string name="remove_favourite">Remove favourite</string>
+    <string name="add_favourite">Add favourite</string>
+    <string name="gallery_empty">Nothing made yet. Whatever is generated appears here.</string>
+    <string name="gallery_no_matches">No matches found</string>
+    <string name="sort_newest">Newest</string>
+    <string name="sort_oldest">Oldest</string>
+    <string name="sort_fastest">Fastest</string>
+    <string name="sort_slowest">Slowest</string>
+    <string name="modality_image">Images</string>
+    <string name="modality_speech">Speech</string>
 </resources>

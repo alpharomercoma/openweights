@@ -120,18 +120,29 @@ class MnnSpeechSynthesizer internal constructor(
     }
 
     override fun synthesize(request: SpeechRequest): Flow<GenerationEvent<Artifact>> = flow {
-        val open = handle
-        val can = capability
-        if (open == 0L || can == null) {
+        val initialHandle = handle
+        val initialCapability = capability
+        if (initialHandle == 0L || initialCapability == null) {
             emit(GenerationEvent.Failed("No voice is loaded."))
             return@flow
         }
-        refuse(request, can)?.let {
+        refuse(request, initialCapability)?.let {
             emit(GenerationEvent.Failed(it))
             return@flow
         }
 
         lock.withLock {
+            val open = handle
+            val can = capability
+            if (open == 0L || can == null) {
+                emit(GenerationEvent.Failed("No voice is loaded."))
+                return@withLock
+            }
+            refuse(request, can)?.let {
+                emit(GenerationEvent.Failed(it))
+                return@withLock
+            }
+
             val target = File(outputDirectory.apply { mkdirs() }, "speech-${clock()}.wav")
             emit(GenerationEvent.Started)
             val startedAt = clock()

@@ -149,8 +149,8 @@ class MnnImageGenerator internal constructor(
 
     override fun generate(request: ImageRequest): Flow<GenerationEvent<Artifact>> = flow {
         val bundle = loaded
-        val open = handle
-        if (bundle == null || open == 0L) {
+        val initialHandle = handle
+        if (bundle == null || initialHandle == 0L) {
             emit(GenerationEvent.Failed("No image model is loaded."))
             return@flow
         }
@@ -160,6 +160,17 @@ class MnnImageGenerator internal constructor(
         }
 
         lock.withLock {
+            val open = handle
+            val currentBundle = loaded
+            if (open == 0L || currentBundle == null) {
+                emit(GenerationEvent.Failed("No image model is loaded."))
+                return@withLock
+            }
+            refuse(request)?.let {
+                emit(GenerationEvent.Failed(it))
+                return@withLock
+            }
+
             // A seed of this app's own when none was given, so the result can be asked for
             // again. Reported in the stats either way, because a picture nobody can
             // reproduce is a picture nobody can iterate on.

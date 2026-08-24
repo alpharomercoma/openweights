@@ -1176,6 +1176,8 @@ private fun Measurements(entry: TranscriptEntry) {
     val dark = LocalIsDarkTheme.current
     val locale = LocalConfiguration.current.locales[0]
     val speed = entry.tokensPerSecond ?: return
+    // Read here rather than inside the semantics block, which is not a composition.
+    val spokenSpeed = stringResource(R.string.generated_at_speed, speed.roundToInt())
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1186,9 +1188,7 @@ private fun Measurements(entry: TranscriptEntry) {
             style = MetricTextStyle,
             color = signalColor((speed / FAST_TOKENS_PER_SECOND).toFloat(), dark),
             maxLines = 1,
-            modifier = Modifier.semantics {
-                contentDescription = "Generated at ${speed.roundToInt()} tokens per second"
-            },
+            modifier = Modifier.semantics { contentDescription = spokenSpeed },
         )
         // Two numbers, not four. How fast it wrote and how long the wait was are the two
         // anyone reads at a glance; time to first token and the token count are detail,

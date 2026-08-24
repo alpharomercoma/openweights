@@ -181,4 +181,19 @@
     <string name="loading_model_into_memory">Nilo-load ang modelo sa memory</string>
     <string name="each_model_says_if_it_runs">Makikita sa bawat isa kung kaya nitong tumakbo sa teleponong ito bago mo ito i-download.</string>
     <string name="answers_can_search_the_web">Kapag may tumatakbong modelo, puwedeng maghanap sa web ang mga sagot. Isa itong switch sa Mga tool.</string>
+    <string name="remove_attachment">Alisin ang %1$s</string>
+    <string name="delete_conversation_named">Tanggalin ang %1$s</string>
+    <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
+    <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>
+    <string name="system_prompt_detail">Mga permanenteng tagubilin, ipinapadala bago ang bawat pag-uusap. Mas nasusunod ng maliliit na modelo ang malinaw na tagubilin kaysa sa ipinahihiwatig.</string>
+    <string name="tool_prompt_detail">Ipinapadala kasama ng mga tool, bago ang sarili mong prompt. Ito ang buong idinaragdag ng app.</string>
+    <string name="thinking_detail">Pag-isipan muna. Mas mabagal, at mas mainam sa anumang may mga hakbang.</string>
+    <string name="report_contents_detail">Ang pangalan ng modelo (%1$s), ang dahilan, ang tala mo at ang sagot. Nananatili ito sa teleponong ito. Wala itong mapagpapadalhan.</string>
+    <string name="an_empty_reply">(walang laman na sagot)</string>
+    <string name="usage_empty">Wala pa. Kapag nag-chat ka, lilitaw dito ang mga kabuuan, at mananatili sa teleponong ito.</string>
+    <string name="tokens_today">+%1$s ngayon ·</string>
+    <string name="about_tagline">Mga open weight na modelo, tumatakbo sa teleponong ito. Walang account, walang server namin, walang telemetry.</string>
+    <string name="about_network_detail">Ang paghahanap sa web at ang pag-download ng modelo ang mga bahaging umaabot sa network. Parehong puwede mong patayin sa Mga tool.</string>
+    <string name="access_token_detail">Para lang sa mga gated o pribadong modelo. Naka-encrypt gamit ang susing nasa hardware ng teleponong ito, at ipinapadala sa huggingface.co at wala nang iba.</string>
+    <string name="cpu_only_build">Sa CPU tumatakbo ang build na ito. Sa mga teleponong nasukat namin, iyon din naman ang mas mabilis na daan.</string>
 </resources>

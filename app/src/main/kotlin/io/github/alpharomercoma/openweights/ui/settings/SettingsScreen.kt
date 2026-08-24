@@ -174,15 +174,13 @@ private fun AboutSection() {
         Mark(size = 44.dp)
         Text(stringResource(R.string.openweights), style = MaterialTheme.typography.titleMedium)
         Text(
-            text = "Open weight models, running on this phone. No account, no server of " +
-                "ours, no telemetry.",
+            text = stringResource(R.string.about_tagline),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Searching the web and downloading a model are the parts that reach " +
-                "the network. Both are yours to switch off in Tools.",
+            text = stringResource(R.string.about_network_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -247,8 +245,7 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
-            text = "Only for gated or private models. Encrypted with a key held in this " +
-                "phone's hardware, and sent to huggingface.co and nowhere else.",
+            text = stringResource(R.string.access_token_detail),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -326,8 +323,7 @@ private fun ComputeSection(state: SettingsUiState) {
         if (state.computeDevices.none { it.kind != ComputeDeviceKind.CPU }) {
             // Being explicit beats a greyed-out toggle nobody can explain.
             Text(
-                text = "This build runs on the CPU. On the phones we have measured, that " +
-                    "is the faster path anyway.",
+                text = stringResource(R.string.cpu_only_build),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

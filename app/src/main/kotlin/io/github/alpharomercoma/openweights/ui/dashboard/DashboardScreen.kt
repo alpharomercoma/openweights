@@ -132,8 +132,7 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    "Nothing yet. Once you chat, the totals appear here, and stay " +
-                        "on this phone.",
+                    stringResource(R.string.usage_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -245,7 +244,7 @@ private fun DayChange(summary: UsageSummary) {
             // Metric type, like the line above it. Two captions under one number in two
             // different treatments read as two captions that happened to end up together;
             // in the same type they read as one sentence with a coloured first clause.
-            text = "+${summary.tokensToday.grouped()} today ·",
+            text = stringResource(R.string.tokens_today, summary.tokensToday.grouped()),
             style = MetricTextStyle,
             // Coloured against yesterday, which is the only thing this line claims. A
             // quiet day is grey, not red: not using your phone is not a fault.

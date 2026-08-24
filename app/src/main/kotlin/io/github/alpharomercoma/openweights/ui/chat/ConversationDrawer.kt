@@ -304,7 +304,10 @@ private fun ConversationRow(
         IconButton(onClick = onDelete) {
             Icon(
                 imageVector = Icons.Rounded.Delete,
-                contentDescription = "Delete ${conversation.title}",
+                contentDescription = stringResource(
+                    R.string.delete_conversation_named,
+                    conversation.title,
+                ),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )

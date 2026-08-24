@@ -33,12 +33,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -57,6 +59,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
  */
 @Composable
 fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // Read here rather than inside the semantics block, which is not a composition.
+    val spoken = stringResource(R.string.choose_a_model_spoken, state.spoken())
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
@@ -64,9 +68,7 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
             // Merged, or the description is read and then every line inside it is read
             // again: the model name, the backend, the context window, one after another.
             // The whole point of composing a sentence here is that it replaces them.
-            .semantics(mergeDescendants = true) {
-                contentDescription = "Choose a model. ${state.spoken()}"
-            }
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
             .heightIn(min = TOUCH_TARGET.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.Center,

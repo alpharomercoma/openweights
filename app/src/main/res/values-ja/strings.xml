@@ -177,4 +177,19 @@
     <string name="loading_model_into_memory">モデルをメモリに読み込んでいます</string>
     <string name="each_model_says_if_it_runs">ダウンロード前に、この端末で動作するかがそれぞれに表示されます。</string>
     <string name="answers_can_search_the_web">モデルが動き出すと、回答がウェブを検索することがあります。ツールで切り替えられます。</string>
+    <string name="remove_attachment">%1$s を削除</string>
+    <string name="delete_conversation_named">%1$s を削除</string>
+    <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
+    <string name="choose_a_model_spoken">モデルを選ぶ。%1$s</string>
+    <string name="system_prompt_detail">すべての会話の前に送られる、変わらない指示です。小さなモデルは、ほのめかすよりもはっきり書いたほうがよく従います。</string>
+    <string name="tool_prompt_detail">ツールと一緒に、あなたのプロンプトより前に送られます。アプリが足しているのはこれだけです。</string>
+    <string name="thinking_detail">まず筋道を立てて考えます。遅くなりますが、手順のあるものには向いています。</string>
+    <string name="report_contents_detail">モデル名（%1$s）、理由、あなたのメモ、そして回答です。この端末から出ません。送る先はありません。</string>
+    <string name="an_empty_reply">（空の回答）</string>
+    <string name="usage_empty">まだ何もありません。チャットを始めると、合計がここに出て、この端末に残ります。</string>
+    <string name="tokens_today">+%1$s 今日 ·</string>
+    <string name="about_tagline">オープンウェイトのモデルを、この端末で動かします。アカウントなし、こちらのサーバーなし、テレメトリーなし。</string>
+    <string name="about_network_detail">ネットワークに出るのは、ウェブ検索とモデルのダウンロードだけです。どちらもツールで切れます。</string>
+    <string name="access_token_detail">制限付きまたは非公開のモデル専用です。この端末のハードウェアが持つ鍵で暗号化し、huggingface.co にだけ送ります。</string>
+    <string name="cpu_only_build">このビルドは CPU で動きます。計測した端末では、そちらのほうが結局は速い経路です。</string>
 </resources>

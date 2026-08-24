@@ -132,7 +132,7 @@ fun StagedDocumentChip(
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Rounded.Close,
-                contentDescription = "Remove ${document.name}",
+                contentDescription = stringResource(R.string.remove_attachment, document.name),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -307,7 +307,10 @@ fun StagedAttachments(
                 AttachmentThumbnail(attachment, size = STAGED_SIZE)
                 Icon(
                     imageVector = Icons.Rounded.Close,
-                    contentDescription = "Remove ${attachment.describe()}",
+                    contentDescription = stringResource(
+                        R.string.remove_attachment,
+                        attachment.describe(),
+                    ),
                     tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .align(Alignment.TopEnd)

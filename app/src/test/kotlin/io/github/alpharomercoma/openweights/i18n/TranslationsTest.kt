@@ -128,9 +128,91 @@ class TranslationsTest {
         }
     }
 
+    @Test
+    fun `no screen puts English straight on the screen`() {
+        // The counterpart to the test above, and the one that catches what it cannot. Every
+        // check here reads the resource files, so a sentence that was never made a resource
+        // is invisible to all of them: it has no key, so no key is missing, and the app
+        // shows English in the middle of a translated screen with nothing red anywhere.
+        //
+        // Scoped to the ui package on purpose. Text there is on a screen by definition.
+        // Elsewhere a string literal is as likely to be a prompt sent to the model, which
+        // stays in English because that is the language it was trained to follow.
+        val offenders = uiSources().flatMap { file ->
+            val source = file.readText()
+            val previews = previewRanges(source)
+            ON_SCREEN.findAll(source)
+                .filter { it.groupValues[1].contains(' ') }
+                .filterNot { match -> previews.any { match.range.first in it } }
+                .map { "${file.name}: ${it.groupValues[1].take(60)}" }
+        }
+
+        assertThat(offenders).isEmpty()
+    }
+
+    @Test
+    fun `sample text inside a preview is not mistaken for interface copy`() {
+        // The exclusion above is what stands between this check and a stream of false
+        // alarms, and a wrong exclusion is worse than none: it would quietly stop reporting
+        // real strings too. So the shape it depends on is asserted here.
+        val source = """
+            @Composable
+            private fun Greeting() {
+                Text(text = stringResource(R.string.hello))
+            }
+
+            @Preview
+            @Composable
+            private fun GreetingPreview() {
+                Text(text = "a sample somebody wrote for the tooling")
+            }
+        """.trimIndent()
+
+        val previews = previewRanges(source)
+        val found = ON_SCREEN.findAll(source)
+            .filter { it.groupValues[1].contains(' ') }
+            .filterNot { match -> previews.any { match.range.first in it } }
+            .toList()
+
+        assertThat(previews).hasSize(1)
+        assertThat(found).isEmpty()
+    }
+
+    private fun uiSources(): List<File> = File("src/main/kotlin")
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "kt" }
+        .filter { it.path.contains("/ui/") }
+        .toList()
+
+    /**
+     * The spans a `@Preview` covers, which are sample data rather than interface copy.
+     *
+     * Found by taking each annotation to the next brace in the first column, which is where
+     * a top level function ends in this codebase. That assumption is the load-bearing part
+     * of the exclusion, so it is tested rather than trusted.
+     */
+    private fun previewRanges(source: String): List<IntRange> =
+        Regex("""^@Preview""", RegexOption.MULTILINE).findAll(source).map { preview ->
+            val close = Regex("""^\}""", RegexOption.MULTILINE)
+                .find(source, preview.range.first)?.range?.last
+                ?: source.lastIndex
+            preview.range.first..close
+        }.toList()
+
     private companion object {
         val ENTRY =
             Regex("""<string name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
         val PLACEHOLDER = Regex("""%\d*\$?[sd]""")
+
+        /**
+         * Text on its way to a screen: what a control says, and what a screen reader reads.
+         *
+         * Deliberately these three and no more. `label` is the fourth slot that takes a
+         * string and it is mostly the name of an animation, which nobody reads and nobody
+         * translates, so including it would make this test cry wolf until somebody turned
+         * it off.
+         */
+        val ON_SCREEN =
+            Regex("""(?:\btext\s*=\s*|\bcontentDescription\s*=\s*|\bText\(\s*)"([^"\\]{6,})"""")
     }
 }

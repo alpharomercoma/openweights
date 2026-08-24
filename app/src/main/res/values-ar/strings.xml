@@ -183,4 +183,19 @@
     <string name="loading_model_into_memory">جارٍ تحميل النموذج في الذاكرة</string>
     <string name="each_model_says_if_it_runs">يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
     <string name="answers_can_search_the_web">بمجرد تشغيل نموذج، يمكن للإجابات البحث في الويب. هذا مفتاح في الأدوات.</string>
+    <string name="remove_attachment">إزالة %1$s</string>
+    <string name="delete_conversation_named">حذف %1$s</string>
+    <string name="generated_at_speed">تم التوليد بسرعة %1$d رمز في الثانية</string>
+    <string name="choose_a_model_spoken">اختيار نموذج. %1$s</string>
+    <string name="system_prompt_detail">تعليمات ثابتة تُرسل قبل كل محادثة. النماذج الصغيرة تتبع التعليمات الصريحة أفضل بكثير من الضمنية.</string>
+    <string name="tool_prompt_detail">تُرسل مع الأدوات، قبل رسالتك أنت. هذا كل ما يضيفه التطبيق.</string>
+    <string name="thinking_detail">يفكر في الأمر أولًا. أبطأ، وأفضل في أي شيء له خطوات.</string>
+    <string name="report_contents_detail">اسم النموذج (%1$s) والسبب وملاحظتك والرد. يبقى على هذا الهاتف. لا توجد جهة تُرسل إليها.</string>
+    <string name="an_empty_reply">(رد فارغ)</string>
+    <string name="usage_empty">لا شيء بعد. بمجرد أن تبدأ محادثة، تظهر الإجماليات هنا وتبقى على هذا الهاتف.</string>
+    <string name="tokens_today">+%1$s اليوم ·</string>
+    <string name="about_tagline">نماذج مفتوحة الأوزان تعمل على هذا الهاتف. بلا حساب، وبلا خادم لنا، وبلا تتبع.</string>
+    <string name="about_network_detail">البحث في الويب وتنزيل نموذج هما الجزءان اللذان يصلان إلى الشبكة. ويمكنك إيقاف كليهما من الأدوات.</string>
+    <string name="access_token_detail">للنماذج المقيّدة أو الخاصة فقط. مشفَّر بمفتاح محفوظ داخل عتاد هذا الهاتف، ويُرسل إلى huggingface.co ولا شيء غيره.</string>
+    <string name="cpu_only_build">هذه النسخة تعمل على المعالج. على الهواتف التي قسناها، هذا هو المسار الأسرع على أي حال.</string>
 </resources>

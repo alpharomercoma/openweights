@@ -250,8 +250,7 @@ fun ParameterSheet(
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        text = "Standing instructions, sent before every conversation. Small " +
-                            "models follow explicit ones far better than implied ones.",
+                        text = stringResource(R.string.system_prompt_detail),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -359,8 +358,7 @@ fun ParameterSheet(
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
-                            text = "Sent with the tools, before your own prompt. This is " +
-                                "the whole of what the app adds.",
+                            text = stringResource(R.string.tool_prompt_detail),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -418,8 +416,7 @@ private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences
             Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.thinking), style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "Work it through first. Slower, and better on anything with " +
-                        "steps in it.",
+                    text = stringResource(R.string.thinking_detail),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

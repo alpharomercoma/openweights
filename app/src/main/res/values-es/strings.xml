@@ -195,4 +195,19 @@
     <string name="loading_model_into_memory">Cargando el modelo en memoria</string>
     <string name="each_model_says_if_it_runs">Cada uno indica si funciona en este teléfono antes de descargarlo.</string>
     <string name="answers_can_search_the_web">Cuando haya un modelo en marcha, las respuestas pueden buscar en la web. Es un interruptor en Herramientas.</string>
+    <string name="remove_attachment">Quitar %1$s</string>
+    <string name="delete_conversation_named">Eliminar %1$s</string>
+    <string name="generated_at_speed">Generado a %1$d tokens por segundo</string>
+    <string name="choose_a_model_spoken">Elegir un modelo. %1$s</string>
+    <string name="system_prompt_detail">Instrucciones permanentes, enviadas antes de cada conversación. Los modelos pequeños siguen mucho mejor las explícitas que las implícitas.</string>
+    <string name="tool_prompt_detail">Se envía con las herramientas, antes de tu propio prompt. Esto es todo lo que añade la app.</string>
+    <string name="thinking_detail">Que lo razone primero. Más lento, y mejor en cualquier cosa que tenga pasos.</string>
+    <string name="report_contents_detail">El nombre del modelo (%1$s), el motivo, tu nota y la respuesta. Se queda en este teléfono. No hay ningún sitio al que enviarlo.</string>
+    <string name="an_empty_reply">(una respuesta vacía)</string>
+    <string name="usage_empty">Todavía nada. Cuando chatees, los totales aparecen aquí y se quedan en este teléfono.</string>
+    <string name="tokens_today">+%1$s hoy ·</string>
+    <string name="about_tagline">Modelos de pesos abiertos, ejecutándose en este teléfono. Sin cuenta, sin servidor nuestro, sin telemetría.</string>
+    <string name="about_network_detail">Buscar en la web y descargar un modelo son las partes que salen a la red. Ambas puedes desactivarlas en Herramientas.</string>
+    <string name="access_token_detail">Solo para modelos restringidos o privados. Cifrado con una clave guardada en el hardware de este teléfono, y enviado a huggingface.co y a ningún otro sitio.</string>
+    <string name="cpu_only_build">Esta versión funciona en la CPU. En los teléfonos que hemos medido, esa es la vía más rápida de todos modos.</string>
 </resources>

@@ -159,13 +159,14 @@ fun ReportSheet(
                     // which was a promise about a screen that was never built. The store is
                     // real and this app has no server, so the first half was always true;
                     // the second half was a plan.
-                    text = "The model name ($modelName), the reason, your note and the " +
-                        "reply. It stays on this phone. There is nowhere to send it.",
+                    text = stringResource(R.string.report_contents_detail, modelName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = replyText.take(PREVIEW_CHARS).ifEmpty { "(an empty reply)" },
+                    text = replyText.take(PREVIEW_CHARS).ifEmpty {
+                        stringResource(R.string.an_empty_reply)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = PREVIEW_LINES,

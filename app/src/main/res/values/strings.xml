@@ -216,4 +216,19 @@
     <string name="loading_model_into_memory">Loading the model into memory</string>
     <string name="each_model_says_if_it_runs">Each one says whether it runs on this phone before you download it.</string>
     <string name="answers_can_search_the_web">Once a model is running, answers can search the web. That is a switch in Tools.</string>
+    <string name="remove_attachment">Remove %1$s</string>
+    <string name="delete_conversation_named">Delete %1$s</string>
+    <string name="generated_at_speed">Generated at %1$d tokens per second</string>
+    <string name="choose_a_model_spoken">Choose a model. %1$s</string>
+    <string name="system_prompt_detail">Standing instructions, sent before every conversation. Small models follow explicit ones far better than implied ones.</string>
+    <string name="tool_prompt_detail">Sent with the tools, before your own prompt. This is the whole of what the app adds.</string>
+    <string name="thinking_detail">Work it through first. Slower, and better on anything with steps in it.</string>
+    <string name="report_contents_detail">The model name (%1$s), the reason, your note and the reply. It stays on this phone. There is nowhere to send it.</string>
+    <string name="an_empty_reply">(an empty reply)</string>
+    <string name="usage_empty">Nothing yet. Once you chat, the totals appear here, and stay on this phone.</string>
+    <string name="tokens_today">+%1$s today ·</string>
+    <string name="about_tagline">Open weight models, running on this phone. No account, no server of ours, no telemetry.</string>
+    <string name="about_network_detail">Searching the web and downloading a model are the parts that reach the network. Both are yours to switch off in Tools.</string>
+    <string name="access_token_detail">Only for gated or private models. Encrypted with a key held in this phone\'s hardware, and sent to huggingface.co and nowhere else.</string>
+    <string name="cpu_only_build">This build runs on the CPU. On the phones we have measured, that is the faster path anyway.</string>
 </resources>

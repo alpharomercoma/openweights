@@ -59,11 +59,11 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "Run ${call.name}?",
+            text = stringResource(R.string.run_tool_question, call.name),
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
-            text = call.argumentsJson.ifBlank { "with no arguments" },
+            text = call.argumentsJson.ifBlank { stringResource(R.string.no_tool_arguments) },
             modifier = Modifier
                 .heightIn(max = 240.dp)
                 .verticalScroll(rememberScrollState()),

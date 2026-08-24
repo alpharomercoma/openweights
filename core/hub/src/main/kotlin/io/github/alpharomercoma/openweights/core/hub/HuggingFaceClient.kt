@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import javax.inject.Inject
@@ -200,18 +201,27 @@ class HuggingFaceClient @Inject constructor(
      * roughly one in six differs between them.
      */
     suspend fun search(query: HubQuery, limit: Int = DEFAULT_LIMIT): List<HubModel> =
-        searchPage(query, offset = 0, limit = limit).models
+        searchPage(query, limit = limit).models
 
-    /** One bounded page; the Hub accepts offset pagination for the models endpoint. */
+    /**
+     * One page, and the cursor that reaches the next one.
+     *
+     * Cursor rather than offset, because `offset` is not a parameter this endpoint has. It
+     * is accepted and ignored: measured against the live Hub, `offset=0`, `offset=3` and
+     * `offset=6` all return the same three repositories. Paging on it appended a page the
+     * screen already held, every model was dropped as a duplicate, and the list sat still
+     * while asking for more forever. The Hub paginates with an opaque cursor handed back in
+     * a `Link` header, which is what this follows.
+     */
     suspend fun searchPage(
         query: HubQuery,
-        offset: Int,
+        cursor: String? = null,
         limit: Int = DEFAULT_LIMIT,
     ): HubSearchPage {
         val url = apiUrl("models")
             .addQueryParameter("apps", LLAMA_CPP)
             .addQueryParameter("limit", limit.toString())
-            .addQueryParameter("offset", offset.coerceAtLeast(0).toString())
+            .apply { cursor?.let { addQueryParameter("cursor", it) } }
             .addQueryParameter("sort", query.sort.parameter)
             .addQueryParameter("direction", "-1")
             .apply {
@@ -225,8 +235,9 @@ class HuggingFaceClient @Inject constructor(
             }
             .build()
 
-        val models = json.decodeFromString<List<SearchEntry>>(get(url)).map { it.toModel() }
-        return HubSearchPage(models = models, hasMore = models.size >= limit)
+        val page = getPaged(url)
+        val models = json.decodeFromString<List<SearchEntry>>(page.body).map { it.toModel() }
+        return HubSearchPage(models = models, cursor = page.nextCursor)
     }
 
     /**
@@ -339,7 +350,10 @@ class HuggingFaceClient @Inject constructor(
             segments.forEach { addPathSegments(it) }
         }
 
-    private suspend fun get(url: HttpUrl): String = withContext(Dispatchers.IO) {
+    private suspend fun get(url: HttpUrl): String = getPaged(url).body
+
+    /** One response body, with the cursor its `Link` header offers for the page after it. */
+    private suspend fun getPaged(url: HttpUrl): Fetched = withContext(Dispatchers.IO) {
         val token = tokenSource.token()
         val request = Request.Builder()
             .url(url)
@@ -350,13 +364,34 @@ class HuggingFaceClient @Inject constructor(
             if (!response.isSuccessful) {
                 throw response.toHubException(hasToken = token != null)
             }
-            response.body.string()
+            Fetched(response.body.string(), response.header("link").nextCursor())
         }
+    }
+
+    /** A body and nothing else, plus the one header that says there is more. */
+    private data class Fetched(val body: String, val nextCursor: String?)
+
+    /**
+     * The cursor out of a `Link` header, taken apart rather than followed.
+     *
+     * Only the opaque cursor is kept and re-attached to an address this app builds itself,
+     * so a header cannot redirect a search anywhere: the host is checked, and every other
+     * parameter still comes from [HubQuery].
+     */
+    private fun String?.nextCursor(): String? {
+        val next = this?.let { LINK_NEXT.find(it) }?.groupValues?.get(1)
+        val address = next?.toHttpUrlOrNull()
+        return address
+            ?.takeIf { it.host == HOST.host }
+            ?.queryParameter("cursor")
     }
 
     private companion object {
         val HOST = "https://huggingface.co".toHttpUrl()
         const val DEFAULT_LIMIT = 30
+
+        /** `<address>; rel="next"`, which is how the Hub says there is another page. */
+        val LINK_NEXT = Regex("""<([^>]+)>\s*;\s*rel="next"""")
 
         /** The Hub's identifier for the local app this project is built on. */
         const val LLAMA_CPP = "llama.cpp"
@@ -469,12 +504,14 @@ val RECOMMENDED = listOf(
  */
 data class Publisher(val avatarUrl: String? = null, val isOrganisation: Boolean = false)
 
-/** Everything the Discover screen can ask the Hub for. */
+/** One page of Hub results, and the way back for the next one. */
 data class HubSearchPage(
     val models: List<HubModel>,
-    /** Conservative: a full page means another request may have more results. */
-    val hasMore: Boolean,
-)
+    /** The Hub's opaque cursor for the page after this one, or null when there is none. */
+    val cursor: String? = null,
+) {
+    val hasMore: Boolean get() = cursor != null
+}
 
 /** Everything the Discover screen can ask the Hub for. */
 data class HubQuery(

@@ -108,6 +108,26 @@ class ModelDownloaderResumeTest {
     }
 
     @Test
+    fun `a model installed before provenance was recorded is adopted on its checksum`() {
+        // The upgrade path. Everything already on the device predates the .source sidecar,
+        // so nothing has one. A repository that publishes a checksum, which is every LFS
+        // tracked GGUF on the Hub, still proves the file is the right one, and the sidecar
+        // is written so the check after this one is cheap.
+        val destination = File(folder.root, "weights.gguf")
+        destination.writeBytes(whole)
+
+        val progress = runBlocking {
+            downloader.download("owner/repo", hubFile(), destination).toList()
+        }
+
+        assertThat(progress.last()).isInstanceOf(DownloadProgress.Finished::class.java)
+        assertThat(destination.readBytes()).isEqualTo(whole)
+        assertThat(server.requestCount).isEqualTo(0)
+        assertThat(File(folder.root, "weights.gguf.source").readText())
+            .isEqualTo(downloadIdentity("owner/repo", hubFile()))
+    }
+
+    @Test
     fun `a download that died halfway asks for the rest and keeps what it had`() {
         val destination = File(folder.root, "weights.gguf")
         val already = 800

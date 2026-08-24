@@ -77,7 +77,6 @@
     <string name="downloading">جارٍ التنزيل</string>
     <string name="download_queued">في قائمة الانتظار</string>
     <string name="download_verifying">جارٍ التحقق</string>
-    <string name="download_progress">%1$s من %2$s</string>
     <string name="report">إبلاغ</string>
     <string name="now">ليس الآن</string>
     <string name="run">تشغيل</string>
@@ -148,4 +147,40 @@
     <string name="goal_stop">إيقاف الهدف</string>
     <string name="goal_send_steering">تطبيق</string>
     <string name="goal_dismiss">إغلاق</string>
+    <string name="attachment_limit">يمكنك إرفاق ما يصل إلى %1$d عناصر وسائط في المرة الواحدة.</string>
+    <string name="pdf_saved">تم حفظ ملف PDF</string>
+    <string name="pdf_save_failed">تعذر حفظ ملف PDF.</string>
+    <string name="read_aloud">قراءة بصوت عالٍ</string>
+    <string name="stop_reading">إيقاف القراءة</string>
+    <string name="discover">استكشاف</string><string name="back_to_search_results">العودة إلى النتائج</string>
+    <string name="no_filter_matches">لا شيء يطابق عوامل التصفية</string><string name="no_models_found">لم يتم العثور على نماذج</string><string name="try_wider_filters">وسّع نطاق الحجم أو امسح عوامل التصفية وابحث مجددًا.</string><string name="try_different_search">جرّب عبارة بحث مختلفة.</string><string name="continue_search">متابعة البحث</string>
+    <string name="proxy_search_only_detail">يُستخدم للبحث فقط، وليس للتنزيلات أو الصفحات المفتوحة. قد يساعد الوكيل لكنه غير مضمون.</string>
+    <string name="attachment_unreadable">تعذرت قراءة الملف.</string><string name="attachment_too_large">حجم الملف أكبر من %1$d م.ب.</string><string name="document_unreadable">تعذرت قراءة الملف كنص.</string><string name="model_text_only_attachment">هذا النموذج يقرأ النص فقط. حمّل نموذجًا بملف عارض لإرسال %1$s.</string><string name="model_attachment_unsupported">لا يستطيع النموذج قراءة %1$s. يمكنه قراءة %2$s.</string>
+    <string name="model_delete_loaded">‏%1$s محمّل الآن. ألغِ تحميله من منتقي النماذج ثم احذفه.</string><string name="model_delete_failed">تعذر حذف %1$s. حاول مجددًا.</string>
+    <string name="tool_search_name">البحث في الويب</string><string name="tool_search_detail">يبحث عن المعلومات الحديثة أو غير المعروفة.</string><string name="tool_page_name">فتح صفحة</string><string name="tool_page_detail">يقرأ نص صفحة عامة.</string><string name="tool_find_file_name">العثور على ملف</string><string name="tool_find_file_detail">يبحث في المجلد المشترك.</string><string name="tool_read_file_name">قراءة ملف</string><string name="tool_read_file_detail">يفتح ملفًا من المجلد.</string><string name="tool_save_file_name">حفظ ملف</string><string name="tool_save_file_detail">يكتب ملفًا في المجلد.</string><string name="tool_script_name">تشغيل برنامج نصي</string><string name="tool_script_detail">يجري حسابات بجافاسكربت دون ملفات أو شبكة.</string>
+    <string name="engine_duckduckgo_detail">يعمل دون حساب. الافتراضي.</string><string name="engine_brave_detail">فهرس بحث مستقل.</string><string name="engine_bing_detail">يشغّل Yahoo وخدمات أخرى.</string><string name="engine_google_detail">فهرس واسع قد يرفض بعض الشبكات.</string>
+    <string name="on_this_device">على هذا الجهاز</string><string name="choose_folder">اختيار مجلد</string><string name="change">تغيير</string><string name="waiting_for_folder">بانتظار مجلد</string><string name="search_engines_status">‏%1$d من %2$d مفعّلة. تُجرّب بالترتيب حتى تجيب إحداها.</string>
+    <string name="storage_on_device">%1$s على هذا الجهاز</string>
+    <string name="models_empty">لم يتم تنزيل أي نموذج بعد. تصفح النماذج من الاسم أعلى المحادثة. يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
+    <string name="download_progress">%1$s من %2$s</string>
+    <string name="reads_attachments">يقرأ المرفقات</string>
+    <string name="delete_model_title">حذف النموذج؟</string>
+    <string name="delete_model_message">هل تريد حذف %1$s وملفاته المرافقة؟ سيؤدي ذلك إلى إزالة نحو %2$s نهائيًا وستحتاج إلى تنزيله مجددًا.</string>
+    <string name="license_label">الترخيص %1$s</string>
+    <string name="parameter_count_millions">%1$d مليون معلمة</string>
+    <string name="unsupported_architecture_detail">لا يمكن لهذا الإصدار من OpenWeights تحميل نماذج %1$s. يتطلب الدعم تحديث التطبيق. لا يزال بإمكانك تصفح الملفات.</string>
+    <string name="vision_projector_detail">يمكن لهذا النموذج قراءة الصور. يُنزّل معه مشفر الرؤية بحجم %1$s وهو محسوب ضمن التقديرات أدناه.</string>
+    <string name="context_length_tokens">طول السياق: %1$d رمزًا</string>
+    <string name="downloading_percent">جارٍ التنزيل %1$d%%</string>
+    <string name="needs_newer_version">يلزم إصدار أحدث من OpenWeights: لا يمكن لهذا الإصدار تحميل نماذج %1$s.</string>
+    <string name="header_read_failed">تعذرت قراءة ترويسة الملف: %1$s</string>
+    <string name="fit_comfortable">يعمل براحة</string>
+    <string name="fit_tight">يعمل بذاكرة محدودة وقد تُغلق تطبيقات أخرى</string>
+    <string name="fit_wont_run">لن يعمل بطول السياق هذا</string>
+    <string name="fit_no_storage">لا توجد مساحة تخزين كافية للتنزيل</string>
+    <string name="run_tool_question">تشغيل %1$s؟</string>
+    <string name="no_tool_arguments">من دون معاملات</string>
+    <string name="loading_model_into_memory">جارٍ تحميل النموذج في الذاكرة</string>
+    <string name="each_model_says_if_it_runs">يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
+    <string name="answers_can_search_the_web">بمجرد تشغيل نموذج، يمكن للإجابات البحث في الويب. هذا مفتاح في الأدوات.</string>
 </resources>

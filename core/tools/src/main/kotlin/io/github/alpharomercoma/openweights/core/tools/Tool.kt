@@ -114,6 +114,9 @@ interface Tool {
      */
     fun asksInAuto(call: ToolCall): Boolean = alwaysAsks
 
+    /** Whether this tool writes data that remains after the current conversation. */
+    val writesDurableData: Boolean get() = false
+
     /**
      * Whether this tool can do anything at all as things stand.
      *

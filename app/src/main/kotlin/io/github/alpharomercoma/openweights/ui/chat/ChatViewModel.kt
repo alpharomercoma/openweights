@@ -26,6 +26,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.context.Goal
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
@@ -120,7 +121,73 @@ data class TranscriptEntry(
      * nothing to match.
      */
     val history: String? = null,
-)
+) {
+    /**
+     * An assistant turn that was opened and never written to.
+     *
+     * The placeholder goes on screen the moment generation starts, so that a reply appears
+     * to begin immediately. If the turn then stops before a single token, that placeholder
+     * is all there is: an empty bubble under the question, which reads as an answer of
+     * silence rather than as a turn that never ran. Whoever ends the turn early drops it.
+     */
+    val saidNothing: Boolean
+        get() = role == ChatRole.ASSISTANT && isStreaming && text.isBlank() && blocks.isEmpty()
+}
+
+/**
+ * What one turn was opened on: the history to send, and the state it was built from.
+ *
+ * Both, and the same both, because the sampler settings, the tool switch and the tool notes
+ * have to be the ones the prompt was assembled with. Reading them from the live state at the
+ * moment the engine is called instead would take whatever this turn has already changed,
+ * which is not the question the model is about to answer.
+ */
+private data class OpenedTurn(val conversation: List<ChatMessage>, val state: ChatUiState)
+
+/**
+ * One rewrite of a question already asked, as a value rather than as a sequence of steps.
+ *
+ * Held together because the three things done with it have to agree: what the screen shows
+ * while the write is in flight, what storage ends up holding, and what the screen goes back
+ * to if the write fails. Two of those are the same decision read twice, and the version that
+ * computed them separately is the one that let the transcript and the database disagree.
+ */
+private data class Edit(
+    /** Where in the transcript the rewritten question sits. */
+    val at: Int,
+    val text: String,
+    /** Kept with the new wording: editing a question does not detach what came with it. */
+    val attachments: List<MessagePart.File>,
+    /** Files belonging to turns this drops, whose copies nothing will reference again. */
+    val abandoned: List<MessagePart.File>,
+    /** Everything before the edited turn, which is all that survives. */
+    val kept: List<TranscriptEntry>,
+    val invalidatesCompaction: Boolean,
+    /** The state as it was, so a failed write can put it back exactly. */
+    val before: ChatUiState,
+) {
+    fun applied(current: ChatUiState): ChatUiState = current.copy(
+        transcript = kept,
+        error = null,
+        // Claimed here, before any suspending work, so a second tap on a second bubble
+        // cannot start a rewrite while this one is still being written.
+        isGenerating = true,
+        compaction = if (invalidatesCompaction) null else current.compaction,
+        contextUsed = if (invalidatesCompaction) 0 else current.contextUsed,
+    )
+
+    fun rolledBack(current: ChatUiState): ChatUiState = current.copy(
+        transcript = before.transcript,
+        compaction = before.compaction,
+        contextUsed = before.contextUsed,
+        isGenerating = false,
+        error = STORAGE_FAILED,
+    )
+}
+
+/** The transcript without a trailing reply that never said anything. See [TranscriptEntry.saidNothing]. */
+private fun List<TranscriptEntry>.withoutEmptyReply(): List<TranscriptEntry> =
+    if (lastOrNull()?.saidNothing == true) dropLast(1) else this
 
 /** A past conversation, as shown in the drawer. */
 data class ConversationSummary(
@@ -338,6 +405,14 @@ data class ChatUiState(
 }
 
 @HiltViewModel
+// Owed work, named rather than waved away. This class is the chat screen, the turn loop and
+// the goal loop in one, and ten dependencies is what carrying all three costs. The seam is
+// the goal loop: `startGoal` through `stepPrompt` is fourteen functions that talk to the
+// boards, the runtime and one turn at a time, and lifting them out takes this back under
+// every one of these limits at once. It is not lifted here because it needs a callback
+// surface back into the turn machinery, which is a design decision rather than a lint fix,
+// and because the tests that make it safe to move only landed alongside this comment.
+@Suppress("LongParameterList", "LargeClass", "TooManyFunctions")
 class ChatViewModel @Inject constructor(
     private val runtime: ModelRuntime,
     private val compactor: ConversationCompactor,
@@ -353,6 +428,17 @@ class ChatViewModel @Inject constructor(
     /** Completed by the approval buttons, so the agent can wait on a human. */
     private var approval: CompletableDeferred<Boolean>? = null
 
+    /**
+     * One question on screen at a time.
+     *
+     * There is a single [approval] slot and a single card above the composer, so two
+     * questions raised at once would leave the first waiting on a deferred that has been
+     * replaced and can no longer be completed: the turn hangs until Stop. Tools that run
+     * together are chosen so this does not arise, and this keeps the failure at "asked one
+     * after the other" rather than "never answered" if that ever changes.
+     */
+    private val approvalGate = Mutex()
+
     /** Tool evidence emitted by the current goal turn; reset before every turn starts. */
     private var lastTurnSteps: List<AgentStep> = emptyList()
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -364,7 +450,13 @@ class ChatViewModel @Inject constructor(
      * Built here rather than injected, because it needs this view model's scope and its state,
      * and a Hilt binding for something that takes both would be a longer way to say the same.
      */
-    private val attachments = Attaching(staging, viewModelScope, _uiState)
+    private val attachments = Attaching(
+        staging = staging,
+        scope = viewModelScope,
+        state = _uiState,
+        limitMessage = appContext.getString(R.string.attachment_limit, MAX_STAGED_ATTACHMENTS),
+        unreadableMessage = appContext.getString(R.string.attachment_unreadable),
+    )
 
     /** Folding older turns into a summary. Built here for the reason [attachments] is. */
     private val folding = Folding(compactor, writer, _uiState)
@@ -841,43 +933,104 @@ class ChatViewModel @Inject constructor(
      * a second mechanism reaching in to purge it could only disagree with the first.
      */
     fun editAndResend(entryId: Long, text: String) {
+        val edit = editFor(entryId, text) ?: return
+        _uiState.update { edit.applied(it) }
+
+        val editJob = viewModelScope.launch {
+            if (!rewriteStoredTurn(edit)) {
+                _uiState.update { edit.rolledBack(it) }
+                return@launch
+            }
+            _uiState.update { current ->
+                current.copy(
+                    transcript = edit.kept +
+                        entry(ChatRole.USER, edit.text).copy(attachments = edit.attachments),
+                    isGenerating = true,
+                )
+            }
+            attachments.discard(edit.abandoned)
+            generate()
+        }
+        generationJob = editJob
+        // The same guard [send] carries, and for the same reason. This claims the busy
+        // state before the rewrite, and the rewrite waits on the write queue, which can sit
+        // behind a compaction. Stop in that window cancels the job before generate() has
+        // run, so nothing has registered `releaseTurn` and nothing else hands the state
+        // back: the composer stayed disabled for the rest of the session.
+        editJob.invokeOnCompletion { cause ->
+            if (cause != null && generationJob === editJob) {
+                _uiState.update { it.copy(isGenerating = false) }
+            }
+        }
+    }
+
+    /**
+     * Works out everything one edit changes, or returns null if it changes nothing.
+     *
+     * Decided in one place and off a single read of the state, because the screen keeps
+     * moving: tokens arrive, a fold completes, and a rule read at the top would no longer
+     * hold by the time the write at the bottom ran. What comes back is a description of the
+     * edit rather than the edit itself, so applying it, undoing it, and writing it down are
+     * three readings of the same decision instead of three decisions.
+     */
+    private fun editFor(entryId: Long, text: String): Edit? {
         val edited = text.trim()
-        if (edited.isEmpty()) return
         val state = _uiState.value
-        if (state.isGenerating || state.isCompacting) return
-        if (loadedModelHasGone()) return
-
         val at = state.transcript.indexOfFirst { it.id == entryId }
-        if (at < 0 || state.transcript[at].role != ChatRole.USER) return
+        // Only a question of the user's own, and only while nothing else is rewriting the
+        // transcript. `loadedModelHasGone` is last because it is the one that also puts a
+        // message on screen, and there is nothing to say about a missing model to somebody
+        // who is not going to get this far anyway.
+        val editable = at >= 0 && state.transcript[at].role == ChatRole.USER
+        val busy = state.isGenerating || state.isCompacting || loadedModelHasGone()
+        if (edited.isEmpty() || !editable || busy) return null
 
-        val kept = state.transcript.take(at)
-        _uiState.update { it.copy(transcript = kept, error = null, isGenerating = true) }
+        // The summary covered the turn being rewritten, so it describes a conversation that
+        // is about to stop existing and has to go with it.
+        val invalidatesCompaction = state.compaction?.foldedThroughIndex?.let { at <= it } == true
+        return Edit(
+            at = at,
+            text = edited,
+            attachments = state.transcript[at].attachments,
+            abandoned = state.transcript.drop(at + 1).flatMap { it.attachments },
+            kept = state.transcript.take(at).map {
+                if (invalidatesCompaction) it.copy(compactionNote = null) else it
+            },
+            invalidatesCompaction = invalidatesCompaction,
+            before = state,
+        )
+    }
 
-        viewModelScope.launch {
-            val trimmed = runCatching {
-                writer.inOrder {
-                    conversationId?.let { id ->
-                        // By position rather than by id: the transcript's ids are the app's
-                        // and the stored rows have their own, and the two only line up
-                        // while nothing has been dropped from either.
-                        messages(id).getOrNull(at)?.let { deleteFrom(id, it.id) }
+    /**
+     * Puts the rewritten turn in storage, and says whether it got there.
+     *
+     * Reported rather than thrown, because the screen has already been changed and the two
+     * have to agree: a transcript that shows the edit while storage still holds the original
+     * is a conversation that changes back the next time it is opened.
+     */
+    private suspend fun rewriteStoredTurn(edit: Edit): Boolean {
+        val written = runCatching {
+            writer.inOrder {
+                conversationId?.let { id ->
+                    // By position rather than by id: the transcript's ids are the app's
+                    // and the stored rows have their own, and the two only line up
+                    // while nothing has been dropped from either.
+                    messages(id).getOrNull(edit.at)?.let { message ->
+                        replaceFrom(
+                            conversationId = id,
+                            messageId = message.id,
+                            text = edit.text,
+                            attachments = edit.attachments,
+                            clearCompaction = edit.invalidatesCompaction,
+                        )
                     }
                 }
             }
-            if (trimmed.isFailure) {
-                Log.w(
-                    "OpenWeights",
-                    "an edited turn could not be trimmed",
-                    trimmed.exceptionOrNull(),
-                )
-                _uiState.update { it.copy(isGenerating = false, error = STORAGE_FAILED) }
-                return@launch
-            }
-            // Released before send, which claims it again. Leaving it set would make send
-            // refuse the very question this was called to ask.
-            _uiState.update { it.copy(isGenerating = false) }
-            send(edited)
         }
+        written.exceptionOrNull()?.let {
+            Log.w("OpenWeights", "an edited turn could not be trimmed", it)
+        }
+        return written.isSuccess
     }
 
     /**
@@ -978,6 +1131,52 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Everything that has to be true before the engine is asked anything.
+     *
+     * Returns what the turn was opened on, or null when there is nothing to send and the
+     * turn is over before it started. Separated from [generate] because these are decisions
+     * about the conversation while what follows is a stream of tokens, and reading one while
+     * looking for the other is how the empty-conversation branch came to be easy to miss.
+     */
+    private suspend fun openTurn(): OpenedTurn? {
+        // Folded before the turn as well as after it. Compaction only ever ran at the
+        // end, so a conversation already past the threshold started its next turn
+        // against the wall, and what the user saw was the turn failing rather than the
+        // history being folded. Cheap when there is nothing to fold.
+        compactIfNeeded()
+
+        // Read here rather than held: the user can switch a tool off in another tab
+        // between one question and the next, and the instruction has to follow. Memory
+        // is read in the same breath and for the same reason, and only when its own
+        // tool is on: switching it off has to stop the app remembering and stop it
+        // repeating what it already remembered.
+        _uiState.update {
+            it.copy(
+                toolsAvailable = turns.hasEnabledTools(),
+                memories = memory.asPrompt().takeIf { _ -> turns.remembers() },
+            )
+        }
+
+        val state = _uiState.value
+        val conversation = state.engineMessages()
+        if (conversation.isEmpty()) {
+            // Callers claim the busy state before this point to close the double-tap
+            // window, so nothing to send has to give it back.
+            _uiState.update { it.copy(isGenerating = false) }
+            return null
+        }
+
+        _uiState.update { current ->
+            current.copy(
+                transcript = current.transcript +
+                    entry(ChatRole.ASSISTANT, "").copy(isStreaming = true),
+                isGenerating = true,
+            )
+        }
+        return OpenedTurn(conversation = conversation, state = state)
+    }
+
     private fun generate() {
         startThermalSampling()
         // Before the work, because a foreground service cannot be started from the
@@ -986,40 +1185,9 @@ class ChatViewModel @Inject constructor(
         GenerationService.hold(appContext, GenerationService.TURN, "Answering")
 
         val job = viewModelScope.launch {
-            // Folded before the turn as well as after it. Compaction only ever ran at the
-            // end, so a conversation already past the threshold started its next turn
-            // against the wall, and what the user saw was the turn failing rather than the
-            // history being folded. Cheap when there is nothing to fold.
-            compactIfNeeded()
-
-            // Read here rather than held: the user can switch a tool off in another tab
-            // between one question and the next, and the instruction has to follow. Memory
-            // is read in the same breath and for the same reason, and only when its own
-            // tool is on: switching it off has to stop the app remembering and stop it
-            // repeating what it already remembered.
-            _uiState.update {
-                it.copy(
-                    toolsAvailable = turns.hasEnabledTools(),
-                    memories = memory.asPrompt().takeIf { _ -> turns.remembers() },
-                )
-            }
-
-            val state = _uiState.value
-            val conversation = state.engineMessages()
-            if (conversation.isEmpty()) {
-                // Callers claim the busy state before this point to close the double-tap
-                // window, so nothing to send has to give it back.
-                _uiState.update { it.copy(isGenerating = false) }
-                return@launch
-            }
-
-            _uiState.update { current ->
-                current.copy(
-                    transcript = current.transcript +
-                        entry(ChatRole.ASSISTANT, "").copy(isStreaming = true),
-                    isGenerating = true,
-                )
-            }
+            val opened = openTurn() ?: return@launch
+            val conversation = opened.conversation
+            val state = opened.state
 
             val turnStartedAt = System.currentTimeMillis()
             var lastFrameAt = 0L
@@ -1214,11 +1382,11 @@ class ChatViewModel @Inject constructor(
      * Suspends the agent rather than polling, so Stop is never blocked by a question
      * nobody answered: cancelling the turn cancels this too.
      */
-    private suspend fun askUser(call: ToolCall): Boolean {
+    private suspend fun askUser(call: ToolCall): Boolean = approvalGate.withLock {
         val pending = CompletableDeferred<Boolean>()
         approval = pending
         _uiState.update { it.copy(pendingApproval = call) }
-        return try {
+        try {
             pending.await()
         } finally {
             approval = null
@@ -1460,8 +1628,34 @@ class ChatViewModel @Inject constructor(
             goals.halt(_uiState.value.error ?: "The turn could not be started.")
             return false
         }
-        generationJob?.join()
+        awaitTurn()
         return goals.goal.value?.isRunning == true
+    }
+
+    /**
+     * Waits for the turn to finish, rather than for it to have started.
+     *
+     * [send] registers a short job of its own that writes the question down and then calls
+     * [generate], which replaces `generationJob` with the one that actually produces the
+     * reply. Joining once joined whichever of the two happened to be current at that
+     * instant, which is almost always the first, so the goal loop came back the moment the
+     * turn had begun.
+     *
+     * What that looked like was not a race that sometimes lost. The loop read the plan
+     * board before the planning turn could put anything on it, found nothing, and halted
+     * with "No plan came back"; and where a plan was already there the next step called
+     * [send] while the previous turn was still generating, was refused, and halted saying
+     * the turn could not be started. A goal on a real phone, where a reply takes seconds,
+     * lost this every time.
+     *
+     * So: join, and if something replaced the job while waiting, join that too.
+     */
+    private suspend fun awaitTurn() {
+        while (true) {
+            val job = generationJob ?: return
+            job.join()
+            if (generationJob === job) return
+        }
     }
 
     /**
@@ -1507,14 +1701,14 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isThrottled = runtime.isThrottling()) }
         if (runtime.planThreads()) return true
 
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            state.copy(
+                transcript = state.transcript.withoutEmptyReply(),
                 isGenerating = false,
                 error = "The phone is too hot to keep generating. It will work again " +
                     "once it cools down.",
             )
         }
-        updateLastEntry { it.copy(isStreaming = false) }
         return false
     }
 
@@ -2382,6 +2576,10 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
  * alternative is a question that simply disappears.
  */
 private fun ChatUiState.refusalReason(): String? = when {
+    // First, because it is the one that used to fall through to null: a caller refused for
+    // this reason was told nothing at all, and the goal loop reported its own halt as "the
+    // turn could not be started" with no idea why.
+    isGenerating -> "A reply is still being written. Wait for it, or stop it first."
     isLoadingModel -> "The model is still loading. Ask again in a moment."
     modelName == null -> "No model is loaded yet. Choose one in Models."
     outputModality == OutputModality.SPEECH ->

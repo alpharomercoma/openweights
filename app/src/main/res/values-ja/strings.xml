@@ -142,4 +142,39 @@
     <string name="goal_stop">ゴールを停止</string>
     <string name="goal_send_steering">適用</string>
     <string name="goal_dismiss">閉じる</string>
+    <string name="attachment_limit">一度に添付できるメディアは %1$d 件までです。</string>
+    <string name="pdf_saved">PDF を保存しました</string>
+    <string name="pdf_save_failed">PDF を保存できませんでした。</string>
+    <string name="read_aloud">読み上げる</string>
+    <string name="stop_reading">読み上げを停止</string>
+    <string name="discover">探す</string><string name="back_to_search_results">検索結果に戻る</string>
+    <string name="no_filter_matches">フィルターに一致しません</string><string name="no_models_found">モデルが見つかりません</string><string name="try_wider_filters">サイズ範囲を広げるか、フィルターを解除してください。</string><string name="try_different_search">別の検索語を試してください。</string><string name="continue_search">検索を続ける</string>
+    <string name="proxy_search_only_detail">検索専用です。ダウンロードや開いたページには使いません。プロキシが役立つ場合がありますが保証はありません。</string>
+    <string name="attachment_unreadable">ファイルを読み取れませんでした。</string><string name="attachment_too_large">ファイルが %1$d MB を超えています。</string><string name="document_unreadable">テキストとして読み取れませんでした。</string><string name="model_text_only_attachment">このモデルはテキスト専用です。%1$s を送るにはプロジェクター付きモデルを読み込んでください。</string><string name="model_attachment_unsupported">このモデルは %1$s を読めません。%2$s を読めます。</string>
+    <string name="model_delete_loaded">%1$s は読み込み中です。モデル選択で解除してから削除してください。</string><string name="model_delete_failed">%1$s を削除できませんでした。もう一度お試しください。</string>
+    <string name="tool_search_name">ウェブ検索</string><string name="tool_search_detail">最新情報や未知の情報を検索します。</string><string name="tool_page_name">ページを開く</string><string name="tool_page_detail">公開ページのテキストを読みます。</string><string name="tool_find_file_name">ファイルを探す</string><string name="tool_find_file_detail">共有フォルダーを検索します。</string><string name="tool_read_file_name">ファイルを読む</string><string name="tool_read_file_detail">フォルダーのファイルを開きます。</string><string name="tool_save_file_name">ファイルを保存</string><string name="tool_save_file_detail">フォルダーにファイルを書き込みます。</string><string name="tool_script_name">スクリプト実行</string><string name="tool_script_detail">JavaScript で計算します。ファイルや通信は使いません。</string>
+    <string name="engine_duckduckgo_detail">アカウント不要。既定です。</string><string name="engine_brave_detail">独立した検索インデックスです。</string><string name="engine_bing_detail">Yahoo などでも使われます。</string><string name="engine_google_detail">一部のネットワークを拒否する場合があります。</string>
+    <string name="on_this_device">この端末上</string><string name="choose_folder">フォルダーを選択</string><string name="change">変更</string><string name="waiting_for_folder">フォルダーを待っています</string><string name="search_engines_status">%2$d 件中 %1$d 件が有効です。順番に試します。</string>
+    <string name="storage_on_device">この端末で %1$s</string>
+    <string name="models_empty">まだダウンロードされていません。チャット上部の名前からモデルを探せます。ダウンロード前に、この端末で動作するか確認できます。</string>
+    <string name="reads_attachments">添付ファイルを読み取り可能</string>
+    <string name="delete_model_title">モデルを削除しますか？</string>
+    <string name="delete_model_message">%1$s と関連ファイルを削除しますか？約 %2$s が完全に削除され、再利用には再ダウンロードが必要です。</string>
+    <string name="license_label">ライセンス %1$s</string>
+    <string name="parameter_count_millions">%1$d M パラメータ</string>
+    <string name="unsupported_architecture_detail">このバージョンの OpenWeights は %1$s モデルを読み込めません。対応にはアプリの更新が必要です。ファイルの閲覧は続けられます。</string>
+    <string name="vision_projector_detail">このモデルは画像を読み取れます。%1$s のビジョンエンコーダーもダウンロードされ、以下の見積もりに含まれています。</string>
+    <string name="context_length_tokens">コンテキスト長: %1$d トークン</string>
+    <string name="downloading_percent">ダウンロード中 %1$d%%</string>
+    <string name="needs_newer_version">新しい OpenWeights が必要です。このバージョンは %1$s モデルを読み込めません。</string>
+    <string name="header_read_failed">ファイルのヘッダーを読み取れませんでした: %1$s</string>
+    <string name="fit_comfortable">余裕をもって実行できます</string>
+    <string name="fit_tight">実行できますが、他のアプリが終了する場合があります</string>
+    <string name="fit_wont_run">このコンテキスト長では実行できません</string>
+    <string name="fit_no_storage">ダウンロードに必要な空き容量がありません</string>
+    <string name="run_tool_question">%1$s を実行しますか？</string>
+    <string name="no_tool_arguments">引数なし</string>
+    <string name="loading_model_into_memory">モデルをメモリに読み込んでいます</string>
+    <string name="each_model_says_if_it_runs">ダウンロード前に、この端末で動作するかがそれぞれに表示されます。</string>
+    <string name="answers_can_search_the_web">モデルが動き出すと、回答がウェブを検索することがあります。ツールで切り替えられます。</string>
 </resources>

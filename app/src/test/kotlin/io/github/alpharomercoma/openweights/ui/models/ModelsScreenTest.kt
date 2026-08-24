@@ -17,6 +17,9 @@
 package io.github.alpharomercoma.openweights.ui.models
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -57,17 +60,34 @@ class ModelsScreenTest {
     }
 
     @Test
-    fun `deleting a model reaches the store`() {
+    fun `deleting a model asks first, then reaches the store`() {
         // The policy says deleting a model removes its weights, and this is the control that
-        // promise reduces to.
+        // promise reduces to. It now goes through a confirmation, and both halves are worth
+        // asserting: the row on its own must not delete several gigabytes on one mistap, and
+        // confirming must actually reach the store rather than only closing the dialog.
         var deleted: LocalModel? = null
         showModels(models = listOf(model("LFM2.5-2.6B-Q4_K_M.gguf")), onDelete = { deleted = it })
 
         compose.onNodeWithText("Delete").performClick()
+        assert(deleted == null) { "the row deleted without asking, got ${deleted?.name}" }
+
+        compose.onNodeWithText("Delete model?").assertIsDisplayed()
+        compose.onNode(hasText("Delete") and hasAnyAncestor(isDialog())).performClick()
 
         assert(deleted?.name == "LFM2.5-2.6B-Q4_K_M") {
             "expected the model to be deleted, got ${deleted?.name}"
         }
+    }
+
+    @Test
+    fun `cancelling the confirmation leaves the model alone`() {
+        var deleted: LocalModel? = null
+        showModels(models = listOf(model("LFM2.5-2.6B-Q4_K_M.gguf")), onDelete = { deleted = it })
+
+        compose.onNodeWithText("Delete").performClick()
+        compose.onNode(hasText("Cancel") and hasAnyAncestor(isDialog())).performClick()
+
+        assert(deleted == null) { "cancelling still deleted ${deleted?.name}" }
     }
 
     @Test

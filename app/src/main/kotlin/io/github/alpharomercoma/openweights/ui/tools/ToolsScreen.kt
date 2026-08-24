@@ -182,7 +182,7 @@ fun ToolsScreen(
             }
 
             if (onDevice.isNotEmpty()) {
-                item { GroupHeading("On this device") }
+                item { GroupHeading(stringResource(R.string.on_this_device)) }
                 item { ToolGroup(tools = onDevice, onToggle = onToggle) }
             }
 
@@ -309,7 +309,11 @@ private fun WorkspaceCard(
                 onClick = { pick.launch(null) },
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
             ) {
-                Text(if (workspace.folder == null) "Choose a folder" else "Change")
+                Text(
+                    stringResource(
+                        if (workspace.folder == null) R.string.choose_folder else R.string.change,
+                    ),
+                )
             }
             if (workspace.folder != null) {
                 TextButton(
@@ -363,7 +367,7 @@ private fun ToolRow(tool: ToolSummary, onToggle: (Boolean) -> Unit) {
             // so the branch could not be reached by any registered tool and only the preview
             // ever showed it. Whether a run is approved is now a property of the turn rather
             // than of the tool, so there is nothing true this row could say about it.
-            val note = if (tool.isReady) null else "Waiting for a folder"
+            val note = if (tool.isReady) null else stringResource(R.string.waiting_for_folder)
             note?.let {
                 Text(
                     text = it,
@@ -453,8 +457,7 @@ private fun SearchCard(
         Text(
             // Says what the order means, because it is not the order of index quality and
             // somebody reading the list will otherwise assume it is.
-            text = "$on of ${engines.size} on. Tried in order until one answers, so the " +
-                "ones most likely to answer a phone come first.",
+            text = stringResource(R.string.search_engines_status, on, engines.size),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -469,7 +472,7 @@ private fun SearchCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(summary.engine.label, style = MaterialTheme.typography.bodyMedium)
                     Text(
-                        text = summary.engine.detail,
+                        text = stringResource(summary.engine.detailResource()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -492,9 +495,7 @@ private fun SearchCard(
         Text(
             // Both halves matter. The scope is a promise about privacy; the caveat stops
             // this reading as a fix for being blocked, which it is not.
-            text = "Used for search only, not for downloads or pages you open. Google and " +
-                "Bing refuse some networks outright, and a proxy may help. It is not a " +
-                "guarantee: one that is itself blocked fails the same way.",
+            text = stringResource(R.string.proxy_search_only_detail),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -508,4 +509,11 @@ private fun SearchCard(
         )
         TextButton(onClick = { onProxy(typed) }) { Text(stringResource(R.string.save_proxy)) }
     }
+}
+
+private fun SearchEngine.detailResource(): Int = when (this) {
+    SearchEngine.DUCKDUCKGO -> R.string.engine_duckduckgo_detail
+    SearchEngine.BRAVE -> R.string.engine_brave_detail
+    SearchEngine.BING -> R.string.engine_bing_detail
+    SearchEngine.GOOGLE -> R.string.engine_google_detail
 }

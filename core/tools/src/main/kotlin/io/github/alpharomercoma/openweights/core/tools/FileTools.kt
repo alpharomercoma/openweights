@@ -234,15 +234,23 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
 
     override val chains: Boolean = true
 
-    /**
-     * A write changes durable user state. It must remain an explicit capability even when
-     * the request came after an untrusted page or file: otherwise prompt injection can turn
-     * "save this" into an unattended workspace mutation. Replace is still called out in
-     * [asksInAuto] for callers that inspect the per-call reason.
-     */
-    override val alwaysAsks: Boolean = true
+    override val writesDurableData: Boolean = true
 
-    override fun asksInAuto(call: ToolCall): Boolean = call.flag("replace", "overwrite")
+    /**
+     * Replacing asks in every mode; creating does not.
+     *
+     * The two are not the same act. A new file in the shared folder is additive and visible,
+     * and the user can delete it; overwriting one destroys content that was there before
+     * this conversation and that nothing here can put back. So the destructive half asks
+     * even in Auto and even in Yolo, and the ordinary save stays a save.
+     *
+     * Stated as [asksInAuto] rather than [alwaysAsks] because that is what the runner reads
+     * for this tool. An `alwaysAsks = true` alongside this override would be inert: the
+     * default implementation of [asksInAuto] is the only thing [alwaysAsks] feeds, and this
+     * replaces it. Ask mode still questions every write through `needsApproval`.
+     */
+    override fun asksInAuto(call: ToolCall): Boolean =
+        alwaysAsks || call.flag("replace", "overwrite")
 
     override suspend fun run(call: ToolCall): String =
         workspace.unavailable().ifEmpty { create(call) }

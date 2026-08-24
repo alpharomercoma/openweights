@@ -72,7 +72,6 @@
     <string name="downloading">Nagda-download</string>
     <string name="download_queued">Nasa pila</string>
     <string name="download_verifying">Bine-verify</string>
-    <string name="download_progress">%1$s sa %2$s</string>
     <string name="report">I-report</string>
     <string name="now">Hindi ngayon</string>
     <string name="run">Patakbuhin</string>
@@ -143,4 +142,43 @@
     <string name="goal_stop">Itigil ang layunin</string>
     <string name="goal_send_steering">Ilapat</string>
     <string name="goal_dismiss">Isara</string>
+    <string name="attachment_limit">Maaari kang mag-attach ng hanggang %1$d media item nang sabay.</string>
+    <string name="pdf_saved">Na-save ang PDF</string>
+    <string name="pdf_save_failed">Hindi ma-save ang PDF.</string>
+    <string name="read_aloud">Basahin nang malakas</string>
+    <string name="stop_reading">Itigil ang pagbasa</string>
+    <string name="discover">Tuklasin</string><string name="back_to_search_results">Bumalik sa mga resulta</string>
+    <string name="no_filter_matches">Walang tugma sa mga filter</string><string name="no_models_found">Walang modelong nakita</string>
+    <string name="try_wider_filters">Palawakin ang laki o alisin ang mga filter at maghanap muli.</string><string name="try_different_search">Subukan ang ibang termino.</string><string name="continue_search">Ipagpatuloy ang paghahanap</string>
+    <string name="proxy_search_only_detail">Para lamang sa paghahanap, hindi sa download o binuksang pahina. Maaaring makatulong ang proxy ngunit walang garantiya.</string>
+    <string name="attachment_unreadable">Hindi mabasa ang file.</string><string name="attachment_too_large">Mas malaki sa %1$d MB ang file.</string><string name="document_unreadable">Hindi mabasa bilang teksto ang file.</string>
+    <string name="model_text_only_attachment">Teksto lang ang nababasa ng modelong ito. Mag-load ng modelong may projector upang magpadala ng %1$s.</string><string name="model_attachment_unsupported">Hindi mabasa ng modelo ang %1$s. Nababasa nito ang %2$s.</string>
+    <string name="model_delete_loaded">Naka-load ang %1$s. I-unload ito sa model picker bago burahin.</string><string name="model_delete_failed">Hindi mabura ang %1$s. Subukan muli.</string>
+    <string name="tool_search_name">Maghanap sa web</string><string name="tool_search_detail">Naghahanap ng bago o hindi alam.</string><string name="tool_page_name">Magbukas ng pahina</string><string name="tool_page_detail">Binabasa ang teksto ng pampublikong pahina.</string>
+    <string name="tool_find_file_name">Maghanap ng file</string><string name="tool_find_file_detail">Hinahanap ang ibinahaging folder.</string><string name="tool_read_file_name">Magbasa ng file</string><string name="tool_read_file_detail">Nagbubukas ng file sa folder.</string><string name="tool_save_file_name">Mag-save ng file</string><string name="tool_save_file_detail">Nagsusulat ng file sa folder.</string><string name="tool_script_name">Magpatakbo ng script</string><string name="tool_script_detail">Nagkakalkula gamit ang JavaScript, walang file o network.</string>
+    <string name="engine_duckduckgo_detail">Walang account. Default.</string><string name="engine_brave_detail">Sariling search index.</string><string name="engine_bing_detail">Ginagamit din ng Yahoo at iba pa.</string><string name="engine_google_detail">Malawak na index na maaaring tumanggi sa ilang network.</string>
+    <string name="on_this_device">Sa device na ito</string><string name="choose_folder">Pumili ng folder</string><string name="change">Palitan</string><string name="waiting_for_folder">Naghihintay ng folder</string><string name="search_engines_status">%1$d sa %2$d ang aktibo. Susubukan ayon sa pagkakasunod.</string>
+    <string name="storage_on_device">%1$s sa device na ito</string>
+    <string name="models_empty">Wala pang na-download. Mag-browse ng mga modelo mula sa pangalan sa itaas ng chat. Makikita sa bawat isa kung kaya nitong tumakbo sa teleponong ito bago mo ito i-download.</string>
+    <string name="download_progress">%1$s sa %2$s</string>
+    <string name="reads_attachments">nakakabasa ng mga attachment</string>
+    <string name="delete_model_title">Burahin ang modelo?</string>
+    <string name="delete_model_message">Burahin ang %1$s at mga kasamang file nito? Permanenteng aalisin ang humigit-kumulang %2$s at kailangan itong i-download muli.</string>
+    <string name="license_label">lisensya %1$s</string>
+    <string name="parameter_count_millions">%1$d M parameter</string>
+    <string name="unsupported_architecture_detail">Hindi kayang i-load ng bersyong ito ng OpenWeights ang mga modelong %1$s. Kailangan ng update ng app. Maaari mo pa ring tingnan ang mga file dito.</string>
+    <string name="vision_projector_detail">Nakakabasa ng larawan ang modelong ito. Kasamang ida-download ang %1$s vision encoder nito at kasama na ito sa mga tantiya sa ibaba.</string>
+    <string name="context_length_tokens">Haba ng konteksto: %1$d token</string>
+    <string name="downloading_percent">Dina-download %1$d%%</string>
+    <string name="needs_newer_version">Kailangan ng mas bagong OpenWeights: hindi kayang i-load ng bersyong ito ang mga modelong %1$s.</string>
+    <string name="header_read_failed">Hindi mabasa ang header ng file: %1$s</string>
+    <string name="fit_comfortable">Maayos na tatakbo</string>
+    <string name="fit_tight">Tatakbo, pero kapos: maaaring isara ang ibang app</string>
+    <string name="fit_wont_run">Hindi tatakbo sa habang ito ng konteksto</string>
+    <string name="fit_no_storage">Kulang ang libreng storage para mag-download</string>
+    <string name="run_tool_question">Patakbuhin ang %1$s?</string>
+    <string name="no_tool_arguments">walang mga argument</string>
+    <string name="loading_model_into_memory">Nilo-load ang modelo sa memory</string>
+    <string name="each_model_says_if_it_runs">Makikita sa bawat isa kung kaya nitong tumakbo sa teleponong ito bago mo ito i-download.</string>
+    <string name="answers_can_search_the_web">Kapag may tumatakbong modelo, puwedeng maghanap sa web ang mga sagot. Isa itong switch sa Mga tool.</string>
 </resources>

@@ -153,5 +153,6 @@ class ModelsViewModelTest {
         store,
         Publishers(HuggingFaceClient(OkHttpClient(), HubTokenSource { null })),
         FakeInferenceEngine(),
+        context,
     )
 }

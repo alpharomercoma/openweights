@@ -135,7 +135,7 @@ fun DiscoverScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = state.detail?.model?.name ?: "Discover",
+                        text = state.detail?.model?.name ?: stringResource(R.string.discover),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },
@@ -153,9 +153,9 @@ fun DiscoverScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                 contentDescription = if (state.detail != null) {
-                                    "Back to search results"
+                                    stringResource(R.string.back_to_search_results)
                                 } else {
-                                    "Back"
+                                    stringResource(R.string.back)
                                 },
                             )
                         }
@@ -226,6 +226,8 @@ fun DiscoverScreen(
             if (state.results.isEmpty() && !state.isSearching && state.error == null) {
                 EmptyResults(
                     hasFilters = state.query.activeCount > 0,
+                    canContinue = state.canLoadMore,
+                    onContinue = onLoadMore,
                     onClearFilters = onClearFilters,
                 )
             }
@@ -307,27 +309,37 @@ private fun resultShape(index: Int, last: Int) = RoundedCornerShape(
 
 /** What to say when the Hub has nothing, which on a narrow filter is most of the time. */
 @Composable
-private fun EmptyResults(hasFilters: Boolean, onClearFilters: () -> Unit) {
+private fun EmptyResults(
+    hasFilters: Boolean,
+    canContinue: Boolean,
+    onContinue: () -> Unit,
+    onClearFilters: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = if (hasFilters) "Nothing matches those filters" else "No models found",
+            text = stringResource(
+                if (hasFilters) R.string.no_filter_matches else R.string.no_models_found,
+            ),
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
             text = if (hasFilters) {
-                "Try a wider size band, or clear the filters and search again."
+                stringResource(R.string.try_wider_filters)
             } else {
-                "Try a different search term."
+                stringResource(R.string.try_different_search)
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (hasFilters) {
             TextButton(onClick = onClearFilters) { Text(stringResource(R.string.clear_filters)) }
+        }
+        if (canContinue) {
+            TextButton(onClick = onContinue) { Text(stringResource(R.string.continue_search)) }
         }
     }
 }
@@ -350,9 +362,11 @@ private fun ModelDetail(
                 Text(detail.model.id, style = MaterialTheme.typography.titleMedium)
                 Metric(
                     listOfNotNull(
-                        detail.license?.let { "license $it" },
+                        detail.license?.let { stringResource(R.string.license_label, it) },
                         detail.architecture,
-                        detail.parameterCount?.let { "${it / 1_000_000} M params" },
+                        detail.parameterCount?.let {
+                            stringResource(R.string.parameter_count_millions, it / 1_000_000)
+                        },
                     ).joinToString(" · "),
                 )
             }
@@ -366,9 +380,7 @@ private fun ModelDetail(
         detail.architecture?.takeUnless { EngineArchitectures.supports(it) }?.let { arch ->
             item {
                 Callout(
-                    "This version of OpenWeights cannot load $arch models. The engine that " +
-                        "reads them ships inside the app, so an update is what adds them. " +
-                        "You can still browse the files here.",
+                    stringResource(R.string.unsupported_architecture_detail, arch),
                 )
             }
         }
@@ -379,9 +391,10 @@ private fun ModelDetail(
                 // is a second file, it is counted in the fit report above, and on a small
                 // vision model it can be larger than the model itself.
                 Callout(
-                    "This model can read images. Its ${formatBytes(projector.sizeBytes)} " +
-                        "vision encoder downloads with it, and the estimates below already " +
-                        "count it.",
+                    stringResource(
+                        R.string.vision_projector_detail,
+                        formatBytes(projector.sizeBytes),
+                    ),
                 )
             }
         }
@@ -391,7 +404,9 @@ private fun ModelDetail(
                 // The slider is the point: KV cache scales with context, so the same file
                 // can be comfortable at 4k and impossible at 64k. Changing it re-runs the
                 // maths locally, with no further network use.
-                Caption("Context length: ${state.contextLength} tokens")
+                Caption(
+                    stringResource(R.string.context_length_tokens, state.contextLength),
+                )
                 StepSlider(
                     value = state.contextLength.toFloat(),
                     onValueChange = { onContextLengthChange(it.roundToInt()) },

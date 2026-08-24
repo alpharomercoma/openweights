@@ -74,6 +74,29 @@ class ChatViewModelTest : ChatFixture() {
     }
 
     @Test
+    fun `stopping before an edited message is written gives the composer back`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.send("First question")
+            settle()
+            engine.finish("An answer")
+            settle()
+
+            val first = viewModel.uiState.value.transcript.first().id
+            viewModel.editAndResend(first, "Second question")
+            // The same window as the send case above: the row is being rewritten and
+            // generate() has not run, so nothing has registered anything to hand the busy
+            // state back. Stop here left the composer disabled for the rest of the session.
+            assertThat(viewModel.uiState.value.isGenerating).isTrue()
+
+            viewModel.stop()
+            settle()
+
+            assertThat(viewModel.uiState.value.isGenerating).isFalse()
+        }
+
+    @Test
     fun `stopping a generation leaves what was produced and clears the busy state`() =
         runTest(dispatcher) {
             loadModel()

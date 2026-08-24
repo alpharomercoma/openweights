@@ -36,9 +36,8 @@ import java.io.OutputStream
  *
  * What that costs is worth stating plainly: this understands the Markdown a model actually
  * writes and nothing more. Headings, paragraphs, bullet and numbered lists, fenced code,
- * block quotes, rules, and inline emphasis. Not tables, not images, not clickable links. A
- * table arrives as its own source text rather than as a grid, which is ugly and readable,
- * and both of those beat dropping it.
+ * block quotes, rules, inline emphasis, and tables flattened into readable cell rows. It
+ * does not embed images or clickable links.
  *
  * A4 rather than Letter, because everywhere outside North America uses it.
  */
@@ -146,17 +145,34 @@ class MarkdownPdf(
         // A truncated reply really does mean the tail is code. A renderer's job is to be
         // right, not to guess what the author meant to write.
         var inCode = false
+        var inTable = false
+        val lines = markdown.lines()
 
-        markdown.lines().forEach { raw ->
+        lines.forEachIndexed { index, raw ->
             val line = raw.trimEnd()
             if (line.trimStart().startsWith(FENCE)) {
                 inCode = !inCode
+                inTable = false
                 sheet.y += BODY_SIZE / 2
-                return@forEach
+                return@forEachIndexed
             }
             if (inCode) {
                 // Not stripped and not wrapped on words: code is what it says it is.
                 draw(sheet, line.ifBlank { " " }, mono)
+            } else if (line.trim().matches(TABLE_DIVIDER)) {
+                inTable = true
+            } else if (
+                inTable ||
+                lines.getOrNull(index + 1)?.trim()?.matches(TABLE_DIVIDER) == true
+            ) {
+                val cells = line.trim().trim('|').split('|').map(String::trim)
+                if (cells.size >= 2) {
+                    draw(sheet, cells.joinToString("  ·  ").stripInline(), body)
+                    inTable = true
+                } else {
+                    inTable = false
+                    block(sheet, line, body)
+                }
             } else {
                 block(sheet, line, body)
             }
@@ -263,6 +279,8 @@ class MarkdownPdf(
         private val RULE = Regex("""^(-{3,}|\*{3,}|_{3,})$""")
         private val BULLET = Regex("""^[-*+]\s+.*""")
         private val NUMBERED = Regex("""^\d+[.)]\s+.*""")
+        private val TABLE_DIVIDER =
+            Regex("\\|?\\s*:?-{3,}:?\\s*(\\|\\s*:?-{3,}:?\\s*)+\\|?")
     }
 }
 

@@ -31,6 +31,9 @@ import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.io.Reader
 import java.util.UUID
 import javax.inject.Inject
@@ -45,6 +48,12 @@ import kotlin.math.roundToInt
  * image, which needs a projector and a path on disk, a document is read into the question.
  */
 data class StagedDocument(val name: String, val text: String, val wasTrimmed: Boolean)
+
+sealed interface AttachmentResult {
+    data class Stored(val files: List<MessagePart.File>) : AttachmentResult
+    data class TooLarge(val limitBytes: Long) : AttachmentResult
+    data object Unreadable : AttachmentResult
+}
 
 /** Reads at most [limit] characters plus one character that proves more content exists. */
 internal fun Reader.readDocumentWindow(limit: Int): String {
@@ -82,31 +91,104 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * Returns an empty list when the file cannot be read, which is the normal outcome of a
      * picker result whose permission was already revoked.
      */
-    suspend fun store(uri: Uri): List<MessagePart.File> = withContext(Dispatchers.IO) {
-        val mediaType = context.contentResolver.getType(uri) ?: FALLBACK_MEDIA_TYPE
+    suspend fun store(uri: Uri): AttachmentResult = withContext(Dispatchers.IO) {
+        val mediaType = runCatching { context.contentResolver.getType(uri) }
+            .getOrNull() ?: FALLBACK_MEDIA_TYPE
+        val kind = MediaKind.of(mediaType)
         val displayName = displayName(uri)
 
-        if (MediaKind.of(mediaType) == MediaKind.VIDEO) {
-            return@withContext runCatching { sampleFrames(uri, displayName) }
+        refusedUpFront(uri, kind)
+            ?: if (kind == MediaKind.VIDEO) {
+                storeVideoFrames(uri, displayName)
+            } else {
+                storeOneFile(uri, mediaType, kind, displayName)
+            }
+    }
+
+    /**
+     * What can be refused before a single byte is copied, or null to go ahead.
+     *
+     * The declared size is the provider's word and is checked because it is free, not
+     * because it is trusted: [bounded] and [copyBounded] enforce the same limit again while
+     * the bytes are actually moving. The storage check is here rather than there because a
+     * phone that is already full should say so instead of half-writing a file first.
+     */
+    private fun refusedUpFront(uri: Uri, kind: MediaKind): AttachmentResult? {
+        val largestAccepted = largestAccepted(kind)
+        val declared = declaredSize(uri)?.takeIf { it > 0L } ?: 0L
+        return when {
+            declared > largestAccepted -> AttachmentResult.TooLarge(largestAccepted)
+            directory.usableSpace <= STORAGE_RESERVE_BYTES -> AttachmentResult.Unreadable
+            else -> null
+        }
+    }
+
+    /**
+     * Stages the clip privately, then reads frames out of that copy.
+     *
+     * Always through a file of our own, never straight from the provider. `SIZE` is
+     * advisory, and the retriever is native code: a provider that lies about its length
+     * would otherwise stream as many bytes as it liked into it.
+     */
+    private fun storeVideoFrames(uri: Uri, displayName: String?): AttachmentResult {
+        val temporary = File(directory, "${UUID.randomUUID()}.video.tmp")
+        val prepared = runCatching { copyBounded(uri, temporary, MAX_VIDEO_SOURCE_BYTES) }
+        if (prepared.getOrDefault(false).not()) {
+            temporary.delete()
+            return refusal(prepared.exceptionOrNull(), MAX_VIDEO_SOURCE_BYTES)
+        }
+        return try {
+            runCatching { sampleFrames(temporary, displayName) }
                 .onFailure { Log.w(TAG, "could not read frames from the chosen video", it) }
                 .getOrDefault(emptyList())
+                .stored()
+        } finally {
+            temporary.delete()
         }
+    }
 
+    /** One picture, sound file or document, copied in under the same byte ceiling. */
+    private fun storeOneFile(
+        uri: Uri,
+        mediaType: String,
+        kind: MediaKind,
+        displayName: String?,
+    ): AttachmentResult {
         val target = File(directory, "${UUID.randomUUID()}${extensionFor(displayName, mediaType)}")
-        val copied = runCatching {
-            if (MediaKind.of(mediaType) == MediaKind.IMAGE) {
+        val copy = runCatching {
+            if (kind == MediaKind.IMAGE) {
                 copyImageDownscaled(uri, target)
             } else {
                 copyVerbatim(uri, target)
             }
-        }.getOrDefault(false)
-
-        if (!copied) {
-            target.delete()
-            return@withContext emptyList()
         }
-        listOf(MessagePart.File(target.absolutePath, mediaType, displayName))
+        if (copy.getOrDefault(false).not()) {
+            target.delete()
+            return refusal(copy.exceptionOrNull(), MAX_COPIED_ATTACHMENT_BYTES)
+        }
+        return listOf(MessagePart.File(target.absolutePath, mediaType, displayName)).stored()
     }
+
+    private fun largestAccepted(kind: MediaKind): Long =
+        if (kind == MediaKind.VIDEO) MAX_VIDEO_SOURCE_BYTES else MAX_COPIED_ATTACHMENT_BYTES
+
+    /**
+     * Why a copy did not happen, said apart from "it did not".
+     *
+     * Only the byte ceiling is worth a distinct answer: it is the one refusal the person can
+     * do something about, by picking a smaller file. A revoked permission, a provider that
+     * disappeared and a full disk all read the same from here.
+     */
+    private fun refusal(failure: Throwable?, limit: Long): AttachmentResult =
+        if (failure is AttachmentTooLargeException) {
+            AttachmentResult.TooLarge(limit)
+        } else {
+            AttachmentResult.Unreadable
+        }
+
+    /** Nothing staged is a failure, not an empty success: there is no message to send. */
+    private fun List<MessagePart.File>.stored(): AttachmentResult =
+        if (isEmpty()) AttachmentResult.Unreadable else AttachmentResult.Stored(this)
 
     /**
      * Turns a video into a handful of stills.
@@ -119,10 +201,14 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * phone is measured in seconds, so a handful of evenly spaced frames is the difference
      * between "what happens in this clip" answered in a minute and answered in ten.
      */
-    private fun sampleFrames(uri: Uri, displayName: String?): List<MessagePart.File> {
+    private fun sampleFrames(source: File, displayName: String?): List<MessagePart.File> {
         val retriever = MediaMetadataRetriever()
+        val made = mutableListOf<File>()
         return try {
-            retriever.setDataSource(context, uri)
+            // A path, never a content URI. Taking the provider's stream here is what
+            // [storeVideoFrames] exists to avoid, and leaving that branch in place would
+            // leave the door it closed standing open for the next caller.
+            retriever.setDataSource(source.absolutePath)
             val durationMs = retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull()
@@ -146,8 +232,14 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
                 val target = File(directory, "${UUID.randomUUID()}.jpg")
                 try {
                     target.outputStream().use { output ->
-                        frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+                        check(frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                            "video frame could not be encoded"
+                        }
                     }
+                    made += target
+                } catch (failure: Throwable) {
+                    target.delete()
+                    throw failure
                 } finally {
                     frame.recycle()
                 }
@@ -157,6 +249,9 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
                     name = "${displayName ?: "Video"} · frame ${index + 1}",
                 )
             }
+        } catch (failure: Throwable) {
+            made.forEach(File::delete)
+            throw failure
         } finally {
             retriever.release()
         }
@@ -191,7 +286,16 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
                         ?.let { ".$it" }
                         .orEmpty()
                     val target = File(directory, "${UUID.randomUUID()}$suffix")
-                    source.copyTo(target, overwrite = false)
+                    check(directory.usableSpace > source.length() + STORAGE_RESERVE_BYTES) {
+                        "not enough storage to duplicate attachment"
+                    }
+                    // Bounded by the length measured a moment ago, so a file being written
+                    // while it is read cannot copy forever.
+                    source.inputStream().use { input ->
+                        target.outputStream().use { output ->
+                            pipeBounded(input, output, source.length())
+                        }
+                    }
                     made += target
                     attachment.copy(path = target.absolutePath)
                 }
@@ -202,10 +306,40 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         }
 
     private fun copyVerbatim(uri: Uri, target: File): Boolean =
+        copyBounded(uri, target, MAX_COPIED_ATTACHMENT_BYTES)
+
+    private fun copyBounded(uri: Uri, target: File, limit: Long): Boolean =
         context.contentResolver.openInputStream(uri)?.use { input ->
-            target.outputStream().use(input::copyTo)
+            target.outputStream().use { output -> pipeBounded(input, output, limit) }
             true
         } ?: false
+
+    /**
+     * Copies until the source ends, the ceiling is reached, or the device runs low.
+     *
+     * The ceiling is enforced here, while the bytes move, rather than only from whatever
+     * length the source claimed beforehand: a content provider's `SIZE` is a hint, and the
+     * one that lies about it is exactly the one worth stopping.
+     *
+     * The free-space check is inside the loop for the same reason. A phone with room for
+     * the file when the copy started can be out of it by the end, because a download or a
+     * photo taken meanwhile is writing to the same volume, and filling the last of a
+     * device's storage is a worse failure than refusing the attachment.
+     */
+    private fun pipeBounded(input: InputStream, output: OutputStream, limit: Long) {
+        val buffer = ByteArray(COPY_BUFFER_BYTES)
+        var copied = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) return
+            copied += read
+            if (copied > limit) throw AttachmentTooLargeException()
+            check(directory.usableSpace > STORAGE_RESERVE_BYTES) {
+                "attachment would use the device's storage reserve"
+            }
+            output.write(buffer, 0, read)
+        }
+    }
 
     /**
      * Copies an image, shrinking it to something a phone can actually encode.
@@ -218,7 +352,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      */
     private fun copyImageDownscaled(uri: Uri, target: File): Boolean {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use {
+        context.contentResolver.openInputStream(uri)?.bounded(MAX_COPIED_ATTACHMENT_BYTES)?.use {
             BitmapFactory.decodeStream(it, null, bounds)
         }
 
@@ -232,6 +366,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
             inSampleSize = Integer.highestOneBit(longestEdge / MAX_IMAGE_EDGE)
         }
         val decoded = context.contentResolver.openInputStream(uri)
+            ?.bounded(MAX_COPIED_ATTACHMENT_BYTES)
             ?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: return false
 
@@ -251,7 +386,9 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         // is already scarce.
         try {
             target.outputStream().use { output ->
-                resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
+                check(resized.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                    "image could not be encoded"
+                }
             }
         } finally {
             if (resized !== decoded) resized.recycle()
@@ -294,6 +431,20 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
             ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
     }.getOrNull() ?: uri.lastPathSegment
 
+    private fun declaredSize(uri: Uri): Long? = runCatching {
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst() &&
+                    !cursor.isNull(0)
+                ) {
+                    cursor.getLong(0)
+                } else {
+                    null
+                }
+            }
+    }.getOrNull()
+
     /**
      * The extension to save under.
      *
@@ -333,6 +484,10 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         /** Longest edge in pixels. Above this, prompt processing dominates the reply. */
         const val MAX_IMAGE_EDGE = 1024
         const val JPEG_QUALITY = 90
+        const val COPY_BUFFER_BYTES = 64 * 1024
+        const val MAX_COPIED_ATTACHMENT_BYTES = 128L * 1024 * 1024
+        const val MAX_VIDEO_SOURCE_BYTES = 1024L * 1024 * 1024
+        const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
 
         /**
          * Frames taken from a video.
@@ -344,3 +499,34 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         const val MICROS_PER_MILLI = 1000L
     }
 }
+
+/** Stops providers that omit or lie about SIZE from supplying an unbounded stream. */
+internal fun InputStream.bounded(limit: Long): InputStream = object : FilterInputStream(this) {
+    private var consumed = 0L
+
+    override fun read(): Int {
+        val value = super.read()
+        if (value >= 0) account(1)
+        return value
+    }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        val read = super.read(buffer, offset, length)
+        if (read > 0) account(read.toLong())
+        return read
+    }
+
+    override fun skip(bytes: Long): Long {
+        if (bytes <= 0L) return 0L
+        val skipped = super.skip(bytes)
+        if (skipped > 0L) account(skipped)
+        return skipped
+    }
+
+    private fun account(bytes: Long) {
+        if (bytes > limit - consumed) throw AttachmentTooLargeException()
+        consumed += bytes
+    }
+}
+
+internal class AttachmentTooLargeException : Exception("attachment exceeded its byte limit")

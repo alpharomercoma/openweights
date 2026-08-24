@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.models
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +29,8 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.Publishers
@@ -96,6 +99,15 @@ data class ModelsUiState(
      * failure, and nothing here waits for one.
      */
     val avatars: Map<String, String> = emptyMap(),
+    /**
+     * One line about something the screen refused to do, or null.
+     *
+     * Deleting the model that is currently loaded is the case this exists for. Refusing was
+     * right and refusing in silence was not: the row stayed exactly where it was, with no
+     * dialog, no error and nothing to read, which reads as a broken button rather than as a
+     * rule. Cleared by the next refresh, so it does not outlive the tap that caused it.
+     */
+    val notice: String? = null,
 ) {
     /** The installed models under the name of whoever published them. */
     val grouped: List<PublisherGroup> get() = models.byPublisher()
@@ -107,6 +119,7 @@ class ModelsViewModel @Inject constructor(
     private val modelStore: ModelStore,
     private val publishers: Publishers,
     private val engine: InferenceEngine,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val local = MutableStateFlow(ModelsUiState())
 
@@ -173,7 +186,11 @@ class ModelsViewModel @Inject constructor(
             LocalModel(file, modelStore.projectorFor(file), modelStore.publisherOf(file.name))
         }
         local.update {
-            it.copy(models = models, storageUsedBytes = models.sumOf { model -> model.sizeBytes })
+            it.copy(
+                models = models,
+                storageUsedBytes = models.sumOf { model -> model.sizeBytes },
+                notice = null,
+            )
         }
         resolveAvatars(models)
     }
@@ -220,7 +237,7 @@ class ModelsViewModel @Inject constructor(
         // logged, which is what the next person debugging a missing download will look at.
         val name = file.fileName
         if (name.isBlank()) {
-            Log.w("OpenWeights", "refused to download ${'$'}repoId/${'$'}path: unusable file name")
+            Log.w("OpenWeights", "refused to download $repoId/$path: unusable file name")
             return
         }
         start(repoId, file, File(modelStore.directory, name))
@@ -279,17 +296,37 @@ class ModelsViewModel @Inject constructor(
 
     fun delete(model: LocalModel) {
         // A mapped model can survive an unlink on some filesystems but not all engines
-        // tolerate the backing file disappearing while a generation is in flight. The
-        // picker exposes an explicit unload action; deletion is therefore a no-op until
-        // the user releases the model first.
-        if (engine.loadedModel?.modelPath == model.file.absolutePath) return
+        // tolerate the backing file disappearing while a generation is in flight, so the
+        // loaded model is not deleted out from under the engine. Said out loud, with the
+        // way out named: the picker has an unload action and nothing else on screen would
+        // have told the user that.
+        if (engine.loadedModel?.modelPath == model.file.absolutePath) {
+            local.update {
+                it.copy(
+                    notice = context.getString(R.string.model_delete_loaded, model.name),
+                )
+            }
+            return
+        }
+        // Refuse to hide the primary model if its large companion cannot be removed.
+        // This keeps a failed cleanup visible and retryable from the same row.
+        if (model.projector?.let { it.exists() && !it.delete() } == true) {
+            local.update {
+                it.copy(notice = context.getString(R.string.model_delete_failed, model.name))
+            }
+            return
+        }
+        model.projector?.sourceSidecar?.delete()
+        if (!model.file.delete()) {
+            local.update {
+                it.copy(notice = context.getString(R.string.model_delete_failed, model.name))
+            }
+            return
+        }
         modelStore.forgetPublisher(model.file.name)
-        model.file.delete()
         model.file.sourceSidecar.delete()
         // The projector is useless without its model and is often the larger of the two,
         // so leaving it behind would quietly keep hundreds of megabytes.
-        model.projector?.delete()
-        model.projector?.sourceSidecar?.delete()
         refresh()
     }
 

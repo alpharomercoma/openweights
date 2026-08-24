@@ -71,7 +71,6 @@
     <string name="downloading">Descargando</string>
     <string name="download_queued">En cola</string>
     <string name="download_verifying">Verificando</string>
-    <string name="download_progress">%1$s de %2$s</string>
     <string name="report">Informar</string>
     <string name="now">Ahora no</string>
     <string name="run">Ejecutar</string>
@@ -142,4 +141,58 @@
     <string name="goal_stop">Detener objetivo</string>
     <string name="goal_send_steering">Aplicar</string>
     <string name="goal_dismiss">Descartar</string>
+    <string name="attachment_limit">Puedes adjuntar hasta %1$d elementos multimedia a la vez.</string>
+    <string name="pdf_saved">PDF guardado</string>
+    <string name="pdf_save_failed">No se pudo guardar el PDF.</string>
+    <string name="read_aloud">Leer en voz alta</string>
+    <string name="stop_reading">Detener lectura</string>
+    <string name="discover">Descubrir</string>
+    <string name="back_to_search_results">Volver a los resultados</string>
+    <string name="no_filter_matches">Nada coincide con esos filtros</string>
+    <string name="no_models_found">No se encontraron modelos</string>
+    <string name="try_wider_filters">Amplía el tamaño o borra los filtros y vuelve a buscar.</string>
+    <string name="try_different_search">Prueba otro término de búsqueda.</string>
+    <string name="continue_search">Continuar búsqueda</string>
+    <string name="proxy_search_only_detail">Se usa solo para búsquedas, no para descargas ni páginas abiertas. Un proxy puede ayudar, pero no lo garantiza.</string>
+    <string name="attachment_unreadable">No se pudo leer ese archivo.</string>
+    <string name="attachment_too_large">Ese archivo supera %1$d MB.</string>
+    <string name="document_unreadable">No se pudo leer ese archivo como texto.</string>
+    <string name="model_text_only_attachment">Este modelo solo lee texto. Carga un modelo con proyector para enviar %1$s.</string>
+    <string name="model_attachment_unsupported">Este modelo no puede leer %1$s. Puede leer %2$s.</string>
+    <string name="model_delete_loaded">%1$s está cargado. Descárgalo del selector y luego elimínalo.</string>
+    <string name="model_delete_failed">No se pudo eliminar %1$s. Inténtalo de nuevo.</string>
+    <string name="tool_search_name">Buscar en la web</string><string name="tool_search_detail">Busca información reciente o desconocida.</string>
+    <string name="tool_page_name">Abrir una página</string><string name="tool_page_detail">Lee el texto de una página pública.</string>
+    <string name="tool_find_file_name">Buscar un archivo</string><string name="tool_find_file_detail">Busca en la carpeta compartida.</string>
+    <string name="tool_read_file_name">Leer un archivo</string><string name="tool_read_file_detail">Abre un archivo de esa carpeta.</string>
+    <string name="tool_save_file_name">Guardar un archivo</string><string name="tool_save_file_detail">Escribe un archivo en esa carpeta.</string>
+    <string name="tool_script_name">Ejecutar un script</string><string name="tool_script_detail">Calcula con JavaScript, sin archivos ni red.</string>
+    <string name="engine_duckduckgo_detail">Responde sin una cuenta. Predeterminado.</string>
+    <string name="engine_brave_detail">Un índice de búsqueda independiente.</string>
+    <string name="engine_bing_detail">También impulsa Yahoo y otros.</string>
+    <string name="engine_google_detail">Un índice amplio que puede rechazar algunas redes.</string>
+    <string name="on_this_device">En este dispositivo</string><string name="choose_folder">Elegir carpeta</string><string name="change">Cambiar</string><string name="waiting_for_folder">Esperando una carpeta</string><string name="search_engines_status">%1$d de %2$d activos. Se prueban en orden hasta obtener respuesta.</string>
+    <string name="storage_on_device">%1$s en este dispositivo</string>
+    <string name="models_empty">Todavía no hay descargas. Explora modelos desde el nombre en la parte superior del chat. Cada uno indica si funciona en este teléfono antes de descargarlo.</string>
+    <string name="download_progress">%1$s de %2$s</string>
+    <string name="reads_attachments">lee archivos adjuntos</string>
+    <string name="delete_model_title">¿Eliminar modelo?</string>
+    <string name="delete_model_message">¿Eliminar %1$s y sus archivos asociados? Se borrarán permanentemente unos %2$s y tendrás que volver a descargarlo.</string>
+    <string name="license_label">licencia %1$s</string>
+    <string name="parameter_count_millions">%1$d M parámetros</string>
+    <string name="unsupported_architecture_detail">Esta versión de OpenWeights no puede cargar modelos %1$s. Se necesita una actualización de la app. Aún puedes explorar los archivos.</string>
+    <string name="vision_projector_detail">Este modelo puede leer imágenes. Su codificador visual de %1$s se descarga con él y ya está incluido en las estimaciones.</string>
+    <string name="context_length_tokens">Longitud del contexto: %1$d tokens</string>
+    <string name="downloading_percent">Descargando %1$d%%</string>
+    <string name="needs_newer_version">Se necesita una versión más reciente de OpenWeights: esta versión no carga modelos %1$s.</string>
+    <string name="header_read_failed">No se pudo leer la cabecera del archivo: %1$s</string>
+    <string name="fit_comfortable">Funciona con holgura</string>
+    <string name="fit_tight">Funciona con poca memoria; podrían cerrarse otras apps</string>
+    <string name="fit_wont_run">No funcionará con esta longitud de contexto</string>
+    <string name="fit_no_storage">No hay espacio libre suficiente para descargar</string>
+    <string name="run_tool_question">¿Ejecutar %1$s?</string>
+    <string name="no_tool_arguments">sin argumentos</string>
+    <string name="loading_model_into_memory">Cargando el modelo en memoria</string>
+    <string name="each_model_says_if_it_runs">Cada uno indica si funciona en este teléfono antes de descargarlo.</string>
+    <string name="answers_can_search_the_web">Cuando haya un modelo en marcha, las respuestas pueden buscar en la web. Es un interruptor en Herramientas.</string>
 </resources>

@@ -21,14 +21,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
 
 /** The envelope a run comes back in, so one string carries both halves of the answer. */
 private const val FAILED_MARK = "!"
@@ -72,44 +73,64 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
             // Null is the outer clock winning, which only happens when the process itself
             // went away: a script that merely ran long stops itself from the inside and
             // comes back as an ordinary failure with something in it to read.
-            withTimeoutOrNull(millis + GRACE_MILLIS) {
-                val runner = connection.awaitBinder()
-                // The binder throws if the far side died, and for an isolated process that
-                // is an ordinary Tuesday: Android reclaims it under memory pressure, and a
-                // model holding a couple of gigabytes supplies plenty of that.
-                runCatching {
-                    runner.run(source, inputsJson, memoryBytes, millis, outputLimit)
-                }.map { it.decoded() }.getOrElse { ScriptResult(STOPPED, failed = true) }
-            } ?: ScriptResult(STOPPED, failed = true)
+            try {
+                withTimeoutOrNull(millis + GRACE_MILLIS) {
+                    val runner = connection.awaitBinder()
+                    val result = CompletableDeferred<String>()
+                    runner.run(
+                        source,
+                        inputsJson,
+                        memoryBytes,
+                        millis,
+                        outputLimit,
+                        object : IScriptResultCallback.Stub() {
+                            override fun onResult(value: String) {
+                                result.complete(value)
+                            }
+                        },
+                    )
+                    result.await().decoded()
+                } ?: ScriptResult(STOPPED, failed = true)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+                Log.w("Sandbox", "Isolated runner stopped before returning", failure)
+                ScriptResult(STOPPED, failed = true)
+            }
         } finally {
             runCatching { context.unbindService(connection) }
         }
     }
 
     private class Connection : ServiceConnection {
-        private var binder: IBinder? = null
-        private var waiting: ((IBinder) -> Unit)? = null
+        /**
+         * One thread-safe hand-off from Android's service callback to the IO coroutine.
+         *
+         * Keeping a nullable binder and a nullable callback was a check-then-set race: the
+         * service could connect after awaitBinder read null but before it installed the
+         * callback, leaving a live binder with nobody to wake and a five-second false timeout.
+         */
+        private val connected = CompletableDeferred<IScriptRunner>()
 
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            service ?: return
-            binder = service
-            waiting?.invoke(service)
-            waiting = null
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            binder = null
-        }
-
-        suspend fun awaitBinder(): IScriptRunner = suspendCancellableCoroutine { continuation ->
-            val ready = binder
-            if (ready != null) {
-                continuation.resume(IScriptRunner.Stub.asInterface(ready))
+            if (service == null) {
+                connected.completeExceptionally(IllegalStateException("sandbox returned no binder"))
             } else {
-                waiting = { continuation.resume(IScriptRunner.Stub.asInterface(it)) }
-                continuation.invokeOnCancellation { waiting = null }
+                connected.complete(IScriptRunner.Stub.asInterface(service))
             }
         }
+
+        override fun onNullBinding(name: ComponentName?) {
+            connected.completeExceptionally(IllegalStateException("sandbox refused binding"))
+        }
+
+        override fun onBindingDied(name: ComponentName?) {
+            connected.completeExceptionally(IllegalStateException("sandbox binding died"))
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) = Unit
+
+        suspend fun awaitBinder(): IScriptRunner = connected.await()
     }
 
     private companion object {

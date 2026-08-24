@@ -14,18 +14,21 @@
 
 package io.github.alpharomercoma.openweights.core.sandbox;
 
+import io.github.alpharomercoma.openweights.core.sandbox.IScriptResultCallback;
+
 // The whole surface between the app and the process that runs scripts.
 //
 // One call, all inputs, one answer. Deliberately narrow: everything crossing this boundary
 // is a string or a number the app chose, and nothing on the other side can ask for more.
 // The reply comes back as a JSON envelope rather than through an out parameter, so there is
 // one thing to marshal and one thing to get wrong.
-interface IScriptRunner {
-    String run(
+oneway interface IScriptRunner {
+    void run(
         in String source,
         in String inputsJson,
         in long memoryBytes,
         in long millis,
-        in int outputLimit
+        in int outputLimit,
+        in IScriptResultCallback callback
     );
 }

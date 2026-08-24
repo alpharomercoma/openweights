@@ -151,20 +151,29 @@ fun WorkBlock(
  */
 internal fun List<TurnBlock>.workLabel(expanded: Boolean): String {
     val steps = filterIsInstance<TurnBlock.Step>().map { it.step }
-    if (steps.isEmpty()) return "Worked on it"
-    if (steps.size == 1) return if (expanded) "Hide the steps" else steps.first().headline()
-
-    val skipped = steps.count { it is AgentStep.Skipped }
-    val ran = steps.size - skipped
-    val what = when {
-        ran == 0 -> return "Skipped $skipped steps"
-        skipped > 0 -> "Used $ran of ${steps.size} tools"
-        else -> "Used $ran tools"
+    return when {
+        steps.isEmpty() -> "Worked on it"
+        steps.size == 1 -> if (expanded) "Hide the steps" else steps.first().headline()
+        else -> {
+            val skipped = steps.count { it is AgentStep.Skipped }
+            val ran = steps.size - skipped
+            val what = when {
+                ran == 0 -> "Skipped $skipped steps"
+                skipped > 0 -> "Used $ran of ${steps.size} tools"
+                else -> "Used $ran tools"
+            }
+            val millis = steps.filterIsInstance<AgentStep.Ran>().sumOf { it.millis }
+            if (millis <= 0) {
+                what
+            } else {
+                what + String.format(
+                    Locale.getDefault(),
+                    " · %.1fs",
+                    millis / MILLIS_PER_SECOND,
+                )
+            }
+        }
     }
-
-    val millis = steps.filterIsInstance<AgentStep.Ran>().sumOf { it.millis }
-    if (millis <= 0) return what
-    return what + String.format(Locale.getDefault(), " · %.1fs", millis / MILLIS_PER_SECOND)
 }
 
 private const val MILLIS_PER_SECOND = 1000.0

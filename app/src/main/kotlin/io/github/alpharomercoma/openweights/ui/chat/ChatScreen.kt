@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -74,6 +75,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -95,8 +98,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Goal
@@ -128,9 +133,13 @@ import io.github.alpharomercoma.openweights.document.MarkdownPdf
 import io.github.alpharomercoma.openweights.model.DictationState
 import io.github.alpharomercoma.openweights.ui.models.ActiveDownload
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
@@ -372,10 +381,21 @@ private fun ChatContent(
 
     // The reply waiting for somewhere to be written, held while the system picker is up.
     var savingPdf by remember { mutableStateOf<TranscriptEntry?>(null) }
+    val pdfSnackbar = remember { SnackbarHostState() }
+    val pdfScope = rememberCoroutineScope()
+    // Read during composition rather than from the callback. `LocalContext.current
+    // .getString` inside the lambda reads the resource at the moment the save finishes,
+    // outside composition, so a locale change while the picker is up would show the old
+    // language and nothing would recompose it. Lint calls this out by name.
+    val pdfSaved = stringResource(R.string.pdf_saved)
+    val pdfFailed = stringResource(R.string.pdf_save_failed)
     SavePdf(
         entry = savingPdf,
         documentTitle = state.transcript.firstOrNull()?.text?.take(PDF_TITLE).orEmpty(),
         onDone = { savingPdf = null },
+        onResult = { saved ->
+            pdfScope.launch { pdfSnackbar.showSnackbar(if (saved) pdfSaved else pdfFailed) }
+        },
     )
     var showParameters by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
@@ -385,55 +405,20 @@ private fun ChatContent(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(pdfSnackbar) },
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
         // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            TopAppBar(
-                // The name raises the picker rather than leaving for another screen: which
-                // model is answering is a fact about this conversation, so changing it should
-                // not take the conversation off screen.
-                title = { RuntimeBar(state = state, onClick = { showModelPicker = true }) },
-                navigationIcon = {
-                    IconButton(onClick = onOpenHistory) {
-                        Icon(
-                            Icons.Rounded.Menu,
-                            contentDescription = stringResource(R.string.past_chats),
-                        )
-                    }
-                },
-                actions = {
-                    if (state.modelName != null) {
-                        // Starting a chat was only in the drawer, which is two taps and a
-                        // slide for the thing people do most often between questions. Left of
-                        // the sampler icon so the pair reads outermost-first: begin something,
-                        // then adjust it. It only starts one when there is something to say
-                        // to, which is the same condition the sampler is under.
-                        IconButton(onClick = onNewChat) {
-                            Icon(
-                                Icons.Rounded.Add,
-                                contentDescription = stringResource(R.string.new_chat),
-                            )
-                        }
-                        IconButton(onClick = { showParameters = true }) {
-                            Icon(
-                                Icons.Rounded.Tune,
-                                contentDescription = stringResource(R.string.model_settings),
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                ),
+            ChatTopBar(
+                state = state,
+                hasScrolled = listState.canScrollBackward,
+                onOpenHistory = onOpenHistory,
+                onNewChat = onNewChat,
+                onOpenParameters = { showParameters = true },
+                onOpenModelPicker = { showModelPicker = true },
             )
-            // Only once something has scrolled under it. A permanent rule draws a line
-            // across an empty screen; an absent one lets a thumbnail collide with the
-            // model name. Appearing on demand is the right behaviour for both.
-            if (listState.canScrollBackward) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
         },
     ) { innerPadding ->
         // Held to a readable width and centred rather than filled to the window's edges.
@@ -859,7 +844,7 @@ private fun ChatSheets(
             // Editing and branching are not limited to the last turn, because both are
             // explicit about the transcript changing: editing says it drops what followed,
             // and branching leaves this conversation exactly as it is.
-            canEdit = entry.role == ChatRole.USER && !state.isGenerating,
+            canEdit = entry.role == ChatRole.USER && entry.text.isNotBlank() && !state.isGenerating,
             canBranch = !state.isGenerating,
             isSpeaking = isSpeaking,
             onToggleReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
@@ -968,6 +953,13 @@ private fun UserTurn(entry: TranscriptEntry, onLongPress: () -> Unit) {
                         contentDescription = stringResource(R.string.message_actions),
                     )
                 }
+            }
+        } else if (entry.attachments.isNotEmpty()) {
+            IconButton(onClick = onLongPress) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = stringResource(R.string.message_actions),
+                )
             }
         }
     }
@@ -1219,140 +1211,225 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean, onBrowseModel
         // half of the glyphs even though the text itself was otherwise correct. Keep the
         // compact layout deliberately smaller, while retaining the roomy treatment on
         // portrait phones and tablets.
-        val compact = maxHeight < 420.dp
-        val edgePadding = if (compact) 12.dp else 32.dp
-        val spacing = if (compact) 4.dp else 12.dp
-        val markSize = if (compact) 36.dp else 44.dp
+        val sizes = emptyStateSizes(compact = maxHeight < COMPACT_EMPTY_STATE_HEIGHT)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = edgePadding, vertical = if (compact) 8.dp else 32.dp),
-            verticalArrangement = Arrangement.spacedBy(spacing, Alignment.CenterVertically),
+                .padding(horizontal = sizes.edge, vertical = sizes.top),
+            verticalArrangement = Arrangement.spacedBy(sizes.gap, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
-                isLoadingModel -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(if (compact) 24.dp else 28.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "Loading the model into memory",
-                        style = if (compact) {
-                            MaterialTheme.typography.bodySmall
-                        } else {
-                            MaterialTheme.typography.bodyMedium
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                // The mark, then a question.
-                //
-                // It was one grey sentence, "Ready. Ask it anything. The model runs on this
-                // phone.", which is three statements and no invitation: correct, cold, and the
-                // first thing anybody sees. ChatGPT opens with a question, Gemini with a
-                // greeting, Claude with both; all three understand that an empty screen is a
-                // moment to say hello rather than to file a status report.
-                //
-                // So the mark carries the brand, the question carries the invitation, and the
-                // one claim worth making survives underneath it in the small type where a
-                // claim belongs. The claim also had to change: it said "nothing leaves this
-                // device" until web search shipped switched on, and what is left is the part
-                // that is true of every reply.
-                hasModel -> {
-                    Mark(size = markSize)
-                    Text(
-                        text = stringResource(R.string.where_shall_we_start),
-                        style = if (compact) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.headlineSmall
-                        },
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        text = stringResource(R.string.whatever_ask_answered_phone),
-                        style = if (compact) {
-                            MaterialTheme.typography.bodySmall
-                        } else {
-                            MaterialTheme.typography.bodyMedium
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-
-                // A button, not a sentence pointing at one.
-                //
-                // On a fresh install there is no model, so the app can do precisely nothing,
-                // and the one thing that has to happen next was described in prose and left
-                // for the reader to go and find: "browse from the name at the top" asks
-                // somebody who has never opened this app to know that the name at the top is a
-                // control. The screen that can do nothing else should offer the one thing it
-                // can do, in the middle, where it is the only thing to press.
-                else -> {
-                    Mark(size = markSize)
-                    Text(
-                        text = stringResource(R.string.pick_model_begin),
-                        style = if (compact) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.headlineSmall
-                        },
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                    )
-                    Text(
-                        text = "Each one says whether it runs on this phone before you " +
-                            "download it.",
-                        style = if (compact) {
-                            MaterialTheme.typography.bodySmall
-                        } else {
-                            MaterialTheme.typography.bodyMedium
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                    AccentButton(
-                        onClick = onBrowseModels,
-                        modifier = Modifier.padding(top = if (compact) 4.dp else 8.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            stringResource(R.string.browse_models),
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
-
-                    // Said here, once, and never as a wall.
-                    //
-                    // The app's whole claim is that it answers on the phone, and web search is
-                    // on from the first run, so the one place that claim can be quietly wrong
-                    // is the one place to be plain about it. A consent dialog at install would
-                    // be dismissed by somebody who does not yet have a model: no context, and
-                    // nothing to consent about. A line here costs nothing and defuses the
-                    // surprise before it can happen.
-                    Text(
-                        text = "Once a model is running, answers can search the web. " +
-                            "That is a switch in Tools.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = if (compact) 8.dp else 20.dp),
-                    )
-                }
+                isLoadingModel -> LoadingTheModel(sizes)
+                hasModel -> ReadyToAsk(sizes)
+                else -> NoModelYet(sizes, onBrowseModels)
             }
         }
     }
 }
+
+/**
+ * The bar over the conversation: history, which model is answering, and the two things
+ * worth reaching without leaving the chat.
+ *
+ * Its own composable rather than a lambda inside [ChatContent], which had grown past the
+ * point where the screen's structure was visible in it at all.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatTopBar(
+    state: ChatUiState,
+    hasScrolled: Boolean,
+    onOpenHistory: () -> Unit,
+    onNewChat: () -> Unit,
+    onOpenParameters: () -> Unit,
+    onOpenModelPicker: () -> Unit,
+) {
+    TopAppBar(
+        // The name raises the picker rather than leaving for another screen: which
+        // model is answering is a fact about this conversation, so changing it should
+        // not take the conversation off screen.
+        title = { RuntimeBar(state = state, onClick = onOpenModelPicker) },
+        navigationIcon = {
+            IconButton(onClick = onOpenHistory) {
+                Icon(
+                    Icons.Rounded.Menu,
+                    contentDescription = stringResource(R.string.past_chats),
+                )
+            }
+        },
+        actions = {
+            if (state.modelName != null) {
+                // Starting a chat was only in the drawer, which is two taps and a
+                // slide for the thing people do most often between questions. Left of
+                // the sampler icon so the pair reads outermost-first: begin something,
+                // then adjust it. It only starts one when there is something to say
+                // to, which is the same condition the sampler is under.
+                IconButton(onClick = onNewChat) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = stringResource(R.string.new_chat),
+                    )
+                }
+                IconButton(onClick = onOpenParameters) {
+                    Icon(
+                        Icons.Rounded.Tune,
+                        contentDescription = stringResource(R.string.model_settings),
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+        ),
+    )
+    // Only once something has scrolled under it. A permanent rule draws a line
+    // across an empty screen; an absent one lets a thumbnail collide with the
+    // model name. Appearing on demand is the right behaviour for both.
+    if (hasScrolled) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/**
+ * The empty screen's measurements, decided once for the window it is being drawn in.
+ *
+ * Gathered rather than asked branch by branch. Every line of this screen has a compact size
+ * and a roomy one, and reading that decision seven times inside three arms of a `when` made
+ * the layout hard to see and easy to get inconsistent.
+ */
+private data class EmptyStateSizes(
+    val edge: Dp,
+    val top: Dp,
+    val gap: Dp,
+    val mark: Dp,
+    val spinner: Dp,
+    val headline: TextStyle,
+    val body: TextStyle,
+)
+
+@Composable
+private fun emptyStateSizes(compact: Boolean) = EmptyStateSizes(
+    edge = if (compact) 12.dp else 32.dp,
+    top = if (compact) 8.dp else 32.dp,
+    gap = if (compact) 4.dp else 12.dp,
+    mark = if (compact) 36.dp else 44.dp,
+    spinner = if (compact) 24.dp else 28.dp,
+    headline = if (compact) {
+        MaterialTheme.typography.titleMedium
+    } else {
+        MaterialTheme.typography.headlineSmall
+    },
+    body = if (compact) {
+        MaterialTheme.typography.bodySmall
+    } else {
+        MaterialTheme.typography.bodyMedium
+    },
+)
+
+@Composable
+private fun ColumnScope.LoadingTheModel(sizes: EmptyStateSizes) {
+    CircularProgressIndicator(
+        modifier = Modifier.size(sizes.spinner),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+        text = stringResource(R.string.loading_model_into_memory),
+        style = sizes.body,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/**
+ * The mark, then a question.
+ *
+ * It was one grey sentence, "Ready. Ask it anything. The model runs on this phone.", which
+ * is three statements and no invitation: correct, cold, and the first thing anybody sees.
+ * ChatGPT opens with a question, Gemini with a greeting, Claude with both; all three
+ * understand that an empty screen is a moment to say hello rather than to file a status
+ * report.
+ *
+ * So the mark carries the brand, the question carries the invitation, and the one claim
+ * worth making survives underneath it in the small type where a claim belongs. The claim
+ * also had to change: it said "nothing leaves this device" until web search shipped switched
+ * on, and what is left is the part that is true of every reply.
+ */
+@Composable
+private fun ColumnScope.ReadyToAsk(sizes: EmptyStateSizes) {
+    Mark(size = sizes.mark)
+    Text(
+        text = stringResource(R.string.where_shall_we_start),
+        style = sizes.headline,
+        color = MaterialTheme.colorScheme.onSurface,
+        textAlign = TextAlign.Center,
+    )
+    Text(
+        text = stringResource(R.string.whatever_ask_answered_phone),
+        style = sizes.body,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+/**
+ * A button, not a sentence pointing at one.
+ *
+ * On a fresh install there is no model, so the app can do precisely nothing, and the one
+ * thing that has to happen next was described in prose and left for the reader to go and
+ * find: "browse from the name at the top" asks somebody who has never opened this app to
+ * know that the name at the top is a control. The screen that can do nothing else should
+ * offer the one thing it can do, in the middle, where it is the only thing to press.
+ */
+@Composable
+private fun ColumnScope.NoModelYet(sizes: EmptyStateSizes, onBrowseModels: () -> Unit) {
+    Mark(size = sizes.mark)
+    Text(
+        text = stringResource(R.string.pick_model_begin),
+        style = sizes.headline,
+        color = MaterialTheme.colorScheme.onSurface,
+        textAlign = TextAlign.Center,
+    )
+    Text(
+        text = stringResource(R.string.each_model_says_if_it_runs),
+        style = sizes.body,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+    AccentButton(
+        onClick = onBrowseModels,
+        modifier = Modifier.padding(top = sizes.gap),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Search,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            stringResource(R.string.browse_models),
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+
+    // Said here, once, and never as a wall.
+    //
+    // The app's whole claim is that it answers on the phone, and web search is on from the
+    // first run, so the one place that claim can be quietly wrong is the one place to be
+    // plain about it. A consent dialog at install would be dismissed by somebody who does
+    // not yet have a model: no context, and nothing to consent about. A line here costs
+    // nothing and defuses the surprise before it can happen.
+    Text(
+        text = stringResource(R.string.answers_can_search_the_web),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.padding(top = sizes.top),
+    )
+}
+
+/** Below this, the window is a phone held sideways and every measurement tightens. */
+private val COMPACT_EMPTY_STATE_HEIGHT = 420.dp
 
 /**
  * Marks where older turns were folded away, so the jump in the conversation is explained
@@ -1438,9 +1515,13 @@ private val STATUS_SLOT = 28.dp
  * action, and the screen it sits in was already at the complexity limit without them.
  */
 @Composable
-private fun SavePdf(entry: TranscriptEntry?, documentTitle: String, onDone: () -> Unit) {
+private fun SavePdf(
+    entry: TranscriptEntry?,
+    documentTitle: String,
+    onDone: () -> Unit,
+    onResult: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val create = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/pdf"),
     ) { target ->
@@ -1449,20 +1530,35 @@ private fun SavePdf(entry: TranscriptEntry?, documentTitle: String, onDone: () -
         if (target == null || source == null) return@rememberLauncherForActivityResult
         // Off the main thread: laying out a long reply is real work, and a save that janks
         // the conversation is worse than one that takes a moment.
-        scope.launch(Dispatchers.IO) {
-            runCatching {
-                context.contentResolver.openOutputStream(target)?.use { out ->
+        pdfExportScope.launch {
+            val saved = try {
+                val output = checkNotNull(context.contentResolver.openOutputStream(target))
+                output.use { out ->
                     MarkdownPdf().write(
                         markdown = source.answer.ifEmpty { source.text },
                         title = documentTitle,
                         out = out,
                     )
                 }
+                true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                withContext(NonCancellable) {
+                    runCatching { context.contentResolver.delete(target, null, null) }
+                }
+                throw cancelled
+            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+                android.util.Log.w("PdfExport", "Could not write PDF", failure)
+                false
             }
+            if (!saved) runCatching { context.contentResolver.delete(target, null, null) }
+            launch(Dispatchers.Main) { onResult(saved) }
         }
     }
     LaunchedEffect(entry) { entry?.let { create.launch(it.pdfName()) } }
 }
+
+/** Owns a picker-confirmed export even if its originating conversation leaves composition. */
+private val pdfExportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
  * A filename that says which conversation and which reply, without a timestamp nobody reads.

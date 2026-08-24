@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * which do not, and what the model is told either way. A model that asks for something and
  * is told nothing is the failure this whole layer exists to prevent.
  */
+@Suppress("LargeClass") // One fixture exercises the complete approval state machine.
 class AgentRunnerTest {
     private val ran = mutableListOf<String>()
 
@@ -85,6 +86,15 @@ class AgentRunnerTest {
             ran += call.name
             return "results"
         }
+    }
+
+    /** Stands in for web_search: parallel safe, and still something that leaves the device. */
+    private val parallelSender = object : Tool {
+        override val definition = ToolDefinition("parallel_sender", "Searches the web", "{}")
+        override val parallelSafe = true
+        override val leavesTheDevice = true
+        override val returnsUntrustedText = true
+        override suspend fun run(call: ToolCall): String = "results"
     }
 
     /** Stands in for fetch_url: the address is whatever the model wrote. */
@@ -789,6 +799,61 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun `clean additive durable write runs unattended in auto`() = runTest {
+        val durable = Durable()
+        val runner = AgentRunner(ToolRegistry(listOf(durable)))
+
+        runner.step(listOf(call("durable")), 0, AgentMode.AUTO, approve = {
+            error("clean additive write must not ask")
+        })
+
+        assertThat(durable.runs).isEqualTo(1)
+    }
+
+    @Test
+    fun `untrusted text cannot silently cause a durable write`() = runTest {
+        val durable = Durable()
+        val runner = AgentRunner(ToolRegistry(listOf(sender, durable)))
+        runner.step(listOf(call("sender")), 0, AgentMode.AUTO, approve = { true })
+        var asked = 0
+
+        val decision = runner.step(
+            listOf(call("durable", id = "write")),
+            1,
+            AgentMode.AUTO,
+            approve = {
+                asked++
+                false
+            },
+        ) as AgentDecision.Continue
+
+        assertThat(asked).isEqualTo(1)
+        assertThat(durable.runs).isEqualTo(0)
+        assertThat(decision.steps.single()).isInstanceOf(AgentStep.Skipped::class.java)
+    }
+
+    @Test
+    fun `yolo does not waive tainted durable write approval`() = runTest {
+        val durable = Durable()
+        val runner = AgentRunner(ToolRegistry(listOf(sender, durable)))
+        runner.step(listOf(call("sender")), 0, AgentMode.YOLO, approve = { true })
+        var asked = 0
+
+        runner.step(
+            listOf(call("durable", id = "write")),
+            1,
+            AgentMode.YOLO,
+            approve = {
+                asked++
+                true
+            },
+        )
+
+        assertThat(asked).isEqualTo(1)
+        assertThat(durable.runs).isEqualTo(1)
+    }
+
+    @Test
     fun `only the destructive form of a call asks in auto`() = runTest {
         var asked = 0
         val runner = AgentRunner(ToolRegistry(listOf(CallSensitive())))
@@ -835,6 +900,41 @@ class AgentRunnerTest {
             .inOrder()
     }
 
+    @Test
+    fun `two outbound lookups never ask the user at the same time`() = runTest {
+        // The screen holds one pending question at a time: `askUser` overwrites its
+        // CompletableDeferred, so a second prompt raised while the first is open leaves the
+        // first coroutine waiting on a deferred nobody will ever complete, and the turn
+        // hangs until Stop. Running parallel-safe calls together must therefore never put
+        // two of them in front of the user at once.
+        val runner = AgentRunner(ToolRegistry(listOf(reader, parallelSender)))
+        runner.step(
+            calls = listOf(call("reader")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        val open = AtomicInteger()
+        var overlapped = false
+        runner.step(
+            calls = listOf(
+                call("parallel_sender", id = "one", args = """{"query":"a"}"""),
+                call("parallel_sender", id = "two", args = """{"query":"b"}"""),
+            ),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = {
+                if (open.incrementAndGet() > 1) overlapped = true
+                delay(10)
+                open.decrementAndGet()
+                true
+            },
+        )
+
+        assertThat(overlapped).isFalse()
+    }
+
     private class Persistent : Tool {
         override val definition = ToolDefinition("persistent", "d", "{}")
         override val alwaysAsks: Boolean = true
@@ -844,6 +944,16 @@ class AgentRunnerTest {
     private class Ordinary : Tool {
         override val definition = ToolDefinition("ordinary", "d", "{}")
         override suspend fun run(call: ToolCall) = "done"
+    }
+
+    private class Durable : Tool {
+        override val definition = ToolDefinition("durable", "d", "{}")
+        override val writesDurableData: Boolean = true
+        var runs = 0
+        override suspend fun run(call: ToolCall): String {
+            runs++
+            return "saved"
+        }
     }
 
     private class CallSensitive : Tool {

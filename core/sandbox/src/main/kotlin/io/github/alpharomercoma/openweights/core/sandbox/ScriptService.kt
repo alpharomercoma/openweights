@@ -19,6 +19,9 @@ package io.github.alpharomercoma.openweights.core.sandbox
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.os.Process
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * The far side of the boundary, running with nothing.
@@ -32,6 +35,8 @@ import android.os.IBinder
  * that wedges its interpreter takes nothing with it.
  */
 class ScriptService : Service() {
+    private val watchdog = Executors.newSingleThreadScheduledExecutor()
+
     private val runner = object : IScriptRunner.Stub() {
         override fun run(
             source: String,
@@ -39,7 +44,16 @@ class ScriptService : Service() {
             memoryBytes: Long,
             millis: Long,
             outputLimit: Int,
-        ): String {
+            callback: IScriptResultCallback,
+        ) {
+            // QuickJS normally enforces its own interrupt deadline. This second clock is
+            // deliberately outside the interpreter: if native code wedges, the isolated
+            // process is disposable and must not keep a core hot after the caller returns.
+            val kill = watchdog.schedule(
+                { Process.killProcess(Process.myPid()) },
+                millis.coerceAtLeast(0L) + WATCHDOG_GRACE_MILLIS,
+                TimeUnit.MILLISECONDS,
+            )
             // Whatever happens in here, something has to come back across the binder. A
             // linkage failure or an interpreter that dies mid-parse would otherwise reach
             // the app as a DeadObjectException with nothing in it to tell the model.
@@ -55,11 +69,17 @@ class ScriptService : Service() {
             }.getOrElse { failure ->
                 ScriptResult("the interpreter stopped: ${failure.message}", failed = true)
             }
-            return result.encode()
+            kill.cancel(false)
+            runCatching { callback.onResult(result.encode()) }
         }
     }
 
     override fun onBind(intent: Intent?): IBinder = runner
+
+    override fun onDestroy() {
+        watchdog.shutdownNow()
+        super.onDestroy()
+    }
 
     private companion object {
         /**
@@ -70,5 +90,6 @@ class ScriptService : Service() {
          * the real thread limit produces a native crash that takes the process with it.
          */
         const val STACK_BYTES = 512L * 1024
+        const val WATCHDOG_GRACE_MILLIS = 750L
     }
 }

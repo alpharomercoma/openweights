@@ -262,7 +262,14 @@ class AgentRunner(
                 !tool.alwaysAsks &&
                 !tool.asksInAuto(call) &&
                 !tool.readsPrivateData &&
-                !tool.sendsWhereTheModelSays
+                !tool.writesDurableData &&
+                !tool.sendsWhereTheModelSays &&
+                // The taint, not only the tool. Two searches are parallel safe in
+                // themselves, but once the turn has read something private they both stop
+                // at the egress check and ask, and the screen holds one question at a time:
+                // the second overwrites the first and the coroutine waiting on it is never
+                // answered. Anything that could ask runs one at a time instead.
+                !(readPrivateData && tool.leavesTheDevice)
         }
     }
 
@@ -340,6 +347,7 @@ class AgentRunner(
      * about this turn has changed what the call could do. Nothing has read anything yet, so
      * the first call of a turn never asks whatever it is.
      */
+    @Suppress("ReturnCount") // Ordered security gates are easier to audit as fail-fast checks.
     private suspend fun allowed(
         tool: Tool,
         call: ToolCall,
@@ -382,6 +390,11 @@ class AgentRunner(
         // not. Checking this before the YOLO return prevents an injected page from turning
         // a temporary mode into permanent prompt text or recurring unattended work.
         if (tool.asksInAuto(call)) return approve(call)
+
+        // Untrusted pages and tool results must not be able to persist their instructions
+        // into the user's workspace. A clean, additive save remains automatic in Auto;
+        // once the turn has consumed untrusted text, every durable write is explicit.
+        if (readUntrustedText && tool.writesDurableData) return approve(call)
 
         // Yolo waives the two egress checks below, and nothing else: it is the user saying
         // they know what those checks are for and would rather have the seconds. It has to

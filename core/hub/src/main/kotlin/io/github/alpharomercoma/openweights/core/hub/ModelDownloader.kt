@@ -101,10 +101,17 @@ class ModelDownloader @Inject constructor(
                 emit(DownloadProgress.Finished(destination))
                 return@flow
             }
+            // Said as what is known rather than as an accusation. Without a published
+            // checksum and without a recorded source there is no way to tell whether this
+            // is the same file under the same name or somebody else's, and the two have
+            // very different costs: adopting the wrong one runs the wrong weights forever,
+            // and deleting the right one is gigabytes over a phone connection. So neither
+            // is chosen here, and the person who knows which it is decides.
             if (expected == null && !sourceMatches) {
                 throw DownloadException(
-                    "A different model named ${destination.name} is already on this device. " +
-                        "Remove or rename it before downloading this one.",
+                    "${destination.name} is already on this device and this repository " +
+                        "publishes no checksum, so it cannot be confirmed as the same file. " +
+                        "Delete it in Models to download this one.",
                 )
             }
             // Different bytes under the same name. Removed rather than resumed: a resume
@@ -186,7 +193,9 @@ class ModelDownloader @Inject constructor(
                 alreadyHave > 0 &&
                 response.servesRangeFrom(alreadyHave)
             val total = file.sizeBytes.takeIf { it > 0 }
-                ?: (response.body.contentLength() + if (resuming) alreadyHave else 0L)
+                ?: response.body.contentLength().takeIf { it >= 0L }
+                    ?.saturatedPlus(if (resuming) alreadyHave else 0L)
+                ?: -1L
 
             copyTo(partial, response.body.byteStream(), resuming, alreadyHave, total)
         }
@@ -200,6 +209,7 @@ class ModelDownloader @Inject constructor(
         total: Long,
     ) {
         val startAt = if (resuming) alreadyHave else 0L
+        ensureStorageFor(partial, total, startAt)
         emit(DownloadProgress.Downloading(startAt, total))
 
         val ceiling = if (total > 0) {
@@ -217,8 +227,21 @@ class ModelDownloader @Inject constructor(
 
         input.use { source ->
             FileOutputStream(partial, resuming).use { output ->
-                pump(source, output, startAt, total, ceiling)
+                pump(source, output, partial, startAt, total, ceiling)
             }
+        }
+    }
+
+    /** Refuses a known-size transfer before it can consume the device's last usable space. */
+    private fun ensureStorageFor(partial: File, total: Long, bytesKept: Long) {
+        if (total <= 0L) return
+        val remaining = (total - bytesKept).coerceAtLeast(0L)
+        val free = partial.parentFile?.usableSpace ?: return
+        if (free < remaining.saturatedPlus(STORAGE_RESERVE_BYTES)) {
+            throw DownloadException(
+                "There is not enough free storage to download this file while keeping " +
+                    "${STORAGE_RESERVE_BYTES / BYTES_PER_MEBIBYTE} MB free for the device.",
+            )
         }
     }
 
@@ -226,6 +249,7 @@ class ModelDownloader @Inject constructor(
     private suspend fun FlowCollector<DownloadProgress>.pump(
         source: InputStream,
         output: FileOutputStream,
+        partial: File,
         startAt: Long,
         total: Long,
         ceiling: Long,
@@ -233,6 +257,7 @@ class ModelDownloader @Inject constructor(
         val buffer = ByteArray(BUFFER_BYTES)
         var written = startAt
         var lastReported = written
+        var lastSpaceCheck = written
         var read = source.readInto(buffer)
 
         while (read >= 0) {
@@ -256,6 +281,15 @@ class ModelDownloader @Inject constructor(
             if (written - lastReported >= PROGRESS_INTERVAL_BYTES) {
                 lastReported = written
                 emit(DownloadProgress.Downloading(written, total))
+            }
+            if (written - lastSpaceCheck >= PROGRESS_INTERVAL_BYTES) {
+                lastSpaceCheck = written
+                val free = partial.parentFile?.usableSpace ?: Long.MAX_VALUE
+                if (free < STORAGE_RESERVE_BYTES.saturatedPlus(PROGRESS_INTERVAL_BYTES)) {
+                    throw DownloadException(
+                        "The download was stopped before it used the device's storage reserve.",
+                    )
+                }
             }
             read = source.readInto(buffer)
         }
@@ -311,6 +345,7 @@ class ModelDownloader @Inject constructor(
         const val PARTIAL_SUFFIX = ".part"
         const val BUFFER_BYTES = 1 shl 16
         const val PROGRESS_INTERVAL_BYTES = 1L shl 20
+        const val BYTES_PER_MEBIBYTE = 1024L * 1024L
         const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
         const val MAX_UNKNOWN_DOWNLOAD_BYTES = 32L * 1024 * 1024 * 1024
     }

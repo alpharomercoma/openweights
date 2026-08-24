@@ -95,7 +95,7 @@ fun FitCard(
             }
 
             when {
-                inspected.isDownloaded -> Caption("On this device")
+                inspected.isDownloaded -> Caption(stringResource(R.string.on_this_device))
                 inspected.isInspecting -> CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
@@ -116,7 +116,10 @@ fun FitCard(
                         strokeWidth = 2.dp,
                     )
                     Text(
-                        text = "Downloading ${(downloadFraction * 100).toInt()}%",
+                        text = stringResource(
+                            R.string.downloading_percent,
+                            (downloadFraction * 100).toInt(),
+                        ),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -130,8 +133,7 @@ fun FitCard(
 
         inspected.unsupportedArchitecture?.let { architecture ->
             Text(
-                text = "Needs a newer OpenWeights: this version cannot load " +
-                    "$architecture models.",
+                text = stringResource(R.string.needs_newer_version, architecture),
                 style = MaterialTheme.typography.bodyMedium,
                 color = signal(
                     OpenWeightsColors.SignalPoor,
@@ -143,7 +145,7 @@ fun FitCard(
 
         inspected.inspectionError?.let { error ->
             Text(
-                text = "Could not read this file's header: $error",
+                text = stringResource(R.string.header_read_failed, error),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -172,19 +174,19 @@ private fun VerdictLine(fit: FitReport) {
     val dark = LocalIsDarkTheme.current
     val (label, color) = when (fit.verdict) {
         FitVerdict.COMFORTABLE ->
-            "Runs comfortably" to
+            stringResource(R.string.fit_comfortable) to
                 signal(OpenWeightsColors.SignalGood, OpenWeightsColors.PaperSignalGood, dark)
 
         FitVerdict.TIGHT ->
-            "Runs, but tight: other apps may be closed" to
+            stringResource(R.string.fit_tight) to
                 signal(OpenWeightsColors.SignalPlain, OpenWeightsColors.PaperSignalPlain, dark)
 
         FitVerdict.WONT_RUN ->
-            "Will not run at this context length" to
+            stringResource(R.string.fit_wont_run) to
                 signal(OpenWeightsColors.SignalPoor, OpenWeightsColors.PaperSignalPoor, dark)
 
         FitVerdict.NO_ROOM_TO_DOWNLOAD ->
-            "Not enough free storage to download" to
+            stringResource(R.string.fit_no_storage) to
                 signal(OpenWeightsColors.SignalPoor, OpenWeightsColors.PaperSignalPoor, dark)
     }
 

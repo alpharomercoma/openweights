@@ -224,6 +224,7 @@ class AssistantStackTest {
 
     private val streaming = mutableStateOf(false)
 
+    @Suppress("LongMethod")
     private fun stage(rounds: Int, streaming: Boolean = false) {
         this.streaming.value = streaming
         this.superseded.value = false

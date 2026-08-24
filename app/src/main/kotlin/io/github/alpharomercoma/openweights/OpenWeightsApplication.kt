@@ -96,14 +96,13 @@ class OpenWeightsApplication :
             .components {
                 // Search results and avatars are untrusted URLs. Reuse the same DNS
                 // boundary as fetch_url so a public hostname cannot resolve into a LAN,
-                // loopback, link-local, or cloud-metadata address (including redirects).
+                // loopback, link-local, or cloud-metadata address. Numeric IP literals can
+                // bypass OkHttp's Dns implementation, so untrusted redirects are refused:
+                // following one would otherwise reopen the private-network boundary.
                 add(
                     OkHttpNetworkFetcherFactory(
                         callFactory = OkHttpClient.Builder()
                             .dns(PublicOnlyDns())
-                            // A redirect is a new, untrusted address. Coil does not expose
-                            // an approval boundary for it, so refusing redirects keeps a
-                            // public thumbnail from silently hopping to a private literal.
                             .followRedirects(false)
                             .followSslRedirects(false)
                             .build(),

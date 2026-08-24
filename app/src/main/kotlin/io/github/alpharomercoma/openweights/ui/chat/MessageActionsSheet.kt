@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CallSplit
@@ -93,6 +95,7 @@ fun MessageActionsSheet(
         // sure they are all shown.
         Column(
             modifier = Modifier
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(bottom = 12.dp),
         ) {
@@ -125,7 +128,9 @@ fun MessageActionsSheet(
                     } else {
                         Icons.AutoMirrored.Rounded.VolumeUp
                     },
-                    label = if (isSpeaking) "Stop reading" else "Read aloud",
+                    label = stringResource(
+                        if (isSpeaking) R.string.stop_reading else R.string.read_aloud,
+                    ),
                     onClick = {
                         onToggleReadAloud()
                         onDismiss()

@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -65,16 +66,12 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
     // reappeared on every update. That was the flicker.
     val state = rememberMarkdownState(content = content, retainState = true)
     val wideTable = remember(content) { content.containsWideMarkdownTable() }
-    val markdownModifier = if (wideTable) {
-        modifier.horizontalScroll(rememberScrollState())
-    } else {
-        modifier
-    }
+    val defaults = markdownComponents()
 
     val render: @Composable () -> Unit = {
         Markdown(
             state,
-            modifier = markdownModifier,
+            modifier = modifier,
             colors = markdownColor(
                 text = MaterialTheme.colorScheme.onBackground,
                 codeBackground = MaterialTheme.colorScheme.surfaceContainer,
@@ -109,6 +106,15 @@ fun MarkdownText(content: String, modifier: Modifier = Modifier) {
                         showHeader = true,
                     )
                 },
+                table = { model ->
+                    if (wideTable) {
+                        Box(Modifier.horizontalScroll(rememberScrollState())) {
+                            defaults.table(model)
+                        }
+                    } else {
+                        defaults.table(model)
+                    }
+                },
             ),
         )
     }
@@ -130,16 +136,37 @@ private val WIDE_TABLE_DIMENS = object : MarkdownDimens {
     override val tableCornerSize = 6.dp
 }
 
-private fun String.containsWideMarkdownTable(): Boolean {
+internal fun String.containsWideMarkdownTable(): Boolean {
     val lines = lines()
-    return lines.zipWithNext().any { (header, divider) ->
-        header.count { it == '|' } >= 2 &&
-            divider.trim().matches(TABLE_DIVIDER) &&
-            header.split('|').any { it.trim().length > 24 }
+    return (0 until lines.lastIndex).any { index ->
+        val divider = lines[index + 1]
+        if (!divider.trim().matches(TABLE_DIVIDER)) {
+            return@any false
+        }
+
+        val rows = lines.drop(index).takeWhile { it.markdownTableCells().size >= 2 }
+        val cells = rows
+            .filterNot { it.trim().matches(TABLE_DIVIDER) }
+            .map(String::markdownTableCells)
+        val columns = cells.maxOfOrNull(List<String>::size) ?: return@any false
+        val estimatedCharacters = (0 until columns).sumOf { column ->
+            cells.maxOfOrNull { row -> row.getOrNull(column)?.length ?: 0 }
+                ?.coerceIn(MIN_TABLE_COLUMN_CHARS, MAX_TABLE_COLUMN_CHARS)
+                ?: MIN_TABLE_COLUMN_CHARS
+        } + columns * TABLE_COLUMN_PADDING_CHARS
+        columns >= WIDE_TABLE_COLUMNS || estimatedCharacters > WIDE_TABLE_CHARACTERS
     }
 }
 
+private fun String.markdownTableCells(): List<String> =
+    trim().trim('|').split('|').map(String::trim)
+
 private val TABLE_DIVIDER = Regex("\\|?\\s*:?-{3,}:?\\s*(\\|\\s*:?-{3,}:?\\s*)+\\|?")
+private const val WIDE_TABLE_COLUMNS = 4
+private const val WIDE_TABLE_CHARACTERS = 32
+private const val MIN_TABLE_COLUMN_CHARS = 4
+private const val MAX_TABLE_COLUMN_CHARS = 24
+private const val TABLE_COLUMN_PADDING_CHARS = 2
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

@@ -110,7 +110,7 @@ class DiscoverViewModel @Inject constructor(
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
-    private var nextOffset = 0
+    private var nextCursor: String? = null
     private var searchGeneration = 0L
 
     /** Runs the query a moment after typing stops, so every keystroke is not a request. */
@@ -206,7 +206,7 @@ class DiscoverViewModel @Inject constructor(
 
     fun search() {
         searchJob?.cancel()
-        nextOffset = 0
+        nextCursor = null
         val generation = ++searchGeneration
         searchJob = viewModelScope.launch {
             _uiState.update {
@@ -224,12 +224,9 @@ class DiscoverViewModel @Inject constructor(
                     // A shortlist is fetched by name, not searched for. Typing in the box
                     // means the shortlist is not what is being asked for any more.
                     query.recommendedOnly && query.text.isBlank() ->
-                        HubSearchPage(client.recommended(), hasMore = false)
-                    query.officialOnly -> {
-                        val page = client.searchPage(query, offset = 0)
-                        HubSearchPage(official(page.models), page.hasMore)
-                    }
-                    else -> client.searchPage(query, offset = 0)
+                        HubSearchPage(client.recommended())
+                    query.officialOnly -> officialPage(query, cursor = null)
+                    else -> client.searchPage(query)
                 }
             }
                 .onSuccess { results ->
@@ -238,7 +235,7 @@ class DiscoverViewModel @Inject constructor(
                     }
                     val page = results
                     val models = page.models
-                    nextOffset = models.size
+                    nextCursor = page.cursor
                     _uiState.update {
                         it.copy(
                             isSearching = false,
@@ -270,20 +267,26 @@ class DiscoverViewModel @Inject constructor(
         searchJob = viewModelScope.launch {
             val query = _uiState.value.query
             _uiState.update { it.copy(isLoadingMore = true, error = null) }
-            runCatching { client.searchPage(query, offset = nextOffset) }
+            runCatching {
+                if (query.officialOnly) {
+                    officialPage(query, nextCursor)
+                } else {
+                    client.searchPage(query, cursor = nextCursor)
+                }
+            }
                 .onSuccess { page ->
                     if (generation != searchGeneration || _uiState.value.query != query) {
                         return@onSuccess
                     }
                     val existing = _uiState.value.results.mapTo(linkedSetOf()) { it.id }
-                    val pageModels = if (query.officialOnly) official(page.models) else page.models
+                    val pageModels = page.models
                     val appended = pageModels.filter { existing.add(it.id) }
-                    nextOffset += page.models.size
+                    nextCursor = page.cursor
                     _uiState.update {
                         it.copy(
                             isLoadingMore = false,
                             results = it.results + appended,
-                            canLoadMore = page.hasMore && page.models.isNotEmpty(),
+                            canLoadMore = page.hasMore,
                         )
                     }
                     resolveAvatars(appended)
@@ -315,6 +318,20 @@ class DiscoverViewModel @Inject constructor(
             .awaitAll()
             .toMap()
         results.filter { kinds[it.owner]?.isOrganisation == true }
+    }
+
+    /** Skips empty client-filtered pages so infinite scroll always gets a visible trigger. */
+    private suspend fun officialPage(query: HubQuery, cursor: String?): HubSearchPage {
+        var next = cursor
+        val visited = mutableSetOf<String?>()
+        repeat(MAX_EMPTY_OFFICIAL_PAGES + 1) {
+            if (!visited.add(next)) return HubSearchPage(emptyList(), cursor = null)
+            val page = client.searchPage(query, cursor = next)
+            val models = official(page.models)
+            next = page.cursor
+            if (models.isNotEmpty() || !page.hasMore) return HubSearchPage(models, next)
+        }
+        return HubSearchPage(emptyList(), next)
     }
 
     /**
@@ -445,6 +462,7 @@ class DiscoverViewModel @Inject constructor(
 
     private companion object {
         const val MAX_CONCURRENT_INSPECTIONS = 3
+        const val MAX_EMPTY_OFFICIAL_PAGES = 3
 
         /**
          * How long typing has to stop before the query runs.

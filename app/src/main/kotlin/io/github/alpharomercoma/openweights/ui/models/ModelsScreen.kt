@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -49,6 +50,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +87,7 @@ fun ModelsScreen(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    var pendingDelete by remember { mutableStateOf<LocalModel?>(null) }
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -97,7 +103,12 @@ fun ModelsScreen(
                             stringResource(R.string.models),
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        Metric("${formatBytes(state.storageUsedBytes)} on this device")
+                        Metric(
+                            stringResource(
+                                R.string.storage_on_device,
+                                formatBytes(state.storageUsedBytes),
+                            ),
+                        )
                     }
                 },
                 navigationIcon = {
@@ -125,9 +136,7 @@ fun ModelsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Nothing downloaded yet. Browse models from the name at the top of a " +
-                        "chat. Each one says whether it runs on this phone before you " +
-                        "download it.",
+                    stringResource(R.string.models_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -142,6 +151,16 @@ fun ModelsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            state.notice?.let { notice ->
+                item(key = "notice") {
+                    Text(
+                        text = notice,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = ROW_TEXT_INSET),
+                    )
+                }
+            }
             items(state.downloads, key = { it.key }) { download ->
                 DownloadRow(download = download, onCancel = { onCancelDownload(download.key) })
             }
@@ -166,11 +185,42 @@ fun ModelsScreen(
                     ModelRow(
                         model = model,
                         onUse = { onUse(model) },
-                        onDelete = { onDelete(model) },
+                        onDelete = { pendingDelete = model },
                     )
                 }
             }
         }
+    }
+    pendingDelete?.let { model ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.delete_model_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.delete_model_message,
+                        model.name,
+                        formatBytes(model.sizeBytes),
+                    ),
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDelete = null
+                        onDelete(model)
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text(stringResource(R.string.delete)) }
+            },
+        )
     }
 }
 
@@ -193,7 +243,7 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
                 color = MaterialTheme.colorScheme.error,
             )
 
-            download.isVerifying -> Caption("Verifying checksum…")
+            download.isVerifying -> Caption(stringResource(R.string.download_verifying))
 
             else -> {
                 LinearProgressIndicator(
@@ -201,7 +251,11 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Metric(
-                    "${formatBytes(download.bytesDone)} of ${formatBytes(download.bytesTotal)}",
+                    stringResource(
+                        R.string.download_progress,
+                        formatBytes(download.bytesDone),
+                        formatBytes(download.bytesTotal),
+                    ),
                 )
             }
         }
@@ -231,7 +285,7 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
                     // projector was downloaded beside the model, and an audio projector
                     // reads sound. Saying which would mean parsing the projector's header,
                     // and claiming the wrong one is worse than being general.
-                    "reads attachments".takeIf { model.isMultimodal },
+                    stringResource(R.string.reads_attachments).takeIf { model.isMultimodal },
                 ).joinToString(" · "),
             )
         }

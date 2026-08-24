@@ -16,10 +16,13 @@
 
 package io.github.alpharomercoma.openweights.ui.tools
 
+import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.tools.GrantState
 import io.github.alpharomercoma.openweights.core.tools.SearchEngine
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
@@ -79,6 +82,7 @@ class ToolsViewModel @Inject constructor(
     private val switches: ToolSwitches,
     private val grant: WorkspaceGrant,
     private val search: SearchSettings,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(ToolsUiState(read(), workspace(), engines(), search.proxy))
@@ -147,9 +151,9 @@ class ToolsViewModel @Inject constructor(
         .map { tool ->
             ToolSummary(
                 id = tool.definition.name,
-                name = LABELS[tool.definition.name]?.first
+                name = LABELS[tool.definition.name]?.first?.let(context::getString)
                     ?: tool.definition.name.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                description = LABELS[tool.definition.name]?.second
+                description = LABELS[tool.definition.name]?.second?.let(context::getString)
                     ?: tool.definition.description,
                 leavesTheDevice = tool.leavesTheDevice,
                 isReady = tool.isAvailable,
@@ -168,15 +172,13 @@ class ToolsViewModel @Inject constructor(
  * A tool with no entry falls back to its definition, so a new one shows up in the list
  * looking rough rather than not showing up at all.
  */
-private val LABELS: Map<String, Pair<String, String>> = mapOf(
-    "web_search" to ("Search the web" to "Looks up anything recent, or anything it does not know."),
-    "fetch_url" to ("Open a page" to "Reads the text of one public page."),
-    "search_files" to ("Find a file" to "Looks through the folder you shared."),
-    "read_file" to ("Read a file" to "Opens a file from that folder."),
-    "write_file" to ("Save a file" to "Writes a new file there. It never replaces one."),
-    "run_script" to (
-        "Run a script" to "Works out sums and dates by running JavaScript. No files, no network."
-        ),
+private val LABELS: Map<String, Pair<Int, Int>> = mapOf(
+    "web_search" to (R.string.tool_search_name to R.string.tool_search_detail),
+    "fetch_url" to (R.string.tool_page_name to R.string.tool_page_detail),
+    "search_files" to (R.string.tool_find_file_name to R.string.tool_find_file_detail),
+    "read_file" to (R.string.tool_read_file_name to R.string.tool_read_file_detail),
+    "write_file" to (R.string.tool_save_file_name to R.string.tool_save_file_detail),
+    "run_script" to (R.string.tool_script_name to R.string.tool_script_detail),
 )
 
 /**

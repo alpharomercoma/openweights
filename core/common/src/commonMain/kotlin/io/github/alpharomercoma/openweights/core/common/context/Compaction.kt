@@ -125,13 +125,16 @@ class CompactionPolicy(
          */
         triggerFraction: Float = this.triggerFraction,
     ): Boolean {
-        if (contextSize <= 0) return false
         // Folding needs something to fold beyond the turns that must stay verbatim.
-        if (entryCount <= keepRecentEntries + MIN_FOLDABLE_ENTRIES) return false
-        val trigger = triggerFraction.coerceIn(MIN_TRIGGER, MAX_TRIGGER)
-        if (contextUsed.toFloat() / contextSize >= trigger) return true
-        if (contextUsed < ceilingTokens) return false
-        return foldableTokens >= MIN_WORTHWHILE_SAVING
+        val canFold = contextSize > 0 &&
+            entryCount > keepRecentEntries + MIN_FOLDABLE_ENTRIES
+        if (!canFold) return false
+
+        val fractionReached = contextUsed.toFloat() / contextSize >=
+            triggerFraction.coerceIn(MIN_TRIGGER, MAX_TRIGGER)
+        val worthwhileCeilingFold = contextUsed >= ceilingTokens &&
+            foldableTokens >= MIN_WORTHWHILE_SAVING
+        return fractionReached || worthwhileCeilingFold
     }
 
     /**

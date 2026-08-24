@@ -18,10 +18,13 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Staging what goes with the message being typed.
@@ -40,7 +43,11 @@ internal class Attaching(
     private val staging: Staging,
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<ChatUiState>,
+    private val limitMessage: String,
+    private val unreadableMessage: String,
 ) {
+    private val attachMutex = Mutex()
+
     /**
      * Copies a picked file in and stages it for the next message.
      *
@@ -49,15 +56,20 @@ internal class Attaching(
      */
     fun attach(uri: Uri) {
         scope.launch {
-            state.update { it.copy(isAttaching = true) }
-            // In a finally: a throw here would otherwise leave the attach button spinning
-            // with no way back to it.
-            val staged = try {
-                staging.file(uri, state.value.mediaSupport)
-            } finally {
-                state.update { it.copy(isAttaching = false) }
+            attachMutex.withLock {
+                if (state.value.staged.size >= MAX_STAGED_ATTACHMENTS) {
+                    state.update { it.copy(error = limitMessage) }
+                    return@withLock
+                }
+                state.update { it.copy(isAttaching = true) }
+                // In a finally: a throw here would otherwise leave the attach button spinning
+                // with no way back to it.
+                try {
+                    accept(safelyStage(uri))
+                } finally {
+                    state.update { it.copy(isAttaching = false) }
+                }
             }
-            state.update { it.after(staged) }
         }
     }
 
@@ -80,20 +92,42 @@ internal class Attaching(
             return
         }
         scope.launch {
-            state.update { it.copy(isAttaching = true) }
-            val refusals = mutableListOf<String>()
-            try {
-                uris.forEach { uri ->
-                    when (val staged = staging.file(uri, state.value.mediaSupport)) {
-                        is Staged.Refused -> refusals += staged.why
-                        else -> state.update { it.after(staged) }
-                    }
+            attachMutex.withLock {
+                val capacity = MAX_STAGED_ATTACHMENTS - state.value.staged.size
+                if (capacity <= 0) {
+                    state.update { it.copy(error = limitMessage) }
+                    return@withLock
                 }
-            } finally {
-                state.update { it.copy(isAttaching = false) }
-            }
-            if (refusals.isNotEmpty()) {
-                state.update { it.copy(error = refusals.distinct().joinToString(" ")) }
+                state.update { it.copy(isAttaching = true) }
+                val refusals = mutableListOf<String>()
+                var hitLimit = uris.size > capacity
+                try {
+                    uris.take(capacity).forEach { uri ->
+                        if (state.value.staged.size >= MAX_STAGED_ATTACHMENTS) {
+                            hitLimit = true
+                            return@forEach
+                        }
+                        when (val staged = safelyStage(uri)) {
+                            is Staged.Refused -> refusals += staged.why
+                            is Staged.Files -> {
+                                if (staged.files.size >
+                                    MAX_STAGED_ATTACHMENTS - state.value.staged.size
+                                ) {
+                                    hitLimit = true
+                                }
+                                accept(staged)
+                            }
+                            else -> accept(staged)
+                        }
+                    }
+                } finally {
+                    state.update { it.copy(isAttaching = false) }
+                }
+                if (refusals.isNotEmpty() || hitLimit) {
+                    val messages = refusals.distinct().toMutableList()
+                    if (hitLimit) messages += limitMessage
+                    state.update { it.copy(error = messages.distinct().joinToString(" ")) }
+                }
             }
         }
     }
@@ -143,7 +177,36 @@ internal class Attaching(
     suspend fun discard(files: List<MessagePart.File>) {
         if (files.isNotEmpty()) staging.discard(files)
     }
+
+    /** Applies the total part budget after expansion, because one video becomes four files. */
+    private suspend fun accept(staged: Staged) {
+        if (staged !is Staged.Files) {
+            state.update { it.after(staged) }
+            return
+        }
+        val remaining = (MAX_STAGED_ATTACHMENTS - state.value.staged.size).coerceAtLeast(0)
+        val accepted = staged.files.take(remaining)
+        val overflow = staged.files.drop(remaining)
+        if (overflow.isNotEmpty()) staging.discard(overflow)
+        state.update {
+            it.after(Staged.Files(accepted)).copy(
+                error = limitMessage.takeIf { overflow.isNotEmpty() } ?: it.error,
+            )
+        }
+    }
+
+    /** A revoked clipboard/provider URI is a refusal, not a failed composer coroutine. */
+    private suspend fun safelyStage(uri: Uri): Staged = try {
+        staging.file(uri, state.value.mediaSupport)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+        android.util.Log.w("Attaching", "Provider refused attachment", failure)
+        Staged.Refused(unreadableMessage)
+    }
 }
+
+internal const val MAX_STAGED_ATTACHMENTS = 8
 
 /**
  * The state with the outcome of an attachment folded into it.

@@ -79,6 +79,17 @@ abstract class ChatFixture {
     protected lateinit var writer: FailableWriter
     protected lateinit var viewModel: ChatViewModel
     protected lateinit var chats: ChatRepository
+
+    /**
+     * The board a goal reads its plan off, held so a test can be the model that proposed it.
+     *
+     * A goal will not start without a plan, and a plan arrives through a tool call the model
+     * makes. Scripting that through the fake engine would be testing the tool parser; what
+     * these tests are about is what the loop does once a plan exists.
+     */
+    protected lateinit var plans: PlanBoard
+    protected lateinit var goals: GoalBoard
+    protected lateinit var turns: TurnRunner
     protected val savedState = SavedStateHandle()
 
     @Before
@@ -100,6 +111,15 @@ abstract class ChatFixture {
     /** Another view model over the same storage, which is what survives process death. */
     protected fun newViewModel(state: SavedStateHandle): ChatViewModel {
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        plans = PlanBoard()
+        goals = GoalBoard()
+        turns = TurnRunner(
+            engine,
+            ToolRegistry(listOf(StubTool)),
+            ToolSwitches(context),
+            plans,
+            AskBoard(),
+        )
         return ChatViewModel(
             runtime = ModelRuntime(
                 engine = engine,
@@ -109,17 +129,11 @@ abstract class ChatFixture {
                 windows = ContextWindows(FitEstimator(), DeviceProfiler(context)),
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
-            staging = Staging(AttachmentStore(context)),
+            staging = Staging(AttachmentStore(context), context),
             writer = writer,
-            turns = TurnRunner(
-                engine,
-                ToolRegistry(listOf(StubTool)),
-                ToolSwitches(context),
-                PlanBoard(),
-                AskBoard(),
-            ),
+            turns = turns,
             notifier = ReplyNotifier(context),
-            goals = GoalBoard(),
+            goals = goals,
             memory = Memory(context),
             // Robolectric has no service to start, and GenerationService swallows the
             // failure on purpose: a turn that cannot raise its own priority still has to

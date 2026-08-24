@@ -20,6 +20,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -41,6 +43,54 @@ import org.robolectric.RobolectricTestRunner
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ChatConversationsTest : ChatFixture() {
+    @Test
+    fun `editing a media turn keeps its files and deletes only the abandoned suffix`() =
+        runTest(dispatcher) {
+            loadModel()
+            val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+            val attachmentDirectory = java.io.File(context.filesDir, "attachments").apply {
+                mkdirs()
+            }
+            val original = java.io.File(attachmentDirectory, "original.jpg").apply {
+                writeText("a")
+            }
+            val abandoned = java.io.File(attachmentDirectory, "abandoned.jpg").apply {
+                writeText("b")
+            }
+            val originalPart = MessagePart.File(original.absolutePath, "image/jpeg", "original")
+            val abandonedPart = MessagePart.File(abandoned.absolutePath, "image/jpeg", "abandoned")
+            val id = chats.startConversation("original", "model-a")
+            chats.addMessage(
+                id,
+                ChatRole.USER.wireName,
+                "original",
+                attachments = listOf(originalPart),
+            )
+            chats.addMessage(id, ChatRole.ASSISTANT.wireName, "old answer")
+            chats.addMessage(
+                id,
+                ChatRole.USER.wireName,
+                "later",
+                attachments = listOf(abandonedPart),
+            )
+
+            viewModel.openConversation(id)
+            settle(steps = FOLD_SETTLE_STEPS)
+            viewModel.editAndResend(viewModel.uiState.value.transcript.first().id, "edited")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            assertThat(original.exists()).isTrue()
+            assertThat(abandoned.exists()).isFalse()
+            assertThat(viewModel.uiState.value.transcript.first().attachments.map { it.path })
+                .containsExactly(original.absolutePath)
+            val stored = chats.messages(id)
+            assertThat(stored.first().text).isEqualTo("edited")
+            assertThat(stored.first().attachments.decodeAttachments().map { it.path })
+                .containsExactly(original.absolutePath)
+            assertThat(stored.flatMap { it.attachments.decodeAttachments() }.map { it.path })
+                .doesNotContain(abandoned.absolutePath)
+        }
+
     @Test
     fun `two questions sent at once produce one conversation, not two`() = runTest(dispatcher) {
         loadModel()

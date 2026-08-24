@@ -93,6 +93,41 @@ class ChatRepository @Inject constructor(
         touch(conversationId)
     }
 
+    /** Replaces an edited turn, trims its suffix, and invalidates any stale summary atomically. */
+    suspend fun replaceFrom(
+        conversationId: Long,
+        messageId: Long,
+        text: String,
+        attachments: List<MessagePart.File>,
+        clearCompaction: Boolean,
+    ) = database.withTransaction {
+        val conversation = database.conversations().byId(conversationId)
+            ?: return@withTransaction
+        database.messages().deleteFrom(conversationId, messageId)
+        database.messages().insert(
+            MessageEntity(
+                conversationId = conversationId,
+                role = "user",
+                text = text,
+                createdAt = clock.nowMillis(),
+                attachments = attachments.encodeAttachments(),
+            ),
+        )
+        database.conversations().upsert(
+            conversation.copy(
+                compactionSummary = conversation.compactionSummary.takeUnless {
+                    clearCompaction
+                },
+                compactionThroughIndex = conversation.compactionThroughIndex
+                    .takeUnless { clearCompaction } ?: -1,
+                compactionHeadId = conversation.compactionHeadId.takeUnless {
+                    clearCompaction
+                },
+                updatedAt = clock.nowMillis(),
+            ),
+        )
+    }
+
     suspend fun deleteConversation(id: Long) = database.conversations().delete(id)
 
     /**

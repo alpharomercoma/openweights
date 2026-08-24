@@ -138,7 +138,9 @@ class WebSearchTool @Inject constructor(
                 "rather than a passage."
         }
 
-        val providers = settings.providers(httpClient)
+        // Through the proxy when one is set, and only here: see SearchSettings.proxy for
+        // why this is scoped to search rather than applied to every request the app makes.
+        val providers = settings.providers(settings.client(httpClient))
         // Each in turn until one answers. A provider returns null when it could not answer
         // rather than an empty list, so being rate limited moves on to the next one instead
         // of telling the model the web has nothing on the subject.

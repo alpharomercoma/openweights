@@ -21,6 +21,8 @@ import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.SearchEngine
+import io.github.alpharomercoma.openweights.core.tools.SearchSettings
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
@@ -53,6 +55,22 @@ data class WorkspaceSummary(val folder: String?, val state: GrantState)
 data class ToolsUiState(
     val tools: List<ToolSummary> = emptyList(),
     val workspace: WorkspaceSummary = WorkspaceSummary(null, GrantState.NONE),
+    /** Which engines search may use, in the order they are tried. */
+    val engines: List<EngineSummary> = emptyList(),
+    val proxy: String = "",
+)
+
+/** One search engine, and whether the user has left it on. */
+data class EngineSummary(
+    val engine: SearchEngine,
+    val enabled: Boolean,
+    /**
+     * False for the last one left on.
+     *
+     * A search tool with no engine behind it reports that the web is unreachable, and a
+     * model reads that as a fact about the web rather than about the settings.
+     */
+    val canDisable: Boolean,
 )
 
 @HiltViewModel
@@ -60,9 +78,32 @@ class ToolsViewModel @Inject constructor(
     private val registry: ToolRegistry,
     private val switches: ToolSwitches,
     private val grant: WorkspaceGrant,
+    private val search: SearchSettings,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ToolsUiState(read(), workspace()))
+    private val _uiState =
+        MutableStateFlow(ToolsUiState(read(), workspace(), engines(), search.proxy))
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
+
+    fun setEngineEnabled(engine: SearchEngine, enabled: Boolean) {
+        search.setEnabled(engine, enabled)
+        refresh()
+    }
+
+    fun setProxy(address: String) {
+        search.proxy = address
+        refresh()
+    }
+
+    private fun engines(): List<EngineSummary> {
+        val on = search.enabledEngines()
+        return SearchEngine.entries.map { engine ->
+            EngineSummary(
+                engine = engine,
+                enabled = engine in on,
+                canDisable = on.size > 1 || engine !in on,
+            )
+        }
+    }
 
     fun setEnabled(id: String, enabled: Boolean) {
         switches.setEnabled(id, enabled)
@@ -86,7 +127,14 @@ class ToolsViewModel @Inject constructor(
      * describe themselves differently, and disappear from the model's view entirely, when
      * there is nowhere to work.
      */
-    private fun refresh() = _uiState.update { it.copy(tools = read(), workspace = workspace()) }
+    private fun refresh() = _uiState.update {
+        it.copy(
+            tools = read(),
+            workspace = workspace(),
+            engines = engines(),
+            proxy = search.proxy,
+        )
+    }
 
     private fun workspace(): WorkspaceSummary =
         WorkspaceSummary(folder = grant.folder?.folderLabel(), state = grant.state())

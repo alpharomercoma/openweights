@@ -13,6 +13,7 @@ room = "2.8.4"
 datastore = "1.2.1"
 work = "2.11.2"
 hiltExt = "1.4.0"
+jsoup = "1.21.2"
 okhttp = "5.4.0"
 kotlinxSerialization = "1.11.0"
 kotlinxCoroutines = "1.11.0"
@@ -78,6 +79,7 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "work" }
 
 # Network
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver3-junit4", version.ref = "mockwebserver" }

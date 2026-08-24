@@ -21,6 +21,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,6 +54,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -65,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.SearchEngine
 
 /**
  * What the model can do, and what each one costs you.
@@ -89,6 +96,8 @@ fun ToolsScreen(
     onToggle: (String, Boolean) -> Unit,
     onChooseFolder: (Uri) -> Unit,
     onForgetFolder: () -> Unit,
+    onEngineEnabled: (SearchEngine, Boolean) -> Unit = { _, _ -> },
+    onProxy: (String) -> Unit = {},
     /**
      * Pops back to the conversation, when this screen was pushed from it.
      *
@@ -151,6 +160,17 @@ fun ToolsScreen(
                     workspace = state.workspace,
                     onChosen = onChooseFolder,
                     onForget = onForgetFolder,
+                )
+            }
+
+            // Below the folder and above the rows, because it governs the two that leave
+            // the device in the same way the folder governs the three that do not.
+            item {
+                SearchCard(
+                    engines = state.engines,
+                    proxy = state.proxy,
+                    onEngineEnabled = onEngineEnabled,
+                    onProxy = onProxy,
                 )
             }
 
@@ -394,5 +414,90 @@ private fun ToolsScreenPreview() {
             onChooseFolder = {},
             onForgetFolder = {},
         )
+    }
+}
+
+/**
+ * Which engines search may use, and a proxy for when they refuse.
+ *
+ * Collapsed to a summary until opened, because most people never touch it and the two rows
+ * it governs are already on this screen. Opened, it is four switches and one field.
+ */
+@Composable
+private fun SearchCard(
+    engines: List<EngineSummary>,
+    proxy: String,
+    onEngineEnabled: (SearchEngine, Boolean) -> Unit,
+    onProxy: (String) -> Unit,
+) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val on = engines.count { it.enabled }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.md))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable { open = !open }
+            .padding(14.dp),
+    ) {
+        Text("Search engines", style = MaterialTheme.typography.titleSmall)
+        Text(
+            // Says what the order means, because it is not the order of index quality and
+            // somebody reading the list will otherwise assume it is.
+            text = "$on of ${engines.size} on. Tried in order until one answers, so the " +
+                "ones most likely to answer a phone come first.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (!open) return@Column
+
+        engines.forEach { summary ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(summary.engine.label, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = summary.engine.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = summary.enabled,
+                    // The last one left on cannot be turned off. See EngineSummary.
+                    enabled = summary.canDisable,
+                    onCheckedChange = { onEngineEnabled(summary.engine, it) },
+                )
+            }
+        }
+
+        var typed by rememberSaveable(proxy) { mutableStateOf(proxy) }
+        Text(
+            text = "Proxy",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+        Text(
+            // Both halves matter. The scope is a promise about privacy; the caveat stops
+            // this reading as a fix for being blocked, which it is not.
+            text = "Used for search only, not for downloads or pages you open. Google and " +
+                "Bing refuse some networks outright, and a proxy may help. It is not a " +
+                "guarantee: one that is itself blocked fails the same way.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { typed = it },
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            placeholder = { Text("http://host:port or socks5://host:port") },
+            singleLine = true,
+            shape = RoundedCornerShape(Radius.sm),
+        )
+        TextButton(onClick = { onProxy(typed) }) { Text("Save proxy") }
     }
 }

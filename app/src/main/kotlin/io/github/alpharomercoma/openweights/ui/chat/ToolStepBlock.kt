@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Block
@@ -43,13 +46,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.scriptSource
 import java.util.Locale
 
@@ -121,6 +129,14 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
                     modifier = Modifier.size(14.dp),
                 )
             }
+        }
+
+        // Outside the disclosure, unlike everything else here. A grid of pictures is the
+        // answer rather than the working: somebody who asked to see something should see it
+        // without first being told a tool ran and having to tap.
+        val thumbnails = step.thumbnails()
+        if (thumbnails.isNotEmpty()) {
+            MediaGrid(thumbnails = thumbnails, modifier = Modifier.padding(top = 8.dp))
         }
 
         AnimatedVisibility(visible = expanded) {
@@ -234,3 +250,65 @@ private val VALUES = Regex(""":\s*("(?:[^"\\]|\\.)*"|[^,}\s]+)""")
 
 private const val ARGUMENT_CHARS = 44
 private const val MILLIS_PER_SECOND = 1000.0
+
+/**
+ * The pictures one step found, or nothing for a step that found none.
+ *
+ * Read back out of the tool's own text, because a tool returns a string and there is no
+ * other channel. See `SearchMediaTool.MEDIA` for the marker and why it is a prefix rather
+ * than a block of JSON.
+ */
+private fun AgentStep.thumbnails(): List<String> = when (this) {
+    is AgentStep.Ran -> if (call.name == SearchMediaTool.NAME) {
+        SearchMediaTool.thumbnailsIn(result)
+    } else {
+        emptyList()
+    }
+    else -> emptyList()
+}
+
+/**
+ * Results as pictures, the way every assistant that can show them does it.
+ *
+ * A row that scrolls sideways rather than a grid that wraps, and the reason is the container:
+ * this sits inside a transcript that scrolls vertically, and a wrapping grid inside a
+ * vertical scroller either has to be measured to its full height, which makes a long result
+ * push the reply off screen, or nested, which Compose will not do. A row has one obvious
+ * gesture and takes fixed height whatever the count.
+ */
+@Composable
+private fun MediaGrid(thumbnails: List<String>, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items(thumbnails) { url ->
+            AsyncImage(
+                model = url,
+                // Named rather than described. Nothing here knows what is in the picture,
+                // and inventing a description for a screen reader is worse than admitting
+                // there is one to look at.
+                contentDescription = "Search result picture",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(THUMBNAIL)
+                    .clip(RoundedCornerShape(Radius.xs))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable {
+                        // Out to the browser rather than into a viewer of our own. The
+                        // thumbnail is a thumbnail; the page it came from is the thing with
+                        // the licence, the caption and the rest of the context.
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, url.toUri()),
+                            )
+                        }
+                    },
+            )
+        }
+    }
+}
+
+/** Big enough to recognise a subject, small enough that eight fit a phone's width in two. */
+private val THUMBNAIL = 96.dp

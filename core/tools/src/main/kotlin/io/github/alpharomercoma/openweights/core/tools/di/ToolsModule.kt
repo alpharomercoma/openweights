@@ -30,6 +30,7 @@ import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RememberTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
+import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WatchTool
 import io.github.alpharomercoma.openweights.core.tools.Watches
@@ -61,6 +62,7 @@ object ToolsModule {
     @Singleton
     fun registry(
         search: WebSearchTool,
+        media: SearchMediaTool,
         fetch: FetchUrlTool,
         searchFiles: SearchFilesTool,
         readFile: ReadFileTool,
@@ -74,8 +76,8 @@ object ToolsModule {
         remember: RememberTool,
     ): ToolRegistry = ToolRegistry(
         listOf(
-            search, fetch, searchFiles, readFile, writeFile, runScript, advance, askUser,
-            watch, remember,
+            search, media, fetch, searchFiles, readFile, writeFile, runScript,
+            advance, askUser, watch, remember,
         ),
     )
 

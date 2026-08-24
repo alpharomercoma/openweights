@@ -79,16 +79,130 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
      * live in the encrypted store this module cannot see, and an unwired settings field is
      * worse than a missing one.
      */
+    /**
+     * The client search uses, which is the caller's with the proxy applied when there is one.
+     *
+     * Derived rather than replaced, so the connection pool, the timeouts and the interceptors
+     * the app configured once are all still there. A proxy address that does not parse is
+     * ignored rather than fatal: a typed setting should degrade to searching directly, not
+     * to a search tool that throws.
+     */
+    fun client(httpClient: OkHttpClient): OkHttpClient {
+        val hop = proxy.asProxy() ?: return httpClient
+        return httpClient.newBuilder().proxy(hop).build()
+    }
+
     fun providers(httpClient: OkHttpClient): List<SearchProvider> = buildList {
         // First when it is on, because it is the precise one: a question it can answer it
         // answers better than the web, and one it cannot it now declines rather than
         // guessing. Behind DuckDuckGo it would only ever be reached when the web had
         // failed, which is exactly when a wrong answer is least welcome.
         if (searchesDocumentation) add(Context7Provider(httpClient))
-        add(DuckDuckGoProvider(httpClient))
+        enabledEngines().forEach { engine ->
+            add(
+                when (engine) {
+                    SearchEngine.DUCKDUCKGO -> DuckDuckGoProvider(httpClient)
+                    SearchEngine.BRAVE -> BraveProvider(httpClient)
+                    SearchEngine.BING -> BingProvider(httpClient)
+                    SearchEngine.GOOGLE -> GoogleProvider(httpClient)
+                },
+            )
+        }
     }.filter { it.isConfigured }
+
+    /**
+     * The engines to try, in order, skipping any the user has switched off.
+     *
+     * Order is fixed rather than configurable, and it is the order of how often each
+     * actually answers from a phone rather than of how good its index is. Google has the
+     * best index and refuses most often, so it is last: putting it first would mean most
+     * searches waited for a refusal before doing anything useful.
+     *
+     * Everything on by default. The chain stops at the first engine that answers, so an
+     * engine that is never reached costs nothing, and one that is switched off cannot be
+     * the one that would have answered.
+     */
+    fun enabledEngines(): List<SearchEngine> = SearchEngine.entries.filter { isEnabled(it) }
+
+    fun isEnabled(engine: SearchEngine): Boolean = store.getBoolean(engine.key, true)
+
+    fun setEnabled(engine: SearchEngine, enabled: Boolean) {
+        // Never all of them off. A search tool with no engine behind it is a tool that
+        // reports the web is unreachable, which reads to the model as a fact about the web.
+        if (!enabled && enabledEngines() == listOf(engine)) return
+        store.edit { putBoolean(engine.key, enabled) }
+    }
+
+    /**
+     * A proxy for search traffic only, or blank for none.
+     *
+     * Search only, deliberately. This app's promise is that nothing leaves the device
+     * without being asked, and a proxy is a third party that would see every request the
+     * app makes if it were global. Scoped here it sees what the user already chose to send
+     * to a search engine, and nothing else: not model downloads, not fetched pages.
+     *
+     * Offered because Google and Bing both refuse outright from some networks and some
+     * countries, and because a user who knows they are blocked has no other lever. It is
+     * not a guarantee and the setting says so: a proxy that is itself blocked, or that the
+     * engine has seen before, fails exactly as the direct connection did.
+     *
+     * `http`, `https` and `socks5` are the schemes `ddgs` supports and the ones supported
+     * here, for the same reason: they are what people actually have.
+     */
+    var proxy: String
+        get() = store.getString(PROXY, "").orEmpty()
+        set(value) = store.edit { putString(PROXY, value.trim()) }
 
     private companion object {
         const val DOCUMENTATION = "documentation"
+        const val PROXY = "proxy"
     }
+}
+
+/**
+ * A general web engine the app can read.
+ *
+ * Four, and the list is a judgement rather than everything possible. `ddgs` reaches ten,
+ * including Yahoo and Startpage, which resell Bing and Google respectively: adding them
+ * would offer the user a longer list of the same two indexes. Yandex and Mojeek are real
+ * independent indexes and are absent because neither is one this app can recommend for a
+ * general question in English.
+ *
+ * So: two independent indexes, Brave and DuckDuckGo, and the two large ones.
+ */
+enum class SearchEngine(val key: String, val label: String, val detail: String) {
+    /** Answers without a key or an account, and the only one measured to do so reliably. */
+    DUCKDUCKGO("engine_duckduckgo", "DuckDuckGo", "Answers without an account. The default."),
+
+    /** Its own index, which is what makes it worth having beside the large two. */
+    BRAVE("engine_brave", "Brave", "An index of its own, not a front end for another."),
+
+    BING("engine_bing", "Bing", "Also the index behind Yahoo and several others."),
+
+    /** Last: best index, most likely to refuse a phone. See [SearchSettings.proxy]. */
+    GOOGLE("engine_google", "Google", "The best index, and the most likely to refuse."),
+}
+
+/**
+ * A typed proxy address, or null for anything this cannot use.
+ *
+ * Null covers blank, unparseable, a missing host or port, and a scheme that is not one of
+ * the three. All of them mean the same thing to the caller: search directly. A typed setting
+ * should degrade to working rather than to a tool that raises.
+ */
+private fun String.asProxy(): java.net.Proxy? {
+    if (isBlank()) return null
+    val parsed = runCatching { java.net.URI(this) }.getOrNull() ?: return null
+    val host = parsed.host
+    val port = parsed.port.takeIf { it > 0 }
+    // socks5h resolves names at the proxy, which is the point of using one to get past a
+    // block. Java has one SOCKS type and resolves at the proxy for an unresolved address,
+    // so both spellings land in the same place.
+    val kind = when (parsed.scheme?.lowercase()) {
+        "socks5", "socks5h", "socks" -> java.net.Proxy.Type.SOCKS
+        "http", "https" -> java.net.Proxy.Type.HTTP
+        else -> null
+    }
+    if (host == null || port == null || kind == null) return null
+    return java.net.Proxy(kind, java.net.InetSocketAddress.createUnresolved(host, port))
 }

@@ -302,6 +302,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onToggle = viewModel::setEnabled,
                 onChooseFolder = viewModel::chooseFolder,
                 onForgetFolder = viewModel::forgetFolder,
+                onEngineEnabled = viewModel::setEngineEnabled,
+                onProxy = viewModel::setProxy,
                 onBack = navController::popBackStack,
             )
         }

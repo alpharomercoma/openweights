@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.generation.ImageSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -199,8 +200,10 @@ class MnnImageGenerator internal constructor(
             } catch (cancelled: CancellationException) {
                 // The coroutine went, not the button. Ask the runtime to stop too, or the
                 // phone keeps denoising a picture nobody is waiting for.
-                bridge.cancel(open)
-                target.delete()
+                withContext(NonCancellable) {
+                    bridge.cancel(open)
+                    target.delete()
+                }
                 throw cancelled
             } finally {
                 bridge.onStep = null

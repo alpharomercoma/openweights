@@ -38,7 +38,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 #include <mutex>
-#include <unordered_set>
+#include <unordered_map>
 
 namespace {
 
@@ -81,15 +81,21 @@ struct SpeechSession {
 };
 
 std::mutex gSessionMutex;
-std::unordered_set<GenerationSession*> gActiveSessions;
-std::unordered_set<SpeechSession*> gActiveSpeechSessions;
+std::unordered_map<jlong, std::shared_ptr<GenerationSession>> gActiveSessions;
+std::unordered_map<jlong, std::shared_ptr<SpeechSession>> gActiveSpeechSessions;
 
-GenerationSession* asSession(jlong handle) {
-    return reinterpret_cast<GenerationSession*>(handle);
+std::shared_ptr<GenerationSession> getSession(jlong handle) {
+    if (handle == 0) return nullptr;
+    std::lock_guard<std::mutex> guard(gSessionMutex);
+    auto it = gActiveSessions.find(handle);
+    return it != gActiveSessions.end() ? it->second : nullptr;
 }
 
-SpeechSession* asSpeech(jlong handle) {
-    return reinterpret_cast<SpeechSession*>(handle);
+std::shared_ptr<SpeechSession> getSpeechSession(jlong handle) {
+    if (handle == 0) return nullptr;
+    std::lock_guard<std::mutex> guard(gSessionMutex);
+    auto it = gActiveSpeechSessions.find(handle);
+    return it != gActiveSpeechSessions.end() ? it->second : nullptr;
 }
 
 void appendUtf8(std::string & out, uint32_t code) {
@@ -116,14 +122,19 @@ std::string to_utf8(JNIEnv* env, jstring value) {
     const jchar* chars = env->GetStringChars(value, nullptr);
     if (chars == nullptr) return {};
     std::string result;
-    result.reserve(static_cast<size_t>(length));
+    result.reserve(static_cast<size_t>(length) * 2);
     for (jsize i = 0; i < length; ++i) {
         uint32_t code = chars[i];
-        if (code >= 0xD800 && code <= 0xDBFF && i + 1 < length &&
-            chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
-            code = 0x10000 + ((code - 0xD800) << 10) + (chars[i + 1] - 0xDC00);
-            if (code > 0x10FFFF) code = 0xFFFD;
-            ++i;
+        if (code >= 0xD800 && code <= 0xDBFF) {
+            if (i + 1 < length && chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
+                code = 0x10000 + ((code - 0xD800) << 10) + (chars[i + 1] - 0xDC00);
+                if (code > 0x10FFFF) code = 0xFFFD;
+                ++i;
+            } else {
+                code = 0xFFFD;
+            }
+        } else if (code >= 0xDC00 && code <= 0xDFFF) {
+            code = 0xFFFD;
         }
         appendUtf8(result, code);
     }
@@ -196,7 +207,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
     }
 
     try {
-        auto session = std::make_unique<GenerationSession>();
+        auto session = std::make_shared<GenerationSession>();
         session->diffusion.reset(MNN::DIFFUSION::Diffusion::createDiffusion(
             path,
             static_cast<MNN::DIFFUSION::DiffusionModelType>(modelType),
@@ -212,12 +223,12 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         }
         session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
         LOGI("loaded a diffusion bundle from %s", path.c_str());
-        GenerationSession* raw = session.release();
+        jlong handle = reinterpret_cast<jlong>(session.get());
         {
             std::lock_guard<std::mutex> guard(gSessionMutex);
-            gActiveSessions.insert(raw);
+            gActiveSessions[handle] = session;
         }
-        return reinterpret_cast<jlong>(raw);
+        return handle;
     } catch (const std::exception& failure) {
         LOGE("MNN failed to initialize diffusion bundle: %s", failure.what());
         return 0;
@@ -239,12 +250,8 @@ JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGenerate(
     JNIEnv* env, jobject self, jlong handle, jstring prompt, jstring outputPath,
     jint steps, jint seed) {
-    GenerationSession* session = asSession(handle);
-    if (session == nullptr) return 2;
-    {
-        std::lock_guard<std::mutex> guard(gSessionMutex);
-        if (gActiveSessions.find(session) == gActiveSessions.end() || !session->diffusion) return 2;
-    }
+    std::shared_ptr<GenerationSession> session = getSession(handle);
+    if (!session || !session->diffusion) return 2;
 
     session->cancelled.store(false);
 
@@ -286,43 +293,33 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeCancel(
     JNIEnv*, jobject, jlong handle) {
-    GenerationSession* session = asSession(handle);
-    if (session != nullptr) {
-        std::lock_guard<std::mutex> guard(gSessionMutex);
-        if (gActiveSessions.find(session) != gActiveSessions.end()) {
-            session->cancelled.store(true);
-        }
-    }
+    std::shared_ptr<GenerationSession> session = getSession(handle);
+    if (session) session->cancelled.store(true);
 }
 
 /** What actually ran, which is not always what was asked for. */
 JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeBackend(
     JNIEnv* env, jobject, jlong handle) {
-    GenerationSession* session = asSession(handle);
-    if (session == nullptr) return env->NewStringUTF("");
-    std::string backendStr;
-    {
-        std::lock_guard<std::mutex> guard(gSessionMutex);
-        if (gActiveSessions.find(session) != gActiveSessions.end()) {
-            backendStr = session->backend;
-        }
-    }
-    return env->NewStringUTF(backendStr.c_str());
+    std::shared_ptr<GenerationSession> session = getSession(handle);
+    return env->NewStringUTF(session ? session->backend.c_str() : "");
 }
 
 /** Releases one handle. Safe to call twice; the caller clears its own copy. */
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRelease(
     JNIEnv*, jobject, jlong handle) {
-    GenerationSession* session = asSession(handle);
-    if (session != nullptr) {
-        {
-            std::lock_guard<std::mutex> guard(gSessionMutex);
-            if (gActiveSessions.erase(session) == 0) return;
+    if (handle == 0) return;
+    std::shared_ptr<GenerationSession> session;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        auto it = gActiveSessions.find(handle);
+        if (it != gActiveSessions.end()) {
+            session = it->second;
+            gActiveSessions.erase(it);
         }
-        delete session;
     }
+    if (session) session->cancelled.store(true);
 }
 
 /**
@@ -339,16 +336,16 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
     if (dir.empty()) return 0;
 
     try {
-        auto session = std::make_unique<SpeechSession>();
+        auto session = std::make_shared<SpeechSession>();
         session->tts = std::make_unique<MNNSupertonicTTSImpl>(dir);
         const std::string speaker = to_utf8(env, speakerId);
         if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
-        SpeechSession* raw = session.release();
+        jlong handle = reinterpret_cast<jlong>(session.get());
         {
             std::lock_guard<std::mutex> guard(gSessionMutex);
-            gActiveSpeechSessions.insert(raw);
+            gActiveSpeechSessions[handle] = session;
         }
-        return reinterpret_cast<jlong>(raw);
+        return handle;
     } catch (const std::exception& failure) {
         LOGE("a voice would not load: %s", failure.what());
         return 0;
@@ -367,12 +364,8 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
 JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSpeak(
     JNIEnv* env, jobject, jlong handle, jstring text, jstring outputPath) {
-    SpeechSession* session = asSpeech(handle);
-    if (session == nullptr) return -1;
-    {
-        std::lock_guard<std::mutex> guard(gSessionMutex);
-        if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end() || !session->tts) return -1;
-    }
+    std::shared_ptr<SpeechSession> session = getSpeechSession(handle);
+    if (!session || !session->tts) return -1;
 
     try {
         const auto [rate, samples] = session->tts->Process(to_utf8(env, text));
@@ -396,23 +389,16 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSp
 JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSampleRate(
     JNIEnv*, jobject, jlong handle) {
-    SpeechSession* session = asSpeech(handle);
-    if (session == nullptr) return 0;
-    std::lock_guard<std::mutex> guard(gSessionMutex);
-    if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end()) return 0;
-    return session->sampleRate;
+    std::shared_ptr<SpeechSession> session = getSpeechSession(handle);
+    return session ? session->sampleRate : 0;
 }
 
 /** Chooses among the voices the weights contain. */
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSetSpeaker(
     JNIEnv* env, jobject, jlong handle, jstring speakerId) {
-    SpeechSession* session = asSpeech(handle);
-    if (session == nullptr) return;
-    {
-        std::lock_guard<std::mutex> guard(gSessionMutex);
-        if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end() || !session->tts) return;
-    }
+    std::shared_ptr<SpeechSession> session = getSpeechSession(handle);
+    if (!session || !session->tts) return;
     const std::string speaker = to_utf8(env, speakerId);
     if (!speaker.empty()) {
         try {
@@ -429,13 +415,15 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSe
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeReleaseVoice(
     JNIEnv*, jobject, jlong handle) {
-    SpeechSession* session = asSpeech(handle);
-    if (session != nullptr) {
-        {
-            std::lock_guard<std::mutex> guard(gSessionMutex);
-            if (gActiveSpeechSessions.erase(session) == 0) return;
+    if (handle == 0) return;
+    std::shared_ptr<SpeechSession> session;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        auto it = gActiveSpeechSessions.find(handle);
+        if (it != gActiveSpeechSessions.end()) {
+            session = it->second;
+            gActiveSpeechSessions.erase(it);
         }
-        delete session;
     }
 }
 

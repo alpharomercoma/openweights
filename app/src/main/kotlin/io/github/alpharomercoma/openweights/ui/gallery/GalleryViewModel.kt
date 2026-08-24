@@ -86,7 +86,14 @@ class GalleryViewModel @Inject constructor(
         // Once, on the way in. The files live in storage Android may clear and a user may
         // clear from Settings, and neither tells the database anything: without this the
         // grid fills with entries that open onto nothing.
-        viewModelScope.launch { gallery.prune() }
+        viewModelScope.launch {
+            val lastPrune = savedState.get<Long>(KEY_LAST_PRUNE) ?: 0L
+            val now = System.currentTimeMillis()
+            if (now - lastPrune > PRUNE_THROTTLE_MILLIS) {
+                gallery.prune()
+                savedState[KEY_LAST_PRUNE] = now
+            }
+        }
     }
 
     fun sortBy(sort: GallerySort) = update { it.copy(sort = sort) }
@@ -154,6 +161,9 @@ class GalleryViewModel @Inject constructor(
         const val KEY_MODALITIES = "gallery.modalities"
         const val KEY_FAVOURITES = "gallery.favourites"
         const val KEY_SEARCH = "gallery.search"
+        const val KEY_LAST_PRUNE = "gallery.last_prune"
+
+        const val PRUNE_THROTTLE_MILLIS = 60_000L
 
         /** Long enough to survive a rotation, short enough not to hold a query open. */
         const val SUBSCRIPTION_GRACE_MILLIS = 5_000L

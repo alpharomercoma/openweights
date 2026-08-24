@@ -200,7 +200,7 @@ fun GalleryScreen(
         }
     }
 
-    val activeViewing = viewing?.let { v -> state.entries.find { it.id == v.id } ?: v }
+    val activeViewing = viewing?.let { v -> state.entries.find { it.id == v.id } }
 
     activeViewing?.let { entry ->
         GalleryViewer(

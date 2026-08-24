@@ -78,9 +78,23 @@ class ModelDownloader @Inject constructor(
     fun download(repoId: String, file: HubFile, destination: File): Flow<DownloadProgress> = flow {
         destination.parentFile?.mkdirs()
 
+        // A file already there at the right length is normally the same file, and rehashing
+        // several gigabytes to prove it would make every reopen of the models screen cost a
+        // minute. So the length is trusted, unless the Hub published a checksum, in which
+        // case it is the cheaper of two wrong answers to check.
+        //
+        // The case that matters is a publisher replacing a file with different bytes under
+        // the same name and the same size. Without the hash, the app reports "Finished" and
+        // keeps running the old weights forever, and nothing on screen ever disagrees.
         if (destination.isFile && destination.length() == file.sizeBytes) {
-            emit(DownloadProgress.Finished(destination))
-            return@flow
+            val expected = file.sha256
+            if (expected == null || destination.sha256(ioDispatcher).equals(expected, true)) {
+                emit(DownloadProgress.Finished(destination))
+                return@flow
+            }
+            // Different bytes under the same name. Removed rather than resumed: a resume
+            // would append to content that is already wrong.
+            destination.delete()
         }
 
         val partial = File(destination.parentFile, destination.name + PARTIAL_SUFFIX)

@@ -102,7 +102,21 @@ data class HubFile(
             .removeSuffix(GGUF_SUFFIX)
             .substringAfterLast('-')
 
-    val fileName: String get() = path.substringAfterLast('/')
+    /**
+     * The last segment of the repository path, and never a way out of a directory.
+     *
+     * `substringAfterLast('/')` strips directories, which handles `../../x` by leaving `x`.
+     * It does not handle a path whose last segment *is* `..`: that survives intact, and
+     * `File(modelsDirectory, "..")` is the parent, so a repository could name a download
+     * destination outside the folder meant to hold it. The blast radius is small, because
+     * the parent is still this app's private storage, and the guard is one comparison, and
+     * the whole point of this path is downloading a stranger's file.
+     *
+     * A backslash is refused for the same reason: it separates nothing on Android but does
+     * on other systems, and a name is copied around.
+     */
+    val fileName: String
+        get() = path.substringAfterLast('/').takeUnless { it.isUnsafeName() }.orEmpty()
 
     /**
      * True for a multimodal projector rather than a chat model.
@@ -240,6 +254,13 @@ class HuggingFaceClient @Inject constructor(
                 )
             }
             .sortedBy { it.sizeBytes }
+            // Bounded, because everything downstream is per file: the screen builds a row
+            // for each, and the inspector launches a coroutine for each to read its header
+            // over the network. A repository is somebody else's data, and one with a
+            // thousand quantisations would turn opening it into a thousand range requests.
+            // Sorted by size first, so the cut keeps the small ones, which are the ones a
+            // phone can actually run.
+            .take(MAX_FILES_PER_REPO)
 
         return HubModelDetail(
             model = payload.toModel(),
@@ -550,3 +571,20 @@ internal fun ParameterRange.parameter(): String? = listOfNotNull(
     min?.let { "min:$it" },
     max?.let { "max:$it" },
 ).joinToString(",").takeIf { it.isNotEmpty() }
+
+/**
+ * Whether a name would escape the directory it is meant to land in, or is not a name at all.
+ *
+ * Deliberately a denylist of the three shapes that are not names, rather than an allowlist
+ * of permitted characters: model files legitimately carry dots, dashes, plus signs and
+ * non-Latin scripts, and an allowlist would reject real files to guard against a case that
+ * a denylist covers exactly.
+ */
+private fun String.isUnsafeName(): Boolean = isBlank() ||
+    this == "." ||
+    this == ".." ||
+    contains('/') ||
+    contains('\\') ||
+    contains('\u0000')
+
+private const val MAX_FILES_PER_REPO = 40

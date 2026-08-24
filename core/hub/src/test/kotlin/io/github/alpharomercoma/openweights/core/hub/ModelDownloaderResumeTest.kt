@@ -210,4 +210,36 @@ class ModelDownloaderResumeTest {
         assertThat(failure).isInstanceOf(DownloadException::class.java)
         assertThat(destination.exists()).isFalse()
     }
+
+    @Test
+    fun `a file already there is checked against the published hash`() = runBlocking {
+        // A publisher replacing bytes under the same name and the same size used to be
+        // invisible: the length matched, the download reported Finished, and the app kept
+        // running the old weights with nothing on screen disagreeing.
+        val destination = File(folder.root, "weights.gguf")
+        // Same length as `whole`, different bytes: exactly the replaced-upstream case.
+        destination.writeBytes(ByteArray(whole.size) { 9 })
+
+        server.enqueue(MockResponse.Builder().code(200).body(body(whole)).build())
+
+        val states = downloader.download("owner/repo", hubFile(), destination).toList()
+
+        assertThat(states.last()).isInstanceOf(DownloadProgress.Finished::class.java)
+        assertThat(destination.readBytes().toList()).isEqualTo(whole.toList())
+    }
+
+    @Test
+    fun `a file already there with a matching hash is not fetched again`() = runBlocking {
+        // The counterweight: rehashing is cheaper than redownloading, but redownloading
+        // every time would be worse than either.
+        val destination = File(folder.root, "weights.gguf")
+        destination.writeBytes(whole)
+
+        val before = server.requestCount
+
+        val states = downloader.download("owner/repo", hubFile(), destination).toList()
+
+        assertThat(states.single()).isInstanceOf(DownloadProgress.Finished::class.java)
+        assertThat(server.requestCount).isEqualTo(before)
+    }
 }

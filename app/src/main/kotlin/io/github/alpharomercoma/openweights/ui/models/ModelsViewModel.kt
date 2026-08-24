@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.models
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.BackoffPolicy
@@ -206,7 +207,21 @@ class ModelsViewModel @Inject constructor(
      */
     fun download(repoId: String, path: String, sizeBytes: Long, sha256: String?) {
         val file = HubFile(path, sizeBytes, sha256)
-        start(repoId, file, File(modelStore.directory, file.fileName))
+        // Blank means the repository offered a name that is not one, and `HubFile.fileName`
+        // refused it rather than let it decide a path: `File(directory, "")` is the
+        // directory, and `File(directory, "..")` is its parent. Nothing is started.
+        //
+        // No error is surfaced, and that is a considered choice rather than an oversight.
+        // Errors here belong to a download row, and there is no row until a download
+        // starts; inventing a second error channel for a case that needs a malformed
+        // repository listing to reach would be more machinery than the case is worth. It is
+        // logged, which is what the next person debugging a missing download will look at.
+        val name = file.fileName
+        if (name.isBlank()) {
+            Log.w("OpenWeights", "refused to download ${'$'}repoId/${'$'}path: unusable file name")
+            return
+        }
+        start(repoId, file, File(modelStore.directory, name))
     }
 
     /**

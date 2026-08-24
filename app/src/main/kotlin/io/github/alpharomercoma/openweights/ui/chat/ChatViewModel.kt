@@ -1009,7 +1009,7 @@ class ChatViewModel @Inject constructor(
      * is a conversation that changes back the next time it is opened.
      */
     private suspend fun rewriteStoredTurn(edit: Edit): Boolean {
-        val written = runCatching {
+        val written = writeOrNull {
             writer.inOrder {
                 conversationId?.let { id ->
                     // By position rather than by id: the transcript's ids are the app's
@@ -1027,10 +1027,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
-        written.exceptionOrNull()?.let {
-            Log.w("OpenWeights", "an edited turn could not be trimmed", it)
-        }
-        return written.isSuccess
+        return written != null
     }
 
     /**
@@ -1056,7 +1053,7 @@ class ChatViewModel @Inject constructor(
             val copiedTranscript = mutableListOf<TranscriptEntry>()
             val copiedFiles = mutableListOf<MessagePart.File>()
             var createdId: Long? = null
-            val branched = runCatching {
+            val branched = writeOrNull {
                 writer.inOrder {
                     val title = carried.first { it.role == ChatRole.USER }.text
                     val id = startConversation(title, state.modelName).also { createdId = it }
@@ -1076,13 +1073,10 @@ class ChatViewModel @Inject constructor(
                     }
                     id
                 }
-            }.getOrNull()
+            }
 
             if (branched == null) {
-                runCatching {
-                    writer.inOrder { createdId?.let { deleteConversation(it) } }
-                }
-                staging.discard(copiedFiles)
+                cleanUpBranch(createdId, copiedFiles)
                 reportError(STORAGE_FAILED)
                 return@launch
             }
@@ -1119,6 +1113,23 @@ class ChatViewModel @Inject constructor(
      * behind spinning a core, which is why every build on this machine got slower until the
      * cause was found. Reading a hardware sensor was never main-thread work anyway.
      */
+    /**
+     * Removes what a branch that did not finish left behind.
+     *
+     * Uncancellable on purpose, and that is the whole reason it is its own function. This
+     * runs on the failure path, and one of the ways to reach the failure path is the
+     * coroutine being cancelled: cleanup written inline suspends at its first line, is
+     * cancelled there, and does nothing. What it does not do is delete a conversation that
+     * has already been created and filled in, so a branch stopped halfway stayed in the
+     * drawer, with copies of every attachment it had got through.
+     */
+    private suspend fun cleanUpBranch(createdId: Long?, copied: List<MessagePart.File>) {
+        withContext(NonCancellable) {
+            writeOrNull { writer.inOrder { createdId?.let { deleteConversation(it) } } }
+            runCatching { staging.discard(copied) }
+        }
+    }
+
     private fun startThermalSampling() {
         thermalJob?.cancel()
         thermalJob = viewModelScope.launch(Dispatchers.Default) {
@@ -2205,14 +2216,28 @@ private const val LAST_CONVERSATION = "lastConversation"
  * screen is that it will not be there later.
  */
 private suspend fun writeReportingFailure(write: suspend () -> Unit, report: (String) -> Unit) {
-    try {
-        write()
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-        Log.w("OpenWeights", "a chat write did not go through", failure)
-        report(STORAGE_FAILED)
-    }
+    if (writeOrNull(write) == null) report(STORAGE_FAILED)
+}
+
+/**
+ * Runs a write and gives back what it produced, or null if it would not go through.
+ *
+ * The same contract as [writeReportingFailure] for callers that need the value rather than
+ * only the outcome, and it exists because `runCatching` is not that contract. `runCatching`
+ * catches a cancellation exactly like a failure, so pressing Stop over a write became a
+ * write that failed: the edit that was being saved reported that storage was broken, and
+ * the branch that was being copied reported the same and left the half-built conversation
+ * it had already created sitting in the drawer.
+ *
+ * Cancellation is passed on. Everything else is logged and answered with null.
+ */
+internal suspend fun <T> writeOrNull(write: suspend () -> T): T? = try {
+    write()
+} catch (cancellation: CancellationException) {
+    throw cancellation
+} catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+    Log.w("OpenWeights", "a chat write did not go through", failure)
+    null
 }
 
 /**

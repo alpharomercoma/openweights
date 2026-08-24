@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.context.compactionPrompt
@@ -25,6 +26,7 @@ import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 /**
@@ -126,13 +128,22 @@ class ConversationCompactor @Inject constructor(
         }
         val request = listOf(ChatMessage.text(ChatRole.USER, compactionPrompt(transcript)))
 
-        return runCatching {
+        return try {
             buildString {
                 engine.chat(request, SUMMARY_PARAMS.copy(maxTokens = budget)).collect { event ->
                     if (event is GenerationEvent.Token) append(event.text)
                 }
             }
-        }.getOrNull()
+        } catch (cancellation: CancellationException) {
+            // Stop pressed, or the screen gone. `runCatching` read that as the summary
+            // having failed, so a fold the user interrupted came back as a fold that could
+            // not be done, and the caller carried on deciding what to do about it inside a
+            // coroutine that was already dead.
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+            Log.w("OpenWeights", "a conversation could not be summarised", failure)
+            null
+        }
             // A reasoning model will think out loud here too; only the answer is the summary.
             ?.let { parseAssistantReply(it).answer.trim() }
     }

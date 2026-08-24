@@ -60,6 +60,24 @@ interface Tool {
     val needsApproval: Boolean get() = true
 
     /**
+     * Whether this tool asks in every mode, including [AgentMode.AUTO].
+     *
+     * For the two tools whose effect outlives the conversation. [needsApproval] is about
+     * ASK mode by design, so a tool that sets it is still silent in AUTO, which is the
+     * default and where nearly everything actually runs. `remember` was given
+     * `needsApproval` to stop a hostile page writing itself into the permanent system
+     * prefix, and that did nothing at all for the mode people use: an audit pointed out the
+     * gap between what the flag was set for and what the flag does.
+     *
+     * The bar for setting this is narrow on purpose, or AUTO stops meaning anything. It is
+     * not "this is important" or "this writes something". It is: the effect is still there
+     * after the conversation ends, so a wrong call cannot be undone by closing the chat.
+     * That is `remember`, which edits every future prompt, and `watch`, which schedules
+     * unattended work. Everything else answers to [needsApproval].
+     */
+    val alwaysAsks: Boolean get() = false
+
+    /**
      * Whether this tool can do anything at all as things stand.
      *
      * False keeps the definition out of the prompt entirely, rather than advertising

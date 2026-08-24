@@ -331,8 +331,14 @@ class AgentRunner(
         // approval is not thereby exempt from the egress rule.
         if (couldBeToldWhereToGo || couldCarryPrivateData) return approve(call)
 
-        val autoAllows = mode == AgentMode.AUTO
-        return autoAllows || !tool.needsApproval || approve(call)
+        // A tool whose effect outlives the conversation asks in every mode. `needsApproval`
+        // is documented as an ASK-mode question and behaves as one, so setting it on
+        // `remember` and `watch` bought nothing in AUTO, which is the default. An injected
+        // instruction could therefore write itself into the permanent system prefix, or
+        // schedule recurring unattended work, without the user seeing anything.
+        if (tool.alwaysAsks) return approve(call)
+
+        return mode == AgentMode.AUTO || !tool.needsApproval || approve(call)
     }
 
     companion object {

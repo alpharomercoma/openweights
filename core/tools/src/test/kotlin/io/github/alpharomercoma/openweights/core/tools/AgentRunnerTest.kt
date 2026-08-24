@@ -689,4 +689,56 @@ class AgentRunnerTest {
         assertThat(AgentMode.of("AUTO")).isEqualTo(AgentMode.AUTO)
         assertThat(AgentMode.of("nonsense")).isNull()
     }
+
+    @Test
+    fun `a tool whose effect outlives the conversation asks even in auto`() = runTest {
+        // The gap an audit found. `needsApproval` is an ASK-mode question by design, so
+        // setting it on `remember` did nothing in AUTO, which is the default: an injected
+        // instruction could write itself into the permanent system prefix unseen.
+        var asked = 0
+        val runner = AgentRunner(ToolRegistry(listOf(Persistent())))
+
+        runner.step(
+            calls = listOf(call("persistent")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = {
+                asked++
+                true
+            },
+        )
+
+        assertThat(asked).isEqualTo(1)
+    }
+
+    @Test
+    fun `an ordinary tool still runs unattended in auto`() = runTest {
+        // The counterweight. If everything asked, AUTO would stop meaning anything, and the
+        // bar for the new flag has to stay narrow.
+        var asked = 0
+        val runner = AgentRunner(ToolRegistry(listOf(Ordinary())))
+
+        runner.step(
+            calls = listOf(call("ordinary")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = {
+                asked++
+                true
+            },
+        )
+
+        assertThat(asked).isEqualTo(0)
+    }
+
+    private class Persistent : Tool {
+        override val definition = ToolDefinition("persistent", "d", "{}")
+        override val alwaysAsks: Boolean = true
+        override suspend fun run(call: ToolCall) = "done"
+    }
+
+    private class Ordinary : Tool {
+        override val definition = ToolDefinition("ordinary", "d", "{}")
+        override suspend fun run(call: ToolCall) = "done"
+    }
 }

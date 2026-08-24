@@ -182,4 +182,17 @@ class SandboxTest {
 
         assertThat(result.output).isEqualTo("\"undefined,undefined,undefined\"")
     }
+
+    @Test
+    fun anEnormousResultIsTruncatedRatherThanKillingTheTransport() = runBlocking {
+        // The output limit was applied to console.log and not to the final expression, so a
+        // script ending in a two million character string allocated all of it, copied it
+        // into a Java string, and then failed to cross Binder, taking the sandbox down for
+        // the turn. A model can be talked into writing that line.
+        val result = sandbox.run("\"x\".repeat(2000000)")
+
+        assertThat(result.failed).isFalse()
+        assertThat(result.output.length).isLessThan(100_000)
+        assertThat(result.output).contains("truncated")
+    }
 }

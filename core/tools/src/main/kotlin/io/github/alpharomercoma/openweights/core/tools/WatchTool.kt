@@ -66,6 +66,9 @@ class WatchTool(private val watches: Watches) : Tool {
     /** Nothing that keeps running afterwards should start without being seen. */
     override val needsApproval: Boolean = true
 
+    /** It schedules unattended work, so it asks in AUTO too. See [Tool.alwaysAsks]. */
+    override val alwaysAsks: Boolean = true
+
     override suspend fun run(call: ToolCall): String {
         val task = call.argument("task", "what", "check")
         val minutes = call.intArgument("every_minutes", "minutes", "interval")

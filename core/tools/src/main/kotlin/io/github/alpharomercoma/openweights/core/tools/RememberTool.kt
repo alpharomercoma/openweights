@@ -82,8 +82,16 @@ class RememberTool @Inject constructor(private val memory: Memory) : Tool {
      * One tap, showing the exact sentence, is what the industry does for the same reason:
      * a memory the user did not agree to is not their memory. It is also cheap, because
      * this tool is off by default and fires rarely when on.
+     *
+     * Setting this alone was not enough and the note here used to imply it was.
+     * [needsApproval] is an ASK-mode question by design, so in AUTO, which is the default,
+     * the tap never happened and the injection this was written to stop went through
+     * unseen. [alwaysAsks] below is the flag that actually asks.
      */
     override val needsApproval: Boolean = true
+
+    /** Its effect is every future prompt, so it asks in AUTO too. See [Tool.alwaysAsks]. */
+    override val alwaysAsks: Boolean = true
 
     override suspend fun run(call: ToolCall): String {
         val fact = call.argument("fact", "text", "note")

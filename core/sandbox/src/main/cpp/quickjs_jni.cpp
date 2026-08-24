@@ -226,11 +226,29 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
     };
 
     JSRuntime *runtime = JS_NewRuntime();
+    if (runtime == nullptr) {
+        // Under memory pressure the allocator returns null and every line below dereferences
+        // it. Isolation means the crash only costs the script process, but a native abort is
+        // not a handled failure and tells the model nothing it can act on.
+        env->ReleaseStringUTFChars(sourceIn, source);
+        env->ReleaseStringUTFChars(inputsJsonIn, inputsJson);
+        const jboolean outOfMemory = JNI_TRUE;
+        env->SetBooleanArrayRegion(failedOut, 0, 1, &outOfMemory);
+        return env->NewStringUTF("there was not enough memory to start the interpreter");
+    }
     JS_SetMemoryLimit(runtime, static_cast<size_t>(memoryBytes));
     JS_SetMaxStackSize(runtime, static_cast<size_t>(stackBytes));
     JS_SetInterruptHandler(runtime, interrupted, &run);
 
     JSContext *context = JS_NewContext(runtime);
+    if (context == nullptr) {
+        JS_FreeRuntime(runtime);
+        env->ReleaseStringUTFChars(sourceIn, source);
+        env->ReleaseStringUTFChars(inputsJsonIn, inputsJson);
+        const jboolean outOfMemory = JNI_TRUE;
+        env->SetBooleanArrayRegion(failedOut, 0, 1, &outOfMemory);
+        return env->NewStringUTF("there was not enough memory to start the interpreter");
+    }
     JS_SetContextOpaque(context, &run);
 
     JSValue global = JS_GetGlobalObject(context);
@@ -297,6 +315,14 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
     // top-level `return` and a genuine `TypeError` was reported as a SyntaxError, because
     // the wrapped retry ran, threw for a real reason, and the real reason was discarded.
     std::string report = failed ? lastFailure : resultOf(context, value);
+    // Capped here as well as in console.log, because only console.log was capped. A script
+    // whose last expression is `"x".repeat(2000000)` allocated the whole thing natively,
+    // copied it into a Java string, and then failed to cross Binder, which takes the sandbox
+    // down for the turn. The limit was advertised and applied to one of the two ways out.
+    if (report.size() > static_cast<size_t>(outputLimit)) {
+        report.resize(static_cast<size_t>(outputLimit));
+        report += "\n... (result truncated)";
+    }
     if (failed && report.empty()) {
         report = failureOf(context);
     }

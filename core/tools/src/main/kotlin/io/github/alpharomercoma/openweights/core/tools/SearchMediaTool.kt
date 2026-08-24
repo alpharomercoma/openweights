@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.tools
 
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -122,6 +123,8 @@ class SearchMediaTool @Inject constructor(
         /** Enough to look at, few enough that the URLs do not dominate the turn. */
         const val LIMIT = 8
 
+        private val WHITESPACE = Regex("\\s+")
+
         /**
          * Every picture in one tool result: what to draw, and what to open.
          *
@@ -132,10 +135,19 @@ class SearchMediaTool @Inject constructor(
             .map { it.trim() }
             .filter { it.startsWith(MEDIA) }
             .mapNotNull { line ->
-                val parts = line.removePrefix(MEDIA).trim().split(' ').filter { it.isNotBlank() }
-                val thumbnail = parts.firstOrNull() ?: return@mapNotNull null
+                // Limit two, so a source address containing whitespace keeps all of
+                // itself rather than being cut at the first space.
+                val parts = line.removePrefix(MEDIA).trim().split(WHITESPACE, limit = 2)
+                val thumbnail = parts.firstOrNull()?.takeIf { it.isNotBlank() }
+                    ?: return@mapNotNull null
                 if (!thumbnail.isDrawable()) return@mapNotNull null
-                FoundPicture(thumbnail = thumbnail, source = parts.getOrNull(1) ?: thumbnail)
+                // The source is checked too, and it needs it more than the thumbnail does.
+                // A thumbnail is fetched; a source is handed to an Intent, which will open
+                // whatever it names in whatever app claims it. An unvalidated one lets a
+                // poisoned result choose a scheme as well as a host. Falling back to the
+                // thumbnail is safe because that has already passed the same test.
+                val source = parts.getOrNull(1)?.trim()?.takeIf { it.isDrawable() }
+                FoundPicture(thumbnail = thumbnail, source = source ?: thumbnail)
             }
             .toList()
     }
@@ -162,19 +174,33 @@ data class FoundPicture(val thumbnail: String, val source: String)
  */
 internal fun String.isDrawable(): Boolean {
     if (!startsWith("https://")) return false
-    val host = substringAfter("://").substringBefore('/').substringBefore(':').lowercase()
-    if (host.isEmpty()) return false
-    if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
-        return false
+
+    // Parsed by the HTTP library rather than by hand, and the hand-written version is why.
+    // It took the text before the first colon as the host, so `https://[fe80::1]/x.png`
+    // yielded `[fe80`, which trims to `fe80`, which contains letters, which was read as a
+    // domain name and waved through: every private IPv6 address with a hex letter in its
+    // first group passed. `https://user@192.168.1.1/x.png` passed the same way, because the
+    // userinfo made the whole thing look like a name. A URL parser knows where a host ends.
+    val host = runCatching { this.toHttpUrl().host }.getOrNull()?.lowercase().orEmpty()
+    return when {
+        host.isEmpty() -> false
+        host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") -> false
+        // A literal address is the form an attack takes. A name is allowed through:
+        // resolving it here would mean a DNS lookup before the frame is composed, and the
+        // protection covering a public name that points inward lives in PublicOnlyDns on
+        // the fetch path.
+        !host.isAddressLiteral() -> true
+        else -> runCatching { java.net.InetAddress.getByName(host) }
+            .getOrNull()
+            ?.isPublicAddress() == true
     }
-    // A literal address, which is the form an attack takes: a name would have to be
-    // registered and would still be resolved by the loader.
-    val literal = host.trim('[', ']')
-    return runCatching {
-        if (literal.none { it.isLetter() } || literal.contains(':')) {
-            java.net.InetAddress.getByName(literal).isPublicAddress()
-        } else {
-            true
-        }
-    }.getOrDefault(false)
 }
+
+/**
+ * Whether the host is written as an address rather than as a name.
+ *
+ * OkHttp normalises an IPv6 host out of its brackets, so the colon test covers those, and an
+ * IPv4 literal is digits and dots. Anything else has to be resolved to be judged, which this
+ * layer deliberately does not do.
+ */
+private fun String.isAddressLiteral(): Boolean = contains(':') || all { it.isDigit() || it == '.' }

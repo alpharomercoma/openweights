@@ -74,8 +74,12 @@ class WatchRunner @Inject constructor(
         }
 
         val (outcome, summary) = check(watch, watchId)
-        watches.record(watchId, now, outcome, summary)
-        return outcome
+        // The recorded state is read back rather than discarded, because recording the third
+        // failure is what stops the watch, and the caller has to know at once. Thrown away,
+        // the ticker slept one more full period before noticing, holding the foreground
+        // notification up for a watch that had already given up.
+        val after = watches.record(watchId, now, outcome, summary)
+        return outcome.takeIf { after == null || after.isActive }
     }
 
     /**

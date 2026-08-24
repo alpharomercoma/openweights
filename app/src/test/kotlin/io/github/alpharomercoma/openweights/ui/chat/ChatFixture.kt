@@ -44,7 +44,7 @@ import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -141,7 +141,12 @@ abstract class ChatFixture {
         // work, and a coroutine written to be cancelled at the end of a screen's life
         // throws when it is instead allowed to finish against a torn-down fixture. Killing
         // the work is what a real view model gets when its screen goes away.
-        runCatching { viewModel.viewModelScope.coroutineContext.cancelChildren() }
+        // The scope, not only its children. Cancelling children leaves the scope itself
+        // active, so anything that launches afterwards, a flow collection restarting or a
+        // callback firing late, gets a live scope on a dispatcher whose test has ended and
+        // throws into the next class. Cancelling the scope makes every later launch a no-op,
+        // which is what a real view model gets when its screen is destroyed.
+        runCatching { viewModel.viewModelScope.cancel() }
         database.close()
         models.deleteRecursively()
         Dispatchers.resetMain()

@@ -79,6 +79,9 @@ class WatchScheduler @Inject constructor(
     /** The in-process tickers, by watch id. Only the ones too fast for WorkManager. */
     private val tickers = mutableMapOf<Long, Job>()
 
+    /** The cadence each ticker was started with, so a changed one can be noticed. */
+    private val periods = mutableMapOf<Long, Int>()
+
     /** Rebuilds every schedule from what is on disk. Called at startup. */
     suspend fun sync() {
         val active = watches.active()
@@ -130,7 +133,16 @@ class WatchScheduler @Inject constructor(
 
     private fun startTicker(watch: Watch) {
         synchronized(tickers) {
-            if (tickers[watch.id]?.isActive == true) return
+            // A ticker already running at this cadence is left alone; one running at a
+            // different cadence is replaced. Returning early regardless meant an edited
+            // interval did nothing until the process restarted, which is the kind of setting
+            // that looks saved and is not.
+            val running = tickers[watch.id]
+            if (running?.isActive == true) {
+                if (periods[watch.id] == watch.everyMinutes) return
+                running.cancel()
+            }
+            periods[watch.id] = watch.everyMinutes
             GenerationService.hold(appContext, holderFor(watch.id), "Watching")
             tickers[watch.id] = scope.launch {
                 // The hold is released in this coroutine's own finally rather than by
@@ -150,8 +162,25 @@ class WatchScheduler @Inject constructor(
                         runCatching { runner.get().tick(watch.id) }
                     }
                 } finally {
-                    synchronized(tickers) { tickers.remove(watch.id) }
-                    GenerationService.release(appContext, holderFor(watch.id))
+                    // Only if this coroutine is still the one registered. Cancellation is
+                    // asynchronous: `stopTicker` cancels and returns, and a reschedule can
+                    // start a replacement before the cancelled job reaches this line. The
+                    // previous version removed unconditionally, so the *old* job evicted the
+                    // *new* job from the map and released the hold the new one had just
+                    // taken. That left a ticker nothing could cancel, running with no
+                    // foreground service, and a refcount one release too low.
+                    val mine = coroutineContext[Job]
+                    val wasCurrent = synchronized(tickers) {
+                        if (tickers[watch.id] === mine) {
+                            tickers.remove(watch.id)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    if (wasCurrent) {
+                        GenerationService.release(appContext, holderFor(watch.id))
+                    }
                 }
             }
         }

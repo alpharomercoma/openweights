@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -26,6 +27,7 @@ import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -70,6 +72,13 @@ class ReportViewModelTest {
 
     @After
     fun tearDown() {
+        // Cancelled before Main is released, for the reason ChatFixture spells out: work
+        // still queued on a view model scope has nowhere to run once the dispatcher is gone,
+        // and surfaces as "uncaught exceptions before the test started" in whichever class
+        // happens to run next. This class was the last holdout after ChatFixture was fixed,
+        // and it is why the flake kept coming back at about one run in five, always blaming
+        // an innocent test in another file.
+        runCatching { viewModel.viewModelScope.cancel() }
         database.close()
         Dispatchers.resetMain()
     }

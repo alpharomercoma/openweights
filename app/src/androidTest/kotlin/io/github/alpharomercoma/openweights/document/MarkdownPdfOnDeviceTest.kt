@@ -96,28 +96,34 @@ class MarkdownPdfOnDeviceTest {
     }
 
     @Test
-    fun anUnclosedFenceDoesNotSwallowTheRestOfTheDocument() {
-        // The bug this replaces: `inCode` was a toggle, so an odd number of fences left it
-        // on and every remaining line rendered as unwrapped monospace. A model that starts
-        // a code block and runs out of tokens produces exactly that, and the result is not
-        // an ugly paragraph, it is a corrupt document nobody notices until they open it.
-        val runOn = buildString {
-            appendLine("# Report")
-            appendLine("```kotlin")
-            appendLine("val x = 1")
-            appendLine()
-            repeat(120) {
-                appendLine("A paragraph of ordinary prose, number $it, which must wrap.")
-            }
-        }
-        val (pages, bytes) = render(runOn)
+    fun anUnclosedFenceRunsToTheEndOfTheDocument() {
+        // What CommonMark says, and the opposite of what this test asserted first. A
+        // reviewer called the unclosed case a corruption; the fix counted fences and treated
+        // an odd last one as closing, which made the code block itself render as prose. The
+        // test written beside it compared against a prose rendering and passed, so the bug
+        // and its test agreed with each other and not with the spec:
+        //
+        //   "If the end of the containing block (or document) is reached and no closing code
+        //   fence has been found, the code block contains all of the lines after the opening
+        //   code fence until the end of the containing block (or document)."
+        //
+        // Asserted as an equality against the closed form rather than as a page-count
+        // inequality against prose, which is what the first attempt did and got backwards:
+        // code is set at 9.5pt and prose at 11pt, so a tail rendered as code takes *fewer*
+        // pages, not more. Comparing like with like says exactly what the spec says and
+        // depends on no font metric at all.
+        // Long enough that the 9.5pt code face and the 11pt prose face reach different page
+        // counts. At sixty lines both landed on two pages and the second assertion below was
+        // measuring nothing.
+        val body = List(400) { "let x$it = someRatherLongIdentifierName + $it" }.joinToString("\n")
 
-        // Prose wraps and code does not, so a tail wrongly treated as code overflows the
-        // page width instead of flowing, and takes far fewer pages than it should.
-        val prose = render(runOn.replace("```kotlin", "")).first
+        val unclosed = render("# Report\n\n```kotlin\n$body").first
+        val closed = render("# Report\n\n```kotlin\n$body\n```").first
+        val prose = render("# Report\n\n$body").first
 
-        assertThat(pages).isEqualTo(prose)
-        assertThat(String(bytes.copyOfRange(0, 5))).isEqualTo("%PDF-")
+        assertThat(unclosed).isEqualTo(closed)
+        // And it is genuinely being treated as code rather than the two happening to match.
+        assertThat(unclosed).isNotEqualTo(prose)
     }
 
     @Test

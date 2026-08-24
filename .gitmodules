@@ -11,3 +11,7 @@
 	path = core/sandbox/src/main/cpp/quickjs
 	url = https://github.com/quickjs-ng/quickjs.git
 	branch = v0.16.1
+[submodule "core/generation/src/androidMain/cpp/MNN"]
+	path = core/generation/src/androidMain/cpp/MNN
+	url = https://github.com/alibaba/MNN.git
+	branch = 3.6.1

@@ -47,6 +47,16 @@ class MarkdownPdf(
     private val pageHeight: Int = A4_HEIGHT,
     private val margin: Int = MARGIN,
 ) {
+    init {
+        // Checked rather than trusted, because the failure is not a bad-looking page: with
+        // no usable height every line starts a new one and the document grows until memory
+        // runs out. A constructor is the cheapest place to say no.
+        require(pageWidth > margin * 2) { "page is narrower than its margins" }
+        require(pageHeight > margin * 2 + TITLE_SIZE * LEADING) {
+            "page is shorter than one line of text"
+        }
+    }
+
     /** Everything a page needs while it is being filled, so the helpers are not six-armed. */
     private class Sheet(private val owner: MarkdownPdf, val document: PdfDocument) {
         var page: PdfDocument.Page = document.startPage(owner.pageInfo(1))
@@ -60,9 +70,19 @@ class MarkdownPdf(
             y = owner.margin.toFloat()
         }
 
-        /** Breaks the page when the next line would not fit under the bottom margin. */
+        /**
+         * Breaks the page when the next line would not fit under the bottom margin.
+         *
+         * The `y > margin` guard is what stops a runaway. On geometry where one line is
+         * taller than the usable height, the check is true on a fresh page too, so every
+         * draw would start another page and none would ever hold anything: pages allocate
+         * until the process dies. Refusing to break a page that has nothing on it yet means
+         * such a line overflows its page, which is visibly wrong and finite.
+         */
         fun room(needed: Float) {
-            if (y + needed > owner.pageHeight - owner.margin) newPage()
+            if (y + needed > owner.pageHeight - owner.margin && y > owner.margin.toFloat()) {
+                newPage()
+            }
         }
     }
 
@@ -111,22 +131,26 @@ class MarkdownPdf(
             sheet.y += TITLE_SIZE
         }
 
-        // Counted first rather than toggled as it goes, because an odd number of fences
-        // means the last one never closes, and a toggle left on turns every remaining line
-        // of the document into unwrapped monospace. A model that writes a code block and
-        // runs out of tokens produces exactly that, and the result is not a wrong-looking
-        // paragraph, it is a corrupt document that the person saving it will not notice
-        // until they open it. With an odd count the final fence is treated as closing.
-        val fences = markdown.lines().count { it.trimStart().startsWith(FENCE) }
-        val unclosed = fences % 2 == 1
-        var seen = 0
+        // A plain toggle, which is what CommonMark specifies and what a previous attempt at
+        // this got wrong in both directions.
+        //
+        // One reviewer called the unclosed case a corruption: a model that opens a code
+        // block and runs out of tokens leaves the rest of the document in monospace. The
+        // fix was to count the fences and treat an odd last one as closing, which inverted
+        // the common case: with a single unclosed fence the block itself then rendered as
+        // prose, and the test written alongside it compared against prose and passed.
+        //
+        // The spec settles it. "If the end of the containing block (or document) is reached
+        // and no closing code fence has been found, the code block contains all of the lines
+        // after the opening code fence until the end of the containing block (or document)."
+        // A truncated reply really does mean the tail is code. A renderer's job is to be
+        // right, not to guess what the author meant to write.
         var inCode = false
 
         markdown.lines().forEach { raw ->
             val line = raw.trimEnd()
             if (line.trimStart().startsWith(FENCE)) {
-                seen++
-                inCode = if (unclosed && seen == fences) false else !inCode
+                inCode = !inCode
                 sheet.y += BODY_SIZE / 2
                 return@forEach
             }

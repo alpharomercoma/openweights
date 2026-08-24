@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import androidx.room.withTransaction
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchOutcome
 import io.github.alpharomercoma.openweights.core.common.context.WatchRun
@@ -80,9 +81,15 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
      * else, so three failures *in a row* stop the watch while three spread over a day do
      * not. A skipped tick is neither, since nothing was attempted.
      */
-    @androidx.room.Transaction
     suspend fun record(watchId: Long, at: Long, outcome: WatchOutcome, summary: String): Watch? =
-        recordInTransaction(watchId, at, outcome, summary)
+        // `database.withTransaction`, not `@Transaction`. The annotation only does anything
+        // on a DAO method: Room generates the wrapper as part of the DAO implementation, and
+        // on a repository function it compiles, reads like a transaction, and does nothing
+        // at all. The first attempt at this fix was exactly that, so the interleaving it was
+        // written to close stayed open.
+        database.withTransaction {
+            recordInTransaction(watchId, at, outcome, summary)
+        }
 
     /**
      * The body of [record], which must not be called outside its transaction.

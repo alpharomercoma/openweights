@@ -101,6 +101,15 @@ class SearchEngineTest {
             "https://127.0.0.1/x.png",
             "https://10.0.0.5/x.png",
             "https://[::1]/x.png",
+            // The two the hand-written host parser waved through. It cut at the first colon,
+            // so an IPv6 host became "[fe80" and read as a domain name; and userinfo made a
+            // private IPv4 address look like one too.
+            "https://[fe80::1]/x.png",
+            "https://[fd00::1]:8443/x.png",
+            "https://user@192.168.1.1/x.png",
+            // The dotted-userinfo form, which looks like a hostname to anything that does
+            // not know where userinfo ends.
+            "https://cdn.example@192.168.1.1/x.png",
             "https://localhost/x.png",
             "http://example.com/x.png",
         ).forEach { assertThat(it.isDrawable()).isFalse() }
@@ -126,6 +135,27 @@ class SearchEngineTest {
 
         assertThat(picture.thumbnail).isEqualTo("https://cdn.example.com/a.jpg")
         assertThat(picture.source).isEqualTo("https://example.com/page")
+    }
+
+    @Test
+    fun `a source address keeps everything after the thumbnail`() {
+        // Split on the first run of whitespace only. Splitting on every space cut a source
+        // address at its first one and handed the user a truncated link.
+        val result = "1. x\n   image: https://cdn.example.com/a.jpg https://example.com/a b"
+
+        assertThat(SearchMediaTool.picturesIn(result).single().source)
+            .isEqualTo("https://example.com/a b")
+    }
+
+    @Test
+    fun `a source that is not safe to open falls back to the thumbnail`() {
+        // The source is handed to an Intent, so it chooses an app as well as a host. An
+        // unvalidated one lets a poisoned result pick both.
+        val result = "1. x\n   image: https://cdn.example.com/a.jpg http://192.168.1.1/admin"
+
+        val picture = SearchMediaTool.picturesIn(result).single()
+
+        assertThat(picture.source).isEqualTo("https://cdn.example.com/a.jpg")
     }
 
     @Test

@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.watch
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -41,7 +42,17 @@ class WatchWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val id = inputData.getLong(WATCH_ID, -1)
         if (id < 0) return Result.success()
-        runCatching { runner.tick(id) }
+
+        // A null tick means the watch is gone or no longer active, and the schedule has to
+        // go with it. Without this, a watch that stopped itself after three failures left a
+        // periodic job behind that woke the device every fifteen minutes, forever, to
+        // discover each time that there was nothing to do. Nothing else cancels it: the
+        // in-process ticker notices the state and exits, and WorkManager is not watching the
+        // database.
+        val outcome = runCatching { runner.tick(id) }.getOrNull()
+        if (outcome == null) {
+            WorkManager.getInstance(applicationContext).cancelUniqueWork(workName(id))
+        }
         return Result.success()
     }
 

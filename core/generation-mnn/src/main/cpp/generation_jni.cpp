@@ -164,6 +164,7 @@ bool writeWav(const std::string& path, const std::vector<int16_t>& samples, int 
     if (ok && dataBytes > 0) {
         ok = std::fwrite(samples.data(), 1, dataBytes, file) == dataBytes;
     }
+    if (std::ferror(file) != 0) ok = false;
     std::fclose(file);
     if (!ok) std::remove(path.c_str());
     return ok;
@@ -190,24 +191,31 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         return 0;
     }
 
-    auto session = std::make_unique<GenerationSession>();
-    session->diffusion.reset(MNN::DIFFUSION::Diffusion::createDiffusion(
-        path,
-        static_cast<MNN::DIFFUSION::DiffusionModelType>(modelType),
-        static_cast<MNNForwardType>(backendType),
-        memoryMode));
-    if (!session->diffusion) {
-        LOGE("MNN would not create a diffusion for %s", path.c_str());
+    try {
+        auto session = std::make_unique<GenerationSession>();
+        session->diffusion.reset(MNN::DIFFUSION::Diffusion::createDiffusion(
+            path,
+            static_cast<MNN::DIFFUSION::DiffusionModelType>(modelType),
+            static_cast<MNNForwardType>(backendType),
+            memoryMode));
+        if (!session->diffusion) {
+            LOGE("MNN would not create a diffusion for %s", path.c_str());
+            return 0;
+        }
+        if (!session->diffusion->load()) {
+            LOGE("MNN would not load the bundle at %s", path.c_str());
+            return 0;
+        }
+        session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
+        LOGI("loaded a diffusion bundle from %s", path.c_str());
+        return reinterpret_cast<jlong>(session.release());
+    } catch (const std::exception& failure) {
+        LOGE("MNN failed to initialize diffusion bundle: %s", failure.what());
+        return 0;
+    } catch (...) {
+        LOGE("MNN failed to initialize diffusion bundle with unknown error");
         return 0;
     }
-    if (!session->diffusion->load()) {
-        LOGE("MNN would not load the bundle at %s", path.c_str());
-        return 0;
-    }
-    // Asked of the runtime rather than assumed from the request. MNN falls back silently.
-    session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
-    LOGI("loaded a diffusion bundle from %s", path.c_str());
-    return reinterpret_cast<jlong>(session.release());
 }
 
 /**
@@ -240,11 +248,13 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
             promptText, output, steps, seed,
             [&](int step) {
                 if (session->cancelled.load()) throw Cancelled{};
-                if (onStep != nullptr) env->CallVoidMethod(self, onStep, step);
-                // A Kotlin listener that threw would leave an exception pending, and the
-                // next JNI call in this loop would behave unpredictably. Cleared here so a
-                // broken listener costs its own callback rather than the generation.
-                if (env->ExceptionCheck()) env->ExceptionClear();
+                if (onStep != nullptr) {
+                    if (env->PushLocalFrame(16) == 0) {
+                        env->CallVoidMethod(self, onStep, step);
+                        if (env->ExceptionCheck()) env->ExceptionClear();
+                        env->PopLocalFrame(nullptr);
+                    }
+                }
             });
         return wrote ? 0 : 2;
     } catch (const Cancelled&) {
@@ -355,7 +365,15 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSe
     SpeechSession* session = asSpeech(handle);
     if (session == nullptr || !session->tts) return;
     const std::string speaker = to_utf8(env, speakerId);
-    if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
+    if (!speaker.empty()) {
+        try {
+            session->tts->SetSpeakerId(speaker);
+        } catch (const std::exception& failure) {
+            LOGE("failed to set speaker %s: %s", speaker.c_str(), failure.what());
+        } catch (...) {
+            LOGE("failed to set speaker %s with unknown error", speaker.c_str());
+        }
+    }
 }
 
 /** Releases one voice handle. */

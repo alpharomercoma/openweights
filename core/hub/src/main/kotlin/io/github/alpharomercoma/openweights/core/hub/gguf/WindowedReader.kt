@@ -37,6 +37,16 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
      */
     private var retainedStringBytes = 0L
 
+    /**
+     * How many arrays are open above the one being read.
+     *
+     * GGUF has no nested arrays, so anything above one level is a file somebody built by
+     * hand. Each level costs twelve bytes of header and one frame of this parser, so a
+     * header small enough to look unremarkable describes a nesting deep enough to take the
+     * stack out, and a StackOverflowError is not something a caller can report to anybody.
+     */
+    private var arrayDepth = 0
+
     private suspend fun ensure(length: Int) {
         val withinBuffer = bufferStart >= 0 &&
             position >= bufferStart &&
@@ -102,18 +112,35 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
     }
 
     private suspend fun readArray(): Any {
+        if (arrayDepth >= MAX_ARRAY_DEPTH) {
+            throw GgufParseException("GGUF header nests arrays more than $MAX_ARRAY_DEPTH deep")
+        }
+        arrayDepth++
+        try {
+            return readArrayBody()
+        } finally {
+            arrayDepth--
+        }
+    }
+
+    private suspend fun readArrayBody(): Any {
         val elementType = readUInt32()
         val count = readUInt64()
         val elementBytes = FIXED_WIDTHS[elementType]
 
         if (elementBytes == null) {
-            // Strings have no fixed width, so they must be walked one at a time.
-            // Clamped as a Long before it becomes an Int. A count above Int.MAX wrapped
-            // negative, and List(negative) throws IllegalArgumentException rather than the
-            // parse exception every caller here is written to expect.
-            return List(count.coerceIn(0, MAX_ARRAY_ELEMENTS.toLong()).toInt()) {
-                readValue(elementType)
+            // Nothing here has a fixed width, so nothing here can be stepped over: the only
+            // way past such an array is to read every element of it. Reading the first few
+            // thousand and stopping would leave the cursor inside the array, and every key
+            // after it would be that array's own bytes read as metadata, which is not a
+            // refusal but an answer that was made up. Refused instead.
+            //
+            // No real file reaches this. The vocabulary is the one string array of any size
+            // and it sits under a `tokenizer.` key, where the parser has already stopped.
+            if (count > MAX_ARRAY_ELEMENTS) {
+                throw GgufParseException("GGUF header declares a $count-element array of text")
             }
+            return List(count.toInt()) { readValue(elementType) }
         }
         // Small integer arrays carry real information, per-layer KV head counts, for one,
         // so read them. Anything larger is vocabulary-sized and irrelevant here: skip it,
@@ -121,8 +148,23 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
         if (count <= MAX_ARRAY_ELEMENTS) {
             return List(count.toInt()) { readValue(elementType) }
         }
-        skip(elementBytes * count)
+        skip(sizeOf(elementBytes, count))
         return SkippedArray(elementType, count)
+    }
+
+    /**
+     * How many bytes an array of [count] elements of [elementBytes] each occupies.
+     *
+     * Multiplied with the overflow checked rather than hoped about. Both operands come
+     * from the file: two to the sixty-first elements of eight bytes is two to the
+     * sixty-fourth, which is zero in a Long, so the skip that should have stepped over the
+     * whole array steps over nothing and every byte of it is then read as metadata.
+     */
+    private fun sizeOf(elementBytes: Long, count: Long): Long {
+        if (count != 0L && elementBytes > Long.MAX_VALUE / count) {
+            throw GgufParseException("GGUF header declares an array larger than any file")
+        }
+        return elementBytes * count
     }
 
     /** Placeholder for an array not read, so callers can tell it apart from absent. */
@@ -164,6 +206,15 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
 
         /** Beyond this an array is vocabulary data, not architecture data. */
         const val MAX_ARRAY_ELEMENTS = 4096
+
+        /**
+         * How deep arrays may nest.
+         *
+         * One, because the format has one level and no more. Written as a number rather
+         * than as a flag because the check reads the same either way and a format that
+         * grows a second level would want two here rather than a rewrite.
+         */
+        const val MAX_ARRAY_DEPTH = 1
 
         /** No legitimate metadata string is this large; a bigger one means a corrupt header. */
         const val MAX_STRING_BYTES = 1L * 1024 * 1024

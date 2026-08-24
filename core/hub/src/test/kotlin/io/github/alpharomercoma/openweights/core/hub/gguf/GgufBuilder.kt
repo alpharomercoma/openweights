@@ -53,6 +53,39 @@ internal class GgufBuilder {
         }
     }
 
+    /**
+     * An array of arrays of arrays, [depth] deep, holding nothing at the bottom.
+     *
+     * Twelve bytes per level buys one more frame of parser recursion, so a header a browser
+     * would call small describes a nesting no stack survives. GGUF does not have nested
+     * arrays; a file with them is a file somebody built by hand.
+     */
+    fun nestedArray(key: String, depth: Int) = apply {
+        entries += buildEntry(key, TYPE_ARRAY) {
+            repeat(depth) {
+                writeUInt32(TYPE_ARRAY)
+                writeUInt64(1)
+            }
+            writeUInt32(TYPE_INT32)
+            writeUInt64(0)
+        }
+    }
+
+    /**
+     * An array whose declared size in bytes wraps to exactly zero.
+     *
+     * Eight bytes an element and two to the sixty-first elements multiply to two to the
+     * sixty-fourth, which is zero in a Long. Chosen over a count that wraps to something
+     * negative because negative is already caught: zero is the one that looks like a
+     * perfectly ordinary array of no bytes at all.
+     */
+    fun arrayWithOverflowingSize(key: String) = apply {
+        entries += buildEntry(key, TYPE_ARRAY) {
+            writeUInt32(TYPE_UINT64)
+            writeUInt64(1L shl 61)
+        }
+    }
+
     fun build(): ByteArray = ByteArrayOutputStream().apply {
         write("GGUF".toByteArray())
         writeUInt32(GGUF_VERSION)
@@ -75,6 +108,7 @@ internal class GgufBuilder {
         const val GGUF_VERSION = 3
         const val TYPE_UINT32 = 4
         const val TYPE_INT32 = 5
+        const val TYPE_UINT64 = 10
         const val TYPE_STRING = 8
         const val TYPE_ARRAY = 9
     }

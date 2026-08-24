@@ -229,4 +229,61 @@ class GgufHeaderParserTest {
             assertThat(metadata.kvCacheBytes(8192)).isAtLeast(0L)
         }
     }
+
+    @Test
+    fun `an array nested past any sane depth is refused rather than overflowing the stack`() =
+        runTest {
+            // GGUF has no nested arrays, so a file with them was built by hand. Each level
+            // costs twelve bytes of header and one frame of parser, so a header small
+            // enough to be unremarkable describes a nesting deep enough to take the stack
+            // out. A StackOverflowError is not something a caller can report to anybody.
+            val header = GgufBuilder()
+                .string("general.architecture", "llama")
+                .nestedArray("llama.rope.freqs", depth = 50_000)
+                .uint32("llama.block_count", 4)
+                .build()
+
+            val failure = runCatching {
+                GgufHeaderParser(header.asSource()).parse()
+            }.exceptionOrNull()
+
+            assertThat(failure).isInstanceOf(GgufParseException::class.java)
+        }
+
+    @Test
+    fun `an array whose size in bytes does not fit is refused rather than skipped by zero`() =
+        runTest {
+            // Elements times width is a Long multiplication with nothing guarding it. Wrap
+            // it to zero and the skip that should step over the array steps over nothing,
+            // so everything read afterwards is the array's own contents read as metadata.
+            val header = GgufBuilder()
+                .string("general.architecture", "llama")
+                .arrayWithOverflowingSize("llama.rope.freqs")
+                .uint32("llama.block_count", 4)
+                .build()
+
+            val failure = runCatching {
+                GgufHeaderParser(header.asSource()).parse()
+            }.exceptionOrNull()
+
+            assertThat(failure).isInstanceOf(GgufParseException::class.java)
+        }
+
+    @Test
+    fun `a string array too long to read is refused rather than half read`() = runTest {
+        // Strings have no fixed width, so an array of them cannot be stepped over the way a
+        // fixed-width one can. Reading the first few thousand and stopping leaves the cursor
+        // inside the array, and every key after it is that array's bytes read as metadata:
+        // not a refusal, an answer that was made up. Under a `tokenizer.` key the parser
+        // stops before ever reaching this, which is the case that matters for real files.
+        val header = GgufBuilder()
+            .string("general.architecture", "llama")
+            .hugeStringArray("llama.something_enormous", count = 5_000)
+            .uint32("llama.block_count", 4)
+            .build()
+
+        val failure = runCatching { GgufHeaderParser(header.asSource()).parse() }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(GgufParseException::class.java)
+    }
 }

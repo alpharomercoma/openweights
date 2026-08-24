@@ -62,28 +62,27 @@ class TokenVault @Inject constructor(@ApplicationContext private val context: Co
         context.settingsDataStore.edit { it.remove(TOKEN_KEY) }
     }
 
-    private fun encrypt(value: String): String {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
-        val encrypted = cipher.doFinal(value.toByteArray())
-        // The IV is generated per encryption and is not secret; it is stored alongside.
-        return Base64.encodeToString(cipher.iv + encrypted, Base64.NO_WRAP)
-    }
+    private fun encrypt(value: String): String = TokenCipher(key).seal(value)
 
-    private fun decrypt(stored: String): String? = runCatching {
-        val bytes = Base64.decode(stored, Base64.NO_WRAP)
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(
-            Cipher.DECRYPT_MODE,
-            secretKey(),
-            GCMParameterSpec(GCM_TAG_BITS, bytes, 0, GCM_IV_BYTES),
-        )
-        String(cipher.doFinal(bytes, GCM_IV_BYTES, bytes.size - GCM_IV_BYTES))
-        // A key invalidated by a device credential change makes the stored value
-        // undecryptable; treat that as "no token" rather than crashing the app.
-    }.getOrNull()
+    private fun decrypt(stored: String): String? = TokenCipher(key).open(stored)
 
-    private fun secretKey(): SecretKey {
+    /**
+     * The key, fetched once and kept for the life of the process.
+     *
+     * Read every time before, which was two problems in one line. It reloads the keystore on
+     * every read of the token, on whichever thread is collecting; and, worse, two callers
+     * arriving together both found no entry and both generated one. Generating twice under a
+     * single alias replaces the first, so a token sealed with it could never be opened
+     * again: the screen would say the token was saved and every gated download afterwards
+     * would be refused for having none.
+     *
+     * `lazy` is synchronized by default, which is exactly the guarantee that was missing. A
+     * failure is not cached, so a keystore that was briefly unavailable is tried again
+     * rather than poisoning the vault for the life of the process.
+     */
+    private val key: SecretKey by lazy { keystoreKey() }
+
+    private fun keystoreKey(): SecretKey {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
             return it.secretKey
@@ -105,9 +104,58 @@ class TokenVault @Inject constructor(@ApplicationContext private val context: Co
     private companion object {
         const val KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "openweights.hf_token"
+        val TOKEN_KEY = stringPreferencesKey("hugging_face_token")
+    }
+}
+
+/**
+ * The envelope the token is stored in, separated from where its key comes from.
+ *
+ * Two different things live in this file. Getting a key out of the Android Keystore is the
+ * platform's job and there is nothing here to be wrong about it; laying an initialisation
+ * vector next to a ciphertext, and reading it back out at the right offset, is ours, and
+ * off-by-one there is the kind of mistake that still round trips on the machine that made
+ * it. Split so that half can be tested on a host, where there is no keystore at all.
+ */
+internal class TokenCipher(private val key: SecretKey) {
+    /**
+     * Encrypts [value] as one storable string.
+     *
+     * The initialisation vector is generated fresh for every call and written in front of
+     * the ciphertext. It is not a secret and does not need to be; what it must never be is
+     * reused with the same key, which is why it is taken from the cipher after `init`
+     * rather than chosen here.
+     */
+    fun seal(value: String): String {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
+        return Base64.encodeToString(cipher.iv + encrypted, Base64.NO_WRAP)
+    }
+
+    /**
+     * Reads a sealed token back, or null if it cannot be read.
+     *
+     * Null covers every way this can fail and they all mean the same thing to the app: a
+     * key invalidated by a device credential change, a value truncated by a half-finished
+     * write, or bytes somebody edited, which GCM refuses on its tag rather than decrypting
+     * into rubbish. None of those is worth a crash on the screen somebody opened to fix it.
+     */
+    fun open(stored: String): String? = runCatching {
+        val bytes = Base64.decode(stored, Base64.NO_WRAP)
+        require(bytes.size > GCM_IV_BYTES) { "too short to hold an IV and a ciphertext" }
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            key,
+            GCMParameterSpec(GCM_TAG_BITS, bytes, 0, GCM_IV_BYTES),
+        )
+        String(cipher.doFinal(bytes, GCM_IV_BYTES, bytes.size - GCM_IV_BYTES), Charsets.UTF_8)
+    }.getOrNull()
+
+    internal companion object {
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_IV_BYTES = 12
         const val GCM_TAG_BITS = 128
-        val TOKEN_KEY = stringPreferencesKey("hugging_face_token")
     }
 }

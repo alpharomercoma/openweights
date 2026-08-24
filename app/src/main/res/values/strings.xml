@@ -127,4 +127,11 @@
     <string name="watch_every">Every %1$d minutes</string>
     <string name="watch_with_notification">, with a notification while it runs</string>
     <string name="watch_so_far"> · %1$d so far</string>
+    <string name="leaves_device">Leaves the device</string>
+    <string name="no_folder_shared">No folder shared</string>
+    <string name="folder_none">The file tools stay off until you pick one. Only that folder is shared.</string>
+    <string name="folder_lost">This folder cannot be reached now. Choose it again to carry on.</string>
+    <string name="folder_readonly">Readable, but it will not take new files, so saving stays off.</string>
+    <string name="folder_ready">The model can search it, read from it, and save new files into it.</string>
+    <string name="proxy_hint">http://host:port or socks5://host:port</string>
 </resources>

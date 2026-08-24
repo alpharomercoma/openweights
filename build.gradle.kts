@@ -105,6 +105,16 @@ val verifyTasks = listOf(
     // difference between a device tier that works when reached for and one that does not.
     "assembleDebugAndroidTest",
     "testDebugUnitTest",
+    // The multiplatform tiers, and they are not decoration. A module that compiles for iOS
+    // and is never run there is a claim rather than a fact, and `verify` wiring only the
+    // Android task names meant the iOS simulator tests existed and nothing ran them: a
+    // reviewer had to point out that the one guarantee they provide was not being collected.
+    //
+    // `jvmTest` is the cheap half and catches Android creeping into commonMain on any
+    // machine. `iosSimulatorArm64Test` needs Xcode and a runtime, so it is matched by name
+    // and simply absent on a machine without them rather than failing the build there.
+    "jvmTest",
+    "iosSimulatorArm64Test",
 )
 
 /**

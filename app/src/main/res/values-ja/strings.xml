@@ -113,4 +113,11 @@
     <string name="watch_every">%1$d分ごと</string>
     <string name="watch_with_notification">、実行中は通知を表示します</string>
     <string name="watch_so_far"> · これまで%1$d回</string>
+    <string name="leaves_device">端末の外に出ます</string>
+    <string name="no_folder_shared">共有フォルダなし</string>
+    <string name="folder_none">フォルダを選ぶまでファイルツールは無効です。共有されるのはそのフォルダだけです。</string>
+    <string name="folder_lost">このフォルダに今アクセスできません。続けるにはもう一度選んでください。</string>
+    <string name="folder_readonly">読み取りはできますが新しいファイルは受け付けないため、保存は無効のままです。</string>
+    <string name="folder_ready">モデルは検索、読み取り、新しいファイルの保存ができます。</string>
+    <string name="proxy_hint">http://host:port または socks5://host:port</string>
 </resources>

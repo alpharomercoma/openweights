@@ -93,8 +93,17 @@ class SearchMediaTool @Inject constructor(
             append("Found ${hits.size} $what for \"$query\".\n")
             hits.forEachIndexed { index, hit ->
                 append("\n${index + 1}. ${hit.title.ifBlank { "Untitled" }}")
-                append("\n   $MEDIA ${hit.thumbnailUrl}")
-                if (hit.sourceUrl.isNotBlank()) append("\n   from ${hit.sourceUrl}")
+                // Thumbnail and source on one line, in that order, because the interface
+                // needs both: one to draw and one to open. They were separate lines and the
+                // grid only parsed the first, so tapping a picture opened the picture rather
+                // than the page it came from, which is not what its own comment claimed.
+                if (hit.thumbnailUrl.isDrawable()) {
+                    append(
+                        "\n   $MEDIA ${hit.thumbnailUrl} ${hit.sourceUrl.ifBlank {
+                            hit.thumbnailUrl
+                        }}",
+                    )
+                }
             }
         }
     }
@@ -113,12 +122,59 @@ class SearchMediaTool @Inject constructor(
         /** Enough to look at, few enough that the URLs do not dominate the turn. */
         const val LIMIT = 8
 
-        /** Every thumbnail in one tool result, in the order they were found. */
-        fun thumbnailsIn(result: String): List<String> = result.lineSequence()
+        /**
+         * Every picture in one tool result: what to draw, and what to open.
+         *
+         * Read back out of the tool's own text because a tool returns a string. Both halves
+         * are needed and only one used to be parsed.
+         */
+        fun picturesIn(result: String): List<FoundPicture> = result.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith(MEDIA) }
-            .map { it.removePrefix(MEDIA).trim() }
-            .filter { it.startsWith("http") }
+            .mapNotNull { line ->
+                val parts = line.removePrefix(MEDIA).trim().split(' ').filter { it.isNotBlank() }
+                val thumbnail = parts.firstOrNull() ?: return@mapNotNull null
+                if (!thumbnail.isDrawable()) return@mapNotNull null
+                FoundPicture(thumbnail = thumbnail, source = parts.getOrNull(1) ?: thumbnail)
+            }
             .toList()
     }
+}
+
+/** One result, split into the address to draw and the address to open. */
+data class FoundPicture(val thumbnail: String, val source: String)
+
+/**
+ * Whether an address is safe to hand to an image loader without asking anybody.
+ *
+ * A thumbnail is fetched the moment a reply renders, with no tap and no approval, which
+ * makes it the one place in this app where a remote party chooses a URL the device will
+ * request unprompted. A poisoned or proxy-modified search result carrying
+ * `http://192.168.1.1/...` would have the app probe the user's own network as a side effect
+ * of drawing a message.
+ *
+ * `https` only, so the address cannot be a plaintext probe, and a literal private address is
+ * refused outright. That is not the same protection `fetch_url` gets, which resolves the
+ * name through [PublicOnlyDns] and can therefore catch a public name pointing at a private
+ * address; doing that here would mean resolving on the main thread before composing. The
+ * scheme and literal checks are what is cheap and honest at this layer, and the remaining
+ * gap is a name that resolves inward.
+ */
+internal fun String.isDrawable(): Boolean {
+    if (!startsWith("https://")) return false
+    val host = substringAfter("://").substringBefore('/').substringBefore(':').lowercase()
+    if (host.isEmpty()) return false
+    if (host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
+        return false
+    }
+    // A literal address, which is the form an attack takes: a name would have to be
+    // registered and would still be resolved by the loader.
+    val literal = host.trim('[', ']')
+    return runCatching {
+        if (literal.none { it.isLetter() } || literal.contains(':')) {
+            java.net.InetAddress.getByName(literal).isPublicAddress()
+        } else {
+            true
+        }
+    }.getOrDefault(false)
 }

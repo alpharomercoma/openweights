@@ -119,4 +119,11 @@
     <string name="watch_every">كل %1$d دقيقة</string>
     <string name="watch_with_notification">، مع إشعار أثناء التشغيل</string>
     <string name="watch_so_far"> · %1$d حتى الآن</string>
+    <string name="leaves_device">يغادر الجهاز</string>
+    <string name="no_folder_shared">لا يوجد مجلد مشترك</string>
+    <string name="folder_none">تظل أدوات الملفات معطلة حتى تختار مجلدًا. يُشارَك ذلك المجلد وحده.</string>
+    <string name="folder_lost">لا يمكن الوصول إلى هذا المجلد الآن. اختره مرة أخرى للمتابعة.</string>
+    <string name="folder_readonly">قابل للقراءة، لكنه لا يقبل ملفات جديدة، لذا يظل الحفظ معطلًا.</string>
+    <string name="folder_ready">يستطيع النموذج البحث فيه والقراءة منه وحفظ ملفات جديدة.</string>
+    <string name="proxy_hint">http://host:port أو socks5://host:port</string>
 </resources>

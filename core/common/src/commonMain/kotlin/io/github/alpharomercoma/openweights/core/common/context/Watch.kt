@@ -32,8 +32,12 @@ package io.github.alpharomercoma.openweights.core.common.context
  * Doze can stretch even that. So there are two regimes and the interface has to be honest
  * about which one a watch is in:
  *
- * - **[everyMinutes] of 15 or more**: scheduled work. Nothing is held open, the app need not
- *   be running, and the tick may arrive late.
+ * - **[everyMinutes] of 15 or more**: scheduled work. Nothing is held open and the tick may
+ *   arrive late. It does **not** mean the check runs with the app closed: a scheduled tick
+ *   that wakes a fresh process finds no model loaded, and `WatchRunner` deliberately records
+ *   a skip rather than opening two gigabytes of weights in the background for a question
+ *   nobody is waiting for. So a watch on a killed app resumes at the first tick after the
+ *   app is next opened. The earlier wording here promised autonomy the runner never had.
  * - **Under 15**: the app keeps a foreground notification up for as long as the watch is
  *   active, because that is the only way to be woken sooner, and the user can see and cancel
  *   it. A scheduled job is registered alongside as a backstop for a process that dies.

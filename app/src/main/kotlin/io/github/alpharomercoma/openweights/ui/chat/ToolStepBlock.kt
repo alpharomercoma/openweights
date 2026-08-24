@@ -59,6 +59,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Markdown
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import io.github.alpharomercoma.openweights.core.tools.FoundPicture
 import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.scriptSource
 import java.util.Locale
@@ -136,9 +137,9 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
         // Outside the disclosure, unlike everything else here. A grid of pictures is the
         // answer rather than the working: somebody who asked to see something should see it
         // without first being told a tool ran and having to tap.
-        val thumbnails = step.thumbnails()
-        if (thumbnails.isNotEmpty()) {
-            MediaGrid(thumbnails = thumbnails, modifier = Modifier.padding(top = 8.dp))
+        val pictures = step.pictures()
+        if (pictures.isNotEmpty()) {
+            MediaGrid(pictures = pictures, modifier = Modifier.padding(top = 8.dp))
         }
 
         AnimatedVisibility(visible = expanded) {
@@ -260,9 +261,9 @@ private const val MILLIS_PER_SECOND = 1000.0
  * other channel. See `SearchMediaTool.MEDIA` for the marker and why it is a prefix rather
  * than a block of JSON.
  */
-private fun AgentStep.thumbnails(): List<String> = when (this) {
+private fun AgentStep.pictures(): List<FoundPicture> = when (this) {
     is AgentStep.Ran -> if (call.name == SearchMediaTool.NAME) {
-        SearchMediaTool.thumbnailsIn(result)
+        SearchMediaTool.picturesIn(result)
     } else {
         emptyList()
     }
@@ -279,15 +280,15 @@ private fun AgentStep.thumbnails(): List<String> = when (this) {
  * gesture and takes fixed height whatever the count.
  */
 @Composable
-private fun MediaGrid(thumbnails: List<String>, modifier: Modifier = Modifier) {
+private fun MediaGrid(pictures: List<FoundPicture>, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        items(thumbnails) { url ->
+        items(pictures) { picture ->
             AsyncImage(
-                model = url,
+                model = picture.thumbnail,
                 // Named rather than described. Nothing here knows what is in the picture,
                 // and inventing a description for a screen reader is worse than admitting
                 // there is one to look at.
@@ -298,12 +299,16 @@ private fun MediaGrid(thumbnails: List<String>, modifier: Modifier = Modifier) {
                     .clip(RoundedCornerShape(Radius.xs))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable {
-                        // Out to the browser rather than into a viewer of our own. The
-                        // thumbnail is a thumbnail; the page it came from is the thing with
-                        // the licence, the caption and the rest of the context.
+                        // The page, not the picture. Out to the browser rather than into a
+                        // viewer of our own: the thumbnail is a thumbnail, and the page it
+                        // came from is what has the licence, the caption and the context.
+                        //
+                        // This opened the thumbnail until a reviewer read the comment beside
+                        // it and then read the code, which is the only reason a comment that
+                        // describes the opposite of what happens ever gets caught.
                         runCatching {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, url.toUri()),
+                                Intent(Intent.ACTION_VIEW, picture.source.toUri()),
                             )
                         }
                     },

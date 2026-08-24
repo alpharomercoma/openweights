@@ -90,24 +90,55 @@ class SearchEngineTest {
     }
 
     @Test
-    fun `thumbnails are read back out of a tool result`() {
+    fun `a thumbnail on the local network is never drawn`() {
+        // The one place in this app where a remote party picks a URL the device fetches with
+        // no tap and no approval: a thumbnail is loaded the moment a reply renders. A
+        // poisoned search result carrying a LAN address would have the app probe the user's
+        // own network as a side effect of drawing a message.
+        listOf(
+            "http://192.168.1.1/x.png",
+            "https://192.168.1.1/x.png",
+            "https://127.0.0.1/x.png",
+            "https://10.0.0.5/x.png",
+            "https://[::1]/x.png",
+            "https://localhost/x.png",
+            "http://example.com/x.png",
+        ).forEach { assertThat(it.isDrawable()).isFalse() }
+    }
+
+    @Test
+    fun `an ordinary https thumbnail is drawn`() {
+        assertThat("https://external-content.duckduckgo.com/iu/?u=x".isDrawable()).isTrue()
+    }
+
+    @Test
+    fun `a picture carries both what to draw and what to open`() {
+        // Tapping used to open the thumbnail while the comment beside it said it opened the
+        // source page. Both addresses travel now, so the comment and the code agree.
         val result = """
-            Found 2 pictures for "otters".
+            Found 1 pictures for "otters".
 
             1. An otter
-               image: https://example.com/a.jpg
-               from https://example.com/page
-            2. Another otter
-               image: https://example.com/b.jpg
+               image: https://cdn.example.com/a.jpg https://example.com/page
         """.trimIndent()
 
-        assertThat(SearchMediaTool.thumbnailsIn(result))
-            .containsExactly("https://example.com/a.jpg", "https://example.com/b.jpg")
-            .inOrder()
+        val picture = SearchMediaTool.picturesIn(result).single()
+
+        assertThat(picture.thumbnail).isEqualTo("https://cdn.example.com/a.jpg")
+        assertThat(picture.source).isEqualTo("https://example.com/page")
+    }
+
+    @Test
+    fun `a picture with no source falls back to itself rather than to nothing`() {
+        val result = "1. x\n   image: https://cdn.example.com/a.jpg"
+
+        val picture = SearchMediaTool.picturesIn(result).single()
+
+        assertThat(picture.source).isEqualTo("https://cdn.example.com/a.jpg")
     }
 
     @Test
     fun `a result with no pictures yields no grid`() {
-        assertThat(SearchMediaTool.thumbnailsIn("The search did not answer.")).isEmpty()
+        assertThat(SearchMediaTool.picturesIn("The search did not answer.")).isEmpty()
     }
 }

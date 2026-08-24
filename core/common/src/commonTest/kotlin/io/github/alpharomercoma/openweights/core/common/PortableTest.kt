@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.common
 
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
+import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
 import io.github.alpharomercoma.openweights.core.common.model.Tunable
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,13 +41,24 @@ import kotlin.test.assertTrue
 class PortableTest {
     @Test
     fun controlCharactersEscapeTheSameWayEverywhere() {
+        // Through the production code, not beside it. The first version of this test
+        // asserted on `padStart` directly, which proves the standard library works and says
+        // nothing about the function that was changed: a reviewer pointed out it would pass
+        // unchanged if ToolCallParser had been left broken.
+        //
         // The line that stopped this module compiling for iOS was a String.format call,
         // which is JVM only. Its replacement pads by hand, and hand-rolled padding is
         // exactly the kind of thing that is right on one platform and off by a digit on
         // another. Bell is the interesting case: one significant digit, three of padding.
-        assertEquals("0007", '\u0007'.code.toString(16).padStart(4, '0'))
-        assertEquals("001f", '\u001F'.code.toString(16).padStart(4, '0'))
-        assertEquals("00ff", 0xFF.toString(16).padStart(4, '0'))
+        val raw = "<tool_call><function=write><parameter=text>a\u0007b\u001Fc</parameter>" +
+            "</function></tool_call>"
+
+        val call = ToolCallParser.parse(raw).calls.single()
+
+        // The escaped form must be four hex digits each, lower case, zero padded. If the
+        // padding were wrong the JSON would still look plausible and would decode to the
+        // wrong character, which is the failure mode worth catching on both platforms.
+        assertTrue(call.argumentsJson.contains("a\\u0007b\\u001fc"), call.argumentsJson)
     }
 
     @Test

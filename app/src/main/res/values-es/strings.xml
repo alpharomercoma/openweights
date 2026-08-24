@@ -113,4 +113,11 @@
     <string name="watch_every">Cada %1$d minutos</string>
     <string name="watch_with_notification">, con una notificación mientras se ejecuta</string>
     <string name="watch_so_far"> · %1$d hasta ahora</string>
+    <string name="leaves_device">Sale del dispositivo</string>
+    <string name="no_folder_shared">Ninguna carpeta compartida</string>
+    <string name="folder_none">Las herramientas de archivos siguen apagadas hasta que elijas una. Solo se comparte esa carpeta.</string>
+    <string name="folder_lost">No se puede acceder a esta carpeta ahora. Vuelve a elegirla para continuar.</string>
+    <string name="folder_readonly">Se puede leer, pero no admite archivos nuevos, así que guardar sigue apagado.</string>
+    <string name="folder_ready">El modelo puede buscar en ella, leerla y guardar archivos nuevos.</string>
+    <string name="proxy_hint">http://host:puerto o socks5://host:puerto</string>
 </resources>

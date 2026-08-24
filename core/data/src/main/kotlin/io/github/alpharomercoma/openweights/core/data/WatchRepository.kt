@@ -80,8 +80,33 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
      * else, so three failures *in a row* stop the watch while three spread over a day do
      * not. A skipped tick is neither, since nothing was attempted.
      */
-    suspend fun record(watchId: Long, at: Long, outcome: WatchOutcome, summary: String): Watch? {
+    @androidx.room.Transaction
+    suspend fun record(watchId: Long, at: Long, outcome: WatchOutcome, summary: String): Watch? =
+        recordInTransaction(watchId, at, outcome, summary)
+
+    /**
+     * The body of [record], which must not be called outside its transaction.
+     *
+     * Read, insert, trim, count and write, and every one of those was a separate statement
+     * before. Two ticks can overlap: the in-process ticker and the fifteen-minute WorkManager
+     * backstop both reach here, and the tick loop is only serialised at the engine, not at
+     * this table. One tick recording the third failure could mark the watch FAILED, and a
+     * second tick that had already read the ACTIVE row could then write ACTIVE back over it,
+     * undoing the guardrail that exists to stop a broken watch running forever.
+     *
+     * A transaction also fixes the smaller half: a process death between the history insert
+     * and the counter write left a run recorded that no counter had counted.
+     */
+    private suspend fun recordInTransaction(
+        watchId: Long,
+        at: Long,
+        outcome: WatchOutcome,
+        summary: String,
+    ): Watch? {
         val existing = database.watches().byId(watchId) ?: return null
+        // Re-read inside the transaction is what makes the failure counter safe; a watch
+        // another tick has already stopped must not be revived by this one.
+        if (existing.state != WatchState.ACTIVE.name) return existing.asWatch()
         database.watches().insertRun(
             WatchRunEntity(
                 watchId = watchId,

@@ -114,4 +114,11 @@
     <string name="watch_every">Tuwing %1$d minuto</string>
     <string name="watch_with_notification">, may abiso habang tumatakbo</string>
     <string name="watch_so_far"> · %1$d na ang nagawa</string>
+    <string name="leaves_device">Umaalis sa device</string>
+    <string name="no_folder_shared">Walang naibahaging folder</string>
+    <string name="folder_none">Naka-off ang mga file tool hanggang pumili ka. Ang folder na iyon lang ang ibinabahagi.</string>
+    <string name="folder_lost">Hindi maabot ang folder na ito ngayon. Piliin itong muli para magpatuloy.</string>
+    <string name="folder_readonly">Nababasa, ngunit hindi ito tatanggap ng bagong file, kaya naka-off ang pag-save.</string>
+    <string name="folder_ready">Kayang hanapin, basahin, at pagsave-an ito ng modelo.</string>
+    <string name="proxy_hint">http://host:port o socks5://host:port</string>
 </resources>

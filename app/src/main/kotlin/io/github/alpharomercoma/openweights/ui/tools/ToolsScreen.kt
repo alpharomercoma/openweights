@@ -187,7 +187,7 @@ fun ToolsScreen(
             }
 
             if (offDevice.isNotEmpty()) {
-                item { GroupHeading("Leaves the device") }
+                item { GroupHeading(stringResource(R.string.leaves_device)) }
                 item { ToolGroup(tools = offDevice, onToggle = onToggle) }
             }
 
@@ -292,7 +292,7 @@ private fun WorkspaceCard(
                 modifier = Modifier.size(18.dp),
             )
             Text(
-                text = workspace.folder ?: "No folder shared",
+                text = workspace.folder ?: stringResource(R.string.no_folder_shared),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -325,15 +325,16 @@ private fun WorkspaceCard(
 }
 
 /** What the row says about the folder, which is a different sentence for each way of failing. */
+@Composable
 private fun WorkspaceSummary.describe(): String = when (state) {
     GrantState.NONE ->
-        "The file tools stay off until you pick one. Only that folder is shared."
+        stringResource(R.string.folder_none)
     GrantState.LOST ->
-        "This folder cannot be reached now. Choose it again to carry on."
+        stringResource(R.string.folder_lost)
     GrantState.READ_ONLY ->
-        "Readable, but it will not take new files, so saving stays off."
+        stringResource(R.string.folder_readonly)
     GrantState.READ_WRITE ->
-        "The model can search it, read from it, and save new files into it."
+        stringResource(R.string.folder_ready)
 }
 
 @Composable
@@ -501,7 +502,7 @@ private fun SearchCard(
             value = typed,
             onValueChange = { typed = it },
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            placeholder = { Text("http://host:port or socks5://host:port") },
+            placeholder = { Text(stringResource(R.string.proxy_hint)) },
             singleLine = true,
             shape = RoundedCornerShape(Radius.sm),
         )

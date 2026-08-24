@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhotoCamera
@@ -60,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -141,6 +143,8 @@ fun AttachmentSheet(
     support: MediaSupport,
     newCaptureUri: () -> Uri,
     onPicked: (Uri) -> Unit,
+    /** Several at once. See [AttachmentSheet]'s note on why every picker allows it. */
+    onPickedAll: (List<Uri>) -> Unit,
     onPickedDocument: (Uri) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -153,17 +157,21 @@ fun AttachmentSheet(
         onDismiss()
     }
 
+    // Multiple, everywhere it is possible. Asking about three photographs is one question,
+    // and a picker that takes one at a time turns it into three trips through a sheet. The
+    // system picker returns them in the order they were tapped, which is the order they are
+    // staged in and therefore the order the model reads them.
     val pickMedia = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        uri?.let(onPicked)
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_AT_ONCE),
+    ) { uris ->
+        if (uris.isNotEmpty()) onPickedAll(uris)
         onDismiss()
     }
 
     val openFile = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        uri?.let(onPicked)
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isNotEmpty()) onPickedAll(uris)
         onDismiss()
     }
 
@@ -176,12 +184,30 @@ fun AttachmentSheet(
         onDismiss()
     }
 
+    val context = LocalContext.current
+    // Asked once, when the sheet opens, and only of the clip's description so no system
+    // toast fires. See ClipboardMedia.
+    val canPaste = remember(support) { ClipboardMedia.holds(context, support) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(modifier = Modifier.navigationBarsPadding().padding(bottom = 16.dp)) {
+            if (canPaste) {
+                // First, because somebody who has just copied a picture is here to paste it
+                // and every row below is a longer way round.
+                AttachmentChoice(
+                    icon = Icons.Rounded.ContentPaste,
+                    label = "Paste",
+                    detail = "What you copied, without leaving the conversation",
+                    onClick = {
+                        onPickedAll(ClipboardMedia.read(context, support))
+                        onDismiss()
+                    },
+                )
+            }
             if (support.vision) {
                 AttachmentChoice(
                     icon = Icons.Rounded.PhotoCamera,
@@ -192,7 +218,7 @@ fun AttachmentSheet(
                 AttachmentChoice(
                     icon = Icons.Rounded.Image,
                     label = "Photos",
-                    detail = if (support.video) "Pick an image or a video" else "Pick an image",
+                    detail = if (support.video) "Images or videos" else "Images",
                     onClick = {
                         val request = PickVisualMediaRequest(
                             if (support.video) {
@@ -209,7 +235,7 @@ fun AttachmentSheet(
                 AttachmentChoice(
                     icon = Icons.Rounded.AudioFile,
                     label = "Audio",
-                    detail = "A recording for the model to listen to",
+                    detail = "Recordings for the model to listen to",
                     onClick = { openFile.launch(arrayOf("audio/*")) },
                 )
             }
@@ -399,3 +425,13 @@ private fun StagedAttachmentsPreview() {
         )
     }
 }
+
+/**
+ * How many the photo picker will return at once.
+ *
+ * Eight, which is a bound on the prompt rather than on the picker. Every image is a prefill
+ * of its own through the projector, so eight pictures is eight passes before a single token
+ * of the answer, and on a phone that is the difference between a slow reply and one nobody
+ * waits for.
+ */
+private const val MAX_AT_ONCE = 8

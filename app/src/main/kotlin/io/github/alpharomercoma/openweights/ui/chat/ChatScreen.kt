@@ -18,6 +18,8 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -86,6 +88,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -115,8 +118,10 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
+import io.github.alpharomercoma.openweights.document.MarkdownPdf
 import io.github.alpharomercoma.openweights.model.DictationState
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -152,6 +157,7 @@ fun ChatScreen(
     onSavePreferences: (ModelPreferences) -> Unit = {},
     onResetPreferences: () -> Unit = {},
     onAttach: (Uri) -> Unit = {},
+    onAttachAll: (List<Uri>) -> Unit = { list -> list.forEach(onAttach) },
     onAttachDocument: (Uri) -> Unit = {},
     onRemoveDocument: () -> Unit = {},
     onRemoveStaged: (MessagePart.File) -> Unit = {},
@@ -261,6 +267,7 @@ fun ChatScreen(
             onOpenHistory = { scope.launch { drawerState.open() } },
             onSavePreferences = onSavePreferences,
             onResetPreferences = onResetPreferences,
+            onAttachAll = onAttachAll,
             onAttach = onAttach,
             onAttachDocument = onAttachDocument,
             onRemoveDocument = onRemoveDocument,
@@ -308,6 +315,7 @@ private fun ChatContent(
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
     onAttach: (Uri) -> Unit,
+    onAttachAll: (List<Uri>) -> Unit = { list -> list.forEach(onAttach) },
     onAttachDocument: (Uri) -> Unit,
     onRemoveDocument: () -> Unit,
     onRemoveStaged: (MessagePart.File) -> Unit,
@@ -332,6 +340,14 @@ private fun ChatContent(
     // nothing instead of to a stale copy of a turn that has since been dropped.
     var editingId by remember { mutableStateOf<Long?>(null) }
     val editing = editingId?.let { id -> state.transcript.firstOrNull { it.id == id } }
+
+    // The reply waiting for somewhere to be written, held while the system picker is up.
+    var savingPdf by remember { mutableStateOf<TranscriptEntry?>(null) }
+    SavePdf(
+        entry = savingPdf,
+        documentTitle = state.transcript.firstOrNull()?.text?.take(PDF_TITLE).orEmpty(),
+        onDone = { savingPdf = null },
+    )
     var showParameters by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
     var showAttachments by remember { mutableStateOf(false) }
@@ -551,6 +567,7 @@ private fun ChatContent(
             support = state.mediaSupport,
             newCaptureUri = newCaptureUri,
             onPicked = onAttach,
+            onPickedAll = onAttachAll,
             onPickedDocument = onAttachDocument,
             onDismiss = { showAttachments = false },
         )
@@ -569,6 +586,7 @@ private fun ChatContent(
         onDismissActions = { onActionsForId(null) },
         onEdit = { editingId = it.id },
         onBranch = { onBranchFrom(it.id) },
+        onSavePdf = { savingPdf = it },
         onReport = onReport,
     )
 }
@@ -722,6 +740,7 @@ private fun ChatSheets(
     /** Puts this turn's text back in the composer. The resend happens from there. */
     onEdit: (TranscriptEntry) -> Unit,
     onBranch: (TranscriptEntry) -> Unit,
+    onSavePdf: (TranscriptEntry) -> Unit,
     onReport: (TranscriptEntry, ReportReason, String) -> Unit,
 ) {
     var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
@@ -780,6 +799,7 @@ private fun ChatSheets(
             },
             onEdit = { onEdit(entry) },
             onBranch = { onBranch(entry) },
+            onSavePdf = { onSavePdf(entry) },
             onReport = {
                 onDismissActions()
                 reportFor = entry
@@ -1289,3 +1309,66 @@ private const val PULSE_MS = 700
  * see [StatusStrip].
  */
 private val STATUS_SLOT = 28.dp
+
+/**
+ * Raises the system's file picker for a reply, and writes the PDF where it lands.
+ *
+ * The system picker rather than writing to Downloads, so the file goes wherever the user
+ * keeps documents and the app needs no storage permission to put it there. Writing there
+ * directly would mean MediaStore, a permission on older versions, and a location nobody
+ * chose.
+ *
+ * Kept out of the screen body because it is a launcher, a scope and an effect for one
+ * action, and the screen it sits in was already at the complexity limit without them.
+ */
+@Composable
+private fun SavePdf(entry: TranscriptEntry?, documentTitle: String, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val create = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf"),
+    ) { target ->
+        val source = entry
+        onDone()
+        if (target == null || source == null) return@rememberLauncherForActivityResult
+        // Off the main thread: laying out a long reply is real work, and a save that janks
+        // the conversation is worse than one that takes a moment.
+        scope.launch(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openOutputStream(target)?.use { out ->
+                    MarkdownPdf().write(
+                        markdown = source.answer.ifEmpty { source.text },
+                        title = documentTitle,
+                        out = out,
+                    )
+                }
+            }
+        }
+    }
+    LaunchedEffect(entry) { entry?.let { create.launch(it.pdfName()) } }
+}
+
+/**
+ * A filename that says which conversation and which reply, without a timestamp nobody reads.
+ *
+ * The first words of the reply, because that is what somebody looking through a folder of
+ * these will recognise. Punctuation goes so the name is safe on every filesystem a phone
+ * might mount.
+ */
+private fun TranscriptEntry.pdfName(): String {
+    val words = (answer.ifEmpty { text })
+        .lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.filter { it.isLetterOrDigit() || it == ' ' }
+        ?.trim()
+        ?.take(PDF_NAME)
+        ?.replace(' ', '-')
+        .orEmpty()
+    return if (words.isBlank()) "openweights.pdf" else "$words.pdf"
+}
+
+/** Enough of the first question to name the document. */
+private const val PDF_TITLE = 80
+
+/** Enough of the reply to recognise the file. Longer names get truncated by the picker. */
+private const val PDF_NAME = 48

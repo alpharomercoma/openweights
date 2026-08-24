@@ -209,6 +209,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSavePreferences = chatViewModel::savePreferences,
                 onResetPreferences = chatViewModel::resetPreferences,
                 onAttach = chatViewModel::attach,
+                onAttachAll = chatViewModel::attachAll,
                 onAttachDocument = chatViewModel::stageDocument,
                 onRemoveDocument = { chatViewModel.stageDocument(null) },
                 onRemoveStaged = chatViewModel::removeStaged,

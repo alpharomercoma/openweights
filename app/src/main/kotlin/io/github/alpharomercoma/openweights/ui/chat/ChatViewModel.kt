@@ -735,6 +735,9 @@ class ChatViewModel @Inject constructor(
      */
     fun attach(uri: Uri) = attachments.attach(uri)
 
+    /** Several at once, from a multi-select picker or from the clipboard. */
+    fun attachAll(uris: List<Uri>) = attachments.attachAll(uris)
+
     /** Removes a staged attachment and deletes the copy that was made of it. */
     fun removeStaged(attachment: MessagePart.File) = attachments.remove(attachment)
 

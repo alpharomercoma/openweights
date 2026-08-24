@@ -153,6 +153,7 @@ class MessageActionsSheetTest {
         canEdit: Boolean = false,
         canBranch: Boolean = false,
         onEdit: () -> Unit = {},
+        onSavePdf: () -> Unit = {},
         onBranch: () -> Unit = {},
     ) {
         compose.setContent {
@@ -174,6 +175,7 @@ class MessageActionsSheetTest {
                     onRegenerate = onRegenerate,
                     onToggleReadAloud = {},
                     onEdit = onEdit,
+                    onSavePdf = onSavePdf,
                     onBranch = onBranch,
                     onReport = onReport,
                     onDismiss = {},

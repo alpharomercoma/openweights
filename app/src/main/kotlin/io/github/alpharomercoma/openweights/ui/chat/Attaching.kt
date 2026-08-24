@@ -61,6 +61,43 @@ internal class Attaching(
         }
     }
 
+    /**
+     * Stages several files at once, in the order they were chosen.
+     *
+     * Sequentially rather than concurrently, and the reason is the shared folder rather
+     * than politeness: each one is copied into the app's own storage, and eight copies
+     * racing on a phone's flash is slower than eight in a row as well as harder to report
+     * on. The spinner is raised once for the whole batch, so it does not flicker per file.
+     *
+     * A file that cannot be read stops nothing. Refusals are collected and reported once at
+     * the end, because "three of these five are not readable by this model" is one useful
+     * sentence and five separate errors are noise.
+     */
+    fun attachAll(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            attach(uris.single())
+            return
+        }
+        scope.launch {
+            state.update { it.copy(isAttaching = true) }
+            val refusals = mutableListOf<String>()
+            try {
+                uris.forEach { uri ->
+                    when (val staged = staging.file(uri, state.value.mediaSupport)) {
+                        is Staged.Refused -> refusals += staged.why
+                        else -> state.update { it.after(staged) }
+                    }
+                }
+            } finally {
+                state.update { it.copy(isAttaching = false) }
+            }
+            if (refusals.isNotEmpty()) {
+                state.update { it.copy(error = refusals.distinct().joinToString(" ")) }
+            }
+        }
+    }
+
     /** Removes a staged attachment and deletes the copy that was made of it. */
     fun remove(attachment: MessagePart.File) {
         state.update { it.copy(staged = it.staged - attachment) }

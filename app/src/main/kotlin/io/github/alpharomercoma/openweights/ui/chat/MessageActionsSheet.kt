@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +71,8 @@ fun MessageActionsSheet(
     onEdit: () -> Unit,
     /** Opens a new conversation carrying everything up to and including this turn. */
     onBranch: () -> Unit,
+    /** Writes this reply to a PDF wherever the user chooses to put it. */
+    onSavePdf: () -> Unit,
     onReport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -162,6 +165,17 @@ fun MessageActionsSheet(
                 )
             }
             if (entry.role == ChatRole.ASSISTANT) {
+                // The one way a reply leaves this app as a document rather than as text on
+                // a clipboard. Markdown a model wrote is a report, a plan or an essay often
+                // enough that "keep this" should not have to mean "paste it somewhere else".
+                ActionRow(
+                    icon = Icons.Rounded.PictureAsPdf,
+                    label = "Save as PDF",
+                    onClick = {
+                        onSavePdf()
+                        onDismiss()
+                    },
+                )
                 // Required of anything that generates AI content, and the only signal this
                 // app can have about a model's behaviour when nothing is measured remotely.
                 ActionRow(

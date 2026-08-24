@@ -31,8 +31,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CompactionEntity::class,
         WatchEntity::class,
         WatchRunEntity::class,
+        GalleryEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -42,6 +43,7 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
+    abstract fun gallery(): GalleryDao
 
     companion object {
         const val NAME = "openweights.db"
@@ -60,6 +62,49 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * runs table cascades on delete, which is what keeps a cancelled watch from leaving
          * an orphaned log behind.
          */
+        /**
+         * Adds the gallery.
+         *
+         * One new table and nothing touched. The unique index on the path is the load
+         * bearing part: a generation writes its file and then records it, and a process
+         * that dies between the two is resumed by a retry that writes the same path again.
+         * Without the constraint the same picture appears twice and deleting one of them
+         * leaves a row pointing at nothing.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS gallery (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        path TEXT NOT NULL,
+                        mediaType TEXT NOT NULL,
+                        modality TEXT NOT NULL,
+                        prompt TEXT NOT NULL,
+                        negativePrompt TEXT NOT NULL DEFAULT '',
+                        bundleId TEXT NOT NULL,
+                        bundleName TEXT NOT NULL,
+                        seed INTEGER,
+                        createdAt INTEGER NOT NULL,
+                        totalMillis INTEGER NOT NULL,
+                        backend TEXT NOT NULL,
+                        width INTEGER,
+                        height INTEGER,
+                        durationMillis INTEGER,
+                        sizeBytes INTEGER NOT NULL DEFAULT 0,
+                        isFavourite INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_gallery_path ON gallery(path)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_gallery_createdAt ON gallery(createdAt)",
+                )
+            }
+        }
+
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

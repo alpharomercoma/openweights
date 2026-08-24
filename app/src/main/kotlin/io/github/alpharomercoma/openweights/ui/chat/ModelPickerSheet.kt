@@ -53,6 +53,7 @@ import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.ui.models.ActiveDownload
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
 import io.github.alpharomercoma.openweights.ui.models.PublisherHeading
@@ -238,7 +239,12 @@ private fun ModelRow(model: LocalModel, isActive: Boolean, onSelect: () -> Unit)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
-            Metric(formatBytes(model.sizeBytes))
+            val badge = when (model.task) {
+                GenerationTask.IMAGE -> stringResource(R.string.model_badge_image_mnn)
+                GenerationTask.SPEECH -> stringResource(R.string.model_badge_voice_mnn)
+                else -> stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
+            }
+            Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
         }
     }
 }

@@ -227,4 +227,10 @@
     <string name="sort_slowest">Más lento</string>
     <string name="modality_image">Imágenes</string>
     <string name="modality_speech">Voz</string>
+    <string name="generation_bundles_heading">Paquetes de generación (MNN)</string>
+    <string name="language_models_heading">Modelos de lenguaje (GGUF)</string>
+    <string name="model_badge_image_mnn">Modelo de imagen (MNN)</string>
+    <string name="model_badge_voice_mnn">Modelo de voz (MNN)</string>
+    <string name="model_task_image">Modelo de imagen</string>
+    <string name="model_task_speech">Modelo de voz</string>
 </resources>

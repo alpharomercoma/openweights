@@ -279,8 +279,8 @@ class MnnSpeechSynthesizer internal constructor(
             "text_encoder.mnn",
             "vector_estimator.mnn",
             "vocoder.mnn",
-            "indexer.json",
-            "voices.json",
+            "tts.json",
+            "unicode_indexer.json",
         )
 
         /** Supertonic's own rate. Confirmed from the runtime after the first utterance. */

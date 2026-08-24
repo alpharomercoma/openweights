@@ -209,4 +209,10 @@
     <string name="sort_slowest">遅い順</string>
     <string name="modality_image">画像</string>
     <string name="modality_speech">音声</string>
+    <string name="generation_bundles_heading">生成バンドル (MNN)</string>
+    <string name="language_models_heading">言語モデル (GGUF)</string>
+    <string name="model_badge_image_mnn">画像モデル (MNN)</string>
+    <string name="model_badge_voice_mnn">音声モデル (MNN)</string>
+    <string name="model_task_image">画像モデル</string>
+    <string name="model_task_speech">音声モデル</string>
 </resources>

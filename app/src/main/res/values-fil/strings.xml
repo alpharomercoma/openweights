@@ -213,4 +213,10 @@
     <string name="sort_slowest">Pinakamabagal</string>
     <string name="modality_image">Mga Larawan</string>
     <string name="modality_speech">Boses</string>
+    <string name="generation_bundles_heading">Mga Bundle ng Pagbuo (MNN)</string>
+    <string name="language_models_heading">Mga Modelo ng Wika (GGUF)</string>
+    <string name="model_badge_image_mnn">Modelo ng Larawan (MNN)</string>
+    <string name="model_badge_voice_mnn">Modelo ng Boses (MNN)</string>
+    <string name="model_task_image">Modelo ng Larawan</string>
+    <string name="model_task_speech">Modelo ng Boses</string>
 </resources>

@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.model
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
+import io.github.alpharomercoma.openweights.core.generation.GenerationCatalog
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,6 +39,24 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
 
     /** Every GGUF currently on disk, newest first. Projectors are not models. */
     fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
+
+    /** Every completed multi-file GenerationBundle directory currently on disk. */
+    fun availableBundles(): List<File> {
+        val dirs = directory.listFiles { file -> file.isDirectory } ?: return emptyList()
+        return dirs.filter { dir ->
+            val completeMarker = File(dir, BUNDLE_SENTINEL)
+            completeMarker.isFile &&
+                GenerationCatalog.findByDirectory(dir.name)?.let { spec ->
+                    spec.files.all { f ->
+                        val file = File(dir, f.name)
+                        file.isFile && file.length() > 0
+                    }
+                } == true
+        }.sortedByDescending { it.lastModified() }
+    }
+
+    /** Destination directory for a generation bundle. */
+    fun bundleDestination(directoryName: String): File = File(directory, directoryName)
 
     /**
      * The model to open with: the one last chosen, or any that is present.
@@ -149,5 +168,6 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         const val KEY_PUBLISHER = "publisher:"
         const val MODELS_DIRECTORY = "models"
         const val GGUF_EXTENSION = GgufFileName.GGUF_SUFFIX
+        const val BUNDLE_SENTINEL = ".complete"
     }
 }

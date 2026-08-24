@@ -29,6 +29,7 @@ import okhttp3.Request
  */
 internal object HubHttp {
     const val PARTIAL_CONTENT = 206
+    const val RANGE_NOT_SATISFIABLE = 416
 
     private const val AUTHORIZATION = "Authorization"
     private const val RANGE = "Range"

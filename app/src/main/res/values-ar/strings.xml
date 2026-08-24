@@ -215,4 +215,10 @@
     <string name="sort_slowest">الأبطأ</string>
     <string name="modality_image">الصور</string>
     <string name="modality_speech">الكلام</string>
+    <string name="generation_bundles_heading">حزم التوليد (MNN)</string>
+    <string name="language_models_heading">نماذج اللغة (GGUF)</string>
+    <string name="model_badge_image_mnn">نموذج صور (MNN)</string>
+    <string name="model_badge_voice_mnn">نموذج صوت (MNN)</string>
+    <string name="model_task_image">نموذج صور</string>
+    <string name="model_task_speech">نموذج صوت</string>
 </resources>

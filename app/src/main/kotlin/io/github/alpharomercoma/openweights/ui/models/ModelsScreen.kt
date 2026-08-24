@@ -71,6 +71,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -278,16 +279,12 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
-            Metric(
-                listOfNotNull(
-                    formatBytes(model.sizeBytes),
-                    // "attachments" rather than "images": all this knows is that a
-                    // projector was downloaded beside the model, and an audio projector
-                    // reads sound. Saying which would mean parsing the projector's header,
-                    // and claiming the wrong one is worse than being general.
-                    stringResource(R.string.reads_attachments).takeIf { model.isMultimodal },
-                ).joinToString(" · "),
-            )
+            val badge = when (model.task) {
+                GenerationTask.IMAGE -> stringResource(R.string.model_badge_image_mnn)
+                GenerationTask.SPEECH -> stringResource(R.string.model_badge_voice_mnn)
+                else -> stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
+            }
+            Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
         }
         TextButton(
             onClick = onDelete,

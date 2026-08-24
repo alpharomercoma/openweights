@@ -272,12 +272,19 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
     const std::string promptText = to_utf8(env, prompt);
     const std::string output = to_utf8(env, outputPath);
 
+    struct GlobalRefGuard {
+        JNIEnv* env;
+        jobject ref;
+        ~GlobalRefGuard() { if (env != nullptr && ref != nullptr) env->DeleteGlobalRef(ref); }
+    } selfGuard{env, env->NewGlobalRef(self)};
+    jobject selfGlobal = selfGuard.ref;
+
     try {
         const bool wrote = session->diffusion->run(
             promptText, output, steps, seed,
             [&](int step) {
                 if (session->cancelled.load()) throw Cancelled{};
-                if (onStep != nullptr) {
+                if (onStep != nullptr && selfGlobal != nullptr) {
                     JNIEnv* callbackEnv = nullptr;
                     bool attached = false;
                     if (gJavaVM != nullptr) {
@@ -291,7 +298,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
                     if (callbackEnv == nullptr) callbackEnv = env;
 
                     if (callbackEnv->PushLocalFrame(32) == 0) {
-                        callbackEnv->CallVoidMethod(self, onStep, step);
+                        callbackEnv->CallVoidMethod(selfGlobal, onStep, step);
                         if (callbackEnv->ExceptionCheck()) callbackEnv->ExceptionClear();
                         callbackEnv->PopLocalFrame(nullptr);
                     }

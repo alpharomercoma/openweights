@@ -321,6 +321,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         navController.push(Routes.MODELS)
                     }
                 },
+                onDownloadBundle = { spec ->
+                    modelsViewModel.downloadBundle(spec)
+                    navController.push(Routes.MODELS)
+                },
                 onBack = navController::popBackStack,
             )
         }

@@ -184,6 +184,15 @@ class ModelDownloader @Inject constructor(
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
+                val totalFromRange = response.header("Content-Range")
+                    ?.substringAfter("*/", "")
+                    ?.toLongOrNull()
+                if (response.code == HubHttp.RANGE_NOT_SATISFIABLE &&
+                    alreadyHave > 0 &&
+                    (totalFromRange == null || alreadyHave >= totalFromRange)
+                ) {
+                    return
+                }
                 throw response.toHubException(hasToken = tokenSource.token() != null)
             }
             // A server that ignores the range header restarts the file, so partial bytes

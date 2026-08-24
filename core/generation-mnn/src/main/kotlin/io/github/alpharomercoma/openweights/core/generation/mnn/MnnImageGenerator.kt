@@ -356,7 +356,9 @@ class MnnImageGenerator internal constructor(
             "unet.mnn.weight",
             "vae_decoder.mnn",
             "vae_decoder.mnn.weight",
-            "tokenizer.mtok",
+            "vocab.json",
+            "merges.txt",
+            "alphas.txt",
         )
 
         const val SD15_EDGE = 512

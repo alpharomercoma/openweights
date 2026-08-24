@@ -248,4 +248,10 @@
     <string name="sort_slowest">Slowest</string>
     <string name="modality_image">Images</string>
     <string name="modality_speech">Speech</string>
+    <string name="generation_bundles_heading">Generation Bundles (MNN)</string>
+    <string name="language_models_heading">Language Models (GGUF)</string>
+    <string name="model_badge_image_mnn">Image Model (MNN)</string>
+    <string name="model_badge_voice_mnn">Voice Model (MNN)</string>
+    <string name="model_task_image">Image Model</string>
+    <string name="model_task_speech">Speech Model</string>
 </resources>

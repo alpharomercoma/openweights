@@ -301,4 +301,28 @@ class ModelDownloaderResumeTest {
         assertThat(destination.readBytes()).isEqualTo(whole)
         assertThat(server.requestCount).isEqualTo(0)
     }
+
+    @Test
+    fun `a resume that receives 416 when already at end of file succeeds`() {
+        val destination = File(folder.root, "weights.gguf")
+        val file = hubFile(size = 0L)
+        File(folder.root, "weights.gguf.part").writeBytes(whole)
+        markPartial(destination, file = file)
+
+        // When sizeBytes was unknown (0) or partial equals remote total, server sends 416
+        server.enqueue(
+            MockResponse.Builder()
+                .code(416)
+                .addHeader("Content-Range", "bytes */${whole.size}")
+                .build(),
+        )
+
+        val progress = runBlocking {
+            downloader.download("owner/repo", file, destination).toList()
+        }
+
+        assertThat(destination.readBytes()).isEqualTo(whole)
+        assertThat(progress.last()).isInstanceOf(DownloadProgress.Finished::class.java)
+        assertThat(File(folder.root, "weights.gguf.part").exists()).isFalse()
+    }
 }

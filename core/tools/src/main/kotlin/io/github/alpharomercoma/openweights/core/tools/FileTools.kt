@@ -322,7 +322,7 @@ private fun String.globMatches(value: String): Boolean {
 /** Media families a text tool has nothing useful to say about. */
 private val NOT_TEXT = setOf("image", "audio", "video")
 
-private const val WINDOW_CHARS = 1_500
+private const val WINDOW_CHARS = 4_000
 
 /**
  * The most a single write may carry.

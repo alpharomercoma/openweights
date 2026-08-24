@@ -215,4 +215,6 @@
     <string name="model_badge_voice_mnn">音声モデル (MNN)</string>
     <string name="model_task_image">画像モデル</string>
     <string name="model_task_speech">音声モデル</string>
+    <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
+    <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
 </resources>

@@ -233,7 +233,8 @@ fun Composer(
                                 // heard so far, so the words appear where they will land
                                 // rather than in a separate panel.
                                 text = heard.ifEmpty {
-                                    if (isListening) "Listening…" else "Message"
+                                    if (isListening) "Listening…"
+                                    else stringResource(R.string.slash_command_hint)
                                 },
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

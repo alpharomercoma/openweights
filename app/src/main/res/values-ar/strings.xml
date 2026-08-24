@@ -221,4 +221,6 @@
     <string name="model_badge_voice_mnn">نموذج صوت (MNN)</string>
     <string name="model_task_image">نموذج صور</string>
     <string name="model_task_speech">نموذج صوت</string>
+    <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
+    <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
 </resources>

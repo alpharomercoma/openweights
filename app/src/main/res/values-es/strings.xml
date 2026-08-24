@@ -233,4 +233,6 @@
     <string name="model_badge_voice_mnn">Modelo de voz (MNN)</string>
     <string name="model_task_image">Modelo de imagen</string>
     <string name="model_task_speech">Modelo de voz</string>
+    <string name="model_badge_projector_missing">Modelo de visión · descargue el proyector (mmproj) para habilitar entrada de imagen</string>
+    <string name="slash_command_hint">Escribe un mensaje, o / para comandos</string>
 </resources>

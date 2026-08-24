@@ -285,6 +285,16 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
                 else -> stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
             }
             Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
+            // Surface the projector gap rather than leaving the user to discover why the
+            // attachment button never appears. One line, amber-toned via error container,
+            // so it reads as a note rather than a failure.
+            if (model.looksLikeVlm) {
+                Text(
+                    text = stringResource(R.string.model_badge_projector_missing),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
         TextButton(
             onClick = onDelete,
@@ -296,6 +306,7 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
         ) { Text(stringResource(R.string.delete)) }
     }
 }
+
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

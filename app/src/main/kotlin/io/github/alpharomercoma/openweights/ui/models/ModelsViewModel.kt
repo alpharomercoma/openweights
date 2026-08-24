@@ -82,7 +82,27 @@ data class LocalModel(
 
     /** True when this model can read attachments or generate images on this device. */
     val isMultimodal: Boolean get() = projector != null || task == GenerationTask.IMAGE
+
+    /**
+     * True when the filename strongly suggests a vision-language model but no projector
+     * has been downloaded.
+     *
+     * Heuristic only — based on common VLM naming conventions. Displayed as a warning chip
+     * in the model list and picker so users know why the attachment button stays hidden.
+     */
+    val looksLikeVlm: Boolean
+        get() = !isBundle && projector == null && VLM_PATTERNS.any { pattern ->
+            file.name.contains(pattern, ignoreCase = true)
+        }
+
+    private companion object {
+        /** Substrings common to vision-language model filenames across every major family. */
+        val VLM_PATTERNS = listOf("-VL", "-vl", "Vision", "vision", "Llava", "llava",
+            "Pixtral", "pixtral", "InternVL", "interVL", "QwenVL", "qwenvl", "Gemma3n",
+            "gemma3n", "phi-4-mm", "Phi-4-mm")
+    }
 }
+
 
 /** A download in flight, keyed by the file it is fetching. */
 data class ActiveDownload(

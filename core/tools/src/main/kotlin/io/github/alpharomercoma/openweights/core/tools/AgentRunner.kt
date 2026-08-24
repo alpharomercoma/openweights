@@ -318,9 +318,20 @@ class AgentRunner(
         if (mode == AgentMode.YOLO) return true
         val couldBeToldWhereToGo = readUntrustedText && tool.sendsWhereTheModelSays
         val couldCarryPrivateData = readPrivateData && tool.leavesTheDevice
-        val autoAllows = mode == AgentMode.AUTO &&
-            !couldBeToldWhereToGo &&
-            !couldCarryPrivateData
+
+        // Asked first, and not skippable. A reviewer read this as a complete egress bypass:
+        // if an outbound tool ever declared `needsApproval = false`, `!tool.needsApproval`
+        // would short-circuit the whole expression and a page could talk the model into
+        // posting a private file with no prompt. That is not true today, because the default
+        // is true and only the two internal planning tools override it, so the reviewer's
+        // scenario does not reach. It was one keystroke away from being true, and a
+        // security property that depends on nobody setting a flag is not a property.
+        //
+        // These two conditions now decide on their own. A tool that is exempt from routine
+        // approval is not thereby exempt from the egress rule.
+        if (couldBeToldWhereToGo || couldCarryPrivateData) return approve(call)
+
+        val autoAllows = mode == AgentMode.AUTO
         return autoAllows || !tool.needsApproval || approve(call)
     }
 

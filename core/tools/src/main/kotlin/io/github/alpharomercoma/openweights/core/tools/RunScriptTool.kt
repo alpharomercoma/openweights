@@ -217,13 +217,25 @@ class RunScriptTool @Inject constructor(
      * prompt. The only thing that has to fit a context window is whatever the script decides
      * to return, which is the whole point of running one.
      */
+    /**
+     * Reads the named files, and says nothing about the ones that are not there.
+     *
+     * A missing file used to be entered as an empty string, which made `existsSync` answer
+     * true for it and `readFileSync` hand back "" instead of raising. A script doing
+     * `JSON.parse(fs.readFileSync('config.json'))` then died on "Unexpected end of JSON
+     * input", which tells the model nothing about the real problem and is not something the
+     * repair round can act on. Absent means absent, and the shim already raises a sentence
+     * naming the file when it is.
+     *
+     * A directory is treated the same way for the same reason: it is not a readable file,
+     * and pretending it is an empty one only moves the error somewhere less useful.
+     */
     private suspend fun gather(paths: List<String>): String {
         val named = buildJsonObject {
             paths.take(MAX_FILES).forEach { path ->
-                val entry = workspace.resolve(path)
-                val text = entry?.takeUnless { it.isDirectory }
-                    ?.let { workspace.readText(it, 0, MAX_INPUT_CHARS) }
-                put(path, JsonPrimitive(text ?: ""))
+                val entry = workspace.resolve(path)?.takeUnless { it.isDirectory }
+                val text = entry?.let { workspace.readText(it, 0, MAX_INPUT_CHARS) }
+                if (text != null) put(path, JsonPrimitive(text))
             }
         }
         return named.toString()
@@ -237,8 +249,7 @@ class RunScriptTool @Inject constructor(
      * through the same [Workspace.resolve] as a declared one, so this widens nothing a
      * script could not already reach by naming the file properly.
      */
-    private fun mentionedPaths(source: String): List<String> =
-        PATH_LIKE.findAll(source).map { it.groupValues[1] }.distinct().take(MAX_FILES).toList()
+    private fun mentionedPaths(source: String): List<String> = mentionedIn(source)
 
     /** The file names asked for, which arrive as an array rather than as a single value. */
     private fun ToolCall.paths(): List<String> = runCatching {
@@ -253,13 +264,30 @@ class RunScriptTool @Inject constructor(
         const val NAME = "run_script"
 
         /**
+         * The files a program names in its own source.
+         *
+         * On the companion so it can be tested without a workspace, a sandbox or a model.
+         * The path pattern is the sort of thing that is quietly wrong for years: it required
+         * a slash until an audit pointed out that a file in the root of the shared folder is
+         * the most ordinary case there is.
+         */
+        fun mentionedIn(source: String): List<String> =
+            PATH_LIKE.findAll(source).map { it.groupValues[1] }.distinct().take(MAX_FILES)
+                .toList()
+
+        /**
          * A quoted string that is shaped like a path in the shared folder.
          *
          * A slash and an extension. `"notes/todo.md"` matches, `"a sentence, with commas"`
          * does not, and neither does `"https://example.com/page.html"`, which is excluded
          * because a program mentioning a URL is not asking to read a local file.
          */
-        val PATH_LIKE = Regex("""["']((?!\w+://)[\w.\-]+(?:/[\w.\-]+)+\.[A-Za-z0-9]{1,6})["']""")
+        // The directory part is optional. It was required, so a script saying
+        // `readFileSync('dataset.csv')` mentioned no path this could see, and unless the
+        // model had also filled in `files` the file was never loaded. A file in the root of
+        // the shared folder is the most ordinary case there is.
+        val PATH_LIKE =
+            Regex("""["']((?!\w+://)(?:[\w.\-]+/)*[\w.\-]+\.[A-Za-z0-9]{1,6})["']""")
 
         /**
          * The two Node modules a model actually reaches for, made to work.

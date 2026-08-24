@@ -71,7 +71,13 @@ class WatchTool(private val watches: Watches) : Tool {
         val minutes = call.intArgument("every_minutes", "minutes", "interval")
         refusal(task, minutes)?.let { return it }
 
-        val started = watches.start(task!!, minutes!!)
+        // Checked here rather than forced with `!!`. [refusal] already returns non-null
+        // whenever either of these is missing, so both are known good, but the compiler
+        // cannot see that through a function boundary and `!!` asks a reader to take it on
+        // trust. Folding both into one branch keeps that safety without a third exit.
+        if (task == null || minutes == null) return NO_TASK
+
+        val started = watches.start(task, minutes)
             ?: return "There are already ${Watch.MAX_ACTIVE} checks running, which is the " +
                 "limit. Ask the user to stop one first."
 
@@ -93,10 +99,8 @@ class WatchTool(private val watches: Watches) : Tool {
      * interval was given" calls again with one; one told "invalid arguments" apologises.
      */
     private fun refusal(task: String?, minutes: Int?): String? = when {
-        task.isNullOrBlank() ->
-            "No task was given. Call $NAME again saying what to check."
-        minutes == null ->
-            "No interval was given. Call $NAME again with every_minutes."
+        task.isNullOrBlank() -> NO_TASK
+        minutes == null -> NO_INTERVAL
         minutes !in Watch.MIN_MINUTES..Watch.MAX_MINUTES ->
             "That interval is outside what this can do. Use between ${Watch.MIN_MINUTES} " +
                 "and ${Watch.MAX_MINUTES} minutes."
@@ -105,5 +109,9 @@ class WatchTool(private val watches: Watches) : Tool {
 
     companion object {
         const val NAME = "watch"
+
+        private const val NO_TASK = "No task was given. Call watch again saying what to check."
+        private const val NO_INTERVAL =
+            "No interval was given. Call watch again with every_minutes."
     }
 }

@@ -251,12 +251,30 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
  * matches on being contained, since a model asked to find "budget" means the spreadsheet
  * rather than a file called exactly that.
  */
-private fun String.asNameMatcher(): (String) -> Boolean {
+/**
+ * Turns a search pattern into a predicate on a file name.
+ *
+ * Internal rather than private so it can be tested directly. It was untested, and it was
+ * wrong: both wildcards behaved as `*`.
+ */
+internal fun String.asNameMatcher(): (String) -> Boolean {
     if (!contains('*') && !contains('?')) {
         val needle = this
         return { it.contains(needle, ignoreCase = true) }
     }
-    val expression = split('*', '?').joinToString(".*") { Regex.escape(it) }
+    // Built character by character, because splitting on both wildcards and rejoining with
+    // one replacement made every `?` behave as `*`: `doc_??.txt` matched
+    // `doc_anything_at_all.txt`. A question mark is exactly one character, which is the
+    // whole reason a glob has two wildcards rather than one.
+    val expression = buildString {
+        this@asNameMatcher.forEach { character ->
+            when (character) {
+                '*' -> append(".*")
+                '?' -> append('.')
+                else -> append(Regex.escape(character.toString()))
+            }
+        }
+    }
     val regex = runCatching { Regex("^$expression$", RegexOption.IGNORE_CASE) }.getOrNull()
     return { name -> regex?.matches(name) ?: false }
 }

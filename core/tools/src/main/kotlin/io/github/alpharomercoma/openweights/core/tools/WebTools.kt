@@ -21,8 +21,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -42,7 +42,11 @@ internal fun ToolCall.argument(vararg names: String): String? {
     val root = runCatching { Json.parseToJsonElement(argumentsJson).jsonObject }.getOrNull()
         ?: return null
     for (name in names) {
-        val value = root[name]?.jsonPrimitive?.contentOrNull()
+        // `as?` rather than `.jsonPrimitive`, which throws on an object or an array instead
+        // of returning null. A small model writing {"query": {"text": "..."}} is not rare,
+        // and the throw escaped the tool and killed the turn where the tool should simply
+        // have said what argument it wanted.
+        val value = (root[name] as? JsonPrimitive)?.contentOrNull()
         if (!value.isNullOrBlank()) return value
     }
     return null

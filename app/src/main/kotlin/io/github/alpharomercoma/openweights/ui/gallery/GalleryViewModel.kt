@@ -26,10 +26,12 @@ import io.github.alpharomercoma.openweights.core.generation.GalleryQuery
 import io.github.alpharomercoma.openweights.core.generation.GallerySort
 import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.core.generation.matching
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -76,11 +78,13 @@ class GalleryViewModel @Inject constructor(
                 total = all.size,
                 isLoading = false,
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(SUBSCRIPTION_GRACE_MILLIS),
-            initialValue = GalleryUiState(query = query.value),
-        )
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(SUBSCRIPTION_GRACE_MILLIS),
+                initialValue = GalleryUiState(query = query.value),
+            )
 
     init {
         // Once, on the way in. The files live in storage Android may clear and a user may

@@ -42,6 +42,9 @@
 
 namespace {
 
+JavaVM* gJavaVM = nullptr;
+std::atomic<int64_t> gNextHandle{1};
+
 /**
  * Thrown out of the progress callback to stop a run between steps.
  *
@@ -166,7 +169,8 @@ bool writeWav(const std::string& path, const std::vector<int16_t>& samples, int 
 
     bool ok = std::fwrite("RIFF", 1, 4, file) == 4;
     ok = ok && std::fwrite(&riffSize, 4, 1, file) == 1;
-    ok = ok && std::fwrite("WAVEfmt ", 1, 8, file) == 8;
+    ok = ok && std::fwrite("WAVE", 1, 4, file) == 4;
+    ok = ok && std::fwrite("fmt ", 1, 4, file) == 4;
     ok = ok && std::fwrite(&fmtSize, 4, 1, file) == 1;
     ok = ok && std::fwrite(&pcm, 2, 1, file) == 1;
     ok = ok && std::fwrite(&channels, 2, 1, file) == 1;
@@ -187,6 +191,11 @@ bool writeWav(const std::string& path, const std::vector<int16_t>& samples, int 
 } // namespace
 
 extern "C" {
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
+    gJavaVM = vm;
+    return JNI_VERSION_1_6;
+}
 
 /**
  * Loads a bundle and returns a handle, or 0.
@@ -222,7 +231,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         }
         session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
         LOGI("loaded a diffusion bundle from %s", path.c_str());
-        jlong handle = reinterpret_cast<jlong>(session.get());
+        jlong handle = gNextHandle.fetch_add(1);
         {
             std::lock_guard<std::mutex> guard(gSessionMutex);
             gActiveSessions[handle] = session;
@@ -269,10 +278,25 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
             [&](int step) {
                 if (session->cancelled.load()) throw Cancelled{};
                 if (onStep != nullptr) {
-                    if (env->PushLocalFrame(32) == 0) {
-                        env->CallVoidMethod(self, onStep, step);
-                        if (env->ExceptionCheck()) env->ExceptionClear();
-                        env->PopLocalFrame(nullptr);
+                    JNIEnv* callbackEnv = nullptr;
+                    bool attached = false;
+                    if (gJavaVM != nullptr) {
+                        jint res = gJavaVM->GetEnv(reinterpret_cast<void**>(&callbackEnv), JNI_VERSION_1_6);
+                        if (res == JNI_EDETACHED) {
+                            if (gJavaVM->AttachCurrentThread(&callbackEnv, nullptr) == JNI_OK) {
+                                attached = true;
+                            }
+                        }
+                    }
+                    if (callbackEnv == nullptr) callbackEnv = env;
+
+                    if (callbackEnv->PushLocalFrame(32) == 0) {
+                        callbackEnv->CallVoidMethod(self, onStep, step);
+                        if (callbackEnv->ExceptionCheck()) callbackEnv->ExceptionClear();
+                        callbackEnv->PopLocalFrame(nullptr);
+                    }
+                    if (attached && gJavaVM != nullptr) {
+                        gJavaVM->DetachCurrentThread();
                     }
                 }
             });
@@ -340,7 +364,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         session->tts = std::make_unique<MNNSupertonicTTSImpl>(dir);
         const std::string speaker = to_utf8(env, speakerId);
         if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
-        jlong handle = reinterpret_cast<jlong>(session.get());
+        jlong handle = gNextHandle.fetch_add(1);
         {
             std::lock_guard<std::mutex> guard(gSessionMutex);
             gActiveSpeechSessions[handle] = session;

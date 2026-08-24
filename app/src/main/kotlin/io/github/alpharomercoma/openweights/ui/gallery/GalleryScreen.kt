@@ -381,6 +381,10 @@ private fun GalleryViewer(
             mediaPlayer = runCatching {
                 MediaPlayer().apply {
                     setDataSource(entry.artifact.path)
+                    setOnErrorListener { _, _, _ ->
+                        isPlaying = false
+                        true
+                    }
                     prepare()
                     setOnCompletionListener { isPlaying = false }
                 }

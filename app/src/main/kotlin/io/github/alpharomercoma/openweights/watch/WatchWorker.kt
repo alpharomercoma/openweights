@@ -17,12 +17,15 @@
 package io.github.alpharomercoma.openweights.watch
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import io.github.alpharomercoma.openweights.core.common.context.WatchOutcome
+import kotlinx.coroutines.CancellationException
 
 /**
  * One scheduled tick, delivered by the system.
@@ -43,14 +46,7 @@ class WatchWorker @AssistedInject constructor(
         val id = inputData.getLong(WATCH_ID, -1)
         if (id < 0) return Result.success()
 
-        // A null tick means the watch is gone or no longer active, and the schedule has to
-        // go with it. Without this, a watch that stopped itself after three failures left a
-        // periodic job behind that woke the device every fifteen minutes, forever, to
-        // discover each time that there was nothing to do. Nothing else cancels it: the
-        // in-process ticker notices the state and exits, and WorkManager is not watching the
-        // database.
-        val outcome = runCatching { runner.tick(id) }.getOrNull()
-        if (outcome == null) {
+        if (scheduleIsOver { runner.tick(id) }) {
             WorkManager.getInstance(applicationContext).cancelUniqueWork(workName(id))
         }
         return Result.success()
@@ -62,4 +58,31 @@ class WatchWorker @AssistedInject constructor(
         /** One name per watch, so scheduling twice replaces rather than doubles. */
         fun workName(watchId: Long) = "watch-$watchId"
     }
+}
+
+/**
+ * Whether one delivered tick means the schedule behind it should be torn down.
+ *
+ * Only a tick that ran and found the watch gone or no longer active, which is what a null
+ * outcome means. Without that the periodic job outlives the watch: one that stopped itself
+ * after three failures left a job behind that woke the device every fifteen minutes,
+ * forever, to discover each time that there was nothing to do. Nothing else cancels it,
+ * since the in-process ticker notices the state and exits and WorkManager is not watching
+ * the database.
+ *
+ * Every other ending keeps it, and that half is the one worth being careful about, because
+ * unscheduling cannot be recovered from inside the app: the watch is still listed, still
+ * says active, and never runs again, and the only clue is a history that stopped growing.
+ * A check that threw already has a home in the watch's own failure counter, which is
+ * visible and recoverable. A worker the system took back says nothing about the watch at
+ * all, and its cancellation is passed on rather than swallowed, so the run is recorded as
+ * stopped rather than as finished.
+ */
+internal suspend fun scheduleIsOver(tick: suspend () -> WatchOutcome?): Boolean = try {
+    tick() == null
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+    Log.w("OpenWeights", "a scheduled check could not run", failure)
+    false
 }

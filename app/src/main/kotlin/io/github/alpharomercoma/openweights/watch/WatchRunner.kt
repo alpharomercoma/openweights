@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.ui.chat.ModelRuntime
 import io.github.alpharomercoma.openweights.ui.chat.TurnListener
 import io.github.alpharomercoma.openweights.ui.chat.TurnRunner
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -111,6 +112,12 @@ class WatchRunner @Inject constructor(
         }
 
         answer.exceptionOrNull()?.let { failure ->
+            // Passed on rather than counted. `runCatching` catches a cancellation like
+            // anything else, and a cancelled tick is the watch being paused or the worker
+            // being taken back, neither of which is the check failing. Counting it would
+            // spend the three-failure guardrail on the one thing it was never meant to
+            // catch, and stop a watch that works.
+            if (failure is CancellationException) throw failure
             Log.w("OpenWeights", "watch $watchId failed", failure)
             return WatchOutcome.FAILED to (failure.message ?: "The check did not finish.")
         }

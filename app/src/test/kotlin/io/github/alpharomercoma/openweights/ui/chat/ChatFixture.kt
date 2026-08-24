@@ -161,6 +161,24 @@ abstract class ChatFixture {
         // throws into the next class. Cancelling the scope makes every later launch a no-op,
         // which is what a real view model gets when its screen is destroyed.
         runCatching { viewModel.viewModelScope.cancel() }
+
+        // Then let the cancellation actually land before the database goes. Cancelling is a
+        // signal, not an event: a coroutine parked on the test dispatcher does not observe
+        // it until something runs the scheduler, and one parked on a real dispatcher, which
+        // is where the DataStore reads go, does not observe it until it is resumed there. If
+        // either resumes after `close`, it touches a database that is gone and throws into
+        // whichever class runs next, which is the failure this whole block exists to stop.
+        //
+        // This is not the draining the comment above rejects. That was draining *instead of*
+        // cancelling, which lets work meant to die run to completion against a fixture that
+        // is already half gone. Draining *after* cancelling only gives work that is already
+        // dead somewhere to unwind, which it has to have.
+        repeat(TEARDOWN_STEPS) {
+            runCatching { dispatcher.scheduler.advanceUntilIdle() }
+            Thread.sleep(SETTLE_PAUSE_MS)
+        }
+        runCatching { dispatcher.scheduler.advanceUntilIdle() }
+
         database.close()
         models.deleteRecursively()
         Dispatchers.resetMain()
@@ -298,6 +316,15 @@ abstract class ChatFixture {
 
         /** How many times to re-check the table before giving up and asserting on it. */
         const val AWAIT_STEPS = 20
+
+        /**
+         * Passes given to work that has been cancelled and has to unwind.
+         *
+         * Small, because nothing here is being waited *for*: the work is already dead and
+         * this only gives it somewhere to notice. Three covers a suspension on a real
+         * dispatcher and its continuation, which is the shape the DataStore reads have.
+         */
+        const val TEARDOWN_STEPS = 3
 
         /** A fold runs the model, resets the cache and writes, all before its turn starts. */
         const val FOLD_SETTLE_STEPS = 30

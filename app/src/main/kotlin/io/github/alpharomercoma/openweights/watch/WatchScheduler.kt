@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.watch
 
 import android.content.Context
+import android.util.Log
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -27,6 +28,7 @@ import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
 import io.github.alpharomercoma.openweights.core.data.WatchRepository
 import io.github.alpharomercoma.openweights.runtime.GenerationService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -159,7 +161,15 @@ class WatchScheduler @Inject constructor(
                         delay(period)
                         val current = watches.byId(watch.id)
                         if (current == null || current.state != WatchState.ACTIVE) break
-                        runCatching { runner.get().tick(watch.id) }
+                        // One bad tick must not end the loop, and a cancellation must.
+                        // `runCatching` alone caught both and told nobody about either.
+                        try {
+                            runner.get().tick(watch.id)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+                            Log.w("OpenWeights", "watch ${watch.id} could not run", failure)
+                        }
                     }
                 } finally {
                     // Only if this coroutine is still the one registered. Cancellation is

@@ -28,6 +28,26 @@ subprojects {
         config.setFrom(rootProject.files("config/detekt/detekt.yml"))
         buildUponDefaultConfig = true
         parallel = true
+        // Detekt looks in src/main and src/test by default, which a multiplatform module
+        // does not have: its code lives in src/commonMain, src/androidMain and so on. The
+        // first module converted here went NO-SOURCE without a word, so a whole module
+        // stopped being analysed and the finding count went *down*, which reads like an
+        // improvement. Every source directory that exists is listed, and the ones that do
+        // not are skipped rather than failing.
+        source.setFrom(
+            files(
+                "src/main/kotlin",
+                "src/test/kotlin",
+                "src/commonMain/kotlin",
+                "src/commonTest/kotlin",
+                "src/jvmMain/kotlin",
+                "src/jvmAndAndroidMain/kotlin",
+                "src/jvmAndAndroidTest/kotlin",
+                "src/androidMain/kotlin",
+                "src/androidHostTest/kotlin",
+                "src/iosMain/kotlin",
+            ).filter { it.exists() },
+        )
     }
 
     // A deadline, because a hung test is worse than a failing one. A sampler that looped

@@ -8,12 +8,33 @@ naming:
   FunctionNaming:
     # Composables are PascalCase by convention, and Android Studio tooling depends on it.
     ignoreAnnotated: ['Composable']
+    # Detekt's defaults exclude test source sets by path, and its list predates
+    # multiplatform: it knows **/test/** and **/commonTest/** and not the source sets a KMP
+    # module actually has. Overriding `excludes` replaces the default list rather than
+    # adding to it, so the defaults are repeated here and the two new ones appended.
+    # Without this, converting one module to KMP turned 10 findings into 193 overnight,
+    # every one of them a backtick test name or a number in a fixture.
+    excludes: &testSourceSets
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/commonTest/**'
+      - '**/jvmTest/**'
+      - '**/androidUnitTest/**'
+      - '**/androidInstrumentedTest/**'
+      - '**/jsTest/**'
+      - '**/iosTest/**'
+      # The AGP multiplatform plugin's own name for a module's host tests.
+      - '**/androidHostTest/**'
+      # This project's intermediate source set: tests shared by the JVM and Android.
+      - '**/jvmAndAndroidTest/**'
+
   MatchingDeclarationName:
     # Theme.kt legitimately holds ThemeMode, the theme composable, and its CompositionLocal.
     active: false
 
 style:
   MagicNumber:
+    excludes: *testSourceSets
     # Colour literals, dp/sp sizes, and animation durations are the numbers. Naming each
     # one produces a wall of constants that says less than the call site did.
     ignoreAnnotated: ['Composable', 'Preview']

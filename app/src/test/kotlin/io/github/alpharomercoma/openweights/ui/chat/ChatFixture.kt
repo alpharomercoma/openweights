@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
@@ -43,6 +44,7 @@ import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -129,13 +131,17 @@ abstract class ChatFixture {
 
     @After
     fun tearDown() {
-        // Drained before Main is released, and that ordering is the point. A view model
-        // scope can still hold queued work when a test ends, and once the main dispatcher is
-        // reset that work has nowhere to run: it surfaces later as
-        // "uncaught exceptions before the test started" in whichever class happens to run
-        // next, which is a failure with no relationship to the test reporting it. Two of
-        // those were chased in this repository before this line existed.
-        runCatching { dispatcher.scheduler.advanceUntilIdle() }
+        // Cancelled, not drained, and the difference is what took two attempts to get
+        // right. A view model scope can still hold queued work when a test ends; once the
+        // main dispatcher is reset that work has nowhere to run and surfaces as "uncaught
+        // exceptions before the test started" in whichever class happens to run next, which
+        // is a failure with no relationship to the test reporting it.
+        //
+        // Draining looked like the fix and was not: `advanceUntilIdle` *runs* the queued
+        // work, and a coroutine written to be cancelled at the end of a screen's life
+        // throws when it is instead allowed to finish against a torn-down fixture. Killing
+        // the work is what a real view model gets when its screen goes away.
+        runCatching { viewModel.viewModelScope.coroutineContext.cancelChildren() }
         database.close()
         models.deleteRecursively()
         Dispatchers.resetMain()

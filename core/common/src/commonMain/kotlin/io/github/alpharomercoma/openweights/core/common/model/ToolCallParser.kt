@@ -167,7 +167,13 @@ object ToolCallParser {
                 character == '\n' -> append("\\n")
                 character == '\r' -> append("\\r")
                 character == '\t' -> append("\\t")
-                character < ' ' -> append("\\u%04x".format(character.code))
+                // Hand-built rather than String.format, which is JVM only. The escape is
+                // always four hex digits, and this is the one line in the parser that
+                // stopped it compiling for iOS.
+                character < ' ' -> {
+                    append("\\u")
+                    append(character.code.toString(HEX).padStart(ESCAPE_DIGITS, '0'))
+                }
                 else -> append(character)
             }
         }
@@ -283,3 +289,9 @@ object ToolCallParser {
     private val PARAMETER_TAG =
         Regex("""<parameter=([^>]+)>(.*?)</parameter>""", RegexOption.DOT_MATCHES_ALL)
 }
+
+/** Base for a `\uXXXX` escape. */
+private const val HEX = 16
+
+/** A JSON unicode escape is always four digits, zero padded. */
+private const val ESCAPE_DIGITS = 4

@@ -112,4 +112,11 @@
     <string name="save_proxy">حفظ الوكيل</string>
     <string name="watching">قيد المراقبة</string>
     <string name="stop">إيقاف</string>
+    <string name="watch_none">لا شيء قيد المراقبة. اطلب مراجعة شيء ما لاحقًا وسيظهر هنا.</string>
+    <string name="watch_running">عمليات تحقق تعمل من تلقاء نفسها. حتى %1$d في وقت واحد.</string>
+    <string name="watch_stopped">توقفت بعد %1$d عملية تحقق</string>
+    <string name="watch_failed">توقفت من تلقاء نفسها بعد %1$d عمليات تحقق فاشلة</string>
+    <string name="watch_every">كل %1$d دقيقة</string>
+    <string name="watch_with_notification">، مع إشعار أثناء التشغيل</string>
+    <string name="watch_so_far"> · %1$d حتى الآن</string>
 </resources>

@@ -17,7 +17,6 @@
 package io.github.alpharomercoma.openweights.core.generation
 
 import kotlinx.coroutines.flow.Flow
-import java.io.File
 
 /**
  * Making a picture or a voice, which is a different job from writing words.
@@ -55,7 +54,7 @@ interface ImageGenerator : AutoCloseable {
 
     suspend fun load(bundle: GenerationBundle)
 
-    fun generate(request: ImageRequest): Flow<GenerationEvent<File>>
+    fun generate(request: ImageRequest): Flow<GenerationEvent<Artifact>>
 
     fun cancel()
 
@@ -69,7 +68,7 @@ interface SpeechSynthesizer : AutoCloseable {
     suspend fun load(bundle: GenerationBundle)
 
     /** Emits PCM as it is produced, then one terminal result naming the finished file. */
-    fun synthesize(request: SpeechRequest): Flow<GenerationEvent<File>>
+    fun synthesize(request: SpeechRequest): Flow<GenerationEvent<Artifact>>
 
     fun cancel()
 
@@ -125,8 +124,25 @@ data class SpeechRequest(
     val voice: String? = null,
     val language: String? = null,
     /** A reference recording to clone, for runtimes whose capability says they can. */
-    val speakerReference: File? = null,
+    val speakerReference: Artifact? = null,
     val seed: Long? = null,
+)
+
+/**
+ * Something on disk, named by a path rather than by a `java.io.File`.
+ *
+ * `File` is a JVM type. It is also the obvious thing to put here, which is why this module's
+ * first version had it in four places and could not compile for iOS: an interface meant to
+ * outlive one runtime had a platform in its signature before any runtime existed behind it.
+ *
+ * A path and a media type is what every caller actually needed. The Android side turns it
+ * into a `File`, an iOS side would turn it into an `NSURL`, and neither has to be named here.
+ */
+data class Artifact(
+    /** An absolute path on the device's own filesystem. */
+    val path: String,
+    /** IANA type, so a caller knows what it is holding without reading it. */
+    val mediaType: String,
 )
 
 /** How a generation is going, and how it ended. */
@@ -140,7 +156,7 @@ sealed interface GenerationEvent<out T> {
      * fabricated preview, or a bar that moves on a timer, is the kind of thing that makes
      * every other number in an app suspect.
      */
-    data class Progress(val step: Int, val totalSteps: Int, val preview: File? = null) :
+    data class Progress(val step: Int, val totalSteps: Int, val preview: Artifact? = null) :
         GenerationEvent<Nothing>
 
     data class Completed<T>(val output: T, val stats: GenerationStats) : GenerationEvent<T>
@@ -178,7 +194,7 @@ data class GenerationBundle(
     val displayName: String,
     val task: GenerationTask,
     val runtime: GenerationRuntime,
-    val files: List<File>,
+    val files: List<Artifact>,
     val quantization: String,
     /** What the phone needs free to load this, so a doomed load can be refused early. */
     val minimumFreeBytes: Long,

@@ -120,4 +120,11 @@
     <string name="save_proxy">Save proxy</string>
     <string name="watching">Watching</string>
     <string name="stop">Stop</string>
+    <string name="watch_none">Nothing is being checked. Ask for something to be looked at again later and it will appear here.</string>
+    <string name="watch_running">Checks running on their own. Up to %1$d at a time.</string>
+    <string name="watch_stopped">Stopped after %1$d checks</string>
+    <string name="watch_failed">Stopped itself after %1$d failed checks</string>
+    <string name="watch_every">Every %1$d minutes</string>
+    <string name="watch_with_notification">, with a notification while it runs</string>
+    <string name="watch_so_far"> · %1$d so far</string>
 </resources>

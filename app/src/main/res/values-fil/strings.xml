@@ -107,4 +107,11 @@
     <string name="save_proxy">I-save ang proxy</string>
     <string name="watching">Nagbabantay</string>
     <string name="stop">Itigil</string>
+    <string name="watch_none">Walang binabantayan. Humiling na tingnan muli ang isang bagay mamaya at lilitaw ito rito.</string>
+    <string name="watch_running">Mga pagsusuring tumatakbo nang mag-isa. Hanggang %1$d nang sabay.</string>
+    <string name="watch_stopped">Huminto pagkatapos ng %1$d na pagsusuri</string>
+    <string name="watch_failed">Huminto ito mismo pagkatapos ng %1$d nabigong pagsusuri</string>
+    <string name="watch_every">Tuwing %1$d minuto</string>
+    <string name="watch_with_notification">, may abiso habang tumatakbo</string>
+    <string name="watch_so_far"> · %1$d na ang nagawa</string>
 </resources>

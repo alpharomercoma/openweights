@@ -94,4 +94,37 @@ class MarkdownPdfOnDeviceTest {
         assertThat(pages).isEqualTo(1)
         assertThat(String(bytes.copyOfRange(0, 5))).isEqualTo("%PDF-")
     }
+
+    @Test
+    fun anUnclosedFenceDoesNotSwallowTheRestOfTheDocument() {
+        // The bug this replaces: `inCode` was a toggle, so an odd number of fences left it
+        // on and every remaining line rendered as unwrapped monospace. A model that starts
+        // a code block and runs out of tokens produces exactly that, and the result is not
+        // an ugly paragraph, it is a corrupt document nobody notices until they open it.
+        val runOn = buildString {
+            appendLine("# Report")
+            appendLine("```kotlin")
+            appendLine("val x = 1")
+            appendLine()
+            repeat(120) {
+                appendLine("A paragraph of ordinary prose, number $it, which must wrap.")
+            }
+        }
+        val (pages, bytes) = render(runOn)
+
+        // Prose wraps and code does not, so a tail wrongly treated as code overflows the
+        // page width instead of flowing, and takes far fewer pages than it should.
+        val prose = render(runOn.replace("```kotlin", "")).first
+
+        assertThat(pages).isEqualTo(prose)
+        assertThat(String(bytes.copyOfRange(0, 5))).isEqualTo("%PDF-")
+    }
+
+    @Test
+    fun aClosedFenceStillRendersItsBodyAsCode() {
+        // The counterweight: the odd-fence rule must not break the ordinary case.
+        val (pages, _) = render("Before.\n\n```kotlin\nval x = 1\n```\n\nAfter.")
+
+        assertThat(pages).isEqualTo(1)
+    }
 }

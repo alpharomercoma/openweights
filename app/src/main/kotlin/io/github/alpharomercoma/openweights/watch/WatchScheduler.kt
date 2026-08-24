@@ -133,22 +133,39 @@ class WatchScheduler @Inject constructor(
             if (tickers[watch.id]?.isActive == true) return
             GenerationService.hold(appContext, holderFor(watch.id), "Watching")
             tickers[watch.id] = scope.launch {
-                val period = watch.everyMinutes * MILLIS_PER_MINUTE
-                while (isActive) {
-                    delay(period)
-                    val current = watches.byId(watch.id)
-                    if (current == null || current.state != WatchState.ACTIVE) break
-                    runCatching { runner.get().tick(watch.id) }
+                // The hold is released in this coroutine's own finally rather than by
+                // whoever stops it. Every way this can end goes through here: the loop
+                // breaking because the watch was stopped, a cancel from [cancel], and a
+                // throw. The previous arrangement released it from `stopTicker`, which the
+                // coroutine also called on its own last line, so an ordinary end released
+                // twice and a cancellation released once, from a different thread, after
+                // the map entry had already gone. A foreground notification left up because
+                // one path missed the release is the visible half of that.
+                try {
+                    val period = watch.everyMinutes * MILLIS_PER_MINUTE
+                    while (isActive) {
+                        delay(period)
+                        val current = watches.byId(watch.id)
+                        if (current == null || current.state != WatchState.ACTIVE) break
+                        runCatching { runner.get().tick(watch.id) }
+                    }
+                } finally {
+                    synchronized(tickers) { tickers.remove(watch.id) }
+                    GenerationService.release(appContext, holderFor(watch.id))
                 }
-                stopTicker(watch.id)
             }
         }
     }
 
+    /**
+     * Stops the ticker for one watch, if it has one.
+     *
+     * Only cancels. The hold and the map entry are the coroutine's own to release, in its
+     * finally, because cancellation is asynchronous: doing it here would race the coroutine
+     * that is still winding down.
+     */
     private fun stopTicker(watchId: Long) {
-        val stopped = synchronized(tickers) { tickers.remove(watchId) }
-        stopped?.cancel()
-        GenerationService.release(appContext, holderFor(watchId))
+        synchronized(tickers) { tickers[watchId] }?.cancel()
     }
 
     private companion object {

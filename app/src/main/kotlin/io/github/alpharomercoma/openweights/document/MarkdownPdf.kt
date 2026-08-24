@@ -75,6 +75,21 @@ class MarkdownPdf(
      */
     fun write(markdown: String, title: String, out: OutputStream): Int {
         val document = PdfDocument()
+        // PdfDocument holds native memory, and a throw between here and the close below
+        // leaks it for the life of the process. `use` is not available: it is not Closeable.
+        return try {
+            layout(document, markdown, title, out)
+        } finally {
+            document.close()
+        }
+    }
+
+    private fun layout(
+        document: PdfDocument,
+        markdown: String,
+        title: String,
+        out: OutputStream,
+    ): Int {
         val sheet = Sheet(this, document)
         val body = Paint().apply {
             textSize = BODY_SIZE
@@ -96,11 +111,22 @@ class MarkdownPdf(
             sheet.y += TITLE_SIZE
         }
 
+        // Counted first rather than toggled as it goes, because an odd number of fences
+        // means the last one never closes, and a toggle left on turns every remaining line
+        // of the document into unwrapped monospace. A model that writes a code block and
+        // runs out of tokens produces exactly that, and the result is not a wrong-looking
+        // paragraph, it is a corrupt document that the person saving it will not notice
+        // until they open it. With an odd count the final fence is treated as closing.
+        val fences = markdown.lines().count { it.trimStart().startsWith(FENCE) }
+        val unclosed = fences % 2 == 1
+        var seen = 0
         var inCode = false
+
         markdown.lines().forEach { raw ->
             val line = raw.trimEnd()
             if (line.trimStart().startsWith(FENCE)) {
-                inCode = !inCode
+                seen++
+                inCode = if (unclosed && seen == fences) false else !inCode
                 sheet.y += BODY_SIZE / 2
                 return@forEach
             }
@@ -115,7 +141,6 @@ class MarkdownPdf(
         document.finishPage(sheet.page)
         val pages = document.pages.size
         document.writeTo(out)
-        document.close()
         return pages
     }
 

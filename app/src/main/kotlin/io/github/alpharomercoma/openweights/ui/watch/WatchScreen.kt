@@ -109,10 +109,9 @@ fun WatchScreen(
             item {
                 Text(
                     text = if (watches.isEmpty()) {
-                        "Nothing is being checked. Ask for something to be looked at again " +
-                            "later and it will appear here."
+                        stringResource(R.string.watch_none)
                     } else {
-                        "Checks running on their own. Up to ${Watch.MAX_ACTIVE} at a time."
+                        stringResource(R.string.watch_running, Watch.MAX_ACTIVE)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -167,12 +166,13 @@ private fun WatchRow(watch: Watch, onStop: () -> Unit, onForget: () -> Unit) {
  * is paying and the only place it is explained. See `WatchScheduler`: Android will not
  * repeat work faster than fifteen minutes without one.
  */
+@Composable
 private fun Watch.cadence(): String = when (state) {
-    WatchState.STOPPED -> "Stopped after $runs checks"
-    WatchState.FAILED -> "Stopped itself after $consecutiveFailures failed checks"
+    WatchState.STOPPED -> stringResource(R.string.watch_stopped, runs)
+    WatchState.FAILED -> stringResource(R.string.watch_failed, consecutiveFailures)
     WatchState.ACTIVE -> buildString {
-        append("Every $everyMinutes minutes")
-        if (needsForegroundService) append(", with a notification while it runs")
-        if (runs > 0) append(" · $runs so far")
+        append(stringResource(R.string.watch_every, everyMinutes))
+        if (needsForegroundService) append(stringResource(R.string.watch_with_notification))
+        if (runs > 0) append(stringResource(R.string.watch_so_far, runs))
     }
 }

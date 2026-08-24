@@ -106,4 +106,11 @@
     <string name="save_proxy">プロキシを保存</string>
     <string name="watching">監視中</string>
     <string name="stop">停止</string>
+    <string name="watch_none">監視中のものはありません。あとで確認するよう頼めば、ここに表示されます。</string>
+    <string name="watch_running">自動で動いている確認です。同時に%1$d件まで。</string>
+    <string name="watch_stopped">%1$d回の確認のあとに停止しました</string>
+    <string name="watch_failed">%1$d回続けて失敗したため、自動的に停止しました</string>
+    <string name="watch_every">%1$d分ごと</string>
+    <string name="watch_with_notification">、実行中は通知を表示します</string>
+    <string name="watch_so_far"> · これまで%1$d回</string>
 </resources>

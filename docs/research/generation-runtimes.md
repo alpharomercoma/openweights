@@ -79,3 +79,44 @@ this bundle", with no performance claim until that data exists.
 Runtime licences are all permissive and compatible with an Apache-2.0 app. The **model**
 files are not covered by that: Stable Diffusion and Sana checkpoints, Supertonic weights and
 voices, and any Qualcomm QNN libraries each need their own review before distribution.
+
+## MNN, built and measured (2026-08-24)
+
+The research above said MNN was the only real candidate and that nobody publishes a size or
+a build cost for it. Both are now measured on this project's own toolchain: NDK r29,
+`arm64-v8a`, `android-29`, Release, on an M5 with `-j10`.
+
+**It builds.** MNN 3.6.1 configures and compiles for Android arm64 with diffusion and OpenCL
+in **105 seconds**.
+
+Two configuration facts worth keeping, because both cost a cycle to find:
+
+- `MNN_BUILD_DIFFUSION=ON` forces `MNN_IMGCODECS` on, which pulls in `MNNOpenCV`. Turning
+  OpenCV off does not help: the flag is forced, not defaulted.
+- With `MNN_SEP_BUILD=OFF`, `MNNOpenCV` becomes an OBJECT library and its `POST_BUILD` step
+  is illegal, so CMake refuses. `MNN_SEP_BUILD=ON` is required, which means four shared
+  objects rather than one.
+
+**What it costs an APK**, stripped, arm64 only:
+
+| library | stripped |
+| --- | --- |
+| `libMNN.so` | 2,707 KB |
+| `libMNN_CL.so` (OpenCL backend) | 2,190 KB |
+| `libMNN_Express.so` | 698 KB |
+| `libMNNOpenCV.so` | 253 KB |
+| **total** | **5,849 KB, about 5.8 MB** |
+
+That is the figure the earlier research could not find anywhere, and it is small: under six
+megabytes for a second inference runtime, against a vendored llama.cpp that is already far
+larger. Binary size is not the reason to hesitate.
+
+**What is still not done, and is the actual cost.** A working image generator needs the MNN
+source vendored (358 MB of checkout), a JNI bridge of this project's own, SD1.5 or Sana
+weights converted to MNN format and delivered on demand, and the measurement runs that turn
+"it generates" into a latency and a peak RSS. The build being cheap does not make the
+feature cheap; it removes the first of four reasons it might have been impossible.
+
+The published Maven artifact is not an option and should not be revisited: `com.alibaba.android:mnn`
+was last updated **2021-02-24** at version 0.0.8, against an upstream now on 3.6.1. It is
+abandoned, and nothing about diffusion or TTS exists in it.

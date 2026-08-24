@@ -60,6 +60,19 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
         set(value) = store.edit { putBoolean(DOCUMENTATION, value) }
 
     /**
+     * The client search uses, which is the caller's with the proxy applied when there is one.
+     *
+     * Derived rather than replaced, so the connection pool, the timeouts and the interceptors
+     * the app configured once are all still there. A proxy address that does not parse is
+     * ignored rather than fatal: a typed setting should degrade to searching directly, not
+     * to a search tool that throws.
+     */
+    fun client(httpClient: OkHttpClient): OkHttpClient {
+        val hop = proxy.asProxy() ?: return httpClient
+        return httpClient.newBuilder().proxy(hop).build()
+    }
+
+    /**
      * The providers to try, in order.
      *
      * One, for now. A provider that is rate limited says so rather than returning nothing,
@@ -79,19 +92,6 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
      * live in the encrypted store this module cannot see, and an unwired settings field is
      * worse than a missing one.
      */
-    /**
-     * The client search uses, which is the caller's with the proxy applied when there is one.
-     *
-     * Derived rather than replaced, so the connection pool, the timeouts and the interceptors
-     * the app configured once are all still there. A proxy address that does not parse is
-     * ignored rather than fatal: a typed setting should degrade to searching directly, not
-     * to a search tool that throws.
-     */
-    fun client(httpClient: OkHttpClient): OkHttpClient {
-        val hop = proxy.asProxy() ?: return httpClient
-        return httpClient.newBuilder().proxy(hop).build()
-    }
-
     fun providers(httpClient: OkHttpClient): List<SearchProvider> = buildList {
         // First when it is on, because it is the precise one: a question it can answer it
         // answers better than the web, and one it cannot it now declines rather than

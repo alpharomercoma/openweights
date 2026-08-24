@@ -1,4 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every word the interface says, in one place.
+
+  Extracted rather than left in the composables so the app can be read in a language other
+  than English. What is deliberately *not* here: Compose animation labels, which take the
+  same `label` argument as a button and are debug names for a transition rather than words
+  anybody reads. "pulse" and "composer border" are not English and must not become Filipino.
+-->
 <resources>
-    <string name="app_name">OpenWeights</string>
+    <string name="app_name" translatable="false">OpenWeights</string>
+    <string name="paste">Paste</string>
+    <string name="what_copied_without_leaving_conversation">What you copied, without leaving the conversation</string>
+    <string name="take_photo">Take a photo</string>
+    <string name="opens_camera_app_nothing_uploaded">Opens the camera app. Nothing is uploaded.</string>
+    <string name="photos">Photos</string>
+    <string name="audio">Audio</string>
+    <string name="recordings_model_listen">Recordings for the model to listen to</string>
+    <string name="document">Document</string>
+    <string name="text_markdown_json_xml_model">Text, markdown, JSON or XML the model can read</string>
+    <string name="files">Files</string>
+    <string name="anything_else_model_accepts">Anything else this model accepts</string>
+    <string name="past_chats">Past chats</string>
+    <string name="new_chat">New chat</string>
+    <string name="model_settings">Model settings</string>
+    <string name="jump_latest_message">Jump to the latest message</string>
+    <string name="where_shall_we_start">Where shall we start?</string>
+    <string name="whatever_ask_answered_phone">Whatever you ask is answered on this phone.</string>
+    <string name="pick_model_begin">Pick a model to begin</string>
+    <string name="browse_models">Browse models</string>
+    <string name="what_kv_cache">What is a KV cache?</string>
+    <string name="attach_file">Attach a file</string>
+    <string name="nothing_here_yet_whatever_ask">Nothing here yet. Whatever you ask is saved on this device only.</string>
+    <string name="search_chats">Search chats</string>
+    <string name="clear_search">Clear the search</string>
+    <string name="chat_mentions">No chat mentions that.</string>
+    <string name="close">Close</string>
+    <string name="sent_message_open_app_came">Sent with this message. Open it in the app it came from to play it.</string>
+    <string name="copy_text">Copy text</string>
+    <string name="regenerate_reply">Regenerate reply</string>
+    <string name="edit_resend">Edit and resend</string>
+    <string name="branch_from_here">Branch from here</string>
+    <string name="save_as_pdf">Save as PDF</string>
+    <string name="report_reply">Report this reply</string>
+    <string name="models_phone_yet">No models on this phone yet.</string>
+    <string name="find_one_hugging_face">Find one on Hugging Face</string>
+    <string name="manage_models">Manage models</string>
+    <string name="downloads_what_remove">Downloads, and what to remove</string>
+    <string name="use">In use</string>
+    <string name="answer_length">Answer length</string>
+    <string name="how_much_model_writes_when">How much the model writes when the question does not say.</string>
+    <string name="temperature">Temperature</string>
+    <string name="lower_steadier_higher_more_varied">Lower is steadier, higher is more varied.</string>
+    <string name="context_length">Context length</string>
+    <string name="summarise_at">Summarise at</string>
+    <string name="system_prompt">System prompt</string>
+    <string name="optional">Optional</string>
+    <string name="top_p" translatable="false">Top-p</string>
+    <string name="keeps_likeliest_words_up_share">Keeps the likeliest words, up to this share of the odds.</string>
+    <string name="top_k" translatable="false">Top-k</string>
+    <string name="never_weighs_up_more_candidates">Never weighs up more candidates than this.</string>
+    <string name="repeat_penalty">Repeat penalty</string>
+    <string name="processor">Processor</string>
+    <string name="tool_instructions">Tool instructions</string>
+    <string name="nothing_about_tools">Nothing about tools</string>
+    <string name="restore_default_wording">Restore the default wording</string>
+    <string name="save">Save</string>
+    <string name="reset_defaults">Reset to defaults</string>
+    <string name="thinking">Thinking</string>
+    <string name="advanced">Advanced</string>
+    <string name="say_own_words">Or say it in your own words</string>
+    <string name="answer">Answer</string>
+    <string name="which_folder_did_mean">Which folder did you mean?</string>
+    <string name="what_was_wrong">What was wrong with it?</string>
+    <string name="anything_add">Anything to add</string>
+    <string name="saved_device">Saved on this device</string>
+    <string name="cancel">Cancel</string>
+    <string name="report">Report</string>
+    <string name="now">Not now</string>
+    <string name="run">Run</string>
+    <string name="result">Result</string>
+    <string name="search_result_picture">Search result picture</string>
+    <string name="usage">Usage</string>
+    <string name="back">Back</string>
+    <string name="speed">Speed</string>
+    <string name="week">This week</string>
+    <string name="by_model">By model</string>
+    <string name="recommended">Recommended</string>
+    <string name="official">Official</string>
+    <string name="filters">Filters</string>
+    <string name="clear_all">Clear all</string>
+    <string name="task">Task</string>
+    <string name="any">Any</string>
+    <string name="size">Size</string>
+    <string name="publisher">Publisher</string>
+    <string name="unsloth_liquidai_bartowski" translatable="false">unsloth, LiquidAI, bartowski</string>
+    <string name="access">Access</string>
+    <string name="open_only">Open only</string>
+    <string name="search_hugging_face">Search Hugging Face</string>
+    <string name="clear_filters">Clear filters</string>
+    <string name="lfm2_5" translatable="false">lfm2.5</string>
+    <string name="download">Download</string>
+    <string name="vision">Vision</string>
+    <string name="gated">Gated</string>
+    <string name="models">Models</string>
+    <string name="delete">Delete</string>
+    <string name="settings">Settings</string>
+    <string name="openweights" translatable="false">OpenWeights</string>
+    <string name="view_source">View the source</string>
+    <string name="appearance">Appearance</string>
+    <string name="hugging_face_access_token">Hugging Face access token</string>
+    <string name="remove">Remove</string>
+    <string name="compute">Compute</string>
+    <string name="device">This device</string>
+    <string name="tools">Tools</string>
+    <string name="what_model_may_do_while">What the model may do while it answers.</string>
+    <string name="skill_files_remote_servers_supported">Skill files and remote servers are not supported yet.</string>
+    <string name="search_engines">Search engines</string>
+    <string name="proxy">Proxy</string>
+    <string name="save_proxy">Save proxy</string>
+    <string name="watching">Watching</string>
+    <string name="stop">Stop</string>
 </resources>

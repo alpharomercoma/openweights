@@ -129,6 +129,13 @@ abstract class ChatFixture {
 
     @After
     fun tearDown() {
+        // Drained before Main is released, and that ordering is the point. A view model
+        // scope can still hold queued work when a test ends, and once the main dispatcher is
+        // reset that work has nowhere to run: it surfaces later as
+        // "uncaught exceptions before the test started" in whichever class happens to run
+        // next, which is a failure with no relationship to the test reporting it. Two of
+        // those were chased in this repository before this line existed.
+        runCatching { dispatcher.scheduler.advanceUntilIdle() }
         database.close()
         models.deleteRecursively()
         Dispatchers.resetMain()

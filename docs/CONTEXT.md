@@ -2963,6 +2963,67 @@ and teaching the turn loop to carry media in a `TOOL` message, which the engine'
 media handling could probably support. Measured need first: nothing here says how often
 somebody asks about a picture already on their phone rather than attaching it.
 
+## Four rungs cost nothing, measured on the phone (2026-08-24)
+
+The sandbox now compiles a program up to four times before giving up, which is the sort of
+change that deserves a number rather than an argument. Measured on the Snapdragon 8 Gen 2
+board, nine runs each after three warmups, median:
+
+| what the program needs | extra compiles | median |
+| --- | --- | --- |
+| nothing, correct as written | 0 | **97 ms** |
+| a top-level `return` | 1 | 90 ms |
+| a top-level `await` | 2 | 102 ms |
+| both | 3 | 107 ms |
+
+Three extra compiles cost about ten milliseconds against a spread of 78 to 132 across
+individual runs, so the worst case is inside the noise of the best. The reason is that
+almost none of this time is compilation: a sandbox call crosses into an isolated process,
+and that hop is the cost. Compiling a short program again is free by comparison.
+
+The test that measures this found something else worth writing down. Handed a fenced code
+block directly, `core:sandbox` fails, and correctly: fences are stripped by
+`RunScriptTool.asProgram` before the sandbox is called, because they are a fact about what
+chat models emit rather than about JavaScript. The module holds no policy about model
+behaviour and should not start.
+
+## Every word the interface says, in one place (2026-08-24)
+
+The app had **one** string in `strings.xml`, `app_name`, and everything else written into
+composables. 122 call sites and 111 distinct strings moved out.
+
+Three rules, each learned from a wrong result of an earlier pass:
+
+1. **Only a whole literal moves.** The first pass matched a literal wherever one appeared,
+   so it split `"a " + "b"` across two lines and cut `"cannot load $arch models"` at the
+   dollar sign, changing the text. Now the match must be followed by a comma or a bracket
+   on the same line, and anything concatenated or interpolated is left for a person.
+2. **A `label` only moves when it starts with a capital.** Compose's animation APIs take a
+   `label` too, and "pulse", "composer border" and "send content" are debug names for a
+   transition rather than words anybody reads. The first pass put all three in
+   `strings.xml`, where a translator would have rendered them into Filipino. Sentence case
+   is what separates a button from a transition.
+3. **Identical text is one resource.** The first pass produced `back`, `back_2` through
+   `back_5`: five strings for one word, and five chances for a translation to disagree with
+   itself.
+
+Names are marked `translatable="false"` rather than translated. `unsloth`, `lfm2.5` and
+`OpenWeights` are identifiers, and a rendered identifier no longer matches the thing it
+filters.
+
+Four languages ship: Filipino, Spanish, Japanese and Arabic. Arabic is there for its
+speakers and also because it is the only right to left locale in the build, which is what
+proves the layout mirrors rather than merely declaring `supportsRtl`. `locales_config.xml`
+is what makes Android offer the per-app language picker at all; without it a translation
+exists and nobody can choose it.
+
+`TranslationsTest` reads the resource files rather than going through the framework, because
+the framework's answer to a missing string is to fall back to English. That is right at
+runtime and exactly wrong in a test: an app silently showing half its interface in English
+is the failure being guarded against. It also checks that no language is a copy of English,
+that no placeholder was dropped in translation, and that every shipped language appears in
+the picker.
+
 ## Watching: periodic checks, and the fifteen minute wall (2026-08-24)
 
 Asked for as "if the user says check something every 5 minutes, have a monitor fire every 5

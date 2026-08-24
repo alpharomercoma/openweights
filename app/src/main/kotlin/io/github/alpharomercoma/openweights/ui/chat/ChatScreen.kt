@@ -89,11 +89,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -138,6 +140,7 @@ fun ChatScreen(
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
     onGoal: (String) -> Unit = {},
+    onResearch: (String) -> Unit = {},
     /** Resend an earlier question, changed, dropping everything that followed it. */
     onEditAndResend: (Long, String) -> Unit = { _, _ -> },
     /** Carry this conversation up to a turn into a new one. */
@@ -260,6 +263,7 @@ fun ChatScreen(
             onNewChat = onNewChat,
             onCompact = onCompact,
             onGoal = onGoal,
+            onResearch = onResearch,
             destinations = destinations,
             installedModels = installedModels,
             publisherAvatars = publisherAvatars,
@@ -307,6 +311,7 @@ private fun ChatContent(
     onNewChat: () -> Unit,
     onCompact: () -> Unit,
     onGoal: (String) -> Unit,
+    onResearch: (String) -> Unit,
     destinations: ChatDestinations,
     installedModels: List<LocalModel>,
     publisherAvatars: Map<String, String>,
@@ -368,7 +373,10 @@ private fun ChatContent(
                 title = { RuntimeBar(state = state, onClick = { showModelPicker = true }) },
                 navigationIcon = {
                     IconButton(onClick = onOpenHistory) {
-                        Icon(Icons.Rounded.Menu, contentDescription = "Past chats")
+                        Icon(
+                            Icons.Rounded.Menu,
+                            contentDescription = stringResource(R.string.past_chats),
+                        )
                     }
                 },
                 actions = {
@@ -379,10 +387,16 @@ private fun ChatContent(
                         // then adjust it. It only starts one when there is something to say
                         // to, which is the same condition the sampler is under.
                         IconButton(onClick = onNewChat) {
-                            Icon(Icons.Rounded.Add, contentDescription = "New chat")
+                            Icon(
+                                Icons.Rounded.Add,
+                                contentDescription = stringResource(R.string.new_chat),
+                            )
                         }
                         IconButton(onClick = { showParameters = true }) {
-                            Icon(Icons.Rounded.Tune, contentDescription = "Model settings")
+                            Icon(
+                                Icons.Rounded.Tune,
+                                contentDescription = stringResource(R.string.model_settings),
+                            )
                         }
                     }
                 },
@@ -466,10 +480,18 @@ private fun ChatContent(
                     ToolApproval(call = call, onAnswer = onApproval)
                 }
 
-                // The argument travels with the command, because "/goal" is the one that
-                // has one and the palette hands over a command with no message attached.
+                // The argument travels with the command, because two of them have one and
+                // the palette hands over a command with no message attached.
                 val dispatch: (SlashCommand, String) -> Unit = { command, argument ->
-                    command.run(onNewChat, onCompact, onRegenerate, onMode, onGoal, argument)
+                    command.run(
+                        onNewChat = onNewChat,
+                        onCompact = onCompact,
+                        onRegenerate = onRegenerate,
+                        onMode = onMode,
+                        onGoal = onGoal,
+                        onResearch = onResearch,
+                        argument = argument,
+                    )
                 }
 
                 // Not before there is a model on the phone at all.
@@ -857,7 +879,7 @@ private fun JumpToLatestButton(visible: Boolean, onClick: () -> Unit, modifier: 
         ) {
             Icon(
                 imageVector = Icons.Rounded.ArrowDownward,
-                contentDescription = "Jump to the latest message",
+                contentDescription = stringResource(R.string.jump_latest_message),
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -1173,13 +1195,13 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean, onBrowseModel
             hasModel -> {
                 Mark(size = 44.dp)
                 Text(
-                    text = "Where shall we start?",
+                    text = stringResource(R.string.where_shall_we_start),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = "Whatever you ask is answered on this phone.",
+                    text = stringResource(R.string.whatever_ask_answered_phone),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -1197,7 +1219,7 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean, onBrowseModel
             else -> {
                 Mark(size = 44.dp)
                 Text(
-                    text = "Pick a model to begin",
+                    text = stringResource(R.string.pick_model_begin),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
@@ -1218,7 +1240,10 @@ private fun EmptyState(isLoadingModel: Boolean, hasModel: Boolean, onBrowseModel
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
-                    Text("Browse models", modifier = Modifier.padding(start = 8.dp))
+                    Text(
+                        stringResource(R.string.browse_models),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 }
 
                 // Said here, once, and never as a wall.
@@ -1270,7 +1295,11 @@ private fun ChatScreenPreview() {
                 contextUsed = 1204,
                 contextSize = 4096,
                 transcript = listOf(
-                    TranscriptEntry(id = 1, role = ChatRole.USER, text = "What is a KV cache?"),
+                    TranscriptEntry(
+                        id = 1,
+                        role = ChatRole.USER,
+                        text = stringResource(R.string.what_kv_cache),
+                    ),
                     TranscriptEntry(
                         id = 2,
                         role = ChatRole.ASSISTANT,

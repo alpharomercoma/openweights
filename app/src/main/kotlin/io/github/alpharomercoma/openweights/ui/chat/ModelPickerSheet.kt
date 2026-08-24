@@ -44,9 +44,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
@@ -91,7 +93,7 @@ fun ModelPickerSheet(
         ) {
             if (models.isEmpty()) {
                 Text(
-                    text = "No models on this phone yet.",
+                    text = stringResource(R.string.models_phone_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -139,14 +141,14 @@ fun ModelPickerSheet(
             )
 
             SheetAction(
-                label = "Browse models",
-                detail = "Find one on Hugging Face",
+                label = stringResource(R.string.browse_models),
+                detail = stringResource(R.string.find_one_hugging_face),
                 icon = Icons.Rounded.Search,
                 onClick = onBrowse,
             )
             SheetAction(
-                label = "Manage models",
-                detail = "Downloads, and what to remove",
+                label = stringResource(R.string.manage_models),
+                detail = stringResource(R.string.downloads_what_remove),
                 icon = Icons.Rounded.Tune,
                 onClick = onManage,
             )
@@ -170,7 +172,7 @@ private fun ModelRow(model: LocalModel, isActive: Boolean, onSelect: () -> Unit)
         if (isActive) {
             Icon(
                 imageVector = Icons.Rounded.Check,
-                contentDescription = "In use",
+                contentDescription = stringResource(R.string.use),
                 tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(TICK),
             )

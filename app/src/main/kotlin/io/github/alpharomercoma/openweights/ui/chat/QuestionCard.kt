@@ -39,10 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -107,7 +109,7 @@ fun QuestionCard(
         OutlinedTextField(
             value = typed,
             onValueChange = { typed = it },
-            label = { Text("Or say it in your own words") },
+            label = { Text(stringResource(R.string.say_own_words)) },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,7 +125,7 @@ fun QuestionCard(
                 onClick = { onAnswer(answerFrom(chosen, typed, question.options)) },
                 enabled = chosen.isNotEmpty() || typed.isNotBlank(),
             ) {
-                Text("Answer")
+                Text(stringResource(R.string.answer))
             }
         }
     }
@@ -148,7 +150,7 @@ private fun QuestionCardPreview() {
     OpenWeightsTheme(dynamicColor = false) {
         QuestionCard(
             question = UserQuestion(
-                text = "Which folder did you mean?",
+                text = stringResource(R.string.which_folder_did_mean),
                 options = listOf("Notes", "Documents", "Downloads"),
             ),
             onAnswer = {},

@@ -52,9 +52,11 @@ fun SlashCommand.run(
     onRegenerate: () -> Unit,
     onMode: (AgentMode) -> Unit,
     onGoal: (String) -> Unit = {},
+    onResearch: (String) -> Unit = {},
     argument: String = "",
 ) = when (this) {
     SlashCommand.GOAL -> onGoal(argument)
+    SlashCommand.DEEP_RESEARCH -> onResearch(argument)
     SlashCommand.NEW_CHAT -> onNewChat()
     SlashCommand.COMPACT -> onCompact()
     SlashCommand.REGENERATE -> onRegenerate()
@@ -87,15 +89,24 @@ enum class SlashCommand(val trigger: String, val description: String) {
     YOLO("/yolo", "Run everything, including sending files and pages out. No prompts"),
 
     /**
-     * The one command that takes an argument, which is why it is last and why [typed] alone
-     * cannot find it: everything else here is a whole message, and this one is a prefix
-     * followed by the task.
+     * The two commands that take an argument, which is why they are last and why [typed]
+     * alone cannot find them: everything else here is a whole message, and these are a
+     * prefix followed by the task.
      */
     GOAL("/goal", "Work through a task on its own, and stop when it is done"),
+
+    /**
+     * A goal whose answer is a document rather than a last step.
+     *
+     * Separate from `/goal` because the difference is not the loop, it is what the model is
+     * asked for: questions instead of actions, a search on every step, and a closing turn
+     * that writes the findings up with the addresses it used. See `Brief` in the view model.
+     */
+    DEEP_RESEARCH("/deep-research", "Research a question and write up what it finds"),
     ;
 
     /** True for a command whose message continues past the trigger. */
-    val takesArgument: Boolean get() = this == GOAL
+    val takesArgument: Boolean get() = this == GOAL || this == DEEP_RESEARCH
 
     companion object {
         /**

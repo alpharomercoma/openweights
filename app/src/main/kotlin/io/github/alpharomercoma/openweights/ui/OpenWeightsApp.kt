@@ -176,6 +176,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onNewChat = chatViewModel::newChat,
                 onCompact = chatViewModel::compactNow,
                 onGoal = chatViewModel::startGoal,
+                onResearch = chatViewModel::startResearch,
                 onEditAndResend = chatViewModel::editAndResend,
                 onBranchFrom = chatViewModel::branchFrom,
                 destinations = ChatDestinations(

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages this app ships, so Android can offer a per-app language picker.
+
+  Without this file the system's "App language" setting does not appear at all, and a user
+  whose phone is in one language and who wants this app in another has no way to say so. It
+  is also what stops the picker offering languages nothing has been translated into.
+
+  `en` first as the default. `ar` is here for a reason beyond its speakers: it is the app's
+  only right to left locale, so it is what proves the layout actually mirrors rather than
+  merely claiming supportsRtl.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="fil" />
+    <locale android:name="es" />
+    <locale android:name="ja" />
+    <locale android:name="ar" />
+</locale-config>

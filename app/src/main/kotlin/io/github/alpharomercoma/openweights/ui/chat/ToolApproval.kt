@@ -30,8 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -71,11 +73,11 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Declining is not an error: the model is told, and answers without the tool.
-            TextButton(onClick = { onAnswer(false) }) { Text("Not now") }
+            TextButton(onClick = { onAnswer(false) }) { Text(stringResource(R.string.now)) }
             AccentButton(
                 onClick = { onAnswer(true) },
             ) {
-                Text("Run")
+                Text(stringResource(R.string.run))
             }
         }
     }

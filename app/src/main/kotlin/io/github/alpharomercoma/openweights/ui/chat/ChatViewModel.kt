@@ -28,6 +28,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.context.Goal
+import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
@@ -1221,7 +1222,25 @@ class ChatViewModel @Inject constructor(
      * runs nothing and asks when the request is ambiguous. Everything after it is the mode
      * the user was already in.
      */
-    fun startGoal(task: String) {
+    fun startGoal(task: String) = start(task, Brief.GOAL)
+
+    /**
+     * Researching a question, which is a goal with three differences.
+     *
+     * It plans questions rather than actions, every step is expected to search rather than
+     * allowed to, and it ends with a turn that writes the findings up. That last one is the
+     * whole point: a goal reports on each step and stops, and a pile of step reports is not
+     * a piece of research.
+     *
+     * Reusing the goal loop rather than writing a second one is deliberate. Everything that
+     * makes unattended work safe on a phone already lives there: the foreground service
+     * across step boundaries, the engine lock, the thermal and battery checks between steps,
+     * the consecutive-failure limit and the stop button. A parallel implementation would
+     * have to grow every one of those again and would grow them a little differently.
+     */
+    fun startResearch(question: String) = start(question, Brief.RESEARCH)
+
+    private fun start(task: String, brief: Brief) {
         if (task.isBlank() || goals.isRunning) return
         if (!_uiState.value.canSend) {
             _uiState.value.refusalReason()?.let { why -> reportError(why) }
@@ -1230,8 +1249,8 @@ class ChatViewModel @Inject constructor(
         goals.start(task)
         // Held across the whole goal, including the gaps between steps where the turn's own
         // hold is not in force. Released in work()'s finally, whatever ends it.
-        GenerationService.hold(appContext, GenerationService.GOAL, "Working on a goal")
-        goalJob = viewModelScope.launch { work(task) }
+        GenerationService.hold(appContext, GenerationService.GOAL, brief.notification)
+        goalJob = viewModelScope.launch { work(task, brief) }
     }
 
     /** Always allowed, and the only control a goal needs to offer. */
@@ -1250,12 +1269,12 @@ class ChatViewModel @Inject constructor(
      */
     fun steerGoal(message: String) = goals.steer(message)
 
-    private suspend fun work(task: String) {
+    private suspend fun work(task: String, brief: Brief) {
         val wasMode = _uiState.value.mode
         var failures = 0
         try {
             setMode(AgentMode.PLAN)
-            if (!turn("$GOAL_PLAN_PREFIX\n\n$task")) return
+            if (!turn("${brief.plan}\n\n$task")) return
             val proposed = turns.planning.plan.value
             if (proposed == null || proposed.steps.isEmpty()) {
                 goals.halt("No plan came back, so there is nothing to work through.")
@@ -1264,17 +1283,34 @@ class ChatViewModel @Inject constructor(
             goals.planned(proposed)
 
             setMode(wasMode)
-            while (true) {
-                when (step(proposed, failures)) {
+            var running = true
+            while (running) {
+                when (step(proposed, failures, brief)) {
                     StepOutcome.DONE -> failures = 0
                     StepOutcome.RETRY -> failures++
-                    StepOutcome.STOP -> return
+                    StepOutcome.STOP -> running = false
                 }
             }
+            writeUp(brief)
         } finally {
             setMode(wasMode)
             GenerationService.release(appContext, GenerationService.GOAL)
         }
+    }
+
+    /**
+     * One last turn, for work whose answer is not the last step but everything the steps
+     * found.
+     *
+     * Only when the plan actually finished. A run that was stopped by the user, halted for
+     * heat, or gave up after three failures has nothing to write up, and writing it up
+     * anyway would produce a confident report from half the research, which is the worst
+     * possible output of a research tool.
+     */
+    private suspend fun writeUp(brief: Brief) {
+        val finish = brief.finish ?: return
+        if (goals.goal.value?.state != GoalState.DONE) return
+        turn(finish)
     }
 
     /**
@@ -1283,7 +1319,7 @@ class ChatViewModel @Inject constructor(
      * Split out of the loop rather than left inline because a loop body with four ways to
      * stop in it stops being readable as a loop. The three outcomes are the whole contract.
      */
-    private suspend fun step(proposed: TaskPlan, failures: Int): StepOutcome {
+    private suspend fun step(proposed: TaskPlan, failures: Int, brief: Brief): StepOutcome {
         val goal = goals.goal.value ?: return StepOutcome.STOP
         if (!goal.isRunning) return StepOutcome.STOP
         val step = goal.currentStep ?: return StepOutcome.STOP
@@ -1295,7 +1331,7 @@ class ChatViewModel @Inject constructor(
         val steering = goals.takeSteering()
         val doneBefore = turns.planning.plan.value?.steps?.count { it.done } ?: 0
         _uiState.update { it.copy(error = null) }
-        if (!turn(stepPrompt(step.text, steering))) return StepOutcome.STOP
+        if (!turn(stepPrompt(brief, step.text, steering))) return StepOutcome.STOP
 
         val failure = _uiState.value.error
         if (failure != null) {
@@ -1371,15 +1407,16 @@ class ChatViewModel @Inject constructor(
         return null
     }
 
-    private fun stepPrompt(step: String, steering: List<String>): String = buildString {
-        append(GOAL_STEP_PREFIX)
-        append("\n\n")
-        append(step)
-        if (steering.isNotEmpty()) {
-            append("\n\nSince you started, I have said: ")
-            append(steering.joinToString(" "))
+    private fun stepPrompt(brief: Brief, step: String, steering: List<String>): String =
+        buildString {
+            append(brief.step)
+            append("\n\n")
+            append(step)
+            if (steering.isNotEmpty()) {
+                append("\n\nSince you started, I have said: ")
+                append(steering.joinToString(" "))
+            }
         }
-    }
 
     /**
      * Re-plans threads for this reply, and says whether to go ahead.
@@ -2005,6 +2042,59 @@ private const val MODEL_GONE = "Choose a model in Models:"
  * is ambiguous; this only says what shape the answer should take, because the steps are
  * parsed back out of it and a paragraph is not a list.
  */
+/**
+ * The three sentences that turn the same loop into a different kind of work.
+ *
+ * A goal carries out actions and reports on each; research answers questions and then writes
+ * up what it found. Everything else about running unattended on a phone is identical, which
+ * is why this is a parameter rather than a second loop.
+ */
+private data class Brief(
+    /** What the foreground notification says while this is running. */
+    val notification: String,
+    /** Asked once, and parsed back into a plan. */
+    val plan: String,
+    /** Asked for every step, pointed at that step alone. */
+    val step: String,
+    /** Asked after the last step, or null for work whose answer is the last step. */
+    val finish: String? = null,
+) {
+    companion object {
+        val GOAL = Brief(
+            notification = "Working on a goal",
+            plan = GOAL_PLAN_PREFIX,
+            step = GOAL_STEP_PREFIX,
+        )
+
+        /**
+         * Researching, which is planning questions rather than actions.
+         *
+         * "Do not answer them yet" is doing real work in the first sentence. Asked to break
+         * a question down, a small model answers the whole thing in the planning turn and
+         * then has nothing left to research, which is the same failure the goal planner has
+         * and needs the same explicit instruction.
+         *
+         * The step prompt names the address because a report with no sources is the one
+         * output here nobody can check, and a model that is not told to keep the link does
+         * not keep it.
+         */
+        val RESEARCH = Brief(
+            notification = "Researching",
+            plan = "Break this into a short numbered list of specific questions, five at " +
+                "most, that could each be answered by searching the web. Do not answer " +
+                "any of them yet.",
+            step = "Research this one question. Search the web, read the best source you " +
+                "find, and report what it says along with the address you found it at. Do " +
+                "not research the other questions.",
+            finish = "Now write the findings up as one document in Markdown. Start with a " +
+                "heading, then the answer in a few short sections. End with a Sources " +
+                "section listing the addresses you used. Do not search again: write only " +
+                "from what you found. If something could not be answered, say so rather " +
+                "than filling the gap.",
+        )
+    }
+}
+
 private const val GOAL_PLAN_PREFIX: String =
     "Plan this out as a short numbered list of steps, five at most, each one a single " +
         "action you could carry out on this phone. Do not do any of them yet."

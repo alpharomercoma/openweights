@@ -47,7 +47,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import java.util.Locale
 
@@ -106,7 +108,7 @@ fun MessageActionsSheet(
             }
             ActionRow(
                 icon = Icons.Rounded.ContentCopy,
-                label = "Copy text",
+                label = stringResource(R.string.copy_text),
                 onClick = {
                     // The reasoning block is the model talking to itself; copying the
                     // answer is what someone pasting into a document wants.
@@ -133,7 +135,7 @@ fun MessageActionsSheet(
             if (canRegenerate) {
                 ActionRow(
                     icon = Icons.Rounded.Refresh,
-                    label = "Regenerate reply",
+                    label = stringResource(R.string.regenerate_reply),
                     onClick = onRegenerate,
                 )
             }
@@ -144,7 +146,7 @@ fun MessageActionsSheet(
                 // of a conversation that never happened.
                 ActionRow(
                     icon = Icons.Rounded.Edit,
-                    label = "Edit and resend",
+                    label = stringResource(R.string.edit_resend),
                     onClick = {
                         onEdit()
                         onDismiss()
@@ -157,7 +159,7 @@ fun MessageActionsSheet(
                 // well is still there when the detour does not work out.
                 ActionRow(
                     icon = Icons.Rounded.CallSplit,
-                    label = "Branch from here",
+                    label = stringResource(R.string.branch_from_here),
                     onClick = {
                         onBranch()
                         onDismiss()
@@ -170,7 +172,7 @@ fun MessageActionsSheet(
                 // enough that "keep this" should not have to mean "paste it somewhere else".
                 ActionRow(
                     icon = Icons.Rounded.PictureAsPdf,
-                    label = "Save as PDF",
+                    label = stringResource(R.string.save_as_pdf),
                     onClick = {
                         onSavePdf()
                         onDismiss()
@@ -180,7 +182,7 @@ fun MessageActionsSheet(
                 // app can have about a model's behaviour when nothing is measured remotely.
                 ActionRow(
                     icon = Icons.Rounded.Flag,
-                    label = "Report this reply",
+                    label = stringResource(R.string.report_reply),
                     onClick = onReport,
                 )
             }

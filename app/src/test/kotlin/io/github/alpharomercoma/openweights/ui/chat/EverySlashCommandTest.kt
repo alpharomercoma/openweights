@@ -59,6 +59,7 @@ class EverySlashCommandTest {
                 onRegenerate = { fired += "retry" },
                 onMode = { fired += "mode:${it.name}" },
                 onGoal = { fired += "goal:$it" },
+                onResearch = { fired += "research:$it" },
                 argument = "a task",
             )
 
@@ -72,6 +73,7 @@ class EverySlashCommandTest {
                 SlashCommand.ASK -> "mode:${AgentMode.ASK.name}"
                 SlashCommand.YOLO -> "mode:${AgentMode.YOLO.name}"
                 SlashCommand.GOAL -> "goal:a task"
+                SlashCommand.DEEP_RESEARCH -> "research:a task"
             }
             assertThat(fired.single()).isEqualTo(expected)
         }

@@ -39,11 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.hub.HubModel
@@ -115,9 +117,24 @@ fun ModelRow(
                 // asks about a model on a phone, and on its own line it cost a third of the
                 // row's height to answer a question that fits in four characters.
                 model.parameterHint?.let { Badge(text = it, emphasis = true) }
-                if (model.isVision) Badge(text = "Vision", icon = Icons.Rounded.Visibility)
-                if (model.isAudio) Badge(text = "Audio", icon = Icons.Rounded.GraphicEq)
-                if (model.isGated) Badge(text = "Gated", icon = Icons.Rounded.Lock)
+                if (model.isVision) {
+                    Badge(
+                        text = stringResource(R.string.vision),
+                        icon = Icons.Rounded.Visibility,
+                    )
+                }
+                if (model.isAudio) {
+                    Badge(
+                        text = stringResource(R.string.audio),
+                        icon = Icons.Rounded.GraphicEq,
+                    )
+                }
+                if (model.isGated) {
+                    Badge(
+                        text = stringResource(R.string.gated),
+                        icon = Icons.Rounded.Lock,
+                    )
+                }
             }
 
             Text(

@@ -62,12 +62,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.GrantState
@@ -116,13 +118,18 @@ fun ToolsScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Tools", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(
+                        stringResource(R.string.tools),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     onBack?.let { back ->
                         IconButton(onClick = back) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -146,7 +153,7 @@ fun ToolsScreen(
         ) {
             item {
                 Text(
-                    text = "What the model may do while it answers.",
+                    text = stringResource(R.string.what_model_may_do_while),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp),
@@ -188,7 +195,7 @@ fun ToolsScreen(
                 // Said plainly rather than shown as a disabled row, because an empty
                 // "Add" affordance that does nothing is worse than an honest sentence.
                 Text(
-                    text = "Skill files and remote servers are not supported yet.",
+                    text = stringResource(R.string.skill_files_remote_servers_supported),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp),
@@ -311,7 +318,7 @@ private fun WorkspaceCard(
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
-                ) { Text("Remove") }
+                ) { Text(stringResource(R.string.remove)) }
             }
         }
     }
@@ -441,7 +448,7 @@ private fun SearchCard(
             .clickable { open = !open }
             .padding(14.dp),
     ) {
-        Text("Search engines", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.search_engines), style = MaterialTheme.typography.titleSmall)
         Text(
             // Says what the order means, because it is not the order of index quality and
             // somebody reading the list will otherwise assume it is.
@@ -477,7 +484,7 @@ private fun SearchCard(
 
         var typed by rememberSaveable(proxy) { mutableStateOf(proxy) }
         Text(
-            text = "Proxy",
+            text = stringResource(R.string.proxy),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(top = 14.dp),
         )
@@ -498,6 +505,6 @@ private fun SearchCard(
             singleLine = true,
             shape = RoundedCornerShape(Radius.sm),
         )
-        TextButton(onClick = { onProxy(typed) }) { Text("Save proxy") }
+        TextButton(onClick = { onProxy(typed) }) { Text(stringResource(R.string.save_proxy)) }
     }
 }

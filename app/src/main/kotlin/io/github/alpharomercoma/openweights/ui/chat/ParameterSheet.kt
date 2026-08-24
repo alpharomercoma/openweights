@@ -55,9 +55,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
@@ -150,9 +152,9 @@ fun ParameterSheet(
             // Above temperature, because it is the one on this sheet a person who does not
             // know what a sampler is still wants.
             Setting(
-                label = "Answer length",
+                label = stringResource(R.string.answer_length),
                 shown = outputModality.accepts(Tunable.ANSWER_LENGTH),
-                explanation = "How much the model writes when the question does not say.",
+                explanation = stringResource(R.string.how_much_model_writes_when),
                 value = AnswerLength.fromName(draft.answerLength).label,
             ) {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -177,9 +179,9 @@ fun ParameterSheet(
             }
 
             Setting(
-                label = "Temperature",
+                label = stringResource(R.string.temperature),
                 shown = outputModality.accepts(Tunable.TEMPERATURE),
-                explanation = "Lower is steadier, higher is more varied.",
+                explanation = stringResource(R.string.lower_steadier_higher_more_varied),
                 value = String.format(locale, "%.2f", draft.temperature),
             ) {
                 StepSlider(
@@ -192,7 +194,7 @@ fun ParameterSheet(
 
             val isAutomatic = draft.contextLength == ModelPreferences.AUTOMATIC
             Setting(
-                label = "Context length",
+                label = stringResource(R.string.context_length),
                 // Careful with this sentence. It used to say "as much as the model was
                 // trained for", which is the one thing the number is not: a file states how
                 // far it can address, not how far it was trained, and the two differ by four
@@ -225,7 +227,7 @@ fun ParameterSheet(
             }
 
             Setting(
-                label = "Summarise at",
+                label = stringResource(R.string.summarise_at),
                 explanation = "How full the conversation gets before earlier turns are " +
                     "folded into a summary. Lower is faster and forgets sooner, higher " +
                     "remembers more and slows down as it fills.",
@@ -243,7 +245,10 @@ fun ParameterSheet(
 
             if (outputModality.accepts(Tunable.SYSTEM_PROMPT)) {
                 Column {
-                    Text("System prompt", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.system_prompt),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
                     Text(
                         text = "Standing instructions, sent before every conversation. Small " +
                             "models follow explicit ones far better than implied ones.",
@@ -254,7 +259,7 @@ fun ParameterSheet(
                         value = draft.systemPrompt,
                         onValueChange = { draft = draft.copy(systemPrompt = it) },
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        placeholder = { Text("Optional") },
+                        placeholder = { Text(stringResource(R.string.optional)) },
                         minLines = 2,
                         maxLines = 5,
                         shape = RoundedCornerShape(Radius.sm),
@@ -273,9 +278,9 @@ fun ParameterSheet(
             // an interface and removing what a developer came for.
             AdvancedSettings(open = advancedOpen, onToggle = { advancedOpen = !advancedOpen }) {
                 Setting(
-                    label = "Top-p",
+                    label = stringResource(R.string.top_p),
                     shown = outputModality.accepts(Tunable.TOP_P),
-                    explanation = "Keeps the likeliest words, up to this share of the odds.",
+                    explanation = stringResource(R.string.keeps_likeliest_words_up_share),
                     value = String.format(locale, "%.2f", draft.topP),
                 ) {
                     StepSlider(
@@ -287,9 +292,9 @@ fun ParameterSheet(
                 }
 
                 Setting(
-                    label = "Top-k",
+                    label = stringResource(R.string.top_k),
                     shown = outputModality.accepts(Tunable.TOP_K),
-                    explanation = "Never weighs up more candidates than this.",
+                    explanation = stringResource(R.string.never_weighs_up_more_candidates),
                     value = draft.topK.toString(),
                 ) {
                     StepSlider(
@@ -301,7 +306,7 @@ fun ParameterSheet(
                 }
 
                 Setting(
-                    label = "Repeat penalty",
+                    label = stringResource(R.string.repeat_penalty),
                     shown = outputModality.accepts(Tunable.REPEAT_PENALTY),
                     explanation = "Discourages repeating itself. Too high and it dodges words " +
                         "it needs.",
@@ -316,7 +321,7 @@ fun ParameterSheet(
                 }
                 if (hasGpu) {
                     Setting(
-                        label = "Processor",
+                        label = stringResource(R.string.processor),
                         explanation = "Which processor holds the layers. Changing this " +
                             "reloads the model, which takes a few seconds. Your chat is " +
                             "kept.",
@@ -349,7 +354,10 @@ fun ParameterSheet(
                 }
                 if (outputModality.accepts(Tunable.TOOL_PROMPT)) {
                     Column {
-                        Text("Tool instructions", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.tool_instructions),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                         Text(
                             text = "Sent with the tools, before your own prompt. This is " +
                                 "the whole of what the app adds.",
@@ -360,7 +368,7 @@ fun ParameterSheet(
                             value = draft.toolPrompt,
                             onValueChange = { draft = draft.copy(toolPrompt = it) },
                             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                            placeholder = { Text("Nothing about tools") },
+                            placeholder = { Text(stringResource(R.string.nothing_about_tools)) },
                             minLines = 3,
                             maxLines = 8,
                             shape = RoundedCornerShape(Radius.sm),
@@ -373,15 +381,15 @@ fun ParameterSheet(
                                 )
                             },
                         ) {
-                            Text("Restore the default wording")
+                            Text(stringResource(R.string.restore_default_wording))
                         }
                     }
                 }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AccentButton(onClick = { onSave(draft) }) { Text("Save") }
-                TextButton(onClick = onReset) { Text("Reset to defaults") }
+                AccentButton(onClick = { onSave(draft) }) { Text(stringResource(R.string.save)) }
+                TextButton(onClick = onReset) { Text(stringResource(R.string.reset_defaults)) }
             }
         }
     }
@@ -408,7 +416,7 @@ private fun ThinkingSetting(draft: ModelPreferences, onChange: (ModelPreferences
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Thinking", style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.thinking), style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = "Work it through first. Slower, and better on anything with " +
                         "steps in it.",
@@ -475,7 +483,7 @@ private fun AdvancedSettings(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Advanced", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.advanced), style = MaterialTheme.typography.titleSmall)
             Icon(
                 imageVector = Icons.Rounded.ExpandMore,
                 contentDescription = if (open) "Hide advanced settings" else "Show advanced",

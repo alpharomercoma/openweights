@@ -32,8 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
@@ -120,7 +122,9 @@ fun FitCard(
                     )
                 }
 
-                else -> AccentButton(onClick = onDownload) { Text("Download") }
+                else -> AccentButton(onClick = onDownload) {
+                    Text(stringResource(R.string.download))
+                }
             }
         }
 

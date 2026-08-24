@@ -48,11 +48,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -172,7 +174,7 @@ private fun CodeStep(program: String, output: String) {
         MarkdownText(content = "```javascript\n$program\n```")
         if (output.isNotBlank()) {
             Text(
-                text = "Result",
+                text = stringResource(R.string.result),
                 style = MetricTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
@@ -289,7 +291,7 @@ private fun MediaGrid(thumbnails: List<String>, modifier: Modifier = Modifier) {
                 // Named rather than described. Nothing here knows what is in the picture,
                 // and inventing a description for a screen reader is worse than admitting
                 // there is one to look at.
-                contentDescription = "Search result picture",
+                contentDescription = stringResource(R.string.search_result_picture),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(THUMBNAIL)

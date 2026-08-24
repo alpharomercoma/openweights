@@ -52,12 +52,15 @@ class GoalCommandTest {
     }
 
     @Test
-    fun `no other command takes an argument`() {
-        SlashCommand.entries.filter { it != SlashCommand.GOAL }.forEach { command ->
+    fun `only the two that take a task take an argument`() {
+        // Deep research is the second. Everything else is a whole message, which is why a
+        // sentence beginning with one is still a sentence.
+        val takesOne = setOf(SlashCommand.GOAL, SlashCommand.DEEP_RESEARCH)
+        SlashCommand.entries.filterNot { it in takesOne }.forEach { command ->
             assertThat(command.takesArgument).isFalse()
-            // Which is why a sentence beginning with one is still a sentence.
             assertThat(SlashCommand.typed("${command.trigger} and then some")).isNull()
         }
+        takesOne.forEach { assertThat(it.takesArgument).isTrue() }
     }
 
     @Test

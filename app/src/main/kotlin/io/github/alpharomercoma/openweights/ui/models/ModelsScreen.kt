@@ -53,12 +53,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
@@ -91,7 +93,10 @@ fun ModelsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Models", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.models),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                         Metric("${formatBytes(state.storageUsedBytes)} on this device")
                     }
                 },
@@ -100,7 +105,7 @@ fun ModelsScreen(
                         IconButton(onClick = back) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -201,7 +206,7 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
             }
         }
 
-        TextButton(onClick = onCancel) { Text("Cancel") }
+        TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
     }
 }
 
@@ -237,7 +242,7 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
             colors = ButtonDefaults.textButtonColors(
                 contentColor = MaterialTheme.colorScheme.error,
             ),
-        ) { Text("Delete") }
+        ) { Text(stringResource(R.string.delete)) }
     }
 }
 

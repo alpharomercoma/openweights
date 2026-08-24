@@ -45,8 +45,10 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
 
@@ -76,13 +78,18 @@ fun WatchScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Watching", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(
+                        stringResource(R.string.watching),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     onBack?.let { back ->
                         IconButton(onClick = back) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -146,9 +153,9 @@ private fun WatchRow(watch: Watch, onStop: () -> Unit, onForget: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (watch.isActive) {
-                TextButton(onClick = onStop) { Text("Stop") }
+                TextButton(onClick = onStop) { Text(stringResource(R.string.stop)) }
             }
-            TextButton(onClick = onForget) { Text("Remove") }
+            TextButton(onClick = onForget) { Text(stringResource(R.string.remove)) }
         }
     }
 }

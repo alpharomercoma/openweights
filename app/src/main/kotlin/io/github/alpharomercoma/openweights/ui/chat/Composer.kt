@@ -64,12 +64,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
@@ -331,7 +333,7 @@ private fun AttachButton(enabled: Boolean, isAttaching: Boolean, onClick: () -> 
         } else {
             Icon(
                 imageVector = Icons.Rounded.Add,
-                contentDescription = "Attach a file",
+                contentDescription = stringResource(R.string.attach_file),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

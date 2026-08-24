@@ -57,12 +57,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.BuildConfig
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Mark
@@ -99,13 +101,18 @@ fun SettingsScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Settings", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(
+                        stringResource(R.string.settings),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     onBack?.let { back ->
                         IconButton(onClick = back) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -165,7 +172,7 @@ private fun AboutSection() {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Mark(size = 44.dp)
-        Text("OpenWeights", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.openweights), style = MaterialTheme.typography.titleMedium)
         Text(
             text = "Open weight models, running on this phone. No account, no server of " +
                 "ours, no telemetry.",
@@ -181,7 +188,9 @@ private fun AboutSection() {
             textAlign = TextAlign.Center,
         )
         Metric("${BuildConfig.VERSION_NAME} · Apache License 2.0")
-        TextButton(onClick = { links.openUri(SOURCE_URL) }) { Text("View the source") }
+        TextButton(onClick = {
+            links.openUri(SOURCE_URL)
+        }) { Text(stringResource(R.string.view_source)) }
     }
 }
 
@@ -199,7 +208,7 @@ private const val SOURCE_URL = "https://github.com/alpharomercoma/openweights"
 @Composable
 private fun AppearanceSection(selected: ThemeChoice, onSelect: (ThemeChoice) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Appearance", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.appearance), style = MaterialTheme.typography.titleSmall)
 
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             ThemeChoice.entries.forEachIndexed { index, choice ->
@@ -233,7 +242,10 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
     var draft by remember { mutableStateOf("") }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Hugging Face access token", style = MaterialTheme.typography.titleSmall)
+        Text(
+            stringResource(R.string.hugging_face_access_token),
+            style = MaterialTheme.typography.titleSmall,
+        )
         Text(
             text = "Only for gated or private models. Encrypted with a key held in this " +
                 "phone's hardware, and sent to huggingface.co and nowhere else.",
@@ -274,7 +286,7 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
-                ) { Text("Remove") }
+                ) { Text(stringResource(R.string.remove)) }
             }
         }
 
@@ -285,7 +297,7 @@ private fun TokenSection(state: SettingsUiState, onSave: (String) -> Unit, onCle
 @Composable
 private fun ComputeSection(state: SettingsUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Compute", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.compute), style = MaterialTheme.typography.titleSmall)
 
         state.computeDevices.forEach { device ->
             Column {
@@ -377,7 +389,7 @@ private fun DeviceSection(state: SettingsUiState) {
     val device = state.device ?: return
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("This device", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.device), style = MaterialTheme.typography.titleSmall)
         Metric("${device.socModel} · ${device.cpuCores} cores")
         // Short enough not to wrap, because a line of figures that breaks after "usable by"
         // and orphans "a model" on its own line is a line nobody finishes reading.

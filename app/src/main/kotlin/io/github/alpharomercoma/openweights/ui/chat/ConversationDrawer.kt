@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.groupByDay
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
@@ -124,7 +126,7 @@ fun ConversationDrawer(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("New chat", modifier = Modifier.padding(start = 8.dp))
+            Text(stringResource(R.string.new_chat), modifier = Modifier.padding(start = 8.dp))
         }
 
         // Under New chat rather than above it. Starting one is the thing people come here to
@@ -148,7 +150,7 @@ fun ConversationDrawer(
                 )
             } else if (conversations.isEmpty()) {
                 Text(
-                    text = "Nothing here yet. Whatever you ask is saved on this device only.",
+                    text = stringResource(R.string.nothing_here_yet_whatever_ask),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -346,7 +348,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .padding(bottom = 8.dp),
-        placeholder = { Text("Search chats") },
+        placeholder = { Text(stringResource(R.string.search_chats)) },
         leadingIcon = {
             Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
         },
@@ -357,7 +359,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
                 IconButton(onClick = { onValueChange("") }) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
-                        contentDescription = "Clear the search",
+                        contentDescription = stringResource(R.string.clear_search),
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -398,7 +400,7 @@ private fun SearchResults(
     if (!hasAnswer) return
     if (results.isEmpty()) {
         Text(
-            text = "No chat mentions that.",
+            text = stringResource(R.string.chat_mentions),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp),

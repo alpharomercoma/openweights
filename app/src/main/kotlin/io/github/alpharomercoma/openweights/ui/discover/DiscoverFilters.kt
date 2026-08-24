@@ -46,8 +46,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
@@ -130,7 +132,7 @@ fun DiscoverFilterBar(
             onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
             label = {
                 Text(
-                    text = "Recommended",
+                    text = stringResource(R.string.recommended),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -182,7 +184,7 @@ fun DiscoverFilterBar(
             onClick = { onOfficialOnlyChange(!query.officialOnly) },
             label = {
                 Text(
-                    text = "Official",
+                    text = stringResource(R.string.official),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -248,15 +250,18 @@ fun DiscoverFilterSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Filters", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.filters), style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = onClear, enabled = query.activeCount > 0) {
-                    Text("Clear all")
+                    Text(stringResource(R.string.clear_all))
                 }
             }
 
-            FilterGroup(title = "Task", caption = "Many repositories carry no task at all") {
+            FilterGroup(
+                title = stringResource(R.string.task),
+                caption = "Many repositories carry no task at all",
+            ) {
                 ChoiceChip(
-                    label = "Any",
+                    label = stringResource(R.string.any),
                     selected = query.task == null,
                     onClick = { onQueryChange(query.copy(task = null)) },
                 )
@@ -270,7 +275,7 @@ fun DiscoverFilterSheet(
             }
 
             FilterGroup(
-                title = "Size",
+                title = stringResource(R.string.size),
                 caption = if (parameterCeilingBillions > 0) {
                     "Parameter count. This phone can hold about ${parameterCeilingBillions}B " +
                         "at the usual quantization."
@@ -296,14 +301,17 @@ fun DiscoverFilterSheet(
                 value = query.author.orEmpty(),
                 onValueChange = { onQueryChange(query.copy(author = it)) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Publisher") },
-                placeholder = { Text("unsloth, LiquidAI, bartowski") },
+                label = { Text(stringResource(R.string.publisher)) },
+                placeholder = { Text(stringResource(R.string.unsloth_liquidai_bartowski)) },
                 singleLine = true,
             )
 
-            FilterGroup(title = "Access", caption = "Gated repositories need an approved token") {
+            FilterGroup(
+                title = stringResource(R.string.access),
+                caption = "Gated repositories need an approved token",
+            ) {
                 ChoiceChip(
-                    label = "Open only",
+                    label = stringResource(R.string.open_only),
                     selected = query.hideGated,
                     onClick = { onQueryChange(query.copy(hideGated = !query.hideGated)) },
                 )

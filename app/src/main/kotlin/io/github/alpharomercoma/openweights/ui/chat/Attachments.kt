@@ -62,10 +62,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -200,8 +202,8 @@ fun AttachmentSheet(
                 // and every row below is a longer way round.
                 AttachmentChoice(
                     icon = Icons.Rounded.ContentPaste,
-                    label = "Paste",
-                    detail = "What you copied, without leaving the conversation",
+                    label = stringResource(R.string.paste),
+                    detail = stringResource(R.string.what_copied_without_leaving_conversation),
                     onClick = {
                         onPickedAll(ClipboardMedia.read(context, support))
                         onDismiss()
@@ -211,13 +213,13 @@ fun AttachmentSheet(
             if (support.vision) {
                 AttachmentChoice(
                     icon = Icons.Rounded.PhotoCamera,
-                    label = "Take a photo",
-                    detail = "Opens the camera app. Nothing is uploaded.",
+                    label = stringResource(R.string.take_photo),
+                    detail = stringResource(R.string.opens_camera_app_nothing_uploaded),
                     onClick = { takePicture.launch(captureUri) },
                 )
                 AttachmentChoice(
                     icon = Icons.Rounded.Image,
-                    label = "Photos",
+                    label = stringResource(R.string.photos),
                     detail = if (support.video) "Images or videos" else "Images",
                     onClick = {
                         val request = PickVisualMediaRequest(
@@ -234,8 +236,8 @@ fun AttachmentSheet(
             if (support.audio) {
                 AttachmentChoice(
                     icon = Icons.Rounded.AudioFile,
-                    label = "Audio",
-                    detail = "Recordings for the model to listen to",
+                    label = stringResource(R.string.audio),
+                    detail = stringResource(R.string.recordings_model_listen),
                     onClick = { openFile.launch(arrayOf("audio/*")) },
                 )
             }
@@ -245,15 +247,15 @@ fun AttachmentSheet(
             // filter, sitting beside the plus and doing a job the plus claimed to do.
             AttachmentChoice(
                 icon = Icons.Rounded.Description,
-                label = "Document",
-                detail = "Text, markdown, JSON or XML the model can read",
+                label = stringResource(R.string.document),
+                detail = stringResource(R.string.text_markdown_json_xml_model),
                 onClick = { openDocument.launch(DOCUMENT_TYPES) },
             )
             if (support.any) {
                 AttachmentChoice(
                     icon = Icons.Rounded.AttachFile,
-                    label = "Files",
-                    detail = "Anything else this model accepts",
+                    label = stringResource(R.string.files),
+                    detail = stringResource(R.string.anything_else_model_accepts),
                     onClick = { openFile.launch(support.acceptedMimeTypes()) },
                 )
             }

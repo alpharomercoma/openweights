@@ -56,10 +56,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -171,7 +173,7 @@ fun DiscoverScreen(
                 value = state.query.text,
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                placeholder = { Text("Search Hugging Face") },
+                placeholder = { Text(stringResource(R.string.search_hugging_face)) },
                 singleLine = true,
                 shape = RoundedCornerShape(Radius.md),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -291,7 +293,7 @@ private fun EmptyResults(hasFilters: Boolean, onClearFilters: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (hasFilters) {
-            TextButton(onClick = onClearFilters) { Text("Clear filters") }
+            TextButton(onClick = onClearFilters) { Text(stringResource(R.string.clear_filters)) }
         }
     }
 }
@@ -396,7 +398,7 @@ private fun DiscoverScreenPreview() {
     OpenWeightsTheme(dynamicColor = false) {
         DiscoverScreen(
             state = DiscoverUiState(
-                query = HubQuery(text = "lfm2.5"),
+                query = HubQuery(text = stringResource(R.string.lfm2_5)),
                 parameterCeilingBillions = 11,
                 results = listOf(
                     HubModel(

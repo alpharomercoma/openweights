@@ -44,8 +44,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.data.ReportReason
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 
@@ -84,9 +86,12 @@ fun ReportSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Report this reply", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "What was wrong with it?",
+                stringResource(R.string.report_reply),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.what_was_wrong),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -133,7 +138,7 @@ fun ReportSheet(
                 value = note,
                 onValueChange = { note = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Anything to add") },
+                label = { Text(stringResource(R.string.anything_add)) },
                 minLines = 2,
             )
 
@@ -146,7 +151,7 @@ fun ReportSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "Saved on this device",
+                    text = stringResource(R.string.saved_device),
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
@@ -174,12 +179,12 @@ fun ReportSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
                 AccentButton(
                     onClick = { reason?.let { onSubmit(it, note) } },
                     enabled = reason != null,
                 ) {
-                    Text("Report")
+                    Text(stringResource(R.string.report))
                 }
             }
         }

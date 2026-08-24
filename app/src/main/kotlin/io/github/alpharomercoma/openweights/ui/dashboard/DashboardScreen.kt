@@ -50,10 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.data.DailyUsage
 import io.github.alpharomercoma.openweights.core.data.GrowthPoint
 import io.github.alpharomercoma.openweights.core.data.ModelUsage
@@ -100,13 +102,18 @@ fun DashboardScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                title = { Text("Usage", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(
+                        stringResource(R.string.usage),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     onBack?.let { back ->
                         IconButton(onClick = back) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
                     }
@@ -198,7 +205,7 @@ private fun StatGrid(summary: UsageSummary) {
         ) {
             Stat("Tokens read", summary.lifetimePromptTokens.grouped(), Modifier.weight(1f))
             Stat(
-                label = "Speed",
+                label = stringResource(R.string.speed),
                 value = summary.averageTokensPerSecond
                     ?.let { String.format(Locale.getDefault(), "%.1f", it) }
                     ?.plus(" tok/s")
@@ -304,7 +311,7 @@ private fun WeekChart(growth: List<GrowthPoint>) {
     val peak = week.maxOf { it.second }.coerceAtLeast(1)
 
     Column {
-        Text("This week", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.week), style = MaterialTheme.typography.titleSmall)
         Caption("tokens a day · best day ${peak.grouped()}")
 
         Row(
@@ -368,7 +375,7 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
     val total = models.sumOf { it.generatedTokens }.coerceAtLeast(1)
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("By model", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.by_model), style = MaterialTheme.typography.titleSmall)
 
         models.forEach { model ->
             val share = model.generatedTokens.toFloat() / total

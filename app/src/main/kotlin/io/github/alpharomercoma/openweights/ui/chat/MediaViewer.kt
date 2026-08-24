@@ -48,11 +48,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import java.io.File
@@ -104,7 +106,7 @@ fun MediaViewer(attachment: MessagePart.File, onDismiss: () -> Unit) {
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.close),
                         tint = Color.White,
                     )
                 }
@@ -159,7 +161,7 @@ private fun Unplayable(attachment: MessagePart.File) {
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Sent with this message. Open it in the app it came from to play it.",
+            text = stringResource(R.string.sent_message_open_app_came),
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(alpha = MUTED),
             textAlign = TextAlign.Center,

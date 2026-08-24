@@ -64,7 +64,13 @@ class MnnSpeechSynthesizerTest {
         var spoken: String? = null
 
         override fun load(modelPath: String, modelType: Int, backendType: Int, memoryMode: Int) = 0L
-        override fun generate(h: Long, p: String, o: String, s: Int, seed: Int) = 2
+        override fun generate(
+            handle: Long,
+            prompt: String,
+            outputPath: String,
+            steps: Int,
+            seed: Int,
+        ) = 2
         override fun cancel(handle: Long) = Unit
         override fun backend(handle: Long) = ""
         override fun release(handle: Long) = Unit
@@ -277,6 +283,17 @@ class MnnSpeechSynthesizerTest {
     }
 
     @Test
+    fun `a language this bundle does not support is refused`() = runTest(dispatcher) {
+        completeBundle()
+        val voice = synthesizer(FakeVoice())
+        voice.load(bundle())
+
+        val events = voice.synthesize(SpeechRequest(text = "hola", language = "es")).toList()
+
+        assertThat((events.single() as GenerationEvent.Failed).reason).contains("en")
+    }
+
+    @Test
     fun `unloading releases the voice and forgets what it could do`() = runTest(dispatcher) {
         completeBundle()
         val bridge = FakeVoice()
@@ -287,6 +304,18 @@ class MnnSpeechSynthesizerTest {
 
         assertThat(bridge.releases).isEqualTo(1)
         assertThat(voice.capability).isNull()
+    }
+
+    @Test
+    fun `closing releases the voice without needing to suspend`() = runTest(dispatcher) {
+        completeBundle()
+        val bridge = FakeVoice()
+        val voice = synthesizer(bridge)
+        voice.load(bundle())
+
+        voice.close()
+
+        assertThat(bridge.releases).isEqualTo(1)
     }
 
     @Test

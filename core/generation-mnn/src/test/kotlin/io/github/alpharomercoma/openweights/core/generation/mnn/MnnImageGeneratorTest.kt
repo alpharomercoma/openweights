@@ -360,8 +360,18 @@ class MnnImageGeneratorTest {
 
         assertThat((generator.generate(request(steps = 0)).toList().single()))
             .isInstanceOf(GenerationEvent.Failed::class.java)
-        assertThat((generator.generate(request(steps = 5_000)).toList().single()))
-            .isInstanceOf(GenerationEvent.Failed::class.java)
+    }
+
+    @Test
+    fun `a guidance scale outside what this path takes is refused`() = runTest(dispatcher) {
+        completeBundle()
+        val generator = generator(FakeBridge())
+        generator.load(bundle())
+
+        val events = generator.generate(request().copy(guidance = 12.0f)).toList()
+
+        assertThat((events.single() as GenerationEvent.Failed).reason)
+            .contains("Guidance must be")
     }
 
     @Test

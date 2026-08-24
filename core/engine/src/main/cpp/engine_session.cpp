@@ -555,7 +555,11 @@ int32_t Session::ingest_media_prompt(
         // the user was handed: hence the size cap above and the catch below.
         mtmd_bitmap * bitmap = nullptr;
         try {
-            bitmap = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false).bitmap;
+            auto wrapper = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false);
+            if (wrapper.video_ctx != nullptr) {
+                mtmd_helper_video_free(wrapper.video_ctx);
+            }
+            bitmap = wrapper.bitmap;
         } catch (const std::exception &) {
             bitmap = nullptr;
         }

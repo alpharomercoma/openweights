@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -226,6 +227,8 @@ class MnnSpeechSynthesizer internal constructor(
         request.text.length > MAX_CHARACTERS ->
             "That is longer than this voice reads at once. Keep it under $MAX_CHARACTERS " +
                 "characters, or split it."
+        request.language != null && request.language !in can.languages ->
+            "This voice bundle supports ${can.languages.joinToString()}."
         request.voice != null && request.voice !in can.voices ->
             "This voice bundle has ${can.voices.joinToString()}."
         request.speakerReference != null && !can.supportsVoiceCloning ->
@@ -252,7 +255,7 @@ class MnnSpeechSynthesizer internal constructor(
     }
 
     override fun close() {
-        unloadLocked()
+        runCatching { runBlocking { unload() } }
     }
 
     private fun GenerationBundle.directory(): File {

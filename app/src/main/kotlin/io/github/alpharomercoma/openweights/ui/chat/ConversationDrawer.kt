@@ -191,10 +191,26 @@ private fun DrawerFooter(destinations: ChatDestinations) {
             Icons.Rounded.Image,
             destinations.onOpenGallery,
         )
-        DrawerDestination("Tools", Icons.Rounded.Build, destinations.onOpenTools)
-        DrawerDestination("Usage", Icons.Rounded.BarChart, destinations.onOpenUsage)
-        DrawerDestination("Watching", Icons.Rounded.Visibility, destinations.onOpenWatches)
-        DrawerDestination("Settings", Icons.Rounded.Settings, destinations.onOpenSettings)
+        DrawerDestination(
+            stringResource(R.string.tools),
+            Icons.Rounded.Build,
+            destinations.onOpenTools,
+        )
+        DrawerDestination(
+            stringResource(R.string.usage),
+            Icons.Rounded.BarChart,
+            destinations.onOpenUsage,
+        )
+        DrawerDestination(
+            stringResource(R.string.watching),
+            Icons.Rounded.Visibility,
+            destinations.onOpenWatches,
+        )
+        DrawerDestination(
+            stringResource(R.string.settings),
+            Icons.Rounded.Settings,
+            destinations.onOpenSettings,
+        )
     }
 }
 

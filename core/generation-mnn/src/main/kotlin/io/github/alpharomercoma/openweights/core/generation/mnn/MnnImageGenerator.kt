@@ -29,10 +29,11 @@ import io.github.alpharomercoma.openweights.core.generation.ImageSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -147,40 +148,41 @@ class MnnImageGenerator internal constructor(
         capability = capabilityOn(bridge.backend(opened))
     }
 
-    override fun generate(request: ImageRequest): Flow<GenerationEvent<Artifact>> = flow {
+    override fun generate(request: ImageRequest): Flow<GenerationEvent<Artifact>> = channelFlow {
         val bundle = loaded
         val initialHandle = handle
         if (bundle == null || initialHandle == 0L) {
-            emit(GenerationEvent.Failed("No image model is loaded."))
-            return@flow
+            send(GenerationEvent.Failed("No image model is loaded."))
+            return@channelFlow
         }
         refuse(request)?.let {
-            emit(GenerationEvent.Failed(it))
-            return@flow
+            send(GenerationEvent.Failed(it))
+            return@channelFlow
         }
 
         lock.withLock {
             val open = handle
             val currentBundle = loaded
             if (open == 0L || currentBundle == null) {
-                emit(GenerationEvent.Failed("No image model is loaded."))
+                send(GenerationEvent.Failed("No image model is loaded."))
                 return@withLock
             }
             refuse(request)?.let {
-                emit(GenerationEvent.Failed(it))
+                send(GenerationEvent.Failed(it))
                 return@withLock
             }
 
             // A seed of this app's own when none was given, so the result can be asked for
             // again. Reported in the stats either way, because a picture nobody can
             // reproduce is a picture nobody can iterate on.
-            val seed = request.seed ?: (clock() and Int.MAX_VALUE.toLong())
+            val seed = request.seed?.coerceAtLeast(0) ?: (clock() and Int.MAX_VALUE.toLong())
             val target = File(outputDirectory.apply { mkdirs() }, "$seed-${clock()}.png")
 
-            emit(GenerationEvent.Started)
+            send(GenerationEvent.Started)
             val startedAt = clock()
-            val steps = mutableListOf<Int>()
-            bridge.onStep = { steps += it }
+            bridge.onStep = { step ->
+                trySend(GenerationEvent.Progress(step, request.steps))
+            }
 
             val outcome = try {
                 withContext(dispatcher) {
@@ -190,7 +192,7 @@ class MnnImageGenerator internal constructor(
                             prompt = request.prompt,
                             outputPath = target.absolutePath,
                             steps = request.steps,
-                            seed = seed.toInt(),
+                            seed = (seed % Int.MAX_VALUE).toInt(),
                         ),
                     )
                 }
@@ -203,12 +205,6 @@ class MnnImageGenerator internal constructor(
             } finally {
                 bridge.onStep = null
             }
-
-            // Emitted from the same collector rather than pushed as they arrive: a step
-            // callback fires on the generating thread, and a flow may not be emitted to from
-            // one it was not collected on. Reporting them after the fact keeps the count
-            // true, and the count is what a progress bar is drawn from.
-            steps.forEach { emit(GenerationEvent.Progress(it, request.steps)) }
 
             publish(outcome, target, request, seed, startedAt)
         }
@@ -223,7 +219,7 @@ class MnnImageGenerator internal constructor(
      * boolean, because a run somebody stopped is not a run that failed, and only one of them
      * is worth an error on screen.
      */
-    private suspend fun FlowCollector<GenerationEvent<Artifact>>.publish(
+    private suspend fun ProducerScope<GenerationEvent<Artifact>>.publish(
         outcome: MnnOutcome,
         target: File,
         request: ImageRequest,
@@ -232,7 +228,7 @@ class MnnImageGenerator internal constructor(
     ) {
         if (outcome != MnnOutcome.FINISHED) {
             target.delete()
-            emit(
+            send(
                 if (outcome == MnnOutcome.CANCELLED) {
                     GenerationEvent.Cancelled
                 } else {
@@ -246,12 +242,12 @@ class MnnImageGenerator internal constructor(
             // entry in the gallery that opens onto nothing, which to the person looking at
             // it is indistinguishable from the app having lost their picture.
             target.delete()
-            emit(GenerationEvent.Failed("The runtime reported a picture it did not write."))
+            send(GenerationEvent.Failed("The runtime reported a picture it did not write."))
             return
         }
 
         val total = clock() - startedAt
-        emit(
+        send(
             GenerationEvent.Completed(
                 output = Artifact(target.absolutePath, "image/png"),
                 stats = GenerationStats(
@@ -276,6 +272,8 @@ class MnnImageGenerator internal constructor(
                 "This model draws at ${can.sizes.joinToString { "${it.width} by ${it.height}" }}."
             request.steps !in can.steps ->
                 "Steps must be between ${can.steps.first} and ${can.steps.last}."
+            request.guidance !in can.guidance ->
+                "Guidance must be ${can.guidance.start}."
             request.negativePrompt.isNotBlank() && !can.supportsNegativePrompt ->
                 "This model does not take a negative prompt."
             else -> null
@@ -301,12 +299,11 @@ class MnnImageGenerator internal constructor(
      * Releases the native handle without suspending, for a caller that is being torn down.
      *
      * `AutoCloseable` cannot suspend, and a handle that outlives its owner is most of the
-     * phone's memory held by nothing. It does not take the lock: a close racing a generation
-     * is a bug in the caller, and blocking a teardown on a two-minute run would be worse
-     * than the race.
+     * phone's memory held by nothing. Synchronized to avoid use-after-free with any in-flight native call.
      */
     override fun close() {
-        unloadLocked()
+        cancel()
+        runCatching { runBlocking { unload() } }
     }
 
     private fun capabilityOn(backend: String) = ImageCapability(

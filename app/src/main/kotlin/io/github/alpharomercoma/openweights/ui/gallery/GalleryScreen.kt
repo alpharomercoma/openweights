@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.gallery
 
+import android.media.MediaPlayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -43,12 +44,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Sort
+import androidx.compose.material.icons.rounded.PauseCircle
+import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -64,6 +67,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -196,7 +200,9 @@ fun GalleryScreen(
         }
     }
 
-    viewing?.let { entry ->
+    val activeViewing = viewing?.let { v -> state.entries.find { it.id == v.id } ?: v }
+
+    activeViewing?.let { entry ->
         GalleryViewer(
             entry = entry,
             onDismiss = { viewing = null },
@@ -247,14 +253,16 @@ private fun SortMenu(current: GallerySort, onSort: (GallerySort) -> Unit) {
                         open = false
                         onSort(sort)
                     },
-                    trailingIcon = {
-                        if (sort == current) {
+                    trailingIcon = if (sort == current) {
+                        {
                             Icon(
-                                Icons.Rounded.Favorite,
+                                Icons.Rounded.Check,
                                 contentDescription = null,
-                                modifier = Modifier.size(0.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                         }
+                    } else {
+                        null
                     },
                 )
             }
@@ -365,6 +373,32 @@ private fun GalleryViewer(
     onToggleFavourite: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var isPlaying by remember { mutableStateOf(false) }
+    val mediaPlayer = remember(entry.artifact.path) {
+        if (entry.modality == GenerationTask.SPEECH) {
+            runCatching {
+                MediaPlayer().apply {
+                    setDataSource(entry.artifact.path)
+                    prepare()
+                    setOnCompletionListener { isPlaying = false }
+                }
+            }.getOrNull()
+        } else {
+            null
+        }
+    }
+
+    DisposableEffect(mediaPlayer) {
+        onDispose {
+            runCatching {
+                mediaPlayer?.run {
+                    if (isPlaying) stop()
+                    release()
+                }
+            }
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -447,12 +481,35 @@ private fun GalleryViewer(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(24.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.GraphicEq,
-                                contentDescription = stringResource(R.string.modality_speech),
-                                tint = Color.White,
-                                modifier = Modifier.size(64.dp),
-                            )
+                            IconButton(
+                                onClick = {
+                                    mediaPlayer?.let { player ->
+                                        if (isPlaying) {
+                                            player.pause()
+                                            isPlaying = false
+                                        } else {
+                                            player.start()
+                                            isPlaying = true
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(72.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) {
+                                        Icons.Rounded.PauseCircle
+                                    } else {
+                                        Icons.Rounded.PlayCircle
+                                    },
+                                    contentDescription = if (isPlaying) {
+                                        stringResource(R.string.stop_reading)
+                                    } else {
+                                        stringResource(R.string.read_aloud)
+                                    },
+                                    tint = Color.White,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                             entry.durationMillis?.let { duration ->
                                 Text(
                                     text = String.format(

@@ -241,6 +241,10 @@ fun ChatScreen(
                 // Closed on the way out, so returning from Settings does not land back on an
                 // open drawer over the conversation.
                 destinations = ChatDestinations(
+                    onOpenGallery = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenGallery()
+                    },
                     onOpenTools = {
                         scope.launch { drawerState.close() }
                         destinations.onOpenTools()

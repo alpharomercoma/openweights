@@ -76,13 +76,42 @@ GenerationSession* asSession(jlong handle) {
     return reinterpret_cast<GenerationSession*>(handle);
 }
 
-std::string toStdString(JNIEnv* env, jstring value) {
+void appendUtf8(std::string & out, uint32_t code) {
+    if (code < 0x80) {
+        out.push_back(static_cast<char>(code));
+    } else if (code < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (code >> 6)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else if (code < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (code >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (code >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+    }
+}
+
+std::string to_utf8(JNIEnv* env, jstring value) {
     if (value == nullptr) return {};
-    const char* chars = env->GetStringUTFChars(value, nullptr);
+    const jsize length = env->GetStringLength(value);
+    const jchar* chars = env->GetStringChars(value, nullptr);
     if (chars == nullptr) return {};
-    std::string copied(chars);
-    env->ReleaseStringUTFChars(value, chars);
-    return copied;
+    std::string result;
+    result.reserve(static_cast<size_t>(length));
+    for (jsize i = 0; i < length; ++i) {
+        uint32_t code = chars[i];
+        if (code >= 0xD800 && code <= 0xDBFF && i + 1 < length &&
+            chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
+            code = 0x10000 + ((code - 0xD800) << 10) + (chars[i + 1] - 0xDC00);
+            ++i;
+        }
+        appendUtf8(result, code);
+    }
+    env->ReleaseStringChars(value, chars);
+    return result;
 }
 
 /**
@@ -155,7 +184,7 @@ extern "C" {
 JNIEXPORT jlong JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLoad(
     JNIEnv* env, jobject, jstring modelPath, jint modelType, jint backendType, jint memoryMode) {
-    const std::string path = toStdString(env, modelPath);
+    const std::string path = to_utf8(env, modelPath);
     if (path.empty()) {
         LOGE("refusing to load a bundle with no path");
         return 0;
@@ -199,10 +228,12 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
     session->cancelled.store(false);
 
     jclass cls = env->GetObjectClass(self);
-    jmethodID onStep = env->GetMethodID(cls, "onNativeStep", "(I)V");
+    jmethodID onStep = cls != nullptr ? env->GetMethodID(cls, "onNativeStep", "(I)V") : nullptr;
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls != nullptr) env->DeleteLocalRef(cls);
 
-    const std::string promptText = toStdString(env, prompt);
-    const std::string output = toStdString(env, outputPath);
+    const std::string promptText = to_utf8(env, prompt);
+    const std::string output = to_utf8(env, outputPath);
 
     try {
         const bool wrote = session->diffusion->run(
@@ -261,13 +292,13 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRe
 JNIEXPORT jlong JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLoadVoice(
     JNIEnv* env, jobject, jstring modelsDir, jstring speakerId) {
-    const std::string dir = toStdString(env, modelsDir);
+    const std::string dir = to_utf8(env, modelsDir);
     if (dir.empty()) return 0;
 
     try {
         auto session = std::make_unique<SpeechSession>();
         session->tts = std::make_unique<MNNSupertonicTTSImpl>(dir);
-        const std::string speaker = toStdString(env, speakerId);
+        const std::string speaker = to_utf8(env, speakerId);
         if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
         return reinterpret_cast<jlong>(session.release());
     } catch (const std::exception& failure) {
@@ -292,13 +323,13 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSp
     if (session == nullptr || !session->tts) return -1;
 
     try {
-        const auto [rate, samples] = session->tts->Process(toStdString(env, text));
+        const auto [rate, samples] = session->tts->Process(to_utf8(env, text));
         if (samples.empty()) {
             LOGE("a voice produced no audio");
             return -1;
         }
         session->sampleRate = rate;
-        if (!writeWav(toStdString(env, outputPath), samples, rate)) return -2;
+        if (!writeWav(to_utf8(env, outputPath), samples, rate)) return -2;
         return static_cast<jint>(samples.size());
     } catch (const std::exception& failure) {
         LOGE("speaking threw: %s", failure.what());
@@ -323,7 +354,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSe
     JNIEnv* env, jobject, jlong handle, jstring speakerId) {
     SpeechSession* session = asSpeech(handle);
     if (session == nullptr || !session->tts) return;
-    const std::string speaker = toStdString(env, speakerId);
+    const std::string speaker = to_utf8(env, speakerId);
     if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
 }
 

@@ -503,6 +503,7 @@ private fun SearchCard(
             value = typed,
             onValueChange = { typed = it },
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            label = { Text(stringResource(R.string.proxy)) },
             placeholder = { Text(stringResource(R.string.proxy_hint)) },
             singleLine = true,
             shape = RoundedCornerShape(Radius.sm),

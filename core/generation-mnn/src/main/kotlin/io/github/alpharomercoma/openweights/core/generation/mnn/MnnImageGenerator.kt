@@ -31,9 +31,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -185,6 +187,10 @@ class MnnImageGenerator internal constructor(
                 trySend(GenerationEvent.Progress(step, request.steps))
             }
 
+            val cancellationHandle = currentCoroutineContext().job.invokeOnCompletion {
+                bridge.cancel(open)
+            }
+
             val outcome = try {
                 withContext(dispatcher) {
                     MnnOutcome.of(
@@ -206,6 +212,7 @@ class MnnImageGenerator internal constructor(
                 }
                 throw cancelled
             } finally {
+                cancellationHandle.dispose()
                 bridge.onStep = null
             }
 

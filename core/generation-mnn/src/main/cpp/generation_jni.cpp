@@ -179,8 +179,7 @@ bool writeWav(const std::string& path, const std::vector<int16_t>& samples, int 
     if (ok && dataBytes > 0) {
         ok = std::fwrite(samples.data(), 1, dataBytes, file) == dataBytes;
     }
-    if (std::ferror(file) != 0) ok = false;
-    std::fclose(file);
+    if (std::ferror(file) != 0 || std::fclose(file) != 0) ok = false;
     if (!ok) std::remove(path.c_str());
     return ok;
 }
@@ -250,6 +249,7 @@ JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGenerate(
     JNIEnv* env, jobject self, jlong handle, jstring prompt, jstring outputPath,
     jint steps, jint seed) {
+    if (steps < 1 || steps > 100) return 2;
     std::shared_ptr<GenerationSession> session = getSession(handle);
     if (!session || !session->diffusion) return 2;
 
@@ -269,7 +269,7 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
             [&](int step) {
                 if (session->cancelled.load()) throw Cancelled{};
                 if (onStep != nullptr) {
-                    if (env->PushLocalFrame(16) == 0) {
+                    if (env->PushLocalFrame(32) == 0) {
                         env->CallVoidMethod(self, onStep, step);
                         if (env->ExceptionCheck()) env->ExceptionClear();
                         env->PopLocalFrame(nullptr);

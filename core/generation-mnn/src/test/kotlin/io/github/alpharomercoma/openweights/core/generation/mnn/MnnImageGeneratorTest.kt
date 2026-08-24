@@ -102,6 +102,33 @@ class MnnImageGeneratorTest {
         override fun release(handle: Long) {
             releases++
         }
+
+        var voiceHandle: Long = 1
+        var samples: Int = 44_100
+        var voiceWrites: Boolean = true
+        var speaker: String? = null
+        var voiceReleases = 0
+            private set
+
+        override fun loadVoice(modelsDir: String, speakerId: String): Long {
+            speaker = speakerId
+            return voiceHandle
+        }
+
+        override fun speak(handle: Long, text: String, outputPath: String): Int {
+            if (samples > 0 && voiceWrites) File(outputPath).writeBytes(ByteArray(128))
+            return samples
+        }
+
+        override fun sampleRate(handle: Long) = 44_100
+
+        override fun setSpeaker(handle: Long, speakerId: String) {
+            speaker = speakerId
+        }
+
+        override fun releaseVoice(handle: Long) {
+            voiceReleases++
+        }
     }
 
     private fun completeBundle() = MnnImageGenerator.REQUIRED_FILES.forEach {

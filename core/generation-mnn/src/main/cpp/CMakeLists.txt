@@ -62,11 +62,31 @@ if (TARGET diffusion)
     target_compile_options(diffusion PRIVATE -fexceptions -frtti)
 endif()
 
-add_library(openweights_generation SHARED generation_jni.cpp)
+# Supertonic, and only Supertonic.
+#
+# MNN's TTS framework has its own CMakeLists and it is demo shaped: it declares `MNN` as an
+# IMPORTED library pointing at a prebuilt `project/android/build_64/lib`, which both
+# collides with the real MNN target already added above and points at a directory this build
+# never produces. Its sources are compiled here instead, against the targets that actually
+# exist.
+#
+# BertVits2 is left out. It is the heavier of the two paths, needing Chinese and English BERT
+# models and their grapheme-to-phoneme tables, and Supertonic is the one MNN's own Android
+# app moved to. Piper is left out because it needs espeak-ng vendored beside it.
+set(TTS_ROOT ${MNN_ROOT}/apps/frameworks/mnn_tts)
+
+add_library(openweights_generation SHARED
+    generation_jni.cpp
+    ${TTS_ROOT}/src/supertonic/mnn_supertonic_tts_impl.cpp
+    ${TTS_ROOT}/src/mnn_tts_logger.cpp
+)
 
 target_include_directories(openweights_generation PRIVATE
     ${MNN_ROOT}/include
     ${MNN_ROOT}/transformers/diffusion/engine/include
+    ${TTS_ROOT}/include
+    ${TTS_ROOT}/include/supertonic
+    ${MNN_ROOT}/apps/frameworks/3rd_party/include
 )
 
 find_library(log-lib log)

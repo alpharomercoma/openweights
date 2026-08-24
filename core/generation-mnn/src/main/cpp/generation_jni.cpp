@@ -27,7 +27,11 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <cstdint>
+#include <cstdio>
+#include <vector>
 #include <diffusion/diffusion.hpp>
+#include <supertonic/mnn_supertonic_tts_impl.hpp>
 
 #define LOG_TAG "OpenWeightsGen"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -79,6 +83,61 @@ std::string toStdString(JNIEnv* env, jstring value) {
     std::string copied(chars);
     env->ReleaseStringUTFChars(value, chars);
     return copied;
+}
+
+/**
+ * One loaded voice.
+ *
+ * Supertonic holds its four MNN modules for the life of the object, so this is what a load
+ * costs and what an unload gives back.
+ */
+struct SpeechSession {
+    std::unique_ptr<MNNSupertonicTTSImpl> tts;
+    int sampleRate = 0;
+};
+
+SpeechSession* asSpeech(jlong handle) { return reinterpret_cast<SpeechSession*>(handle); }
+
+/**
+ * Writes 16-bit mono PCM as a RIFF/WAVE file.
+ *
+ * Written here rather than through MNN's `wavfile.hpp`, because the length in samples is
+ * needed on the way past: a gallery that sorts by duration cannot ask a file how long it is
+ * without decoding it, and the one moment the answer is free is while the samples are in
+ * hand. Little-endian throughout, which is what WAVE is and what every device this runs on
+ * already is.
+ */
+bool writeWav(const std::string& path, const std::vector<int16_t>& samples, int sampleRate) {
+    FILE* file = std::fopen(path.c_str(), "wb");
+    if (file == nullptr) return false;
+
+    const uint32_t dataBytes = static_cast<uint32_t>(samples.size() * sizeof(int16_t));
+    const uint32_t riffSize = 36 + dataBytes;
+    const uint16_t channels = 1;
+    const uint16_t bitsPerSample = 16;
+    const uint32_t byteRate = static_cast<uint32_t>(sampleRate) * channels * bitsPerSample / 8;
+    const uint16_t blockAlign = channels * bitsPerSample / 8;
+    const uint16_t pcm = 1;
+    const uint32_t fmtSize = 16;
+
+    bool ok = std::fwrite("RIFF", 1, 4, file) == 4;
+    ok = ok && std::fwrite(&riffSize, 4, 1, file) == 1;
+    ok = ok && std::fwrite("WAVEfmt ", 1, 8, file) == 8;
+    ok = ok && std::fwrite(&fmtSize, 4, 1, file) == 1;
+    ok = ok && std::fwrite(&pcm, 2, 1, file) == 1;
+    ok = ok && std::fwrite(&channels, 2, 1, file) == 1;
+    ok = ok && std::fwrite(&sampleRate, 4, 1, file) == 1;
+    ok = ok && std::fwrite(&byteRate, 4, 1, file) == 1;
+    ok = ok && std::fwrite(&blockAlign, 2, 1, file) == 1;
+    ok = ok && std::fwrite(&bitsPerSample, 2, 1, file) == 1;
+    ok = ok && std::fwrite("data", 1, 4, file) == 4;
+    ok = ok && std::fwrite(&dataBytes, 4, 1, file) == 1;
+    if (ok && dataBytes > 0) {
+        ok = std::fwrite(samples.data(), 1, dataBytes, file) == dataBytes;
+    }
+    std::fclose(file);
+    if (!ok) std::remove(path.c_str());
+    return ok;
 }
 
 } // namespace
@@ -190,6 +249,89 @@ JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRelease(
     JNIEnv*, jobject, jlong handle) {
     delete asSession(handle);
+}
+
+/**
+ * Loads a voice bundle and returns a handle, or 0.
+ *
+ * Supertonic reads a directory: its four models, an indexer and the voice styles. Which
+ * files are missing is checked in Kotlin before this is called, because the answer here to
+ * anything wrong is a throw with a message written for a C++ developer.
+ */
+JNIEXPORT jlong JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLoadVoice(
+    JNIEnv* env, jobject, jstring modelsDir, jstring speakerId) {
+    const std::string dir = toStdString(env, modelsDir);
+    if (dir.empty()) return 0;
+
+    try {
+        auto session = std::make_unique<SpeechSession>();
+        session->tts = std::make_unique<MNNSupertonicTTSImpl>(dir);
+        const std::string speaker = toStdString(env, speakerId);
+        if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
+        return reinterpret_cast<jlong>(session.release());
+    } catch (const std::exception& failure) {
+        LOGE("a voice would not load: %s", failure.what());
+        return 0;
+    } catch (...) {
+        LOGE("a voice would not load, with no message");
+        return 0;
+    }
+}
+
+/**
+ * Speaks [text] into a WAV file and returns its length in samples, or a negative code.
+ *
+ * -1 for a runtime that refused, -2 for a file that could not be written. Samples rather
+ * than a boolean because the duration is wanted above and this is the one place it is free.
+ */
+JNIEXPORT jint JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSpeak(
+    JNIEnv* env, jobject, jlong handle, jstring text, jstring outputPath) {
+    SpeechSession* session = asSpeech(handle);
+    if (session == nullptr || !session->tts) return -1;
+
+    try {
+        const auto [rate, samples] = session->tts->Process(toStdString(env, text));
+        if (samples.empty()) {
+            LOGE("a voice produced no audio");
+            return -1;
+        }
+        session->sampleRate = rate;
+        if (!writeWav(toStdString(env, outputPath), samples, rate)) return -2;
+        return static_cast<jint>(samples.size());
+    } catch (const std::exception& failure) {
+        LOGE("speaking threw: %s", failure.what());
+        return -1;
+    } catch (...) {
+        LOGE("speaking threw something with no message");
+        return -1;
+    }
+}
+
+/** The rate the last utterance came back at, which the file header also carries. */
+JNIEXPORT jint JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSampleRate(
+    JNIEnv*, jobject, jlong handle) {
+    SpeechSession* session = asSpeech(handle);
+    return session == nullptr ? 0 : session->sampleRate;
+}
+
+/** Chooses among the voices the weights contain. */
+JNIEXPORT void JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSetSpeaker(
+    JNIEnv* env, jobject, jlong handle, jstring speakerId) {
+    SpeechSession* session = asSpeech(handle);
+    if (session == nullptr || !session->tts) return;
+    const std::string speaker = toStdString(env, speakerId);
+    if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
+}
+
+/** Releases one voice handle. */
+JNIEXPORT void JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeReleaseVoice(
+    JNIEnv*, jobject, jlong handle) {
+    delete asSpeech(handle);
 }
 
 } // extern "C"

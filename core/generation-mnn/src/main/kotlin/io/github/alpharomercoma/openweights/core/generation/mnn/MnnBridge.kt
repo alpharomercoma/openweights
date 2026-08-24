@@ -42,6 +42,19 @@ internal interface MnnBridge {
 
     /** Set for the duration of one generation, so native code can report progress. */
     var onStep: ((Int) -> Unit)?
+
+    /** A voice handle, or 0 when the bundle would not load. */
+    fun loadVoice(modelsDir: String, speakerId: String): Long
+
+    /** Samples written, or negative: -1 the runtime refused, -2 the file would not write. */
+    fun speak(handle: Long, text: String, outputPath: String): Int
+
+    /** The rate the last utterance came back at. */
+    fun sampleRate(handle: Long): Int
+
+    fun setSpeaker(handle: Long, speakerId: String)
+
+    fun releaseVoice(handle: Long)
 }
 
 /** How one generation ended, as the three answers the caller has to tell apart. */
@@ -93,6 +106,18 @@ internal class NativeMnn : MnnBridge {
 
     override fun release(handle: Long) = nativeRelease(handle)
 
+    override fun loadVoice(modelsDir: String, speakerId: String) =
+        nativeLoadVoice(modelsDir, speakerId)
+
+    override fun speak(handle: Long, text: String, outputPath: String) =
+        nativeSpeak(handle, text, outputPath)
+
+    override fun sampleRate(handle: Long) = nativeSampleRate(handle)
+
+    override fun setSpeaker(handle: Long, speakerId: String) = nativeSetSpeaker(handle, speakerId)
+
+    override fun releaseVoice(handle: Long) = nativeReleaseVoice(handle)
+
     /**
      * Called from the generating thread by native code.
      *
@@ -124,6 +149,16 @@ internal class NativeMnn : MnnBridge {
     private external fun nativeBackend(handle: Long): String
 
     private external fun nativeRelease(handle: Long)
+
+    private external fun nativeLoadVoice(modelsDir: String, speakerId: String): Long
+
+    private external fun nativeSpeak(handle: Long, text: String, outputPath: String): Int
+
+    private external fun nativeSampleRate(handle: Long): Int
+
+    private external fun nativeSetSpeaker(handle: Long, speakerId: String)
+
+    private external fun nativeReleaseVoice(handle: Long)
 
     companion object {
         /**
@@ -160,5 +195,14 @@ internal class NativeMnn : MnnBridge {
          * and this app generates repeatedly by design.
          */
         const val MEMORY_KEEP_LOADED = 1
+
+        /**
+         * The voices Supertonic's weights contain, in the order it names them.
+         *
+         * Listed rather than discovered, because the runtime offers no way to ask: its
+         * speaker ids are a fixed array in the implementation. A capability that guessed
+         * would eventually offer a voice the weights do not have.
+         */
+        val SUPERTONIC_VOICES = listOf("M1", "M2", "F1", "F2")
     }
 }

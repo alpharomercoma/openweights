@@ -37,4 +37,22 @@ class WebSearchToolTest {
         // Malformed JSON is common from small models and must not throw.
         assertThat(call("not json").argument("query")).isNull()
     }
+
+    @Test
+    fun `successful search keeps exact normalized source addresses as typed evidence`() {
+        val execution = WebSearchTool.webSearchSuccess(
+            query = "topic",
+            provider = "Example",
+            results = listOf(
+                SearchHit("One", "first", "https://example.test"),
+                SearchHit("Two", "second", "https://example.test/two?q=1"),
+            ),
+        )
+
+        assertThat(execution.successful).isTrue()
+        assertThat((execution.evidence as ToolEvidence.Search).urls).containsExactly(
+            "https://example.test/",
+            "https://example.test/two?q=1",
+        )
+    }
 }

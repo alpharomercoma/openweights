@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Android 12+ and the compat path use the same branded launch surface. -->
+    <style name="Theme.OpenWeights" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.OpenWeights.App</item>
+    </style>
+
     <!-- Compose owns all real theming; this only styles the pre-Compose window. -->
-    <style name="Theme.OpenWeights" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.OpenWeights.App" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/window_background</item>

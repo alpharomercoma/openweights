@@ -5,7 +5,7 @@ below was checked against the build rather than assumed.
 
 ## Verified in the build
 
-Everything in this table was re-checked against the artifact on 2026-08-15, not against the
+Everything in this table was re-checked against the artifact on 2026-08-24, not against the
 intent. Where a row says "measured", the command is in the row.
 
 | Requirement | State | How it was checked |
@@ -43,18 +43,22 @@ One trap, since it cost a run: a release APK signed with a throwaway key and the
 share a signature, so the second refuses to replace the first with
 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Uninstall before generating.
 
-### The baseline profile is ours now
+### The baseline profile is ours, but must be refreshed after launch changes
 
 `:baselineprofile` drives the app on a device and records what a cold start and one visit to
 each tab actually run, so ART compiles it ahead of time instead of interpreting it. The
 result is checked in at `app/src/release/generated/baselineProfiles/baseline-prof.txt`, which
 is what lets a machine with no phone attached still build a profiled release.
 
-Measured on the artifact, before and after: the release APK carried one 10.6 KB `.dm` of
+Measured on the previous artifact, before and after: the release APK carried one 10.6 KB `.dm` of
 merged AndroidX profiles and nothing of ours; it now carries two, 12.5 and 12.6 KB, and the
 profile behind them has 1,658 lines naming our own classes out of 24,749. `profileinstaller`
 is a dependency now as well, because a profile that ships and is never applied is the quiet
 way to do this work twice.
+
+The checked-in profile predates the current drawer-first navigation and branded splash launch
+path. Treat its numbers as historical until a representative device records the current
+startup flow; do not use them as a release performance claim.
 
 ```
 ./gradlew :app:generateReleaseBaselineProfile     # needs a device, rewrites the file above

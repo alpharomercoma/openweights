@@ -192,6 +192,8 @@ data class LoadedModelInfo(
      * be on screen.
      */
     val supportsReasoningEffort: Boolean = false,
+    /** Absolute path of the weights currently owned by the engine. */
+    val modelPath: String = "",
 )
 
 /**

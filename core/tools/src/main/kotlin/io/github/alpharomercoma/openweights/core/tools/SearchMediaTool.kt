@@ -49,6 +49,7 @@ class SearchMediaTool @Inject constructor(
     private val settings: SearchSettings,
     private val reachability: Reachability,
 ) : Tool {
+    override val parallelSafe: Boolean = true
     override val isAvailable: Boolean get() = reachability.isOnline()
 
     override val definition = ToolDefinition(

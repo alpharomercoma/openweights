@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +53,7 @@ import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.ui.models.ActiveDownload
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
 import io.github.alpharomercoma.openweights.ui.models.PublisherHeading
 import io.github.alpharomercoma.openweights.ui.models.byPublisher
@@ -73,10 +75,12 @@ import io.github.alpharomercoma.openweights.ui.models.byPublisher
 @Composable
 fun ModelPickerSheet(
     models: List<LocalModel>,
+    downloads: List<ActiveDownload> = emptyList(),
     activeName: String?,
     /** Publisher logos, when the Hub has been asked. Empty offline, and that is fine. */
     avatars: Map<String, String> = emptyMap(),
     onSelect: (LocalModel) -> Unit,
+    onUnload: () -> Unit = {},
     onBrowse: () -> Unit,
     onManage: () -> Unit,
     onDismiss: () -> Unit,
@@ -98,6 +102,18 @@ fun ModelPickerSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
+            }
+
+            if (downloads.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.downloading),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 8.dp),
+                )
+                downloads.forEach { download ->
+                    DownloadingModelRow(download)
+                }
             }
 
             // The list scrolls inside its own bounds and the two ways out sit under it,
@@ -152,7 +168,48 @@ fun ModelPickerSheet(
                 icon = Icons.Rounded.Tune,
                 onClick = onManage,
             )
+            if (activeName != null) {
+                SheetAction(
+                    label = stringResource(R.string.unload_model),
+                    detail = stringResource(R.string.release_model_memory),
+                    icon = Icons.Rounded.Close,
+                    onClick = onUnload,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun DownloadingModelRow(download: ActiveDownload) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = download.path.substringAfterLast('/').ifBlank { download.key },
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+        )
+        androidx.compose.material3.LinearProgressIndicator(
+            progress = { download.fraction.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Caption(
+            text = if (download.isVerifying) {
+                stringResource(R.string.download_verifying)
+            } else if (download.bytesTotal > 0) {
+                stringResource(
+                    R.string.download_progress,
+                    formatBytes(download.bytesDone),
+                    formatBytes(download.bytesTotal),
+                )
+            } else {
+                stringResource(R.string.download_queued)
+            },
+        )
     }
 }
 

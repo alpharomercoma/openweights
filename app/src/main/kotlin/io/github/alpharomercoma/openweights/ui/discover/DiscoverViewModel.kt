@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubSearchPage
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
@@ -74,6 +75,8 @@ data class DiscoverUiState(
     val query: HubQuery = HubQuery(),
     val results: List<HubModel> = emptyList(),
     val isSearching: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val canLoadMore: Boolean = false,
     val detail: HubModelDetail? = null,
     val files: List<InspectedFile> = emptyList(),
     val contextLength: Int = DEFAULT_CONTEXT,
@@ -107,6 +110,8 @@ class DiscoverViewModel @Inject constructor(
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var nextOffset = 0
+    private var searchGeneration = 0L
 
     /** Runs the query a moment after typing stops, so every keystroke is not a request. */
     private var typingJob: Job? = null
@@ -201,25 +206,92 @@ class DiscoverViewModel @Inject constructor(
 
     fun search() {
         searchJob?.cancel()
+        nextOffset = 0
+        val generation = ++searchGeneration
         searchJob = viewModelScope.launch {
-            _uiState.update { it.copy(isSearching = true, error = null) }
+            _uiState.update {
+                it.copy(
+                    isSearching = true,
+                    isLoadingMore = false,
+                    canLoadMore = false,
+                    results = emptyList(),
+                    error = null,
+                )
+            }
             val query = _uiState.value.query
             runCatching {
                 when {
                     // A shortlist is fetched by name, not searched for. Typing in the box
                     // means the shortlist is not what is being asked for any more.
-                    query.recommendedOnly && query.text.isBlank() -> client.recommended()
-                    query.officialOnly -> official(client.search(query))
-                    else -> client.search(query)
+                    query.recommendedOnly && query.text.isBlank() ->
+                        HubSearchPage(client.recommended(), hasMore = false)
+                    query.officialOnly -> {
+                        val page = client.searchPage(query, offset = 0)
+                        HubSearchPage(official(page.models), page.hasMore)
+                    }
+                    else -> client.searchPage(query, offset = 0)
                 }
             }
                 .onSuccess { results ->
-                    _uiState.update { it.copy(isSearching = false, results = results) }
-                    resolveAvatars(results)
+                    if (generation != searchGeneration || _uiState.value.query != query) {
+                        return@onSuccess
+                    }
+                    val page = results
+                    val models = page.models
+                    nextOffset = models.size
+                    _uiState.update {
+                        it.copy(
+                            isSearching = false,
+                            results = models,
+                            canLoadMore = page.hasMore,
+                        )
+                    }
+                    resolveAvatars(models)
                 }
                 .onFailure { failure ->
+                    if (failure is CancellationException) throw failure
                     _uiState.update {
                         it.copy(isSearching = false, error = failure.readableMessage())
+                    }
+                }
+        }
+    }
+
+    /** Appends one page for an ordinary Hub search, preserving the current query generation. */
+    fun loadMore() {
+        val state = _uiState.value
+        val isRecommendedSearch = state.query.recommendedOnly && state.query.text.isBlank()
+        if (state.isSearching) return
+        if (state.isLoadingMore) return
+        if (!state.canLoadMore) return
+        if (isRecommendedSearch) return
+        searchJob?.cancel()
+        val generation = searchGeneration
+        searchJob = viewModelScope.launch {
+            val query = _uiState.value.query
+            _uiState.update { it.copy(isLoadingMore = true, error = null) }
+            runCatching { client.searchPage(query, offset = nextOffset) }
+                .onSuccess { page ->
+                    if (generation != searchGeneration || _uiState.value.query != query) {
+                        return@onSuccess
+                    }
+                    val existing = _uiState.value.results.mapTo(linkedSetOf()) { it.id }
+                    val pageModels = if (query.officialOnly) official(page.models) else page.models
+                    val appended = pageModels.filter { existing.add(it.id) }
+                    nextOffset += page.models.size
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMore = false,
+                            results = it.results + appended,
+                            canLoadMore = page.hasMore && page.models.isNotEmpty(),
+                        )
+                    }
+                    resolveAvatars(appended)
+                }
+                .onFailure { failure ->
+                    if (failure is CancellationException) throw failure
+                    _uiState.update {
+                        it.copy(isLoadingMore = false, error = failure.readableMessage())
                     }
                 }
         }
@@ -292,6 +364,7 @@ class DiscoverViewModel @Inject constructor(
                     }
                 }
                 .onFailure { failure ->
+                    if (failure is CancellationException) throw failure
                     _uiState.update { it.copy(error = failure.readableMessage()) }
                 }
         }

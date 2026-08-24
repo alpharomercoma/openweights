@@ -28,6 +28,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.download.ModelDownloadWorker
@@ -105,6 +106,7 @@ class ModelsViewModel @Inject constructor(
     private val workManager: WorkManager,
     private val modelStore: ModelStore,
     private val publishers: Publishers,
+    private val engine: InferenceEngine,
 ) : ViewModel() {
     private val local = MutableStateFlow(ModelsUiState())
 
@@ -276,11 +278,18 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun delete(model: LocalModel) {
+        // A mapped model can survive an unlink on some filesystems but not all engines
+        // tolerate the backing file disappearing while a generation is in flight. The
+        // picker exposes an explicit unload action; deletion is therefore a no-op until
+        // the user releases the model first.
+        if (engine.loadedModel?.modelPath == model.file.absolutePath) return
         modelStore.forgetPublisher(model.file.name)
         model.file.delete()
+        model.file.sourceSidecar.delete()
         // The projector is useless without its model and is often the larger of the two,
         // so leaving it behind would quietly keep hundreds of megabytes.
         model.projector?.delete()
+        model.projector?.sourceSidecar?.delete()
         refresh()
     }
 
@@ -343,3 +352,6 @@ class ModelsViewModel @Inject constructor(
         const val BACKOFF_SECONDS = 30L
     }
 }
+
+/** Downloader provenance belongs to the model and must not survive its deletion. */
+private val File.sourceSidecar: File get() = File(parentFile, name + ".source")

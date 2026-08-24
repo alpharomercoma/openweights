@@ -75,8 +75,12 @@ class ModelDownloader @Inject constructor(
     private val tokenSource: HubTokenSource,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    // This is a Flow state machine with intentionally explicit resume/provenance guards.
+    @Suppress("CyclomaticComplexMethod")
     fun download(repoId: String, file: HubFile, destination: File): Flow<DownloadProgress> = flow {
         destination.parentFile?.mkdirs()
+        val identity = downloadIdentity(repoId, file)
+        val destinationSource = destination.sourceFile()
 
         // A file already there at the right length is normally the same file, and rehashing
         // several gigabytes to prove it would make every reopen of the models screen cost a
@@ -86,18 +90,38 @@ class ModelDownloader @Inject constructor(
         // The case that matters is a publisher replacing a file with different bytes under
         // the same name and the same size. Without the hash, the app reports "Finished" and
         // keeps running the old weights forever, and nothing on screen ever disagrees.
-        if (destination.isFile && destination.length() == file.sizeBytes) {
+        if (destination.isFile) {
             val expected = file.sha256
-            if (expected == null || destination.sha256(ioDispatcher).equals(expected, true)) {
+            val hashMatches = expected != null &&
+                destination.length() == file.sizeBytes &&
+                destination.sha256(ioDispatcher).equals(expected, true)
+            val sourceMatches = destinationSource.readTextOrNull() == identity
+            if (destination.length() == file.sizeBytes && (hashMatches || sourceMatches)) {
+                destinationSource.writeText(identity)
                 emit(DownloadProgress.Finished(destination))
                 return@flow
+            }
+            if (expected == null && !sourceMatches) {
+                throw DownloadException(
+                    "A different model named ${destination.name} is already on this device. " +
+                        "Remove or rename it before downloading this one.",
+                )
             }
             // Different bytes under the same name. Removed rather than resumed: a resume
             // would append to content that is already wrong.
             destination.delete()
+            destinationSource.delete()
         }
 
         val partial = File(destination.parentFile, destination.name + PARTIAL_SUFFIX)
+        val partialSource = partial.sourceFile()
+        if (partial.isFile && partialSource.readTextOrNull() != identity) {
+            // A basename is not an identity. Without this, cancelling repo A/model.gguf and
+            // starting repo B/model.gguf appends B to A and can install the hybrid when no
+            // checksum was published.
+            partial.delete()
+        }
+        partialSource.writeText(identity)
 
         // A partial longer than the file it is meant to become can never be resumed: the
         // range request starts past the end, the server answers 416, and every retry
@@ -123,9 +147,15 @@ class ModelDownloader @Inject constructor(
         }
         verify(file, partial)
 
+        // Commit provenance first. If this write fails, the resumable bytes remain under
+        // .part; publishing the model first could leave a valid no-checksum download that
+        // its own retry refuses because its identity was never durably recorded.
+        destinationSource.writeText(identity)
         if (!partial.renameTo(destination)) {
+            destinationSource.delete()
             throw DownloadException("Could not move the finished download into place.")
         }
+        partialSource.delete()
         emit(DownloadProgress.Finished(destination))
     }.flowOn(ioDispatcher)
 
@@ -172,9 +202,22 @@ class ModelDownloader @Inject constructor(
         val startAt = if (resuming) alreadyHave else 0L
         emit(DownloadProgress.Downloading(startAt, total))
 
+        val ceiling = if (total > 0) {
+            total
+        } else {
+            val free = partial.parentFile?.usableSpace ?: 0L
+            if (free <= STORAGE_RESERVE_BYTES) {
+                throw DownloadException("There is not enough free storage to download this file.")
+            }
+            minOf(
+                MAX_UNKNOWN_DOWNLOAD_BYTES,
+                startAt.saturatedPlus(free - STORAGE_RESERVE_BYTES),
+            )
+        }
+
         input.use { source ->
             FileOutputStream(partial, resuming).use { output ->
-                pump(source, output, startAt, total)
+                pump(source, output, startAt, total, ceiling)
             }
         }
     }
@@ -185,6 +228,7 @@ class ModelDownloader @Inject constructor(
         output: FileOutputStream,
         startAt: Long,
         total: Long,
+        ceiling: Long,
     ) {
         val buffer = ByteArray(BUFFER_BYTES)
         var written = startAt
@@ -196,9 +240,14 @@ class ModelDownloader @Inject constructor(
             // keeps sending filled the disk, because the length was only checked once the
             // transfer had finished. Zero means the size was not published, which is the
             // one case there is nothing to check against.
-            if (total > 0 && written + read > total) {
+            if (written > ceiling - read) {
                 throw DownloadException(
-                    "The server sent more than the $total bytes this file claims to be.",
+                    if (total > 0) {
+                        "The server sent more than the $total bytes this file claims to be."
+                    } else {
+                        "The server sent an unbounded file, so the download was stopped " +
+                            "before it could fill the device."
+                    },
                 )
             }
             output.write(buffer, 0, read)
@@ -262,5 +311,20 @@ class ModelDownloader @Inject constructor(
         const val PARTIAL_SUFFIX = ".part"
         const val BUFFER_BYTES = 1 shl 16
         const val PROGRESS_INTERVAL_BYTES = 1L shl 20
+        const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
+        const val MAX_UNKNOWN_DOWNLOAD_BYTES = 32L * 1024 * 1024 * 1024
     }
 }
+
+/** Stable provenance for files whose repository-controlled basenames may collide. */
+internal fun downloadIdentity(repoId: String, file: HubFile): String =
+    listOf(repoId, file.path, file.sizeBytes.toString(), file.sha256.orEmpty()).joinToString("\n")
+
+private fun File.sourceFile(): File = File(parentFile, "$name.source")
+
+private fun File.readTextOrNull(): String? = runCatching {
+    takeIf(File::isFile)?.readText()
+}.getOrNull()
+
+private fun Long.saturatedPlus(other: Long): Long =
+    if (this > Long.MAX_VALUE - other) Long.MAX_VALUE else this + other

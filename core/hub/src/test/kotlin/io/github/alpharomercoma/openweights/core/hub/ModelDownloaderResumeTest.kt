@@ -98,12 +98,22 @@ class ModelDownloaderResumeTest {
         downloader.download("owner/repo", hubFile(), destination).toList()
     }
 
+    private fun markPartial(
+        destination: File,
+        repoId: String = "owner/repo",
+        file: HubFile = hubFile(),
+    ) {
+        File(folder.root, destination.name + ".part.source")
+            .writeText(downloadIdentity(repoId, file))
+    }
+
     @Test
     fun `a download that died halfway asks for the rest and keeps what it had`() {
         val destination = File(folder.root, "weights.gguf")
         val already = 800
         File(folder.root, "weights.gguf.part")
             .writeBytes(whole.copyOfRange(0, already))
+        markPartial(destination)
 
         server.enqueue(
             MockResponse.Builder()
@@ -144,6 +154,7 @@ class ModelDownloaderResumeTest {
         // on that answer with nothing on screen offering a way out.
         val destination = File(folder.root, "weights.gguf")
         File(folder.root, "weights.gguf.part").writeBytes(ByteArray(whole.size + 500))
+        markPartial(destination)
 
         server.enqueue(MockResponse.Builder().code(200).body(body(whole)).build())
 
@@ -161,6 +172,7 @@ class ModelDownloaderResumeTest {
         // from the end is a 416, so it must not ask at all.
         val destination = File(folder.root, "weights.gguf")
         File(folder.root, "weights.gguf.part").writeBytes(whole)
+        markPartial(destination)
 
         val progress = fetch(destination)
 
@@ -241,5 +253,32 @@ class ModelDownloaderResumeTest {
 
         assertThat(states.single()).isInstanceOf(DownloadProgress.Finished::class.java)
         assertThat(server.requestCount).isEqualTo(before)
+    }
+
+    @Test
+    fun `a partial from another repository is never resumed`() = runBlocking {
+        val destination = File(folder.root, "weights.gguf")
+        File(folder.root, "weights.gguf.part").writeBytes(ByteArray(800) { 9 })
+        markPartial(destination, repoId = "other/repo")
+        server.enqueue(MockResponse.Builder().code(200).body(body(whole)).build())
+
+        downloader.download("owner/repo", hubFile(), destination).toList()
+
+        assertThat(server.takeRequest().headers["Range"]).isNull()
+        assertThat(destination.readBytes()).isEqualTo(whole)
+    }
+
+    @Test
+    fun `an unverified same-name file from another source is preserved`() = runBlocking {
+        val destination = File(folder.root, "weights.gguf").apply { writeBytes(whole) }
+        val unverified = hubFile(sha = null)
+
+        val failure = runCatching {
+            downloader.download("another/repo", unverified, destination).toList()
+        }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(DownloadException::class.java)
+        assertThat(destination.readBytes()).isEqualTo(whole)
+        assertThat(server.requestCount).isEqualTo(0)
     }
 }

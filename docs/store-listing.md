@@ -57,9 +57,9 @@ Search Hugging Face from inside the app, find out whether a model will actually 
 device before you download it, and chat with it. Every token is produced by your own
 hardware.
 
-ANY MODEL, NOT A CATALOGUE
-Other on-device apps hand you a short list somebody else chose. OpenWeights hands you the
-Hub. If someone published a GGUF an hour ago, you can run it.
+BROWSE THE HUB, RUN WHAT FITS
+Other on-device apps hand you a short list somebody else chose. OpenWeights lets you browse
+GGUF repositories on Hugging Face, inspect the fit, and run supported architectures locally.
 
 HONEST ABOUT YOUR DEVICE
 Before you spend gigabytes, the app reads the model's header over the network and tells you
@@ -79,7 +79,8 @@ that is a switch too, and on a phone with a working GPU you can say which proces
 layers.
 
 MORE THAN TEXT
-Images and audio for models that ship a projector for them, documents any model can read,
+Images and audio for models that ship a compatible projector, documents supported by the
+selected model,
 dictation through your phone's own on-device recogniser, and read-aloud.
 
 AN ASSISTANT THAT CAN ACT

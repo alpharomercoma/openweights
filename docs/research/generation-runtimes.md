@@ -70,11 +70,13 @@ target chip so the interface cannot claim a size or a voice the weights do not h
 tokens per second, none of which a diffusion model has, and the settings sheet has already
 had to be rescued once from offering parameters that reach nothing.
 
-The smallest honest next increment, when it happens, is one MNN OpenCL image proof: a
-downloadable INT8 SD1.5 bundle, one fixed seed at 512 by 512 and 10 steps, five warm runs on
-one real 8 Gen 2, recording wall time, per step time, the backend that actually ran, peak
-PSS, and what cancellation releases. Shipped as "experimental, validated on this device with
-this bundle", with no performance claim until that data exists.
+The smallest honest next increment, when it happens, is one MNN OpenCL image proof: a locally
+converted and checksummed SD1.5 bundle whose source revision, licence and conversion arguments
+are recorded, one fixed seed at 512 by 512 and 10 steps, and repeated runs on one real 8 Gen 2.
+The run must record wall time, step timing, the backend that actually ran and peak PSS. An INT8
+or downloadable bundle is a later deliverable, not something this repository has established.
+Any result is labelled "experimental, validated on this device with this bundle", with no
+performance claim until the checklist below has been completed.
 
 Runtime licences are all permissive and compatible with an Apache-2.0 app. The **model**
 files are not covered by that: Stable Diffusion and Sana checkpoints, Supertonic weights and
@@ -91,13 +93,15 @@ in **105 seconds**.
 
 Two configuration facts worth keeping, because both cost a cycle to find:
 
-- `MNN_BUILD_DIFFUSION=ON` forces `MNN_IMGCODECS` on, which pulls in `MNNOpenCV`. Turning
-  OpenCV off does not help: the flag is forced, not defaulted.
+- `MNN_BUILD_DIFFUSION=ON` forces the OpenCV surface on, and that surface enables
+  `MNN_IMGCODECS`, which supplies the image writer used by Stable Diffusion. Turning OpenCV
+  off does not help: the flag is forced, not defaulted.
 - With `MNN_SEP_BUILD=OFF`, `MNNOpenCV` becomes an OBJECT library and its `POST_BUILD` step
   is illegal, so CMake refuses. `MNN_SEP_BUILD=ON` is required, which means four shared
-  objects rather than one.
+  MNN prerequisite libraries rather than one. A usable diffusion bridge also needs MNN's
+  separate `diffusion` and `llm` libraries and a project-owned JNI library.
 
-**What it costs an APK**, stripped, arm64 only:
+**What the measured prerequisite subset costs**, stripped, arm64 only:
 
 | library | stripped |
 | --- | --- |
@@ -105,17 +109,78 @@ Two configuration facts worth keeping, because both cost a cycle to find:
 | `libMNN_CL.so` (OpenCL backend) | 2,190 KB |
 | `libMNN_Express.so` | 698 KB |
 | `libMNNOpenCV.so` | 253 KB |
-| **total** | **5,849 KB, about 5.8 MB** |
+| **measured subtotal** | **5,849 KB, about 5.8 MB** |
 
-That is the figure the earlier research could not find anywhere, and it is small: under six
-megabytes for a second inference runtime, against a vendored llama.cpp that is already far
-larger. Binary size is not the reason to hesitate.
+This is not the APK cost of image generation. The build also produces `libdiffusion.so` and
+`libllm.so`, and an integration will add its own JNI shared object. Their stripped sizes and
+the resulting APK delta were not recorded, so no complete runtime-size total is claimed here.
 
-**What is still not done, and is the actual cost.** A working image generator needs the MNN
-source vendored (358 MB of checkout), a JNI bridge of this project's own, SD1.5 or Sana
-weights converted to MNN format and delivered on demand, and the measurement runs that turn
-"it generates" into a latency and a peak RSS. The build being cheap does not make the
-feature cheap; it removes the first of four reasons it might have been impossible.
+**What is still not done, and is the actual cost.** The MNN source is already pinned in this
+repository. A working image generator still needs a JNI bridge of this project's own, SD1.5
+or Sana weights converted to MNN format and eventually delivered on demand, and measurement
+runs that turn "it generates" into latency and peak-memory evidence. The native prerequisite
+build removes one unknown; it does not yet establish a working or distributable feature.
+
+### The model bundle is more than four files
+
+MNN's Stable Diffusion README names `text_encoder.mnn`, `unet.mnn`, `vae_decoder.mnn` and
+`tokenizer.mtok`. The supplied conversion script invokes `MNNConvert` with
+`--saveExternalData=1`, so each `.mnn` also has a sibling `.mnn.weight` file. A benchmark
+fixture therefore contains these seven files:
+
+```text
+text_encoder.mnn
+text_encoder.mnn.weight
+unet.mnn
+unet.mnn.weight
+vae_decoder.mnn
+vae_decoder.mnn.weight
+tokenizer.mtok
+```
+
+The repository does not contain this bundle, a download location, or verified hashes for it.
+The conversion script also does not make INT8 the default and does not propagate a failed
+`MNNConvert` subprocess as a failing process. A reproducible conversion wrapper must choose
+and record the quantization arguments, fail if any conversion fails, require every expected
+file to be non-empty, and write hashes for all seven outputs. Distribution additionally waits
+on a review of the source checkpoint's model licence.
+
+### Benchmark acceptance checklist
+
+The first benchmark is an instrumented proof with a trusted fixture pushed to the device. It
+is not a production downloader or a public generation feature.
+
+Before a run, record:
+
+- app build and MNN commits; checkpoint repository and immutable revision; conversion command;
+  the seven file sizes and SHA-256 hashes;
+- device model, SoC, Android version, GPU/driver identity and thermal state;
+- requested and verified runtime backend. A request for OpenCL is not evidence that OpenCL
+  ran; reject or skip the result if the selected backend cannot be verified as OpenCL.
+
+Use one fixed prompt, seed `42`, 512 by 512 output, 10 steps and guidance `7.5`. Those values
+match the fixed SD1.5 path in the pinned MNN source. Keep negative prompts, variable sizes,
+previews and other guidance values out of this proof because that path does not implement
+them.
+
+Measure cold load and cold generation separately. Then perform one unreported warm-up and
+five measured generations, reporting every sample plus median and p95 rather than only an
+average. Use memory mode 1 for repeated runs: the pinned implementation releases modules
+during a run in modes 0 and 2, so those modes require a fresh load and are not warm runs.
+Record total wall time, progress-callback timestamps, baseline/post-load/peak/post-unload PSS,
+and the stripped APK native-library delta including `libdiffusion.so`, `libllm.so` and the JNI
+bridge. State whether image encoding is included in wall time.
+
+Every measured run must produce a non-empty, decodable 512 by 512 image with non-zero pixel
+variance. Preserve the output and raw measurements with the result. A fixed-seed hash may be
+used only after the same device/backend/build has established that byte-for-byte output is
+stable; otherwise record an explicitly chosen image-comparison threshold.
+
+Cancellation is not part of the current proof. The pinned Stable Diffusion denoising loop has
+no cancellation hook, so the benchmark must say "not implemented" rather than infer release
+behaviour from closing or killing the process. Before any public generator claims cancellation,
+it needs a between-step cancellation check, a distinct cancelled result, a bounded stop-time
+test, proof that no final file was published, and post-unload PSS evidence.
 
 The published Maven artifact is not an option and should not be revisited: `com.alibaba.android:mnn`
 was last updated **2021-02-24** at version 0.0.8, against an upstream now on 3.6.1. It is

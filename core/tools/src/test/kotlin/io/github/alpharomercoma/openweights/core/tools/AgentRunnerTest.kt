@@ -24,9 +24,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * What the agent does with what a model asks for.
@@ -691,6 +693,43 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun `typed tool outcome reaches the agent step without being inferred from prose`() = runTest {
+        val evidence = ToolEvidence.Search(setOf("https://example.test/"))
+        val tool = TypedOutcome(ToolExecution("plausible result", evidence = evidence))
+        val runner = AgentRunner(ToolRegistry(listOf(tool)))
+
+        val decision = runner.step(
+            listOf(call("typed")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        ) as AgentDecision.Continue
+        val step = decision.steps.single() as AgentStep.Ran
+
+        assertThat(step.successful).isTrue()
+        assertThat(step.evidence).isEqualTo(evidence)
+    }
+
+    @Test
+    fun `useful failure prose remains an unsuccessful agent step`() = runTest {
+        val runner = AgentRunner(
+            ToolRegistry(listOf(TypedOutcome(ToolExecution.failure("try another source")))),
+        )
+
+        val decision = runner.step(
+            listOf(call("typed")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        ) as AgentDecision.Continue
+        val step = decision.steps.single() as AgentStep.Ran
+
+        assertThat(step.result).isEqualTo("try another source")
+        assertThat(step.successful).isFalse()
+        assertThat(step.evidence).isNull()
+    }
+
+    @Test
     fun `a tool whose effect outlives the conversation asks even in auto`() = runTest {
         // The gap an audit found. `needsApproval` is an ASK-mode question by design, so
         // setting it on `remember` did nothing in AUTO, which is the default: an injected
@@ -705,6 +744,24 @@ class AgentRunnerTest {
             approve = {
                 asked++
                 true
+            },
+        )
+
+        assertThat(asked).isEqualTo(1)
+    }
+
+    @Test
+    fun `yolo cannot waive approval for an effect that outlives yolo`() = runTest {
+        var asked = 0
+        val runner = AgentRunner(ToolRegistry(listOf(Persistent())))
+
+        runner.step(
+            calls = listOf(call("persistent")),
+            round = 0,
+            mode = AgentMode.YOLO,
+            approve = {
+                asked++
+                false
             },
         )
 
@@ -731,6 +788,53 @@ class AgentRunnerTest {
         assertThat(asked).isEqualTo(0)
     }
 
+    @Test
+    fun `only the destructive form of a call asks in auto`() = runTest {
+        var asked = 0
+        val runner = AgentRunner(ToolRegistry(listOf(CallSensitive())))
+        val approve: suspend (ToolCall) -> Boolean = {
+            asked++
+            true
+        }
+
+        runner.step(
+            listOf(call("save", args = """{"replace":false}""")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = approve,
+        )
+        runner.step(
+            listOf(call("save", id = "c2", args = """{"replace":true}""")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = approve,
+        )
+
+        assertThat(asked).isEqualTo(1)
+    }
+
+    @Test
+    fun `independent auto lookups run concurrently but keep model order`() = runTest {
+        val active = AtomicInteger(0)
+        val peak = AtomicInteger(0)
+        val runner = AgentRunner(ToolRegistry(listOf(ParallelLookup(active, peak))))
+
+        val decision = runner.step(
+            calls = listOf(
+                call("parallel_lookup", id = "one", args = "{\"query\":\"a\"}"),
+                call("parallel_lookup", id = "two", args = "{\"query\":\"b\"}"),
+            ),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { error("parallel-safe calls must not ask") },
+        ) as AgentDecision.Continue
+
+        assertThat(peak.get()).isEqualTo(2)
+        assertThat(decision.steps.map { it.callId() })
+            .containsExactly("one", "two")
+            .inOrder()
+    }
+
     private class Persistent : Tool {
         override val definition = ToolDefinition("persistent", "d", "{}")
         override val alwaysAsks: Boolean = true
@@ -740,5 +844,33 @@ class AgentRunnerTest {
     private class Ordinary : Tool {
         override val definition = ToolDefinition("ordinary", "d", "{}")
         override suspend fun run(call: ToolCall) = "done"
+    }
+
+    private class CallSensitive : Tool {
+        override val definition = ToolDefinition("save", "d", "{}")
+        override fun asksInAuto(call: ToolCall): Boolean = call.flag("replace")
+        override suspend fun run(call: ToolCall) = "done"
+    }
+
+    private class TypedOutcome(private val outcome: ToolExecution) : Tool {
+        override val definition = ToolDefinition("typed", "d", "{}")
+        override suspend fun run(call: ToolCall): String = outcome.text
+        override suspend fun execute(call: ToolCall): ToolExecution = outcome
+    }
+
+    private class ParallelLookup(
+        private val active: AtomicInteger,
+        private val peak: AtomicInteger,
+    ) : Tool {
+        override val definition = ToolDefinition("parallel_lookup", "d", "{}")
+        override val parallelSafe: Boolean = true
+
+        override suspend fun run(call: ToolCall): String {
+            val now = active.incrementAndGet()
+            peak.updateAndGet { old -> maxOf(old, now) }
+            delay(100)
+            active.decrementAndGet()
+            return call.id
+        }
     }
 }

@@ -37,6 +37,7 @@ import io.github.alpharomercoma.openweights.core.hub.DownloadException
 import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.ModelDownloader
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.catch
 import java.io.File
 import java.io.IOException
@@ -100,7 +101,13 @@ class ModelDownloadWorker @AssistedInject constructor(
         val file = HubFile(path, sizeBytes, inputData.getString(KEY_SHA256))
 
         downloader.download(repoId, file, destination)
-            .catch { failure = it }
+            .catch {
+                // WorkManager cancellation must remain cancellation. Turning it into a
+                // terminal failure leaves a cancelled row visible and can schedule a retry
+                // after the user explicitly stopped a multi-gigabyte transfer.
+                if (it is CancellationException) throw it
+                failure = it
+            }
             .collect { progress -> report(progress) }
 
         val error = failure ?: return Result.success()

@@ -36,6 +36,9 @@
     <string name="models_phone_yet">この端末にはまだモデルがありません。</string>
     <string name="find_one_hugging_face">Hugging Faceで探す</string>
     <string name="manage_models">モデルを管理</string>
+    <string name="unload_model">モデルをアンロード</string>
+    <string name="release_model_memory">ファイルを削除せずにモデルのメモリを解放</string>
+    <string name="battery_temperature">バッテリー %1$.1f°C</string>
     <string name="downloads_what_remove">ダウンロードと、削除するもの</string>
     <string name="use">使用中</string>
     <string name="answer_length">返答の長さ</string>
@@ -64,6 +67,11 @@
     <string name="anything_add">補足があれば</string>
     <string name="saved_device">この端末に保存されます</string>
     <string name="cancel">キャンセル</string>
+    <string name="message_actions">メッセージの操作</string>
+    <string name="downloading">ダウンロード中</string>
+    <string name="download_queued">キューに追加済み</string>
+    <string name="download_verifying">検証中</string>
+    <string name="download_progress">%1$s / %2$s</string>
     <string name="report">報告</string>
     <string name="now">今はしない</string>
     <string name="run">実行</string>
@@ -77,6 +85,8 @@
     <string name="recommended">おすすめ</string>
     <string name="official">公式</string>
     <string name="filters">絞り込み</string>
+    <string name="filters_count">絞り込み %1$d</string>
+    <string name="show_more_filters">さらに絞り込む</string>
     <string name="clear_all">すべて消去</string>
     <string name="task">タスク</string>
     <string name="any">すべて</string>
@@ -120,4 +130,16 @@
     <string name="folder_readonly">読み取りはできますが新しいファイルは受け付けないため、保存は無効のままです。</string>
     <string name="folder_ready">モデルは検索、読み取り、新しいファイルの保存ができます。</string>
     <string name="proxy_hint">http://host:port または socks5://host:port</string>
+    <string name="goal_planning">ゴールを計画中</string>
+    <string name="goal_working">ゴールを実行中</string>
+    <string name="goal_done">ゴール完了</string>
+    <string name="goal_stopped">ゴールを停止しました</string>
+    <string name="goal_halted">ゴールの確認が必要です</string>
+    <string name="goal_step_count">%2$d ステップ中 %1$d</string>
+    <string name="goal_current_step">現在: %1$s</string>
+    <string name="goal_steer_label">次のステップを調整</string>
+    <string name="goal_steer_support">現在のステップが終わった後に適用されます</string>
+    <string name="goal_stop">ゴールを停止</string>
+    <string name="goal_send_steering">適用</string>
+    <string name="goal_dismiss">閉じる</string>
 </resources>

@@ -115,4 +115,16 @@ class PlanBoardTest {
 
         assertThat(board.plan.value).isNull()
     }
+
+    @Test
+    fun `a rejected completion restores the plan before the turn`() {
+        board.propose("1. search it\n2. write it")
+        val before = requireNotNull(board.plan.value)
+        board.tick(0)
+
+        board.restore(before)
+
+        assertThat(board.plan.value).isEqualTo(before)
+        assertThat(board.plan.value?.steps?.none { it.done }).isTrue()
+    }
 }

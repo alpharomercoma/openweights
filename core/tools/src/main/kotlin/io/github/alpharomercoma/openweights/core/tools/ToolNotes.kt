@@ -67,6 +67,7 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
         // associateBy keeps the last on a collision, which is what a batch holding the same
         // call twice should leave behind: one note, the newer of the two.
         val fresh = steps.filterIsInstance<AgentStep.Ran>()
+            .filter { it.successful }
             .map { it.asNote(source(it.call.name)) }
             .associateBy { it.call }
             .values

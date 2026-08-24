@@ -61,6 +61,7 @@ import io.github.alpharomercoma.openweights.core.tools.GoalBoard
 import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
+import io.github.alpharomercoma.openweights.core.tools.correlatedWebResearchSources
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.runtime.GenerationService
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
@@ -329,7 +330,11 @@ data class ChatUiState(
      * nothing is right.
      */
     val canSend: Boolean get() =
-        modelName != null && !isGenerating && !isLoadingModel && !isCompacting
+        modelName != null &&
+            outputModality == OutputModality.TEXT &&
+            !isGenerating &&
+            !isLoadingModel &&
+            !isCompacting
 }
 
 @HiltViewModel
@@ -347,6 +352,9 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
     /** Completed by the approval buttons, so the agent can wait on a human. */
     private var approval: CompletableDeferred<Boolean>? = null
+
+    /** Tool evidence emitted by the current goal turn; reset before every turn starts. */
+    private var lastTurnSteps: List<AgentStep> = emptyList()
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -480,6 +488,25 @@ class ChatViewModel @Inject constructor(
                 // costs: the user has already asked for a different model.
                 if (request != loadRequest) return@withLock
                 performLoad(modelFile, contextLength, keepConversation)
+            }
+        }
+    }
+
+    /** Explicitly releases the loaded model while keeping its files available to reload. */
+    fun unloadModel() {
+        stop()
+        val request = ++loadRequest
+        viewModelScope.launch {
+            generationJob?.join()
+            loadMutex.withLock {
+                if (request != loadRequest) return@withLock
+                runCatching {
+                    runtime.unload()
+                    forgetLoadedModel()
+                    preferencesKey = null
+                }.onFailure { failure ->
+                    _uiState.update { it.copy(error = failure.userMessage()) }
+                }
             }
         }
     }
@@ -873,19 +900,25 @@ class ChatViewModel @Inject constructor(
         if (carried.isEmpty()) return
 
         viewModelScope.launch {
+            val copiedTranscript = mutableListOf<TranscriptEntry>()
+            val copiedFiles = mutableListOf<MessagePart.File>()
+            var createdId: Long? = null
             val branched = runCatching {
                 writer.inOrder {
                     val title = carried.first { it.role == ChatRole.USER }.text
-                    val id = startConversation(title, state.modelName)
+                    val id = startConversation(title, state.modelName).also { createdId = it }
                     // Skipped rather than carried, because the summary belongs to the
                     // conversation it was written for: the new one has every turn the old
                     // one folded away, so there is nothing for it to stand in for.
                     carried.forEach { entry ->
+                        val attachments = staging.duplicate(entry.attachments)
+                        copiedFiles += attachments
+                        copiedTranscript += entry.copy(attachments = attachments)
                         addMessage(
                             conversationId = id,
                             role = entry.role.wireName,
                             text = entry.history ?: entry.text,
-                            attachments = entry.attachments,
+                            attachments = attachments,
                         )
                     }
                     id
@@ -893,6 +926,10 @@ class ChatViewModel @Inject constructor(
             }.getOrNull()
 
             if (branched == null) {
+                runCatching {
+                    writer.inOrder { createdId?.let { deleteConversation(it) } }
+                }
+                staging.discard(copiedFiles)
                 reportError(STORAGE_FAILED)
                 return@launch
             }
@@ -904,7 +941,7 @@ class ChatViewModel @Inject constructor(
             conversationId = branched
             _uiState.update {
                 it.copy(
-                    transcript = carried,
+                    transcript = copiedTranscript,
                     compaction = null,
                     toolNotes = ToolNotes(),
                     contextUsed = 0,
@@ -994,6 +1031,7 @@ class ChatViewModel @Inject constructor(
             // tool. Null until a pass completes at all, which is what tells the difference
             // between a turn that answered and one that was stopped before it could.
             var settled: Pair<String, GenerationStats>? = null
+            lastTurnSteps = emptyList()
 
             val listener = object : TurnListener {
                 override fun onText(raw: String) {
@@ -1020,6 +1058,7 @@ class ChatViewModel @Inject constructor(
                 }
 
                 override fun onSteps(steps: List<AgentStep>) {
+                    lastTurnSteps += steps
                     updateLastEntry { it.copy(blocks = it.blocks + steps.map(TurnBlock::Step)) }
                     // Kept for the turns after this one. Within this turn the results are
                     // already in the loop's own messages, which is why nothing here is sent
@@ -1269,9 +1308,15 @@ class ChatViewModel @Inject constructor(
      */
     fun steerGoal(message: String) = goals.steer(message)
 
+    /** Removes a finished, stopped, or recovered goal card from the conversation UI. */
+    fun dismissGoal() {
+        if (goals.goal.value?.isRunning != true) goals.clear()
+    }
+
     private suspend fun work(task: String, brief: Brief) {
         val wasMode = _uiState.value.mode
         var failures = 0
+        val researchSources = linkedSetOf<String>()
         try {
             setMode(AgentMode.PLAN)
             if (!turn("${brief.plan}\n\n$task")) return
@@ -1282,16 +1327,22 @@ class ChatViewModel @Inject constructor(
             }
             goals.planned(proposed)
 
-            setMode(wasMode)
+            // Research is an explicitly autonomous operation. AUTO keeps web tools
+            // available without inheriting PLAN, stopping for every call in ASK, or
+            // inheriting YOLO's waived egress checks.
+            // PLAN is only for producing the plan. Leaving a generic goal in PLAN would
+            // silently strip every tool from all execution turns, so a goal started from
+            // the planning UI could never carry out its own steps.
+            setMode(goalExecutionMode(brief.executionMode, wasMode))
             var running = true
             while (running) {
-                when (step(proposed, failures, brief)) {
+                when (step(proposed, failures, brief, researchSources)) {
                     StepOutcome.DONE -> failures = 0
                     StepOutcome.RETRY -> failures++
                     StepOutcome.STOP -> running = false
                 }
             }
-            writeUp(brief)
+            writeUp(brief, researchSources)
         } finally {
             setMode(wasMode)
             GenerationService.release(appContext, GenerationService.GOAL)
@@ -1307,10 +1358,16 @@ class ChatViewModel @Inject constructor(
      * anyway would produce a confident report from half the research, which is the worst
      * possible output of a research tool.
      */
-    private suspend fun writeUp(brief: Brief) {
+    private suspend fun writeUp(brief: Brief, researchSources: Set<String>) {
         val finish = brief.finish ?: return
         if (goals.goal.value?.state != GoalState.DONE) return
-        turn(finish)
+        val sourceBoundary = if (brief.requiresWebEvidence) {
+            "\n\nThese are the only source addresses the app verified were read:\n" +
+                researchSources.joinToString(separator = "\n") { "- $it" }
+        } else {
+            ""
+        }
+        turn(finish + sourceBoundary)
     }
 
     /**
@@ -1319,22 +1376,42 @@ class ChatViewModel @Inject constructor(
      * Split out of the loop rather than left inline because a loop body with four ways to
      * stop in it stops being readable as a loop. The three outcomes are the whole contract.
      */
-    private suspend fun step(proposed: TaskPlan, failures: Int, brief: Brief): StepOutcome {
-        val goal = goals.goal.value ?: return StepOutcome.STOP
-        if (!goal.isRunning) return StepOutcome.STOP
-        val step = goal.currentStep ?: return StepOutcome.STOP
+    private suspend fun step(
+        proposed: TaskPlan,
+        failures: Int,
+        brief: Brief,
+        researchSources: MutableSet<String>,
+    ): StepOutcome {
+        val goal = goals.goal.value
+        val step = goal?.currentStep
+        if (goal?.isRunning != true || step == null) return StepOutcome.STOP
         tooHotOrFlat()?.let {
             goals.halt(it)
             return StepOutcome.STOP
         }
 
         val steering = goals.takeSteering()
-        val doneBefore = turns.planning.plan.value?.steps?.count { it.done } ?: 0
+        val planBefore = turns.planning.plan.value ?: proposed
+        val doneBefore = planBefore.steps.count { it.done }
         _uiState.update { it.copy(error = null) }
         if (!turn(stepPrompt(brief, step.text, steering))) return StepOutcome.STOP
 
+        val verifiedSources = lastTurnSteps.correlatedWebResearchSources()
+        if (brief.requiresWebEvidence && verifiedSources.isEmpty()) {
+            // Undo an eager `advance` call before retrying. A model saying it searched is
+            // not evidence that a source was actually reached.
+            turns.planning.restore(planBefore)
+            _uiState.update {
+                it.copy(
+                    error = "This research step did not successfully search and read a " +
+                        "source, so it was not marked done.",
+                )
+            }
+        } else {
+            researchSources += verifiedSources
+        }
         val failure = _uiState.value.error
-        if (failure != null) {
+        return if (failure != null) {
             // A step that ended in an error has not been done, whatever the plan says. One
             // retry, because the common failure is a tool call the model can repair once it
             // reads the message, and then a halt: a loop that retries forever on a phone is
@@ -1344,13 +1421,15 @@ class ChatViewModel @Inject constructor(
                     "Stopped after $MAX_STEP_FAILURES steps in a row that did not finish. " +
                         "The last problem was: $failure",
                 )
-                return StepOutcome.STOP
+                StepOutcome.STOP
+            } else {
+                StepOutcome.RETRY
             }
-            return StepOutcome.RETRY
+        } else {
+            tickIfTheModelDidNot(doneBefore)
+            goals.advanced(turns.planning.plan.value ?: proposed)
+            StepOutcome.DONE
         }
-        tickIfTheModelDidNot(doneBefore)
-        goals.advanced(turns.planning.plan.value ?: proposed)
-        return StepOutcome.DONE
     }
 
     /**
@@ -2058,6 +2137,10 @@ private data class Brief(
     val step: String,
     /** Asked after the last step, or null for work whose answer is the last step. */
     val finish: String? = null,
+    /** Execution mode for each step, or null to preserve the user's chosen mode. */
+    val executionMode: AgentMode? = null,
+    /** Whether each step must prove a correlated web search and page fetch. */
+    val requiresWebEvidence: Boolean = false,
 ) {
     companion object {
         val GOAL = Brief(
@@ -2091,6 +2174,8 @@ private data class Brief(
                 "section listing the addresses you used. Do not search again: write only " +
                 "from what you found. If something could not be answered, say so rather " +
                 "than filling the gap.",
+            executionMode = AgentMode.AUTO,
+            requiresWebEvidence = true,
         )
     }
 }
@@ -2098,6 +2183,10 @@ private data class Brief(
 private const val GOAL_PLAN_PREFIX: String =
     "Plan this out as a short numbered list of steps, five at most, each one a single " +
         "action you could carry out on this phone. Do not do any of them yet."
+
+/** PLAN produces a goal's plan; it is never a usable mode for carrying that plan out. */
+internal fun goalExecutionMode(requested: AgentMode?, previous: AgentMode): AgentMode =
+    requested ?: previous.takeUnless { it == AgentMode.PLAN } ?: AgentMode.AUTO
 
 /**
  * What every later turn asks for.
@@ -2295,6 +2384,9 @@ private fun List<ChatMessage>.asExchange(): List<ChatMessage> {
 private fun ChatUiState.refusalReason(): String? = when {
     isLoadingModel -> "The model is still loading. Ask again in a moment."
     modelName == null -> "No model is loaded yet. Choose one in Models."
+    outputModality == OutputModality.SPEECH ->
+        "This model generates speech, which this build can detect but cannot play yet. " +
+            "Choose a text model in Models."
     // Reached only if the composer let a tap through anyway. The Send button is disabled
     // for the same condition, so this is the belt to that pair of braces.
     isCompacting -> "Making room by summarising earlier turns. This takes a few seconds."

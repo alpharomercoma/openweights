@@ -32,6 +32,7 @@ ktlint = "14.2.0"
 kover = "0.9.9"
 benchmark = "1.5.0-rc01"
 profileinstaller = "1.4.1"
+splashscreen = "1.0.1"
 
 [libraries]
 # Gradle plugin artifacts, used only by build-logic convention plugins
@@ -104,6 +105,7 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmark" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTest" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTest" }

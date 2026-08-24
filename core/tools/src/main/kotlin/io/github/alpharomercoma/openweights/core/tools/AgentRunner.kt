@@ -19,15 +19,24 @@ package io.github.alpharomercoma.openweights.core.tools
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
+import java.util.concurrent.ConcurrentHashMap
 
 /** One step the agent took, as the transcript shows it. */
 sealed interface AgentStep {
     /** A tool the model asked for, before it has run. */
     data class Requested(val call: ToolCall) : AgentStep
 
-    /** A tool that ran, with what it returned. */
-    data class Ran(val call: ToolCall, val result: String, val millis: Long) : AgentStep
+    /** A tool that ran, with what it returned and whether it actually accomplished the call. */
+    data class Ran(
+        val call: ToolCall,
+        val result: String,
+        val millis: Long,
+        val successful: Boolean = true,
+        val evidence: ToolEvidence? = null,
+    ) : AgentStep
 
     /** A tool the user declined, or that plan mode refused to run. */
     data class Skipped(val call: ToolCall, val why: String) : AgentStep
@@ -49,6 +58,32 @@ fun AgentStep.scriptSource(): String? {
     if (call.name != RunScriptTool.NAME) return null
     return call.textArgument("source", "code", "script", "js")?.takeIf { it.isNotBlank() }
 }
+
+/**
+ * True only when this turn searched successfully and then read one of the returned sources.
+ *
+ * Invocation is not evidence: web tools report validation, network, HTTP and content
+ * failures as ordinary text so the model can recover. Typed evidence is attached only by
+ * the successful branches inside those tools, and the fetched address must be one the search
+ * actually returned. Conservative false negatives retry a step; a false positive would let
+ * a fabricated research claim into the final report.
+ */
+fun Iterable<AgentStep>.correlatedWebResearchSources(): Set<String> {
+    val ran = filterIsInstance<AgentStep.Ran>().filter { it.successful }
+    val sources = ran.mapNotNull { it.evidence as? ToolEvidence.Search }
+        .flatMap { it.urls }
+        .toSet()
+    if (sources.isEmpty()) return emptySet()
+
+    return ran.mapNotNull { it.evidence as? ToolEvidence.Fetch }
+        .filter { it.requestedUrl in sources }
+        .map { it.finalUrl }
+        .toSet()
+}
+
+/** Whether [correlatedWebResearchSources] found at least one source the turn actually read. */
+fun Iterable<AgentStep>.hasWebResearchEvidence(): Boolean =
+    correlatedWebResearchSources().isNotEmpty()
 
 /** The call a step belongs to, whatever became of it. */
 internal fun AgentStep.callId(): String = when (this) {
@@ -128,6 +163,7 @@ class AgentRunner(
      * search anyone made afterwards; but where [ToolNotes] has kept that file in the prompt,
      * the turn it reaches starts suspicious, because the thing being guarded is still there.
      */
+    @Volatile
     private var readUntrustedText = carriesUntrustedText
 
     /**
@@ -137,6 +173,7 @@ class AgentRunner(
      * because the two guard different things. Untrusted text is a risk about who is giving
      * the orders; private data is a risk about what could be carried out.
      */
+    @Volatile
     private var readPrivateData = carriesPrivateData
 
     /**
@@ -157,7 +194,7 @@ class AgentRunner(
      * Per turn, like [readUntrustedText] and for the same reason: this instance is one turn,
      * so the next question starts with nothing settled.
      */
-    private val settled = mutableMapOf<String, String>()
+    private val settled = ConcurrentHashMap<String, String>()
 
     suspend fun step(
         calls: List<ToolCall>,
@@ -175,7 +212,16 @@ class AgentRunner(
             )
         }
 
-        val steps = calls.map { call -> decide(call, mode, approve, now) }
+        val steps = if (canRunInParallel(calls, mode)) {
+            // Every call in this branch is a read-only, no-approval lookup. Keeping the
+            // result list in model order makes the transcript deterministic even though the
+            // wall-clock completion order differs.
+            coroutineScope {
+                calls.map { call -> async { decide(call, mode, approve, now) } }.map { it.await() }
+            }
+        } else {
+            calls.map { call -> decide(call, mode, approve, now) }
+        }
         // Every step answers, including the ones that did not run: a model told nothing
         // about a call it made has no way to finish the turn.
         val messages = steps.map { ChatMessage.toolResult(it.callId(), it.report()) }
@@ -205,6 +251,19 @@ class AgentRunner(
             return AgentStep.Skipped(call, "plan mode: nothing was run")
         }
         return runOne(call, mode, approve, now)
+    }
+
+    private fun canRunInParallel(calls: List<ToolCall>, mode: AgentMode): Boolean {
+        if (mode != AgentMode.AUTO || calls.size < 2) return false
+        if (calls.map { it.settledKey() }.distinct().size != calls.size) return false
+        return calls.all { call ->
+            val tool = registry.find(call.name) ?: return@all false
+            tool.parallelSafe &&
+                !tool.alwaysAsks &&
+                !tool.asksInAuto(call) &&
+                !tool.readsPrivateData &&
+                !tool.sendsWhereTheModelSays
+        }
     }
 
     private suspend fun runOne(
@@ -241,19 +300,19 @@ class AgentRunner(
         // it like anything else, which turned Stop pressed during a slow request into a
         // tool failure the agent then carried on from: the turn kept going after the user
         // had ended it.
-        var failed = false
-        val result = try {
-            tool.run(call)
+        val execution = try {
+            tool.execute(call)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-            failed = true
-            "${call.name} failed: ${failure.message ?: "unknown error"}"
+            ToolExecution.failure(
+                "${call.name} failed: ${failure.message ?: "unknown error"}",
+            )
         }
         // Set after the run rather than before it, so a tool that failed to read anything
         // does not spend the turn's freedom on text that never arrived.
-        if (tool.returnsUntrustedText) readUntrustedText = true
-        if (tool.readsPrivateData) readPrivateData = true
+        if (execution.successful && tool.returnsUntrustedText) readUntrustedText = true
+        if (execution.successful && tool.readsPrivateData) readPrivateData = true
         // Pointed at rather than repeated. The result is already in the conversation as a
         // tool message, so sending it a second time would spend the context twice over to
         // tell the model something it can see.
@@ -261,11 +320,17 @@ class AgentRunner(
         // Only a call that got somewhere is settled. A socket that went away is the one case
         // where asking again for exactly the same thing is the right move, and a breaker that
         // caught it would turn a blip into the end of the turn.
-        if (!failed) {
+        if (execution.successful) {
             settled[call.settledKey()] = "Already run this turn with these same arguments. " +
                 "Its result is above; answer from that rather than calling it again."
         }
-        return AgentStep.Ran(call, result, now() - startedAt)
+        return AgentStep.Ran(
+            call = call,
+            result = execution.text,
+            millis = now() - startedAt,
+            successful = execution.successful,
+            evidence = execution.evidence,
+        )
     }
 
     /**
@@ -312,9 +377,15 @@ class AgentRunner(
         // matter: a file read from the shared folder can be carried by a search as easily as
         // by a fetch. So that one is still gated on anything leaving the device at all.
         //
-        // Yolo is those two waived, and nothing else: it is the user saying they know what
-        // the checks are for and would rather have the seconds. It has to be typed, it is
-        // named in the runtime line while it is on, and it is gone when the process is.
+        // A persistent or destructive effect is not an egress question and YOLO must not
+        // waive it. YOLO disappears with the process; remember, watch and replacement do
+        // not. Checking this before the YOLO return prevents an injected page from turning
+        // a temporary mode into permanent prompt text or recurring unattended work.
+        if (tool.asksInAuto(call)) return approve(call)
+
+        // Yolo waives the two egress checks below, and nothing else: it is the user saying
+        // they know what those checks are for and would rather have the seconds. It has to
+        // be typed, is named in the runtime line while on, and is gone with the process.
         if (mode == AgentMode.YOLO) return true
         val couldBeToldWhereToGo = readUntrustedText && tool.sendsWhereTheModelSays
         val couldCarryPrivateData = readPrivateData && tool.leavesTheDevice
@@ -336,8 +407,6 @@ class AgentRunner(
         // `remember` and `watch` bought nothing in AUTO, which is the default. An injected
         // instruction could therefore write itself into the permanent system prefix, or
         // schedule recurring unattended work, without the user seeing anything.
-        if (tool.alwaysAsks) return approve(call)
-
         return mode == AgentMode.AUTO || !tool.needsApproval || approve(call)
     }
 

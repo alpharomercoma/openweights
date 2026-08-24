@@ -29,7 +29,6 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
@@ -103,8 +102,19 @@ class LlamaCppEngine internal constructor(
                     gpuLayers = params.gpuLayers,
                     useMmap = params.useMmap,
                 )
-                handle.set(newHandle)
-                currentModel = readModelInfo(newHandle)
+                val info = try {
+                    readModelInfo(newHandle, modelFile.absolutePath)
+                } catch (failure: Throwable) {
+                    // The weights are already mapped at this point. Publishing the handle
+                    // before interrogating it left a failed load resident and made a retry
+                    // compound the memory pressure that commonly caused the failure.
+                    bridge.nativeFreeModel(newHandle)
+                    throw failure
+                }
+                synchronized(handleLock) {
+                    handle.set(newHandle)
+                    currentModel = info
+                }
             }
         }
     }
@@ -126,6 +136,14 @@ class LlamaCppEngine internal constructor(
 
         var parsed = ParsedReply()
         val prompt = renderPrompt(activeHandle, messages)
+
+        // Registered before the blocking JNI call. During prefill there are no token
+        // callbacks, so waiting for trySend to fail cannot observe a collector that left.
+        // Closing the producer channel can happen from the cancelling thread and flips the
+        // native atomic immediately.
+        channel.invokeOnClose { cause ->
+            if (cause != null) this@LlamaCppEngine.cancel()
+        }
 
         val stats = bridge.nativeGenerate(
             handle = activeHandle,
@@ -169,10 +187,6 @@ class LlamaCppEngine internal constructor(
             currentModel = currentModel?.copy(contextUsed = stats[CONTEXT_USED].toInt())
         }
         close()
-        // nativeGenerate has already returned by this point, but a collector that walks
-        // away mid-stream is handled inside the sink above: trySend fails and the native
-        // loop stops. This is the belt-and-braces path for any other unwind.
-        awaitClose { this@LlamaCppEngine.cancel() }
     }
         // Tokens arrive faster than a Compose collector redraws. Without an unbounded
         // buffer, trySend fails on backpressure and the sink reads that as "the
@@ -256,7 +270,7 @@ class LlamaCppEngine internal constructor(
             timeToFirstTokenMs = stats[5],
             contextUsed = stats[CONTEXT_USED].toInt(),
             contextSize = stats[7].toInt(),
-            thinkingPrefilled = stats.getOrElse(8) { 0L } == 1L,
+            thinkingPrefilled = stats.getOrElse(THINKING_PREFILLED) { 0L } == TRUE_FLAG,
         ),
     )
 
@@ -296,7 +310,7 @@ class LlamaCppEngine internal constructor(
         )
     }
 
-    private fun readModelInfo(activeHandle: Long): LoadedModelInfo {
+    private fun readModelInfo(activeHandle: Long, modelPath: String): LoadedModelInfo {
         val info = bridge.nativeModelInfo(activeHandle)
         // Read once: llama.cpp accounted for these at load and nothing moves afterwards.
         val offload = runCatching { bridge.nativeOffloadSummary(activeHandle) }.getOrDefault("")
@@ -326,6 +340,7 @@ class LlamaCppEngine internal constructor(
             supportsTools = bridge.nativeSupportsTools(activeHandle),
             supportsToolResults = bridge.nativeSupportsToolResults(activeHandle),
             supportsReasoningEffort = bridge.nativeSupportsReasoningEffort(activeHandle),
+            modelPath = modelPath,
         ).also {
             // What the chat template can actually do, asked of the template at load. Logged
             // because every "why did it not search" question starts here and the answer is
@@ -355,6 +370,10 @@ class LlamaCppEngine internal constructor(
 
         /** Index of the context-used field in the stats array the native layer returns. */
         const val CONTEXT_USED = 6
+
+        /** Index and native truth value for whether the thinking prefix was reused. */
+        const val THINKING_PREFILLED = 8
+        const val TRUE_FLAG = 1L
 
         /** Long enough for a cancelled decode step to return; short enough not to hang. */
         const val SHUTDOWN_TIMEOUT_SECONDS = 10L

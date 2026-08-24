@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
@@ -120,6 +121,9 @@ class FakeInferenceEngine : InferenceEngine {
     /** What each loaded model claims it can read, keyed by file name. */
     val mediaSupport = mutableMapOf<String, MediaSupport>()
 
+    /** What each loaded model emits; text unless a test names a speech projector. */
+    val outputModalities = mutableMapOf<String, OutputModality>()
+
     /** Load order, so a test can prove which model the engine ended up holding. */
     val loads = mutableListOf<String>()
 
@@ -159,6 +163,7 @@ class FakeInferenceEngine : InferenceEngine {
             layerCount = 1,
             contextUsed = 0,
             mediaSupport = mediaSupport[modelFile.name] ?: MediaSupport(),
+            outputModality = outputModalities[modelFile.name] ?: OutputModality.TEXT,
             // A template that branches on the flag, which is what the load time test can
             // establish. Whether the weights honour it is a separate question and the
             // reason the view model keeps watching after this point.

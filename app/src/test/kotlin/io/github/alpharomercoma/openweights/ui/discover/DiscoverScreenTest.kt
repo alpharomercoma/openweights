@@ -18,8 +18,10 @@ package io.github.alpharomercoma.openweights.ui.discover
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.hub.HubModel
@@ -73,6 +75,16 @@ class DiscoverScreenTest {
     }
 
     @Test
+    fun `search ime action reaches the hub callback`() {
+        var searches = 0
+        showDiscover(query = HubQuery(sort = HubSort.TRENDING), onSearch = { searches++ })
+
+        compose.onNodeWithText("Search Hugging Face").performImeAction()
+
+        assert(searches == 1) { "expected the keyboard search action to run once, got $searches" }
+    }
+
+    @Test
     fun `the sort in use is the one the state names`() {
         showDiscover(query = HubQuery(text = "gguf", sort = HubSort.DOWNLOADS))
 
@@ -91,6 +103,16 @@ class DiscoverScreenTest {
         compose.onNodeWithText("Fits my phone").performClick()
 
         assert(asked == true) { "expected the fit filter to be switched on, got $asked" }
+    }
+
+    @Test
+    fun `filter rail exposes a scroll affordance when chips do not fit`() {
+        showDiscover()
+
+        // A narrow phone cannot show every sort and filter chip at once. The right-edge cue
+        // is part of the contract: clipping a chip without it is indistinguishable from a
+        // layout overflow to a user.
+        compose.onNodeWithContentDescription("Show more filters").assertIsDisplayed()
     }
 
     @Suppress("LongParameterList")
@@ -122,6 +144,7 @@ class DiscoverScreenTest {
     private fun showDiscover(
         query: HubQuery = HubQuery(text = "gguf", sort = HubSort.TRENDING),
         onQueryChange: (String) -> Unit = {},
+        onSearch: () -> Unit = {},
         onSortChange: (HubSort) -> Unit = {},
         onPhoneSizedChange: (Boolean) -> Unit = {},
         onOfficialOnlyChange: (Boolean) -> Unit = {},
@@ -139,7 +162,7 @@ class DiscoverScreenTest {
                         parameterCeilingBillions = 8,
                     ),
                     onQueryChange = onQueryChange,
-                    onSearch = {},
+                    onSearch = onSearch,
                     onSortChange = onSortChange,
                     onFiltersChange = {},
                     onPhoneSizedChange = onPhoneSizedChange,

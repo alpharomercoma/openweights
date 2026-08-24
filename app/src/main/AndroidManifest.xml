@@ -62,22 +62,18 @@
         android:usesCleartextTraffic="false">
 
         <!--
-             Any orientation, on anything.
+             Keep phone-sized windows portrait. A QDC phone and a real handset can report their
+             current physical orientation as landscape when the app starts, which made the
+             first frame arrive sideways before the user had chosen to rotate anything.
 
-             It was portrait on phones, on the argument that a composer with the keyboard up
-             leaves almost no room in landscape. That was true, and the thing taking the room
-             was the five tab bottom bar: about 80dp of permanent chrome across the bottom
-             of a screen that is only 360dp tall to begin with once a keyboard is up. The bar
-             is gone, the conversation is the whole surface, and the composer is one row.
-
-             Targeting API 36 already ignored the lock at 600dp and over, so tablets and
-             unfolded foldables have been rotating all along and the layouts have been built
-             and screenshotted for it. What this changes is a phone on its side, which is how
-             anybody reading a long reply with a keyboard attached is holding it.
+             Targeting API 36 already ignores the lock at 600dp and over, so tablets and
+             unfolded foldables remain rotatable and the layouts are still built for both
+             directions. This only keeps a phone's first-run chat surface upright.
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.OpenWeights">
             <intent-filter>

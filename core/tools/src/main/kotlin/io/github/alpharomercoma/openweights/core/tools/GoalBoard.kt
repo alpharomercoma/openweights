@@ -22,8 +22,6 @@ import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.getAndUpdate
-import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,8 +37,13 @@ import javax.inject.Singleton
  * from the notification, shows the truth rather than a guess.
  */
 @Singleton
-class GoalBoard @Inject constructor() {
-    private val current = MutableStateFlow<Goal?>(null)
+class GoalBoard @Inject constructor(private val snapshots: GoalSnapshotStore) {
+    /** Lightweight non-persistent board for unit fixtures and previews. */
+    constructor() : this(GoalSnapshotStore.none())
+
+    private val lock = Any()
+    private val restored = snapshots.load()
+    private val current = MutableStateFlow(restored?.goal?.afterInterruption())
 
     val goal: StateFlow<Goal?> = current.asStateFlow()
 
@@ -55,22 +58,31 @@ class GoalBoard @Inject constructor() {
      * is typed is held here and folded into the next step's prompt, which is the first
      * moment reading it cannot corrupt a turn already in flight.
      */
-    private val pending = MutableStateFlow<List<String>>(emptyList())
+    private val pending = MutableStateFlow(restored?.steering.orEmpty())
 
     val steering: StateFlow<List<String>> = pending.asStateFlow()
 
-    fun start(task: String) {
-        pending.value = emptyList()
-        current.value = Goal(task = task)
+    init {
+        // A process can disappear after a tool made its change but before the turn recorded
+        // that it finished. Continuing automatically would repeat that change. Keep the plan
+        // and steering, but make the interruption visible and wait for a person to decide.
+        current.value?.let { goal -> persist(goal, pending.value) }
     }
 
-    fun planned(plan: TaskPlan) = current.update {
-        it?.copy(plan = plan, state = GoalState.WORKING)
+    fun start(task: String) {
+        synchronized(lock) {
+            pending.value = emptyList()
+            current.value = Goal(task = task)
+            persist(current.value, pending.value)
+        }
+    }
+
+    fun planned(plan: TaskPlan) = changeGoal {
+        it.copy(plan = plan, state = GoalState.WORKING)
     }
 
     /** One step finished, whatever became of it. */
-    fun advanced(plan: TaskPlan) = current.update { goal ->
-        goal ?: return@update null
+    fun advanced(plan: TaskPlan) = changeGoal { goal ->
         val next = goal.copy(plan = plan, stepsTaken = goal.stepsTaken + 1)
         when {
             plan.isFinished -> next.copy(state = GoalState.DONE)
@@ -85,32 +97,70 @@ class GoalBoard @Inject constructor() {
     }
 
     /** The user pressed stop, which is always allowed and never needs a reason. */
-    fun stop() = current.update { it?.copy(state = GoalState.STOPPED) }
+    fun stop() = changeGoal { it.copy(state = GoalState.STOPPED) }
 
     /** Something outside the goal ended it: heat, battery, or a model that went away. */
-    fun halt(why: String) = current.update {
-        it?.copy(state = GoalState.HALTED, note = why)
-    }
+    fun halt(why: String) = changeGoal { it.copy(state = GoalState.HALTED, note = why) }
 
     /** Cleared with the conversation it belonged to. */
     fun clear() {
-        current.value = null
-        pending.value = emptyList()
+        synchronized(lock) {
+            current.value = null
+            pending.value = emptyList()
+            snapshots.clear()
+        }
     }
 
     fun steer(message: String) {
         if (message.isBlank()) return
-        pending.update { it + message }
+        synchronized(lock) {
+            // Steering is copied into a later prompt and persisted. Bound both axes here,
+            // not only in the UI, because tools and tests can call the board directly and
+            // an oversized value must not erase the otherwise valid recovery snapshot.
+            pending.value = (pending.value + message.take(MAX_STEERING_MESSAGE_CHARS))
+                .takeLast(MAX_STEERING_MESSAGES)
+            persist(current.value, pending.value)
+        }
     }
 
     /**
      * Takes what was typed, leaving nothing behind for the step after this one.
      *
-     * `getAndUpdate` rather than a read followed by a write, because the two are not the
-     * same thing here. Steering arrives from the user's thread while the goal loop reads it
-     * between steps, and anything typed in the window between the read and the clear was
-     * silently dropped: the one message a person sends to redirect a running goal is exactly
-     * the message that arrives while a step is ending.
+     * Taken and persisted under the same lock rather than as a read followed by a write,
+     * because the two are not the same thing here. Steering arrives from the user's thread
+     * while the goal loop reads it between steps, and anything typed in the window between
+     * the read and the clear would be silently dropped: the one message a person sends to
+     * redirect a running goal is exactly the message that arrives while a step is ending.
      */
-    fun takeSteering(): List<String> = pending.getAndUpdate { emptyList() }
+    fun takeSteering(): List<String> = synchronized(lock) {
+        val taken = pending.value
+        pending.value = emptyList()
+        persist(current.value, pending.value)
+        taken
+    }
+
+    private fun changeGoal(change: (Goal) -> Goal) {
+        synchronized(lock) {
+            current.value = current.value?.let(change)
+            persist(current.value, pending.value)
+        }
+    }
+
+    private fun persist(goal: Goal?, steering: List<String>) {
+        if (goal == null) snapshots.clear() else snapshots.save(GoalSnapshot(goal, steering))
+    }
+
+    private fun Goal.afterInterruption(): Goal = if (isRunning) {
+        copy(
+            state = GoalState.HALTED,
+            note = "Interrupted when the app stopped. Review the plan before starting again.",
+        )
+    } else {
+        this
+    }
+
+    private companion object {
+        const val MAX_STEERING_MESSAGES = 16
+        const val MAX_STEERING_MESSAGE_CHARS = 500
+    }
 }

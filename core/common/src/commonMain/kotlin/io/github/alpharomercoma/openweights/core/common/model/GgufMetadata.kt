@@ -63,8 +63,24 @@ data class GgufMetadata(
      *
      * Keys and values are each stored per head per token, at 16 bits by default.
      */
-    fun kvCacheBytes(contextLength: Int): Long =
-        2L * totalKeyValueHeads * headDimension * contextLength * KV_ELEMENT_BYTES
+    fun kvCacheBytes(contextLength: Int): Long = saturatedProduct(
+        2L,
+        totalKeyValueHeads.toLong(),
+        headDimension.toLong(),
+        contextLength.toLong(),
+        KV_ELEMENT_BYTES.toLong(),
+    )
+
+    /** Positive-only product that refuses hostile metadata by saturating instead of wrapping. */
+    private fun saturatedProduct(vararg factors: Long): Long {
+        var product = 1L
+        factors.forEach { factor ->
+            if (factor <= 0) return 0
+            if (product > Long.MAX_VALUE / factor) return Long.MAX_VALUE
+            product *= factor
+        }
+        return product
+    }
 
     private companion object {
         /** llama.cpp defaults to an f16 KV cache. */

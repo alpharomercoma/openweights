@@ -201,7 +201,10 @@ internal class GoogleProvider(client: OkHttpClient) : HtmlSearchProvider(client)
     /** Google sometimes hands back its own redirect rather than the destination. */
     private fun String.unwrapped(): String = if (startsWith("/url?q=")) {
         runCatching {
-            URLDecoder.decode(removePrefix("/url?q=").substringBefore('&'), Charsets.UTF_8)
+            URLDecoder.decode(
+                removePrefix("/url?q=").substringBefore('&'),
+                Charsets.UTF_8.name(),
+            )
         }.getOrDefault(this)
     } else {
         this

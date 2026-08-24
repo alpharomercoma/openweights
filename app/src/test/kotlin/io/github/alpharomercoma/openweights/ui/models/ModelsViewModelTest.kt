@@ -28,6 +28,7 @@ import io.github.alpharomercoma.openweights.core.hub.HubTokenSource
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.model.ModelStore
+import io.github.alpharomercoma.openweights.ui.chat.FakeInferenceEngine
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import org.junit.Before
@@ -151,5 +152,6 @@ class ModelsViewModelTest {
         WorkManager.getInstance(context),
         store,
         Publishers(HuggingFaceClient(OkHttpClient(), HubTokenSource { null })),
+        FakeInferenceEngine(),
     )
 }

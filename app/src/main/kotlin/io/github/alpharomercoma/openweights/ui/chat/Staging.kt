@@ -85,6 +85,9 @@ class Staging @Inject constructor(private val attachments: AttachmentStore) {
     suspend fun discard(attachment: MessagePart.File) = attachments.discard(attachment)
 
     suspend fun discard(attachments: List<MessagePart.File>) = this.attachments.discard(attachments)
+
+    suspend fun duplicate(attachments: List<MessagePart.File>): List<MessagePart.File> =
+        this.attachments.duplicate(attachments)
 }
 
 /**

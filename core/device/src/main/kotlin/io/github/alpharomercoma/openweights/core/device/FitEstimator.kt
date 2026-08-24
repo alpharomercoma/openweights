@@ -81,12 +81,12 @@ class FitEstimator @Inject constructor() {
         projectorSizeBytes: Long = 0,
     ): FitReport {
         val kvCache = metadata.kvCacheBytes(contextLength)
-        val weights = fileSizeBytes + projectorSizeBytes
-        val required = weights + kvCache + RUNTIME_OVERHEAD_BYTES
+        val weights = saturatedSum(fileSizeBytes, projectorSizeBytes)
+        val required = saturatedSum(weights, kvCache, RUNTIME_OVERHEAD_BYTES)
         val usable = device.usableMemoryBytes
 
         val verdict = when {
-            device.freeStorageBytes < weights + STORAGE_MARGIN_BYTES ->
+            device.freeStorageBytes < saturatedSum(weights, STORAGE_MARGIN_BYTES) ->
                 FitVerdict.NO_ROOM_TO_DOWNLOAD
 
             required > usable -> FitVerdict.WONT_RUN
@@ -293,6 +293,17 @@ class FitEstimator @Inject constructor() {
          */
         const val SAFE_CONTEXT = 32_768
     }
+}
+
+/** Adds remote size claims without allowing a wraparound to look like free memory. */
+private fun saturatedSum(vararg values: Long): Long {
+    var sum = 0L
+    values.forEach { raw ->
+        val value = raw.coerceAtLeast(0)
+        if (sum > Long.MAX_VALUE - value) return Long.MAX_VALUE
+        sum += value
+    }
+    return sum
 }
 
 /**

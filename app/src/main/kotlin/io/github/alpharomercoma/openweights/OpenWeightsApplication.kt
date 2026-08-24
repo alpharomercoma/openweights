@@ -25,11 +25,13 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import dagger.hilt.android.HiltAndroidApp
+import io.github.alpharomercoma.openweights.core.tools.PublicOnlyDns
 import io.github.alpharomercoma.openweights.watch.WatchScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import javax.inject.Inject
 
 /**
@@ -92,7 +94,21 @@ class OpenWeightsApplication :
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory())
+                // Search results and avatars are untrusted URLs. Reuse the same DNS
+                // boundary as fetch_url so a public hostname cannot resolve into a LAN,
+                // loopback, link-local, or cloud-metadata address (including redirects).
+                add(
+                    OkHttpNetworkFetcherFactory(
+                        callFactory = OkHttpClient.Builder()
+                            .dns(PublicOnlyDns())
+                            // A redirect is a new, untrusted address. Coil does not expose
+                            // an approval boundary for it, so refusing redirects keeps a
+                            // public thumbnail from silently hopping to a private literal.
+                            .followRedirects(false)
+                            .followSslRedirects(false)
+                            .build(),
+                    ),
+                )
                 add(SvgDecoder.Factory())
             }
             .build()

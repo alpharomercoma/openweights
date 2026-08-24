@@ -45,6 +45,9 @@
     <string name="models_phone_yet">No models on this phone yet.</string>
     <string name="find_one_hugging_face">Find one on Hugging Face</string>
     <string name="manage_models">Manage models</string>
+    <string name="unload_model">Unload model</string>
+    <string name="release_model_memory">Release model memory without deleting the file</string>
+    <string name="battery_temperature">Battery %1$.1f°C</string>
     <string name="downloads_what_remove">Downloads, and what to remove</string>
     <string name="use">In use</string>
     <string name="answer_length">Answer length</string>
@@ -75,6 +78,7 @@
     <string name="anything_add">Anything to add</string>
     <string name="saved_device">Saved on this device</string>
     <string name="cancel">Cancel</string>
+    <string name="message_actions">Message actions</string>
     <string name="report">Report</string>
     <string name="now">Not now</string>
     <string name="run">Run</string>
@@ -88,6 +92,8 @@
     <string name="recommended">Recommended</string>
     <string name="official">Official</string>
     <string name="filters">Filters</string>
+    <string name="filters_count">Filters %1$d</string>
+    <string name="show_more_filters">Show more filters</string>
     <string name="clear_all">Clear all</string>
     <string name="task">Task</string>
     <string name="any">Any</string>
@@ -100,6 +106,10 @@
     <string name="clear_filters">Clear filters</string>
     <string name="lfm2_5" translatable="false">lfm2.5</string>
     <string name="download">Download</string>
+    <string name="downloading">Downloading</string>
+    <string name="download_queued">Queued</string>
+    <string name="download_verifying">Verifying checksum…</string>
+    <string name="download_progress">%1$s of %2$s</string>
     <string name="vision">Vision</string>
     <string name="gated">Gated</string>
     <string name="models">Models</string>
@@ -134,4 +144,16 @@
     <string name="folder_readonly">Readable, but it will not take new files, so saving stays off.</string>
     <string name="folder_ready">The model can search it, read from it, and save new files into it.</string>
     <string name="proxy_hint">http://host:port or socks5://host:port</string>
+    <string name="goal_planning">Planning goal</string>
+    <string name="goal_working">Working on goal</string>
+    <string name="goal_done">Goal complete</string>
+    <string name="goal_stopped">Goal stopped</string>
+    <string name="goal_halted">Goal needs attention</string>
+    <string name="goal_step_count">%1$d of %2$d steps</string>
+    <string name="goal_current_step">Now: %1$s</string>
+    <string name="goal_steer_label">Adjust the next step</string>
+    <string name="goal_steer_support">Applied only after the current step finishes</string>
+    <string name="goal_stop">Stop goal</string>
+    <string name="goal_send_steering">Apply</string>
+    <string name="goal_dismiss">Dismiss</string>
 </resources>

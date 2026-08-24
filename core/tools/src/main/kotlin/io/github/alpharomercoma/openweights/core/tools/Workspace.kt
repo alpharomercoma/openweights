@@ -47,7 +47,7 @@ private fun mediaTypeFor(name: String): String = when (name.substringAfterLast('
     else -> "text/plain"
 }
 
-private fun Reader.readAsMuchAs(buffer: CharArray): Int {
+internal fun Reader.readAsMuchAs(buffer: CharArray): Int {
     var filled = 0
     while (filled < buffer.size) {
         val read = read(buffer, filled, buffer.size - filled)
@@ -55,6 +55,28 @@ private fun Reader.readAsMuchAs(buffer: CharArray): Int {
         filled += read
     }
     return filled
+}
+
+/**
+ * Advances exactly [count] characters unless the stream ends.
+ *
+ * [Reader.skip] is explicitly allowed to advance fewer characters than requested. Treating
+ * one call as exact repeats part of the previous page with providers that use short skips.
+ * A zero skip falls back to one read so a legal but unhelpful provider cannot spin forever.
+ */
+@Suppress("LoopWithTooManyJumpStatements")
+internal fun Reader.skipAsMuchAs(count: Long): Long {
+    var skipped = 0L
+    while (skipped < count) {
+        val step = skip(count - skipped)
+        if (step > 0) {
+            skipped += step
+            continue
+        }
+        if (read() < 0) break
+        skipped++
+    }
+    return skipped
 }
 
 /** Something found in the shared folder, named the way the model was taught to name it. */
@@ -195,7 +217,7 @@ class Workspace @Inject constructor(
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     stream.reader().use { reader ->
-                        reader.skip(skip.toLong())
+                        reader.skipAsMuchAs(skip.toLong())
                         val buffer = CharArray(take)
                         val read = reader.readAsMuchAs(buffer)
                         String(buffer, 0, read)
@@ -212,6 +234,8 @@ class Workspace @Inject constructor(
      * already exists is the load-bearing line: without it a model that read half a long file
      * would write that half back over the whole, and report success for having done it.
      */
+    // Each return is a distinct storage refusal; flattening them would obscure the boundary.
+    @Suppress("ReturnCount")
     suspend fun put(path: String, text: String, replace: Boolean = false): String {
         val segments = path.workspaceSegments()
             ?: return "$path is not a path inside the shared folder. Try one like notes/todo.md."

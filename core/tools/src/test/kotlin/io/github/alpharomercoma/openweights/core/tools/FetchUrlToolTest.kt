@@ -49,6 +49,38 @@ class FetchUrlToolTest {
     }
 
     @Test
+    fun `successful page read carries requested and final addresses as typed evidence`() {
+        val execution = FetchUrlTool.fetchedPageSuccess(
+            body = "The article.",
+            requestedUrl = "https://example.test/article",
+            finalUrl = "https://www.example.test/article",
+        )
+
+        assertThat(execution.successful).isTrue()
+        assertThat(execution.text).isEqualTo("The article.")
+        assertThat(execution.evidence).isEqualTo(
+            ToolEvidence.Fetch(
+                requestedUrl = "https://example.test/article",
+                finalUrl = "https://www.example.test/article",
+            ),
+        )
+    }
+
+    @Test
+    fun `refused page is an unsuccessful typed execution with no evidence`() = runTest {
+        val execution = tool.execute(
+            ToolCall(
+                id = "1",
+                name = "fetch_url",
+                argumentsJson = """{"url":"https://127.0.0.1/private"}""",
+            ),
+        )
+
+        assertThat(execution.successful).isFalse()
+        assertThat(execution.evidence).isNull()
+    }
+
+    @Test
     fun `an address written as a bare loopback literal is refused`() = runTest {
         // OkHttp routes a hostname through Dns and an IP literal straight to a socket, so
         // PublicOnlyDns is never consulted about this one and cannot refuse it. A page that

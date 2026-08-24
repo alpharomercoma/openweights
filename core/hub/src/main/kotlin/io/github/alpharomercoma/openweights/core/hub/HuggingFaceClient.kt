@@ -199,10 +199,19 @@ class HuggingFaceClient @Inject constructor(
      * catches repositories that never got tagged. Sampling the top 500 by downloads,
      * roughly one in six differs between them.
      */
-    suspend fun search(query: HubQuery, limit: Int = DEFAULT_LIMIT): List<HubModel> {
+    suspend fun search(query: HubQuery, limit: Int = DEFAULT_LIMIT): List<HubModel> =
+        searchPage(query, offset = 0, limit = limit).models
+
+    /** One bounded page; the Hub accepts offset pagination for the models endpoint. */
+    suspend fun searchPage(
+        query: HubQuery,
+        offset: Int,
+        limit: Int = DEFAULT_LIMIT,
+    ): HubSearchPage {
         val url = apiUrl("models")
             .addQueryParameter("apps", LLAMA_CPP)
             .addQueryParameter("limit", limit.toString())
+            .addQueryParameter("offset", offset.coerceAtLeast(0).toString())
             .addQueryParameter("sort", query.sort.parameter)
             .addQueryParameter("direction", "-1")
             .apply {
@@ -216,7 +225,8 @@ class HuggingFaceClient @Inject constructor(
             }
             .build()
 
-        return json.decodeFromString<List<SearchEntry>>(get(url)).map { it.toModel() }
+        val models = json.decodeFromString<List<SearchEntry>>(get(url)).map { it.toModel() }
+        return HubSearchPage(models = models, hasMore = models.size >= limit)
     }
 
     /**
@@ -458,6 +468,13 @@ val RECOMMENDED = listOf(
  * free, because the lookup that answers it is the one already made for the avatar.
  */
 data class Publisher(val avatarUrl: String? = null, val isOrganisation: Boolean = false)
+
+/** Everything the Discover screen can ask the Hub for. */
+data class HubSearchPage(
+    val models: List<HubModel>,
+    /** Conservative: a full page means another request may have more results. */
+    val hasMore: Boolean,
+)
 
 /** Everything the Discover screen can ask the Hub for. */
 data class HubQuery(

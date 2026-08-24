@@ -52,9 +52,8 @@ constexpr size_t MAX_ATTACHMENT_BYTES = 64u * 1024u * 1024u;
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
 
-/** How much text either side of a divergence is enough to see what differs. */
-constexpr size_t kDiffBack = 12;
-constexpr size_t kDiffForward = 24;
+/** No legitimate tokenizer piece is remotely this large; malformed vocabularies stop here. */
+constexpr size_t MAX_TOKEN_PIECE_BYTES = 1024u * 1024u;
 
 #define LOG_TAG "OpenWeights"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -1068,6 +1067,10 @@ StopReason Session::generate(
         const int32_t n_tokens_needed = -llama_tokenize(
             vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
             nullptr, 0, add_special, true);
+        if (n_tokens_needed <= 0) {
+            error = "the model's chat template produced an empty prompt";
+            return StopReason::ERROR;
+        }
         std::vector<llama_token> prompt_tokens(n_tokens_needed);
         if (llama_tokenize(
                 vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
@@ -1108,31 +1111,6 @@ StopReason Session::generate(
                  reusable, cached_.size(), prompt_tokens.size(),
                  prompt_tokens.size() - reusable);
 
-            // And what the difference actually is.
-            //
-            // The index alone said the prefix stopped matching about a hundred tokens from
-            // the end and two fixes were built on guesses about why. Both were wrong. This
-            // prints the text either side of the split from each sequence, which turns the
-            // question into a diff instead of a hypothesis.
-            const llama_vocab * vocab = llama_model_get_vocab(model_);
-            const auto window = [&](const std::vector<llama_token> & tokens) {
-                const size_t from = reusable > kDiffBack ? reusable - kDiffBack : 0;
-                const size_t to = std::min(tokens.size(), reusable + kDiffForward);
-                std::string out;
-                for (size_t i = from; i < to; ++i) {
-                    char piece[64];
-                    const int n = llama_token_to_piece(
-                        vocab, tokens[i], piece, sizeof(piece), 0, true);
-                    if (n <= 0) continue;
-                    if (i == reusable) out += " >>|";
-                    for (int c = 0; c < n; ++c) {
-                        out += piece[c] == '\n' ? '?' : piece[c];
-                    }
-                }
-                return out;
-            };
-            LOGI("kv: cached  ...%s", window(cached_).c_str());
-            LOGI("kv: prompt  ...%s", window(prompt_tokens).c_str());
         }
         // Compared against the cache position rather than the token count, because a
         // previous turn with an attachment leaves positions filled that no token describes.
@@ -1201,7 +1179,7 @@ StopReason Session::generate(
     StopReason reason = StopReason::END_OF_TURN;
     int64_t first_token_ms = 0;
 
-    char piece_buffer[512];
+    std::vector<char> piece_buffer(512);
     // Everything the model produced, and the subset of it that is well formed. The parser
     // reads the second: a trailing half character withheld from the UI must not reappear
     // in the finished reply.
@@ -1231,8 +1209,19 @@ StopReason Session::generate(
             break;
         }
 
-        const int32_t piece_len =
-            llama_token_to_piece(vocab, token, piece_buffer, sizeof(piece_buffer), 0, true);
+        int32_t piece_len = llama_token_to_piece(
+            vocab, token, piece_buffer.data(), piece_buffer.size(), 0, true);
+        if (piece_len < 0) {
+            const size_t needed = static_cast<size_t>(-static_cast<int64_t>(piece_len));
+            if (needed > MAX_TOKEN_PIECE_BYTES) {
+                error = "the model vocabulary contains an implausibly large token";
+                reason = StopReason::ERROR;
+                break;
+            }
+            piece_buffer.resize(needed);
+            piece_len = llama_token_to_piece(
+                vocab, token, piece_buffer.data(), piece_buffer.size(), 0, true);
+        }
         if (piece_len < 0) {
             error = "failed to convert a token to text";
             reason = StopReason::ERROR;
@@ -1245,7 +1234,7 @@ StopReason Session::generate(
         }
         ++stats.generated_tokens;
 
-        const std::string piece(piece_buffer, piece_len);
+        const std::string piece(piece_buffer.data(), piece_len);
         raw_reply += piece;
 
         pending += piece;
@@ -1343,5 +1332,3 @@ int32_t Session::training_context_size() const { return llama_model_n_ctx_train(
 int32_t Session::layer_count() const { return llama_model_n_layer(model_); }
 
 }  // namespace openweights
-
-

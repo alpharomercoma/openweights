@@ -36,6 +36,9 @@
     <string name="models_phone_yet">Aún no hay modelos en este teléfono.</string>
     <string name="find_one_hugging_face">Busca uno en Hugging Face</string>
     <string name="manage_models">Gestionar modelos</string>
+    <string name="unload_model">Descargar modelo de la memoria</string>
+    <string name="release_model_memory">Liberar la memoria del modelo sin eliminar el archivo</string>
+    <string name="battery_temperature">Batería %1$.1f °C</string>
     <string name="downloads_what_remove">Descargas, y qué quitar</string>
     <string name="use">En uso</string>
     <string name="answer_length">Longitud de la respuesta</string>
@@ -64,6 +67,11 @@
     <string name="anything_add">Algo que añadir</string>
     <string name="saved_device">Guardado en este dispositivo</string>
     <string name="cancel">Cancelar</string>
+    <string name="message_actions">Acciones del mensaje</string>
+    <string name="downloading">Descargando</string>
+    <string name="download_queued">En cola</string>
+    <string name="download_verifying">Verificando</string>
+    <string name="download_progress">%1$s de %2$s</string>
     <string name="report">Informar</string>
     <string name="now">Ahora no</string>
     <string name="run">Ejecutar</string>
@@ -77,6 +85,8 @@
     <string name="recommended">Recomendado</string>
     <string name="official">Oficial</string>
     <string name="filters">Filtros</string>
+    <string name="filters_count">Filtros %1$d</string>
+    <string name="show_more_filters">Mostrar más filtros</string>
     <string name="clear_all">Borrar todo</string>
     <string name="task">Tarea</string>
     <string name="any">Cualquiera</string>
@@ -120,4 +130,16 @@
     <string name="folder_readonly">Se puede leer, pero no admite archivos nuevos, así que guardar sigue apagado.</string>
     <string name="folder_ready">El modelo puede buscar en ella, leerla y guardar archivos nuevos.</string>
     <string name="proxy_hint">http://host:puerto o socks5://host:puerto</string>
+    <string name="goal_planning">Planificando el objetivo</string>
+    <string name="goal_working">Trabajando en el objetivo</string>
+    <string name="goal_done">Objetivo completado</string>
+    <string name="goal_stopped">Objetivo detenido</string>
+    <string name="goal_halted">El objetivo requiere atención</string>
+    <string name="goal_step_count">%1$d de %2$d pasos</string>
+    <string name="goal_current_step">Ahora: %1$s</string>
+    <string name="goal_steer_label">Ajustar el siguiente paso</string>
+    <string name="goal_steer_support">Se aplicará cuando termine el paso actual</string>
+    <string name="goal_stop">Detener objetivo</string>
+    <string name="goal_send_steering">Aplicar</string>
+    <string name="goal_dismiss">Descartar</string>
 </resources>

@@ -366,11 +366,12 @@ class RunScriptTool @Inject constructor(
         const val MAX_SOURCE_CHARS = 16 * 1024
 
         /**
-         * Sixty four thousand characters of a file, which is far past what the model could
-         * read for itself. It never reaches the prompt, so the limit here is the binder's
-         * appetite rather than the context window's.
+         * Twenty thousand characters per file, which is far past what the model could read
+         * for itself. Three inputs made only of JSON control characters expand sixfold when
+         * escaped; this bound keeps that worst case, the source and AIDL overhead below
+         * Binder's transaction ceiling.
          */
-        const val MAX_INPUT_CHARS = 64 * 1024
+        const val MAX_INPUT_CHARS = 20 * 1024
     }
 }
 

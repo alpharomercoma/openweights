@@ -30,8 +30,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -49,10 +51,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,14 +77,19 @@ import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("CyclomaticComplexMethod") // One screen owns list, filters, detail, and back states.
 fun DiscoverScreen(
     state: DiscoverUiState,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onLoadMore: () -> Unit = {},
     onSortChange: (HubSort) -> Unit,
     onFiltersChange: (HubQuery) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
@@ -104,6 +113,9 @@ fun DiscoverScreen(
     modifier: Modifier = Modifier,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
+    LoadMoreEffect(listState, state.results.size, state.canLoadMore, onLoadMore)
 
     // The system back gesture, which the toolbar arrow has always handled correctly and this
     // did not. Opening a model replaces the list with its files rather than pushing a route,
@@ -221,7 +233,7 @@ fun DiscoverScreen(
             // One container with rules in it rather than a card per model. Five free
             // floating cards read as five unrelated things and gave a list of search
             // results the same shape as the settings screen; a list looks like a list.
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(state = listState, contentPadding = PaddingValues(16.dp)) {
                 itemsIndexed(state.results, key = { _, model -> model.id }) { index, model ->
                     Column(
                         modifier = Modifier
@@ -243,6 +255,11 @@ fun DiscoverScreen(
                         )
                     }
                 }
+                if (state.isLoadingMore) {
+                    item(key = "loading-more") {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                }
             }
         }
     }
@@ -255,6 +272,23 @@ fun DiscoverScreen(
             onClear = onClearFilters,
             onDismiss = { filtersOpen = false },
         )
+    }
+}
+
+private const val LOAD_MORE_THRESHOLD = 4
+
+@Composable
+private fun LoadMoreEffect(
+    listState: LazyListState,
+    resultCount: Int,
+    canLoadMore: Boolean,
+    onLoadMore: () -> Unit,
+) {
+    LaunchedEffect(listState, resultCount, canLoadMore) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .distinctUntilChanged()
+            .filter { it >= (resultCount - 1 - LOAD_MORE_THRESHOLD).coerceAtLeast(0) }
+            .collectLatest { onLoadMore() }
     }
 }
 

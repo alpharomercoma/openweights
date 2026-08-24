@@ -17,6 +17,11 @@ that motivated this project.
 found five minutes ago and have it work, and it is what essentially every serious
 local-LLM Android app ships today.
 
+That verdict is for the primary arbitrary-model text engine. Image and speech *output* are a
+different, experimental runtime boundary: MNN is the selected candidate for a measured proof
+there, but no production generator is integrated. See
+[`generation-runtimes.md`](generation-runtimes.md).
+
 ## The field
 
 ### llama.cpp: chosen
@@ -57,11 +62,17 @@ Compiles each model through Apache TVM to native code per target. Fast on GPU,
 but the catalog is whatever has been compiled; adding a model is a build-system task, not
 a download. Same catalog problem.
 
-### MNN (Alibaba): rejected
+### MNN (Alibaba): rejected for primary text; selected for an output proof
 
 Excellent mobile CPU/GPU performance and broad model support, with its own conversion
 pipeline. Smaller English-language ecosystem and community than llama.cpp; the conversion
-step again stands between a user and an arbitrary Hub repo.
+step again stands between a user and an arbitrary Hub repo, so it does not satisfy the
+primary text-engine requirement.
+
+That rejection does not apply to experimental image or speech output, where a curated,
+converted bundle is inherent to the task. MNN is the candidate for the first Android OpenCL
+image benchmark and later speech investigation. This is a research selection, not a claim
+that either generator currently ships.
 
 ### MediaPipe / Google AI Edge (LiteRT): rejected
 

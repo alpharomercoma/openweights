@@ -106,9 +106,9 @@ def feature_graphic() -> None:
     # none. "or" rather than "and": layers go to one or the other, never to both at once,
     # and that is a distinction this project spent a week measuring.
     claims = [
-        "Runs on your CPU or GPU",
+        "CPU or GPU where supported",
         "No account, no server, no telemetry",
-        "Any GGUF on Hugging Face",
+        "Run supported GGUF models locally",
     ]
     for index, claim in enumerate(claims):
         draw.text((538, 146 + index * 90), claim,

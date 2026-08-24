@@ -186,6 +186,7 @@ dependencies {
     // which is most of them below API 31 and any sideloaded build. Without it the profile
     // is carried and never applied, which is the quiet way to have done this work twice.
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.core.splashscreen)
 
     // Not shipped: the module that records the profile above by driving the app on a device.
     baselineProfile(project(":baselineprofile"))

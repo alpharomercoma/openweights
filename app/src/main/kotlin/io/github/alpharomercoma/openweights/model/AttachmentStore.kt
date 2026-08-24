@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.Reader
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +45,19 @@ import kotlin.math.roundToInt
  * image, which needs a projector and a path on disk, a document is read into the question.
  */
 data class StagedDocument(val name: String, val text: String, val wasTrimmed: Boolean)
+
+/** Reads at most [limit] characters plus one character that proves more content exists. */
+internal fun Reader.readDocumentWindow(limit: Int): String {
+    val bounded = limit.coerceAtLeast(0)
+    val buffer = CharArray(bounded + 1)
+    var filled = 0
+    while (filled < buffer.size) {
+        val read = read(buffer, filled, buffer.size - filled)
+        if (read <= 0) return String(buffer, 0, filled)
+        filled += read
+    }
+    return String(buffer, 0, filled)
+}
 
 /**
  * Keeps attachments alongside the conversations that refer to them.
@@ -162,6 +176,31 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
 
     suspend fun discard(attachment: MessagePart.File) = discard(listOf(attachment))
 
+    /** Gives a branched conversation files it can delete independently of its source. */
+    suspend fun duplicate(attachments: List<MessagePart.File>): List<MessagePart.File> =
+        withContext(Dispatchers.IO) {
+            val made = mutableListOf<File>()
+            try {
+                attachments.map { attachment ->
+                    val source = File(attachment.path)
+                    check(source.parentFile == directory && source.isFile) {
+                        "attachment is no longer available"
+                    }
+                    val suffix = source.extension
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { ".$it" }
+                        .orEmpty()
+                    val target = File(directory, "${UUID.randomUUID()}$suffix")
+                    source.copyTo(target, overwrite = false)
+                    made += target
+                    attachment.copy(path = target.absolutePath)
+                }
+            } catch (failure: Throwable) {
+                made.forEach(File::delete)
+                throw failure
+            }
+        }
+
     private fun copyVerbatim(uri: Uri, target: File): Boolean =
         context.contentResolver.openInputStream(uri)?.use { input ->
             target.outputStream().use(input::copyTo)
@@ -234,17 +273,18 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * silently would be worse than not attaching it, so the caller is told.
      */
     suspend fun readDocument(uri: Uri, limit: Int): StagedDocument? = withContext(Dispatchers.IO) {
+        val bounded = limit.coerceIn(0, MAX_DOCUMENT_CHARS)
         val text = runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().readText()
+                input.bufferedReader().use { it.readDocumentWindow(bounded) }
             }
         }.getOrNull() ?: return@withContext null
 
         if (text.isBlank()) return@withContext null
         StagedDocument(
             name = displayName(uri) ?: "document",
-            text = text.take(limit),
-            wasTrimmed = text.length > limit,
+            text = text.take(bounded),
+            wasTrimmed = text.length > bounded,
         )
     }
 
@@ -288,6 +328,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         const val CAPTURES = "captures"
         const val DIRECTORY = "attachments"
         const val FALLBACK_MEDIA_TYPE = "application/octet-stream"
+        const val MAX_DOCUMENT_CHARS = 1_000_000
 
         /** Longest edge in pixels. Above this, prompt processing dominates the reply. */
         const val MAX_IMAGE_EDGE = 1024

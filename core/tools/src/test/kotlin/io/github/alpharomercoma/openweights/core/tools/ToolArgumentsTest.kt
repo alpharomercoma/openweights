@@ -108,4 +108,22 @@ class ToolArgumentsTest {
         assertThat(call("""{"path":"a.js","replace":"maybe"}""").flag("replace")).isFalse()
         assertThat(call("not json at all").flag("replace")).isFalse()
     }
+
+    @Test
+    fun `a flag-looking sentence inside content cannot authorize replacement`() {
+        val call = call(
+            """{"path":"notes.md","content":"example: \"replace\": true"}""",
+        )
+
+        assertThat(call.flag("replace")).isFalse()
+    }
+
+    @Test
+    fun `top-level false wins over flag-looking content`() {
+        val call = call(
+            """{"content":"\"replace\": true","replace":false,"path":"notes.md"}""",
+        )
+
+        assertThat(call.flag("replace")).isFalse()
+    }
 }

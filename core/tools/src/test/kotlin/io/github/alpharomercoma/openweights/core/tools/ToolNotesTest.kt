@@ -57,6 +57,18 @@ class ToolNotesTest {
     }
 
     @Test
+    fun `a failed tool result does not become persistent context`() {
+        val failed = AgentStep.Ran(
+            call = call("fetch_url", URL_ARGS),
+            result = "network failed",
+            millis = 1,
+            successful = false,
+        )
+
+        assertThat(ToolNotes().withSteps(listOf(failed)) { null }.render()).isNull()
+    }
+
+    @Test
     fun `the same call made twice is recorded once, at its newest`() {
         val old = listOf(ran("fetch_url", URL_ARGS, "The old front page."))
         val first = ToolNotes().withSteps(old) { null }

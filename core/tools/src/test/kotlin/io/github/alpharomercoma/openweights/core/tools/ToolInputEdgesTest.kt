@@ -108,6 +108,13 @@ class ToolInputEdgesTest {
     }
 
     @Test
+    fun `many overlapping stars cannot trigger regex backtracking`() {
+        val matcher = ("*a".repeat(256) + "b").asNameMatcher()
+
+        assertThat(matcher("a".repeat(256) + "c")).isFalse()
+    }
+
+    @Test
     fun `a file named without a directory is still seen in a script`() {
         // The path pattern required a slash, so a script reading a file from the root of the
         // shared folder mentioned nothing this could find, and unless the model had also

@@ -26,14 +26,14 @@ off. Every token is produced by your own hardware through
 ## Why
 
 Every other on-device app hands you a catalogue somebody else chose. OpenWeights hands you
-the Hub. If someone published a GGUF an hour ago, you can run it: no vendor pipeline, no
-per-model export step, no waiting for a first-party blessing.
+the Hub: browse GGUF repositories, inspect fit, and run supported architectures locally
+without a vendor pipeline or a first-party catalogue.
 
 ## What it does differently
 
-**Any GGUF, not a catalogue.** The Hub search is the model list. Most of what is on there is
-far too large for a phone, which is what the next paragraph is for, but nothing is kept from
-you because a vendor has not blessed it yet.
+**Browse the Hub, not a fixed catalogue.** The Hub search is the model list. Most of what is
+on there is far too large for a phone, and some architectures are not supported, which is
+why the fit check is shown before download.
 
 **Honest about your device.** Before downloading, the app reads the GGUF header over HTTP
 range requests and says what the file needs at your context length, roughly how fast it will
@@ -92,15 +92,20 @@ Multi-module Gradle project; each module has one job.
 | `:core:common` | Shared domain models and utilities |
 | `:core:designsystem` | Theme, tokens, reusable composables |
 | `:core:engine` | `InferenceEngine` API and the llama.cpp JNI implementation |
+| `:core:generation` | Multiplatform image/speech output contracts; no production generator yet |
 | `:core:hub` | Hugging Face client, GGUF header parser, downloader |
 | `:core:data` | Room database, settings, encrypted token vault |
 | `:core:device` | Device profiling, model fit estimation, benchmarks |
 | `:core:tools` | The agent loop and the tools it may call |
 | `:core:sandbox` | QuickJS in an isolated process, for the script tool |
 
-Longer form in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Why llama.cpp rather than
-ExecuTorch, MLC-LLM, MNN or MediaPipe is argued in
-[`docs/research/inference-engines.md`](docs/research/inference-engines.md).
+Longer form in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Why llama.cpp is the primary
+arbitrary-GGUF text engine is argued in
+[`docs/research/inference-engines.md`](docs/research/inference-engines.md). MNN was rejected
+for that role but selected as the candidate for a separate, experimental image/speech output
+proof; no production generator is integrated. That boundary and its benchmark requirements
+are recorded in
+[`docs/research/generation-runtimes.md`](docs/research/generation-runtimes.md).
 
 ## Contributing
 

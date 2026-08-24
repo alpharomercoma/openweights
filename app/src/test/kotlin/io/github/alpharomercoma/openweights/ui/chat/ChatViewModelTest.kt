@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import android.net.Uri
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
@@ -42,6 +43,18 @@ import java.io.File
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ChatViewModelTest : ChatFixture() {
+    @Test
+    fun `a detected speech model is refused before it reaches the text generator`() =
+        runTest(dispatcher) {
+            engine.outputModalities["voice.gguf"] = OutputModality.SPEECH
+            loadModel("voice.gguf")
+
+            assertThat(viewModel.uiState.value.canSend).isFalse()
+            assertThat(viewModel.send("Say hello")).isFalse()
+            assertThat(engine.prompts).isEmpty()
+            assertThat(viewModel.uiState.value.error).contains("cannot play")
+        }
+
     @Test
     fun `stopping before the message is written gives the composer back`() = runTest(dispatcher) {
         loadModel()

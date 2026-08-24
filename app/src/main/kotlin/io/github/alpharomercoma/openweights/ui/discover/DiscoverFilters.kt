@@ -16,18 +16,25 @@
 
 package io.github.alpharomercoma.openweights.ui.discover
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Verified
@@ -44,8 +51,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +66,7 @@ import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HubTask
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
+import kotlinx.coroutines.launch
 
 /**
  * The row of controls under the search field.
@@ -78,147 +90,186 @@ fun DiscoverFilterBar(
     onOpenFilters: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clipToBounds(),
     ) {
-        AssistChip(
-            onClick = onOpenFilters,
-            label = {
-                Text(
-                    text = if (query.activeCount == 0) {
-                        "Filters"
-                    } else {
-                        "Filters ${query.activeCount}"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Tune,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = if (query.activeCount == 0) {
-                    MaterialTheme.colorScheme.surfaceContainer
-                } else {
-                    OpenWeightsColors.Lime
-                },
-                labelColor = if (query.activeCount == 0) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    OpenWeightsColors.Ink
-                },
-                leadingIconContentColor = if (query.activeCount == 0) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    OpenWeightsColors.Ink
-                },
-            ),
-        )
-
-        // First in the row, because it is the only one on when the screen opens and the
-        // one that makes the other three unnecessary while it is.
-        FilterChip(
-            selected = query.recommendedOnly,
-            onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
-            label = {
-                Text(
-                    text = stringResource(R.string.recommended),
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Bolt,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            colors = selectedChipColors(),
-            border = chipBorder(query.recommendedOnly),
-        )
-
-        val phoneSized = query.maxParametersBillions != null
-        FilterChip(
-            selected = phoneSized,
-            onClick = { onPhoneSizedChange(!phoneSized) },
-            label = {
-                Text(
-                    // The number is the whole point once it is on: "Fits my phone" is a
-                    // claim, "Under 11B" is the claim with its working shown.
-                    text = if (phoneSized && parameterCeilingBillions > 0) {
-                        "Under ${parameterCeilingBillions}B"
-                    } else {
-                        "Fits my phone"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Smartphone,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            colors = selectedChipColors(),
-            border = chipBorder(phoneSized),
-        )
-
-        // Next to "Fits my phone", because the two answer the same kind of question: not
-        // what a model is, but whether it is worth your attention. Size is about the
-        // hardware, this is about who stands behind the weights.
-        FilterChip(
-            selected = query.officialOnly,
-            onClick = { onOfficialOnlyChange(!query.officialOnly) },
-            label = {
-                Text(
-                    text = stringResource(R.string.official),
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Rounded.Verified,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            colors = selectedChipColors(),
-            border = chipBorder(query.officialOnly),
-        )
-
-        HubSort.entries.forEach { sort ->
-            FilterChip(
-                selected = query.sort == sort,
-                onClick = { onSortChange(sort) },
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AssistChip(
+                onClick = onOpenFilters,
                 label = {
                     Text(
-                        text = sort.label,
+                        text = if (query.activeCount == 0) {
+                            stringResource(R.string.filters)
+                        } else {
+                            stringResource(R.string.filters_count, query.activeCount)
+                        },
                         style = MaterialTheme.typography.labelMedium,
-                        // A chip that wraps is a chip taller than the ones beside it, which
-                        // is what made this row ragged at any font scale.
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 },
-                colors = sortChipColors(),
-                // Always the neutral outline: the fill is what says which one is on, and a
-                // lime ring around a grey pill is two answers to one question.
-                border = chipBorder(selected = false),
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = if (query.activeCount == 0) {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    } else {
+                        OpenWeightsColors.Lime
+                    },
+                    labelColor = if (query.activeCount == 0) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        OpenWeightsColors.Ink
+                    },
+                    leadingIconContentColor = if (query.activeCount == 0) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        OpenWeightsColors.Ink
+                    },
+                ),
             )
+
+            // First in the row, because it is the only one on when the screen opens and the
+            // one that makes the other three unnecessary while it is.
+            FilterChip(
+                selected = query.recommendedOnly,
+                onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.recommended),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Bolt,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                colors = selectedChipColors(),
+                border = chipBorder(query.recommendedOnly),
+            )
+
+            val phoneSized = query.maxParametersBillions != null
+            FilterChip(
+                selected = phoneSized,
+                onClick = { onPhoneSizedChange(!phoneSized) },
+                label = {
+                    Text(
+                        // The number is the whole point once it is on: "Fits my phone" is a
+                        // claim, "Under 11B" is the claim with its working shown.
+                        text = if (phoneSized && parameterCeilingBillions > 0) {
+                            "Under ${parameterCeilingBillions}B"
+                        } else {
+                            "Fits my phone"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Smartphone,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                colors = selectedChipColors(),
+                border = chipBorder(phoneSized),
+            )
+
+            // Next to "Fits my phone", because the two answer the same kind of question: not
+            // what a model is, but whether it is worth your attention. Size is about the
+            // hardware, this is about who stands behind the weights.
+            FilterChip(
+                selected = query.officialOnly,
+                onClick = { onOfficialOnlyChange(!query.officialOnly) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.official),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Verified,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                },
+                colors = selectedChipColors(),
+                border = chipBorder(query.officialOnly),
+            )
+
+            HubSort.entries.forEach { sort ->
+                FilterChip(
+                    selected = query.sort == sort,
+                    onClick = { onSortChange(sort) },
+                    label = {
+                        Text(
+                            text = sort.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            // A chip that wraps is a chip taller than the ones beside it, which
+                            // is what made this row ragged at any font scale.
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = sortChipColors(),
+                    // Always the neutral outline: the fill is what says which one is on, and a
+                    // lime ring around a grey pill is two answers to one question.
+                    border = chipBorder(selected = false),
+                )
+            }
+        }
+
+        // The row is intentionally wider than a phone, but a raw scroll container reads as
+        // clipped content. Keep a restrained trailing cue only while more chips are hidden;
+        // tapping it advances to the end and the content description makes the affordance
+        // available to TalkBack without shrinking labels or hiding filters behind a sheet.
+        if (scrollState.maxValue > scrollState.value) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(36.dp)
+                    .height(IntrinsicSize.Min)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, MaterialTheme.colorScheme.surface),
+                        ),
+                    )
+                    .clickable(
+                        onClickLabel = stringResource(R.string.show_more_filters),
+                        onClick = {
+                            scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
+                        },
+                    ),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ChevronRight,
+                    contentDescription = stringResource(R.string.show_more_filters),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

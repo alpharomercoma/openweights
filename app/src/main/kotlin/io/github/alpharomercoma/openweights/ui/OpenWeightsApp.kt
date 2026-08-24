@@ -143,14 +143,12 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             // Collected here rather than above the NavHost. This scope already
             // recomposes on every token, so a download ticking costs nothing extra in
             // it, whereas hoisting it would make the whole shell recompose for both.
-            val installedModels by modelsViewModel.uiState
-                .collectAsStateWithLifecycle()
-                .let { state -> remember { derivedStateOf { state.value.models } } }
+            val modelsUiState by modelsViewModel.uiState.collectAsStateWithLifecycle()
+            val installedModels by remember { derivedStateOf { modelsUiState.models } }
             // Derived the same way and for the same reason: the picker wants logos and the
             // shell must not recompose because one arrived.
-            val publisherAvatars by modelsViewModel.uiState
-                .collectAsStateWithLifecycle()
-                .let { state -> remember { derivedStateOf { state.value.avatars } } }
+            val publisherAvatars by remember { derivedStateOf { modelsUiState.avatars } }
+            val activeDownloads by remember { derivedStateOf { modelsUiState.downloads } }
 
             val state by chatViewModel.uiState.collectAsStateWithLifecycle()
             val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
@@ -159,6 +157,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             // Collected from the board rather than mirrored into the chat state: it is
             // already a flow, and a second copy would be a second thing to keep in step.
             val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
+            val goal by chatViewModel.goal.collectAsStateWithLifecycle()
             val question by chatViewModel.asking.pending.collectAsStateWithLifecycle()
             val chatSearch by chatViewModel.search.state.collectAsStateWithLifecycle()
 
@@ -171,7 +170,9 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             ChatScreen(
                 state = state,
                 onSend = chatViewModel::send,
-                onStop = chatViewModel::stop,
+                onStop = {
+                    if (goal?.isRunning == true) chatViewModel.stopGoal() else chatViewModel.stop()
+                },
                 onRegenerate = chatViewModel::regenerate,
                 onNewChat = chatViewModel::newChat,
                 onCompact = chatViewModel::compactNow,
@@ -188,10 +189,12 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onManageModels = { navController.push(Routes.MODELS) },
                 ),
                 installedModels = installedModels,
+                activeDownloads = activeDownloads,
                 publisherAvatars = publisherAvatars,
                 onSelectModel = { model ->
                     chatViewModel.loadModel(model.file, keepConversation = true)
                 },
+                onUnloadModel = chatViewModel::unloadModel,
                 onOpenConversation = {
                     // The search has done its job once a chat is open, and leaving it set
                     // meant reopening the drawer later showed a list still filtered by a
@@ -224,6 +227,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onApproval = chatViewModel::resolveApproval,
                 plan = plan,
                 onTickStep = chatViewModel.planning::tick,
+                goal = goal,
+                onStopGoal = chatViewModel::stopGoal,
+                onSteerGoal = chatViewModel::steerGoal,
+                onDismissGoal = chatViewModel::dismissGoal,
                 question = question,
                 onAnswerQuestion = chatViewModel.asking::answer,
                 onReport = { entry, reason, note ->
@@ -263,6 +270,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 state = state,
                 onQueryChange = viewModel::onQueryChange,
                 onSearch = { viewModel.search() },
+                onLoadMore = viewModel::loadMore,
                 onSortChange = viewModel::onSortChange,
                 onFiltersChange = viewModel::onQueryChange,
                 onPhoneSizedChange = viewModel::onPhoneSizedChange,

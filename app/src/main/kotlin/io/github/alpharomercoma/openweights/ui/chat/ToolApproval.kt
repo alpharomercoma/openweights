@@ -21,8 +21,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -62,10 +64,11 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
         )
         Text(
             text = call.argumentsJson.ifBlank { "with no arguments" },
+            modifier = Modifier
+                .heightIn(max = 240.dp)
+                .verticalScroll(rememberScrollState()),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = ARGUMENT_LINES,
-            overflow = TextOverflow.Ellipsis,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -82,14 +85,3 @@ fun ToolApproval(call: ToolCall, onAnswer: (Boolean) -> Unit, modifier: Modifier
         }
     }
 }
-
-/** Enough to read a query or a URL, not enough for a page of JSON to take the screen. */
-/**
- * Enough lines to show the whole of anything that would leave the device.
- *
- * Four cut a long argument off with an ellipsis, which is tolerable for a file being saved
- * on the device and not tolerable for a search query: the reason that card is being shown at
- * all can be the passage hidden behind the dots. A search is capped at a hundred and twenty
- * characters, so twelve lines shows all of one with room to spare.
- */
-private const val ARGUMENT_LINES = 12

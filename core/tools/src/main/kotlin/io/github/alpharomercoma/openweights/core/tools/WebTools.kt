@@ -83,11 +83,13 @@ class WebSearchTool @Inject constructor(
     private val settings: SearchSettings,
     private val reachability: Reachability,
 ) : Tool {
+    override val parallelSafe: Boolean = true
+
     /** Not described to the model when it cannot work. See [Reachability]. */
     override val isAvailable: Boolean get() = reachability.isOnline()
 
     override val definition = ToolDefinition(
-        name = "web_search",
+        name = NAME,
         // Named for what it does, not for where it looks. The name is the strongest hint a
         // model gets: while this was called search_wikipedia, replies said "Wikipedia" for
         // questions that had nothing to do with an encyclopedia, and the model wrote as
@@ -134,12 +136,17 @@ class WebSearchTool @Inject constructor(
 
     override val leavesTheDevice: Boolean = true
 
-    override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution = withContext(Dispatchers.IO) {
         val query = call.argument("query", "q", "search", "input", "topic")
-            ?: return@withContext "No query was given. Call web_search again with a query."
+            ?: return@withContext ToolExecution.failure(
+                "No query was given. Call web_search again with a query.",
+            )
         if (query.length > MAX_QUERY_CHARS) {
-            return@withContext "That is too long to search for. Search for a few words " +
-                "rather than a passage."
+            return@withContext ToolExecution.failure(
+                "That is too long to search for. Search for a few words rather than a passage.",
+            )
         }
 
         // Through the proxy when one is set, and only here: see SearchSettings.proxy for
@@ -153,26 +160,45 @@ class WebSearchTool @Inject constructor(
         }
 
         val (provider, results) = answered
-            ?: return@withContext "No search provider could answer. The device may be " +
-                "offline, or the search may be rate limited. Say so rather than guessing."
+            ?: return@withContext ToolExecution.failure(
+                "No search provider could answer. The device may be offline, or the search " +
+                    "may be rate limited. Say so rather than guessing.",
+            )
 
         // Framed as material, not as a menu. A small model handed three bare titles reads
         // them as options and asks which one to open, which is how "what is the Eiffel
         // Tower" came back as "how about I fetch the page for Gustave Eiffel". The first
         // result is the best match and saying so is what stops it picking the third.
-        buildString {
-            append("Results for \"").append(query).append("\" from ").append(provider.label)
-            append(", best match first. Answer the question using these. ")
-            append("Do not ask which one to read.\n")
-            results.forEachIndexed { index, result ->
-                append("\n[").append(index + 1).append("] ").append(result.title).append('\n')
-                append(result.snippet.take(MAX_EXTRACT_CHARS)).append('\n')
-                append(result.url).append('\n')
-            }
-        }
+        webSearchSuccess(query, provider.label, results)
     }
 
     internal companion object {
+        const val NAME = "web_search"
+
+        /** Builds the model-facing result while keeping its source addresses structured. */
+        fun webSearchSuccess(
+            query: String,
+            provider: String,
+            results: List<SearchHit>,
+        ): ToolExecution {
+            val text = buildString {
+                append("Results for \"").append(query).append("\" from ").append(provider)
+                append(", best match first. Answer the question using these. ")
+                append("Do not ask which one to read.\n")
+                results.forEachIndexed { index, result ->
+                    append("\n[").append(index + 1).append("] ").append(result.title).append('\n')
+                    append(result.snippet.take(MAX_EXTRACT_CHARS)).append('\n')
+                    append(result.url).append('\n')
+                }
+            }
+            return ToolExecution(
+                text = text,
+                evidence = ToolEvidence.Search(
+                    results.mapNotNull { it.url.toHttpUrlOrNull()?.toString() }.toSet(),
+                ),
+            )
+        }
+
         /**
          * Longer than any question and shorter than a document.
          *
@@ -260,21 +286,28 @@ class FetchUrlTool @Inject constructor(
         """.trimIndent(),
     )
 
-    override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution = withContext(Dispatchers.IO) {
         val url = call.argument("url", "link", "address", "input")
-            ?: return@withContext "No URL was given. Call fetch_url again with a url."
+            ?: return@withContext ToolExecution.failure(
+                "No URL was given. Call fetch_url again with a url.",
+            )
 
         // Parsed rather than pattern matched. The checks below are about the host, and the
         // host is not the part of the string it looks like: everything before an @ is
         // userinfo and goes nowhere, so "https://example.com@10.0.0.1/" reads as example.com
         // to anything working on the text.
         var next = url.trim().toHttpUrlOrNull()
-            ?: return@withContext "That is not an address that can be read. Got: $url"
+            ?: return@withContext ToolExecution.failure(
+                "That is not an address that can be read. Got: $url",
+            )
+        val requested = next.toString()
 
         // Every hop, not only the address the user approved. See [refuseAddress].
         var hops = 0
         while (true) {
-            refuseAddress(next)?.let { return@withContext it }
+            refuseAddress(next)?.let { return@withContext ToolExecution.failure(it) }
 
             val request = Request.Builder()
                 .url(next)
@@ -287,11 +320,15 @@ class FetchUrlTool @Inject constructor(
                     Hop.Read(textOf(response))
                 }
             }.getOrNull()
-                ?: return@withContext "That page could not be read. The device may be offline."
+                ?: return@withContext ToolExecution.failure(
+                    "That page could not be read. The device may be offline.",
+                )
 
             when (hop) {
                 is Hop.Read -> {
-                    val body = hop.text
+                    val page = hop.page
+                    if (!page.successful) return@withContext ToolExecution.failure(page.text)
+                    val body = page.text
                     return@withContext when {
                         // A page that answered and left nothing to read is almost always one
                         // that builds itself in the browser: the file holds a script and an
@@ -299,18 +336,19 @@ class FetchUrlTool @Inject constructor(
                         // follow. Returning the empty string said none of that, and a model
                         // handed nothing reports that the page does not mention the thing,
                         // which is a wrong answer rather than a missing one.
-                        body.isBlank() ->
-                            "That page has no readable text in it. It is " +
-                                "probably built in the browser, so there is nothing in the file " +
-                                "to read. Try a different source."
-                        body.length <= MAX_CHARS -> body
-                        else -> body.take(MAX_CHARS) + "\n[truncated]"
+                        body.isBlank() -> ToolExecution.failure(
+                            "That page has no readable text in it. It is probably built in " +
+                                "the browser, so there is nothing in the file to read. Try a " +
+                                "different source.",
+                        )
+                        else -> fetchedPageSuccess(body, requested, next.toString())
                     }
                 }
                 is Hop.Moved -> {
                     if (++hops > MAX_HOPS) {
-                        return@withContext "That address redirected more than $MAX_HOPS " +
-                            "times, so it was not read."
+                        return@withContext ToolExecution.failure(
+                            "That address redirected more than $MAX_HOPS times, so it was not read.",
+                        )
                     }
                     next = hop.to
                 }
@@ -318,7 +356,7 @@ class FetchUrlTool @Inject constructor(
         }
         // Unreachable: every branch of the loop returns.
         @Suppress("UNREACHABLE_CODE")
-        return@withContext "That page could not be read."
+        return@withContext ToolExecution.failure("That page could not be read.")
     }
 
     /**
@@ -329,25 +367,42 @@ class FetchUrlTool @Inject constructor(
      * prose. The model chooses this address, which is what makes it worth checking: a link
      * in a search result can point at a video, an archive, or a page that never stops.
      */
-    private fun textOf(response: Response): String {
-        if (!response.isSuccessful) return "HTTP ${response.code}"
+    private fun textOf(response: Response): PageText {
+        if (!response.isSuccessful) return PageText("HTTP ${response.code}", successful = false)
 
         val type = response.body.contentType()?.let { "${it.type}/${it.subtype}" }
         if (type != null && TEXTUAL.none { type.startsWith(it) }) {
-            return "That address is $type, which is not text. Nothing to read."
+            return PageText(
+                "That address is $type, which is not text. Nothing to read.",
+                successful = false,
+            )
         }
         // peekBody stops at the limit rather than after it: the bytes past it are never
         // buffered, so a page with no end cannot exhaust the heap.
-        return response.peekBody(MAX_BYTES.toLong()).string().readable()
+        return PageText(response.peekBody(MAX_BYTES.toLong()).string().readable())
     }
 
     /** One step of a fetch: either something to read, or somewhere else to look. */
     private sealed interface Hop {
-        data class Read(val text: String) : Hop
+        data class Read(val page: PageText) : Hop
         data class Moved(val to: HttpUrl) : Hop
     }
 
-    private companion object {
+    /** Text from one HTTP response, before the page-level empty-content check. */
+    private data class PageText(val text: String, val successful: Boolean = true)
+
+    internal companion object {
+        /** Builds a successful page outcome without inferring success from its prose later. */
+        fun fetchedPageSuccess(
+            body: String,
+            requestedUrl: String,
+            finalUrl: String,
+        ): ToolExecution = ToolExecution(
+            text = body.take(MAX_CHARS) +
+                "\n[truncated]".takeIf { body.length > MAX_CHARS }.orEmpty(),
+            evidence = ToolEvidence.Fetch(requestedUrl, finalUrl),
+        )
+
         /**
          * How many redirects one address may take before it is given up on.
          *

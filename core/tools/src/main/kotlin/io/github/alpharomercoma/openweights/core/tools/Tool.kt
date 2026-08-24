@@ -19,6 +19,32 @@ package io.github.alpharomercoma.openweights.core.tools
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 
+/** Structured proof produced by the two web tools, alongside the text shown to the model. */
+sealed interface ToolEvidence {
+    /** The exact source addresses a successful search returned. */
+    data class Search(val urls: Set<String>) : ToolEvidence
+
+    /** The address requested and the final address reached by a successful page read. */
+    data class Fetch(val requestedUrl: String, val finalUrl: String) : ToolEvidence
+}
+
+/**
+ * What a tool did, separated from the prose it returns.
+ *
+ * Failure has historically been returned as useful text so the model can recover. That made
+ * `AgentStep.Ran` indistinguishable from success to orchestration code. This preserves the
+ * useful text while giving callers a typed fact they can use before claiming work finished.
+ */
+data class ToolExecution(
+    val text: String,
+    val successful: Boolean = true,
+    val evidence: ToolEvidence? = null,
+) {
+    companion object {
+        fun failure(text: String) = ToolExecution(text = text, successful = false)
+    }
+}
+
 /**
  * Something the model can actually run.
  *
@@ -78,6 +104,17 @@ interface Tool {
     val alwaysAsks: Boolean get() = false
 
     /**
+     * Whether this particular call asks in Auto mode.
+     *
+     * Most tools answer this for the tool as a whole through [alwaysAsks]. A call may be
+     * materially more dangerous than its ordinary form, though: creating a new file is
+     * recoverable, while replacing one destroys the previous contents. Keeping the call in
+     * the decision lets that one operation ask without turning every harmless save into a
+     * dialog.
+     */
+    fun asksInAuto(call: ToolCall): Boolean = alwaysAsks
+
+    /**
      * Whether this tool can do anything at all as things stand.
      *
      * False keeps the definition out of the prompt entirely, rather than advertising
@@ -113,6 +150,15 @@ interface Tool {
      * where the work was going to be saved is the round that gets thrown away.
      */
     val chains: Boolean get() = false
+
+    /**
+     * Whether independent calls may run together in one agent round.
+     *
+     * This is deliberately opt-in. Tools with durable effects, shared mutable state,
+     * private-data taint, or approval prompts remain serialized; a network lookup can opt in
+     * when its implementation is idempotent and its result is independent of sibling calls.
+     */
+    val parallelSafe: Boolean get() = false
 
     /**
      * Whether what this tool returns is text somebody else wrote.
@@ -178,6 +224,12 @@ interface Tool {
      * whoever chose the destination.
      */
     val readsPrivateData: Boolean get() = false
+
+    /**
+     * Runs with a typed outcome for callers that must distinguish useful failure text from
+     * success. Existing tools inherit success; tools with recoverable failure paths override.
+     */
+    suspend fun execute(call: ToolCall): ToolExecution = ToolExecution(run(call))
 
     /**
      * Runs the call and returns what the model should be told.

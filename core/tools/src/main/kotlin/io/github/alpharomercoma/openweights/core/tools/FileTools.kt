@@ -65,6 +65,11 @@ class SearchFilesTool @Inject constructor(private val workspace: Workspace) : To
 
     override val chains: Boolean = true
 
+    // Paths are private data too, and file names come from outside the model's trust
+    // boundary. `contains` also reads contents even though it only returns matching paths.
+    override val readsPrivateData: Boolean = true
+    override val returnsUntrustedText: Boolean = true
+
     override suspend fun run(call: ToolCall): String =
         workspace.unavailable().ifEmpty { search(call) }
 
@@ -140,6 +145,8 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         return window(entry, path, skip)
     }
 
+    // Guard clauses keep each incompatible file shape next to its user-facing explanation.
+    @Suppress("ReturnCount")
     private suspend fun window(entry: Entry, path: String, skip: Int): String {
         if (entry.isDirectory) {
             return "$path is a folder, not a file. Use search_files to see what is in it."
@@ -227,6 +234,16 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
 
     override val chains: Boolean = true
 
+    /**
+     * A write changes durable user state. It must remain an explicit capability even when
+     * the request came after an untrusted page or file: otherwise prompt injection can turn
+     * "save this" into an unattended workspace mutation. Replace is still called out in
+     * [asksInAuto] for callers that inspect the per-call reason.
+     */
+    override val alwaysAsks: Boolean = true
+
+    override fun asksInAuto(call: ToolCall): Boolean = call.flag("replace", "overwrite")
+
     override suspend fun run(call: ToolCall): String =
         workspace.unavailable().ifEmpty { create(call) }
 
@@ -262,21 +279,35 @@ internal fun String.asNameMatcher(): (String) -> Boolean {
         val needle = this
         return { it.contains(needle, ignoreCase = true) }
     }
-    // Built character by character, because splitting on both wildcards and rejoining with
-    // one replacement made every `?` behave as `*`: `doc_??.txt` matched
-    // `doc_anything_at_all.txt`. A question mark is exactly one character, which is the
-    // whole reason a glob has two wildcards rather than one.
-    val expression = buildString {
-        this@asNameMatcher.forEach { character ->
-            when (character) {
-                '*' -> append(".*")
-                '?' -> append('.')
-                else -> append(Regex.escape(character.toString()))
+    val pattern = lowercase()
+    return { name -> pattern.globMatches(name.lowercase()) }
+}
+
+/** Linear-time `*`/`?` glob matching; regex backtracking lets a model pin the UI thread. */
+private fun String.globMatches(value: String): Boolean {
+    var patternAt = 0
+    var valueAt = 0
+    var lastStar = -1
+    var afterStar = -1
+    while (valueAt < value.length) {
+        when {
+            patternAt < length && (this[patternAt] == '?' || this[patternAt] == value[valueAt]) -> {
+                patternAt++
+                valueAt++
             }
+            patternAt < length && this[patternAt] == '*' -> {
+                lastStar = patternAt++
+                afterStar = valueAt
+            }
+            lastStar >= 0 -> {
+                patternAt = lastStar + 1
+                valueAt = ++afterStar
+            }
+            else -> return false
         }
     }
-    val regex = runCatching { Regex("^$expression$", RegexOption.IGNORE_CASE) }.getOrNull()
-    return { name -> regex?.matches(name) ?: false }
+    while (patternAt < length && this[patternAt] == '*') patternAt++
+    return patternAt == length
 }
 
 /** What one read_file call hands back, well inside what the tool budget will keep. */

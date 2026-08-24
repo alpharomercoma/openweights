@@ -17,6 +17,9 @@
 package io.github.alpharomercoma.openweights.core.tools
 
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Reads an argument that is a lump of text rather than a word.
@@ -63,24 +66,13 @@ private val DIGITS = Regex("\\d+")
  * for a quoted value and would find nothing here.
  */
 internal fun ToolCall.flag(vararg names: String): Boolean =
-    names.any { argumentsJson.booleanNamed(it) == true }
-
-private fun String.booleanNamed(name: String): Boolean? {
-    val key = indexOf("\"$name\"")
-    if (key < 0) return null
-
-    val colon = indexOf(':', startIndex = key + name.length + QUOTES)
-    if (colon < 0) return null
-
-    // Quoted or bare, because a model writing Pythonic calls and a harness rendering JSON
-    // do not always agree on whether a boolean wears quotes.
-    val rest = substring(colon + 1).trimStart().removePrefix("\"")
-    return when {
-        rest.startsWith("true", ignoreCase = true) -> true
-        rest.startsWith("false", ignoreCase = true) -> false
-        else -> null
-    }
-}
+    runCatching { Json.parseToJsonElement(argumentsJson).jsonObject }
+        .getOrNull()
+        ?.let { root ->
+            names.any { name ->
+                (root[name] as? JsonPrimitive)?.content?.equals("true", ignoreCase = true) == true
+            }
+        } == true
 
 private fun String.scavenge(name: String): String? {
     val key = indexOf("\"$name\"")

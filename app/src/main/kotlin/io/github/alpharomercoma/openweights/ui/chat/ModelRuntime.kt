@@ -38,6 +38,8 @@ import javax.inject.Singleton
  * this is about a conversation, which is why it is not in there any more.
  */
 @Singleton
+// Lifecycle wrappers stay here so engine policy does not leak into the UI.
+@Suppress("TooManyFunctions")
 class ModelRuntime @Inject constructor(
     private val engine: InferenceEngine,
     private val modelStore: ModelStore,
@@ -65,6 +67,9 @@ class ModelRuntime @Inject constructor(
 
     suspend fun load(model: File, params: ModelLoadParams, projector: File?) =
         engine.load(model, params, projector)
+
+    /** Releases weights and the KV cache without deleting the model from storage. */
+    suspend fun unload() = engine.unload()
 
     /**
      * Clears the KV cache.

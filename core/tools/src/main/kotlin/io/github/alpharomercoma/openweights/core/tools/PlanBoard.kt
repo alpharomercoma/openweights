@@ -69,6 +69,17 @@ class PlanBoard @Inject constructor() {
      */
     fun tick(step: Int) = current.update { it?.ticked(step) }
 
+    /**
+     * Restores the plan held before a turn whose claimed completion was rejected by the host.
+     *
+     * Research verifies that a search actually ran after the model answers. If the model
+     * called [AdvanceTool] without doing that work, its tick must be rolled back before the
+     * step is retried; otherwise the retry silently moves to the next question.
+     */
+    fun restore(plan: TaskPlan) {
+        current.value = plan
+    }
+
     /** Dropped when the conversation is, or when the user starts a new one. */
     fun clear() {
         current.value = null

@@ -374,21 +374,18 @@ private fun GalleryViewer(
     onDelete: () -> Unit,
 ) {
     var isPlaying by remember { mutableStateOf(false) }
-    val mediaPlayer = remember(entry.artifact.path) {
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+    DisposableEffect(entry.id, entry.artifact.path) {
         if (entry.modality == GenerationTask.SPEECH) {
-            runCatching {
+            mediaPlayer = runCatching {
                 MediaPlayer().apply {
                     setDataSource(entry.artifact.path)
                     prepare()
                     setOnCompletionListener { isPlaying = false }
                 }
             }.getOrNull()
-        } else {
-            null
         }
-    }
-
-    DisposableEffect(mediaPlayer) {
         onDispose {
             runCatching {
                 mediaPlayer?.run {
@@ -396,6 +393,8 @@ private fun GalleryViewer(
                     release()
                 }
             }
+            mediaPlayer = null
+            isPlaying = false
         }
     }
 

@@ -37,6 +37,9 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
+#include <mutex>
+#include <unordered_set>
+
 namespace {
 
 /**
@@ -72,8 +75,21 @@ struct GenerationSession {
     std::string backend;
 };
 
+struct SpeechSession {
+    std::unique_ptr<MNNSupertonicTTSImpl> tts;
+    int sampleRate = 0;
+};
+
+std::mutex gSessionMutex;
+std::unordered_set<GenerationSession*> gActiveSessions;
+std::unordered_set<SpeechSession*> gActiveSpeechSessions;
+
 GenerationSession* asSession(jlong handle) {
     return reinterpret_cast<GenerationSession*>(handle);
+}
+
+SpeechSession* asSpeech(jlong handle) {
+    return reinterpret_cast<SpeechSession*>(handle);
 }
 
 void appendUtf8(std::string & out, uint32_t code) {
@@ -106,6 +122,7 @@ std::string to_utf8(JNIEnv* env, jstring value) {
         if (code >= 0xD800 && code <= 0xDBFF && i + 1 < length &&
             chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
             code = 0x10000 + ((code - 0xD800) << 10) + (chars[i + 1] - 0xDC00);
+            if (code > 0x10FFFF) code = 0xFFFD;
             ++i;
         }
         appendUtf8(result, code);
@@ -113,19 +130,6 @@ std::string to_utf8(JNIEnv* env, jstring value) {
     env->ReleaseStringChars(value, chars);
     return result;
 }
-
-/**
- * One loaded voice.
- *
- * Supertonic holds its four MNN modules for the life of the object, so this is what a load
- * costs and what an unload gives back.
- */
-struct SpeechSession {
-    std::unique_ptr<MNNSupertonicTTSImpl> tts;
-    int sampleRate = 0;
-};
-
-SpeechSession* asSpeech(jlong handle) { return reinterpret_cast<SpeechSession*>(handle); }
 
 /**
  * Writes 16-bit mono PCM as a RIFF/WAVE file.
@@ -208,7 +212,12 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         }
         session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
         LOGI("loaded a diffusion bundle from %s", path.c_str());
-        return reinterpret_cast<jlong>(session.release());
+        GenerationSession* raw = session.release();
+        {
+            std::lock_guard<std::mutex> guard(gSessionMutex);
+            gActiveSessions.insert(raw);
+        }
+        return reinterpret_cast<jlong>(raw);
     } catch (const std::exception& failure) {
         LOGE("MNN failed to initialize diffusion bundle: %s", failure.what());
         return 0;
@@ -231,7 +240,11 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeGe
     JNIEnv* env, jobject self, jlong handle, jstring prompt, jstring outputPath,
     jint steps, jint seed) {
     GenerationSession* session = asSession(handle);
-    if (session == nullptr || !session->diffusion) return 2;
+    if (session == nullptr) return 2;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        if (gActiveSessions.find(session) == gActiveSessions.end() || !session->diffusion) return 2;
+    }
 
     session->cancelled.store(false);
 
@@ -274,7 +287,12 @@ JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeCancel(
     JNIEnv*, jobject, jlong handle) {
     GenerationSession* session = asSession(handle);
-    if (session != nullptr) session->cancelled.store(true);
+    if (session != nullptr) {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        if (gActiveSessions.find(session) != gActiveSessions.end()) {
+            session->cancelled.store(true);
+        }
+    }
 }
 
 /** What actually ran, which is not always what was asked for. */
@@ -282,14 +300,29 @@ JNIEXPORT jstring JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeBackend(
     JNIEnv* env, jobject, jlong handle) {
     GenerationSession* session = asSession(handle);
-    return env->NewStringUTF(session == nullptr ? "" : session->backend.c_str());
+    if (session == nullptr) return env->NewStringUTF("");
+    std::string backendStr;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        if (gActiveSessions.find(session) != gActiveSessions.end()) {
+            backendStr = session->backend;
+        }
+    }
+    return env->NewStringUTF(backendStr.c_str());
 }
 
 /** Releases one handle. Safe to call twice; the caller clears its own copy. */
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRelease(
     JNIEnv*, jobject, jlong handle) {
-    delete asSession(handle);
+    GenerationSession* session = asSession(handle);
+    if (session != nullptr) {
+        {
+            std::lock_guard<std::mutex> guard(gSessionMutex);
+            if (gActiveSessions.erase(session) == 0) return;
+        }
+        delete session;
+    }
 }
 
 /**
@@ -310,7 +343,12 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
         session->tts = std::make_unique<MNNSupertonicTTSImpl>(dir);
         const std::string speaker = to_utf8(env, speakerId);
         if (!speaker.empty()) session->tts->SetSpeakerId(speaker);
-        return reinterpret_cast<jlong>(session.release());
+        SpeechSession* raw = session.release();
+        {
+            std::lock_guard<std::mutex> guard(gSessionMutex);
+            gActiveSpeechSessions.insert(raw);
+        }
+        return reinterpret_cast<jlong>(raw);
     } catch (const std::exception& failure) {
         LOGE("a voice would not load: %s", failure.what());
         return 0;
@@ -330,7 +368,11 @@ JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSpeak(
     JNIEnv* env, jobject, jlong handle, jstring text, jstring outputPath) {
     SpeechSession* session = asSpeech(handle);
-    if (session == nullptr || !session->tts) return -1;
+    if (session == nullptr) return -1;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end() || !session->tts) return -1;
+    }
 
     try {
         const auto [rate, samples] = session->tts->Process(to_utf8(env, text));
@@ -355,7 +397,10 @@ JNIEXPORT jint JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSampleRate(
     JNIEnv*, jobject, jlong handle) {
     SpeechSession* session = asSpeech(handle);
-    return session == nullptr ? 0 : session->sampleRate;
+    if (session == nullptr) return 0;
+    std::lock_guard<std::mutex> guard(gSessionMutex);
+    if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end()) return 0;
+    return session->sampleRate;
 }
 
 /** Chooses among the voices the weights contain. */
@@ -363,7 +408,11 @@ JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSetSpeaker(
     JNIEnv* env, jobject, jlong handle, jstring speakerId) {
     SpeechSession* session = asSpeech(handle);
-    if (session == nullptr || !session->tts) return;
+    if (session == nullptr) return;
+    {
+        std::lock_guard<std::mutex> guard(gSessionMutex);
+        if (gActiveSpeechSessions.find(session) == gActiveSpeechSessions.end() || !session->tts) return;
+    }
     const std::string speaker = to_utf8(env, speakerId);
     if (!speaker.empty()) {
         try {
@@ -380,7 +429,14 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeSe
 JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeReleaseVoice(
     JNIEnv*, jobject, jlong handle) {
-    delete asSpeech(handle);
+    SpeechSession* session = asSpeech(handle);
+    if (session != nullptr) {
+        {
+            std::lock_guard<std::mutex> guard(gSessionMutex);
+            if (gActiveSpeechSessions.erase(session) == 0) return;
+        }
+        delete session;
+    }
 }
 
 } // extern "C"

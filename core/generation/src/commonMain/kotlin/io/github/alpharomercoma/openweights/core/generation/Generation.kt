@@ -89,6 +89,15 @@ data class ImageCapability(
     val supportsNegativePrompt: Boolean,
     /** True when the runtime can hand back a usable picture mid generation. */
     val supportsPreview: Boolean,
+    /**
+     * True when a run can actually be stopped, rather than abandoned.
+     *
+     * Stated because it is not a property of the app: it is a property of whether the
+     * runtime's inner loop offers anywhere to interrupt it. A generator that reported a run
+     * as cancelled while the phone went on computing it for another minute would be lying
+     * about the one thing a stop button is for, so a caller that needs to know asks.
+     */
+    val supportsCancellation: Boolean,
     val backend: String,
 )
 

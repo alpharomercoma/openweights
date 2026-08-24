@@ -93,9 +93,14 @@ in **105 seconds**.
 
 Two configuration facts worth keeping, because both cost a cycle to find:
 
-- `MNN_BUILD_DIFFUSION=ON` forces the OpenCV surface on, and that surface enables
-  `MNN_IMGCODECS`, which supplies the image writer used by Stable Diffusion. Turning OpenCV
-  off does not help: the flag is forced, not defaulted.
+- `MNN_BUILD_DIFFUSION=ON` turns the OpenCV surface on, and that is not enough. The
+  diffusion target is guarded by `MNN_BUILD_DIFFUSION AND MNN_BUILD_OPENCV AND
+  MNN_IMGCODECS`, and `MNN_IMGCODECS` stays at its default of OFF, so the guard fails
+  silently: everything configures, everything compiles, and `libdiffusion.so` is simply
+  never produced. Nothing in the output says why. It has to be set explicitly. (An earlier
+  version of this note said the flag was forced rather than defaulted. It is not, and the
+  configure log printing `MNN_IMGCODECS: ON` while the cache holds OFF is what makes that
+  easy to believe.)
 - With `MNN_SEP_BUILD=OFF`, `MNNOpenCV` becomes an OBJECT library and its `POST_BUILD` step
   is illegal, so CMake refuses. `MNN_SEP_BUILD=ON` is required, which means four shared
   MNN prerequisite libraries rather than one. A usable diffusion bridge also needs MNN's
@@ -109,11 +114,18 @@ Two configuration facts worth keeping, because both cost a cycle to find:
 | `libMNN_CL.so` (OpenCL backend) | 2,190 KB |
 | `libMNN_Express.so` | 698 KB |
 | `libMNNOpenCV.so` | 253 KB |
-| **measured subtotal** | **5,849 KB, about 5.8 MB** |
+| `libdiffusion.so` | 672 KB |
+| `libopenweights_generation.so` (the JNI bridge) | 35 KB |
+| `libc++_shared.so` | 1,342 KB |
+| **measured total** | **7,864 KB, about 7.7 MB** |
 
-This is not the APK cost of image generation. The build also produces `libdiffusion.so` and
-`libllm.so`, and an integration will add its own JNI shared object. Their stripped sizes and
-the resulting APK delta were not recorded, so no complete runtime-size total is claimed here.
+That is the whole arm64-v8a native cost of image generation, measured from the packaged AAR
+rather than added up from intentions. `libllm.so` is not in it: `MNN_BUILD_LLM` is off,
+because only the Sana and Wan paths take their text embedding from a language model and
+Stable Diffusion carries its own tokenizer.
+
+One ABI, on purpose. Every additional ABI is another 7.7 MB and another two minutes of
+build, and a phone with room for a diffusion model is a 64-bit phone.
 
 **What is still not done, and is the actual cost.** The MNN source is already pinned in this
 repository. A working image generator still needs a JNI bridge of this project's own, SD1.5

@@ -67,7 +67,20 @@ object GenerationCatalog {
                 sizeBytes = 49_639_112L,
                 sha256 = "20db884599922383eb168fd2fd018892a7741bb45f3ad7073d4cfaf7d75f2241",
             ),
-            BundleFileSpec("tokenizer.mtok", "tokenizer.mtok", 1_322_513L),
+            // taobao-mnn/stable-diffusion-v1-5-mnn-opencl (and every other backend variant of
+            // this repo) genuinely does not publish tokenizer.mtok — confirmed with a direct
+            // HTTP request, not assumed; every download of this bundle 404ed on this one file
+            // and the UI reported "That model no longer exists on Hugging Face," which was
+            // misleading since the rest of the repo is fine. The engine requires this exact
+            // MNN tokenizer format (see stable_diffusion.cpp's MNN_DIFFUSION_WITH_LLM_TOKENIZER
+            // path) and there's no way to derive it on-device from vocab.json/merges.txt alone,
+            // so a known-good copy ships as an app asset instead of a doomed download.
+            BundleFileSpec(
+                "tokenizer.mtok",
+                sizeBytes = 1_322_513L,
+                sha256 = "2cacfbfd332a6366ac4589d3b4006606ea101d2e2365d4a70070a03be103aaea",
+                assetPath = "generation-bundles/stable-diffusion-v1-5-tokenizer.mtok",
+            ),
             BundleFileSpec("vocab.json", "vocab.json", 1_059_962L),
             BundleFileSpec("merges.txt", "merges.txt", 524_619L),
             BundleFileSpec("alphas.txt", "alphas.txt", 6_999L),
@@ -210,4 +223,11 @@ data class BundleFileSpec(
     val remotePath: String = name,
     val sizeBytes: Long = 0L,
     val sha256: String? = null,
+    /**
+     * When set, this file is copied from the app's own assets instead of downloaded from
+     * [GenerationBundleSpec.repoId] — [remotePath] is then unused. For a file the repo doesn't
+     * actually publish (confirmed by hitting its HTTP 404 for real, not assumed), shipping a
+     * known-good copy in the APK is more honest than a download spec that always fails.
+     */
+    val assetPath: String? = null,
 )

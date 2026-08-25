@@ -82,6 +82,18 @@ class BundleDownloadWorker @AssistedInject constructor(
 
         for (fileSpec in spec.files) {
             val destination = File(targetDir, fileSpec.name)
+
+            val assetPath = fileSpec.assetPath
+            if (assetPath != null) {
+                val assetFailure = copyFromAssets(assetPath, destination)
+                if (assetFailure != null) {
+                    return Result.failure(errorData(assetFailure.message ?: "Could not install ${fileSpec.name}."))
+                }
+                completedFilesBytes += destination.length().coerceAtLeast(fileSpec.sizeBytes)
+                reportProgress(completedFilesBytes.coerceAtMost(totalSizeBytes), totalSizeBytes, isVerifying = false)
+                continue
+            }
+
             val hubFile = HubFile(
                 path = fileSpec.remotePath,
                 sizeBytes = fileSpec.sizeBytes,
@@ -195,6 +207,19 @@ class BundleDownloadWorker @AssistedInject constructor(
     }
 
     private fun errorData(message: String): Data = workDataOf(KEY_ERROR to message)
+
+    /** Copies a file the app ships itself rather than fetches, e.g. [BundleFileSpec.assetPath]. */
+    private fun copyFromAssets(assetPath: String, destination: File): Throwable? = runCatching {
+        if (destination.isFile && destination.length() > 0L) return@runCatching
+        val temp = File(destination.parentFile, destination.name + ".part")
+        context.assets.open(assetPath).use { input ->
+            temp.outputStream().use { output -> input.copyTo(output) }
+        }
+        if (!temp.renameTo(destination)) {
+            temp.delete()
+            error("Could not move ${destination.name} into place.")
+        }
+    }.exceptionOrNull()
 
     companion object {
         const val KEY_BUNDLE_ID = "bundleId"

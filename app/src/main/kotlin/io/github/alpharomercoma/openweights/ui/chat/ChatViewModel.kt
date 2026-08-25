@@ -1791,7 +1791,6 @@ class ChatViewModel @Inject constructor(
 
         stop()
         generationJob?.join()
-        runtime.resetContext()
 
         if (conversation == null) {
             // Deleted between the tap and this read; adopting the id would make the
@@ -1843,6 +1842,14 @@ class ChatViewModel @Inject constructor(
             // window that was already spoken for.
             reopened.copy(contextUsed = reopened.estimatedPromptTokens())
         }
+
+        // After the transcript is on screen, not before. This only matters for the next
+        // reply's KV cache, and the engine call behind it shares a single-threaded
+        // dispatcher with model loading: reopening a chat while a model is still loading
+        // used to sit here waiting its turn on that thread, so a previous conversation's
+        // history stayed hidden behind the loading screen for exactly as long as the model
+        // took to load, instead of appearing immediately from data already in hand.
+        runtime.resetContext()
     }
 
     /**

@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.engine.LlamaException
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -96,6 +97,14 @@ class FakeInferenceEngine : InferenceEngine {
 
     var resetCount = 0
         private set
+
+    /**
+     * When set, [resetContext] suspends on this until the test completes it, instead of
+     * returning immediately. Models the real engine's single-threaded dispatcher, where
+     * resetContext queues behind a load already in flight -- without racing virtual time
+     * to catch the window in between.
+     */
+    var resetContextGate: CompletableDeferred<Unit>? = null
 
     /** Every conversation the engine was asked to answer, in order. */
     val prompts = mutableListOf<List<ChatMessage>>()
@@ -236,6 +245,7 @@ class FakeInferenceEngine : InferenceEngine {
     }
 
     override suspend fun resetContext() {
+        resetContextGate?.await()
         resetCount++
     }
 

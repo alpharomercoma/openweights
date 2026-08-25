@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
@@ -157,6 +158,40 @@ class ChatConversationsTest : ChatFixture() {
         assertThat(viewModel.uiState.value.transcript).isNotEmpty()
         assertThat(viewModel.uiState.value.contextUsed).isGreaterThan(0)
     }
+
+    @Test
+    fun `reopening a conversation shows its transcript before context reset finishes`() =
+        runTest(dispatcher) {
+            // resetContext shares the engine's single-threaded dispatcher with load, so a
+            // slow one used to hold up everything reopen() did after it -- including the
+            // transcript update, which needs nothing from the engine at all. A held gate
+            // proves the screen no longer waits on it, without racing virtual time to catch
+            // the window in between.
+            loadModel()
+            viewModel.send("Something worth remembering")
+            settle()
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            viewModel.newChat()
+            settle()
+            assertThat(viewModel.uiState.value.transcript).isEmpty()
+            // loadModel and newChat each call resetContext of their own, so this is the
+            // count reopen()'s own call would add one to -- not zero.
+            val resetsBeforeReopen = engine.resetCount
+
+            engine.resetContextGate = CompletableDeferred()
+            viewModel.openConversation(id)
+            settle()
+
+            // The gate is still held -- reopen()'s resetContext has not returned -- yet the
+            // history is already on screen.
+            assertThat(engine.resetCount).isEqualTo(resetsBeforeReopen)
+            assertThat(viewModel.uiState.value.transcript).isNotEmpty()
+            assertThat(viewModel.uiState.value.activeConversationId).isEqualTo(id)
+
+            engine.resetContextGate?.complete(Unit)
+            settle()
+            assertThat(engine.resetCount).isEqualTo(resetsBeforeReopen + 1)
+        }
 
     @Test
     fun `a plan does not follow the user into another conversation`() = runTest(dispatcher) {

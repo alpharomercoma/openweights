@@ -193,6 +193,7 @@
     <string name="run_tool_question">¿Ejecutar %1$s?</string>
     <string name="no_tool_arguments">sin argumentos</string>
     <string name="loading_model_into_memory">Cargando el modelo en memoria</string>
+    <string name="loading_model">Cargando modelo…</string>
     <string name="each_model_says_if_it_runs">Cada uno indica si funciona en este teléfono antes de descargarlo.</string>
     <string name="answers_can_search_the_web">Cuando haya un modelo en marcha, las respuestas pueden buscar en la web. Es un interruptor en Herramientas.</string>
     <string name="remove_attachment">Quitar %1$s</string>

@@ -527,6 +527,7 @@ private fun ChatContent(
                         // state, so there is exactly one writer to the conversation.
                         enabled = composerEnabled(state.canSend, goal),
                         isGenerating = state.isGenerating,
+                        isLoadingModel = state.isLoadingModel,
                         staged = state.staged,
                         document = state.stagedDocument,
                         onRemoveDocument = onRemoveDocument,

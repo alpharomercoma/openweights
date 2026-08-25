@@ -214,6 +214,10 @@
     <string name="run_tool_question">Run %1$s?</string>
     <string name="no_tool_arguments">with no arguments</string>
     <string name="loading_model_into_memory">Loading the model into memory</string>
+    <!-- Same fact as loading_model_into_memory, said where the composer's action row has
+         room for a phrase, not a sentence: beside Attach and Send rather than centred under
+         a full-screen spinner. -->
+    <string name="loading_model">Loading model…</string>
     <string name="each_model_says_if_it_runs">Each one says whether it runs on this phone before you download it.</string>
     <string name="answers_can_search_the_web">Once a model is running, answers can search the web. That is a switch in Tools.</string>
     <string name="remove_attachment">Remove %1$s</string>

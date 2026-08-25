@@ -175,6 +175,7 @@
     <string name="run_tool_question">%1$s を実行しますか？</string>
     <string name="no_tool_arguments">引数なし</string>
     <string name="loading_model_into_memory">モデルをメモリに読み込んでいます</string>
+    <string name="loading_model">モデルを読み込み中…</string>
     <string name="each_model_says_if_it_runs">ダウンロード前に、この端末で動作するかがそれぞれに表示されます。</string>
     <string name="answers_can_search_the_web">モデルが動き出すと、回答がウェブを検索することがあります。ツールで切り替えられます。</string>
     <string name="remove_attachment">%1$s を削除</string>

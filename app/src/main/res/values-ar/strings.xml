@@ -181,6 +181,7 @@
     <string name="run_tool_question">تشغيل %1$s؟</string>
     <string name="no_tool_arguments">من دون معاملات</string>
     <string name="loading_model_into_memory">جارٍ تحميل النموذج في الذاكرة</string>
+    <string name="loading_model">جارٍ تحميل النموذج…</string>
     <string name="each_model_says_if_it_runs">يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
     <string name="answers_can_search_the_web">بمجرد تشغيل نموذج، يمكن للإجابات البحث في الويب. هذا مفتاح في الأدوات.</string>
     <string name="remove_attachment">إزالة %1$s</string>

@@ -28,6 +28,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -96,6 +98,13 @@ fun Composer(
     conversationKey: Long?,
     enabled: Boolean,
     isGenerating: Boolean,
+    /**
+     * Why [enabled] is false when it's a model still coming into memory rather than one of
+     * the composer's other reasons (already generating, nothing installed). Send already
+     * refuses silently either way; this is the difference between a control that looks
+     * broken and one that visibly says what it's waiting for.
+     */
+    isLoadingModel: Boolean = false,
     staged: List<MessagePart.File>,
     document: StagedDocument?,
     onRemoveDocument: () -> Unit,
@@ -248,6 +257,7 @@ fun Composer(
             ComposerActions(
                 enabled = enabled,
                 isGenerating = isGenerating,
+                isLoadingModel = isLoadingModel,
                 leading = leading,
                 isAttaching = isAttaching,
                 canDictate = canDictate,
@@ -278,6 +288,7 @@ fun Composer(
 private fun ComposerActions(
     enabled: Boolean,
     isGenerating: Boolean,
+    isLoadingModel: Boolean,
     leading: @Composable () -> Unit,
     isAttaching: Boolean,
     canDictate: Boolean,
@@ -303,7 +314,11 @@ private fun ComposerActions(
         // Left of the spacer, with Attach: both answer "what goes into this message",
         // while the right-hand side is for sending it.
         leading()
-        Spacer(Modifier.weight(1f))
+        if (isLoadingModel) {
+            LoadingModelHint(modifier = Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         if (canDictate) {
             DictateButton(isListening = isListening, enabled = enabled, onDictate = onDictate)
         }
@@ -318,6 +333,30 @@ private fun ComposerActions(
                 }
             },
         )
+    }
+}
+
+/**
+ * What fills the space between Attach and Send while a model is coming into memory.
+ *
+ * The composer is disabled either way, but "disabled" alone reads as broken. This is the
+ * same fact [ChatScreen]'s full-screen [LoadingTheModel] shows for an empty chat, said in
+ * the one place still on screen once there's a conversation to look at instead: the bar the
+ * thumb is already resting on.
+ */
+@Composable
+private fun LoadingModelHint(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Caption(text = stringResource(R.string.loading_model), maxLines = 1)
     }
 }
 

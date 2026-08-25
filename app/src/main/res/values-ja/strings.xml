@@ -224,6 +224,7 @@
     <string name="generate_steps_label">ステップ数</string>
     <string name="generate_button">生成</string>
     <string name="generate_stop">停止</string>
+    <string name="generate_step_of">ステップ %1$d / %2$d</string>
     <string name="generate_no_bundle_title">画像モデルがダウンロードされていません</string>
     <string name="generate_no_bundle_body">このデバイスで画像生成を開始するには、「見つける」画面から生成バンドルをダウンロードしてください。</string>
     <string name="generate_browse_models">モデルを探す</string>

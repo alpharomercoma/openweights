@@ -49,11 +49,11 @@ import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -65,10 +65,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -81,6 +85,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.generation.GenerationBundleSpec
 import io.github.alpharomercoma.openweights.core.generation.ImageSize
+import kotlinx.coroutines.delay
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -195,6 +201,7 @@ private fun GenerateContent(
         ResultPane(
             result = state.lastResult,
             isGenerating = state.isGenerating,
+            isLoadingCapability = state.isLoadingCapability,
             step = state.progressStep,
             totalSteps = state.steps,
         )
@@ -229,6 +236,13 @@ private fun GenerateContent(
                     steps = (cap.steps.last - cap.steps.first - 1).coerceAtLeast(0),
                     enabled = !state.isGenerating,
                 )
+            } else if (state.isLoadingCapability) {
+                // The slider needs cap.steps' real range to size itself, which isn't known
+                // until the model finishes loading -- a first run can take on the order of
+                // thirty seconds building its OpenCL kernel cache. Without this, the row
+                // above sat at a static "10" with nothing below it, and there was nothing
+                // on screen to say that was a placeholder rather than the whole feature.
+                Caption(stringResource(R.string.loading_model))
             }
         }
 
@@ -339,6 +353,7 @@ private fun BundlePicker(
 private fun ResultPane(
     result: GenerationResult?,
     isGenerating: Boolean,
+    isLoadingCapability: Boolean,
     step: Int,
     totalSteps: Int,
     modifier: Modifier = Modifier,
@@ -358,7 +373,25 @@ private fun ResultPane(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else {
+        } else if (isLoadingCapability) {
+            // The one prominent thing on an otherwise-empty screen while the model loads --
+            // the same role the broken-image glyph plays once it's actually idle, but this
+            // is not idle, it's working. See isLoadingCapability's own doc for why this can
+            // take long enough to need saying at all.
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Caption(
+                    text = stringResource(R.string.loading_model_into_memory),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (!isGenerating) {
+            // Not shown mid-generation: the overlay below already covers this same space,
+            // and a broken-image glyph fading in and out underneath a scrim read as the
+            // generator flickering rather than working.
             Icon(
                 imageVector = Icons.Rounded.BrokenImage,
                 contentDescription = null,
@@ -367,26 +400,89 @@ private fun ResultPane(
             )
         }
 
+        // Covers the whole pane rather than sitting in a strip at the bottom: a step count
+        // and a running clock are worth reading, and a thin bar under the frame was easy to
+        // miss entirely next to whatever image happened to still be showing from last time.
         AnimatedVisibility(
             visible = isGenerating,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            GeneratingOverlay(step = step, totalSteps = totalSteps)
+        }
+    }
+}
+
+/**
+ * What's on screen for the whole run: which step, and how long it's taken so far.
+ *
+ * The clock is the one number here that isn't already implied by the ring -- steps translate
+ * to a fraction people can already see, but nothing else says whether this run is behaving
+ * like the last one or has quietly gone three times as long, and that's the question a
+ * person actually watching this screen is asking.
+ */
+@Composable
+private fun GeneratingOverlay(step: Int, totalSteps: Int, modifier: Modifier = Modifier) {
+    // Freshly mounted each time this fades in (AnimatedVisibility disposes its content on
+    // exit), so Unit as the key is enough for the clock to start at zero on every run without
+    // being told which run this is.
+    var elapsedMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        val startedAt = System.currentTimeMillis()
+        while (true) {
+            elapsedMs = System.currentTimeMillis() - startedAt
+            // A tenth of a second is fine granularity for a number meant to be read, not
+            // measured, and costs nothing next to the seconds a diffusion step actually takes.
+            delay(ELAPSED_TICK_MS)
+        }
+    }
+
+    Box(
+        modifier = modifier.background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val progress = animateFloatAsState(
                 targetValue = if (totalSteps > 0) step.toFloat() / totalSteps else 0f,
                 label = "step_progress",
             )
-            LinearProgressIndicator(
-                progress = { progress.value },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                strokeCap = StrokeCap.Round,
-            )
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { progress.value },
+                    modifier = Modifier.size(RING_SIZE),
+                    strokeWidth = 5.dp,
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.25f),
+                    strokeCap = StrokeCap.Round,
+                )
+                Text(
+                    text = formatElapsed(elapsedMs),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+            }
+            if (totalSteps > 0) {
+                Text(
+                    text = stringResource(R.string.generate_step_of, step, totalSteps),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                )
+            }
         }
     }
 }
+
+/** "9.9s" -- one decimal place, a stable width, and never a locale's own comma for the point. */
+private fun formatElapsed(elapsedMs: Long): String =
+    String.format(Locale.ROOT, "%.1fs", elapsedMs / 1000f)
+
+private val RING_SIZE = 84.dp
+private const val ELAPSED_TICK_MS = 100L
 
 @Composable
 private fun NoBundlesPane(

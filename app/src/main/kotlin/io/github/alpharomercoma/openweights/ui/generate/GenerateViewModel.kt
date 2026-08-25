@@ -46,6 +46,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -66,6 +68,16 @@ data class GenerateUiState(
     val availableBundles: List<GenerationBundleSpec> = emptyList(),
     val selectedBundleSpec: GenerationBundleSpec? = null,
     val capability: ImageCapability? = null,
+    /**
+     * True while [capability] is being fetched for [selectedBundleSpec].
+     *
+     * A first run builds the OpenCL kernel cache for this model, which alone can take on
+     * the order of thirty seconds -- and until it's done, [capability] is null, the Steps
+     * slider has nothing to size itself against and stays hidden, and Generate stays
+     * disabled. Without this flag none of that had a visible cause: the screen looked
+     * finished loading a moment after opening it, not partway through something slow.
+     */
+    val isLoadingCapability: Boolean = false,
     val prompt: String = "",
     val steps: Int = 10,
     val guidance: Float = 4.5f,
@@ -101,12 +113,29 @@ class GenerateViewModel @Inject constructor(
     private val outputDir: File
         get() = File(context.filesDir, "generated").also { it.mkdirs() }
 
+    /**
+     * Serializes [loadBundle] against itself.
+     *
+     * refreshBundles() used to be called from both this view model's own init block and the
+     * screen's LaunchedEffect(Unit), which fires on every composition including the first --
+     * so two calls, a few milliseconds apart, each read capability as still null and each
+     * started their own ~30s model load. Both usually finished (this is a real MNN generator
+     * per call, not a no-op), leaving whichever loaded second holding the handle Generate
+     * actually uses while the *other* one's state update could still land after it and show
+     * a session that had already been superseded -- capability looked populated, but the
+     * generator backing the screen's next actual generate() call was whichever lost that
+     * race, sporadically the wrong -- or, worse, already-torn-down -- one. The init-block
+     * call is gone now (the LaunchedEffect covers first-open the same as every later
+     * return), but this stays as the actual fix: nothing calls loadBundle while another call
+     * is still in flight, no matter how many places end up asking for a refresh.
+     */
+    private val loadMutex = Mutex()
+
     init {
         if (!MnnImageGenerator.isAvailable) {
             _state.update { it.copy(runtimeMissing = true) }
             Log.i(TAG, "MNN runtime absent in this build")
         }
-        refreshBundles()
     }
 
     /**
@@ -141,8 +170,12 @@ class GenerateViewModel @Inject constructor(
         viewModelScope.launch { loadBundle(spec) }
     }
 
-    private suspend fun loadBundle(spec: GenerationBundleSpec) {
-        if (_state.value.runtimeMissing) return
+    private suspend fun loadBundle(spec: GenerationBundleSpec) = loadMutex.withLock {
+        if (_state.value.runtimeMissing) return@withLock
+        // Whatever queued behind another call's lock has, by now, likely been superseded --
+        // re-read rather than trust the spec the caller queued with.
+        if (_state.value.selectedBundleSpec?.id != spec.id) return@withLock
+        if (_state.value.capability != null) return@withLock
         val dir = modelStore.bundleDestination(spec.directoryName)
         val bundle = GenerationBundle(
             id = spec.id,
@@ -155,7 +188,7 @@ class GenerateViewModel @Inject constructor(
             licence = spec.licence,
             mnnModelType = spec.mnnModelType,
         )
-        _state.update { it.copy(error = null) }
+        _state.update { it.copy(error = null, isLoadingCapability = true) }
         withContext(Dispatchers.IO) {
             try {
                 val gen = generator ?: MnnImageGenerator(outputDir).also { generator = it }
@@ -169,12 +202,18 @@ class GenerateViewModel @Inject constructor(
                     it.copy(
                         capability = capability,
                         guidance = capability?.defaultGuidance ?: it.guidance,
+                        isLoadingCapability = false,
                     )
                 }
                 Log.i(TAG, "loaded ${spec.displayName}: capability=$capability")
             } catch (e: Exception) {
                 Log.e(TAG, "load failed: ${spec.displayName}", e)
-                _state.update { it.copy(error = "Could not load ${spec.displayName}: ${e.message}") }
+                _state.update {
+                    it.copy(
+                        error = "Could not load ${spec.displayName}: ${e.message}",
+                        isLoadingCapability = false,
+                    )
+                }
             }
         }
     }

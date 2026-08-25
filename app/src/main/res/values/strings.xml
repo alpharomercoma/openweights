@@ -266,6 +266,7 @@
     <string name="generate_steps_label">Steps</string>
     <string name="generate_button">Generate</string>
     <string name="generate_stop">Stop</string>
+    <string name="generate_step_of">Step %1$d of %2$d</string>
     <string name="generate_no_bundle_title">No image model downloaded</string>
     <string name="generate_no_bundle_body">Download a generation bundle from the Discover screen to start generating images on this device.</string>
     <string name="generate_browse_models">Browse models</string>

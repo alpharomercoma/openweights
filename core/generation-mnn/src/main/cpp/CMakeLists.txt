@@ -29,6 +29,14 @@ set(MNN_IMGCODECS ON CACHE BOOL "" FORCE)
 set(MNN_OPENCL ON CACHE BOOL "" FORCE)
 set(MNN_USE_LOGCAT ON CACHE BOOL "" FORCE)
 
+# Without this, MNN never registers the OpenCL GroupNorm executor (it's compiled behind
+# `#ifdef MNN_SUPPORT_TRANSFORMER_FUSE` in OpenCLOPRegister.cpp) and there is no CPU GroupNorm
+# implementation anywhere in MNN to fall back to. Stable Diffusion 1.5's UNet uses GroupNorm in
+# every ResBlock, so without this flag every normalization layer silently fails on-device
+# ("Don't support type [GroupNorm]" in logcat) and on CPU it null-derefs. This was the root
+# cause of SD 1.5 generating near-uniform brown output instead of the prompted image.
+set(MNN_SUPPORT_TRANSFORMER_FUSE ON CACHE BOOL "" FORCE)
+
 # Off on purpose. Every one of these builds a host tool or a test binary that an APK has no
 # use for. MNN_BUILD_LLM is ON because Sana Edit V2 uses Qwen3-0.6B as its prompt encoder —
 # the LLM runs first to encode text, then diffusion reads the embeddings. The Wan 2.1 video

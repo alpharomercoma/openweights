@@ -126,7 +126,7 @@ class ImageGenerationOnDeviceTest {
         assertThat(gen.capability).isNotNull()
 
         val events = gen.generate(
-            ImageRequest(prompt = PROMPT, size = ImageSize(512, 512), steps = 10, guidance = 4.5f, seed = 42L),
+            ImageRequest(prompt = PROMPT, size = ImageSize(512, 512), steps = 10, guidance = 15.0f, seed = 42L),
         ).toList()
 
         val completed = events.filterIsInstance<GenerationEvent.Completed<Artifact>>().singleOrNull()
@@ -148,7 +148,7 @@ class ImageGenerationOnDeviceTest {
         val gen = MnnImageGenerator(outputDir).also { generator = it }
         gen.load(bundle(dir, mnnModelType = SANA))
         val events = gen.generate(
-            ImageRequest(prompt = prompt, size = ImageSize(512, 512), steps = 10, guidance = 4.5f, seed = 42L),
+            ImageRequest(prompt = prompt, size = ImageSize(512, 512), steps = 10, guidance = 15.0f, seed = 42L),
         ).toList()
 
         val completed = events.filterIsInstance<GenerationEvent.Completed<Artifact>>().singleOrNull()

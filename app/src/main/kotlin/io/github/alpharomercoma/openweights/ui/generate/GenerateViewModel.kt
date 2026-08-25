@@ -160,8 +160,18 @@ class GenerateViewModel @Inject constructor(
             try {
                 val gen = generator ?: MnnImageGenerator(outputDir).also { generator = it }
                 gen.load(bundle)
-                _state.update { it.copy(capability = gen.capability) }
-                Log.i(TAG, "loaded ${spec.displayName}: capability=${gen.capability}")
+                val capability = gen.capability
+                // Guidance means different things at different scales on different runtimes
+                // (Sana measured needing ~15 to converge; SD 1.5 is fixed at 7.5) -- carrying a
+                // leftover value from whichever model was loaded before would silently apply
+                // the wrong model's scale to this one.
+                _state.update {
+                    it.copy(
+                        capability = capability,
+                        guidance = capability?.defaultGuidance ?: it.guidance,
+                    )
+                }
+                Log.i(TAG, "loaded ${spec.displayName}: capability=$capability")
             } catch (e: Exception) {
                 Log.e(TAG, "load failed: ${spec.displayName}", e)
                 _state.update { it.copy(error = "Could not load ${spec.displayName}: ${e.message}") }

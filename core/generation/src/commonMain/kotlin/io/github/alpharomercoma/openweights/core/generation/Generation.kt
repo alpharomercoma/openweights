@@ -86,6 +86,8 @@ data class ImageCapability(
     val sizes: List<ImageSize>,
     val steps: IntRange,
     val guidance: ClosedFloatingPointRange<Float>,
+    /** Where a fresh request should start on [guidance]; not necessarily its midpoint. */
+    val defaultGuidance: Float,
     val supportsNegativePrompt: Boolean,
     /** True when the runtime can hand back a usable picture mid generation. */
     val supportsPreview: Boolean,

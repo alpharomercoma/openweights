@@ -24,3 +24,4 @@ keystore.properties
 
 # Debris from the Playwright MCP browser tool, not project content.
 .playwright-mcp/
+build-mnn-host/

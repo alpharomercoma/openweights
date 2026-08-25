@@ -158,6 +158,25 @@ class ImageGenerationOnDeviceTest {
         assertRealPicture(picture, 512, 512)
     }
 
+    @Test(timeout = 600_000)
+    fun generateParisWomanWithStableDiffusion() = runBlocking {
+        val dir = bundleDir(SD_DIR)
+        requireBundle(dir, MnnImageGenerator.SD15_REQUIRED_FILES)
+
+        val prompt = "A high-quality portrait of a beautiful woman in Paris, France, Eiffel tower in the background, golden hour lighting, 8k resolution, photorealistic"
+        val gen = MnnImageGenerator(outputDir).also { generator = it }
+        gen.load(bundle(dir, mnnModelType = SD15))
+        val events = gen.generate(
+            ImageRequest(prompt = prompt, size = ImageSize(512, 512), steps = 20, guidance = 7.5f, seed = 42L),
+        ).toList()
+
+        val completed = events.filterIsInstance<GenerationEvent.Completed<Artifact>>().singleOrNull()
+        if (completed == null) throw AssertionError("sd15 completed no picture: $events")
+        val picture = File(completed.output.path)
+        Log.i(TAG, "paris woman sd15 picture on device: ${picture.absolutePath}")
+        assertRealPicture(picture, 512, 512)
+    }
+
     private fun assertRealPicture(file: File, width: Int, height: Int) {
         assertThat(file.isFile).isTrue()
         assertThat(file.length()).isGreaterThan(5_000L)

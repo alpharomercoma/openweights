@@ -256,5 +256,17 @@
     <string name="model_task_speech">Speech Model</string>
     <string name="model_badge_projector_missing">Vision model · download projector (mmproj) to enable image input</string>
     <string name="slash_command_hint">Message, or type / for commands</string>
+    <string name="generate_title">Generate Image</string>
+    <string name="generate_prompt_label">Prompt</string>
+    <string name="generate_prompt_hint">Describe what to draw…</string>
+    <string name="generate_steps_label">Steps</string>
+    <string name="generate_button">Generate</string>
+    <string name="generate_stop">Stop</string>
+    <string name="generate_no_bundle_title">No image model downloaded</string>
+    <string name="generate_no_bundle_body">Download a generation bundle from the Discover screen to start generating images on this device.</string>
+    <string name="generate_browse_models">Browse models</string>
+    <string name="generate_no_runtime_title">Generation not available</string>
+    <string name="generate_no_runtime_body">This build does not include the MNN generation runtime. Use the openweights.mnn=true build flag to enable it.</string>
+    <string name="nav_generate">Generate</string>
 </resources>
 

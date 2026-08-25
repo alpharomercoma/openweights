@@ -53,6 +53,8 @@ import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
 import io.github.alpharomercoma.openweights.ui.watch.WatchScreen
 import io.github.alpharomercoma.openweights.ui.watch.WatchViewModel
+import io.github.alpharomercoma.openweights.ui.generate.GenerateScreen
+import io.github.alpharomercoma.openweights.ui.generate.GenerateViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -77,6 +79,7 @@ private object Routes {
     const val USAGE = "usage"
     const val WATCHES = "watches"
     const val SETTINGS = "settings"
+    const val GENERATE = "generate"
 }
 
 /** A twelfth of the screen: enough travel to read as arrival, small enough to stay quick. */
@@ -191,6 +194,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onOpenSettings = { navController.push(Routes.SETTINGS) },
                     onBrowseModels = { navController.push(Routes.DISCOVER) },
                     onManageModels = { navController.push(Routes.MODELS) },
+                    onOpenGenerate = { navController.push(Routes.GENERATE) },
                 ),
                 installedModels = installedModels,
                 activeDownloads = activeDownloads,
@@ -371,6 +375,27 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSaveToken = viewModel::saveToken,
                 onClearToken = viewModel::clearToken,
                 onSelectTheme = viewModel::setTheme,
+                onBack = navController::popBackStack,
+            )
+        }
+
+        composable(Routes.GENERATE) {
+            val viewModel: GenerateViewModel = hiltViewModel()
+            val state by viewModel.state.collectAsStateWithLifecycle()
+
+            // Pick up any bundle that finished downloading while we were away.
+            LaunchedEffect(Unit) { viewModel.refreshBundles() }
+
+            GenerateScreen(
+                state = state,
+                onPromptChange = viewModel::setPrompt,
+                onStepsChange = viewModel::setSteps,
+                onSizeChange = viewModel::setSize,
+                onGenerate = viewModel::generate,
+                onCancel = viewModel::cancel,
+                onSelectBundle = viewModel::selectBundle,
+                onDismissError = viewModel::dismissError,
+                onBrowseModels = { navController.push(Routes.DISCOVER) },
                 onBack = navController::popBackStack,
             )
         }

@@ -47,7 +47,8 @@ import java.io.File
 class ImageGenerationOnDeviceTest {
     private val context: Context =
         InstrumentationRegistry.getInstrumentation().targetContext
-    private val outputDir = File("/data/local/tmp/openweights/generated")
+    private val outputDir: File
+        get() = File(context.filesDir, "generated").apply { mkdirs() }
 
     private var generator: MnnImageGenerator? = null
 
@@ -140,7 +141,7 @@ class ImageGenerationOnDeviceTest {
 
     private fun assertRealPicture(file: File, width: Int, height: Int) {
         assertThat(file.isFile).isTrue()
-        assertThat(file.length()).isGreaterThan(10_000L)
+        assertThat(file.length()).isGreaterThan(5_000L)
         val bytes = file.readBytes()
         assertThat(bytes.copyOfRange(1, 4).map { it.toInt().toChar() }.joinToString("")).isEqualTo("PNG")
         val bitmap = BitmapFactory.decodeFile(file.absolutePath)

@@ -221,4 +221,16 @@
     <string name="model_task_speech">Modelo ng Boses</string>
     <string name="model_badge_projector_missing">Vision model · i-download ang projector (mmproj) para paganahin ang image input</string>
     <string name="slash_command_hint">Mag-mensahe, o i-type / para sa mga utos</string>
+    <string name="generate_title">Bumuo ng Larawan</string>
+    <string name="generate_prompt_label">Prompt</string>
+    <string name="generate_prompt_hint">Ilarawan kung ano ang iguguhit…</string>
+    <string name="generate_steps_label">Mga Hakbang</string>
+    <string name="generate_button">Bumuo</string>
+    <string name="generate_stop">Huminto</string>
+    <string name="generate_no_bundle_title">Walang na-download na modelo ng larawan</string>
+    <string name="generate_no_bundle_body">Mag-download ng bundle ng pagbuo mula sa screen ng Tuklasin upang simulan ang pagbuo ng mga larawan sa device na ito.</string>
+    <string name="generate_browse_models">Mag-browse ng mga modelo</string>
+    <string name="generate_no_runtime_title">Hindi available ang pagbuo</string>
+    <string name="generate_no_runtime_body">Hindi kasama sa build na ito ang MNN generation runtime. Gamitin ang openweights.mnn=true build flag para paganahin ito.</string>
+    <string name="nav_generate">Bumuo</string>
 </resources>

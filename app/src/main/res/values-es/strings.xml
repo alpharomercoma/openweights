@@ -235,4 +235,16 @@
     <string name="model_task_speech">Modelo de voz</string>
     <string name="model_badge_projector_missing">Modelo de visión · descargue el proyector (mmproj) para habilitar entrada de imagen</string>
     <string name="slash_command_hint">Escribe un mensaje, o / para comandos</string>
+    <string name="generate_title">Generar imagen</string>
+    <string name="generate_prompt_label">Petición</string>
+    <string name="generate_prompt_hint">Describe qué dibujar…</string>
+    <string name="generate_steps_label">Pasos</string>
+    <string name="generate_button">Generar</string>
+    <string name="generate_stop">Detener</string>
+    <string name="generate_no_bundle_title">Ningún modelo de imagen descargado</string>
+    <string name="generate_no_bundle_body">Descarga un paquete de generación desde la pantalla Descubrir para comenzar a generar imágenes en este dispositivo.</string>
+    <string name="generate_browse_models">Explorar modelos</string>
+    <string name="generate_no_runtime_title">Generación no disponible</string>
+    <string name="generate_no_runtime_body">Esta versión no incluye el motor de generación MNN. Utilice el parámetro openweights.mnn=true para habilitarlo.</string>
+    <string name="nav_generate">Generar</string>
 </resources>

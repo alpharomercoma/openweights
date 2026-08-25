@@ -223,4 +223,16 @@
     <string name="model_task_speech">نموذج صوت</string>
     <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
     <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
+    <string name="generate_title">توليد الصور</string>
+    <string name="generate_prompt_label">الوصف</string>
+    <string name="generate_prompt_hint">صف ما تريد رسمه…</string>
+    <string name="generate_steps_label">الخطوات</string>
+    <string name="generate_button">توليد</string>
+    <string name="generate_stop">إيقاف</string>
+    <string name="generate_no_bundle_title">لم يتم تنزيل نموذج صور</string>
+    <string name="generate_no_bundle_body">نزّل حزمة توليد من شاشة الاستكشاف للبدء في توليد الصور على هذا الجهاز.</string>
+    <string name="generate_browse_models">استعراض النماذج</string>
+    <string name="generate_no_runtime_title">التوليد غير متاح</string>
+    <string name="generate_no_runtime_body">هذا الإصدار لا يتضمن بيئة تشغيل MNN للتوليد. استخدم إعداد البناء openweights.mnn=true لتفعيله.</string>
+    <string name="nav_generate">توليد</string>
 </resources>

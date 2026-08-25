@@ -40,4 +40,6 @@ data class ChatDestinations(
     val onBrowseModels: () -> Unit = {},
     /** The installed list, which owns deleting a model and watching one arrive. */
     val onManageModels: () -> Unit = {},
+    /** On-device image generation with diffusion models. */
+    val onOpenGenerate: () -> Unit = {},
 )

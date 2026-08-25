@@ -261,6 +261,10 @@ fun ChatScreen(
                         scope.launch { drawerState.close() }
                         destinations.onOpenSettings()
                     },
+                    onOpenGenerate = {
+                        scope.launch { drawerState.close() }
+                        destinations.onOpenGenerate()
+                    },
                 ),
                 onNewChat = {
                     onNewChat()

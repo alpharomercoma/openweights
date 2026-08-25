@@ -67,6 +67,7 @@ object GenerationCatalog {
                 sizeBytes = 49_639_112L,
                 sha256 = "20db884599922383eb168fd2fd018892a7741bb45f3ad7073d4cfaf7d75f2241",
             ),
+            BundleFileSpec("tokenizer.mtok", "tokenizer.mtok", 1_322_513L),
             BundleFileSpec("vocab.json", "vocab.json", 1_059_962L),
             BundleFileSpec("merges.txt", "merges.txt", 524_619L),
             BundleFileSpec("alphas.txt", "alphas.txt", 6_999L),

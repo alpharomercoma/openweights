@@ -377,6 +377,9 @@ class MnnImageGenerator internal constructor(
     }
 
     companion object {
+        /** True when the underlying native library (libopenweights_generation.so) is present. */
+        val isAvailable: Boolean get() = NativeMnn.isAvailable
+
         /**
          * The files a bundle of [modelType] must contain, checked before the runtime
          * is asked so the answer names a missing file rather than crashing in native code.
@@ -401,6 +404,7 @@ class MnnImageGenerator internal constructor(
             "unet.mnn.weight",
             "vae_decoder.mnn",
             "vae_decoder.mnn.weight",
+            "tokenizer.mtok",
             "vocab.json",
             "merges.txt",
             "alphas.txt",

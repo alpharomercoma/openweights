@@ -217,4 +217,16 @@
     <string name="model_task_speech">音声モデル</string>
     <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
     <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
+    <string name="generate_title">画像生成</string>
+    <string name="generate_prompt_label">プロンプト</string>
+    <string name="generate_prompt_hint">描きたい内容を入力…</string>
+    <string name="generate_steps_label">ステップ数</string>
+    <string name="generate_button">生成</string>
+    <string name="generate_stop">停止</string>
+    <string name="generate_no_bundle_title">画像モデルがダウンロードされていません</string>
+    <string name="generate_no_bundle_body">このデバイスで画像生成を開始するには、「見つける」画面から生成バンドルをダウンロードしてください。</string>
+    <string name="generate_browse_models">モデルを探す</string>
+    <string name="generate_no_runtime_title">生成機能は利用できません</string>
+    <string name="generate_no_runtime_body">このビルドにはMNN生成ランタイムが含まれていません。有効にするには openweights.mnn=true ビルドフラグを使用してください。</string>
+    <string name="nav_generate">生成</string>
 </resources>

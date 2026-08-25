@@ -34,6 +34,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
+import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.ui.chat.ChatDestinations
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
@@ -200,7 +201,17 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 activeDownloads = activeDownloads,
                 publisherAvatars = publisherAvatars,
                 onSelectModel = { model ->
-                    chatViewModel.loadModel(model.file, keepConversation = true)
+                    // Image/speech bundles are directories of MNN files, not a single GGUF a
+                    // chat engine can load — chatViewModel.loadModel(model.file, ...) reached
+                    // LlamaCppEngine's `require(modelFile.isFile)` with a directory and failed
+                    // with a confusing "model file does not exist". They're listed here (with
+                    // a badge) so the picker shows everything installed, but selecting one
+                    // routes to where it actually works instead of trying to chat-load it.
+                    when (model.task) {
+                        GenerationTask.IMAGE -> navController.push(Routes.GENERATE)
+                        GenerationTask.SPEECH -> Unit
+                        null -> chatViewModel.loadModel(model.file, keepConversation = true)
+                    }
                 },
                 onUnloadModel = chatViewModel::unloadModel,
                 onOpenConversation = {

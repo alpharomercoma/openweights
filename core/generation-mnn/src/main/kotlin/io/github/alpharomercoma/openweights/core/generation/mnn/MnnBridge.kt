@@ -46,6 +46,15 @@ internal interface MnnBridge {
     /** A voice handle, or 0 when the bundle would not load. */
     fun loadVoice(modelsDir: String, speakerId: String): Long
 
+    /**
+     * Runs Sana end-to-end in one native call: LLM encode → diffusion → output file.
+     *
+     * Returns [MnnOutcome] ordinal: 0 for finished, 1 for cancelled, 2 for failed.
+     * This is a single call rather than a load/generate pair because Sana's LLM output
+     * is an MNN tensor that cannot cross the JNI boundary.
+     */
+    fun runSana(request: SanaRequest): Int
+
     /** Samples written, or negative: -1 the runtime refused, -2 the file would not write. */
     fun speak(handle: Long, text: String, outputPath: String): Int
 
@@ -77,6 +86,29 @@ internal enum class MnnOutcome {
         }
     }
 }
+
+/**
+ * Parameters for one Sana generation call.
+ *
+ * Sana's pipeline is indivisible: the LLM encodes text into embeddings, then diffusion
+ * reads those embeddings. Neither can cross the JNI boundary alone, so the entire run
+ * is one native call that manages the LLM ↔ diffusion lifecycle internally.
+ */
+internal data class SanaRequest(
+    val sessionHandle: Long,
+    val resourcePath: String,
+    val prompt: String,
+    val inputImagePath: String,
+    val outputPath: String,
+    val width: Int,
+    val height: Int,
+    val steps: Int,
+    val seed: Int,
+    val useCfg: Boolean,
+    val cfgScale: Float,
+    val backendType: Int,
+    val memoryMode: Int,
+)
 
 /**
  * The real bridge, which exists only in a build that compiled the native libraries.
@@ -117,6 +149,22 @@ internal class NativeMnn : MnnBridge {
     override fun setSpeaker(handle: Long, speakerId: String) = nativeSetSpeaker(handle, speakerId)
 
     override fun releaseVoice(handle: Long) = nativeReleaseVoice(handle)
+
+    override fun runSana(request: SanaRequest) = nativeRunSana(
+        request.sessionHandle,
+        request.resourcePath,
+        request.prompt,
+        request.inputImagePath,
+        request.outputPath,
+        request.width,
+        request.height,
+        request.steps,
+        request.seed,
+        request.useCfg,
+        request.cfgScale,
+        request.backendType,
+        request.memoryMode,
+    )
 
     /**
      * Called from the generating thread by native code.
@@ -160,6 +208,28 @@ internal class NativeMnn : MnnBridge {
 
     private external fun nativeReleaseVoice(handle: Long)
 
+    /**
+     * Sana's entire pipeline in one call: LLM encode → diffusion → output.
+     *
+     * Defined in generation_jni.cpp. Requires MNN's LLM engine linked into the binary.
+     * Returns 0 on success, 1 when cancelled, 2 when the runtime refused.
+     */
+    private external fun nativeRunSana(
+        sessionHandle: Long,
+        resourcePath: String,
+        prompt: String,
+        inputImagePath: String,
+        outputPath: String,
+        width: Int,
+        height: Int,
+        steps: Int,
+        seed: Int,
+        useCfg: Boolean,
+        cfgScale: Float,
+        backendType: Int,
+        memoryMode: Int,
+    ): Int
+
     companion object {
         /**
          * Whether this build can generate at all.
@@ -182,6 +252,9 @@ internal class NativeMnn : MnnBridge {
 
         /** `STABLE_DIFFUSION_1_5` in MNN's `DiffusionModelType`. */
         const val STABLE_DIFFUSION_1_5 = 0
+
+        /** `SANA_DIFFUSION` in MNN's `DiffusionModelType`. */
+        const val SANA_DIFFUSION = 2
 
         /** `MNN_FORWARD_CPU` and `MNN_FORWARD_OPENCL` in MNN's `MNNForwardType`. */
         const val FORWARD_CPU = 0

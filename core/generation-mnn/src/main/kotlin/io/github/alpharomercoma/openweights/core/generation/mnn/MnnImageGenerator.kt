@@ -120,7 +120,8 @@ class MnnImageGenerator internal constructor(
         }
 
         val directory = bundle.directory()
-        val missing = REQUIRED_FILES.filterNot { File(directory, it).isFile }
+        val required = requiredFilesFor(bundle.mnnModelType)
+        val missing = required.filterNot { File(directory, it).isFile }
         if (missing.isNotEmpty()) {
             throw GenerationUnavailableException(
                 "${bundle.displayName} is missing ${missing.size} of its files, " +
@@ -129,10 +130,14 @@ class MnnImageGenerator internal constructor(
         }
 
         unloadLocked()
+
+        // Sana: nativeLoad creates a lightweight session (no diffusion pre-loaded)
+        // because the actual diffusion load happens inside nativeRunSana per-call.
+        // SD 1.5: nativeLoad creates the Diffusion and loads weights immediately.
         val opened = withContext(dispatcher) {
             bridge.load(
                 modelPath = directory.absolutePath,
-                modelType = NativeMnn.STABLE_DIFFUSION_1_5,
+                modelType = bundle.mnnModelType,
                 backendType = NativeMnn.FORWARD_OPENCL,
                 memoryMode = NativeMnn.MEMORY_KEEP_LOADED,
             )
@@ -193,19 +198,39 @@ class MnnImageGenerator internal constructor(
 
             val outcome = try {
                 withContext(dispatcher) {
-                    MnnOutcome.of(
-                        bridge.generate(
-                            handle = open,
-                            prompt = request.prompt,
-                            outputPath = target.absolutePath,
-                            steps = request.steps,
-                            seed = seed.toInt(),
-                        ),
-                    )
+                    if (currentBundle.mnnModelType == NativeMnn.SANA_DIFFUSION) {
+                        MnnOutcome.of(
+                            bridge.runSana(
+                                SanaRequest(
+                                    sessionHandle = open,
+                                    resourcePath = currentBundle.directory().absolutePath,
+                                    prompt = request.prompt,
+                                    inputImagePath = "",
+                                    outputPath = target.absolutePath,
+                                    width = request.size.width,
+                                    height = request.size.height,
+                                    steps = request.steps,
+                                    seed = seed.toInt(),
+                                    useCfg = false,
+                                    cfgScale = 4.5f,
+                                    backendType = NativeMnn.FORWARD_OPENCL,
+                                    memoryMode = NativeMnn.MEMORY_KEEP_LOADED,
+                                ),
+                            ),
+                        )
+                    } else {
+                        MnnOutcome.of(
+                            bridge.generate(
+                                handle = open,
+                                prompt = request.prompt,
+                                outputPath = target.absolutePath,
+                                steps = request.steps,
+                                seed = seed.toInt(),
+                            ),
+                        )
+                    }
                 }
             } catch (cancelled: CancellationException) {
-                // The coroutine went, not the button. Ask the runtime to stop too, or the
-                // phone keeps denoising a picture nobody is waiting for.
                 withContext(NonCancellable) {
                     bridge.cancel(open)
                     target.delete()
@@ -316,20 +341,31 @@ class MnnImageGenerator internal constructor(
         runCatching { runBlocking { unload() } }
     }
 
-    private fun capabilityOn(backend: String) = ImageCapability(
-        // One size, because MNN's Stable Diffusion path takes no width or height: it draws
-        // at what the bundle was converted for, and the supplied conversion is 512.
-        sizes = listOf(ImageSize(SD15_EDGE, SD15_EDGE)),
-        steps = MIN_STEPS..MAX_STEPS,
-        // A single value rather than a range. The path applies its own fixed guidance and
-        // there is no argument to change it, so a range would be a control that reached
-        // nothing.
-        guidance = SD15_GUIDANCE..SD15_GUIDANCE,
-        supportsNegativePrompt = false,
-        supportsPreview = false,
-        supportsCancellation = true,
-        backend = backend.ifBlank { "CPU" },
-    )
+    private fun capabilityOn(backend: String) = when (loaded?.mnnModelType) {
+        NativeMnn.SANA_DIFFUSION -> ImageCapability(
+            // Sana supports multiple resolutions through its config. The bundle is
+            // converted at 512 but the model accepts 512–1024.
+            sizes = listOf(ImageSize(512, 512), ImageSize(1024, 1024)),
+            steps = SANA_MIN_STEPS..SANA_MAX_STEPS,
+            // Sana uses CFG through the unified run() API. Until that JNI bridge is
+            // built, the legacy run() path applies a fixed guidance.
+            guidance = SANA_GUIDANCE..SANA_GUIDANCE,
+            supportsNegativePrompt = false,
+            supportsPreview = false,
+            supportsCancellation = true,
+            backend = backend.ifBlank { "CPU" },
+        )
+        else -> ImageCapability(
+            // SD 1.5 and any other legacy path: fixed 512, no CFG control.
+            sizes = listOf(ImageSize(SD15_EDGE, SD15_EDGE)),
+            steps = MIN_STEPS..MAX_STEPS,
+            guidance = SD15_GUIDANCE..SD15_GUIDANCE,
+            supportsNegativePrompt = false,
+            supportsPreview = false,
+            supportsCancellation = true,
+            backend = backend.ifBlank { "CPU" },
+        )
+    }
 
     private fun GenerationBundle.directory(): File {
         val first = files.firstOrNull()
@@ -342,6 +378,15 @@ class MnnImageGenerator internal constructor(
 
     companion object {
         /**
+         * The files a bundle of [modelType] must contain, checked before the runtime
+         * is asked so the answer names a missing file rather than crashing in native code.
+         */
+        internal fun requiredFilesFor(modelType: Int): List<String> = when (modelType) {
+            NativeMnn.SANA_DIFFUSION -> SANA_REQUIRED_FILES
+            else -> SD15_REQUIRED_FILES
+        }
+
+        /**
          * What a converted Stable Diffusion 1.5 bundle contains.
          *
          * Seven rather than the four MNN's README names, because its conversion script
@@ -349,7 +394,7 @@ class MnnImageGenerator internal constructor(
          * sibling holding the actual weights. A bundle checked for four files passes with
          * the three biggest ones missing.
          */
-        val REQUIRED_FILES = listOf(
+        val SD15_REQUIRED_FILES = listOf(
             "text_encoder.mnn",
             "text_encoder.mnn.weight",
             "unet.mnn",
@@ -361,8 +406,38 @@ class MnnImageGenerator internal constructor(
             "alphas.txt",
         )
 
+        /**
+         * What a converted Sana Edit V2 bundle contains.
+         *
+         * Sana uses an LLM (Qwen3-0.6B) for prompt encoding instead of CLIP, so its file
+         * layout includes an llm/ subdirectory. The config.json names every model file
+         * and MNN reads it, but the files must still exist on disk.
+         */
+        val SANA_REQUIRED_FILES = listOf(
+            "config.json",
+            "connector.mnn",
+            "connector.mnn.weight",
+            "projector.mnn",
+            "projector.mnn.weight",
+            "transformer.mnn",
+            "transformer.mnn.weight",
+            "vae_decoder.mnn",
+            "vae_decoder.mnn.weight",
+            "vae_encoder.mnn",
+            "vae_encoder.mnn.weight",
+            "llm/llm.mnn",
+            "llm/llm.mnn.weight",
+            "llm/meta_queries.mnn",
+            "llm/tokenizer.txt",
+            "llm/llm.mnn.json",
+        )
+
         const val SD15_EDGE = 512
         const val SD15_GUIDANCE = 7.5f
+
+        const val SANA_GUIDANCE = 4.5f
+        const val SANA_MIN_STEPS = 1
+        const val SANA_MAX_STEPS = 30
 
         /** One step produces noise; beyond fifty is minutes of phone for no visible gain. */
         const val MIN_STEPS = 1

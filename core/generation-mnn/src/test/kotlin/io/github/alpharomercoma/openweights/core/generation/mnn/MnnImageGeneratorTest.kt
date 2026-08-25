@@ -110,6 +110,17 @@ class MnnImageGeneratorTest {
         var voiceReleases = 0
             private set
 
+        var sanaOutcome: MnnOutcome = MnnOutcome.FINISHED
+        var lastSanaPrompt: String? = null
+
+        override fun runSana(request: SanaRequest): Int {
+            lastSanaPrompt = request.prompt
+            if (sanaOutcome == MnnOutcome.FINISHED && writes) {
+                File(request.outputPath).writeBytes(ByteArray(64))
+            }
+            return sanaOutcome.ordinal
+        }
+
         override fun loadVoice(modelsDir: String, speakerId: String): Long {
             speaker = speakerId
             return voiceHandle
@@ -131,11 +142,15 @@ class MnnImageGeneratorTest {
         }
     }
 
-    private fun completeBundle() = MnnImageGenerator.REQUIRED_FILES.forEach {
-        File(bundleFolder, it).writeBytes(ByteArray(8))
+    private fun completeBundle(modelType: Int = NativeMnn.STABLE_DIFFUSION_1_5) {
+        MnnImageGenerator.requiredFilesFor(modelType).forEach {
+            val file = File(bundleFolder, it)
+            file.parentFile.mkdirs()
+            file.writeBytes(ByteArray(8))
+        }
     }
 
-    private fun bundle() = GenerationBundle(
+    private fun bundle(modelType: Int = NativeMnn.STABLE_DIFFUSION_1_5) = GenerationBundle(
         id = "sd15",
         displayName = "Stable Diffusion 1.5",
         task = GenerationTask.IMAGE,
@@ -144,6 +159,19 @@ class MnnImageGeneratorTest {
         quantization = "fp16",
         minimumFreeBytes = 0,
         licence = "CreativeML Open RAIL-M",
+        mnnModelType = modelType,
+    )
+
+    private fun sanaBundle() = GenerationBundle(
+        id = "sana",
+        displayName = "Sana Edit V2",
+        task = GenerationTask.IMAGE,
+        runtime = GenerationRuntime.MNN,
+        files = listOf(Artifact(File(bundleFolder, "transformer.mnn").absolutePath, "application/mnn")),
+        quantization = "q4_k",
+        minimumFreeBytes = 0,
+        licence = "Apache 2.0",
+        mnnModelType = NativeMnn.SANA_DIFFUSION,
     )
 
     private fun generator(bridge: FakeBridge, available: Boolean = true) = MnnImageGenerator(
@@ -174,7 +202,7 @@ class MnnImageGeneratorTest {
         // The seven-file shape is the one that bites: MNN's README names four, and the
         // conversion writes a `.mnn.weight` beside each `.mnn`. Checked for four, a bundle
         // passes with the three largest files absent and fails inside the runtime.
-        MnnImageGenerator.REQUIRED_FILES.filterNot { it.endsWith(".weight") }
+        MnnImageGenerator.SD15_REQUIRED_FILES.filterNot { it.endsWith(".weight") }
             .forEach { File(bundleFolder, it).writeBytes(ByteArray(8)) }
 
         val failure = runCatching { generator(FakeBridge()).load(bundle()) }.exceptionOrNull()
@@ -441,5 +469,102 @@ class MnnImageGeneratorTest {
         }.exceptionOrNull()
 
         assertThat(failure).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `Sana bundle loads with its own required files and model type`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val bridge = FakeBridge()
+        val generator = generator(bridge)
+
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        assertThat(generator.capability).isNotNull()
+    }
+
+    @Test
+    fun `Sana reports 512 and 1024 as supported sizes`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val generator = generator(FakeBridge())
+
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        val can = requireNotNull(generator.capability)
+        assertThat(can.sizes).contains(ImageSize(512, 512))
+        assertThat(can.sizes).contains(ImageSize(1024, 1024))
+    }
+
+    @Test
+    fun `Sana accepts 1024 sized requests`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val generator = generator(FakeBridge())
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        // 1024×1024 must not be refused as it would be for SD 1.5.
+        val events = generator.generate(
+            request(size = ImageSize(1024, 1024)).copy(guidance = 4.5f)
+        ).toList()
+
+        assertThat(events.first()).isEqualTo(GenerationEvent.Started)
+    }
+
+    @Test
+    fun `Sana missing its LLM files is refused`() = runTest(dispatcher) {
+        // Write everything except the LLM subdirectory.
+        MnnImageGenerator.SANA_REQUIRED_FILES
+            .filterNot { it.startsWith("llm/") }
+            .forEach {
+                val file = File(bundleFolder, it)
+                file.parentFile.mkdirs()
+                file.writeBytes(ByteArray(8))
+            }
+
+        val failure = runCatching {
+            generator(FakeBridge()).load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+        }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(GenerationUnavailableException::class.java)
+        assertThat(failure).hasMessageThat().contains("llm/")
+    }
+
+    @Test
+    fun `Sana generate routes through runSana rather than the legacy path`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val bridge = FakeBridge()
+        val generator = generator(bridge)
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        generator.generate(request(prompt = "a cat").copy(guidance = 4.5f)).toList()
+
+        // Sana should call runSana, not the legacy generate.
+        assertThat(bridge.lastSanaPrompt).isEqualTo("a cat")
+        assertThat(bridge.lastPrompt).isNull() // Legacy path NOT called.
+    }
+
+    @Test
+    fun `Sana 1024 resolution is not refused`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val bridge = FakeBridge()
+        val generator = generator(bridge)
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        val events = generator.generate(
+            request(size = ImageSize(1024, 1024), steps = 5).copy(guidance = 4.5f)
+        ).toList()
+
+        assertThat(events.first()).isEqualTo(GenerationEvent.Started)
+    }
+
+    @Test
+    fun `Sana cancelled run publishes nothing`() = runTest(dispatcher) {
+        completeBundle(modelType = NativeMnn.SANA_DIFFUSION)
+        val bridge = FakeBridge().also { it.sanaOutcome = MnnOutcome.CANCELLED }
+        val generator = generator(bridge)
+        generator.load(bundle(modelType = NativeMnn.SANA_DIFFUSION))
+
+        val events = generator.generate(request().copy(guidance = 4.5f)).toList()
+
+        assertThat(events.last()).isEqualTo(GenerationEvent.Cancelled)
+        assertThat(outputs.listFiles().orEmpty()).isEmpty()
     }
 }

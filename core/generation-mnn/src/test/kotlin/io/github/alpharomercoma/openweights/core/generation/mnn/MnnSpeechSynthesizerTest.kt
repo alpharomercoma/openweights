@@ -74,6 +74,7 @@ class MnnSpeechSynthesizerTest {
         override fun cancel(handle: Long) = Unit
         override fun backend(handle: Long) = ""
         override fun release(handle: Long) = Unit
+        override fun runSana(request: SanaRequest) = 2
 
         override fun loadVoice(modelsDir: String, speakerId: String): Long {
             speaker = speakerId

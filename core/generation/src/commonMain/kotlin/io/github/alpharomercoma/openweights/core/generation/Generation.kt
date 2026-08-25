@@ -217,6 +217,13 @@ data class GenerationBundle(
      */
     val targetSoc: String? = null,
     val licence: String,
+    /**
+     * MNN's `DiffusionModelType` enum value. Meaningless for non-MNN runtimes.
+     *
+     * An Int rather than a sealed class so `:generation` stays KMP-pure with no MNN
+     * dependency. The MNN backend reads it; everything else ignores it.
+     */
+    val mnnModelType: Int = 0,
 )
 
 enum class GenerationTask { IMAGE, SPEECH }

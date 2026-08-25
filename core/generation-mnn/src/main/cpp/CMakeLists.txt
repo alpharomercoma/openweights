@@ -30,12 +30,13 @@ set(MNN_OPENCL ON CACHE BOOL "" FORCE)
 set(MNN_USE_LOGCAT ON CACHE BOOL "" FORCE)
 
 # Off on purpose. Every one of these builds a host tool or a test binary that an APK has no
-# use for, and MNN_BUILD_LLM is only needed by the Sana and Wan paths, which take their text
-# embedding from a language model. Stable Diffusion carries its own tokenizer.
+# use for. MNN_BUILD_LLM is ON because Sana Edit V2 uses Qwen3-0.6B as its prompt encoder —
+# the LLM runs first to encode text, then diffusion reads the embeddings. The Wan 2.1 video
+# path also uses it, though Wan is intentionally deferred.
 set(MNN_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(MNN_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
 set(MNN_BUILD_TEST OFF CACHE BOOL "" FORCE)
-set(MNN_BUILD_LLM OFF CACHE BOOL "" FORCE)
+set(MNN_BUILD_LLM ON CACHE BOOL "" FORCE)
 
 # Vendored where it was pinned, referenced from here. Ten thousand files of somebody else's
 # source do not move house because this project grew a module.
@@ -84,10 +85,11 @@ add_library(openweights_generation SHARED
 target_include_directories(openweights_generation PRIVATE
     ${MNN_ROOT}/include
     ${MNN_ROOT}/transformers/diffusion/engine/include
+    ${MNN_ROOT}/transformers/llm/engine/include
     ${TTS_ROOT}/include
     ${TTS_ROOT}/include/supertonic
     ${MNN_ROOT}/apps/frameworks/3rd_party/include
 )
 
 find_library(log-lib log)
-target_link_libraries(openweights_generation MNN MNN_Express diffusion ${log-lib})
+target_link_libraries(openweights_generation MNN MNN_Express diffusion llm ${log-lib})

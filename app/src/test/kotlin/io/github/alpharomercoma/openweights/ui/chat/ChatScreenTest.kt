@@ -139,7 +139,7 @@ class ChatScreenTest {
         compose.onNodeWithContentDescription("Send message").performClick()
         assert(sent == null) { "an empty composer must not send" }
 
-        compose.onNodeWithText("Message").performTextInput("hello")
+        compose.onNodeWithContentDescription("Message").performTextInput("hello")
         compose.onNodeWithContentDescription("Send message").performClick()
         assert(sent == "hello") { "expected the typed text to be sent, got $sent" }
     }

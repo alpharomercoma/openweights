@@ -27,6 +27,7 @@ object GenerationCatalog {
         description = "On-device text-to-image diffusion model running on OpenCL GPU / NPU.",
         task = GenerationTask.IMAGE,
         runtime = GenerationRuntime.MNN,
+        mnnModelType = 0, // STABLE_DIFFUSION_1_5
         directoryName = "stable-diffusion-v1-5-mnn-opencl",
         totalSizeBytes = 1_154_240_776L,
         files = listOf(
@@ -75,6 +76,52 @@ object GenerationCatalog {
         licence = "CreativeML OpenRAIL-M",
     )
 
+    val SANA_EDIT_V2 = GenerationBundleSpec(
+        id = "sana-edit-v2-mnn",
+        repoId = "taobao-mnn/MNN-Sana-Edit-V2",
+        displayName = "Sana Edit V2 (MNN)",
+        description = "LLM-powered text-to-image and image editing with Qwen3-0.6B prompt encoder.",
+        task = GenerationTask.IMAGE,
+        runtime = GenerationRuntime.MNN,
+        mnnModelType = 2, // SANA_DIFFUSION
+        directoryName = "sana-edit-v2-mnn",
+        totalSizeBytes = 1_601_619_806L,
+        files = listOf(
+            // config.json — MNN reads this to discover model paths within the bundle
+            BundleFileSpec("config.json", "config.json", 810L),
+            BundleFileSpec("connector.mnn", "connector.mnn", 99_096L),
+            BundleFileSpec("connector.mnn.weight", "connector.mnn.weight", 76_268_760L,
+                sha256 = "7128351d2de561932741f7f874b116ea3b4e5979296d8adf41472a93fcb889cd"),
+            BundleFileSpec("projector.mnn", "projector.mnn", 2_416L),
+            BundleFileSpec("projector.mnn.weight", "projector.mnn.weight", 2_387_206L,
+                sha256 = "34b5afdb0c3b1fc815cdee7f3ed293e8d8f1f377328e5785cad2bd1768a843c3"),
+            BundleFileSpec("transformer.mnn", "transformer.mnn", 1_454_264L,
+                sha256 = "092dd75e8b8c12694ffe43476addcbde07fe7227774a1a40b19420f87b217386"),
+            BundleFileSpec("transformer.mnn.weight", "transformer.mnn.weight", 884_435_680L,
+                sha256 = "b3bab45fbabc8dabd05840b52ea3cd9bd3e54dd990e153ff6fbecd8b6c17f331"),
+            BundleFileSpec("vae_decoder.mnn", "vae_decoder.mnn", 751_784L,
+                sha256 = "9fbe51979b27339b7685cf88f1010a0ff3ab7ff1a7d873fba321eea94b762911"),
+            BundleFileSpec("vae_decoder.mnn.weight", "vae_decoder.mnn.weight", 162_011_594L,
+                sha256 = "a6ef7a13ba9af29754adf9b97651cb29a7eaee20b716c16dbe079f500d5eddae"),
+            BundleFileSpec("vae_encoder.mnn", "vae_encoder.mnn", 761_568L,
+                sha256 = "06da21081f8ee98792bd1838990068e7284351157cafbfa8793282b611eacb24"),
+            BundleFileSpec("vae_encoder.mnn.weight", "vae_encoder.mnn.weight", 155_787_522L,
+                sha256 = "b44ac00f4683697add9578ef4c0f561fb5753fe24a3f4525e7f492028409d05e"),
+            // llm/ subdirectory — the Qwen3-0.6B prompt encoder
+            BundleFileSpec("llm/llm.mnn", "llm/llm.mnn", 504_504L,
+                sha256 = "a3e32dc50e8988e78d416031023345048f4b6cf152db021da6ee1de921d45096"),
+            BundleFileSpec("llm/llm.mnn.weight", "llm/llm.mnn.weight", 373_018_866L,
+                sha256 = "79db6ac8267ec6a7c9172a363112fa613c0cf17d6f46121d947a75c987ccf49a"),
+            BundleFileSpec("llm/meta_queries.mnn", "llm/meta_queries.mnn", 1_048_824L,
+                sha256 = "5e80d4e591af78cca31b6e4cf4ee4ead410e9d2f64ee34c73cf5b633def16e0c"),
+            BundleFileSpec("llm/tokenizer.txt", "llm/tokenizer.txt", 3_193_562L),
+            BundleFileSpec("llm/llm.mnn.json", "llm/llm.mnn.json", 1_006_495L),
+        ),
+        quantization = "Q4_K (4-bit)",
+        minimumFreeBytes = 3_500_000_000L,
+        licence = "Apache 2.0",
+    )
+
     val SUPERTONIC_TTS = GenerationBundleSpec(
         id = "supertonic-tts-mnn",
         repoId = "yunfengwang/supertonic-tts-mnn",
@@ -119,7 +166,7 @@ object GenerationCatalog {
         licence = "OpenRAIL",
     )
 
-    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SUPERTONIC_TTS)
+    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SANA_EDIT_V2, SUPERTONIC_TTS)
 
     fun findById(id: String): GenerationBundleSpec? = ALL.firstOrNull { it.id == id }
 
@@ -134,6 +181,8 @@ data class GenerationBundleSpec(
     val description: String,
     val task: GenerationTask,
     val runtime: GenerationRuntime,
+    /** MNN's DiffusionModelType enum value, or 0 when the runtime is not MNN. */
+    val mnnModelType: Int = 0,
     val directoryName: String,
     val totalSizeBytes: Long,
     val files: List<BundleFileSpec>,

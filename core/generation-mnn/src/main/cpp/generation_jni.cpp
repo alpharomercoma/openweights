@@ -31,6 +31,7 @@
 #include <cstdio>
 #include <vector>
 #include <diffusion/diffusion.hpp>
+#include <diffusion/sana_llm.hpp>
 #include <supertonic/mnn_supertonic_tts_impl.hpp>
 
 #define LOG_TAG "OpenWeightsGen"
@@ -76,6 +77,13 @@ struct GenerationSession {
     std::unique_ptr<MNN::DIFFUSION::Diffusion> diffusion;
     std::atomic<bool> cancelled{false};
     std::string backend;
+
+    /**
+     * Set by nativeRunSana before it starts, cleared after. Only one Sana run at a time.
+     * nativeCancel sets this to stop an in-flight Sana generation at the next progress
+     * callback boundary, the same way it stops an SD 1.5 generation through `cancelled`.
+     */
+    std::atomic<bool> sanaRunning{false};
 };
 
 struct SpeechSession {
@@ -216,6 +224,21 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeLo
 
     try {
         auto session = std::make_shared<GenerationSession>();
+        // Sana's diffusion is created and destroyed inside nativeRunSana on each call.
+        // Pre-loading one here would waste memory (SanaDiffusion loads all models,
+        // holds them, then gets released before nativeRunSana loads them again).
+        // A session is still created so cancellation works through the same handle.
+        if (static_cast<MNN::DIFFUSION::DiffusionModelType>(modelType) == MNN::DIFFUSION::SANA_DIFFUSION) {
+            session->backend = backendType == MNN_FORWARD_OPENCL ? "OpenCL" : "CPU";
+            LOGI("registered a Sana session (diffusion loaded per-call in nativeRunSana)");
+            jlong handle = gNextHandle.fetch_add(1);
+            {
+                std::lock_guard<std::mutex> guard(gSessionMutex);
+                gActiveSessions[handle] = session;
+            }
+            return handle;
+        }
+
         session->diffusion.reset(MNN::DIFFUSION::Diffusion::createDiffusion(
             path,
             static_cast<MNN::DIFFUSION::DiffusionModelType>(modelType),
@@ -326,6 +349,146 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeCa
     JNIEnv*, jobject, jlong handle) {
     std::shared_ptr<GenerationSession> session = getSession(handle);
     if (session) session->cancelled.store(true);
+}
+
+/**
+ * Runs Sana end-to-end: loads the LLM, encodes the prompt, runs diffusion, and writes
+ * the output. The LLM and diffusion are serialised to avoid OOM — the LLM is freed before
+ * diffusion is loaded.
+ *
+ * Returns 0 on success, 1 when cancelled, 2 when the runtime refused.
+ *
+ * This is a single call rather than a load/generate pair because Sana's pipeline is
+ * indivisible: the LLM output is an MNN tensor (VARP), not a primitive, and cannot cross
+ * the JNI boundary. The Kotlin side calls this once per request and the C++ side manages
+ * the full lifecycle internally.
+ *
+ * Build note: this function requires MNN's LLM engine, linked via `sana_llm.hpp`.
+ * If the build does not include the LLM engine, the function is compiled but returns 2.
+ */
+JNIEXPORT jint JNICALL
+Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRunSana(
+    JNIEnv* env, jobject self, jlong sessionHandle, jstring resourcePath, jstring prompt,
+    jstring inputImagePath, jstring outputPath,
+    jint width, jint height, jint steps, jint seed,
+    jboolean useCfg, jfloat cfgScale, jint backendType, jint memoryMode) {
+
+    if (steps < 1 || steps > 50) return 2;
+
+    std::shared_ptr<GenerationSession> session = getSession(sessionHandle);
+    if (!session) return 2;
+
+    const std::string resource = to_utf8(env, resourcePath);
+    const std::string promptText = to_utf8(env, prompt);
+    const std::string inputImage = to_utf8(env, inputImagePath);
+    const std::string output = to_utf8(env, outputPath);
+
+    if (resource.empty() || output.empty()) return 2;
+
+    session->cancelled.store(false);
+
+    // Progress callback: call back into Kotlin on each step.
+    jclass cls = env->GetObjectClass(self);
+    jmethodID onStep = cls != nullptr
+        ? env->GetMethodID(cls, "onNativeStep", "(I)V") : nullptr;
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls != nullptr) env->DeleteLocalRef(cls);
+
+    struct GlobalRefGuard {
+        JNIEnv* env;
+        jobject ref;
+        ~GlobalRefGuard() {
+            if (env != nullptr && ref != nullptr) env->DeleteGlobalRef(ref);
+        }
+    } selfGuard{env, env->NewGlobalRef(self)};
+    jobject selfGlobal = selfGuard.ref;
+
+    std::atomic<bool> cancelled{false};
+    auto progress = [&](int step) {
+        if (session->cancelled.load()) throw Cancelled{};
+        if (onStep != nullptr && selfGlobal != nullptr) {
+            JNIEnv* cbEnv = nullptr;
+            bool attached = false;
+            if (gJavaVM != nullptr) {
+                jint res = gJavaVM->GetEnv(reinterpret_cast<void**>(&cbEnv), JNI_VERSION_1_6);
+                if (res == JNI_EDETACHED) {
+                    if (gJavaVM->AttachCurrentThread(&cbEnv, nullptr) == JNI_OK) {
+                        attached = true;
+                    }
+                }
+            }
+            if (cbEnv == nullptr) cbEnv = env;
+            if (cbEnv->PushLocalFrame(32) == 0) {
+                cbEnv->CallVoidMethod(selfGlobal, onStep, step);
+                if (cbEnv->ExceptionCheck()) cbEnv->ExceptionClear();
+                cbEnv->PopLocalFrame(nullptr);
+            }
+            if (attached && gJavaVM != nullptr) {
+                gJavaVM->DetachCurrentThread();
+            }
+        }
+    };
+
+    try {
+        // Step 1: Run the LLM to encode the prompt.
+        LOGI("Sana: encoding prompt with LLM");
+        std::string llmPath = resource + "/llm";
+        auto sanaLlm = std::make_unique<MNN::DIFFUSION::SanaLlm>(llmPath);
+
+        auto llmOut = useCfg
+            ? sanaLlm->process(promptText, true, "")
+            : sanaLlm->process(promptText, false);
+
+        if (llmOut.get() == nullptr) {
+            LOGE("Sana: LLM produced no output");
+            return 2;
+        }
+
+        // Step 2: Free the LLM before loading diffusion to avoid OOM.
+        sanaLlm.reset();
+        LOGI("Sana: LLM done, loading diffusion");
+
+        // Step 3: Load and run diffusion.
+        auto diffusion = std::unique_ptr<MNN::DIFFUSION::Diffusion>(
+            MNN::DIFFUSION::Diffusion::createDiffusion(
+                resource,
+                MNN::DIFFUSION::SANA_DIFFUSION,
+                static_cast<MNNForwardType>(backendType),
+                memoryMode));
+
+        if (!diffusion) {
+            LOGE("Sana: could not create diffusion");
+            return 2;
+        }
+        if (!diffusion->load()) {
+            LOGE("Sana: diffusion would not load");
+            return 2;
+        }
+
+        std::string mode = inputImage.empty() ? "text2img" : "img2img";
+        LOGI("Sana: running diffusion mode=%s %dx%d steps=%d",
+             mode.c_str(), width, height, steps);
+
+        bool ok = diffusion->run(
+            llmOut, mode, inputImage, output,
+            width, height, steps, seed,
+            useCfg, cfgScale, progress);
+
+        llmOut = nullptr;
+        diffusion.reset();
+
+        return ok ? 0 : 2;
+
+    } catch (const Cancelled&) {
+        LOGI("Sana: cancelled between steps");
+        return 1;
+    } catch (const std::exception& failure) {
+        LOGE("Sana: generation failed: %s", failure.what());
+        return 2;
+    } catch (...) {
+        LOGE("Sana: generation failed with unknown error");
+        return 2;
+    }
 }
 
 /** What actually ran, which is not always what was asked for. */

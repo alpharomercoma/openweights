@@ -167,12 +167,25 @@ object GenerationCatalog {
         licence = "OpenRAIL",
     )
 
-    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SANA_EDIT_V2, SUPERTONIC_TTS)
+    // SANA_EDIT_V2 is deliberately excluded from ALL: it's an image-*editing* model (conditioned
+    // primarily on a reference image), not a text-to-image one. Fed the all-zero reference latent
+    // that pure text-to-image mode requires, it converges (that bug is fixed) but produces content
+    // unrelated to the prompt — confirmed against Alibaba's own reference usage of this exact
+    // checkpoint, not a wiring bug on our side. Stable Diffusion 1.5 is the app's text-to-image
+    // model until a genuine text-to-image checkpoint is sourced/converted, or Sana is wired up as
+    // an image-editing feature (starting from a real photo) instead. The spec is kept below,
+    // reachable by id/directory, so that work isn't lost.
+    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SUPERTONIC_TTS)
 
-    fun findById(id: String): GenerationBundleSpec? = ALL.firstOrNull { it.id == id }
+    val ALL_INCLUDING_UNLISTED: List<GenerationBundleSpec> =
+        listOf(STABLE_DIFFUSION_1_5, SANA_EDIT_V2, SUPERTONIC_TTS)
+
+    // Looked up by id/directory against the full set (including SANA_EDIT_V2), not just ALL, so a
+    // bundle already downloaded before it was delisted still resolves, and tests can still find it.
+    fun findById(id: String): GenerationBundleSpec? = ALL_INCLUDING_UNLISTED.firstOrNull { it.id == id }
 
     fun findByDirectory(dirName: String): GenerationBundleSpec? =
-        ALL.firstOrNull { it.directoryName == dirName }
+        ALL_INCLUDING_UNLISTED.firstOrNull { it.directoryName == dirName }
 }
 
 data class GenerationBundleSpec(

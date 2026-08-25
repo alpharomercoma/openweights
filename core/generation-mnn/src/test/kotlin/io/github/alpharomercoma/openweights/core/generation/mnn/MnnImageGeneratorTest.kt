@@ -297,6 +297,27 @@ class MnnImageGeneratorTest {
     }
 
     @Test
+    fun `a millisecond-timestamp seed is folded into range, not clamped to the same value`() = runTest(dispatcher) {
+        // A clamp collapses every timestamp-sized seed onto Int.MAX_VALUE, so every run ends
+        // up using the same noise. Folding with mod keeps them distinct.
+        completeBundle()
+        val bridge = FakeBridge()
+        val generator = generator(bridge)
+        generator.load(bundle())
+
+        val firstMillis = 1_756_000_000_000L
+        val secondMillis = 1_756_000_000_123L
+        val first = generator.generate(request(seed = firstMillis)).toList()
+            .filterIsInstance<GenerationEvent.Completed<Artifact>>().single()
+        val second = generator.generate(request(seed = secondMillis)).toList()
+            .filterIsInstance<GenerationEvent.Completed<Artifact>>().single()
+
+        assertThat(first.stats.seed).isNotEqualTo(Int.MAX_VALUE.toLong())
+        assertThat(second.stats.seed).isNotEqualTo(Int.MAX_VALUE.toLong())
+        assertThat(first.stats.seed).isNotEqualTo(second.stats.seed)
+    }
+
+    @Test
     fun `a cancelled run publishes nothing`() = runTest(dispatcher) {
         completeBundle()
         val generator = generator(FakeBridge(outcome = MnnOutcome.CANCELLED))

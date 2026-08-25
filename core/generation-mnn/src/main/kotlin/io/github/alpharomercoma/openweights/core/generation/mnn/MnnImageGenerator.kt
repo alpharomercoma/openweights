@@ -182,8 +182,10 @@ class MnnImageGenerator internal constructor(
 
             // A seed of this app's own when none was given, so the result can be asked for
             // again. Reported in the stats either way, because a picture nobody can
-            val seed = request.seed?.coerceIn(0L, Int.MAX_VALUE.toLong())
-                ?: (clock() % Int.MAX_VALUE.toLong())
+            // Folded into Int range with mod, not coerceIn: the caller's seed is usually a
+            // millisecond timestamp, far larger than Int.MAX_VALUE, so a clamp collapsed
+            // every generation onto the same seed instead of varying it.
+            val seed = (request.seed ?: clock()).mod(Int.MAX_VALUE.toLong())
             val target = File(outputDirectory.apply { mkdirs() }, "$seed-${clock()}.png")
 
             send(GenerationEvent.Started)

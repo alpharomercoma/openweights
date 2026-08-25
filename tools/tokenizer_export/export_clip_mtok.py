@@ -232,6 +232,14 @@ def export_mtok(tokenizer_json_path, output_mtok_path):
         for id1, id2, rank in merge_pairs:
             fp.write(struct.pack('<III', id1, id2, rank))
 
+        # CLIP's BPE seeds each word's merge with a trailing "</w>" (see model.end_of_word_suffix
+        # in tokenizer.json) before running merges, so e.g. "apple" resolves to the word-final
+        # vocab entry "apple</w>" instead of the mid-word entry "apple" -- a different id with a
+        # different, untrained-in-context embedding. Without this the reader has no way to know
+        # a suffix is expected at all.
+        fp.write(pack_str(model.get('end_of_word_suffix', '') or ''))
+        fp.write(pack_str(model.get('continuing_subword_prefix', '') or ''))
+
         # --- Decoder ---
         dec = tj.get('decoder')
         def write_decoder_bin(fp, dec):

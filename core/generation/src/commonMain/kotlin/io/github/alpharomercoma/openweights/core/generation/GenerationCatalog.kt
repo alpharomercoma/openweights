@@ -77,8 +77,8 @@ object GenerationCatalog {
             // so a known-good copy ships as an app asset instead of a doomed download.
             BundleFileSpec(
                 "tokenizer.mtok",
-                sizeBytes = 1_322_513L,
-                sha256 = "2cacfbfd332a6366ac4589d3b4006606ea101d2e2365d4a70070a03be103aaea",
+                sizeBytes = 1_322_521L,
+                sha256 = "8ec18545cf3d318325f43887984e2798e9dd69fdecc933b73ce519217afa93c3",
                 assetPath = "generation-bundles/stable-diffusion-v1-5-tokenizer.mtok",
             ),
             BundleFileSpec("vocab.json", "vocab.json", 1_059_962L),

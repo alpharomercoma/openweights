@@ -13,5 +13,5 @@
 	branch = v0.16.1
 [submodule "core/generation/src/androidMain/cpp/MNN"]
 	path = core/generation/src/androidMain/cpp/MNN
-	url = https://github.com/alibaba/MNN.git
-	branch = 3.6.1
+	url = https://github.com/alpharomercoma/MNN.git
+	branch = openweights-fixes

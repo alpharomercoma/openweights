@@ -144,6 +144,26 @@ class SlashCommandTest {
     }
 
     @Test
+    fun `the argument after a near miss drops the whole trigger, not just its first word`() {
+        // The bug this replaced: removing only the token before the first space left
+        // "research what changed" behind, so accepting the correction asked the model
+        // "/deep-research research what changed" instead of the question that was typed.
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep research what changed"))
+            .isEqualTo("what changed")
+    }
+
+    @Test
+    fun `a near miss with the trigger spelled correctly still yields the right argument`() {
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep-research what changed"))
+            .isEqualTo("what changed")
+    }
+
+    @Test
+    fun `a near miss with nothing after the trigger yields an empty argument`() {
+        assertThat(SlashCommand.PLAN.argumentAfterNearMiss("/pl an")).isEqualTo("")
+    }
+
+    @Test
     fun `an unrecognised command falling through as a message is a deliberate default`() {
         // Documented here because it is the one behaviour a reviewer would otherwise read
         // as a bug: OrdinaryMessage is the answer for a sentence that happens to start with

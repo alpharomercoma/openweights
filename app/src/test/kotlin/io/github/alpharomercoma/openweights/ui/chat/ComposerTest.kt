@@ -128,9 +128,62 @@ class ComposerTest {
         assert(sent == "/deep research foo") { "a second press must send the text as written" }
     }
 
+    @Test
+    fun `accepting a suggestion for a no-argument command runs it rather than staging it`() {
+        var dispatched: SlashCommand? = null
+        var sent: String? = null
+        show(onCommand = { dispatched = it }, onSend = {
+            sent = it
+            true
+        })
+
+        // A near miss of /plan, which takes no argument.
+        compose.onNodeWithContentDescription("Message").performTextInput("/pl an")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        compose.onNodeWithText("Did you mean ${SlashCommand.PLAN.trigger}?").performClick()
+
+        assert(dispatched == SlashCommand.PLAN) {
+            "expected PLAN to run immediately from the suggestion, got: $dispatched"
+        }
+        assert(sent == null) { "a no-argument suggestion must not also reach onSend as prose" }
+    }
+
+    @Test
+    fun `accepting a suggestion for an argument command keeps the whole question`() {
+        show()
+
+        // The exact input that motivated this: a space where the trigger has a hyphen,
+        // with a real question after it.
+        compose.onNodeWithContentDescription("Message")
+            .performTextInput("/deep research what changed")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        compose.onNodeWithText("Did you mean ${SlashCommand.DEEP_RESEARCH.trigger}?")
+            .performClick()
+
+        // Not "research what changed" — the whole near-miss trigger comes off, not just
+        // the first word of it.
+        compose.onNodeWithText("what changed").assertExists()
+    }
+
+    @Test
+    fun `editing a message that looks like a failed command resends on the first press`() {
+        var sent: String? = null
+        show(editing = "/tmp is full", onSend = {
+            sent = it
+            true
+        })
+
+        compose.onNodeWithContentDescription("Send message").performClick()
+
+        assert(sent == "/tmp is full") {
+            "an edit must resend on the first press, not be held for an unknown-command warning"
+        }
+    }
+
     private fun show(
         onSend: (String) -> Boolean = { true },
         onCommand: (SlashCommand) -> Unit = {},
+        editing: String? = null,
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -149,6 +202,7 @@ class ComposerTest {
                     onRemoveStaged = {},
                     onDictate = {},
                     onSend = onSend,
+                    editing = editing,
                     onStop = {},
                     onCommand = onCommand,
                 )

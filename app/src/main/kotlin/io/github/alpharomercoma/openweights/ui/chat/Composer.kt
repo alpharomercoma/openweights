@@ -178,6 +178,14 @@ fun Composer(
     }
 
     fun trySend() {
+        // Resending, unconditionally. The reopened text goes straight to onSend, which is
+        // `submit()` and already puts editing ahead of command parsing; gating it here too
+        // meant an edit that happened to read like a failed command ("/tmp is full") needed
+        // Send pressed twice, once to clear a warning `submit` was never going to raise.
+        if (editing != null) {
+            if (onSend(draft)) draft = ""
+            return
+        }
         val command = pendingCommand
         if (command != null) {
             if (draft.isBlank()) return
@@ -201,7 +209,7 @@ fun Composer(
         }
     }
 
-    val unknownParse = if (pendingCommand == null && unknownAttempt == draft) {
+    val unknownParse = if (editing == null && pendingCommand == null && unknownAttempt == draft) {
         SlashCommand.parse(draft) as? CommandParseResult.Unknown
     } else {
         null
@@ -284,11 +292,24 @@ fun Composer(
                         token = unknown.token,
                         suggestion = unknown.suggestions.firstOrNull(),
                         onUseSuggestion = { suggestion ->
-                            pendingCommandName = suggestion.name
-                            // Whatever followed the token the user actually typed becomes
-                            // the argument, rather than being thrown away for a fresh field.
-                            draft = draft.trim().removePrefix(unknown.token).trim()
                             unknownAttempt = null
+                            if (suggestion.takesArgument) {
+                                pendingCommandName = suggestion.name
+                                // The whole near-miss trigger comes off, not just its first
+                                // word: "/deep research what changed" against a suggestion
+                                // of "/deep-research" leaves "what changed", not "research
+                                // what changed" with half the trigger still attached to it.
+                                draft = suggestion.argumentAfterNearMiss(draft)
+                            } else {
+                                // A no-argument command runs the same way choosing it from
+                                // the palette does. Staging it as pending instead built a
+                                // trigger-plus-argument string submit() does not recognise
+                                // for a command that never takes one, and the correction
+                                // reached the model as prose.
+                                pendingCommandName = null
+                                draft = ""
+                                onCommand(suggestion)
+                            }
                         },
                         modifier = Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp),
                     )

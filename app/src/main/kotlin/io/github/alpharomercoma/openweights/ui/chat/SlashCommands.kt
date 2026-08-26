@@ -190,6 +190,34 @@ enum class SlashCommand(val trigger: String, val description: String) {
         private fun String.normalizedForSuggestion(): String =
             lowercase().filterNot { it.isWhitespace() || it == '-' }
     }
+
+    /**
+     * What is left of [rawMessage] once a near miss of this command's own trigger is taken off
+     * the front.
+     *
+     * Not [argument], which needs an exact trigger already confirmed by [typed]. This is for
+     * the moment right after a user has accepted "did you mean /deep-research?" for something
+     * typed as "/deep research what changed": [String.substringBefore] alone only knows about
+     * the first word, so removing just that left "research what changed" behind — the rest of
+     * the near-miss trigger, silently folded into the question it was meant to be about.
+     *
+     * Walks the raw text one character at a time, skipping whitespace and hyphens exactly as
+     * [normalizedForSuggestion] does, until as many raw characters have been consumed as the
+     * trigger is long once normalized. Whatever follows that point is the argument, however
+     * the trigger itself was spelled.
+     */
+    fun argumentAfterNearMiss(rawMessage: String): String {
+        val trimmed = rawMessage.trim()
+        val targetLength = trigger.normalizedForSuggestion().length
+        var normalizedLength = 0
+        var index = 0
+        while (index < trimmed.length && normalizedLength < targetLength) {
+            val char = trimmed[index]
+            if (!char.isWhitespace() && char != '-') normalizedLength++
+            index++
+        }
+        return trimmed.substring(index).trim()
+    }
 }
 
 /**

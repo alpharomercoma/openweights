@@ -80,7 +80,11 @@ fun RuntimeBar(
 ) {
     // Read here rather than inside the semantics block, which is not a composition.
     val spoken = stringResource(R.string.choose_a_model_spoken, state.spoken())
-    val leaveMode = stringResource(R.string.leave_mode, state.mode.label)
+    // The token typed to reach this mode (`plan`, `ask`, `yolo`), not [AgentMode.label]: a
+    // command name is not prose, so it needs no translation to sit inside a sentence that
+    // is one. The label is still what the identity line above spells the mode out as, in
+    // whatever language the rest of that line already is not translated into either.
+    val leaveMode = stringResource(R.string.leave_mode, state.mode.command)
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
@@ -128,15 +132,14 @@ fun RuntimeBar(
         // touch target, nested inside the bar's, so tapping the mode clears the mode rather
         // than opening the model picker underneath it.
         //
-        // The visible text is the mode's own name and nothing else. [AgentMode.label] is a
-        // fixed English word chosen by whoever typed `/plan`, the same word this line
-        // already showed above before there was anything to tap; wrapping it in a
-        // translated sentence only sat the two side by side in every language that is not
-        // English. The sentence is said instead, once, to whoever cannot see this is a
-        // button.
+        // Shown as the typed command rather than [AgentMode.label]. The command is what
+        // put the mode on — the same word in every language, because it is the word this
+        // build actually recognises after a `/` — where the label is English prose about
+        // it, which read as a translated sentence with an untranslated word sitting inside
+        // it everywhere that is not English, spoken as well as shown.
         if (state.mode != ChatUiState().mode && !goalRunning) {
             Text(
-                text = state.mode.label,
+                text = "/${state.mode.command}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier

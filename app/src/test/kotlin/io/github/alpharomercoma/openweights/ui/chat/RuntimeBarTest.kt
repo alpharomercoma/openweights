@@ -45,7 +45,7 @@ class RuntimeBarTest {
         show(mode = AgentMode.AUTO)
 
         AgentMode.entries.forEach { mode ->
-            compose.onNodeWithText(mode.label).assertDoesNotExist()
+            compose.onNodeWithText("/${mode.command}").assertDoesNotExist()
         }
     }
 
@@ -53,9 +53,9 @@ class RuntimeBarTest {
     fun `a mode that is not the default offers a way to leave it`() {
         show(mode = AgentMode.PLAN)
 
-        compose.onNodeWithText(AgentMode.PLAN.label).assertIsDisplayed()
-        // Said to a screen reader, since the visible word alone is not a sentence.
-        compose.onNodeWithContentDescription("Leave ${AgentMode.PLAN.label} mode")
+        compose.onNodeWithText("/${AgentMode.PLAN.command}").assertIsDisplayed()
+        // Said to a screen reader, since the visible command alone is not a sentence.
+        compose.onNodeWithContentDescription("Leave ${AgentMode.PLAN.command} mode")
             .assertIsDisplayed()
     }
 
@@ -69,7 +69,7 @@ class RuntimeBarTest {
             onClick = { pickerOpened = true },
         )
 
-        compose.onNodeWithText(AgentMode.PLAN.label).performClick()
+        compose.onNodeWithText("/${AgentMode.PLAN.command}").performClick()
 
         assert(resetCalls == 1) { "tapping the mode label must reset the mode exactly once" }
         assert(!pickerOpened) { "resetting the mode must not also open the model picker" }
@@ -85,7 +85,7 @@ class RuntimeBarTest {
         // reaches nothing rather than a button that silently declines it.
         show(mode = AgentMode.PLAN, goalRunning = true)
 
-        compose.onNodeWithText(AgentMode.PLAN.label).assertDoesNotExist()
+        compose.onNodeWithText("/${AgentMode.PLAN.command}").assertDoesNotExist()
     }
 
     private fun show(

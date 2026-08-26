@@ -435,8 +435,13 @@ Java_io_github_alpharomercoma_openweights_core_generation_mnn_NativeMnn_nativeRu
         std::string llmPath = resource + "/llm";
         auto sanaLlm = std::make_unique<MNN::DIFFUSION::SanaLlm>(llmPath);
 
+        // Alibaba's own reference app (MnnLlmChat) never calls this with an empty negative
+        // prompt -- its default cfgPrompt is "Generate high quality image", applied to every
+        // generation regardless of mode. An empty negative prompt is untested territory for
+        // this checkpoint's CFG calibration, worth ruling out before calling text2img output
+        // (pure static, confirmed on-device) a fixed property of the model.
         auto llmOut = useCfg
-            ? sanaLlm->process(promptText, true, "")
+            ? sanaLlm->process(promptText, true, "Generate high quality image")
             : sanaLlm->process(promptText, false);
 
         if (llmOut.get() == nullptr) {

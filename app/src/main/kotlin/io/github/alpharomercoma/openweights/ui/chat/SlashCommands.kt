@@ -201,19 +201,27 @@ enum class SlashCommand(val trigger: String, val description: String) {
      * the first word, so removing just that left "research what changed" behind — the rest of
      * the near-miss trigger, silently folded into the question it was meant to be about.
      *
-     * Walks the raw text one character at a time, skipping whitespace and hyphens exactly as
-     * [normalizedForSuggestion] does, until as many raw characters have been consumed as the
-     * trigger is long once normalized. Whatever follows that point is the argument, however
-     * the trigger itself was spelled.
+     * Matched character by character against the trigger, normalized the same way
+     * [normalizedForSuggestion] compares them, rather than by counting off however many raw
+     * characters the trigger is long once normalized: counting alone does not stop at the
+     * near miss, it stops at a length, and an abbreviated trigger — "/deep-researc" is one
+     * character short of the real word — is shorter than that length, so counting kept going
+     * into the sentence after it and ate the first letter of "what". Stopping at the first
+     * character that no longer matches the trigger is what a length cannot tell it.
      */
     fun argumentAfterNearMiss(rawMessage: String): String {
         val trimmed = rawMessage.trim()
-        val targetLength = trigger.normalizedForSuggestion().length
-        var normalizedLength = 0
+        val normalizedTrigger = trigger.normalizedForSuggestion()
+        var matched = 0
         var index = 0
-        while (index < trimmed.length && normalizedLength < targetLength) {
+        while (index < trimmed.length && matched < normalizedTrigger.length) {
             val char = trimmed[index]
-            if (!char.isWhitespace() && char != '-') normalizedLength++
+            if (char.isWhitespace() || char == '-') {
+                index++
+                continue
+            }
+            if (char.lowercaseChar() != normalizedTrigger[matched]) break
+            matched++
             index++
         }
         return trimmed.substring(index).trim()

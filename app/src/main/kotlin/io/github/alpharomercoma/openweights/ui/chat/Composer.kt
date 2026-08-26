@@ -291,6 +291,7 @@ fun Composer(
                     UnknownCommandNotice(
                         token = unknown.token,
                         suggestion = unknown.suggestions.firstOrNull(),
+                        enabled = enabled,
                         onUseSuggestion = { suggestion ->
                             unknownAttempt = null
                             if (suggestion.takesArgument) {
@@ -464,6 +465,15 @@ private fun CommandChip(
 private fun UnknownCommandNotice(
     token: String,
     suggestion: SlashCommand?,
+    /**
+     * Whether accepting the suggestion would do anything.
+     *
+     * A no-argument suggestion now runs immediately rather than waiting for its own Send,
+     * which means this button is a second way into the view model beside Send and the
+     * palette — both of which already stop while the composer is disabled. A model loading
+     * or a reply already running is exactly when a stray tap should not also start `/retry`.
+     */
+    enabled: Boolean,
     onUseSuggestion: (SlashCommand) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -482,6 +492,7 @@ private fun UnknownCommandNotice(
         if (suggestion != null) {
             TextButton(
                 onClick = { onUseSuggestion(suggestion) },
+                enabled = enabled,
                 contentPadding = PaddingValues(0.dp),
             ) {
                 Text(stringResource(R.string.unknown_command_suggestion, suggestion.trigger))

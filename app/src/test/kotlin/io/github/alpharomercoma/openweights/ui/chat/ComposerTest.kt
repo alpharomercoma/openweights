@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -163,6 +165,49 @@ class ComposerTest {
         // Not "research what changed" — the whole near-miss trigger comes off, not just
         // the first word of it.
         compose.onNodeWithText("what changed").assertExists()
+    }
+
+    @Test
+    fun `a suggestion cannot be accepted once the composer becomes disabled`() {
+        // The suggestion button is a second way into the view model beside Send and the
+        // palette, both of which already stop while a reply or a goal is running. A model
+        // that starts loading, or a goal that starts, right after the warning appeared must
+        // not leave a stray tap free to run a no-argument suggestion immediately.
+        var dispatched: SlashCommand? = null
+        val enabled = mutableStateOf(true)
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                Composer(
+                    conversationKey = null,
+                    enabled = enabled.value,
+                    isGenerating = false,
+                    staged = emptyList<MessagePart.File>(),
+                    document = null as StagedDocument?,
+                    onRemoveDocument = {},
+                    isAttaching = false,
+                    canDictate = false,
+                    isListening = false,
+                    heard = "",
+                    onAttach = {},
+                    onRemoveStaged = {},
+                    onDictate = {},
+                    onSend = { true },
+                    onStop = {},
+                    onCommand = { dispatched = it },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("Message").performTextInput("/pl an")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        compose.onNodeWithText("Did you mean ${SlashCommand.PLAN.trigger}?").assertIsDisplayed()
+
+        enabled.value = false
+        compose.onNodeWithText("Did you mean ${SlashCommand.PLAN.trigger}?").performClick()
+
+        assert(dispatched == null) {
+            "a disabled suggestion must not dispatch even when the button is still on screen"
+        }
     }
 
     @Test

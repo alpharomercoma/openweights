@@ -164,6 +164,16 @@ class SlashCommandTest {
     }
 
     @Test
+    fun `an abbreviated trigger does not eat into the argument that follows it`() {
+        // Counting off however many raw characters the trigger is long once normalized used
+        // to keep going past a trigger one letter short of the real word, and the missing
+        // letter was quietly taken from the next word instead: "/deep-researc what changed"
+        // became the argument "hat changed".
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep-researc what changed"))
+            .isEqualTo("what changed")
+    }
+
+    @Test
     fun `an unrecognised command falling through as a message is a deliberate default`() {
         // Documented here because it is the one behaviour a reviewer would otherwise read
         // as a bug: OrdinaryMessage is the answer for a sentence that happens to start with

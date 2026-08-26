@@ -188,12 +188,23 @@ class SlashCommandTest {
     }
 
     @Test
-    fun `a single-word trigger is never split across a space by this`() {
-        // /plan has no hyphen, so exactly one attempted word is assumed — the word actually
-        // typed, however it was spelled — never two. Whatever a user meant by "/pl an" is
-        // moot in practice: /plan takes no argument, so this path is never reached for it.
-        // What matters is that a one-word trigger's own count stays one.
-        assertThat(SlashCommand.PLAN.argumentAfterNearMiss("/pl an")).isEqualTo("an")
+    fun `a single-word trigger can still absorb a second word that completes it`() {
+        // Moot in practice — /plan takes no argument, so this path is never reached for it —
+        // but "an" is exactly what "/pl" is missing of "/plan", so it reads as the rest of the
+        // trigger rather than the start of an argument /plan will never have.
+        assertThat(SlashCommand.PLAN.argumentAfterNearMiss("/pl an")).isEqualTo("")
+    }
+
+    @Test
+    fun `an abbreviation that is only the first word does not eat the word after it`() {
+        // The shape a fixed word count cannot tell apart from a typo in the second word:
+        // "deep" alone is what got this suggested, the same as "deep" alongside a mistyped
+        // second word does, so a count assumed from the trigger's own shape took "what" for
+        // part of "research" and left only "changed" behind.
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep what changed"))
+            .isEqualTo("what changed")
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deepresearch what changed"))
+            .isEqualTo("what changed")
     }
 
     @Test

@@ -97,6 +97,52 @@ class GoalLoopTest : ChatFixture() {
         assertThat(goals.goal.value?.task).isEqualTo("First task")
     }
 
+    /**
+     * A second goal, started in the same conversation once the first is done, used to read
+     * the first's plan back as its own: nothing ever cleared the board between them, so a
+     * planning turn that answered in prose rather than a plan still found a non-null plan
+     * sitting there and ran with it — the wrong task's steps, or, once every one of them was
+     * already ticked, a goal stuck WORKING with nothing left for it to do.
+     */
+    @Test
+    fun `a second goal does not inherit a stale plan from the one before it`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("1. Do the first thing\n2. Do the second thing")
+            viewModel.startGoal("First task")
+            awaitGoalSettled()
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
+
+            // No scripted reply this time: the default is not parseable as a plan.
+            viewModel.startGoal("Second task")
+            awaitGoalSettled()
+
+            val goal = goals.goal.value
+            assertThat(goal?.task).isEqualTo("Second task")
+            assertThat(goal?.state).isEqualTo(GoalState.HALTED)
+            assertThat(goal?.note).contains("No plan came back")
+        }
+
+    /**
+     * Stopping only the turn in flight left a goal's own loop free to keep running: it reads
+     * the board rather than the transcript to decide whether to take another step, so it
+     * found itself still marked running and started the next one against whatever
+     * conversation newChat had, by then, already switched to.
+     */
+    @Test
+    fun `starting a new chat stops a goal that is still running`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.startGoal("Something long")
+        settle()
+        assertThat(goals.goal.value?.isRunning).isTrue()
+
+        viewModel.newChat()
+        settle()
+
+        assertThat(goals.goal.value).isNull()
+    }
+
     @Test
     fun `a blank goal starts nothing`() = runTest(dispatcher) {
         loadModel()
@@ -325,7 +371,10 @@ class GoalLoopTest : ChatFixture() {
             // the conversation looking exactly like one that could not: nothing ran, nothing
             // on screen said why, and the only way out was already knowing to type /auto.
             loadModel()
-            plans.propose("1. Do the first thing\n2. Do the second thing")
+            // Scripted as the planning turn's own reply rather than pre-seeded onto the
+            // board directly: start() now clears a stale plan before that turn runs, so a
+            // plan placed on the board ahead of time would not survive to be read back.
+            engine.scripted += ScriptedPass("1. Do the first thing\n2. Do the second thing")
             viewModel.setMode(AgentMode.PLAN)
 
             viewModel.startGoal("Do a small thing")
@@ -341,7 +390,8 @@ class GoalLoopTest : ChatFixture() {
         // goal quietly switching one of those back to Auto would be the app overriding a
         // choice nobody asked it to reconsider.
         loadModel()
-        plans.propose("1. Do the first thing\n2. Do the second thing")
+        // See the test above: scripted as the reply rather than pre-seeded on the board.
+        engine.scripted += ScriptedPass("1. Do the first thing\n2. Do the second thing")
         viewModel.setMode(AgentMode.YOLO)
 
         viewModel.startGoal("Do a small thing")

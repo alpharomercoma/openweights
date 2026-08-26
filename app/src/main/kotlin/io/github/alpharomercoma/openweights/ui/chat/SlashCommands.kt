@@ -209,23 +209,50 @@ enum class SlashCommand(val trigger: String, val description: String) {
      * a multi-word attempt ("/deep resfarch what changed") stops the match right there and
      * leaves the rest of that mistyped word sitting in the argument.
      *
-     * What survives both is not counting characters at all, but words. A trigger's own hyphens
-     * say how many words it is — one for "/plan", two for "/deep-research" — and that is
-     * assumed to be exactly how many space-delimited words were attempted, typos in any of
-     * them included, unless the very first word already contains a hyphen of its own, which
-     * means the whole trigger, hyphen and all, was attempted as that one word and nothing
-     * needs adding to it.
+     * Assuming the word count fixes both of those, but breaks a third shape a word count alone
+     * cannot tell apart from the second: "/deep what changed", where "deep" is the whole
+     * abbreviation and "what" is the first word of the question, not a mistyped "research". A
+     * fixed count of words has no way to know the attempt was one word rather than two: [parse]
+     * matched it on "deep" alone, the same way it matches "resfarch" alongside it.
+     *
+     * So words are taken one at a time, and a word past the first only counts as more of the
+     * trigger when its length is close to what the trigger still has left to match — a typo
+     * changes letters, which a length comparison does not see, not how many of them there are,
+     * which it does. "resfarch" is as long as the "research" it is short for; "what" is not.
      */
     fun argumentAfterNearMiss(rawMessage: String): String {
-        val trimmed = rawMessage.trim()
-        val firstWord = trimmed.substringBefore(' ')
-        val wordsInTrigger = trigger.count { it == '-' } + 1
-        val attemptedWords = if (firstWord.contains('-')) 1 else wordsInTrigger
-        return trimmed.split(Regex("\\s+"), limit = attemptedWords + 1)
-            .getOrElse(attemptedWords) { "" }
-            .trim()
+        val words = rawMessage.trim().split(Regex("\\s+"))
+        val normalizedTrigger = trigger.normalizedForSuggestion()
+        var matched = ""
+        var consumed = 0
+        for (word in words) {
+            val remaining = normalizedTrigger.removePrefix(matched)
+            if (remaining.isEmpty()) break
+            val normalizedWord = word.normalizedForSuggestion()
+            // The first word is never checked against this: [parse] already found it plausible
+            // enough to suggest this trigger, whatever its length, and that check is not
+            // repeated here.
+            val looksLikeMoreOfTheTrigger = consumed == 0 ||
+                kotlin.math.abs(normalizedWord.length - remaining.length) <= LENGTH_TOLERANCE
+            if (!looksLikeMoreOfTheTrigger) break
+            matched += normalizedWord
+            consumed++
+        }
+        return words.drop(consumed).joinToString(" ")
     }
 }
+
+/**
+ * How many characters a word attempting more of the trigger may differ from what is left of
+ * it, in length alone, and still count as an attempt rather than the start of the argument.
+ *
+ * Small: this is the one thing standing between a typo ("resfarch" for "research", both eight
+ * letters) and an ordinary word that happens to come right after an abbreviation ("what", four
+ * letters short of the "research" still expected). Either extreme breaks a real case — zero
+ * rejects a typo that added or dropped a single letter, and a wide tolerance starts accepting
+ * words that were never part of the trigger at all.
+ */
+private const val LENGTH_TOLERANCE = 2
 
 /**
  * What [SlashCommand.parse] decided a finished message is.

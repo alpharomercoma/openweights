@@ -1493,6 +1493,13 @@ class ChatViewModel @Inject constructor(
             _uiState.value.refusalReason()?.let { why -> reportError(why) }
             return
         }
+        // A plan left over from whatever this conversation last ran through the loop —
+        // finished, stopped, or halted, none of which touch the board on their own. Without
+        // this a new goal's planning turn that answered in prose rather than a plan read as
+        // having one anyway: the old plan was still sitting there, non-null, so the check for
+        // "did a plan come back" passed on a plan this goal never proposed and could go on to
+        // run steps that belonged to the last one.
+        turns.planning.clear()
         goals.start(task)
         // Held across the whole goal, including the gaps between steps where the turn's own
         // hold is not in force. Released in work()'s finally, whatever ends it.
@@ -1510,6 +1517,11 @@ class ChatViewModel @Inject constructor(
         // question card outlived the goal it came from, asking on behalf of a run that had
         // already ended.
         turns.asking.cancel()
+        // Set for the turn a cancelled job never reached: consumed once by the turn it was
+        // meant for, and nothing else clears it if that turn was the one just cancelled. Left
+        // set, it would apply itself to whatever ordinary turn runs next.
+        offerAskOverride = null
+        toolPromptOverride = null
     }
 
     /**
@@ -1786,7 +1798,12 @@ class ChatViewModel @Inject constructor(
 
     /** Clears the conversation and the model's KV cache, keeping the model loaded. */
     fun newChat() {
-        stop()
+        // A goal is driven by its own job, separate from generationJob, and reading the
+        // board rather than the transcript to decide what to do next: stopping only the
+        // turn in flight left it free to join a wait, see the board still says running, and
+        // start the next step against whatever conversation happens to be open by the time
+        // it wakes — this one, mid-switch. stopGoal ends the loop itself, not just its turn.
+        if (goals.goal.value?.isRunning == true) stopGoal() else stop()
         viewModelScope.launch {
             // Awaited, not merely cancelled: a generation still unwinding writes into the
             // transcript this is about to replace, and would do so after the engine cache
@@ -1797,10 +1814,9 @@ class ChatViewModel @Inject constructor(
             turns.planning.clear()
             // The board is one object for the whole app: a goal left over from the chat just
             // left behind would otherwise be on screen here too, its card naming a task this
-            // conversation never asked for. Left alone only while it is still running, since
-            // that means the engine is genuinely busy and the card is the one thing on
-            // screen saying why nothing here can be sent yet.
-            if (goals.goal.value?.isRunning != true) goals.clear()
+            // conversation never asked for. Safe to clear unconditionally now that a running
+            // one has already been stopped above.
+            goals.clear()
             turns.asking.cancel()
             _uiState.update {
                 it.copy(
@@ -1847,7 +1863,10 @@ class ChatViewModel @Inject constructor(
         // still running, and the sentence they get is about the chat that did not open.
         val conversation = writer.inOrder { conversation(id) }
 
-        stop()
+        // See newChat: stopping only the turn in flight leaves a goal's own loop free to
+        // read the board, find itself still running, and start its next step against
+        // whichever conversation is open by the time it wakes — this one, mid-switch.
+        if (goals.goal.value?.isRunning == true) stopGoal() else stop()
         generationJob?.join()
 
         if (conversation == null) {
@@ -1868,8 +1887,9 @@ class ChatViewModel @Inject constructor(
         // newChat has always cleared it; this is the switch people actually use.
         turns.planning.clear()
         // Same reasoning as newChat: a goal (and any question it left pending) belongs to
-        // the conversation that started it, not to whichever one is opened next.
-        if (goals.goal.value?.isRunning != true) goals.clear()
+        // the conversation that started it, not to whichever one is opened next. Safe to
+        // clear unconditionally now that a running one has already been stopped above.
+        goals.clear()
         turns.asking.cancel()
 
         // A conversation continued under a different model would mix two models'

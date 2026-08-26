@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -78,6 +79,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -88,11 +90,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -105,6 +109,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Goal
+import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -462,6 +467,7 @@ private fun ChatContent(
                     } else {
                         Transcript(
                             state = state,
+                            goal = goal,
                             listState = listState,
                             isSpeaking = isSpeaking,
                             clipboard = clipboard,
@@ -730,6 +736,7 @@ private fun FoldingLine() {
 @Suppress("LongParameterList")
 private fun Transcript(
     state: ChatUiState,
+    goal: Goal?,
     listState: androidx.compose.foundation.lazy.LazyListState,
     isSpeaking: Boolean,
     clipboard: MessageClipboard,
@@ -738,6 +745,10 @@ private fun Transcript(
     onRegenerate: () -> Unit,
 ) {
     val lastId = state.transcript.lastOrNull()?.id
+    // A goal that halted right under this reply, rather than one that finished normally: the
+    // one case a reply here is not really an answer but the model's planning attempt, and a
+    // long one of those read as broken rather than as an answer. See AssistantTurn.
+    val haltedRightHere = goal?.state == GoalState.HALTED
 
     LazyColumn(
         state = listState,
@@ -775,6 +786,7 @@ private fun Transcript(
                     // Only the last reply can be retried: regenerating an earlier one would
                     // silently discard everything said after it.
                     onRetry = onRegenerate.takeIf { entry.id == lastId && !state.isGenerating },
+                    collapseByDefault = entry.id == lastId && haltedRightHere,
                 )
             }
         }
@@ -987,6 +999,7 @@ private fun AssistantTurn(
     onCopy: () -> Unit,
     onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
+    collapseByDefault: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Selectable, which it was not.
@@ -1021,7 +1034,15 @@ private fun AssistantTurn(
                     isLatest = isLatest,
                 )
 
-                if (entry.answer.isNotEmpty()) MarkdownText(entry.answer)
+                if (entry.answer.isNotEmpty()) {
+                    if (collapseByDefault &&
+                        entry.answer.length > COLLAPSED_ANSWER_CHAR_THRESHOLD
+                    ) {
+                        CollapsibleAnswer(entry.answer)
+                    } else {
+                        MarkdownText(entry.answer)
+                    }
+                }
             }
         }
 
@@ -1041,6 +1062,43 @@ private fun AssistantTurn(
                 onMore = onMore,
                 modifier = Modifier.padding(top = 2.dp),
                 measurements = entry.tokensPerSecond?.let { { Measurements(entry) } },
+            )
+        }
+    }
+}
+
+/** Past this many characters, a reply that ends in a halted goal collapses. See [CollapsibleAnswer]. */
+private const val COLLAPSED_ANSWER_CHAR_THRESHOLD = 600
+private val COLLAPSED_ANSWER_HEIGHT = 96.dp
+
+/**
+ * A long reply, capped to a few lines with a tap to read the rest.
+ *
+ * Only used for the one reply immediately above a goal that halted: a planning turn a small
+ * model failed to turn into a plan reads as chain-of-thought rather than an answer, and shown
+ * at full height it pushes the "needs attention" card that explains what went wrong off the
+ * bottom of an already-long screen — the two together read as broken rather than as a model
+ * that did not follow the instruction. Collapsing it keeps that explanation in view without
+ * throwing anything away; a tap still shows the whole reply.
+ */
+@Composable
+private fun CollapsibleAnswer(text: String, modifier: Modifier = Modifier) {
+    var expanded by rememberSaveable(text) { mutableStateOf(false) }
+    Column(modifier = modifier) {
+        Box(
+            modifier = if (expanded) {
+                Modifier
+            } else {
+                Modifier.heightIn(max = COLLAPSED_ANSWER_HEIGHT).clipToBounds()
+            },
+        ) {
+            MarkdownText(text)
+        }
+        TextButton(onClick = { expanded = !expanded }) {
+            Text(
+                stringResource(
+                    if (expanded) R.string.show_less_answer else R.string.show_more_answer,
+                ),
             )
         }
     }

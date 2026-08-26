@@ -23,6 +23,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import io.github.alpharomercoma.openweights.core.common.context.Goal
+import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
 import io.github.alpharomercoma.openweights.core.common.context.TaskStep
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -219,6 +221,44 @@ class ChatScreenTest {
         assert(ticked == 0) { "ticking a step must reach the board, got $ticked" }
     }
 
+    /**
+     * The exact shape reported as "looks weird": a small, heavily quantised model asked to
+     * plan a goal rambles instead of producing one, the goal halts with nothing to work
+     * through, and the wall of text it produced used to sit above that explanation at full
+     * height — long enough that the card explaining what went wrong was the thing pushed off
+     * the bottom of the screen.
+     */
+    @Test
+    fun aLongReplyBeforeAHaltedGoalCollapsesButStaysReachable() {
+        val rambling = "Uncertain whether they want longer or shorter. ".repeat(20)
+        showChat(
+            transcript = listOf(assistantEntry(rambling)),
+            goal = Goal(
+                task = "who is alpha romer coma",
+                state = GoalState.HALTED,
+                note = "No plan came back, so there is nothing to work through.",
+            ),
+        )
+
+        awaitSubstring("Uncertain whether")
+        compose.onNodeWithText("No plan came back, so there is nothing to work through.")
+            .assertIsDisplayed()
+        compose.onNodeWithText("Show the rest").assertIsDisplayed()
+
+        compose.onNodeWithText("Show the rest").performClick()
+        compose.onNodeWithText("Show less").assertIsDisplayed()
+    }
+
+    /** The same reply, but the goal it precedes finished normally: nothing here should fold. */
+    @Test
+    fun aLongReplyIsNotCollapsedWhenNoGoalHalted() {
+        val rambling = "Uncertain whether they want longer or shorter. ".repeat(20)
+        showChat(transcript = listOf(assistantEntry(rambling)))
+
+        awaitSubstring("Uncertain whether")
+        compose.onNodeWithText("Show the rest").assertDoesNotExist()
+    }
+
     @Suppress("LongParameterList")
     private fun showChat(
         transcript: List<TranscriptEntry>,
@@ -229,6 +269,7 @@ class ChatScreenTest {
         onTickStep: (Int) -> Unit = {},
         question: UserQuestion? = null,
         onAnswerQuestion: (String) -> Unit = {},
+        goal: Goal? = null,
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -250,6 +291,7 @@ class ChatScreenTest {
                     onTickStep = onTickStep,
                     question = question,
                     onAnswerQuestion = onAnswerQuestion,
+                    goal = goal,
                 )
             }
         }
@@ -258,6 +300,11 @@ class ChatScreenTest {
     /** Waits for a node holding [text], for the markdown that arrives off the main clock. */
     private fun awaitText(text: String) = compose.waitUntil(TEXT_TIMEOUT_MS) {
         compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    }
+
+    /** As [awaitText], but for a fragment of a longer paragraph rather than the whole of it. */
+    private fun awaitSubstring(text: String) = compose.waitUntil(TEXT_TIMEOUT_MS) {
+        compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
     }
 
     private fun assistantEntry(raw: String): TranscriptEntry {

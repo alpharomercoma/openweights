@@ -206,8 +206,13 @@ class GoalLoopTest : ChatFixture() {
             viewModel.startResearch("who is alpha romer coma")
             settle()
 
-            val planningPrompt = engine.prompts.last().last().text
-            assertThat(planningPrompt).contains("not a reason to ask first")
+            // Not `.last()`: the fallback plan below means this run does not stop at
+            // planning any more, so the planning turn is found by what it contains rather
+            // than assumed to be wherever the engine happened to stop.
+            val planningTurn = engine.prompts.first { convo ->
+                convo.any { it.text.contains("Break this into a short numbered list") }
+            }
+            assertThat(planningTurn.last().text).contains("not a reason to ask first")
         }
 
     /**
@@ -262,6 +267,32 @@ class GoalLoopTest : ChatFixture() {
             val system = stepTurn.first { it.role == ChatRole.SYSTEM }.text
             assertThat(system).contains("This step exists to search")
             assertThat(system).doesNotContain("Do not search to double check")
+        }
+
+    /**
+     * The exact shape reported live, three times in a row on a physical device: asked to
+     * plan a subject it did not recognise, the model answered in prose — "I don't have the
+     * current information stored" — rather than proposing anything, tool or no tool. This
+     * is the fallback that makes that not the end of the run: research plans one step, the
+     * question exactly as asked, rather than halting before it searched even once.
+     */
+    @Test
+    fun `research falls back to a one-step plan of the question itself rather than halting`() =
+        runTest(dispatcher) {
+            loadModel()
+
+            viewModel.startResearch("who is alpha romer coma")
+            awaitGoalSettled()
+
+            assertThat(goals.goal.value?.note).isNotEqualTo(
+                "No plan came back, so there is nothing to work through.",
+            )
+            assertThat(goals.goal.value?.plan?.steps?.map { it.text })
+                .containsExactly("who is alpha romer coma")
+            val stepTurn = engine.prompts.first { convo ->
+                convo.any { it.text.contains("Research this one question") }
+            }
+            assertThat(stepTurn.last().text).contains("who is alpha romer coma")
         }
 
     @Test

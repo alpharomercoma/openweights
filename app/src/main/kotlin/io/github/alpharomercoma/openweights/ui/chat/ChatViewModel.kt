@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.context.Goal
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
+import io.github.alpharomercoma.openweights.core.common.context.TaskStep
 import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
@@ -1533,7 +1534,13 @@ class ChatViewModel @Inject constructor(
             setMode(AgentMode.PLAN)
             offerAskOverride = if (brief.offersAskDuringPlan) null else false
             if (!turn("${brief.plan}\n\n$task")) return
+            // Falls back for a brief that has one: measured live, a small model asked to
+            // plan a subject it does not recognise sometimes answers in prose instead of
+            // proposing anything at all, tool or no tool. Research's own fallback plans
+            // one step, the question as asked, rather than stopping before it searched
+            // once. See Brief.RESEARCH.
             val proposed = turns.planning.plan.value
+                ?: brief.fallbackPlan(task)?.also { turns.planning.restore(it) }
             if (proposed == null || proposed.steps.isEmpty()) {
                 goals.halt("No plan came back, so there is nothing to work through.")
                 return
@@ -2431,6 +2438,15 @@ private data class Brief(
      * that motivated it, so the tool is not offered rather than merely discouraged.
      */
     val offersAskDuringPlan: Boolean = true,
+    /**
+     * What to work through when the planning turn did not produce a plan of its own.
+     *
+     * Null for a goal: guessing a list of actions to carry out on the user's own files,
+     * unread by anyone, is not a safe thing to default to. Research's own fallback plans
+     * one step, the question exactly as asked — read-only, and the one thing the model
+     * was already asked to do, so there is nothing about it to have guessed.
+     */
+    val fallbackPlan: (String) -> TaskPlan? = { null },
 ) {
     companion object {
         val GOAL = Brief(
@@ -2477,6 +2493,9 @@ private data class Brief(
                 "than filling the gap.",
             executionMode = AgentMode.AUTO,
             requiresWebEvidence = true,
+            fallbackPlan = { task ->
+                TaskPlan(listOf(TaskStep(task.take(TaskPlan.MAX_STEP_CHARS))))
+            },
         )
     }
 }

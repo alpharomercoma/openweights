@@ -351,6 +351,12 @@ fun Composer(
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it },
+                // Every other control in this bar already stops for this: Attach, Dictate,
+                // Send. The field itself did not, so a goal or a question waiting for its own
+                // answer still looked and behaved like an ordinary, ready-to-type composer,
+                // and text typed into it went nowhere Send could reach — the button beside it
+                // was already Stop, wired to end the run rather than to send anything.
+                enabled = enabled,
                 // maxLines rather than a height cap: a fixed dp ceiling is six lines at the
                 // default font scale and barely three at 200%, which quietly punishes the
                 // people who need the room most.
@@ -360,8 +366,13 @@ fun Composer(
                     .padding(horizontal = 18.dp, vertical = 10.dp)
                     .onFocusChanged { isFocused = it.isFocused }
                     .semantics { contentDescription = "Message" },
-                textStyle = MaterialTheme.typography.bodyLarge
-                    .copy(color = MaterialTheme.colorScheme.onSurface),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = if (enabled) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = ImeAction.Default,

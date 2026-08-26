@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -223,6 +224,45 @@ class ComposerTest {
         assert(sent == "/tmp is full") {
             "an edit must resend on the first press, not be held for an unknown-command warning"
         }
+    }
+
+    /**
+     * The exact shape reported live: a goal running and a question pending, which disables
+     * the composer, but every control except the message field itself honoured that. Typed
+     * text went nowhere Send could reach, because Send was already Stop — wired to end the
+     * run, not to send what had just been typed into a field that looked perfectly live.
+     */
+    @Test
+    fun `the message field does not accept text while the composer is disabled`() {
+        var sent: String? = null
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                Composer(
+                    conversationKey = null,
+                    enabled = false,
+                    isGenerating = true,
+                    staged = emptyList<MessagePart.File>(),
+                    document = null as StagedDocument?,
+                    onRemoveDocument = {},
+                    isAttaching = false,
+                    canDictate = false,
+                    isListening = false,
+                    heard = "",
+                    onAttach = {},
+                    onRemoveStaged = {},
+                    onDictate = {},
+                    onSend = {
+                        sent = it
+                        true
+                    },
+                    onStop = {},
+                    onCommand = {},
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("Message").assertIsNotEnabled()
+        assert(sent == null) { "nothing should have reached onSend before any input" }
     }
 
     private fun show(

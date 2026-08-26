@@ -2404,6 +2404,14 @@ private data class Brief(
          * then has nothing left to research, which is the same failure the goal planner has
          * and needs the same explicit instruction.
          *
+         * The second sentence exists because plan mode's only other tool is ask_user, and
+         * not recognising the subject of a research request reads to a small model as
+         * exactly the kind of thing to ask about — asked to research a name it does not
+         * know, it asked the person who is Alpha Romer rather than putting that question on
+         * the list, which is the one place in this whole loop research can actually search
+         * for an answer. Not knowing the subject is not an ambiguity to resolve before
+         * planning; it is usually the plan's first question.
+         *
          * The step prompt names the address because a report with no sources is the one
          * output here nobody can check, and a model that is not told to keep the link does
          * not keep it.
@@ -2412,7 +2420,9 @@ private data class Brief(
             notification = "Researching",
             plan = "Break this into a short numbered list of specific questions, five at " +
                 "most, that could each be answered by searching the web. Do not answer " +
-                "any of them yet.",
+                "any of them yet. If you do not already know who or what this is about, " +
+                "that is not a reason to ask first: searching to find out is the research " +
+                "itself, so make it one of the questions instead.",
             step = "Research this one question. Search the web, read the best source you " +
                 "find, and report what it says along with the address you found it at. Do " +
                 "not research the other questions.",

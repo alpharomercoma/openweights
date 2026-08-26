@@ -189,6 +189,26 @@ class GoalLoopTest : ChatFixture() {
         assertThat(goals.steering.value).contains("Prefer the shorter option")
     }
 
+    /**
+     * The exact shape reported live: asked to research "who is alpha romer coma", the model
+     * asked the person who Alpha Romer was instead of putting it on the plan, because plan
+     * mode's only other tool is ask_user and not recognising a name reads as ambiguity to a
+     * small model. Not knowing the subject of a research request is not that; it is usually
+     * the plan's first question, and the planning prompt has to say so rather than leaving a
+     * small model to reach for the one tool in front of it.
+     */
+    @Test
+    fun `the research prompt says not recognising the subject belongs on the plan`() =
+        runTest(dispatcher) {
+            loadModel()
+
+            viewModel.startResearch("who is alpha romer coma")
+            settle()
+
+            val planningPrompt = engine.prompts.last().last().text
+            assertThat(planningPrompt).contains("not a reason to ask first")
+        }
+
     @Test
     fun `research that never actually searched halts instead of reporting it done`() =
         runTest(dispatcher) {

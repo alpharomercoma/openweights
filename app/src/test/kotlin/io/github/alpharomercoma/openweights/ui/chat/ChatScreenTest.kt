@@ -259,6 +259,27 @@ class ChatScreenTest {
         compose.onNodeWithText("Show the rest").assertDoesNotExist()
     }
 
+    /**
+     * The other shape reported as bad: a goal still planning asks a clarifying question, and
+     * the goal card's own "steer the next step" box used to sit right above the card actually
+     * asking for input, two lookalike text fields stacked with only one of them live, since
+     * there was no step yet for the other one to apply to.
+     */
+    @Test
+    fun aQuestionDuringPlanningHidesTheGoalsOwnSteeringBox() {
+        showChat(
+            transcript = emptyList(),
+            goal = Goal(task = "who is alpha romer coma", state = GoalState.PLANNING),
+            question = UserQuestion(text = "Who is Alpha Romer?"),
+        )
+
+        compose.onNodeWithText("Who is Alpha Romer?").assertIsDisplayed()
+        compose.onNodeWithText("Or say it in your own words").assertIsDisplayed()
+        compose.onNodeWithText("Adjust the next step").assertDoesNotExist()
+        compose.onNodeWithText("Apply").assertDoesNotExist()
+        compose.onNodeWithText("Stop goal").assertIsDisplayed()
+    }
+
     @Suppress("LongParameterList")
     private fun showChat(
         transcript: List<TranscriptEntry>,

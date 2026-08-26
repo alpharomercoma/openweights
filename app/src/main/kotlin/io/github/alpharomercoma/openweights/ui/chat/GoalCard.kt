@@ -51,6 +51,12 @@ fun GoalCard(
     onSteer: (String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    // Whether the model is blocked on a question of its own, shown as its own card right
+    // below this one. Both cards used to offer a text box at once: one to steer a step that
+    // does not exist yet, since planning has not produced one, and one to answer the thing
+    // actually blocking the turn. Steering a step that cannot run yet has nothing to apply to,
+    // so it is the box that goes away here, not the other one.
+    awaitingAnswer: Boolean = false,
 ) {
     var steering by remember(goal.task) { mutableStateOf("") }
     val state = when (goal.state) {
@@ -105,7 +111,18 @@ fun GoalCard(
             )
         }
 
-        if (goal.isRunning) {
+        if (goal.isRunning && awaitingAnswer) {
+            // The question card underneath is the only box worth typing into right now: the
+            // model is waiting on it, not on a step this goal has not planned yet.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onStop) {
+                    Text(stringResource(R.string.goal_stop))
+                }
+            }
+        } else if (goal.isRunning) {
             OutlinedTextField(
                 value = steering,
                 onValueChange = { steering = it.take(MAX_STEERING_CHARS) },

@@ -491,7 +491,13 @@ private fun ChatContent(
                 }
 
                 StatusStrip(state = state, dictationError = dictation.error)
-                GoalSection(goal, onStopGoal, onSteerGoal, onDismissGoal)
+                GoalSection(
+                    goal = goal,
+                    onStop = onStopGoal,
+                    onSteer = onSteerGoal,
+                    onDismiss = onDismissGoal,
+                    awaitingAnswer = question != null,
+                )
                 plan?.let { PlanCard(plan = it, onTick = onTickStep) }
                 question?.let { QuestionCard(question = it, onAnswer = onAnswerQuestion) }
                 state.pendingApproval?.let { call ->
@@ -646,9 +652,16 @@ private fun GoalSection(
     onStop: () -> Unit,
     onSteer: (String) -> Unit,
     onDismiss: () -> Unit,
+    awaitingAnswer: Boolean,
 ) {
     goal?.let {
-        GoalCard(goal = it, onStop = onStop, onSteer = onSteer, onDismiss = onDismiss)
+        GoalCard(
+            goal = it,
+            onStop = onStop,
+            onSteer = onSteer,
+            onDismiss = onDismiss,
+            awaitingAnswer = awaitingAnswer,
+        )
     }
 }
 

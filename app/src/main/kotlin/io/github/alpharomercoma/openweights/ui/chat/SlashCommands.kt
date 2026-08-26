@@ -157,13 +157,72 @@ enum class SlashCommand(val trigger: String, val description: String) {
             } ?: return ""
             return trimmed.removeRange(0, command.trigger.length).trim()
         }
+
+        /**
+         * What a finished message actually is: a command, an attempt at one that missed, or
+         * text with no special meaning.
+         *
+         * [typed] alone leaves a near miss silent — "/deep research" with a space where the
+         * trigger has a hyphen reaches the model as a question instead of running anything,
+         * and nothing on screen says a command was even attempted. This is the one place that
+         * decides whether a leading slash was reaching for the six-word set of things this app
+         * recognises, so a caller can say so before sending it as prose.
+         */
+        fun parse(message: String): CommandParseResult {
+            typed(message)?.let { return CommandParseResult.Valid(it, argument(message)) }
+            val trimmed = message.trim()
+            if (!trimmed.startsWith("/")) return CommandParseResult.OrdinaryMessage
+            // Hyphen and space are the one difference between a working trigger and a typo of
+            // it ("/deep-research" against "/deep research"), so both are folded away before
+            // comparing: two strings that agree once whitespace and hyphens are gone are almost
+            // certainly the same word typed two ways, not two different sentences.
+            val token = trimmed.substringBefore(' ')
+            val normalizedToken = token.normalizedForSuggestion()
+            val suggestions = entries.filter { command ->
+                val normalizedTrigger = command.trigger.normalizedForSuggestion()
+                normalizedTrigger == trimmed.normalizedForSuggestion() ||
+                    normalizedTrigger.startsWith(normalizedToken) ||
+                    normalizedToken.startsWith(normalizedTrigger)
+            }
+            return CommandParseResult.Unknown(token, suggestions)
+        }
+
+        private fun String.normalizedForSuggestion(): String =
+            lowercase().filterNot { it.isWhitespace() || it == '-' }
     }
+}
+
+/**
+ * What [SlashCommand.parse] decided a finished message is.
+ *
+ * A type rather than a nullable command, because "not a command" and "an attempt at a command
+ * that did not match anything" are different facts and used to collapse into the same silent
+ * send.
+ */
+sealed interface CommandParseResult {
+    /** A command, recognised exactly or by its trigger-plus-argument prefix. */
+    data class Valid(val command: SlashCommand, val argument: String) : CommandParseResult
+
+    /** Opens with `/` but matches nothing. [suggestions] is often one command, often none. */
+    data class Unknown(val token: String, val suggestions: List<SlashCommand>) : CommandParseResult
+
+    /** No leading slash, or a slash followed by ordinary words: a message like any other. */
+    data object OrdinaryMessage : CommandParseResult
 }
 
 @Composable
 fun SlashCommandPalette(
     commands: List<SlashCommand>,
     onSelect: (SlashCommand) -> Unit,
+    /**
+     * Whether a row here would do anything if tapped.
+     *
+     * The composer disables Send while a reply is in flight or a goal is running, and the
+     * palette used to keep answering anyway: `/new` or `/compact` mid-goal reached the view
+     * model exactly like tapping Send would have, through a control that looked idle because
+     * everything beside it was greyed out.
+     */
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (commands.isEmpty()) return
@@ -190,7 +249,7 @@ fun SlashCommandPalette(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelect(command) }
+                    .clickable(enabled = enabled) { onSelect(command) }
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

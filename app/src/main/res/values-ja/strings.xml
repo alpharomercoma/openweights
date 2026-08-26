@@ -179,6 +179,9 @@
     <string name="each_model_says_if_it_runs">ダウンロード前に、この端末で動作するかがそれぞれに表示されます。</string>
     <string name="answers_can_search_the_web">モデルが動き出すと、回答がウェブを検索することがあります。ツールで切り替えられます。</string>
     <string name="remove_attachment">%1$s を削除</string>
+    <string name="remove_command">%1$s コマンドを削除</string>
+    <string name="unknown_command">「%1$s」は認識されないコマンドです。もう一度送信するとメッセージとして送信されます。</string>
+    <string name="unknown_command_suggestion">%1$s のことですか?</string>
     <string name="delete_conversation_named">%1$s を削除</string>
     <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
     <string name="choose_a_model_spoken">モデルを選ぶ。%1$s</string>

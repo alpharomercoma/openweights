@@ -185,6 +185,9 @@
     <string name="each_model_says_if_it_runs">يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
     <string name="answers_can_search_the_web">بمجرد تشغيل نموذج، يمكن للإجابات البحث في الويب. هذا مفتاح في الأدوات.</string>
     <string name="remove_attachment">إزالة %1$s</string>
+    <string name="remove_command">إزالة أمر %1$s</string>
+    <string name="unknown_command">"%1$s" ليس أمرًا معروفًا. أرسل مرة أخرى لإرساله كرسالة.</string>
+    <string name="unknown_command_suggestion">هل تقصد %1$s؟</string>
     <string name="delete_conversation_named">حذف %1$s</string>
     <string name="generated_at_speed">تم التوليد بسرعة %1$d رمز في الثانية</string>
     <string name="choose_a_model_spoken">اختيار نموذج. %1$s</string>

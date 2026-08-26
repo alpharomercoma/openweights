@@ -874,22 +874,23 @@ private fun ChatSheets(
  * commands are reachable by anyone who already knows the word. A message being edited
  * replaces the turn it came from. Everything else is an ordinary send.
  */
-private fun submit(
+internal fun submit(
     typed: String,
     editingId: Long?,
     onDispatch: (SlashCommand, String) -> Unit,
     onEdit: (Long, String) -> Unit,
     onSend: (String) -> Boolean,
 ): Boolean {
+    // Checked first. An edit reopens whatever the turn actually was, including a message
+    // that happened to be the literal text "/plan" sent before commands ran anything;
+    // resending has to mean resending, not running the text as a command on the way out.
+    if (editingId != null) {
+        onEdit(editingId, typed)
+        return true
+    }
     val command = SlashCommand.typed(typed)
     if (command != null) {
         onDispatch(command, SlashCommand.argument(typed))
-        return true
-    }
-    // Resending, not sending: the turn being replaced and everything after it goes. See
-    // ChatViewModel.editAndResend.
-    if (editingId != null) {
-        onEdit(editingId, typed)
         return true
     }
     return onSend(typed)

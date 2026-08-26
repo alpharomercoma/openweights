@@ -31,6 +31,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +43,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -137,14 +140,72 @@ fun Composer(
     var draft by rememberSaveable(conversationKey) { mutableStateOf("") }
     var isFocused by remember { mutableStateOf(false) }
 
+    // The command an argument is being typed for, chosen from the palette rather than typed.
+    // Stored by name because an enum has no built-in Saver; a command survives rotation the
+    // same way the draft it is paired with does. Once chosen this way the trigger cannot be
+    // corrupted by autocorrect changing a hyphen to a space mid-sentence, because it is never
+    // characters in the field again — only [draft] is, and only the argument.
+    var pendingCommandName by rememberSaveable(conversationKey) { mutableStateOf<String?>(null) }
+    val pendingCommand = pendingCommandName?.let { name ->
+        SlashCommand.entries.firstOrNull { it.name == name }
+    }
+
+    // The exact text Send was already pressed on once and refused, because it opened with a
+    // slash and matched nothing. A second press on the same text is the user overruling the
+    // warning rather than a stray tap, so it goes through as an ordinary message the next
+    // time this is compared against an unchanged [draft].
+    var unknownAttempt by rememberSaveable(conversationKey) { mutableStateOf<String?>(null) }
+
     // Keyed on the text itself rather than on a flag, so choosing a different message to
     // edit refills the field, and so a user who has started changing the text does not have
     // it overwritten on every recomposition.
     LaunchedEffect(editing) {
-        if (editing != null) draft = editing
+        if (editing != null) {
+            draft = editing
+            // Editing replaces a turn that already happened; parsing the reopened text as a
+            // fresh command would run it instead of resending the edit.
+            pendingCommandName = null
+            unknownAttempt = null
+        }
     }
-    val commands = SlashCommand.match(draft)
-    val hasSomethingToSend = draft.isNotBlank() || staged.isNotEmpty() || document != null
+    // Null once a command is already chosen: the field is an argument now, and a leading
+    // slash typed into it is content, not a second attempt at a command.
+    val commands = if (pendingCommand == null) SlashCommand.match(draft) else null
+    val hasSomethingToSend = if (pendingCommand != null) {
+        draft.isNotBlank()
+    } else {
+        draft.isNotBlank() || staged.isNotEmpty() || document != null
+    }
+
+    fun trySend() {
+        val command = pendingCommand
+        if (command != null) {
+            if (draft.isBlank()) return
+            if (onSend("${command.trigger} ${draft.trim()}")) {
+                draft = ""
+                pendingCommandName = null
+                unknownAttempt = null
+            }
+            return
+        }
+        val parsed = SlashCommand.parse(draft)
+        if (parsed is CommandParseResult.Unknown && unknownAttempt != draft) {
+            // First press only warns. The text stays exactly as typed, so a second press on
+            // an unchanged field is unambiguous: the warning was seen and overruled.
+            unknownAttempt = draft
+            return
+        }
+        if (onSend(draft)) {
+            draft = ""
+            unknownAttempt = null
+        }
+    }
+
+    val unknownParse = if (pendingCommand == null && unknownAttempt == draft) {
+        SlashCommand.parse(draft) as? CommandParseResult.Unknown
+    } else {
+        null
+    }
 
     // The border is the focus indicator: it is the only boundary this control has, so it
     // has to be the thing that answers when the field is live.
@@ -167,9 +228,19 @@ fun Composer(
         if (commands != null) {
             SlashCommandPalette(
                 commands = commands,
+                enabled = enabled,
                 onSelect = { command ->
-                    draft = ""
-                    onCommand(command)
+                    unknownAttempt = null
+                    if (command.takesArgument) {
+                        // Chosen, not typed: the trigger is state from here on, not
+                        // characters in the field an edit or an autocorrect could reach.
+                        pendingCommandName = command.name
+                        draft = ""
+                    } else {
+                        pendingCommandName = null
+                        draft = ""
+                        onCommand(command)
+                    }
                 },
                 modifier = Modifier.padding(bottom = 8.dp),
             )
@@ -182,6 +253,48 @@ fun Composer(
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .border(width = 1.dp, color = border, shape = RoundedCornerShape(Radius.lg)),
         ) {
+            // Above the field rather than beside it: the trigger is a whole word ("/deep-
+            // research"), which beside a field on a phone either eats the width the argument
+            // needs or wraps and pushes the row's height around while the field is focused.
+            AnimatedVisibility(
+                visible = pendingCommand != null,
+                enter = fadeIn(Motion.quick()) + expandVertically(Motion.quick()),
+                exit = fadeOut(Motion.instant()) + shrinkVertically(Motion.instant()),
+            ) {
+                pendingCommand?.let { command ->
+                    CommandChip(
+                        command = command,
+                        onRemove = {
+                            // The argument is kept. Removing the command is "I did not mean
+                            // that command", not "I take back the sentence I wrote for it".
+                            pendingCommandName = null
+                        },
+                        modifier = Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp),
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = unknownParse != null,
+                enter = fadeIn(Motion.quick()) + expandVertically(Motion.quick()),
+                exit = fadeOut(Motion.instant()) + shrinkVertically(Motion.instant()),
+            ) {
+                unknownParse?.let { unknown ->
+                    UnknownCommandNotice(
+                        token = unknown.token,
+                        suggestion = unknown.suggestions.firstOrNull(),
+                        onUseSuggestion = { suggestion ->
+                            pendingCommandName = suggestion.name
+                            // Whatever followed the token the user actually typed becomes
+                            // the argument, rather than being thrown away for a fresh field.
+                            draft = draft.trim().removePrefix(unknown.token).trim()
+                            unknownAttempt = null
+                        },
+                        modifier = Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp),
+                    )
+                }
+            }
+
             // Inside the container, not above it: an attachment is part of the message
             // being written, and showing it detached invites sending one by accident.
             AnimatedVisibility(
@@ -242,8 +355,16 @@ fun Composer(
                                 // heard so far, so the words appear where they will land
                                 // rather than in a separate panel.
                                 text = heard.ifEmpty {
-                                    if (isListening) "Listening…"
-                                    else stringResource(R.string.slash_command_hint)
+                                    when {
+                                        isListening -> "Listening…"
+                                        // The command's own description, already written to
+                                        // say what it does; a second, command-specific
+                                        // sentence here would be one more string to keep in
+                                        // step with it for no reader who cannot already see
+                                        // the chip above.
+                                        pendingCommand != null -> pendingCommand.description
+                                        else -> stringResource(R.string.slash_command_hint)
+                                    }
                                 },
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -264,14 +385,86 @@ fun Composer(
                 isListening = isListening,
                 onAttach = onAttach,
                 onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
-                onSend = {
-                    // Cleared only if it was taken. Refused messages stay in the box, which
-                    // is the difference between "not yet" and "gone".
-                    if (onSend(draft)) draft = ""
-                },
+                onSend = ::trySend,
                 onStop = onStop,
                 hasSomethingToSend = hasSomethingToSend,
             )
+        }
+    }
+}
+
+/**
+ * The command an argument is being written for, and the way to change your mind.
+ *
+ * A chip rather than the trigger sitting in the field as more characters, which is what let
+ * autocorrect or a stray edit turn "/deep-research" into something that no longer matches
+ * anything. Removing it keeps the argument: it says "not that command", not "not that
+ * sentence".
+ */
+@Composable
+private fun CommandChip(
+    command: SlashCommand,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = command.trigger,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.remove_command, command.trigger),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * What Send meant when the text it was pressed on opened with a slash and matched nothing.
+ *
+ * Said once, so the first press is a warning rather than a silent trip to the model: typing
+ * "/deep research" with a space where the trigger has a hyphen used to answer the question
+ * as prose with nothing on screen to say a command had even been attempted. A second press
+ * on the same text is the user overruling this, which [Composer] reads by comparing the
+ * field against what was warned about rather than by a button here.
+ */
+@Composable
+private fun UnknownCommandNotice(
+    token: String,
+    suggestion: SlashCommand?,
+    onUseSuggestion: (SlashCommand) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.sm))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.unknown_command, token),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (suggestion != null) {
+            TextButton(
+                onClick = { onUseSuggestion(suggestion) },
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Text(stringResource(R.string.unknown_command_suggestion, suggestion.trigger))
+            }
         }
     }
 }

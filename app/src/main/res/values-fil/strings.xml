@@ -183,6 +183,9 @@
     <string name="each_model_says_if_it_runs">Makikita sa bawat isa kung kaya nitong tumakbo sa teleponong ito bago mo ito i-download.</string>
     <string name="answers_can_search_the_web">Kapag may tumatakbong modelo, puwedeng maghanap sa web ang mga sagot. Isa itong switch sa Mga tool.</string>
     <string name="remove_attachment">Alisin ang %1$s</string>
+    <string name="remove_command">Alisin ang %1$s command</string>
+    <string name="unknown_command">"%1$s" ay hindi kilalang command. Ipadala ulit para ipadala ito bilang mensahe.</string>
+    <string name="unknown_command_suggestion">Ibig mo bang sabihin %1$s?</string>
     <string name="delete_conversation_named">Tanggalin ang %1$s</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>

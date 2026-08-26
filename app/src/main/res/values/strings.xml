@@ -221,6 +221,9 @@
     <string name="each_model_says_if_it_runs">Each one says whether it runs on this phone before you download it.</string>
     <string name="answers_can_search_the_web">Once a model is running, answers can search the web. That is a switch in Tools.</string>
     <string name="remove_attachment">Remove %1$s</string>
+    <string name="remove_command">Remove %1$s command</string>
+    <string name="unknown_command">"%1$s" is not a recognised command. Send again to send it as a message.</string>
+    <string name="unknown_command_suggestion">Did you mean %1$s?</string>
     <string name="delete_conversation_named">Delete %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>

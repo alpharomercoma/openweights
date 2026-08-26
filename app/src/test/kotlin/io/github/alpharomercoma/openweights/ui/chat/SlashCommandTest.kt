@@ -105,6 +105,56 @@ class SlashCommandTest {
     }
 
     @Test
+    fun `parse recognises a valid command with its argument`() {
+        assertThat(SlashCommand.parse("/deep-research what changed in Android 16"))
+            .isEqualTo(
+                CommandParseResult.Valid(
+                    SlashCommand.DEEP_RESEARCH,
+                    "what changed in Android 16",
+                ),
+            )
+        assertThat(SlashCommand.parse("/plan"))
+            .isEqualTo(CommandParseResult.Valid(SlashCommand.PLAN, ""))
+    }
+
+    @Test
+    fun `parse leaves an ordinary message alone`() {
+        assertThat(SlashCommand.parse("what is a KV cache?"))
+            .isEqualTo(CommandParseResult.OrdinaryMessage)
+        assertThat(SlashCommand.parse("/tmp is full"))
+            .isInstanceOf(CommandParseResult.Unknown::class.java)
+    }
+
+    @Test
+    fun `parse catches the exact failure that motivated it`() {
+        // A space where the trigger has a hyphen used to answer as prose with nothing on
+        // screen to say a command had even been attempted.
+        val result = SlashCommand.parse("/deep research what changed")
+        assertThat(result).isInstanceOf(CommandParseResult.Unknown::class.java)
+        val unknown = result as CommandParseResult.Unknown
+        assertThat(unknown.token).isEqualTo("/deep")
+        assertThat(unknown.suggestions).containsExactly(SlashCommand.DEEP_RESEARCH)
+    }
+
+    @Test
+    fun `parse suggests nothing for a slash that resembles no command`() {
+        val result = SlashCommand.parse("/zzz do a thing")
+        assertThat(result).isInstanceOf(CommandParseResult.Unknown::class.java)
+        assertThat((result as CommandParseResult.Unknown).suggestions).isEmpty()
+    }
+
+    @Test
+    fun `an unrecognised command falling through as a message is a deliberate default`() {
+        // Documented here because it is the one behaviour a reviewer would otherwise read
+        // as a bug: OrdinaryMessage is the answer for a sentence that happens to start with
+        // a slash, and Unknown is the answer for one that does not — the composer decides
+        // what to do with each, this only tells them apart.
+        assertThat(
+            SlashCommand.parse("/tmp is full"),
+        ).isNotEqualTo(CommandParseResult.OrdinaryMessage)
+    }
+
+    @Test
     fun `the mode the app starts in is the one the palette calls the default`() {
         // /ask described itself as the default while the app started in auto, so the list
         // that is meant to be the documentation told the user tools would ask first when

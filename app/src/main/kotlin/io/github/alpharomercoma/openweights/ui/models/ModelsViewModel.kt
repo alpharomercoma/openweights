@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.download.ModelDownloadWorker
 import io.github.alpharomercoma.openweights.model.ModelStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -181,8 +182,14 @@ class ModelsViewModel @Inject constructor(
     )
 
     init {
-        modelStore.deleteLegacyGenerationBundles()
-        refresh()
+        // Off the main thread: a phone that still has a pre-revert Sana/SD bundle deletes up
+        // to 1.6 GB recursively here, and Hilt constructs this view model synchronously
+        // during composition, so doing it inline would be a near-guaranteed ANR the first
+        // time this build opens the Models screen on such a phone.
+        viewModelScope.launch(Dispatchers.IO) {
+            modelStore.deleteLegacyGenerationBundles()
+            refresh()
+        }
         // Last run's finished rows, which are of no interest now: their files are either on
         // disk, where refresh finds them, or they are not, and a failure the user cannot
         // act on any more is just clutter.

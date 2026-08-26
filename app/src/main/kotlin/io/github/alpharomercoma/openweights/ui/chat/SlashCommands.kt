@@ -201,30 +201,29 @@ enum class SlashCommand(val trigger: String, val description: String) {
      * the first word, so removing just that left "research what changed" behind — the rest of
      * the near-miss trigger, silently folded into the question it was meant to be about.
      *
-     * Matched character by character against the trigger, normalized the same way
-     * [normalizedForSuggestion] compares them, rather than by counting off however many raw
-     * characters the trigger is long once normalized: counting alone does not stop at the
-     * near miss, it stops at a length, and an abbreviated trigger — "/deep-researc" is one
-     * character short of the real word — is shorter than that length, so counting kept going
-     * into the sentence after it and ate the first letter of "what". Stopping at the first
-     * character that no longer matches the trigger is what a length cannot tell it.
+     * Neither a character count nor a character match survives every shape a near miss takes.
+     * Counting off however many raw characters the trigger is long, once normalized, walks
+     * straight past an abbreviated trigger — "/deep-researc" is one letter short of the real
+     * word — into the sentence after it and eats the first letter of that. Matching character
+     * by character fixes that but breaks the opposite way: a typo inside the *second* word of
+     * a multi-word attempt ("/deep resfarch what changed") stops the match right there and
+     * leaves the rest of that mistyped word sitting in the argument.
+     *
+     * What survives both is not counting characters at all, but words. A trigger's own hyphens
+     * say how many words it is — one for "/plan", two for "/deep-research" — and that is
+     * assumed to be exactly how many space-delimited words were attempted, typos in any of
+     * them included, unless the very first word already contains a hyphen of its own, which
+     * means the whole trigger, hyphen and all, was attempted as that one word and nothing
+     * needs adding to it.
      */
     fun argumentAfterNearMiss(rawMessage: String): String {
         val trimmed = rawMessage.trim()
-        val normalizedTrigger = trigger.normalizedForSuggestion()
-        var matched = 0
-        var index = 0
-        while (index < trimmed.length && matched < normalizedTrigger.length) {
-            val char = trimmed[index]
-            if (char.isWhitespace() || char == '-') {
-                index++
-                continue
-            }
-            if (char.lowercaseChar() != normalizedTrigger[matched]) break
-            matched++
-            index++
-        }
-        return trimmed.substring(index).trim()
+        val firstWord = trimmed.substringBefore(' ')
+        val wordsInTrigger = trigger.count { it == '-' } + 1
+        val attemptedWords = if (firstWord.contains('-')) 1 else wordsInTrigger
+        return trimmed.split(Regex("\\s+"), limit = attemptedWords + 1)
+            .getOrElse(attemptedWords) { "" }
+            .trim()
     }
 }
 

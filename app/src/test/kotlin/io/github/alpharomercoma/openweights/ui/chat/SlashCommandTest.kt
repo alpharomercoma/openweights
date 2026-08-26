@@ -160,7 +160,10 @@ class SlashCommandTest {
 
     @Test
     fun `a near miss with nothing after the trigger yields an empty argument`() {
-        assertThat(SlashCommand.PLAN.argumentAfterNearMiss("/pl an")).isEqualTo("")
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep-research"))
+            .isEqualTo("")
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep research"))
+            .isEqualTo("")
     }
 
     @Test
@@ -171,6 +174,26 @@ class SlashCommandTest {
         // became the argument "hat changed".
         assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep-researc what changed"))
             .isEqualTo("what changed")
+    }
+
+    @Test
+    fun `a typo inside the second word of a multi-word near miss does not stop the match`() {
+        // Matching character by character, the fix for the abbreviated case above, broke
+        // this one instead: it stopped at the first character that disagreed with the
+        // trigger, which for a typo in "research" itself was partway through the second
+        // word, and left the rest of that mistyped word — "farch what changed" — as the
+        // argument. Counting attempted words rather than matching characters survives both.
+        assertThat(SlashCommand.DEEP_RESEARCH.argumentAfterNearMiss("/deep resfarch what changed"))
+            .isEqualTo("what changed")
+    }
+
+    @Test
+    fun `a single-word trigger is never split across a space by this`() {
+        // /plan has no hyphen, so exactly one attempted word is assumed — the word actually
+        // typed, however it was spelled — never two. Whatever a user meant by "/pl an" is
+        // moot in practice: /plan takes no argument, so this path is never reached for it.
+        // What matters is that a one-word trigger's own count stays one.
+        assertThat(SlashCommand.PLAN.argumentAfterNearMiss("/pl an")).isEqualTo("an")
     }
 
     @Test

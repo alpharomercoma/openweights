@@ -96,7 +96,12 @@ data class GenerateUiState(
     val runtimeMissing: Boolean = false,
 ) {
     val canGenerate: Boolean
-        get() = !isGenerating && capability != null && prompt.isNotBlank()
+        get() = !isGenerating && capability != null && prompt.isNotBlank() &&
+            // Sana Edit V2 has no learned "no reference image" mode: measured on-device, its
+            // text2img path (zero or noise ref_latents, either way) produces pure static, not a
+            // bad-but-related image. Requiring the picture here is the only thing standing
+            // between Generate and that dead end for a model whose capability says it can edit.
+            (!capability.supportsImageEdit || referenceImage != null)
 }
 
 private const val TAG = "GenerateVM"

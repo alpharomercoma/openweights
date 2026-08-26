@@ -63,10 +63,24 @@ fun RuntimeBar(
     state: ChatUiState,
     onClick: () -> Unit,
     onResetMode: () -> Unit = {},
+    /**
+     * Whether a goal or research is currently driving the conversation on its own.
+     *
+     * Mode is that loop's to set for as long as it runs — planning starts in PLAN
+     * regardless of what was on screen before, and a step executes in whatever
+     * [goalExecutionMode] chose. A tap landing in either window would hand the mode back
+     * to a run that is not expecting it: PLAN would lose the plan it was about to read
+     * back, and AUTO on a run started in ASK or YOLO would silently reinstate the checks
+     * that mode had waived. The control the reader is tapping is gone by the time the
+     * run's own `finally` restores what was there before, so hiding it here rather than
+     * merely disabling it is what keeps a well-timed tap from doing anything at all.
+     */
+    goalRunning: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Read here rather than inside the semantics block, which is not a composition.
     val spoken = stringResource(R.string.choose_a_model_spoken, state.spoken())
+    val leaveMode = stringResource(R.string.leave_mode, state.mode.label)
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(Radius.sm))
@@ -113,16 +127,24 @@ fun RuntimeBar(
         // above says which one is on, but nothing said how to stop it being on. Its own
         // touch target, nested inside the bar's, so tapping the mode clears the mode rather
         // than opening the model picker underneath it.
-        if (state.mode != ChatUiState().mode) {
+        //
+        // The visible text is the mode's own name and nothing else. [AgentMode.label] is a
+        // fixed English word chosen by whoever typed `/plan`, the same word this line
+        // already showed above before there was anything to tap; wrapping it in a
+        // translated sentence only sat the two side by side in every language that is not
+        // English. The sentence is said instead, once, to whoever cannot see this is a
+        // button.
+        if (state.mode != ChatUiState().mode && !goalRunning) {
             Text(
-                text = stringResource(R.string.leave_mode, state.mode.label),
+                text = state.mode.label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(Radius.sm))
                     .background(MaterialTheme.colorScheme.primaryContainer)
                     .clickable(onClick = onResetMode, role = Role.Button)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .semantics { contentDescription = leaveMode },
             )
         }
     }

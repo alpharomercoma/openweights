@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -44,7 +45,7 @@ class RuntimeBarTest {
         show(mode = AgentMode.AUTO)
 
         AgentMode.entries.forEach { mode ->
-            compose.onNodeWithText("Leave ${mode.label} mode").assertDoesNotExist()
+            compose.onNodeWithText(mode.label).assertDoesNotExist()
         }
     }
 
@@ -52,7 +53,10 @@ class RuntimeBarTest {
     fun `a mode that is not the default offers a way to leave it`() {
         show(mode = AgentMode.PLAN)
 
-        compose.onNodeWithText("Leave ${AgentMode.PLAN.label} mode").assertIsDisplayed()
+        compose.onNodeWithText(AgentMode.PLAN.label).assertIsDisplayed()
+        // Said to a screen reader, since the visible word alone is not a sentence.
+        compose.onNodeWithContentDescription("Leave ${AgentMode.PLAN.label} mode")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -65,13 +69,31 @@ class RuntimeBarTest {
             onClick = { pickerOpened = true },
         )
 
-        compose.onNodeWithText("Leave ${AgentMode.PLAN.label} mode").performClick()
+        compose.onNodeWithText(AgentMode.PLAN.label).performClick()
 
         assert(resetCalls == 1) { "tapping the mode label must reset the mode exactly once" }
         assert(!pickerOpened) { "resetting the mode must not also open the model picker" }
     }
 
-    private fun show(mode: AgentMode, onResetMode: () -> Unit = {}, onClick: () -> Unit = {}) {
+    @Test
+    fun `a goal running its own steps hides the control, not merely disables it`() {
+        // PLAN is what a goal's planning turn runs in, and AUTO, ASK or YOLO is what its
+        // steps run in. Either way the mode belongs to the run for as long as it is going,
+        // and a tap landing here would hand it back mid-run: PLAN loses the plan it was
+        // about to read back, and AUTO on a run started in ASK or YOLO reinstates the
+        // checks that mode had waived. Hidden rather than disabled, so a tap in flight
+        // reaches nothing rather than a button that silently declines it.
+        show(mode = AgentMode.PLAN, goalRunning = true)
+
+        compose.onNodeWithText(AgentMode.PLAN.label).assertDoesNotExist()
+    }
+
+    private fun show(
+        mode: AgentMode,
+        goalRunning: Boolean = false,
+        onResetMode: () -> Unit = {},
+        onClick: () -> Unit = {},
+    ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
                 RuntimeBar(
@@ -83,6 +105,7 @@ class RuntimeBarTest {
                     ),
                     onClick = onClick,
                     onResetMode = onResetMode,
+                    goalRunning = goalRunning,
                 )
             }
         }

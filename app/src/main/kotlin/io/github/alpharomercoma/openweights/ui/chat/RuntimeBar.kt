@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,12 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
  * video frames in it takes a minute on this hardware, and a spinner cannot say that.
  */
 @Composable
-fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun RuntimeBar(
+    state: ChatUiState,
+    onClick: () -> Unit,
+    onResetMode: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
     // Read here rather than inside the semantics block, which is not a composition.
     val spoken = stringResource(R.string.choose_a_model_spoken, state.spoken())
     Column(
@@ -101,6 +107,23 @@ fun RuntimeBar(state: ChatUiState, onClick: () -> Unit, modifier: Modifier = Mod
         // the answer scrolled underneath.
         if (state.runtimeIdentity.isNotEmpty()) {
             Metric(state.runtimeIdentity, maxLines = 1)
+        }
+
+        // A mode chosen by typing was otherwise invisible to leave the same way: the label
+        // above says which one is on, but nothing said how to stop it being on. Its own
+        // touch target, nested inside the bar's, so tapping the mode clears the mode rather
+        // than opening the model picker underneath it.
+        if (state.mode != ChatUiState().mode) {
+            Text(
+                text = stringResource(R.string.leave_mode, state.mode.label),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Radius.sm))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable(onClick = onResetMode, role = Role.Button)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
         }
     }
 }

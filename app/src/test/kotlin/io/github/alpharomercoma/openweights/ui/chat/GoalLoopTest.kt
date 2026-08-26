@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -156,6 +157,40 @@ class GoalLoopTest : ChatFixture() {
             // would start at the following question and the unanswered one would be gone.
             assertThat(plans.plan.value?.steps?.none { it.done }).isTrue()
         }
+
+    @Test
+    fun `finishing a goal started from plan mode leaves auto rather than plan`() =
+        runTest(dispatcher) {
+            // The mode a goal's own plan comes from, and the one mode with no tools in it.
+            // Restoring it verbatim after the goal finished was how a run that worked left
+            // the conversation looking exactly like one that could not: nothing ran, nothing
+            // on screen said why, and the only way out was already knowing to type /auto.
+            loadModel()
+            plans.propose("1. Do the first thing\n2. Do the second thing")
+            viewModel.setMode(AgentMode.PLAN)
+
+            viewModel.startGoal("Do a small thing")
+            awaitGoalSettled()
+
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
+            assertThat(viewModel.uiState.value.mode).isEqualTo(AgentMode.AUTO)
+        }
+
+    @Test
+    fun `finishing a goal leaves a mode the user actually chose alone`() = runTest(dispatcher) {
+        // Only plan is special-cased. Ask and Yolo are usable modes on their own, and a
+        // goal quietly switching one of those back to Auto would be the app overriding a
+        // choice nobody asked it to reconsider.
+        loadModel()
+        plans.propose("1. Do the first thing\n2. Do the second thing")
+        viewModel.setMode(AgentMode.YOLO)
+
+        viewModel.startGoal("Do a small thing")
+        awaitGoalSettled()
+
+        assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
+        assertThat(viewModel.uiState.value.mode).isEqualTo(AgentMode.YOLO)
+    }
 
     /**
      * Drains until the goal stops running, or gives up.

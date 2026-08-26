@@ -418,6 +418,7 @@ private fun ChatContent(
                 onNewChat = onNewChat,
                 onOpenParameters = { showParameters = true },
                 onOpenModelPicker = { showModelPicker = true },
+                onResetMode = { onMode(AgentMode.AUTO) },
             )
         },
     ) { innerPadding ->
@@ -1247,12 +1248,15 @@ private fun ChatTopBar(
     onNewChat: () -> Unit,
     onOpenParameters: () -> Unit,
     onOpenModelPicker: () -> Unit,
+    onResetMode: () -> Unit,
 ) {
     TopAppBar(
         // The name raises the picker rather than leaving for another screen: which
         // model is answering is a fact about this conversation, so changing it should
         // not take the conversation off screen.
-        title = { RuntimeBar(state = state, onClick = onOpenModelPicker) },
+        title = {
+            RuntimeBar(state = state, onClick = onOpenModelPicker, onResetMode = onResetMode)
+        },
         navigationIcon = {
             IconButton(onClick = onOpenHistory) {
                 Icon(

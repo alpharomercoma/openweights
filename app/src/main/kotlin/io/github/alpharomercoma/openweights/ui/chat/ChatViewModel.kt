@@ -1523,7 +1523,12 @@ class ChatViewModel @Inject constructor(
             }
             writeUp(brief, researchSources)
         } finally {
-            setMode(wasMode)
+            // Not simply `wasMode`. Starting from PLAN is exactly the case this app has to
+            // handle, since PLAN is where a goal's own plan comes from, and restoring it
+            // verbatim would return the user to the one mode with no tools in it, with
+            // nothing on screen saying why running a goal changed nothing. Same rule as
+            // starting one: see goalExecutionMode.
+            setMode(goalExecutionMode(null, wasMode))
             GenerationService.release(appContext, GenerationService.GOAL)
         }
     }

@@ -186,6 +186,7 @@
     <string name="delete_conversation_named">Tanggalin ang %1$s</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>
+    <string name="leave_mode">Umalis sa %1$s mode</string>
     <string name="system_prompt_detail">Mga permanenteng tagubilin, ipinapadala bago ang bawat pag-uusap. Mas nasusunod ng maliliit na modelo ang malinaw na tagubilin kaysa sa ipinahihiwatig.</string>
     <string name="tool_prompt_detail">Ipinapadala kasama ng mga tool, bago ang sarili mong prompt. Ito ang buong idinaragdag ng app.</string>
     <string name="thinking_detail">Pag-isipan muna. Mas mabagal, at mas mainam sa anumang may mga hakbang.</string>

@@ -200,6 +200,7 @@
     <string name="delete_conversation_named">Eliminar %1$s</string>
     <string name="generated_at_speed">Generado a %1$d tokens por segundo</string>
     <string name="choose_a_model_spoken">Elegir un modelo. %1$s</string>
+    <string name="leave_mode">Salir del modo %1$s</string>
     <string name="system_prompt_detail">Instrucciones permanentes, enviadas antes de cada conversación. Los modelos pequeños siguen mucho mejor las explícitas que las implícitas.</string>
     <string name="tool_prompt_detail">Se envía con las herramientas, antes de tu propio prompt. Esto es todo lo que añade la app.</string>
     <string name="thinking_detail">Que lo razone primero. Más lento, y mejor en cualquier cosa que tenga pasos.</string>

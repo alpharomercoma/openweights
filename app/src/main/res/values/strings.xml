@@ -224,6 +224,7 @@
     <string name="delete_conversation_named">Delete %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>
+    <string name="leave_mode">Leave %1$s mode</string>
     <string name="system_prompt_detail">Standing instructions, sent before every conversation. Small models follow explicit ones far better than implied ones.</string>
     <string name="tool_prompt_detail">Sent with the tools, before your own prompt. This is the whole of what the app adds.</string>
     <string name="thinking_detail">Work it through first. Slower, and better on anything with steps in it.</string>

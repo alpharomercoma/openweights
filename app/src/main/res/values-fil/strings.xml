@@ -145,8 +145,6 @@
     <string name="attachment_limit">Maaari kang mag-attach ng hanggang %1$d media item nang sabay.</string>
     <string name="pdf_saved">Na-save ang PDF</string>
     <string name="pdf_save_failed">Hindi ma-save ang PDF.</string>
-    <string name="read_aloud">Basahin nang malakas</string>
-    <string name="stop_reading">Itigil ang pagbasa</string>
     <string name="discover">Tuklasin</string><string name="back_to_search_results">Bumalik sa mga resulta</string>
     <string name="no_filter_matches">Walang tugma sa mga filter</string><string name="no_models_found">Walang modelong nakita</string>
     <string name="try_wider_filters">Palawakin ang laki o alisin ang mga filter at maghanap muli.</string><string name="try_different_search">Subukan ang ibang termino.</string><string name="continue_search">Ipagpatuloy ang paghahanap</string>
@@ -197,45 +195,7 @@
     <string name="about_network_detail">Ang paghahanap sa web at ang pag-download ng modelo ang mga bahaging umaabot sa network. Parehong puwede mong patayin sa Mga tool.</string>
     <string name="access_token_detail">Para lang sa mga gated o pribadong modelo. Naka-encrypt gamit ang susing nasa hardware ng teleponong ito, at ipinapadala sa huggingface.co at wala nang iba.</string>
     <string name="cpu_only_build">Sa CPU tumatakbo ang build na ito. Sa mga teleponong nasukat namin, iyon din naman ang mas mabilis na daan.</string>
-    <string name="gallery">Galerya</string>
-    <string name="gallery_count">%1$d sa %2$d</string>
-    <string name="delete_output_title">Tanggalin ang ginawa?</string>
-    <string name="delete_output_message">Tanggalin ang ginawang ito at ang file nito? Permanenteng aalisin nito ang file sa device na ito.</string>
-    <string name="sort_by">Ayusin ayon sa</string>
-    <string name="search_prompts">Maghanap sa mga prompt</string>
-    <string name="favourites">Mga Paborito</string>
-    <string name="remove_favourite">Alisin sa paborito</string>
-    <string name="add_favourite">Idagdag sa paborito</string>
-    <string name="gallery_empty">Wala pang nagagawa. Ang anumang malikha ay lilitaw dito.</string>
-    <string name="gallery_no_matches">Walang nahanap na tugma</string>
-    <string name="sort_newest">Pinakabago</string>
-    <string name="sort_oldest">Pinakaluma</string>
-    <string name="sort_fastest">Pinakamabilis</string>
-    <string name="sort_slowest">Pinakamabagal</string>
-    <string name="modality_image">Mga Larawan</string>
-    <string name="modality_speech">Boses</string>
-    <string name="generation_bundles_heading">Mga Bundle ng Pagbuo (MNN)</string>
     <string name="language_models_heading">Mga Modelo ng Wika (GGUF)</string>
-    <string name="model_badge_image_mnn">Modelo ng Larawan (MNN)</string>
-    <string name="model_badge_voice_mnn">Modelo ng Boses (MNN)</string>
-    <string name="model_task_image">Modelo ng Larawan</string>
-    <string name="model_task_speech">Modelo ng Boses</string>
     <string name="model_badge_projector_missing">Vision model · i-download ang projector (mmproj) para paganahin ang image input</string>
     <string name="slash_command_hint">Mag-mensahe, o i-type / para sa mga utos</string>
-    <string name="generate_title">Bumuo ng Larawan</string>
-    <string name="generate_prompt_label">Prompt</string>
-    <string name="generate_prompt_hint">Ilarawan kung ano ang iguguhit…</string>
-    <string name="generate_steps_label">Mga Hakbang</string>
-    <string name="generate_button">Bumuo</string>
-    <string name="generate_stop">Huminto</string>
-    <string name="generate_step_of">Hakbang %1$d ng %2$d</string>
-    <string name="generate_add_reference_image">Magdagdag ng reference na larawan para i-edit</string>
-    <string name="generate_reference_image">Reference na larawan</string>
-    <string name="generate_remove_reference_image">Alisin ang reference na larawan</string>
-    <string name="generate_no_bundle_title">Walang na-download na modelo ng larawan</string>
-    <string name="generate_no_bundle_body">Mag-download ng bundle ng pagbuo mula sa screen ng Tuklasin upang simulan ang pagbuo ng mga larawan sa device na ito.</string>
-    <string name="generate_browse_models">Mag-browse ng mga modelo</string>
-    <string name="generate_no_runtime_title">Hindi available ang pagbuo</string>
-    <string name="generate_no_runtime_body">Hindi kasama sa build na ito ang MNN generation runtime. Gamitin ang openweights.mnn=true build flag para paganahin ito.</string>
-    <string name="nav_generate">Bumuo</string>
 </resources>

@@ -150,8 +150,6 @@
     <string name="attachment_limit">يمكنك إرفاق ما يصل إلى %1$d عناصر وسائط في المرة الواحدة.</string>
     <string name="pdf_saved">تم حفظ ملف PDF</string>
     <string name="pdf_save_failed">تعذر حفظ ملف PDF.</string>
-    <string name="read_aloud">قراءة بصوت عالٍ</string>
-    <string name="stop_reading">إيقاف القراءة</string>
     <string name="discover">استكشاف</string><string name="back_to_search_results">العودة إلى النتائج</string>
     <string name="no_filter_matches">لا شيء يطابق عوامل التصفية</string><string name="no_models_found">لم يتم العثور على نماذج</string><string name="try_wider_filters">وسّع نطاق الحجم أو امسح عوامل التصفية وابحث مجددًا.</string><string name="try_different_search">جرّب عبارة بحث مختلفة.</string><string name="continue_search">متابعة البحث</string>
     <string name="proxy_search_only_detail">يُستخدم للبحث فقط، وليس للتنزيلات أو الصفحات المفتوحة. قد يساعد الوكيل لكنه غير مضمون.</string>
@@ -199,45 +197,7 @@
     <string name="about_network_detail">البحث في الويب وتنزيل نموذج هما الجزءان اللذان يصلان إلى الشبكة. ويمكنك إيقاف كليهما من الأدوات.</string>
     <string name="access_token_detail">للنماذج المقيّدة أو الخاصة فقط. مشفَّر بمفتاح محفوظ داخل عتاد هذا الهاتف، ويُرسل إلى huggingface.co ولا شيء غيره.</string>
     <string name="cpu_only_build">هذه النسخة تعمل على المعالج. على الهواتف التي قسناها، هذا هو المسار الأسرع على أي حال.</string>
-    <string name="gallery">المعرض</string>
-    <string name="gallery_count">%1$d من %2$d</string>
-    <string name="delete_output_title">حذف المخرج؟</string>
-    <string name="delete_output_message">حذف هذا المخرج وملفه؟ سيؤدي هذا إلى إزالة الملف نهائيًا من هذا الجهاز.</string>
-    <string name="sort_by">ترتيب حسب</string>
-    <string name="search_prompts">البحث في التعليمات</string>
-    <string name="favourites">المفضلة</string>
-    <string name="remove_favourite">إزالة من المفضلة</string>
-    <string name="add_favourite">إضافة إلى المفضلة</string>
-    <string name="gallery_empty">لم يتم إنشاء أي شيء بعد. كل ما يتم إنشاؤه سيظهر هنا.</string>
-    <string name="gallery_no_matches">لم يتم العثور على نتائج</string>
-    <string name="sort_newest">الأحدث</string>
-    <string name="sort_oldest">الأقدم</string>
-    <string name="sort_fastest">الأسرع</string>
-    <string name="sort_slowest">الأبطأ</string>
-    <string name="modality_image">الصور</string>
-    <string name="modality_speech">الكلام</string>
-    <string name="generation_bundles_heading">حزم التوليد (MNN)</string>
     <string name="language_models_heading">نماذج اللغة (GGUF)</string>
-    <string name="model_badge_image_mnn">نموذج صور (MNN)</string>
-    <string name="model_badge_voice_mnn">نموذج صوت (MNN)</string>
-    <string name="model_task_image">نموذج صور</string>
-    <string name="model_task_speech">نموذج صوت</string>
     <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
     <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
-    <string name="generate_title">توليد الصور</string>
-    <string name="generate_prompt_label">الوصف</string>
-    <string name="generate_prompt_hint">صف ما تريد رسمه…</string>
-    <string name="generate_steps_label">الخطوات</string>
-    <string name="generate_button">توليد</string>
-    <string name="generate_stop">إيقاف</string>
-    <string name="generate_step_of">الخطوة %1$d من %2$d</string>
-    <string name="generate_add_reference_image">أضف صورة مرجعية للتعديل عليها</string>
-    <string name="generate_reference_image">الصورة المرجعية</string>
-    <string name="generate_remove_reference_image">إزالة الصورة المرجعية</string>
-    <string name="generate_no_bundle_title">لم يتم تنزيل نموذج صور</string>
-    <string name="generate_no_bundle_body">نزّل حزمة توليد من شاشة الاستكشاف للبدء في توليد الصور على هذا الجهاز.</string>
-    <string name="generate_browse_models">استعراض النماذج</string>
-    <string name="generate_no_runtime_title">التوليد غير متاح</string>
-    <string name="generate_no_runtime_body">هذا الإصدار لا يتضمن بيئة تشغيل MNN للتوليد. استخدم إعداد البناء openweights.mnn=true لتفعيله.</string>
-    <string name="nav_generate">توليد</string>
 </resources>

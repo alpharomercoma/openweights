@@ -145,8 +145,6 @@
     <string name="attachment_limit">一度に添付できるメディアは %1$d 件までです。</string>
     <string name="pdf_saved">PDF を保存しました</string>
     <string name="pdf_save_failed">PDF を保存できませんでした。</string>
-    <string name="read_aloud">読み上げる</string>
-    <string name="stop_reading">読み上げを停止</string>
     <string name="discover">探す</string><string name="back_to_search_results">検索結果に戻る</string>
     <string name="no_filter_matches">フィルターに一致しません</string><string name="no_models_found">モデルが見つかりません</string><string name="try_wider_filters">サイズ範囲を広げるか、フィルターを解除してください。</string><string name="try_different_search">別の検索語を試してください。</string><string name="continue_search">検索を続ける</string>
     <string name="proxy_search_only_detail">検索専用です。ダウンロードや開いたページには使いません。プロキシが役立つ場合がありますが保証はありません。</string>
@@ -193,45 +191,7 @@
     <string name="about_network_detail">ネットワークに出るのは、ウェブ検索とモデルのダウンロードだけです。どちらもツールで切れます。</string>
     <string name="access_token_detail">制限付きまたは非公開のモデル専用です。この端末のハードウェアが持つ鍵で暗号化し、huggingface.co にだけ送ります。</string>
     <string name="cpu_only_build">このビルドは CPU で動きます。計測した端末では、そちらのほうが結局は速い経路です。</string>
-    <string name="gallery">ギャラリー</string>
-    <string name="gallery_count">%1$d / %2$d</string>
-    <string name="delete_output_title">出力を削除しますか？</string>
-    <string name="delete_output_message">この出力とファイルを削除しますか？この端末からファイルが完全に削除されます。</string>
-    <string name="sort_by">並べ替え</string>
-    <string name="search_prompts">プロンプトを検索</string>
-    <string name="favourites">お気に入り</string>
-    <string name="remove_favourite">お気に入りから削除</string>
-    <string name="add_favourite">お気に入りに追加</string>
-    <string name="gallery_empty">まだ何も作成されていません。生成されたコンテンツはここに表示されます。</string>
-    <string name="gallery_no_matches">一致するものが見つかりません</string>
-    <string name="sort_newest">新しい順</string>
-    <string name="sort_oldest">古い順</string>
-    <string name="sort_fastest">速い順</string>
-    <string name="sort_slowest">遅い順</string>
-    <string name="modality_image">画像</string>
-    <string name="modality_speech">音声</string>
-    <string name="generation_bundles_heading">生成バンドル (MNN)</string>
     <string name="language_models_heading">言語モデル (GGUF)</string>
-    <string name="model_badge_image_mnn">画像モデル (MNN)</string>
-    <string name="model_badge_voice_mnn">音声モデル (MNN)</string>
-    <string name="model_task_image">画像モデル</string>
-    <string name="model_task_speech">音声モデル</string>
     <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
     <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
-    <string name="generate_title">画像生成</string>
-    <string name="generate_prompt_label">プロンプト</string>
-    <string name="generate_prompt_hint">描きたい内容を入力…</string>
-    <string name="generate_steps_label">ステップ数</string>
-    <string name="generate_button">生成</string>
-    <string name="generate_stop">停止</string>
-    <string name="generate_step_of">ステップ %1$d / %2$d</string>
-    <string name="generate_add_reference_image">編集する参照画像を追加</string>
-    <string name="generate_reference_image">参照画像</string>
-    <string name="generate_remove_reference_image">参照画像を削除</string>
-    <string name="generate_no_bundle_title">画像モデルがダウンロードされていません</string>
-    <string name="generate_no_bundle_body">このデバイスで画像生成を開始するには、「見つける」画面から生成バンドルをダウンロードしてください。</string>
-    <string name="generate_browse_models">モデルを探す</string>
-    <string name="generate_no_runtime_title">生成機能は利用できません</string>
-    <string name="generate_no_runtime_body">このビルドにはMNN生成ランタイムが含まれていません。有効にするには openweights.mnn=true ビルドフラグを使用してください。</string>
-    <string name="nav_generate">生成</string>
 </resources>

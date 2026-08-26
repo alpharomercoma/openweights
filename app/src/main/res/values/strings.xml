@@ -158,8 +158,6 @@
     <string name="attachment_limit">You can attach up to %1$d media items at once.</string>
     <string name="pdf_saved">PDF saved</string>
     <string name="pdf_save_failed">The PDF could not be saved.</string>
-    <string name="read_aloud">Read aloud</string>
-    <string name="stop_reading">Stop reading</string>
     <string name="discover">Discover</string>
     <string name="back_to_search_results">Back to search results</string>
     <string name="no_filter_matches">Nothing matches those filters</string>
@@ -235,46 +233,8 @@
     <string name="about_network_detail">Searching the web and downloading a model are the parts that reach the network. Both are yours to switch off in Tools.</string>
     <string name="access_token_detail">Only for gated or private models. Encrypted with a key held in this phone\'s hardware, and sent to huggingface.co and nowhere else.</string>
     <string name="cpu_only_build">This build runs on the CPU. On the phones we have measured, that is the faster path anyway.</string>
-    <string name="gallery">Gallery</string>
-    <string name="gallery_count">%1$d of %2$d</string>
-    <string name="delete_output_title">Delete output?</string>
-    <string name="delete_output_message">Delete this output and its file? This permanently removes the file from this device.</string>
-    <string name="sort_by">Sort by</string>
-    <string name="search_prompts">Search prompts</string>
-    <string name="favourites">Favourites</string>
-    <string name="remove_favourite">Remove favourite</string>
-    <string name="add_favourite">Add favourite</string>
-    <string name="gallery_empty">Nothing made yet. Whatever is generated appears here.</string>
-    <string name="gallery_no_matches">No matches found</string>
-    <string name="sort_newest">Newest</string>
-    <string name="sort_oldest">Oldest</string>
-    <string name="sort_fastest">Fastest</string>
-    <string name="sort_slowest">Slowest</string>
-    <string name="modality_image">Images</string>
-    <string name="modality_speech">Speech</string>
-    <string name="generation_bundles_heading">Generation Bundles (MNN)</string>
     <string name="language_models_heading">Language Models (GGUF)</string>
-     <string name="model_badge_image_mnn">Image Model (MNN)</string>
-    <string name="model_badge_voice_mnn">Voice Model (MNN)</string>
-    <string name="model_task_image">Image Model</string>
-    <string name="model_task_speech">Speech Model</string>
     <string name="model_badge_projector_missing">Vision model · download projector (mmproj) to enable image input</string>
     <string name="slash_command_hint">Message, or type / for commands</string>
-    <string name="generate_title">Generate Image</string>
-    <string name="generate_prompt_label">Prompt</string>
-    <string name="generate_prompt_hint">Describe what to draw…</string>
-    <string name="generate_steps_label">Steps</string>
-    <string name="generate_button">Generate</string>
-    <string name="generate_stop">Stop</string>
-    <string name="generate_step_of">Step %1$d of %2$d</string>
-    <string name="generate_add_reference_image">Add reference image to edit</string>
-    <string name="generate_reference_image">Reference image</string>
-    <string name="generate_remove_reference_image">Remove reference image</string>
-    <string name="generate_no_bundle_title">No image model downloaded</string>
-    <string name="generate_no_bundle_body">Download a generation bundle from the Discover screen to start generating images on this device.</string>
-    <string name="generate_browse_models">Browse models</string>
-    <string name="generate_no_runtime_title">Generation not available</string>
-    <string name="generate_no_runtime_body">This build does not include the MNN generation runtime. Use the openweights.mnn=true build flag to enable it.</string>
-    <string name="nav_generate">Generate</string>
 </resources>
 

@@ -71,7 +71,6 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
-import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,11 +278,7 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
-            val badge = when (model.task) {
-                GenerationTask.IMAGE -> stringResource(R.string.model_badge_image_mnn)
-                GenerationTask.SPEECH -> stringResource(R.string.model_badge_voice_mnn)
-                else -> stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
-            }
+            val badge = stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
             Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
             // Surface the projector gap rather than leaving the user to discover why the
             // attachment button never appears. One line, amber-toned via error container,
@@ -306,7 +301,6 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
         ) { Text(stringResource(R.string.delete)) }
     }
 }
-
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

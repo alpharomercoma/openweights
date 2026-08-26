@@ -28,11 +28,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,9 +58,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 fun MessageActions(
-    isSpeaking: Boolean,
     onCopy: () -> Unit,
-    onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
     /** Opens the sheet with the rarer actions, which the long press used to. */
     onMore: (() -> Unit)? = null,
@@ -93,15 +89,6 @@ fun MessageActions(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Action(Icons.Rounded.ContentCopy, "Copy reply", onCopy)
-            Action(
-                icon = if (isSpeaking) {
-                    Icons.Rounded.StopCircle
-                } else {
-                    Icons.AutoMirrored.Rounded.VolumeUp
-                },
-                description = if (isSpeaking) "Stop reading aloud" else "Read aloud",
-                onClick = onReadAloud,
-            )
             onRetry?.let { Action(Icons.Rounded.Refresh, "Try again", it) }
             onMore?.let { Action(Icons.Rounded.MoreHoriz, "More actions", it) }
         }
@@ -161,6 +148,6 @@ fun rememberMessageClipboard(): MessageClipboard {
 @Composable
 private fun MessageActionsPreview() {
     OpenWeightsTheme(dynamicColor = false) {
-        MessageActions(isSpeaking = false, onCopy = {}, onReadAloud = {}, onRetry = {})
+        MessageActions(onCopy = {}, onRetry = {})
     }
 }

@@ -75,16 +75,6 @@ class MessageActionsSheetTest {
     }
 
     @Test
-    fun `reading aloud offers to stop once it has started`() {
-        // One control with two meanings, and getting it the wrong way round leaves somebody
-        // tapping "read aloud" to silence a phone that is already talking.
-        showSheet(isSpeaking = true)
-
-        compose.onNodeWithText("Stop reading").assertIsDisplayed()
-        compose.onNodeWithText("Read aloud").assertDoesNotExist()
-    }
-
-    @Test
     fun `the measurements for this reply are shown`() {
         showSheet()
 
@@ -146,7 +136,6 @@ class MessageActionsSheetTest {
     @Suppress("LongParameterList")
     private fun showSheet(
         canRegenerate: Boolean = true,
-        isSpeaking: Boolean = false,
         onRegenerate: () -> Unit = {},
         onReport: () -> Unit = {},
         role: ChatRole = ChatRole.ASSISTANT,
@@ -171,9 +160,7 @@ class MessageActionsSheetTest {
                     canRegenerate = canRegenerate,
                     canEdit = canEdit,
                     canBranch = canBranch,
-                    isSpeaking = isSpeaking,
                     onRegenerate = onRegenerate,
-                    onToggleReadAloud = {},
                     onEdit = onEdit,
                     onSavePdf = onSavePdf,
                     onBranch = onBranch,

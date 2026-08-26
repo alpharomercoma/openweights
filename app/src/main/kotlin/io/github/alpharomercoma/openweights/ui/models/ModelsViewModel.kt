@@ -32,12 +32,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
-import io.github.alpharomercoma.openweights.core.generation.GenerationBundleSpec
-import io.github.alpharomercoma.openweights.core.generation.GenerationCatalog
-import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.Publishers
-import io.github.alpharomercoma.openweights.download.BundleDownloadWorker
 import io.github.alpharomercoma.openweights.download.ModelDownloadWorker
 import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +49,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/** A model file or generation bundle on disk. */
+/** A model file on disk. */
 data class LocalModel(
     val file: File,
     /** The projector paired with this model, when one has been downloaded. */
@@ -67,21 +63,14 @@ data class LocalModel(
      * and a wrong attribution is worse than none.
      */
     val publisher: String? = null,
-    val isBundle: Boolean = false,
-    val task: GenerationTask? = null,
-    val bundleSpec: GenerationBundleSpec? = null,
 ) {
-    val name: String get() = bundleSpec?.displayName ?: file.nameWithoutExtension
+    val name: String get() = file.nameWithoutExtension
 
     /** What this model occupies in total, projector included. */
-    val sizeBytes: Long get() = if (isBundle) {
-        file.walkTopDown().filter { it.isFile && it.name != ".complete" }.sumOf { it.length() }
-    } else {
-        file.length() + (projector?.length() ?: 0)
-    }
+    val sizeBytes: Long get() = file.length() + (projector?.length() ?: 0)
 
-    /** True when this model can read attachments or generate images on this device. */
-    val isMultimodal: Boolean get() = projector != null || task == GenerationTask.IMAGE
+    /** True when this model can read attachments on this device. */
+    val isMultimodal: Boolean get() = projector != null
 
     /**
      * True when the filename strongly suggests a vision-language model but no projector
@@ -91,18 +80,18 @@ data class LocalModel(
      * in the model list and picker so users know why the attachment button stays hidden.
      */
     val looksLikeVlm: Boolean
-        get() = !isBundle && projector == null && VLM_PATTERNS.any { pattern ->
-            file.name.contains(pattern, ignoreCase = true)
-        }
+        get() = projector == null &&
+            VLM_PATTERNS.any { pattern -> file.name.contains(pattern, ignoreCase = true) }
 
     private companion object {
         /** Substrings common to vision-language model filenames across every major family. */
-        val VLM_PATTERNS = listOf("-VL", "-vl", "Vision", "vision", "Llava", "llava",
+        val VLM_PATTERNS = listOf(
+            "-VL", "-vl", "Vision", "vision", "Llava", "llava",
             "Pixtral", "pixtral", "InternVL", "interVL", "QwenVL", "qwenvl", "Gemma3n",
-            "gemma3n", "phi-4-mm", "Phi-4-mm")
+            "gemma3n", "phi-4-mm", "Phi-4-mm",
+        )
     }
 }
-
 
 /** A download in flight, keyed by the file it is fetching. */
 data class ActiveDownload(
@@ -213,20 +202,9 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        val singleModels = modelStore.availableModels().map { file ->
+        val models = modelStore.availableModels().map { file ->
             LocalModel(file, modelStore.projectorFor(file), modelStore.publisherOf(file.name))
         }
-        val bundleModels = modelStore.availableBundles().mapNotNull { dir ->
-            val spec = GenerationCatalog.findByDirectory(dir.name) ?: return@mapNotNull null
-            LocalModel(
-                file = dir,
-                publisher = spec.repoId.substringBefore('/'),
-                isBundle = true,
-                task = spec.task,
-                bundleSpec = spec,
-            )
-        }
-        val models = bundleModels + singleModels
         local.update {
             it.copy(
                 models = models,
@@ -256,40 +234,6 @@ class ModelsViewModel @Inject constructor(
                     local.update { it.copy(avatars = it.avatars + (owner to url)) }
                 }
             }
-    }
-
-    /**
-     * Starts downloading a curated multi-file generation bundle.
-     */
-    fun downloadBundle(spec: GenerationBundleSpec) {
-        val key = spec.directoryName
-        val targetDir = modelStore.bundleDestination(spec.directoryName)
-        modelStore.rememberPublisher(
-            key,
-            spec.repoId.substringBefore('/', missingDelimiterValue = ""),
-        )
-
-        val request = OneTimeWorkRequestBuilder<BundleDownloadWorker>()
-            .setInputData(
-                workDataOf(
-                    BundleDownloadWorker.KEY_BUNDLE_ID to spec.id,
-                    BundleDownloadWorker.KEY_REPO_ID to spec.repoId,
-                    BundleDownloadWorker.KEY_TARGET_DIR to targetDir.absolutePath,
-                ),
-            )
-            .setConstraints(
-                Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
-            )
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
-            .addTag(ModelDownloadWorker.TAG_DOWNLOAD)
-            .addTag(ModelDownloadWorker.TAG_KEY + key)
-            .addTag(ModelDownloadWorker.TAG_REPO + spec.repoId)
-            .addTag(ModelDownloadWorker.TAG_PATH + spec.directoryName)
-            .addTag(ModelDownloadWorker.TAG_SIZE + spec.totalSizeBytes)
-            .build()
-
-        workManager.enqueueUniqueWork(key, ExistingWorkPolicy.KEEP, request)
-        dismissed.update { it - key }
     }
 
     /**
@@ -371,18 +315,6 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun delete(model: LocalModel) {
-        if (model.isBundle) {
-            if (!model.file.deleteRecursively()) {
-                local.update {
-                    it.copy(notice = context.getString(R.string.model_delete_failed, model.name))
-                }
-                return
-            }
-            modelStore.forgetPublisher(model.file.name)
-            refresh()
-            return
-        }
-
         // A mapped model can survive an unlink on some filesystems but not all engines
         // tolerate the backing file disappearing while a generation is in flight, so the
         // loaded model is not deleted out from under the engine. Said out loud, with the

@@ -25,9 +25,6 @@ room {
 
 dependencies {
     api(project(":core:common"))
-    // The gallery record and its query live with the generation interfaces, because both
-    // platforms read a gallery and only one of them has Room.
-    api(project(":core:generation"))
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)

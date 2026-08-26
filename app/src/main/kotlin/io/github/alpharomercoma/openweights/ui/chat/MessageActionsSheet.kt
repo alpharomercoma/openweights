@@ -30,14 +30,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CallSplit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,9 +66,7 @@ fun MessageActionsSheet(
     canRegenerate: Boolean,
     canEdit: Boolean,
     canBranch: Boolean,
-    isSpeaking: Boolean,
     onRegenerate: () -> Unit,
-    onToggleReadAloud: () -> Unit,
     /** Puts the question back in the composer and drops everything after it. */
     onEdit: () -> Unit,
     /** Opens a new conversation carrying everything up to and including this turn. */
@@ -119,24 +115,6 @@ fun MessageActionsSheet(
                     onDismiss()
                 },
             )
-            if (entry.role == ChatRole.ASSISTANT) {
-                // The one output modality a local model can add beyond text: the phone's
-                // own synthesiser reading what it wrote, with nothing leaving the device.
-                ActionRow(
-                    icon = if (isSpeaking) {
-                        Icons.Rounded.StopCircle
-                    } else {
-                        Icons.AutoMirrored.Rounded.VolumeUp
-                    },
-                    label = stringResource(
-                        if (isSpeaking) R.string.stop_reading else R.string.read_aloud,
-                    ),
-                    onClick = {
-                        onToggleReadAloud()
-                        onDismiss()
-                    },
-                )
-            }
             if (canRegenerate) {
                 ActionRow(
                     icon = Icons.Rounded.Refresh,

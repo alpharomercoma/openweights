@@ -18,7 +18,6 @@ package io.github.alpharomercoma.openweights.core.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -219,45 +218,4 @@ interface WatchDao {
         """,
     )
     suspend fun trimRuns(watchId: Long, keep: Int)
-}
-
-/**
- * Reading and writing what the phone made.
- *
- * Everything comes back newest first and unfiltered. Sorting and filtering are done above
- * this, in shared code both platforms run, so that an iOS gallery cannot quietly disagree
- * with an Android one about what "favourites, images, last week" means.
- */
-@Dao
-interface GalleryDao {
-    @Query("SELECT * FROM gallery ORDER BY createdAt DESC, id DESC")
-    fun observeAll(): Flow<List<GalleryEntity>>
-
-    @Query("SELECT * FROM gallery WHERE id = :id")
-    suspend fun byId(id: Long): GalleryEntity?
-
-    @Query("SELECT * FROM gallery ORDER BY createdAt DESC, id DESC")
-    suspend fun all(): List<GalleryEntity>
-
-    /**
-     * Records one output, replacing any row that already claims the same path.
-     *
-     * Replace rather than ignore, because the second write is the newer account of the same
-     * file: a retry that produced it again knows its real duration and backend, and the
-     * first row's numbers describe an attempt that no longer exists.
-     */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entry: GalleryEntity): Long
-
-    @Query("UPDATE gallery SET isFavourite = :favourite WHERE id = :id")
-    suspend fun setFavourite(id: Long, favourite: Boolean)
-
-    @Query("DELETE FROM gallery WHERE id = :id")
-    suspend fun delete(id: Long)
-
-    @Query("SELECT COALESCE(SUM(sizeBytes), 0) FROM gallery")
-    suspend fun totalBytes(): Long
-
-    @Query("SELECT COUNT(*) FROM gallery")
-    suspend fun count(): Int
 }

@@ -34,7 +34,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
-import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.ui.chat.ChatDestinations
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
@@ -44,8 +43,6 @@ import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverViewModel
-import io.github.alpharomercoma.openweights.ui.gallery.GalleryScreen
-import io.github.alpharomercoma.openweights.ui.gallery.GalleryViewModel
 import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
 import io.github.alpharomercoma.openweights.ui.models.ModelsViewModel
 import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
@@ -54,8 +51,6 @@ import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
 import io.github.alpharomercoma.openweights.ui.watch.WatchScreen
 import io.github.alpharomercoma.openweights.ui.watch.WatchViewModel
-import io.github.alpharomercoma.openweights.ui.generate.GenerateScreen
-import io.github.alpharomercoma.openweights.ui.generate.GenerateViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -73,14 +68,12 @@ import kotlinx.coroutines.flow.map
  */
 private object Routes {
     const val CHAT = "chat"
-    const val GALLERY = "gallery"
     const val MODELS = "models"
     const val DISCOVER = "discover"
     const val TOOLS = "tools"
     const val USAGE = "usage"
     const val WATCHES = "watches"
     const val SETTINGS = "settings"
-    const val GENERATE = "generate"
 }
 
 /** A twelfth of the screen: enough travel to read as arrival, small enough to stay quick. */
@@ -158,7 +151,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             val activeDownloads by remember { derivedStateOf { modelsUiState.downloads } }
 
             val state by chatViewModel.uiState.collectAsStateWithLifecycle()
-            val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
             val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
             val reportViewModel: ReportViewModel = hiltViewModel()
             // Collected from the board rather than mirrored into the chat state: it is
@@ -188,30 +180,18 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onEditAndResend = chatViewModel::editAndResend,
                 onBranchFrom = chatViewModel::branchFrom,
                 destinations = ChatDestinations(
-                    onOpenGallery = { navController.push(Routes.GALLERY) },
                     onOpenTools = { navController.push(Routes.TOOLS) },
                     onOpenUsage = { navController.push(Routes.USAGE) },
                     onOpenWatches = { navController.push(Routes.WATCHES) },
                     onOpenSettings = { navController.push(Routes.SETTINGS) },
                     onBrowseModels = { navController.push(Routes.DISCOVER) },
                     onManageModels = { navController.push(Routes.MODELS) },
-                    onOpenGenerate = { navController.push(Routes.GENERATE) },
                 ),
                 installedModels = installedModels,
                 activeDownloads = activeDownloads,
                 publisherAvatars = publisherAvatars,
                 onSelectModel = { model ->
-                    // Image/speech bundles are directories of MNN files, not a single GGUF a
-                    // chat engine can load — chatViewModel.loadModel(model.file, ...) reached
-                    // LlamaCppEngine's `require(modelFile.isFile)` with a directory and failed
-                    // with a confusing "model file does not exist". They're listed here (with
-                    // a badge) so the picker shows everything installed, but selecting one
-                    // routes to where it actually works instead of trying to chat-load it.
-                    when (model.task) {
-                        GenerationTask.IMAGE -> navController.push(Routes.GENERATE)
-                        GenerationTask.SPEECH -> Unit
-                        null -> chatViewModel.loadModel(model.file, keepConversation = true)
-                    }
+                    chatViewModel.loadModel(model.file, keepConversation = true)
                 },
                 onUnloadModel = chatViewModel::unloadModel,
                 onOpenConversation = {
@@ -236,8 +216,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onAttachDocument = chatViewModel::stageDocument,
                 onRemoveDocument = { chatViewModel.stageDocument(null) },
                 onRemoveStaged = chatViewModel::removeStaged,
-                onToggleReadAloud = mediaViewModel::toggleReadAloud,
-                isSpeaking = isSpeaking,
                 newCaptureUri = mediaViewModel::newCaptureUri,
                 dictation = dictation,
                 canDictate = mediaViewModel.canDictate,
@@ -260,23 +238,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         note = note,
                     )
                 },
-            )
-        }
-
-        composable(Routes.GALLERY) {
-            val viewModel: GalleryViewModel = hiltViewModel()
-            val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-            GalleryScreen(
-                state = state,
-                onSort = viewModel::sortBy,
-                onToggleModality = viewModel::toggleModality,
-                onToggleFavourites = viewModel::toggleFavouritesOnly,
-                onSearch = viewModel::search,
-                onClearFilters = viewModel::clearFilters,
-                onSetFavourite = viewModel::setFavourite,
-                onDelete = viewModel::delete,
-                onBack = navController::popBackStack,
             )
         }
 
@@ -336,10 +297,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                         navController.push(Routes.MODELS)
                     }
                 },
-                onDownloadBundle = { spec ->
-                    modelsViewModel.downloadBundle(spec)
-                    navController.push(Routes.MODELS)
-                },
                 onBack = navController::popBackStack,
             )
         }
@@ -386,29 +343,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSaveToken = viewModel::saveToken,
                 onClearToken = viewModel::clearToken,
                 onSelectTheme = viewModel::setTheme,
-                onBack = navController::popBackStack,
-            )
-        }
-
-        composable(Routes.GENERATE) {
-            val viewModel: GenerateViewModel = hiltViewModel()
-            val state by viewModel.state.collectAsStateWithLifecycle()
-
-            // Pick up any bundle that finished downloading while we were away.
-            LaunchedEffect(Unit) { viewModel.refreshBundles() }
-
-            GenerateScreen(
-                state = state,
-                onPromptChange = viewModel::setPrompt,
-                onStepsChange = viewModel::setSteps,
-                onSizeChange = viewModel::setSize,
-                onGenerate = viewModel::generate,
-                onCancel = viewModel::cancel,
-                onSelectBundle = viewModel::selectBundle,
-                onDismissError = viewModel::dismissError,
-                onBrowseModels = { navController.push(Routes.DISCOVER) },
-                onAttachReferenceImage = viewModel::attachReferenceImage,
-                onClearReferenceImage = viewModel::clearReferenceImage,
                 onBack = navController::popBackStack,
             )
         }

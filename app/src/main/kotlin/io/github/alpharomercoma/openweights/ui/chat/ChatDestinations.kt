@@ -30,7 +30,6 @@ package io.github.alpharomercoma.openweights.ui.chat
  * switch to.
  */
 data class ChatDestinations(
-    val onOpenGallery: () -> Unit = {},
     val onOpenTools: () -> Unit = {},
     val onOpenUsage: () -> Unit = {},
     /** Everything running on its own, and the one place to stop it. */
@@ -40,6 +39,4 @@ data class ChatDestinations(
     val onBrowseModels: () -> Unit = {},
     /** The installed list, which owns deleting a model and watching one arrive. */
     val onManageModels: () -> Unit = {},
-    /** On-device image generation with diffusion models. */
-    val onOpenGenerate: () -> Unit = {},
 )

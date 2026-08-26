@@ -21,13 +21,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -40,7 +37,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,8 +74,6 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.formatBy
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
-import io.github.alpharomercoma.openweights.core.generation.GenerationBundleSpec
-import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
 import io.github.alpharomercoma.openweights.core.hub.HubSort
@@ -106,7 +100,6 @@ fun DiscoverScreen(
     onCloseModel: () -> Unit,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
-    onDownloadBundle: (GenerationBundleSpec) -> Unit = {},
     /** Downloads already running, by destination filename, so a started one says so. */
     downloading: Map<String, Float> = emptyMap(),
     /**
@@ -244,25 +237,6 @@ fun DiscoverScreen(
             // results the same shape as the settings screen; a list looks like a list.
             LazyColumn(state = listState, contentPadding = PaddingValues(16.dp)) {
                 if (state.query.text.isBlank()) {
-                    item(key = "bundles-heading") {
-                        Text(
-                            text = stringResource(R.string.generation_bundles_heading),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 6.dp),
-                        )
-                    }
-                    items(
-                        io.github.alpharomercoma.openweights.core.generation.GenerationCatalog.ALL,
-                        key = { it.id },
-                    ) { spec ->
-                        GenerationBundleCard(
-                            spec = spec,
-                            onDownload = { onDownloadBundle(spec) },
-                            downloadFraction = downloading[spec.directoryName],
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
                     if (state.results.isNotEmpty()) {
                         item(key = "models-heading") {
                             Text(
@@ -532,65 +506,3 @@ private fun DiscoverScreenPreview() {
 /** The context lengths a user may pick, as the slider wants them. */
 private val CONTEXT_RANGE =
     ModelLoadParams.MIN_CONTEXT_LENGTH.toFloat()..ModelLoadParams.MAX_CONTEXT_LENGTH.toFloat()
-
-@Composable
-private fun GenerationBundleCard(
-    spec: GenerationBundleSpec,
-    onDownload: () -> Unit,
-    downloadFraction: Float?,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.md))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(spec.displayName, style = MaterialTheme.typography.titleMedium)
-                val taskLabel = when (spec.task) {
-                    GenerationTask.IMAGE -> stringResource(R.string.model_task_image)
-                    GenerationTask.SPEECH -> stringResource(R.string.model_task_speech)
-                }
-                Metric(
-                    listOf(formatBytes(spec.totalSizeBytes), spec.quantization, taskLabel)
-                        .joinToString(" · "),
-                )
-            }
-            if (downloadFraction == null) {
-                TextButton(
-                    onClick = onDownload,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary,
-                    ),
-                ) {
-                    Text(stringResource(R.string.download))
-                }
-            }
-        }
-        Text(
-            text = spec.description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (downloadFraction != null) {
-            LinearProgressIndicator(
-                progress = { downloadFraction.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            )
-            Caption(
-                if (downloadFraction >= 1f) {
-                    stringResource(R.string.download_verifying)
-                } else {
-                    "${(downloadFraction * 100).toInt()}%"
-                },
-            )
-        }
-    }
-}

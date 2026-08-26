@@ -31,9 +31,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CompactionEntity::class,
         WatchEntity::class,
         WatchRunEntity::class,
-        GalleryEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -43,10 +42,16 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
-    abstract fun gallery(): GalleryDao
 
     companion object {
         const val NAME = "openweights.db"
+
+        /** Drops the gallery: image/speech generation was removed. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS gallery")
+            }
+        }
 
         /**
          * Adds attachments to messages.

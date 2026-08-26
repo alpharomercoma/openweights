@@ -56,6 +56,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_3_4,
         OpenWeightsDatabase.MIGRATION_4_5,
         OpenWeightsDatabase.MIGRATION_5_6,
+        OpenWeightsDatabase.MIGRATION_6_7,
     )
 
     @Test
@@ -126,11 +127,10 @@ class MigrationTest {
     }
 
     @Test
-    fun `a gallery arrives on an upgrade with nothing lost from before it`() {
-        // The table is new, so the risk is not the table: it is everything already there.
-        // A conversation and a watch written under version five have to come through the
-        // same migration that adds it.
-        helper.createDatabase(5).use { db ->
+    fun `a gallery from before generation was removed is dropped without touching anything else`() {
+        // The table existed under version six. A conversation and a watch written alongside
+        // it have to come through the migration that removes it untouched.
+        helper.createDatabase(6).use { db ->
             db.execSQL(
                 "INSERT INTO conversations " +
                     "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
@@ -141,42 +141,26 @@ class MigrationTest {
                     "(id, task, everyMinutes, state, createdAt, runs, consecutiveFailures) " +
                     "VALUES (1, 'check the tides', 15, 'ACTIVE', 5, 0, 0)",
             )
+            db.execSQL(
+                "INSERT INTO gallery " +
+                    "(path, mediaType, modality, prompt, negativePrompt, bundleId, " +
+                    "bundleName, createdAt, totalMillis, backend, sizeBytes, isFavourite) " +
+                    "VALUES ('/pictures/1.png', 'image/png', 'IMAGE', 'a lighthouse', '', " +
+                    "'sd15', 'Stable Diffusion 1.5', 100, 9000, 'OpenCL', 0, 0)",
+            )
         }
 
-        helper.runMigrationsAndValidate(6, migrations.toList()).use { db ->
+        helper.runMigrationsAndValidate(7, migrations.toList()).use { db ->
             assertThat(db.textAt("SELECT title FROM conversations WHERE id = 1"))
                 .isEqualTo("About Ada")
             assertThat(db.textAt("SELECT task FROM watches WHERE id = 1"))
                 .isEqualTo("check the tides")
-
-            db.execSQL(
-                "INSERT INTO gallery " +
-                    "(path, mediaType, modality, prompt, bundleId, bundleName, createdAt, " +
-                    "totalMillis, backend) " +
-                    "VALUES ('/pictures/1.png', 'image/png', 'IMAGE', 'a lighthouse', " +
-                    "'sd15', 'Stable Diffusion 1.5', 100, 9000, 'OpenCL')",
-            )
-            assertThat(db.textAt("SELECT prompt FROM gallery WHERE path = '/pictures/1.png'"))
-                .isEqualTo("a lighthouse")
-        }
-    }
-
-    @Test
-    fun `one file cannot be recorded in the gallery twice`() {
-        // A generation writes its file and then records it. A process that dies between the
-        // two is resumed by a retry that writes the same path again, and without the unique
-        // index the picture appears twice and deleting one of them leaves a row pointing at
-        // nothing.
-        helper.createDatabase(5).use { }
-
-        helper.runMigrationsAndValidate(6, migrations.toList()).use { db ->
-            val insert = "INSERT INTO gallery " +
-                "(path, mediaType, modality, prompt, bundleId, bundleName, createdAt, " +
-                "totalMillis, backend) VALUES ('/pictures/1.png', 'image/png', 'IMAGE', " +
-                "'a lighthouse', 'sd15', 'Stable Diffusion 1.5', 100, 9000, 'OpenCL')"
-            db.execSQL(insert)
-
-            assertThat(runCatching { db.execSQL(insert) }.isFailure).isTrue()
+            assertThat(
+                db.intAt(
+                    "SELECT count(*) FROM sqlite_master " +
+                        "WHERE type = 'table' AND name = 'gallery'",
+                ),
+            ).isEqualTo(0)
         }
     }
 }

@@ -181,8 +181,6 @@ fun ChatScreen(
     onAttachDocument: (Uri) -> Unit = {},
     onRemoveDocument: () -> Unit = {},
     onRemoveStaged: (MessagePart.File) -> Unit = {},
-    onToggleReadAloud: (String) -> Unit = {},
-    isSpeaking: Boolean = false,
     newCaptureUri: () -> Uri = { Uri.EMPTY },
     dictation: DictationState = DictationState(),
     canDictate: Boolean = false,
@@ -241,10 +239,6 @@ fun ChatScreen(
                 // Closed on the way out, so returning from Settings does not land back on an
                 // open drawer over the conversation.
                 destinations = ChatDestinations(
-                    onOpenGallery = {
-                        scope.launch { drawerState.close() }
-                        destinations.onOpenGallery()
-                    },
                     onOpenTools = {
                         scope.launch { drawerState.close() }
                         destinations.onOpenTools()
@@ -260,10 +254,6 @@ fun ChatScreen(
                     onOpenSettings = {
                         scope.launch { drawerState.close() }
                         destinations.onOpenSettings()
-                    },
-                    onOpenGenerate = {
-                        scope.launch { drawerState.close() }
-                        destinations.onOpenGenerate()
                     },
                 ),
                 onNewChat = {
@@ -307,8 +297,6 @@ fun ChatScreen(
             onAttachDocument = onAttachDocument,
             onRemoveDocument = onRemoveDocument,
             onRemoveStaged = onRemoveStaged,
-            onToggleReadAloud = onToggleReadAloud,
-            isSpeaking = isSpeaking,
             newCaptureUri = newCaptureUri,
             dictation = dictation,
             canDictate = canDictate,
@@ -361,8 +349,6 @@ private fun ChatContent(
     onAttachDocument: (Uri) -> Unit,
     onRemoveDocument: () -> Unit,
     onRemoveStaged: (MessagePart.File) -> Unit,
-    onToggleReadAloud: (String) -> Unit,
-    isSpeaking: Boolean,
     newCaptureUri: () -> Uri,
     dictation: DictationState,
     canDictate: Boolean,
@@ -469,10 +455,8 @@ private fun ChatContent(
                         Transcript(
                             state = state,
                             listState = listState,
-                            isSpeaking = isSpeaking,
                             clipboard = clipboard,
                             onActionsForId = onActionsForId,
-                            onToggleReadAloud = onToggleReadAloud,
                             onRegenerate = onRegenerate,
                         )
                     }
@@ -630,8 +614,6 @@ private fun ChatContent(
         onSavePreferences = onSavePreferences,
         onResetPreferences = onResetPreferences,
         onRegenerate = onRegenerate,
-        onToggleReadAloud = onToggleReadAloud,
-        isSpeaking = isSpeaking,
         onDismissActions = { onActionsForId(null) },
         onEdit = { editingId = it.id },
         onBranch = { onBranchFrom(it.id) },
@@ -737,10 +719,8 @@ private fun FoldingLine() {
 private fun Transcript(
     state: ChatUiState,
     listState: androidx.compose.foundation.lazy.LazyListState,
-    isSpeaking: Boolean,
     clipboard: MessageClipboard,
     onActionsForId: (Long?) -> Unit,
-    onToggleReadAloud: (String) -> Unit,
     onRegenerate: () -> Unit,
 ) {
     val lastId = state.transcript.lastOrNull()?.id
@@ -772,12 +752,10 @@ private fun Transcript(
                     },
                     thermal = state.thermal,
                     celsius = state.deviceCelsius,
-                    isSpeaking = isSpeaking,
                     onMore = { onActionsForId(entry.id) },
                     // The answer, not the reasoning and not the tool steps: what a reader
                     // means by "copy the reply" is the reply.
                     onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
-                    onReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
                     // Only the last reply can be retried: regenerating an earlier one would
                     // silently discard everything said after it.
                     onRetry = onRegenerate.takeIf { entry.id == lastId && !state.isGenerating },
@@ -798,8 +776,6 @@ private fun ChatSheets(
     onSavePreferences: (ModelPreferences) -> Unit,
     onResetPreferences: () -> Unit,
     onRegenerate: () -> Unit,
-    onToggleReadAloud: (String) -> Unit,
-    isSpeaking: Boolean,
     onDismissActions: () -> Unit,
     /** Puts this turn's text back in the composer. The resend happens from there. */
     onEdit: (TranscriptEntry) -> Unit,
@@ -855,8 +831,6 @@ private fun ChatSheets(
             // and branching leaves this conversation exactly as it is.
             canEdit = entry.role == ChatRole.USER && entry.text.isNotBlank() && !state.isGenerating,
             canBranch = !state.isGenerating,
-            isSpeaking = isSpeaking,
-            onToggleReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
             onRegenerate = {
                 onRegenerate()
                 onDismissActions()
@@ -987,10 +961,8 @@ private fun AssistantTurn(
     activity: RuntimeState?,
     thermal: ThermalLevel,
     celsius: Float?,
-    isSpeaking: Boolean,
     onMore: () -> Unit,
     onCopy: () -> Unit,
-    onReadAloud: () -> Unit,
     onRetry: (() -> Unit)?,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1039,9 +1011,7 @@ private fun AssistantTurn(
         // answer, and a retry mid-stream is a stop the user did not ask for.
         if (!entry.isStreaming && entry.answer.isNotEmpty()) {
             MessageActions(
-                isSpeaking = isSpeaking,
                 onCopy = onCopy,
-                onReadAloud = onReadAloud,
                 onRetry = onRetry,
                 onMore = onMore,
                 modifier = Modifier.padding(top = 2.dp),

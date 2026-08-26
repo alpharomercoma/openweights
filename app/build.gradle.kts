@@ -155,7 +155,6 @@ dependencies {
     implementation(project(":core:tools"))
     implementation(project(":core:device"))
     implementation(project(":core:data"))
-    implementation(project(":core:generation-mnn"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

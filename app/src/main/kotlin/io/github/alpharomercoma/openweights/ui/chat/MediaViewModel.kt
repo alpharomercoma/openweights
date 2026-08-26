@@ -22,7 +22,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.Dictation
 import io.github.alpharomercoma.openweights.model.DictationState
-import io.github.alpharomercoma.openweights.model.SpeechReader
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
@@ -30,13 +29,12 @@ import javax.inject.Inject
  * The device's own media capabilities, as used from the chat screen.
  *
  * Separate from [ChatViewModel] because none of it is about producing a reply: it hands
- * the camera somewhere to write a photo and asks the synthesiser to read an answer out.
- * Both outlive no conversation and neither touches the model, and folding them in was
- * turning the chat view model into the place every unrelated capability landed.
+ * the camera somewhere to write a photo. Both outlive no conversation and neither touches
+ * the model, and folding them in was turning the chat view model into the place every
+ * unrelated capability landed.
  */
 @HiltViewModel
 class MediaViewModel @Inject constructor(
-    private val speech: SpeechReader,
     private val dictation: Dictation,
     private val attachments: AttachmentStore,
 ) : ViewModel() {
@@ -55,20 +53,7 @@ class MediaViewModel @Inject constructor(
         if (dictation.state.value.isListening) dictation.stop() else dictation.start(onFinal)
     }
 
-    val isSpeaking: StateFlow<Boolean> = speech.isSpeaking
-
-    /**
-     * Starts reading [text], or stops if a reply is already being read.
-     *
-     * One entry point rather than a start and a stop, because whether it is speaking is
-     * state this owns and a caller would only be mirroring it.
-     */
-    fun toggleReadAloud(text: String) {
-        if (isSpeaking.value) speech.stop() else speech.speak(text)
-    }
-
     override fun onCleared() {
         dictation.stop()
-        speech.release()
     }
 }

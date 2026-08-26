@@ -83,6 +83,12 @@ class FakeInferenceEngine : InferenceEngine {
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
+    /** When true, every call to [chat] throws instead of answering, standing in for a turn
+     * that could not complete. Stays true until unset, so a fixed number of failed calls in
+     * a row can be scripted for a caller that counts them.
+     */
+    var failChat = false
+
     /**
      * What each completion reports the context as holding.
      *
@@ -193,6 +199,7 @@ class FakeInferenceEngine : InferenceEngine {
     ): Flow<GenerationEvent> {
         prompts += messages
         offered += tools
+        if (failChat) return flow { throw LlamaException("the turn did not finish") }
         if (!hold) {
             val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)
             return flow {

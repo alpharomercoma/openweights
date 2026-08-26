@@ -27,11 +27,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
 import io.github.alpharomercoma.openweights.core.data.WatchRepository
+import io.github.alpharomercoma.openweights.di.ApplicationScope
 import io.github.alpharomercoma.openweights.runtime.GenerationService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -39,7 +39,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
-import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Keeps every active watch on a schedule, in the only two ways Android actually offers.
@@ -75,9 +74,12 @@ class WatchScheduler @Inject constructor(
      * something is actually due.
      */
     private val runner: Provider<WatchRunner>,
+    /**
+     * Injected so a test can hand over a `TestScope` and run a ticker's `delay` calls in
+     * virtual time instead of a real one. See [io.github.alpharomercoma.openweights.di.ApplicationScope].
+     */
+    @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + EmptyCoroutineContext)
-
     /** The in-process tickers, by watch id. Only the ones too fast for WorkManager. */
     private val tickers = mutableMapOf<Long, Job>()
 

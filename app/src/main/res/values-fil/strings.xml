@@ -192,6 +192,7 @@
     <string name="leave_mode">Umalis sa %1$s mode</string>
     <string name="show_more_answer">Ipakita ang natitira</string>
     <string name="show_less_answer">Ipakita nang kaunti</string>
+    <string name="question_from_model">Tinatanong ka ng modelo</string>
     <string name="system_prompt_detail">Mga permanenteng tagubilin, ipinapadala bago ang bawat pag-uusap. Mas nasusunod ng maliliit na modelo ang malinaw na tagubilin kaysa sa ipinahihiwatig.</string>
     <string name="tool_prompt_detail">Ipinapadala kasama ng mga tool, bago ang sarili mong prompt. Ito ang buong idinaragdag ng app.</string>
     <string name="thinking_detail">Pag-isipan muna. Mas mabagal, at mas mainam sa anumang may mga hakbang.</string>

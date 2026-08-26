@@ -206,6 +206,7 @@
     <string name="leave_mode">Salir del modo %1$s</string>
     <string name="show_more_answer">Mostrar el resto</string>
     <string name="show_less_answer">Mostrar menos</string>
+    <string name="question_from_model">El modelo te está preguntando</string>
     <string name="system_prompt_detail">Instrucciones permanentes, enviadas antes de cada conversación. Los modelos pequeños siguen mucho mejor las explícitas que las implícitas.</string>
     <string name="tool_prompt_detail">Se envía con las herramientas, antes de tu propio prompt. Esto es todo lo que añade la app.</string>
     <string name="thinking_detail">Que lo razone primero. Más lento, y mejor en cualquier cosa que tenga pasos.</string>

@@ -194,6 +194,7 @@
     <string name="leave_mode">الخروج من وضع %1$s</string>
     <string name="show_more_answer">عرض الباقي</string>
     <string name="show_less_answer">عرض أقل</string>
+    <string name="question_from_model">النموذج يسألك</string>
     <string name="system_prompt_detail">تعليمات ثابتة تُرسل قبل كل محادثة. النماذج الصغيرة تتبع التعليمات الصريحة أفضل بكثير من الضمنية.</string>
     <string name="tool_prompt_detail">تُرسل مع الأدوات، قبل رسالتك أنت. هذا كل ما يضيفه التطبيق.</string>
     <string name="thinking_detail">يفكر في الأمر أولًا. أبطأ، وأفضل في أي شيء له خطوات.</string>

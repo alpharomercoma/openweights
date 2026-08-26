@@ -181,6 +181,9 @@ class ChatScreenTest {
         )
 
         compose.onNodeWithText("Which folder did you mean?").assertIsDisplayed()
+        // The label this card was missing: reproduced live as "I didn't know that was a
+        // prompt for me" when the question read as one more status line among several.
+        compose.onNodeWithText("The model is asking you").assertIsDisplayed()
         compose.onNodeWithText("Notes").performClick()
 
         assert(answered == "Notes") { "the tapped option must reach the model, got $answered" }

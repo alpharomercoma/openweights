@@ -46,6 +46,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
+import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
@@ -61,6 +62,11 @@ import io.github.alpharomercoma.openweights.core.tools.UserQuestion
  * A single-choice question answers on the tap, because asking someone to choose and then
  * confirm is asking twice. A multiple-choice one has a button, because there is no other
  * moment at which the person is finished.
+ *
+ * Tinted and labelled rather than the same neutral grey as every other card here, because a
+ * reader who reproduced this said exactly the failure it caused: "I didn't know that was a
+ * prompt for me." A card that reads as one more status line among several sits there
+ * unanswered, and unanswered is where a plan-mode turn stops dead until somebody notices.
  */
 @Composable
 fun QuestionCard(
@@ -76,12 +82,20 @@ fun QuestionCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(Radius.sm))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(12.dp)
             .semantics { contentDescription = "Question" },
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(text = question.text, style = MaterialTheme.typography.titleSmall)
+        Caption(
+            text = stringResource(R.string.question_from_model),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Text(
+            text = question.text,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
 
         if (question.options.isNotEmpty()) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

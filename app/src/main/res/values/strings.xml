@@ -230,6 +230,7 @@
     <string name="leave_mode">Leave %1$s mode</string>
     <string name="show_more_answer">Show the rest</string>
     <string name="show_less_answer">Show less</string>
+    <string name="question_from_model">The model is asking you</string>
     <string name="system_prompt_detail">Standing instructions, sent before every conversation. Small models follow explicit ones far better than implied ones.</string>
     <string name="tool_prompt_detail">Sent with the tools, before your own prompt. This is the whole of what the app adds.</string>
     <string name="thinking_detail">Work it through first. Slower, and better on anything with steps in it.</string>

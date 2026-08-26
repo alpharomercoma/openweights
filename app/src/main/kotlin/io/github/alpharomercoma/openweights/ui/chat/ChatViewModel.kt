@@ -1651,6 +1651,13 @@ class ChatViewModel @Inject constructor(
             planAfter.steps[i].done && planBefore.steps.getOrNull(i)?.done != true
         }
         val skippedAhead = newlyDone.isNotEmpty() && newlyDone != listOf(stepIndex)
+        // Calling `advance` on a step that was already done closes nothing: `newlyDone` stays
+        // empty, exactly as if the model had not called it at all, and the branch below would
+        // read that as silence and tick the *next* step on the model's behalf with no evidence
+        // it was worked on — the same failure `skippedAhead` exists to catch, reached from the
+        // other direction. A stale or wrong step number is treated the same as too many.
+        val calledAdvance = lastTurnSteps.any { it is AgentStep.Ran && it.call.name == "advance" }
+        val advancedNothing = calledAdvance && newlyDone.isEmpty()
 
         when {
             brief.requiresWebEvidence && verifiedSources.isEmpty() -> {
@@ -1671,6 +1678,16 @@ class ChatViewModel @Inject constructor(
                     it.copy(
                         error = "This step closed more than the one it was given, so it " +
                             "was not marked done.",
+                    )
+                }
+            }
+
+            advancedNothing -> {
+                turns.planning.restore(planBefore)
+                _uiState.update {
+                    it.copy(
+                        error = "This step's advance call did not close the step it was " +
+                            "given, so it was not marked done.",
                     )
                 }
             }

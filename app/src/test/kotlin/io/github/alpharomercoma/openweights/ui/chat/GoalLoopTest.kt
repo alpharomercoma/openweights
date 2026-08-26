@@ -434,6 +434,46 @@ class GoalLoopTest : ChatFixture() {
         }
 
     /**
+     * Found in an agy review of the fix above: `advance` on a step that is already done
+     * closes nothing, which reads exactly like the model calling no tool at all — the plan's
+     * done count does not move either way — so the app's own fallback for "the model
+     * finished but forgot to call the tool" stepped in and ticked the *next* step with no
+     * evidence it was worked on. A wrong or stale step number is not silence; it is a step
+     * that has to be asked again, the same as calling `advance` on too many at once.
+     */
+    @Test
+    fun `advance on a step already done does not silently close the next one instead`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass(
+                "1. Do the first thing\n2. Do the second thing\n3. Do the third thing",
+            )
+            // Step one: no tool call, so the app's own fallback closes it — this is the
+            // ordinary, legitimate case that fallback exists for.
+            engine.scripted += ScriptedPass("Done with the first thing.")
+            // Step two: the model calls advance on step one again, already done, instead of
+            // on the step it was actually given.
+            engine.scripted += ScriptedPass(
+                text = "",
+                toolCalls = listOf(
+                    ToolCall(id = "a", name = "advance", argumentsJson = """{"step":1}"""),
+                ),
+            )
+
+            viewModel.startGoal("Do three things")
+            awaitGoalSettled()
+
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
+            // Three real steps and one rejected, wasted attempt at the second: four turns
+            // pointed at a single step, not three. Silently accepting the stale advance call
+            // as though it had closed step two would have needed only three.
+            val stepTurns = engine.prompts.count { convo ->
+                convo.any { it.text.contains("Carry out this one step of the plan") }
+            }
+            assertThat(stepTurns).isEqualTo(4)
+        }
+
+    /**
      * The exact shape codex's loop-engineering review found: a goal interrupted by the
      * process dying comes back HALTED so a person can review it, and restoring the last chat
      * on the next launch reopens that goal's own conversation automatically. reopen used to

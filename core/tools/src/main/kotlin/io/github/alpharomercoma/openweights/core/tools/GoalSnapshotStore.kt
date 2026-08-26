@@ -34,6 +34,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -100,6 +101,7 @@ class GoalSnapshotStore private constructor(private val preferences: SharedPrefe
         put("stepsTaken", JsonPrimitive(snapshot.goal.stepsTaken))
         put("state", JsonPrimitive(snapshot.goal.state.name))
         snapshot.goal.note?.let { put("note", JsonPrimitive(it)) }
+        snapshot.goal.conversationId?.let { put("conversationId", JsonPrimitive(it)) }
         snapshot.goal.plan?.let { plan ->
             put(
                 "plan",
@@ -129,10 +131,15 @@ class GoalSnapshotStore private constructor(private val preferences: SharedPrefe
         require(stepsTaken in 0..Goal.MAX_STEPS)
         val state = root.requiredText("state").let { GoalState.valueOf(it) }
         val note = root.optionalText("note", MAX_NOTE_CHARS)
+        // Absent in a snapshot written before this field existed. Null reads the same as a
+        // goal that has always had no conversation of its own would, which is the right
+        // default for one nobody can place any more: treated as belonging to whichever
+        // conversation is open, exactly as every goal did before this existed.
+        val conversationId = root["conversationId"]?.jsonPrimitive?.longOrNull
         val plan = root["plan"]?.jsonArray?.toPlan()
         val steering = root["steering"]?.jsonArray?.toSteering().orEmpty()
         return GoalSnapshot(
-            goal = Goal(task, plan, stepsTaken, state, note),
+            goal = Goal(task, plan, stepsTaken, state, note, conversationId),
             steering = steering,
         )
     }

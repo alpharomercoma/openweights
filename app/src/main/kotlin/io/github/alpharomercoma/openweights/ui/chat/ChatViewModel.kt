@@ -1500,7 +1500,7 @@ class ChatViewModel @Inject constructor(
         // "did a plan come back" passed on a plan this goal never proposed and could go on to
         // run steps that belonged to the last one.
         turns.planning.clear()
-        goals.start(task)
+        goals.start(task, conversationId)
         // Held across the whole goal, including the gaps between steps where the turn's own
         // hold is not in force. Released in work()'s finally, whatever ends it.
         GenerationService.hold(appContext, GenerationService.GOAL, brief.notification)
@@ -1639,18 +1639,43 @@ class ChatViewModel @Inject constructor(
         if (!turn(stepPrompt(brief, step.text, steering))) return StepOutcome.STOP
 
         val verifiedSources = lastTurnSteps.correlatedWebResearchSources()
-        if (brief.requiresWebEvidence && verifiedSources.isEmpty()) {
-            // Undo an eager `advance` call before retrying. A model saying it searched is
-            // not evidence that a source was actually reached.
-            turns.planning.restore(planBefore)
-            _uiState.update {
-                it.copy(
-                    error = "This research step did not successfully search and read a " +
-                        "source, so it was not marked done.",
-                )
+        // What the turn is pointed at is exactly one step, but nothing before this stopped
+        // the model calling `advance` more than once in the same turn — several sequential
+        // tool calls are one round to AgentRunner, and each one ticks whichever step it
+        // names. A single turn could finish the whole plan at once and still pass the
+        // evidence check above, which only asks whether some step was researched, not
+        // which one or how many.
+        val planAfter = turns.planning.plan.value ?: proposed
+        val stepIndex = planBefore.steps.indexOfFirst { !it.done }
+        val newlyDone = planAfter.steps.indices.filter { i ->
+            planAfter.steps[i].done && planBefore.steps.getOrNull(i)?.done != true
+        }
+        val skippedAhead = newlyDone.isNotEmpty() && newlyDone != listOf(stepIndex)
+
+        when {
+            brief.requiresWebEvidence && verifiedSources.isEmpty() -> {
+                // Undo an eager `advance` call before retrying. A model saying it searched
+                // is not evidence that a source was actually reached.
+                turns.planning.restore(planBefore)
+                _uiState.update {
+                    it.copy(
+                        error = "This research step did not successfully search and read " +
+                            "a source, so it was not marked done.",
+                    )
+                }
             }
-        } else {
-            researchSources += verifiedSources
+
+            skippedAhead -> {
+                turns.planning.restore(planBefore)
+                _uiState.update {
+                    it.copy(
+                        error = "This step closed more than the one it was given, so it " +
+                            "was not marked done.",
+                    )
+                }
+            }
+
+            else -> researchSources += verifiedSources
         }
         val failure = _uiState.value.error
         return if (failure != null) {
@@ -1865,8 +1890,14 @@ class ChatViewModel @Inject constructor(
 
         // See newChat: stopping only the turn in flight leaves a goal's own loop free to
         // read the board, find itself still running, and start its next step against
-        // whichever conversation is open by the time it wakes — this one, mid-switch.
-        if (goals.goal.value?.isRunning == true) stopGoal() else stop()
+        // whichever conversation is open by the time it wakes — this one, mid-switch. Not
+        // when the running goal already belongs to the conversation being reopened, though:
+        // that is the same case the cleanup below carves out, and stopping a goal because
+        // someone reopened the very chat it is already working in would be a switch that
+        // never happened.
+        val runningElsewhere = goals.goal.value?.isRunning == true &&
+            goals.goal.value?.conversationId != id
+        if (runningElsewhere) stopGoal() else stop()
         generationJob?.join()
 
         if (conversation == null) {
@@ -1885,12 +1916,21 @@ class ChatViewModel @Inject constructor(
         // The board is one object for the whole app, so a plan left in it is on screen in
         // whatever chat is opened next and is pinned to the tail of that chat's prompt.
         // newChat has always cleared it; this is the switch people actually use.
-        turns.planning.clear()
-        // Same reasoning as newChat: a goal (and any question it left pending) belongs to
-        // the conversation that started it, not to whichever one is opened next. Safe to
-        // clear unconditionally now that a running one has already been stopped above.
-        goals.clear()
-        turns.asking.cancel()
+        //
+        // Not when the goal on the board is tagged with the very conversation being opened,
+        // though: that is recovery, not a switch. A goal interrupted by the process dying
+        // comes back HALTED so a person can review it, and reopening its own conversation on
+        // the next launch — which restoring the last chat does automatically — used to read
+        // as leaving it behind and clear it before anyone had a chance to see it come back.
+        if (goals.goal.value?.conversationId != id) {
+            turns.planning.clear()
+            // Same reasoning: a goal (and any question it left pending) belongs to the
+            // conversation that started it, not to whichever one is opened next. Safe to
+            // clear unconditionally here — a still-running one has already been stopped
+            // above — because this branch is only reached when it belongs elsewhere.
+            goals.clear()
+            turns.asking.cancel()
+        }
 
         // A conversation continued under a different model would mix two models'
         // voices in one transcript, and the history would not say which said what.

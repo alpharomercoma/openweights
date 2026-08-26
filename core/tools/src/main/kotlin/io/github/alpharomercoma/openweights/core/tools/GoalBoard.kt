@@ -69,10 +69,10 @@ class GoalBoard @Inject constructor(private val snapshots: GoalSnapshotStore) {
         current.value?.let { goal -> persist(goal, pending.value) }
     }
 
-    fun start(task: String) {
+    fun start(task: String, conversationId: Long? = null) {
         synchronized(lock) {
             pending.value = emptyList()
-            current.value = Goal(task = task)
+            current.value = Goal(task = task, conversationId = conversationId)
             persist(current.value, pending.value)
         }
     }

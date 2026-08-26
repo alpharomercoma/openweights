@@ -164,7 +164,15 @@ class WatchScheduler @Inject constructor(
                         // One bad tick must not end the loop, and a cancellation must.
                         // `runCatching` alone caught both and told nobody about either.
                         try {
-                            runner.get().tick(watch.id)
+                            // Null is [WatchRunner.tick]'s own signal that recording this
+                            // tick was what stopped the watch — the third failure, or a
+                            // pause that landed between the read above and this call. Acted
+                            // on here rather than left for the top of the loop, which would
+                            // have delayed a full period first: a notification and a
+                            // foreground hold the watch no longer needs, kept for up to
+                            // fourteen more minutes for no reason other than not having
+                            // looked yet.
+                            if (runner.get().tick(watch.id) == null) break
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {

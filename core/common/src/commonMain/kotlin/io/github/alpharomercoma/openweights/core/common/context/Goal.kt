@@ -47,6 +47,17 @@ data class Goal(
     val state: GoalState = GoalState.PLANNING,
     /** Why it stopped, when it stopped for a reason worth showing. */
     val note: String? = null,
+    /**
+     * The conversation this goal was started from, or null for one recovered from a
+     * snapshot written before this field existed.
+     *
+     * What tells a goal being restored into the same conversation it was interrupted in
+     * apart from the app switching to a different one. Without it, reopening any
+     * conversation — including the one a recovered goal already belongs to — read as a
+     * switch away from it and cleared the very recovery [afterInterruption] had just made
+     * visible.
+     */
+    val conversationId: Long? = null,
 ) {
     val isRunning: Boolean get() = state == GoalState.PLANNING || state == GoalState.WORKING
 

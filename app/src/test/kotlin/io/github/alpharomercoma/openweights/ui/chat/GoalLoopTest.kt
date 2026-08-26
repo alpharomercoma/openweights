@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -400,6 +401,90 @@ class GoalLoopTest : ChatFixture() {
         assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
         assertThat(viewModel.uiState.value.mode).isEqualTo(AgentMode.YOLO)
     }
+
+    /**
+     * The exact shape codex's loop-engineering review found: what the model is pointed at is
+     * exactly one step, but a plan is closed by the same `advance` tool call regardless of
+     * how many times a turn calls it, so nothing stopped one turn ticking every step of a
+     * two-step plan at once and reporting the whole goal finished, having genuinely worked
+     * through half of it.
+     */
+    @Test
+    fun `a turn that closes more than the one step it was given is rolled back and redone`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("1. Do the first thing\n2. Do the second thing")
+            engine.scripted += ScriptedPass(
+                text = "",
+                toolCalls = listOf(
+                    ToolCall(id = "a", name = "advance", argumentsJson = """{"step":1}"""),
+                    ToolCall(id = "b", name = "advance", argumentsJson = """{"step":2}"""),
+                ),
+            )
+
+            viewModel.startGoal("Do two things")
+            awaitGoalSettled()
+
+            val goal = goals.goal.value
+            assertThat(goal?.state).isEqualTo(GoalState.DONE)
+            // A single tool round allowed to close both steps at once would have counted as
+            // one step taken for a two-step plan. Rolled back and worked through one at a
+            // time, as every other step is, counts two.
+            assertThat(goal?.stepsTaken).isEqualTo(2)
+        }
+
+    /**
+     * The exact shape codex's loop-engineering review found: a goal interrupted by the
+     * process dying comes back HALTED so a person can review it, and restoring the last chat
+     * on the next launch reopens that goal's own conversation automatically. reopen used to
+     * clear any goal on the board unconditionally, which read that restoration as a switch
+     * away from the goal and erased the very recovery the board had just made visible.
+     */
+    @Test
+    fun `reopening the conversation a halted goal belongs to does not clear it`() =
+        runTest(dispatcher) {
+            loadModel()
+            val id = chats.startConversation("recovering", "model-a")
+            viewModel.openConversation(id)
+            settle()
+            engine.hold = true
+            viewModel.startGoal("Something long")
+            settle()
+            assertThat(goals.goal.value?.isRunning).isTrue()
+
+            // Stands in for the process dying and the board recovering the goal as HALTED,
+            // without actually restarting the process this test runs in.
+            goals.halt("Interrupted when the app stopped. Review the plan before starting again.")
+            settle()
+
+            viewModel.openConversation(id)
+            settle()
+
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.HALTED)
+        }
+
+    /** The other half of the fix above: a goal still has to give way when what is opened is
+     * genuinely a different conversation than the one it belongs to.
+     */
+    @Test
+    fun `opening a different conversation still clears a halted goal left over from another`() =
+        runTest(dispatcher) {
+            loadModel()
+            val first = chats.startConversation("first", "model-a")
+            val second = chats.startConversation("second", "model-a")
+            viewModel.openConversation(first)
+            settle()
+            engine.hold = true
+            viewModel.startGoal("Something long")
+            settle()
+            goals.halt("Interrupted when the app stopped. Review the plan before starting again.")
+            settle()
+
+            viewModel.openConversation(second)
+            settle()
+
+            assertThat(goals.goal.value).isNull()
+        }
 
     /**
      * Drains until the goal stops running, or gives up.

@@ -317,6 +317,54 @@ class GoalLoopTest : ChatFixture() {
         }
 
     /**
+     * The literal sentence complained about, scripted verbatim as the planning turn's reply.
+     * Where the earlier bug ended: the model says exactly "I don't have the current
+     * information stored", nothing parses as a plan, and the goal used to halt right there
+     * with "No plan came back" — a refusal, and nothing tried. This asserts the goal instead
+     * reaches a step turn with `web_search` on offer, which is "research iteratively" at the
+     * code level: the one sentence that used to end the run is not the last thing that
+     * happens to it. (Whether that step turn then goes on to find and prove a source is
+     * `research that never actually searched halts instead of reporting it done`'s question,
+     * not this one — the two are deliberately independent: refusing to plan and refusing to
+     * accept unverified research as done are different failure modes with different fixes.)
+     */
+    @Test
+    fun `the model saying it does not have the information does not end a research goal`() =
+        runTest(dispatcher) {
+            // Tools are rendered to the engine only when its own template reports it can
+            // carry them (see TurnRunner's `native`); this test checks that `web_search`
+            // reached the engine, not only that the app considered it available, so the fake
+            // has to claim the same support a real tool-capable template would.
+            engine.supportsTools = true
+            loadModel()
+            engine.scripted += ScriptedPass(
+                "I don't have the current information stored, so I can't provide a direct " +
+                    "answer right now. Let me know how you'd like to proceed.",
+            )
+
+            viewModel.startResearch("who is alpha romer coma")
+            settle()
+
+            // Not halted on the refusal it was given — the fallback plan in e192989 means
+            // this run does not stop at the planning turn, so a plan exists at all.
+            assertThat(goals.goal.value?.note).isNotEqualTo(
+                "No plan came back, so there is nothing to work through.",
+            )
+            assertThat(goals.goal.value?.plan?.steps?.map { it.text })
+                .containsExactly("who is alpha romer coma")
+            // A step turn ran, pointed at the actual question, with the tool that answers it
+            // on offer — the goal went on to try to research rather than stopping at the
+            // planning turn's refusal.
+            val stepTurn = engine.prompts.firstOrNull { convo ->
+                convo.any { it.text.contains("Research this one question") }
+            }
+            assertThat(stepTurn).isNotNull()
+            assertThat(requireNotNull(stepTurn).last().text).contains("who is alpha romer coma")
+            assertThat(engine.offered.any { defs -> defs.any { it.name == "web_search" } })
+                .isTrue()
+        }
+
+    /**
      * The exact shape reported live, three times in a row on a physical device: asked to
      * plan a subject it did not recognise, the model answered in prose — "I don't have the
      * current information stored" — rather than proposing anything, tool or no tool. This

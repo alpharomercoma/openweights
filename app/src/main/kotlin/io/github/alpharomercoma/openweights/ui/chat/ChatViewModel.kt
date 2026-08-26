@@ -476,6 +476,18 @@ class ChatViewModel @Inject constructor(
     private var offerAskOverride: Boolean? = null
 
     /**
+     * Overrides the configured tool prompt for the next turn only, consumed by [openTurn]
+     * the same way [offerAskOverride] is consumed by [generate].
+     *
+     * Set before a research step. The configured prompt defaults to "you already know the
+     * answer to most questions", tuned for ordinary chat where a needless search is the
+     * failure worth avoiding; a research step is already past that decision; the plan
+     * would not have this question on it if the answer were assumed known. Sent as-is that
+     * instruction argues with the very turn asking the model to search.
+     */
+    private var toolPromptOverride: String? = null
+
+    /**
      * Searching the history, collected beside this state rather than inside it.
      *
      * Built here rather than injected because it needs this view model's scope: a search in
@@ -1180,7 +1192,9 @@ class ChatViewModel @Inject constructor(
         }
 
         val state = _uiState.value
-        val conversation = state.engineMessages()
+        val conversation = state.engineMessages(
+            toolPromptOverride = toolPromptOverride.also { toolPromptOverride = null },
+        )
         if (conversation.isEmpty()) {
             // Callers claim the busy state before this point to close the double-tap
             // window, so nothing to send has to give it back.
@@ -1598,6 +1612,11 @@ class ChatViewModel @Inject constructor(
         val planBefore = turns.planning.plan.value ?: proposed
         val doneBefore = planBefore.steps.count { it.done }
         _uiState.update { it.copy(error = null) }
+        // The configured tool prompt defaults to "you already know the answer to most
+        // questions", which is right for ordinary chat and argues with the one turn whose
+        // entire purpose is searching: this step exists because the plan already decided
+        // the answer was not already known. See RESEARCH_STEP_TOOL_PROMPT.
+        if (brief.requiresWebEvidence) toolPromptOverride = RESEARCH_STEP_TOOL_PROMPT
         if (!turn(stepPrompt(brief, step.text, steering))) return StepOutcome.STOP
 
         val verifiedSources = lastTurnSteps.correlatedWebResearchSources()
@@ -2482,6 +2501,23 @@ private const val GOAL_STEP_PREFIX: String =
         "steps."
 
 /**
+ * Replaces the configured tool prompt for a research step. See [ChatViewModel.step].
+ *
+ * The configured default opens with "you already know the answer to most questions", which
+ * is the right bias for ordinary chat and the wrong one here: a research step only exists
+ * because the plan already decided the answer was not already known, and telling the model
+ * to lean on memory anyway is what let a step answer "I don't have the current information
+ * stored" instead of searching for it.
+ */
+private const val RESEARCH_STEP_TOOL_PROMPT: String =
+    "This step exists to search, not to answer from memory: the plan already decided this " +
+        "question needed one. Search the web for it and read a real source before " +
+        "answering. If the first search does not settle it, change the query and search " +
+        "again rather than answering from what you already believe or saying you cannot " +
+        "know — one weak search is not evidence the answer is unavailable, only that the " +
+        "first query was."
+
+/**
  * Where a goal stops rather than flatten the phone.
  *
  * Fifteen percent, which is the band Android itself starts warning in. Working on its own is
@@ -2518,8 +2554,13 @@ private const val MARKDOWN_STYLE: String =
 /**
  * What actually gets sent to the model: the compaction summary, if any, followed by the
  * turns that were not folded into it.
+ *
+ * @param toolPromptOverride Replaces [ModelPreferences.toolPrompt] for this one turn. The
+ *   configured prompt is tuned for ordinary chat, where reaching for a tool the model
+ *   probably does not need is the failure worth avoiding; a research step is the opposite
+ *   case; see the override research steps pass.
  */
-internal fun ChatUiState.engineMessages(): List<ChatMessage> {
+internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): List<ChatMessage> {
     val instructions = listOfNotNull(
         // A model cannot tell that "this year's final" is past its training data if nobody
         // tells it what year it is, and it will answer from memory rather than look. Eight
@@ -2538,7 +2579,11 @@ internal fun ChatUiState.engineMessages(): List<ChatMessage> {
         // mode the user chose and it changes how the model is meant to answer. Gated on
         // tools being available, "/plan" with everything switched off sent no instruction
         // at all and the mode was a silent no-op.
-        toolInstruction(mode, preferences.toolPrompt, anyTools = toolsAvailable),
+        toolInstruction(
+            mode,
+            toolPromptOverride ?: preferences.toolPrompt,
+            anyTools = toolsAvailable,
+        ),
     ).joinToString("\n\n")
 
     val system = instructions

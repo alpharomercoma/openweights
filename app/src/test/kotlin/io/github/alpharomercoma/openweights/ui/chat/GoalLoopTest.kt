@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -239,6 +240,29 @@ class GoalLoopTest : ChatFixture() {
 
         assertThat(turns.asking.offered).isTrue()
     }
+
+    /**
+     * The exact shape reported live: a research step answered "I don't have the current
+     * information stored" instead of searching. The configured tool prompt defaults to
+     * "you already know the answer to most questions", which argues with a turn whose whole
+     * point is that the plan already decided the answer was not known.
+     */
+    @Test
+    fun `a research step's own turn overrides the tool prompt to push searching`() =
+        runTest(dispatcher) {
+            loadModel()
+            plans.propose("1. Find what changed\n2. Write it up")
+
+            viewModel.startResearch("What changed in Android 16 for foreground services?")
+            awaitGoalSettled()
+
+            val stepTurn = engine.prompts.first { convo ->
+                convo.any { it.text.contains("Research this one question") }
+            }
+            val system = stepTurn.first { it.role == ChatRole.SYSTEM }.text
+            assertThat(system).contains("This step exists to search")
+            assertThat(system).doesNotContain("Do not search to double check")
+        }
 
     @Test
     fun `research that never actually searched halts instead of reporting it done`() =

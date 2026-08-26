@@ -67,6 +67,41 @@ class EngineMessagesTest {
         assertThat(system.text).contains("Today is")
     }
 
+    /**
+     * A research step's own turn against the configured default: the reported failure was
+     * the model answering "I don't have the current information stored" instead of
+     * searching, because the default tells it not to bother.
+     */
+    @Test
+    fun `an override replaces the configured tool prompt rather than adding to it`() {
+        val state = ChatUiState(
+            transcript = transcript(1),
+            mode = AgentMode.AUTO,
+            supportsTools = true,
+            toolsAvailable = true,
+        )
+
+        val system = state.engineMessages(toolPromptOverride = "Search first, always.")
+            .single { it.role == ChatRole.SYSTEM }
+
+        assertThat(system.text).contains("Search first, always.")
+        assertThat(system.text).doesNotContain("Do not search to double check")
+    }
+
+    @Test
+    fun `with no override the configured tool prompt is unchanged`() {
+        val state = ChatUiState(
+            transcript = transcript(1),
+            mode = AgentMode.AUTO,
+            supportsTools = true,
+            toolsAvailable = true,
+        )
+
+        val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
+
+        assertThat(system.text).contains("Do not search to double check")
+    }
+
     @Test
     fun `a model with every tool switched off is not told it can look things up`() {
         val state = ChatUiState(

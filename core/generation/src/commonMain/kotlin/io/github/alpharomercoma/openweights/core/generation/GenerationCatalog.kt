@@ -99,7 +99,7 @@ object GenerationCatalog {
         runtime = GenerationRuntime.MNN,
         mnnModelType = 2, // SANA_DIFFUSION
         directoryName = "sana-edit-v2-mnn",
-        totalSizeBytes = 1_601_619_806L,
+        totalSizeBytes = 1_601_624_654L,
         files = listOf(
             // config.json — MNN reads this to discover model paths within the bundle
             BundleFileSpec("config.json", "config.json", 810L),
@@ -130,6 +130,16 @@ object GenerationCatalog {
                 sha256 = "5e80d4e591af78cca31b6e4cf4ee4ead410e9d2f64ee34c73cf5b633def16e0c"),
             BundleFileSpec("llm/tokenizer.txt", "llm/tokenizer.txt", 3_193_562L),
             BundleFileSpec("llm/llm.mnn.json", "llm/llm.mnn.json", 1_006_495L),
+            // Without this, the loader has no way to know this checkpoint's embedding table is
+            // tied into llm.mnn.weight (its "tie_embeddings" field) rather than a separate file,
+            // falls back to the wrong default of a standalone embeddings_bf16.bin -- which this
+            // checkpoint doesn't ship -- and the LLM prompt encoder silently fails to load.
+            BundleFileSpec("llm/llm_config.json", "llm/llm_config.json", 4_638L,
+                sha256 = "2e45095efda4d17853d8b565f7f354210d3f14f97ac24b24a87a5ab771f5980a"),
+            // SanaLlm's C++ constructor opens "<llm dir>/config.json" directly (not
+            // llm.mnn.json or llm_config.json above) for its own runtime settings.
+            BundleFileSpec("llm/config.json", "llm/config.json", 210L,
+                sha256 = "c4bd25dbbc950feffccc3b154d634fdfbce96fbed453dd738bda4abfc763b73a"),
         ),
         quantization = "Q4_K (4-bit)",
         minimumFreeBytes = 3_500_000_000L,
@@ -180,15 +190,15 @@ object GenerationCatalog {
         licence = "OpenRAIL",
     )
 
-    // SANA_EDIT_V2 is deliberately excluded from ALL: it's an image-*editing* model (conditioned
-    // primarily on a reference image), not a text-to-image one. Fed the all-zero reference latent
-    // that pure text-to-image mode requires, it converges (that bug is fixed) but produces content
-    // unrelated to the prompt — confirmed against Alibaba's own reference usage of this exact
-    // checkpoint, not a wiring bug on our side. Stable Diffusion 1.5 is the app's text-to-image
-    // model until a genuine text-to-image checkpoint is sourced/converted, or Sana is wired up as
-    // an image-editing feature (starting from a real photo) instead. The spec is kept below,
-    // reachable by id/directory, so that work isn't lost.
-    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SUPERTONIC_TTS)
+    // SANA_EDIT_V2 was excluded from ALL for a while: it's an image-*editing* model (conditioned
+    // primarily on a reference image), not a text-to-image one, and fed the all-zero reference
+    // latent that pure text-to-image mode requires, it converges but produces content unrelated
+    // to the prompt — confirmed against Alibaba's own reference usage of this exact checkpoint,
+    // not a wiring bug on our side. Stable Diffusion 1.5 remains the app's text-to-image model.
+    // Re-listed now that GenerateScreen has a reference-image picker gated on
+    // ImageCapability.supportsImageEdit, so this bundle is only ever driven the way it was
+    // trained to be.
+    val ALL: List<GenerationBundleSpec> = listOf(STABLE_DIFFUSION_1_5, SANA_EDIT_V2, SUPERTONIC_TTS)
 
     val ALL_INCLUDING_UNLISTED: List<GenerationBundleSpec> =
         listOf(STABLE_DIFFUSION_1_5, SANA_EDIT_V2, SUPERTONIC_TTS)

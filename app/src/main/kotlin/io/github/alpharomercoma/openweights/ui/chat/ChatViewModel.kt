@@ -1476,6 +1476,11 @@ class ChatViewModel @Inject constructor(
         goals.stop()
         goalJob?.cancel()
         stop()
+        // A goal stopped mid-question leaves ask_user suspended on nothing worth resuming:
+        // the turn it belonged to is not going to finish either way. Without this the
+        // question card outlived the goal it came from, asking on behalf of a run that had
+        // already ended.
+        turns.asking.cancel()
     }
 
     /**
@@ -1749,6 +1754,13 @@ class ChatViewModel @Inject constructor(
             runtime.resetContext()
             conversationId = null
             turns.planning.clear()
+            // The board is one object for the whole app: a goal left over from the chat just
+            // left behind would otherwise be on screen here too, its card naming a task this
+            // conversation never asked for. Left alone only while it is still running, since
+            // that means the engine is genuinely busy and the card is the one thing on
+            // screen saying why nothing here can be sent yet.
+            if (goals.goal.value?.isRunning != true) goals.clear()
+            turns.asking.cancel()
             _uiState.update {
                 it.copy(
                     transcript = emptyList(),
@@ -1814,6 +1826,10 @@ class ChatViewModel @Inject constructor(
         // whatever chat is opened next and is pinned to the tail of that chat's prompt.
         // newChat has always cleared it; this is the switch people actually use.
         turns.planning.clear()
+        // Same reasoning as newChat: a goal (and any question it left pending) belongs to
+        // the conversation that started it, not to whichever one is opened next.
+        if (goals.goal.value?.isRunning != true) goals.clear()
+        turns.asking.cancel()
 
         // A conversation continued under a different model would mix two models'
         // voices in one transcript, and the history would not say which said what.

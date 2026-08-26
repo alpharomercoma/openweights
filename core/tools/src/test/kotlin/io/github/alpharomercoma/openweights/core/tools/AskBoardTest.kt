@@ -102,6 +102,27 @@ class AskBoardTest {
     }
 
     @Test
+    fun `cancelling a pending question resolves it the same way an empty answer does`() = runTest {
+        var result: String? = null
+        launch { result = ask.run(call("""{"question":"Which folder?"}""")) }
+        runCurrent()
+        assertThat(board.pending.value).isNotNull()
+
+        board.cancel()
+        runCurrent()
+
+        assertThat(result).contains("Choose for them")
+        assertThat(board.pending.value).isNull()
+    }
+
+    @Test
+    fun `cancelling with nothing pending does nothing`() {
+        // A goal that stops, or a chat left for another one, calls this whether or not a
+        // question happened to be open. It must be a no-op the rest of the time.
+        board.cancel()
+    }
+
+    @Test
     fun `the tool is invisible unless the mode has opened it`() {
         // A fourth tool on every routing decision costs tokens once and accuracy again. This
         // one is only useful while deciding what to do, so it is only there then.

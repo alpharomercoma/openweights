@@ -84,6 +84,19 @@ class AskBoard @Inject constructor() {
     fun answer(reply: String) {
         waiting?.complete(reply)
     }
+
+    /**
+     * Releases whatever question is pending, without an answer.
+     *
+     * For a goal that stopped, or a conversation left for another one, while [ask] was still
+     * suspended: the turn that asked is going nowhere either way, so completing it with
+     * nothing lets [AskUserTool.run] finish the same way a person declining to answer would,
+     * rather than leaving that coroutine suspended forever and this board showing a question
+     * that belongs to a chat no longer on screen.
+     */
+    fun cancel() {
+        waiting?.complete("")
+    }
 }
 
 /**

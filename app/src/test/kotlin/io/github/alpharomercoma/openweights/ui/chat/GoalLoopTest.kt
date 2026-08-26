@@ -19,7 +19,9 @@ package io.github.alpharomercoma.openweights.ui.chat
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.GoalState
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.UserQuestion
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -120,6 +122,57 @@ class GoalLoopTest : ChatFixture() {
         assertThat(goals.goal.value?.isRunning).isFalse()
         assertThat(viewModel.uiState.value.isGenerating).isFalse()
     }
+
+    /**
+     * The exact shape reported live: a goal stopped, but the question it had asked stayed on
+     * screen with no way to satisfy it, because the coroutine that had been waiting for an
+     * answer was never told the run it belonged to was already over.
+     */
+    @Test
+    fun `stopping a goal releases a question it left pending`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+        viewModel.startGoal("Something long")
+        settle()
+
+        var answer: String? = null
+        launch { answer = turns.asking.ask(UserQuestion("Which one?")) }
+        settle()
+        assertThat(turns.asking.pending.value).isNotNull()
+
+        viewModel.stopGoal()
+        settle()
+
+        assertThat(turns.asking.pending.value).isNull()
+        assertThat(answer).isEqualTo("")
+    }
+
+    /**
+     * The board is one object for the whole app, so a goal that finished in one conversation
+     * used to still be there, naming its old task, the moment a different one was opened.
+     */
+    @Test
+    fun `starting a new chat clears a goal and question left over from another one`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.startGoal("Something long")
+            settle()
+            viewModel.stopGoal()
+            settle()
+            assertThat(goals.goal.value?.isRunning).isFalse()
+
+            var answer: String? = null
+            launch { answer = turns.asking.ask(UserQuestion("Which one?")) }
+            settle()
+
+            viewModel.newChat()
+            settle()
+
+            assertThat(goals.goal.value).isNull()
+            assertThat(turns.asking.pending.value).isNull()
+            assertThat(answer).isEqualTo("")
+        }
 
     @Test
     fun `what is typed while a goal runs is kept for the next step`() = runTest(dispatcher) {

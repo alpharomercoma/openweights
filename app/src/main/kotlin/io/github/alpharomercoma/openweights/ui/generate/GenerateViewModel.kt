@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.generate
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,7 +33,10 @@ import io.github.alpharomercoma.openweights.core.generation.GenerationTask
 import io.github.alpharomercoma.openweights.core.generation.ImageCapability
 import io.github.alpharomercoma.openweights.core.generation.ImageRequest
 import io.github.alpharomercoma.openweights.core.generation.ImageSize
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.generation.mnn.MnnImageGenerator
+import io.github.alpharomercoma.openweights.model.AttachmentResult
+import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.runtime.GenerationService
 import kotlinx.coroutines.CancellationException
@@ -79,6 +83,9 @@ data class GenerateUiState(
      */
     val isLoadingCapability: Boolean = false,
     val prompt: String = "",
+    /** A picture to edit rather than generate from scratch. Only settable when [capability]'s
+     * `supportsImageEdit` is true. */
+    val referenceImage: MessagePart.File? = null,
     val steps: Int = 10,
     val guidance: Float = 4.5f,
     val size: ImageSize = ImageSize(512, 512),
@@ -98,6 +105,7 @@ private const val TAG = "GenerateVM"
 class GenerateViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val modelStore: ModelStore,
+    private val attachmentStore: AttachmentStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(GenerateUiState())
@@ -166,6 +174,10 @@ class GenerateViewModel @Inject constructor(
 
     fun selectBundle(spec: GenerationBundleSpec) {
         if (_state.value.selectedBundleSpec?.id == spec.id) return
+        // A reference image staged for one model's img2img path is meaningless to another --
+        // keeping it around silently would let a switch to SD 1.5 leave a picture attached
+        // that its request never reads, with nothing on screen explaining why.
+        clearReferenceImage()
         _state.update { it.copy(selectedBundleSpec = spec, capability = null, error = null) }
         viewModelScope.launch { loadBundle(spec) }
     }
@@ -219,6 +231,31 @@ class GenerateViewModel @Inject constructor(
     }
 
     fun setPrompt(text: String) = _state.update { it.copy(prompt = text, error = null) }
+
+    /** Stages [uri] as the picture to edit. Replaces and discards whatever was staged before. */
+    fun attachReferenceImage(uri: Uri) {
+        val previous = _state.value.referenceImage
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = attachmentStore.store(uri)) {
+                is AttachmentResult.Stored -> {
+                    val picked = result.files.first()
+                    _state.update { it.copy(referenceImage = picked, error = null) }
+                    previous?.let { attachmentStore.discard(it) }
+                }
+                is AttachmentResult.TooLarge ->
+                    _state.update { it.copy(error = "That image is too large to attach.") }
+                AttachmentResult.Unreadable ->
+                    _state.update { it.copy(error = "Could not read that image.") }
+            }
+        }
+    }
+
+    fun clearReferenceImage() {
+        val current = _state.value.referenceImage ?: return
+        _state.update { it.copy(referenceImage = null) }
+        viewModelScope.launch(Dispatchers.IO) { attachmentStore.discard(current) }
+    }
+
     fun setSteps(steps: Int) = _state.update { it.copy(steps = steps.coerceAtLeast(1)) }
     fun setGuidance(guidance: Float) = _state.update { it.copy(guidance = guidance) }
     fun setSize(size: ImageSize) = _state.update { it.copy(size = size) }
@@ -236,6 +273,9 @@ class GenerateViewModel @Inject constructor(
                 steps = s.steps,
                 guidance = s.guidance,
                 seed = System.currentTimeMillis(),
+                referenceImage = s.referenceImage
+                    ?.takeIf { s.capability?.supportsImageEdit == true }
+                    ?.let { Artifact(it.path, it.mediaType) },
             )
             _state.update { it.copy(isGenerating = true, progressStep = 0, error = null) }
             GenerationService.hold(context, HOLDER, "Generating image\u2026")

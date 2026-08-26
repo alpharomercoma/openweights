@@ -16,6 +16,10 @@
 
 package io.github.alpharomercoma.openweights.ui.generate
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -44,8 +48,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
@@ -81,11 +87,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.generation.GenerationBundleSpec
 import io.github.alpharomercoma.openweights.core.generation.ImageSize
 import kotlinx.coroutines.delay
+import java.io.File
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -101,6 +109,8 @@ fun GenerateScreen(
     onSelectBundle: (GenerationBundleSpec) -> Unit,
     onDismissError: () -> Unit,
     onBrowseModels: () -> Unit,
+    onAttachReferenceImage: (Uri) -> Unit,
+    onClearReferenceImage: () -> Unit,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -159,6 +169,8 @@ fun GenerateScreen(
                 onGenerate = onGenerate,
                 onCancel = onCancel,
                 onSelectBundle = onSelectBundle,
+                onAttachReferenceImage = onAttachReferenceImage,
+                onClearReferenceImage = onClearReferenceImage,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -174,8 +186,14 @@ private fun GenerateContent(
     onGenerate: () -> Unit,
     onCancel: () -> Unit,
     onSelectBundle: (GenerationBundleSpec) -> Unit,
+    onAttachReferenceImage: (Uri) -> Unit,
+    onClearReferenceImage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val pickImage = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> uri?.let(onAttachReferenceImage) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -205,6 +223,20 @@ private fun GenerateContent(
             step = state.progressStep,
             totalSteps = state.steps,
         )
+
+        // Reference image — only for models whose capability says they can edit one.
+        if (state.capability?.supportsImageEdit == true) {
+            ReferenceImagePicker(
+                referenceImage = state.referenceImage,
+                enabled = !state.isGenerating,
+                onPick = {
+                    pickImage.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                onClear = onClearReferenceImage,
+            )
+        }
 
         // Prompt field.
         OutlinedTextField(
@@ -304,6 +336,66 @@ private fun GenerateContent(
         Spacer(Modifier.height(8.dp))
     }
 }
+
+/**
+ * The picture being edited, or a button to pick one.
+ *
+ * Shown only for a model whose capability says it can edit -- Sana Edit V2's native run()
+ * already branches text2img/img2img on whether an input image path is non-empty, so this is
+ * the one control that actually reaches that branch.
+ */
+@Composable
+private fun ReferenceImagePicker(
+    referenceImage: MessagePart.File?,
+    enabled: Boolean,
+    onPick: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (referenceImage == null) {
+        FilledTonalButton(
+            onClick = onPick,
+            enabled = enabled,
+            modifier = modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null)
+            Text(
+                stringResource(R.string.generate_add_reference_image),
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        return
+    }
+
+    Box(modifier = modifier.size(REFERENCE_THUMB_SIZE)) {
+        AsyncImage(
+            model = File(referenceImage.path),
+            contentDescription = stringResource(R.string.generate_reference_image),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(Radius.sm))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        IconButton(
+            onClick = onClear,
+            enabled = enabled,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(28.dp)
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f), RoundedCornerShape(50)),
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.generate_remove_reference_image),
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+private val REFERENCE_THUMB_SIZE = 96.dp
 
 @Composable
 private fun BundlePicker(

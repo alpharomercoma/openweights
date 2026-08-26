@@ -231,6 +231,9 @@
     <string name="generate_button">توليد</string>
     <string name="generate_stop">إيقاف</string>
     <string name="generate_step_of">الخطوة %1$d من %2$d</string>
+    <string name="generate_add_reference_image">أضف صورة مرجعية للتعديل عليها</string>
+    <string name="generate_reference_image">الصورة المرجعية</string>
+    <string name="generate_remove_reference_image">إزالة الصورة المرجعية</string>
     <string name="generate_no_bundle_title">لم يتم تنزيل نموذج صور</string>
     <string name="generate_no_bundle_body">نزّل حزمة توليد من شاشة الاستكشاف للبدء في توليد الصور على هذا الجهاز.</string>
     <string name="generate_browse_models">استعراض النماذج</string>

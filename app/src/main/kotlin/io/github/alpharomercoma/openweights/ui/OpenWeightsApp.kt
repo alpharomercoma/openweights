@@ -407,6 +407,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSelectBundle = viewModel::selectBundle,
                 onDismissError = viewModel::dismissError,
                 onBrowseModels = { navController.push(Routes.DISCOVER) },
+                onAttachReferenceImage = viewModel::attachReferenceImage,
+                onClearReferenceImage = viewModel::clearReferenceImage,
                 onBack = navController::popBackStack,
             )
         }

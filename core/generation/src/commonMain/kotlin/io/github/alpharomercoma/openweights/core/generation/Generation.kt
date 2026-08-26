@@ -100,6 +100,8 @@ data class ImageCapability(
      * about the one thing a stop button is for, so a caller that needs to know asks.
      */
     val supportsCancellation: Boolean,
+    /** True when the runtime can edit a reference image rather than only generating from text. */
+    val supportsImageEdit: Boolean = false,
     val backend: String,
 )
 
@@ -128,6 +130,8 @@ data class ImageRequest(
     val guidance: Float,
     /** Null for a new one each time, which is the right default for a creative tool. */
     val seed: Long? = null,
+    /** A picture to edit rather than start from noise, for runtimes whose capability says they can. */
+    val referenceImage: Artifact? = null,
 )
 
 data class SpeechRequest(

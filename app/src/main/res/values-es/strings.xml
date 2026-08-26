@@ -243,6 +243,9 @@
     <string name="generate_button">Generar</string>
     <string name="generate_stop">Detener</string>
     <string name="generate_step_of">Paso %1$d de %2$d</string>
+    <string name="generate_add_reference_image">Añadir imagen de referencia para editar</string>
+    <string name="generate_reference_image">Imagen de referencia</string>
+    <string name="generate_remove_reference_image">Quitar imagen de referencia</string>
     <string name="generate_no_bundle_title">Ningún modelo de imagen descargado</string>
     <string name="generate_no_bundle_body">Descarga un paquete de generación desde la pantalla Descubrir para comenzar a generar imágenes en este dispositivo.</string>
     <string name="generate_browse_models">Explorar modelos</string>

@@ -207,7 +207,7 @@ class MnnImageGenerator internal constructor(
                                     sessionHandle = open,
                                     resourcePath = currentBundle.directory().absolutePath,
                                     prompt = request.prompt,
-                                    inputImagePath = "",
+                                    inputImagePath = request.referenceImage?.path.orEmpty(),
                                     outputPath = target.absolutePath,
                                     width = request.size.width,
                                     height = request.size.height,
@@ -354,6 +354,9 @@ class MnnImageGenerator internal constructor(
             supportsNegativePrompt = false,
             supportsPreview = false,
             supportsCancellation = true,
+            // The "Edit" in Sana Edit V2: the native run() already branches text2img/img2img on
+            // whether an input image path is non-empty. SD 1.5 has no such branch.
+            supportsImageEdit = true,
             backend = backend.ifBlank { "CPU" },
         )
         else -> ImageCapability(

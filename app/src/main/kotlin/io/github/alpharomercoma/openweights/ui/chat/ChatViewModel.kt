@@ -466,6 +466,16 @@ class ChatViewModel @Inject constructor(
     private var goalJob: Job? = null
 
     /**
+     * Overrides whether the next turn offers ask_user, consumed the moment [generate] reads
+     * it so it cannot leak into the turn after the one it was set for.
+     *
+     * Set immediately before the one turn that needs it — a research brief's own planning
+     * turn — rather than threaded as a parameter through [send], which every ordinary
+     * message also calls and has no reason to know this exists.
+     */
+    private var offerAskOverride: Boolean? = null
+
+    /**
      * Searching the history, collected beside this state rather than inside it.
      *
      * Built here rather than injected because it needs this view model's scope: a search in
@@ -1268,6 +1278,9 @@ class ChatViewModel @Inject constructor(
                 if (!applyThreadPlan()) return@launch
 
                 isDecoding = true
+                // Consumed here and only here: whatever this turn was set to override, the
+                // next one starts with nothing overridden unless it sets its own.
+                val offerAsk = offerAskOverride.also { offerAskOverride = null }
                 produced = turns.run(
                     conversation = conversation,
                     params = state.preferences.toSamplerParams(),
@@ -1287,6 +1300,7 @@ class ChatViewModel @Inject constructor(
                     // question the model is about to answer.
                     notes = state.toolNotes,
                     listener = listener,
+                    offerAsk = offerAsk,
                 )
                 // Here, so a turn that used a tool is written down once. Skipped by both
                 // catches below, where finishInterrupted writes what was produced instead.
@@ -1503,6 +1517,7 @@ class ChatViewModel @Inject constructor(
         val researchSources = linkedSetOf<String>()
         try {
             setMode(AgentMode.PLAN)
+            offerAskOverride = if (brief.offersAskDuringPlan) null else false
             if (!turn("${brief.plan}\n\n$task")) return
             val proposed = turns.planning.plan.value
             if (proposed == null || proposed.steps.isEmpty()) {
@@ -2388,6 +2403,15 @@ private data class Brief(
     val executionMode: AgentMode? = null,
     /** Whether each step must prove a correlated web search and page fetch. */
     val requiresWebEvidence: Boolean = false,
+    /**
+     * Whether the planning turn is offered ask_user at all.
+     *
+     * True for a goal, where the action is going to touch the user's own files and a
+     * genuine ambiguity is worth a question before anything runs. False for research: the
+     * prompt alone saying not to ask was not enough, measured against exactly the failure
+     * that motivated it, so the tool is not offered rather than merely discouraged.
+     */
+    val offersAskDuringPlan: Boolean = true,
 ) {
     companion object {
         val GOAL = Brief(
@@ -2426,6 +2450,7 @@ private data class Brief(
             step = "Research this one question. Search the web, read the best source you " +
                 "find, and report what it says along with the address you found it at. Do " +
                 "not research the other questions.",
+            offersAskDuringPlan = false,
             finish = "Now write the findings up as one document in Markdown. Start with a " +
                 "heading, then the answer in a few short sections. End with a Sources " +
                 "section listing the addresses you used. Do not search again: write only " +

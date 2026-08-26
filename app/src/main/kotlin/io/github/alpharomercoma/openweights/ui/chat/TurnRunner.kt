@@ -151,8 +151,9 @@ class TurnRunner @Inject constructor(
         withTools: Boolean,
         notes: ToolNotes,
         listener: TurnListener,
+        offerAsk: Boolean? = null,
     ): String = engineInUse.withLock {
-        turn(conversation, params, mode, withTools, notes, listener)
+        turn(conversation, params, mode, withTools, notes, listener, offerAsk)
     }
 
     /**
@@ -170,10 +171,11 @@ class TurnRunner @Inject constructor(
         withTools: Boolean,
         notes: ToolNotes,
         listener: TurnListener,
+        offerAsk: Boolean? = null,
     ): String? {
         if (!engineInUse.tryLock()) return null
         return try {
-            turn(conversation, params, mode, withTools, notes, listener)
+            turn(conversation, params, mode, withTools, notes, listener, offerAsk)
         } finally {
             engineInUse.unlock()
         }
@@ -186,6 +188,7 @@ class TurnRunner @Inject constructor(
         withTools: Boolean,
         notes: ToolNotes,
         listener: TurnListener,
+        offerAsk: Boolean? = null,
     ): String {
         // Read once per turn, not once per app start: a tool switched off mid-conversation
         // should be off for the next thing asked, and a registry captured at construction
@@ -199,7 +202,13 @@ class TurnRunner @Inject constructor(
         // that knows the mode and the line below is the thing that reads the answer. Asking a
         // clarifying question is only useful while deciding what to do, and every tool in the
         // catalogue makes the choice between the others harder.
-        asks.offered = mode == AgentMode.PLAN
+        //
+        // [offerAsk] overrides this for the one turn that needs it: a research brief's own
+        // planning turn, where the model not recognising its subject is not the ambiguity
+        // this tool exists for, and offering it anyway is what let a small model ask who
+        // the subject was instead of researching it. Null everywhere else, which is every
+        // other turn there is.
+        asks.offered = offerAsk ?: (mode == AgentMode.PLAN)
         // The switches only govern what the user was offered a switch for. Plan mode's own
         // two tools are machinery, so they follow availability alone; a stale "off" left in
         // the preferences by the screen that used to list them must not disable them now.

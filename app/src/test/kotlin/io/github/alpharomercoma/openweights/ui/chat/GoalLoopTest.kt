@@ -209,6 +209,37 @@ class GoalLoopTest : ChatFixture() {
             assertThat(planningPrompt).contains("not a reason to ask first")
         }
 
+    /**
+     * The instruction alone was measured not to be enough: asked not to, the model asked who
+     * Alpha Romer was anyway. This is the fix that actually holds — the tool is not offered
+     * during a research brief's planning turn at all, so there is nothing for a small model
+     * to reach for instead of writing the question down.
+     */
+    @Test
+    fun `ask_user is not offered during a research planning turn`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+
+        viewModel.startResearch("who is alpha romer coma")
+        settle()
+
+        assertThat(turns.asking.offered).isFalse()
+    }
+
+    /** The same tool, left alone for a goal: an action on the user's own files can be worth
+     * a genuine question before anything runs, which is what plan mode's own tuning is for.
+     */
+    @Test
+    fun `ask_user is still offered during a goal's planning turn`() = runTest(dispatcher) {
+        loadModel()
+        engine.hold = true
+
+        viewModel.startGoal("Tidy the notes folder")
+        settle()
+
+        assertThat(turns.asking.offered).isTrue()
+    }
+
     @Test
     fun `research that never actually searched halts instead of reporting it done`() =
         runTest(dispatcher) {

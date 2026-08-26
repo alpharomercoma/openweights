@@ -91,10 +91,12 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
         <!--
-             Keeps the process alive while the model answers. The subtype string is what Play
-             asks about at review, and the answer is in docs/play-store.md: this app runs a
-             language model on the device's own processor, and a reply the user asked for has
-             to be allowed to finish when they put the phone down.
+             Keeps the process alive while the model answers, for a reply in front of the
+             user and for a Watch checking on its own schedule alike. The subtype string is
+             what Play asks about at review, and the answer is in docs/play-store.md: this
+             app runs a language model on the device's own processor, and work the user
+             asked for, once or on a schedule they set, has to be allowed to finish when
+             they put the phone down.
         -->
         <service
             android:name=".runtime.GenerationService"
@@ -102,7 +104,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="On-device language model inference the user started and is waiting for" />
+                android:value="On-device language model inference the user asked for, right away or on a schedule they set" />
         </service>
         <!--
              WorkManager's own initializer would build a default configuration before the

@@ -137,7 +137,7 @@ the declaration form and a video.
 | Type | Service | What it is for |
 | --- | --- | --- |
 | `dataSync` | WorkManager's `SystemForegroundService` | Downloading a model the user chose |
-| `specialUse` | `runtime.GenerationService` | Letting a reply finish when the app is not on screen |
+| `specialUse` | `runtime.GenerationService` | Letting a reply, a goal, or a Watch's own check finish when the app is not on screen |
 
 #### 1. `dataSync`, for downloads
 
@@ -164,44 +164,62 @@ the app, the notification still counting up, and Cancel stopping it.
 
 #### 2. `specialUse`, for generation
 
-Added when the app learned to keep answering after the user leaves the screen. `specialUse`
-is the type Play scrutinises hardest, because it is the one with no fixed meaning, so the
-declaration has to carry the measurement rather than an assertion.
+Added when the app learned to keep answering after the user leaves the screen, and extended
+without a new declaration when a Watch learned to check on its own schedule: both hold the
+same service, for the same reason, and Play asks about the service, not the feature that
+happens to be using it at the moment. `specialUse` is the type Play scrutinises hardest,
+because it is the one with no fixed meaning, so the declaration has to carry the measurement
+rather than an assertion.
 
 The manifest already states the subtype, and the Console answer should match it:
 
 ```
-On-device language model inference the user started and is waiting for
+On-device language model inference the user asked for, right away or on a schedule they set
 ```
 
 - **What the service does.** Keeps the app's process running while a language model, loaded
-  from the user's own storage, produces a reply the user asked for. It transfers nothing and
-  contacts nothing: all of the work is arithmetic on this device's own processor.
+  from the user's own storage, produces a reply, works through a goal, or runs one tick of a
+  Watch the user set up. It transfers nothing and contacts nothing: all of the work is
+  arithmetic on this device's own processor.
 - **Why it has to run in the foreground.** Measured on an Android 14 phone: backgrounding
   the app mid-reply takes its `oom_score_adj` from 0 to between 400 and 700, puts it in the
   cached process state, and the process then accumulates **zero** CPU ticks. Android freezes
   cached processes, so a reply in flight does not slow down, it stops. With the service the
   same measurement reads `oom_score_adj` 50, process state 4, and 1,440 CPU ticks over ten
-  seconds. A reply takes tens of seconds on a phone and a goal takes minutes; without this
-  the user has to watch the screen for the whole of it.
+  seconds. A reply takes tens of seconds on a phone, a goal takes minutes, and a Watch is the
+  same turn run again on the schedule the user picked; none of them run at all if the process
+  is frozen the moment the screen goes off.
 - **Why no other type fits.** `dataSync` is for transferring data, which this does not do,
   and misdeclaring it would be worse than asking; Android 15 also caps it at six hours a
-  day. `shortService` ends after three minutes, which is shorter than one long answer on a
-  mid-range chip. `mediaPlayback`, `camera`, `location`, `phoneCall`, `connectedDevice`,
-  `mediaProjection`, `health` and `remoteMessaging` describe things the app does not do.
+  day, which a Watch checking for weeks would exceed. `shortService` ends after three
+  minutes, which is shorter than one long answer on a mid-range chip and far shorter than a
+  Watch's own lifetime. `mediaPlayback`, `camera`, `location`, `phoneCall`,
+  `connectedDevice`, `mediaProjection`, `health` and `remoteMessaging` describe things the
+  app does not do.
 - **Why not WorkManager instead.** The work is not deferrable and not restartable. It is one
-  reply, in progress, holding the model's KV cache in memory; a worker that was killed and
-  retried would start the answer again from nothing, and the cache it rebuilt would cost the
-  user the eleven to nineteen seconds of prefill measured elsewhere in this repository.
+  reply or one Watch tick, in progress, holding the model's KV cache in memory; a worker that
+  was killed and retried would start the answer again from nothing, and the cache it rebuilt
+  would cost the user the eleven to nineteen seconds of prefill measured elsewhere in this
+  repository. A Watch checking more often than every fifteen minutes also cannot be
+  WorkManager's `PeriodicWorkRequest` at all: that API refuses to repeat faster than fifteen
+  minutes, silently rounding a shorter interval up, which is why a fast Watch holds this
+  service instead and a fifteen-minute-or-slower one uses `PeriodicWorkRequest` as its own
+  backstop rather than holding anything.
 - **User visibility and control.** A low-importance notification says what is happening and
-  opens the app when tapped. It appears only while the model is producing something the user
-  started, and it is taken down the moment the turn ends, however it ends, including when it
-  is cancelled or fails.
+  opens the app when tapped. For a reply or a goal it appears only while the model is
+  producing something the user started, and is taken down the moment the turn ends, however
+  it ends, including when it is cancelled or fails. For a Watch checking faster than every
+  fifteen minutes, the same notification stays up for as long as that Watch is active, names
+  the check by the task the user gave it, and is taken down the moment the user stops or
+  removes it, or three checks in a row fail.
 
 The video needs to show: asking a question, the notification appearing, leaving the app, the
 reply still arriving when you come back, and the notification gone once it has finished. If
 the goal feature is being demonstrated in the same video, show it advancing through more
-than one step with the app off screen, since that is the case the service exists for.
+than one step with the app off screen. If a Watch faster than fifteen minutes is being
+demonstrated, show it being set up, the notification appearing and naming the check, at
+least one tick landing in the Watching screen with the app off screen, and the notification
+gone once the Watch is stopped — since that is the other case the service exists for.
 
 ## Data safety form
 
@@ -384,23 +402,24 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
   unless a user opens an issue. The pre-launch report partly covers this, which is why
   `mapping.txt` has to go up with the bundle.
-- **The web tools are on by default, and nothing leaves before somebody says so.** This used
-  to be the gap: `web_search` ships switched on and the default mode runs it without asking,
-  so a question could reach a search engine before the user had opened the Tools tab.
-  `fetch_url` never had the problem, because the address is the model's to choose and it
-  therefore asks every time.
+- **The web tools are on by default, and the default mode runs them without asking.**
+  `web_search` and `fetch_url` both ship switched on, in `ToolSwitches`, for the reason
+  documented there: a tool that ships off is a feature nobody finds. There was once a
+  one-time prompt before the first thing either tool ever sent, so that discovery and
+  consent were the same event; it is gone, deliberately, per the note at
+  `AgentRunner.allowed`. An agent that stops to ask whether it may search is not an agent,
+  and the call is not hidden afterwards: it is a row in the reply that used it, naming the
+  tool and what it was given, in the same conversation the user is already reading. Turning
+  either tool off is one tap away in the Tools tab, which is named as the place to look
+  wherever this is declared to the user.
 
-  Shipping them off was the obvious fix and the wrong one, for the reason `ToolSwitches`
-  already carries: a tool that ships off is a feature nobody finds. Asking at install is
-  worse, because the question means nothing before there is anything to ask about. So the
-  first thing that would leave the device asks, once, showing the exact call, and the answer
-  is remembered. Discovery and consent become the same event. A refusal switches that tool
-  off, so the decision lands somewhere the user can see and reverse, and turning the switch
-  back on is itself the consent.
-
-  What remains, and is declared: after that yes, searches go out without further prompting,
-  composed by the model out of the conversation. `fetch_url` will only reach public
-  addresses, so a page cannot talk the model into reading the router.
+  What still asks, in every mode but `/yolo`, is narrower and is about two specific risks
+  rather than about using the tools at all: a call whose destination or query could have
+  been steered by something untrusted the turn just read (a page telling the model where to
+  go next), and a call that could carry data off the device after the turn has read
+  something private. Neither condition is the ordinary case, so the ordinary search or fetch
+  does not stop to ask, and the two that do are declared as such rather than folded into "the
+  tools ask before they run."
 - **No upload key.** `keystore.properties` does not exist in this checkout, so
   `bundleRelease` produces an unsigned AAB. Creating the key and enrolling in Play App
   Signing is the first Console step and has deliberately not been done for you.

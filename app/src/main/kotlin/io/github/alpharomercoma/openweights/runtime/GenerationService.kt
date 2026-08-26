@@ -39,7 +39,8 @@ import io.github.alpharomercoma.openweights.R
  * when the user does.
  *
  * That is survivable for a chat app where every reply is watched. It is fatal for anything
- * that runs on its own, which is what a goal is, so this exists before the goal does.
+ * that runs on its own, which is what a goal is and what a Watch's own tick is, so this
+ * exists before either does.
  *
  * ### Why `specialUse`
  *

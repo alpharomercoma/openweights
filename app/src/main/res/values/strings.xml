@@ -158,6 +158,8 @@
     <string name="attachment_limit">You can attach up to %1$d media items at once.</string>
     <string name="pdf_saved">PDF saved</string>
     <string name="pdf_save_failed">The PDF could not be saved.</string>
+    <string name="read_aloud">Read aloud</string>
+    <string name="stop_reading">Stop reading</string>
     <string name="discover">Discover</string>
     <string name="back_to_search_results">Back to search results</string>
     <string name="no_filter_matches">Nothing matches those filters</string>

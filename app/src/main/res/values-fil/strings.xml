@@ -145,6 +145,8 @@
     <string name="attachment_limit">Maaari kang mag-attach ng hanggang %1$d media item nang sabay.</string>
     <string name="pdf_saved">Na-save ang PDF</string>
     <string name="pdf_save_failed">Hindi ma-save ang PDF.</string>
+    <string name="read_aloud">Basahin nang malakas</string>
+    <string name="stop_reading">Itigil ang pagbasa</string>
     <string name="discover">Tuklasin</string><string name="back_to_search_results">Bumalik sa mga resulta</string>
     <string name="no_filter_matches">Walang tugma sa mga filter</string><string name="no_models_found">Walang modelong nakita</string>
     <string name="try_wider_filters">Palawakin ang laki o alisin ang mga filter at maghanap muli.</string><string name="try_different_search">Subukan ang ibang termino.</string><string name="continue_search">Ipagpatuloy ang paghahanap</string>

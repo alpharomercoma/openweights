@@ -181,6 +181,7 @@ class ModelsViewModel @Inject constructor(
     )
 
     init {
+        modelStore.deleteLegacyGenerationBundles()
         refresh()
         // Last run's finished rows, which are of no interest now: their files are either on
         // disk, where refresh finds them, or they are not, and a failure the user cannot

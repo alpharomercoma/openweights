@@ -36,6 +36,19 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         get() = File(context.getExternalFilesDir(null) ?: context.filesDir, MODELS_DIRECTORY)
             .apply { mkdirs() }
 
+    /**
+     * Reclaims space held by a generation bundle from before that feature was removed.
+     *
+     * A GGUF model is always a single file here, so a directory in this folder could only
+     * be a leftover multi-file bundle (Sana, Stable Diffusion) — up to 1.6 GB each, and with
+     * the screen that once listed and deleted them gone, otherwise unreachable without
+     * clearing app data. Run once per process: real work only the first time a phone that
+     * had one installed opens this build, a no-op every time after.
+     */
+    fun deleteLegacyGenerationBundles() {
+        directory.listFiles { file -> file.isDirectory }?.forEach { it.deleteRecursively() }
+    }
+
     /** Every GGUF currently on disk, newest first. Projectors are not models. */
     fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
 

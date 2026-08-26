@@ -150,6 +150,8 @@
     <string name="attachment_limit">يمكنك إرفاق ما يصل إلى %1$d عناصر وسائط في المرة الواحدة.</string>
     <string name="pdf_saved">تم حفظ ملف PDF</string>
     <string name="pdf_save_failed">تعذر حفظ ملف PDF.</string>
+    <string name="read_aloud">قراءة بصوت عالٍ</string>
+    <string name="stop_reading">إيقاف القراءة</string>
     <string name="discover">استكشاف</string><string name="back_to_search_results">العودة إلى النتائج</string>
     <string name="no_filter_matches">لا شيء يطابق عوامل التصفية</string><string name="no_models_found">لم يتم العثور على نماذج</string><string name="try_wider_filters">وسّع نطاق الحجم أو امسح عوامل التصفية وابحث مجددًا.</string><string name="try_different_search">جرّب عبارة بحث مختلفة.</string><string name="continue_search">متابعة البحث</string>
     <string name="proxy_search_only_detail">يُستخدم للبحث فقط، وليس للتنزيلات أو الصفحات المفتوحة. قد يساعد الوكيل لكنه غير مضمون.</string>

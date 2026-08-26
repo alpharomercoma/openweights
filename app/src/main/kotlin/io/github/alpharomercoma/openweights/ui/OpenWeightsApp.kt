@@ -151,6 +151,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             val activeDownloads by remember { derivedStateOf { modelsUiState.downloads } }
 
             val state by chatViewModel.uiState.collectAsStateWithLifecycle()
+            val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
             val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
             val reportViewModel: ReportViewModel = hiltViewModel()
             // Collected from the board rather than mirrored into the chat state: it is
@@ -216,6 +217,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onAttachDocument = chatViewModel::stageDocument,
                 onRemoveDocument = { chatViewModel.stageDocument(null) },
                 onRemoveStaged = chatViewModel::removeStaged,
+                onToggleReadAloud = mediaViewModel::toggleReadAloud,
+                isSpeaking = isSpeaking,
                 newCaptureUri = mediaViewModel::newCaptureUri,
                 dictation = dictation,
                 canDictate = mediaViewModel.canDictate,

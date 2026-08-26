@@ -144,6 +144,8 @@
     <string name="attachment_limit">Puedes adjuntar hasta %1$d elementos multimedia a la vez.</string>
     <string name="pdf_saved">PDF guardado</string>
     <string name="pdf_save_failed">No se pudo guardar el PDF.</string>
+    <string name="read_aloud">Leer en voz alta</string>
+    <string name="stop_reading">Detener lectura</string>
     <string name="discover">Descubrir</string>
     <string name="back_to_search_results">Volver a los resultados</string>
     <string name="no_filter_matches">Nada coincide con esos filtros</string>

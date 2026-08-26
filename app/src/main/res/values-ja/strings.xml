@@ -145,6 +145,8 @@
     <string name="attachment_limit">一度に添付できるメディアは %1$d 件までです。</string>
     <string name="pdf_saved">PDF を保存しました</string>
     <string name="pdf_save_failed">PDF を保存できませんでした。</string>
+    <string name="read_aloud">読み上げる</string>
+    <string name="stop_reading">読み上げを停止</string>
     <string name="discover">探す</string><string name="back_to_search_results">検索結果に戻る</string>
     <string name="no_filter_matches">フィルターに一致しません</string><string name="no_models_found">モデルが見つかりません</string><string name="try_wider_filters">サイズ範囲を広げるか、フィルターを解除してください。</string><string name="try_different_search">別の検索語を試してください。</string><string name="continue_search">検索を続ける</string>
     <string name="proxy_search_only_detail">検索専用です。ダウンロードや開いたページには使いません。プロキシが役立つ場合がありますが保証はありません。</string>

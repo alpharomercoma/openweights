@@ -179,8 +179,13 @@ On-device language model inference the user asked for, right away or on a schedu
 
 - **What the service does.** Keeps the app's process running while a language model, loaded
   from the user's own storage, produces a reply, works through a goal, or runs one tick of a
-  Watch the user set up. It transfers nothing and contacts nothing: all of the work is
-  arithmetic on this device's own processor.
+  Watch the user set up. The service itself transfers nothing and contacts nothing — it
+  raises the process and does no networking of its own — and the reply generation it holds
+  the process open for is arithmetic on this device's own processor. What it holds open for a
+  goal or a Watch step can be more than that: if `web_search` or `fetch_url` are on (see
+  below), the turn those tools run inside is the same turn this service is holding, so a
+  research step reaching the network happens inside the window this service keeps alive, not
+  outside it.
 - **Why it has to run in the foreground.** Measured on an Android 14 phone: backgrounding
   the app mid-reply takes its `oom_score_adj` from 0 to between 400 and 700, puts it in the
   cached process state, and the process then accumulates **zero** CPU ticks. Android freezes
@@ -414,12 +419,24 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   wherever this is declared to the user.
 
   What still asks, in every mode but `/yolo`, is narrower and is about two specific risks
-  rather than about using the tools at all: a call whose destination or query could have
-  been steered by something untrusted the turn just read (a page telling the model where to
-  go next), and a call that could carry data off the device after the turn has read
-  something private. Neither condition is the ordinary case, so the ordinary search or fetch
-  does not stop to ask, and the two that do are declared as such rather than folded into "the
-  tools ask before they run."
+  rather than about using the tools at all: a call whose destination could have been steered
+  by something untrusted the turn just read (a page telling the model where to go next —
+  `fetch_url` only, since `web_search`'s destination is the configured provider regardless of
+  what the query says), and a call that could carry data off the device after the turn has
+  read something private (either tool). Neither condition is the ordinary case, so the
+  ordinary search or fetch does not stop to ask, and the two that do are declared as such
+  rather than folded into "the tools ask before they run."
 - **No upload key.** `keystore.properties` does not exist in this checkout, so
   `bundleRelease` produces an unsigned AAB. Creating the key and enrolling in Play App
   Signing is the first Console step and has deliberately not been done for you.
+- **A fast Watch restored on a background process start can run unprotected.**
+  `OpenWeightsApplication.onCreate` calls `watches.sync()` on every process start
+  (`OpenWeightsApplication.kt`), including one the system triggered in the background rather
+  than one a person opening the app caused. `GenerationService.hold` deliberately swallows a
+  refused `startForegroundService` call — Android 12+ can refuse one from a background start
+  — and generates anyway rather than crashing, which is the right call for a turn the user is
+  looking at (`GenerationService.kt`). A fast Watch's own ticker inherits that same swallow:
+  it starts regardless of whether the hold actually got the foreground guarantee, so a Watch
+  restored this way can tick unprotected until the next thing raises the process. Rare — it
+  needs a background process start with a fast Watch already scheduled — and not a crash,
+  only a tick Android may freeze before it finishes.

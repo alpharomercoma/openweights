@@ -45,14 +45,17 @@ and everything else stays local. What each call sent is not hidden afterwards ei
 tool call is a row in the reply that used it, naming the tool and what it was given.
 
 Two narrower situations still ask you before anything runs, in every mode except one
-described below. The first is a page telling the assistant where to go next: once something
+described below. The first is a page telling the assistant where to go next: `fetch_url` is
+the only tool whose destination is a page's to choose rather than yours, so once something
 the assistant read this turn could have been written by someone other than you, a page it
-fetches on that page's say-so, or a search it runs with a query that page could have
-steered, is held for your approval, because otherwise a page could talk the assistant into
-reading its own follow-up address and calling that a fetch you asked for. The second is your
-own data: once something private has been read in a turn, from a shared file or otherwise,
-anything that would carry data off the device in that same turn is held for your approval
-too, regardless of which tool it is.
+fetches on that page's own say-so is held for your approval — otherwise a page could talk
+the assistant into reading its own follow-up address and calling that a fetch you asked for.
+`web_search` is not held on this basis: its destination is the search provider the app is
+configured with, however the query reads, so a page cannot redirect it anywhere by steering
+the query. The second situation is your own data: once something private has been read in a
+turn, from a shared file or otherwise, anything that would carry data off the device in that
+same turn is held for your approval too, regardless of which tool it is — this one does
+cover `web_search`.
 
 **Files you share.** If you give the app access to a folder, its contents are read on the
 device and are never uploaded on their own. They can leave only through `web_search` or

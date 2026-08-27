@@ -21,9 +21,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.data.ModelUsage
+import io.github.alpharomercoma.openweights.core.data.UsageRepository
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
+import io.github.alpharomercoma.openweights.core.device.ThroughputCalibration
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
@@ -46,10 +49,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.io.File
 import javax.inject.Inject
 
 /** One downloadable file with everything known about how it would run here. */
@@ -105,6 +110,7 @@ class DiscoverViewModel @Inject constructor(
     private val rangeSourceFactory: RangeByteSource.Factory,
     private val modelStore: ModelStore,
     private val publishers: Publishers,
+    private val usageRepository: UsageRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -133,6 +139,7 @@ class DiscoverViewModel @Inject constructor(
         // chip has to be able to say "Under 10B" the moment somebody reaches for it.
         val ceiling = estimator.parameterCeilingBillions(profiler.profile())
         _uiState.update { it.copy(parameterCeilingBillions = ceiling) }
+        loadCalibration()
         search()
     }
 
@@ -449,8 +456,36 @@ class DiscoverViewModel @Inject constructor(
             metadata = metadata,
             fileSizeBytes = file.sizeBytes,
             contextLength = contextLength,
+            calibration = calibration,
             projectorSizeBytes = _uiState.value.detail?.pairedProjector(file)?.sizeBytes ?: 0,
         )
+
+    /**
+     * What this device has actually measured, if anything, read once per visit to this
+     * screen rather than per file: it does not change while someone is browsing, and
+     * [estimate] runs synchronously from inside a plain state update, which a suspending
+     * read cannot.
+     *
+     * FitEstimator predicts a new file's speed from one real (bytes, tokens a second) pair
+     * on this device, because decode is bandwidth-bound and one measurement predicts other
+     * sizes far better than a table of chip names. The pair was never supplied here, so the
+     * whole estimate — the formula, the test, the line in [FitCard] — has sat unreachable:
+     * a browsing screen showing memory but never speed. This is where it was missing from.
+     *
+     * The heaviest-used model this device has actually run, since that average is the one
+     * least likely to be a single unrepresentative reply. A model since deleted from disk
+     * cannot be sized, so it is skipped in favour of the next one down the list rather than
+     * reported against a size that is now a guess.
+     */
+    private var calibration: ThroughputCalibration? = null
+
+    private fun loadCalibration() {
+        viewModelScope.launch {
+            val usage = usageRepository.observeSummary().first()
+            val installed = modelStore.availableModels().associateBy { it.nameWithoutExtension }
+            calibration = matchCalibration(usage.perModel, installed)
+        }
+    }
 
     private fun updateFile(path: String, transform: (InspectedFile) -> InspectedFile) {
         _uiState.update { state ->
@@ -476,3 +511,21 @@ class DiscoverViewModel @Inject constructor(
 
 internal fun Throwable.readableMessage(): String =
     message ?: "Something went wrong (${this::class.simpleName})."
+
+/**
+ * The heaviest-used model this device has actually run that is still installed, turned
+ * into the one (bytes, tokens a second) pair [FitEstimator] needs.
+ *
+ * [ModelUsage.perModel] is already sorted by generated tokens descending, so the first
+ * match here is the calibration with the most data behind it, not merely the most recent.
+ * A model whose usage this device remembers but whose file has since been deleted is
+ * skipped rather than reported against a size that would now be a guess.
+ */
+internal fun matchCalibration(
+    perModel: List<ModelUsage>,
+    installed: Map<String, File>,
+): ThroughputCalibration? = perModel.firstNotNullOfOrNull { model ->
+    val tokensPerSecond = model.averageTokensPerSecond ?: return@firstNotNullOfOrNull null
+    val file = installed[model.modelName] ?: return@firstNotNullOfOrNull null
+    ThroughputCalibration(measuredBytes = file.length(), measuredTokensPerSecond = tokensPerSecond)
+}

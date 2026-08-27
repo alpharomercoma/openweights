@@ -253,6 +253,46 @@ class DiscoverCalibrationTest {
         assertThat(predictedGranite!!).isGreaterThan(10.60 * 2.5)
     }
 
+    /**
+     * The same real-dataset benchmark, on the Poco (the local device used throughout this
+     * project, `[[alpha-dev-environment]]`) rather than a QDC loan. Real medians, decode /
+     * prefill tok/s: LFM2.5-1.2B 35.77/141.36, LFM2.5-2.6B 17.32/56.22, Qwen3-1.7B-Q4_K_M
+     * 17.93/40.58 — only three of the intended six models, for a reason worth recording.
+     *
+     * **What actually happened.** Twice during this run the phone entered Android Doze
+     * (`mWakefulness=Dozing`) mid-benchmark despite `svc power stayon true` and an extended
+     * screen timeout, each time silently throttling the app until woken again — a failure
+     * mode the QDC device never showed once across two full runs. After the second wake,
+     * granite-4.2-3b ran for over twenty minutes without completing a single model pass
+     * (confirmed still consuming 380-450% CPU throughout, not hung; `dumpsys thermalservice`
+     * reported nominal temperatures throughout, so this was not classic thermal throttling
+     * either) before the run was deliberately stopped. ai9stars/G9v3-3B and ling-3.0-tiny
+     * never got a turn. The three models that did complete finished in the same 2-3 minutes
+     * each takes everywhere else, so whatever made granite pathological here is specific to
+     * that combination of model and device state, not a general Poco slowdown.
+     *
+     * **Cross-device speedup, on the models this run actually has:** decode speedup
+     * (Snapdragon over Poco) is inconsistent — 1.76x, 1.05x, 1.41x — echoing the earlier
+     * two-device finding that no single scalar fits. Prefill speedup is both larger and far
+     * more consistent: 3.13x, 2.91x, 3.60x. That prefill separates so much more cleanly than
+     * decode across these two chips, while granite alone turns openly pathological on one of
+     * them, is two more open questions this project has real numbers for and no explanation
+     * of yet.
+     */
+    @Test
+    fun `prefill speedup between devices is larger and more consistent than decode speedup`() {
+        val poco = mapOf("LFM2.5-1.2B" to 141.36, "LFM2.5-2.6B" to 56.22, "Qwen3-1.7B" to 40.58)
+        val snapdragon =
+            mapOf("LFM2.5-1.2B" to 443.15, "LFM2.5-2.6B" to 163.33, "Qwen3-1.7B" to 146.14)
+
+        val prefillSpeedups = poco.keys.map { snapdragon.getValue(it) / poco.getValue(it) }
+
+        // 2.91x-3.60x: a real spread, but far tighter than decode's 1.05x-1.76x on the same
+        // three models and the same two devices.
+        assertThat(prefillSpeedups.min()).isGreaterThan(2.5)
+        assertThat(prefillSpeedups.max()).isLessThan(4.0)
+    }
+
     private fun fakeFile(sizeBytes: Long): File {
         val file = File.createTempFile("calibration-test", ".gguf")
         file.deleteOnExit()

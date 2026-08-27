@@ -203,6 +203,56 @@ class DiscoverCalibrationTest {
         assertThat(predictedGranite!!).isGreaterThan(14.91 * 2.2)
     }
 
+    /**
+     * A second Snapdragon run, three things different from every prior one: a real dataset
+     * prompt instead of hand-written text or Lorem-ipsum filler, prefill recorded alongside
+     * decode, and three more models (LFM2.5-2.6B, ai9stars/G9v3-3B) run back-to-back with
+     * *no* cooldown between them — unlike every prior run here, which paced measurements
+     * further apart.
+     *
+     * The prompt is drawn verbatim from IFEval (google-research/google-research,
+     * instruction_following_eval/data/input_data.jsonl, Apache-2.0) — one of the two
+     * datasets (with TinyMMLU) MLCommons' MLPerf Mobile v6.0, the current industry benchmark
+     * for on-device Android LLM inference, uses for its own GenAI tests. See
+     * `DecodeSpeedBenchmark.BENCHMARK_PROMPT` for the exact text and citation.
+     *
+     * Real medians (decode / prefill tok/s, ~680 prompt tokens, 128 generated):
+     * LFM2.5-1.2B 62.84/443.15 (first, cold), LFM2.5-2.6B 24.04/163.33, Qwen3-1.7B-Q4_K_M
+     * 25.35/146.14, granite-4.2-3b-Q2_K 10.60/24.43, ai9stars/G9v3-3B-Q4_K_M 16.07/75.11,
+     * LFM2.5-1.2B 48.36/345.59 (last, after four other loads, no cooldown).
+     *
+     * **What broke, and why it matters more than any single number here.** LFM's own
+     * decode dropped 23% and its prefill 22% between the first and last measurement of the
+     * *same file* — purely from four other models loading in between with no recovery time.
+     * That is larger than this run's Qwen3 prediction error (+14%) and comparable to G9v3's
+     * (+43%); only granite's (+183%) clearly survives it. Asked directly, codex and agy gave
+     * the same one-line verdict: report this run as order/thermal-confounded, and treat its
+     * per-model prediction errors as unreliable *except* granite's, which is large enough to
+     * remain directionally credible even against 23% drift noise. The granite fixture below
+     * is the only cross-model assertion carried over from this run for that reason — Qwen3's
+     * and G9v3's real numbers are logged in `DecodeSpeedBenchmark`'s own run output, not
+     * asserted here as if this run had isolated them from drift the way the controlled
+     * multi-rep-per-model sessions did.
+     *
+     * The practical lesson for any future run: pace models apart, or accept that "prediction
+     * error" and "thermal drift since the last cooldown" are entangled and cannot be
+     * separated from a single back-to-back pass, no matter how many models it covers.
+     */
+    @Test
+    fun `granite's prediction error survives a run large enough to have real thermal drift`() {
+        val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 62.84, 2519))
+
+        val calibration = matchCalibration(decodeSpeeds, installed)
+        val predictedGranite = calibration?.predictFor(1_455_736_960L)
+
+        // Real, measured, same run: 10.60 tokens a second. The +183% miss is roughly 8x
+        // this run's own worst-case thermal drift (23%), which is what makes it credible
+        // despite the run not otherwise being a controlled measurement.
+        assertThat(predictedGranite).isNotNull()
+        assertThat(predictedGranite!!).isGreaterThan(10.60 * 2.5)
+    }
+
     private fun fakeFile(sizeBytes: Long): File {
         val file = File.createTempFile("calibration-test", ".gguf")
         file.deleteOnExit()

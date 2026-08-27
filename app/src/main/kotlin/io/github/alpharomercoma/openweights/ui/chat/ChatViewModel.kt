@@ -2598,8 +2598,10 @@ private data class Brief(
                 "that is not a reason to ask first: searching to find out is the research " +
                 "itself, so make it one of the questions instead.",
             step = "Research this one question. Search the web, read the best source you " +
-                "find, and report what it says along with the address you found it at. Do " +
-                "not research the other questions.",
+                "find, and report what it says along with the address you found it at. " +
+                "Only state facts that are actually in what you read; do not add a date, " +
+                "a figure, or a name from memory just because it sounds like it belongs. " +
+                "Do not research the other questions.",
             offersAskDuringPlan = false,
             finish = "Now write the findings up as one document in Markdown. Start with a " +
                 "heading, then the answer in a few short sections. End with a Sources " +

@@ -619,6 +619,34 @@ class GoalLoopTest : ChatFixture() {
             assertThat(goals.goal.value?.state).isEqualTo(GoalState.HALTED)
         }
 
+    /**
+     * The shape a second codex loop-engineering review found: a goal started from a chat
+     * with no conversation yet had nothing to record, since the conversation itself is
+     * created asynchronously by the first message the goal's own turn sends. Left as
+     * `null`, reopening that very chat once it existed read as a switch to a conversation
+     * this goal did not belong to, and cleared it. See GoalBoard.bindConversation.
+     */
+    @Test
+    fun `a goal started on a still-empty chat is not orphaned once that chat exists`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.hold = true
+            viewModel.startGoal("Something long")
+            settle()
+            assertThat(goals.goal.value?.isRunning).isTrue()
+            val createdId = requireNotNull(goals.goal.value?.conversationId) {
+                "the goal's own first turn should have created and bound a conversation"
+            }
+
+            goals.halt("Interrupted when the app stopped. Review the plan before starting again.")
+            settle()
+
+            viewModel.openConversation(createdId)
+            settle()
+
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.HALTED)
+        }
+
     /** The other half of the fix above: a goal still has to give way when what is opened is
      * genuinely a different conversation than the one it belongs to.
      */

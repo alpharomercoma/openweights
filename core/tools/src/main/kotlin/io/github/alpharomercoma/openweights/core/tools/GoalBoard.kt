@@ -81,6 +81,20 @@ class GoalBoard @Inject constructor(private val snapshots: GoalSnapshotStore) {
         it.copy(plan = plan, state = GoalState.WORKING)
     }
 
+    /**
+     * Fills in the conversation a goal was started before one existed.
+     *
+     * A goal begun on a still-empty chat has nothing to record: the conversation itself is
+     * created asynchronously, after [start] has already run. Left as `null`, that goal reads
+     * as belonging to no conversation at all, and reopening the very chat it started in — the
+     * ordinary next thing a person does — matched it against no conversation this goal knows
+     * and cleared it. Only when the goal does not already know its conversation, so a goal
+     * already tied to a real one is never moved to a different one this way.
+     */
+    fun bindConversation(id: Long) = changeGoal { goal ->
+        if (goal.conversationId == null) goal.copy(conversationId = id) else goal
+    }
+
     /** One step finished, whatever became of it. */
     fun advanced(plan: TaskPlan) = changeGoal { goal ->
         val next = goal.copy(plan = plan, stepsTaken = goal.stepsTaken + 1)

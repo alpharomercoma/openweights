@@ -852,7 +852,13 @@ class ChatViewModel @Inject constructor(
                     val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
                     val id = conversationId
                         ?: startConversation(title, _uiState.value.modelName)
-                            .also { conversationId = it }
+                            .also {
+                                conversationId = it
+                                // A goal or research started on a still-empty chat had no
+                                // conversation to record when it started; this is the first
+                                // moment one exists. See GoalBoard.bindConversation.
+                                goals.bindConversation(it)
+                            }
                     addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
                 }
             }
@@ -1869,8 +1875,18 @@ class ChatViewModel @Inject constructor(
             // transcript this is about to replace, and would do so after the engine cache
             // has already been reset underneath it.
             generationJob?.join()
+            // The same reasoning as generationJob, for the goal's own loop: cancel() only
+            // requests it stop, and work() still unwinding past that request can go on to
+            // read or write the very board goals.clear() below is about to reset, or the
+            // planning board turns.planning.clear() is.
+            goalJob?.join()
             runtime.resetContext()
             conversationId = null
+            // A research turn interrupted mid-plan can leave these set; unconsumed, the
+            // new chat's first turn would silently inherit an override that belonged to
+            // the conversation just left behind. See start().
+            offerAskOverride = null
+            toolPromptOverride = null
             turns.planning.clear()
             // The board is one object for the whole app: a goal left over from the chat just
             // left behind would otherwise be on screen here too, its card naming a task this
@@ -1934,6 +1950,10 @@ class ChatViewModel @Inject constructor(
             goals.goal.value?.conversationId != id
         if (runningElsewhere) stopGoal() else stop()
         generationJob?.join()
+        // Same reasoning as newChat: cancel() only asks work() to stop, and it unwinding
+        // past that request must not go on to touch the board this function is about to
+        // read and clear for the conversation being opened.
+        if (runningElsewhere) goalJob?.join()
 
         if (conversation == null) {
             // Deleted between the tap and this read; adopting the id would make the

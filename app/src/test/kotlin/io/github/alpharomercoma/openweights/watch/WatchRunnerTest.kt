@@ -20,6 +20,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.context.WatchOutcome
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.data.WatchRepository
@@ -155,5 +156,25 @@ class WatchRunnerTest {
     @Test
     fun `a tick for a watch that is gone reports nothing to reschedule`() = runTest {
         assertThat(runner.tick(watchId = 404, now = 1)).isNull()
+    }
+
+    /**
+     * The exact shape a live device test found: a watch created from "remind me to
+     * stretch" stores that phrasing verbatim, and on its own tick answered "I'm sorry, but
+     * I can't set reminders" — true of the assistant in an ordinary turn, and false of a
+     * tick, which is the reminder already firing. The tick's own system prompt has to say
+     * so, since nothing forces every watch's task to have been rephrased as a check at
+     * creation time.
+     */
+    @Test
+    fun `the tick prompt tells the model a reminder-worded task is already due`() = runTest {
+        loadedEngine()
+        val watch = requireNotNull(watches.add("Remind me to stretch", everyMinutes = 5, now = 0))
+
+        runner.tick(watch.id, now = 1)
+
+        val systemPrompt = engine.prompts.last().first { it.role == ChatRole.SYSTEM }.text
+        assertThat(systemPrompt).contains("due now")
+        assertThat(systemPrompt).contains("not something you need a tool for")
     }
 }

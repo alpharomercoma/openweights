@@ -165,7 +165,12 @@ class WatchRunner @Inject constructor(
                     "You are running a scheduled check on the user's phone. Nobody is " +
                         "watching, so do the check with the tools you have and answer in " +
                         "one or two sentences. Say what you found. If nothing has changed, " +
-                        "say so plainly.",
+                        "say so plainly. The task below may still read as a request to you " +
+                        "rather than a question, if it is a reminder rather than something " +
+                        "to look up: it is due now, and delivering it is the check, not " +
+                        "something you need a tool for. Say it plainly rather than " +
+                        "explaining that you cannot set reminders — this schedule is " +
+                        "already the reminder.",
                 ),
             ),
         ),

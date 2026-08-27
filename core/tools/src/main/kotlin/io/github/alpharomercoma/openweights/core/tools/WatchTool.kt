@@ -51,7 +51,7 @@ class WatchTool(private val watches: Watches) : Tool {
               "properties": {
                 "task": {
                   "type": "string",
-                  "description": "What to check each time, as an instruction"
+                  "description": "What to check each time, rephrased as the check itself rather than repeated as the user's own words. 'Remind me to stretch' becomes 'Time to stretch' or similar: a check has nobody left to ask it of, and a task that still reads as a request to the assistant reads that way on every tick, including to the model running it."
                 },
                 "every_minutes": {
                   "type": "integer",

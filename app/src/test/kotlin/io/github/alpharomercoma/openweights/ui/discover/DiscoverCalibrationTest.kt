@@ -91,24 +91,29 @@ class DiscoverCalibrationTest {
     }
 
     /**
-     * The formula's real accuracy, not an invented number: this session measured
+     * Two real, single-run residuals, not an invented number: this session measured
      * LFM2.5-1.2B-Instruct at a genuine, decode-only 32.46 tokens a second
-     * (695,755,488 bytes) and granite-4.2-3b-Q2_K, a different architecture entirely, at a
-     * genuine decode-only 6.73 (1,455,736,960 bytes). One predicts the other at ≈15.5, over
-     * double the real figure — documented here as a fact about the formula's real-world
-     * accuracy across architectures, not the arithmetic, which the previous test already
-     * pins tightly.
+     * (695,755,488 bytes), then granite-4.2-3b-Q2_K at a genuine decode-only 6.73
+     * (1,455,736,960 bytes) and, later the same session, Qwen3-1.7B-Q4_K_M at a genuine
+     * decode-only 16.54 (1,107,409,472 bytes). Calibrated from LFM, the formula predicts
+     * ≈15.5 for granite (real: 6.73, prediction ~2.3x too optimistic) and ≈20.4 for Qwen3
+     * (real: 16.54, prediction ~1.23x too optimistic).
      *
-     * codex and agy's research (independent, both citing real llama.cpp measurements) found
-     * the bandwidth-bound formula holds tightly within one architecture and quant family,
-     * and can be off by multiples of that across architectures, across MoE-vs-dense, and
-     * especially across K-quant-vs-IQ-quant, where a smaller IQ file has sometimes measured
-     * *slower* than a larger K-quant one because its dequantization is compute-bound rather
-     * than bandwidth-bound. This assertion only checks that the prediction lands clearly
-     * outside a tight band around the true value — proving the gap is real without claiming
-     * a precision the formula does not have — so a future correction (per-architecture or
-     * per-quant-family calibration) has a real number to close rather than a synthetic one
-     * that would have hidden it.
+     * **What this is not:** a characterisation of the formula's error profile. codex and
+     * agy both reviewed this exact data and independently gave the same verdict: two
+     * out-of-sample residuals, each a single run of 178-2519 tokens with no repeats, is
+     * not enough to say the error "scales with architectural distance" — that reads a
+     * trend into what could just as easily be measurement noise (thermal state, background
+     * load, sample size all uncontrolled and unmeasured here). Both explicitly warned
+     * against shipping a UI claim like "give or take ~2x": the observed error already
+     * exceeds 2x for granite, and nothing here bounds it from above.
+     *
+     * These two assertions are pinned regression fixtures — real numbers this device
+     * produced, worth re-checking if the formula changes — not proof the estimator is
+     * reliable across architectures. A real accuracy claim needs repeated, controlled runs
+     * (fixed token count, fixed context depth, randomised order, reported dispersion)
+     * across a deliberately stratified model/quant/backend panel, per codex and agy's
+     * shared recommendation, which this session's on-device testing time did not cover.
      */
     @Test
     fun `a cross-architecture prediction is real-world off by more than double`() {
@@ -121,6 +126,20 @@ class DiscoverCalibrationTest {
         // Actually measured on this device: 6.73 tokens a second.
         assertThat(predicted).isNotNull()
         assertThat(predicted!!).isGreaterThan(6.73 * 2)
+    }
+
+    @Test
+    fun `a same-family dense-transformer prediction is real-world off by a smaller margin`() {
+        val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 32.46, 2519))
+
+        val calibration = matchCalibration(decodeSpeeds, installed)
+        val predicted = calibration?.predictFor(1_107_409_472L)
+
+        // Actually measured on this device: 16.54 tokens a second (249-token sample).
+        assertThat(predicted).isNotNull()
+        assertThat(predicted!!).isGreaterThan(16.54 * 1.1)
+        assertThat(predicted).isLessThan(16.54 * 1.4)
     }
 
     private fun fakeFile(sizeBytes: Long): File {

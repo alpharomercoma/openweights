@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.data.db.UsageEntity
 import kotlinx.coroutines.flow.Flow
@@ -107,6 +108,17 @@ class UsageRepository @Inject constructor(
     ) { rows, conversationCount ->
         rows.toSummary(conversationCount)
     }
+
+    /**
+     * Real, measured, decode-only throughput per model on this device, heaviest-used first.
+     *
+     * Deliberately not [observeSummary]'s [ModelUsage.averageTokensPerSecond]: that one
+     * divides by prefill time as well as decode time, which is right for "how much of the
+     * day did this model cost" and wrong for predicting a different model's decode speed,
+     * since prefill scales with how long the prompt happened to be rather than with
+     * anything about the model. See [UsageDao.decodeSpeedByModel].
+     */
+    suspend fun decodeSpeedByModel(): List<ModelDecodeSpeed> = database.usage().decodeSpeedByModel()
 
     internal fun List<UsageEntity>.toSummary(conversationCount: Int) = UsageSummary(
         lifetimePromptTokens = sumOf { it.promptTokens },

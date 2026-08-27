@@ -206,12 +206,16 @@ class ChatRepository @Inject constructor(
         promptTokens: Int,
         generatedTokens: Int,
         inferenceMs: Long,
+        decodeMs: Long,
+        decodeTokens: Long,
     ) = database.usage().record(
         day = clock.today(),
         modelName = modelName,
         promptTokens = promptTokens,
         generatedTokens = generatedTokens,
         inferenceMs = inferenceMs,
+        decodeMs = decodeMs,
+        decodeTokens = decodeTokens,
     )
 
     /**

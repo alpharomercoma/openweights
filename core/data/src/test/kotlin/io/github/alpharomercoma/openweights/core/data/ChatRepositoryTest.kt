@@ -213,6 +213,8 @@ class ChatRepositoryTest {
             promptTokens = 10,
             generatedTokens = 40,
             inferenceMs = 2_000,
+            decodeMs = 1_500,
+            decodeTokens = 39,
         )
 
         repository.deleteConversation(id)
@@ -310,6 +312,8 @@ class ChatRepositoryTest {
                 promptTokens = 5,
                 generatedTokens = 10,
                 inferenceMs = 100,
+                decodeMs = 80,
+                decodeTokens = 9,
             )
         }
 

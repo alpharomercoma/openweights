@@ -32,7 +32,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchEntity::class,
         WatchRunEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -45,6 +45,29 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "openweights.db"
+
+        /**
+         * Adds decode-only time to the usage ledger, alongside the prefill-plus-decode
+         * total it already kept.
+         *
+         * The total is right for the usage dashboard's "how much of the day did this model
+         * cost" and wrong for predicting a different model's decode speed from this one's
+         * measurement, since a long prompt inflates it with prefill time a different
+         * model's prefill would not repeat. Defaulted to zero on every row that predates
+         * this column, which the calibration query excludes rather than divides by, so an
+         * old install's history is not misread as a device that decodes at zero tokens a
+         * second.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE usage_ledger ADD COLUMN decodeMs INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "ALTER TABLE usage_ledger ADD COLUMN decodeTokens INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
 
         /** Drops the gallery: image/speech generation was removed. */
         val MIGRATION_6_7 = object : Migration(6, 7) {

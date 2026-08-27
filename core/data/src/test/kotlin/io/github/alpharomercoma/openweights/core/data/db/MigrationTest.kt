@@ -57,6 +57,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_4_5,
         OpenWeightsDatabase.MIGRATION_5_6,
         OpenWeightsDatabase.MIGRATION_6_7,
+        OpenWeightsDatabase.MIGRATION_7_8,
     )
 
     @Test
@@ -161,6 +162,33 @@ class MigrationTest {
                         "WHERE type = 'table' AND name = 'gallery'",
                 ),
             ).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `a usage row from before decode time was split out keeps its totals and reads as unmeasured`() {
+        // decodeMs did not exist at version seven, so every row already on a device is
+        // exactly this shape: a real inferenceMs total with nothing to say about how much
+        // of it was decode. The calibration query is what has to treat that as "no
+        // measurement" rather than "measured at zero tokens a second" — this only checks
+        // that the migration itself hands it a real zero to do that with, not an error.
+        helper.createDatabase(7).use { db ->
+            db.execSQL(
+                "INSERT INTO usage_ledger " +
+                    "(day, modelName, promptTokens, generatedTokens, inferenceMs, replies) " +
+                    "VALUES (100, 'qwen', 500, 200, 9000, 3)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(8, migrations.toList()).use { db ->
+            assertThat(db.intAt("SELECT generatedTokens FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(200)
+            assertThat(db.intAt("SELECT inferenceMs FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(9000)
+            assertThat(db.intAt("SELECT decodeMs FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(0)
+            assertThat(db.intAt("SELECT decodeTokens FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(0)
         }
     }
 }

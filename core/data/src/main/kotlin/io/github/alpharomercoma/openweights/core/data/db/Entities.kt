@@ -148,6 +148,35 @@ data class UsageEntity(
     val generatedTokens: Long,
     val inferenceMs: Long,
     val replies: Int,
+    /**
+     * Decode time alone, out of [inferenceMs].
+     *
+     * [inferenceMs] is prefill plus decode, which is right for "how much of the day did
+     * this model cost" and wrong for predicting a different model's decode speed: a long
+     * prompt inflates it with prefill time that says nothing about the model's own
+     * bandwidth-bound throughput. Zero on a row written before this column existed, which
+     * [UsageDao.decodeSpeedByModel] excludes rather than divides by.
+     */
+    val decodeMs: Long = 0,
+    /**
+     * Tokens counted against [decodeMs] alone — not [generatedTokens], and deliberately a
+     * separate column rather than reusing it.
+     *
+     * The day this device upgrades to the version that added [decodeMs], the row already on
+     * disk has real [generatedTokens] from before with no [decodeMs] behind any of them. If
+     * the next reply that same day accumulated into the *same* [generatedTokens] total,
+     * every token generated before the upgrade would sit in the numerator of a rate whose
+     * denominator only covers the tokens generated after it — overstating speed for exactly
+     * one day per model. A column that only ever grows alongside [decodeMs], in the same
+     * write, cannot mix the two populations no matter when the upgrade happened.
+     *
+     * Also [GenerationStats.decodeTokensPerSecond]'s own denominator, not [generatedTokens]
+     * verbatim: decode timing runs from the first token to the last, which is one fewer
+     * interval than tokens generated, and a ledger meant to approximate that same per-reply
+     * rate across many replies has to use the same count or it systematically overstates
+     * speed on short replies, where the difference is largest.
+     */
+    val decodeTokens: Long = 0,
 )
 
 /**

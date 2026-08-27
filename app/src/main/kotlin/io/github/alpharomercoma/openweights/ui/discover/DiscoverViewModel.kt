@@ -21,8 +21,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
-import io.github.alpharomercoma.openweights.core.data.ModelUsage
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
+import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
@@ -472,6 +472,14 @@ class DiscoverViewModel @Inject constructor(
      * whole estimate — the formula, the test, the line in [FitCard] — has sat unreachable:
      * a browsing screen showing memory but never speed. This is where it was missing from.
      *
+     * Built from [UsageRepository.decodeSpeedByModel], not [UsageRepository.observeSummary],
+     * and that distinction is the one that matters: the summary's average divides by prefill
+     * time as well as decode time, which reads as this device running dramatically slower
+     * than it does the moment a session's prompts have gotten long — measured live, LFM2.5
+     * at a genuine ~30 tokens a second read back as low as 3 once a long research goal's
+     * prompts were folded into the average. Decode speed alone is what a new model's decode
+     * speed should be predicted from.
+     *
      * The heaviest-used model this device has actually run, since that average is the one
      * least likely to be a single unrepresentative reply. A model since deleted from disk
      * cannot be sized, so it is skipped in favour of the next one down the list rather than
@@ -481,9 +489,9 @@ class DiscoverViewModel @Inject constructor(
 
     private fun loadCalibration() {
         viewModelScope.launch {
-            val usage = usageRepository.observeSummary().first()
+            val decodeSpeeds = usageRepository.decodeSpeedByModel()
             val installed = modelStore.availableModels().associateBy { it.nameWithoutExtension }
-            calibration = matchCalibration(usage.perModel, installed)
+            calibration = matchCalibration(decodeSpeeds, installed)
         }
     }
 
@@ -516,16 +524,18 @@ internal fun Throwable.readableMessage(): String =
  * The heaviest-used model this device has actually run that is still installed, turned
  * into the one (bytes, tokens a second) pair [FitEstimator] needs.
  *
- * [ModelUsage.perModel] is already sorted by generated tokens descending, so the first
- * match here is the calibration with the most data behind it, not merely the most recent.
- * A model whose usage this device remembers but whose file has since been deleted is
- * skipped rather than reported against a size that would now be a guess.
+ * [decodeSpeeds] is already sorted by generated tokens descending, so the first match here
+ * is the calibration with the most data behind it, not merely the most recent. A model
+ * whose usage this device remembers but whose file has since been deleted is skipped
+ * rather than reported against a size that would now be a guess.
  */
 internal fun matchCalibration(
-    perModel: List<ModelUsage>,
+    decodeSpeeds: List<ModelDecodeSpeed>,
     installed: Map<String, File>,
-): ThroughputCalibration? = perModel.firstNotNullOfOrNull { model ->
-    val tokensPerSecond = model.averageTokensPerSecond ?: return@firstNotNullOfOrNull null
+): ThroughputCalibration? = decodeSpeeds.firstNotNullOfOrNull { model ->
     val file = installed[model.modelName] ?: return@firstNotNullOfOrNull null
-    ThroughputCalibration(measuredBytes = file.length(), measuredTokensPerSecond = tokensPerSecond)
+    ThroughputCalibration(
+        measuredBytes = file.length(),
+        measuredTokensPerSecond = model.averageTokensPerSecond,
+    )
 }

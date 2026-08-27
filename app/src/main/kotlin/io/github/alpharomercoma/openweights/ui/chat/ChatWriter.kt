@@ -116,11 +116,18 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
      * chat later does not un-count the work.
      */
     suspend fun work(modelName: String, stats: GenerationStats) = inOrder {
+        // The same guard as GenerationStats.decodeTokensPerSecond, and for the same reason:
+        // a reply with one token or less decoded has no decode interval to measure, only a
+        // prefill one, and recording zero for both keeps this pass out of the calibration
+        // average rather than counting it as an infinitely fast one.
+        val decoded = stats.decodeMs > 0 && stats.generatedTokens > 1
         recordUsage(
             modelName = modelName,
             promptTokens = stats.promptTokens,
             generatedTokens = stats.generatedTokens,
             inferenceMs = stats.prefillMs + stats.decodeMs,
+            decodeMs = if (decoded) stats.decodeMs else 0,
+            decodeTokens = if (decoded) (stats.generatedTokens - 1).toLong() else 0,
         )
     }
 }

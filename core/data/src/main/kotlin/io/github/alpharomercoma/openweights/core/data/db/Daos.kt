@@ -113,10 +113,46 @@ interface UsageDao {
     suspend fun upsert(usage: UsageEntity)
 
     /**
+     * Real, measured, decode-only throughput per model, heaviest-used first.
+     *
+     * [decodeTokens] over [decodeMs], not [UsageEntity.generatedTokens] over
+     * [UsageEntity.inferenceMs]: that pair is prefill plus decode and every token including
+     * the first, right for "how much of the day did this model cost" and wrong here twice
+     * over — prefill scales with how long the prompt happened to be rather than with
+     * anything about the model, and the two columns this reads only ever grow together, in
+     * the same write, so a device upgrading mid-day cannot mix a token counted before this
+     * pair existed against decode time measured after. A row with nothing decoded is zero
+     * in both and excluded, not divided by.
+     *
+     * Weighted by tokens generated rather than averaged day by day, so one short reply's
+     * day does not count the same as one that ran long enough to settle into steady state.
+     */
+    @Query(
+        """
+        SELECT modelName,
+               SUM(decodeTokens) * 1000.0 / SUM(decodeMs) AS averageTokensPerSecond,
+               SUM(decodeTokens) AS generatedTokens
+        FROM usage_ledger
+        WHERE decodeMs > 0
+        GROUP BY modelName
+        ORDER BY generatedTokens DESC
+        """,
+    )
+    suspend fun decodeSpeedByModel(): List<ModelDecodeSpeed>
+
+    /**
      * Folds one reply into the day's running totals.
      *
      * A transaction because this is read-modify-write on a shared row, and two replies
      * finishing close together would otherwise lose one of them.
+     *
+     * @param decodeMs zero unless this reply actually decoded more than one token: decode
+     *   timing runs from the first token to the last, so a single-token reply has no decode
+     *   interval to measure at all, only a prefill one.
+     * @param decodeTokens [GenerationStats.decodeTokensPerSecond]'s own denominator, not
+     *   [generatedTokens] verbatim: one fewer than tokens generated, since decode timing
+     *   spans the gaps between tokens rather than the tokens themselves. Zero exactly when
+     *   [decodeMs] is, so the two can never end up counting a different population.
      */
     @Transaction
     suspend fun record(
@@ -125,6 +161,8 @@ interface UsageDao {
         promptTokens: Int,
         generatedTokens: Int,
         inferenceMs: Long,
+        decodeMs: Long,
+        decodeTokens: Long,
     ) {
         val existing = forDay(day, modelName)
         upsert(
@@ -135,10 +173,19 @@ interface UsageDao {
                 generatedTokens = (existing?.generatedTokens ?: 0) + generatedTokens,
                 inferenceMs = (existing?.inferenceMs ?: 0) + inferenceMs,
                 replies = (existing?.replies ?: 0) + 1,
+                decodeMs = (existing?.decodeMs ?: 0) + decodeMs,
+                decodeTokens = (existing?.decodeTokens ?: 0) + decodeTokens,
             ),
         )
     }
 }
+
+/** One model's real, measured, decode-only throughput on this device. See [UsageDao.decodeSpeedByModel]. */
+data class ModelDecodeSpeed(
+    val modelName: String,
+    val averageTokensPerSecond: Double,
+    val generatedTokens: Long,
+)
 
 /** Reads and writes the reports the user filed against model output. */
 @Dao

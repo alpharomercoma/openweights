@@ -91,55 +91,63 @@ class DiscoverCalibrationTest {
     }
 
     /**
-     * Two real, single-run residuals, not an invented number: this session measured
-     * LFM2.5-1.2B-Instruct at a genuine, decode-only 32.46 tokens a second
-     * (695,755,488 bytes), then granite-4.2-3b-Q2_K at a genuine decode-only 6.73
-     * (1,455,736,960 bytes) and, later the same session, Qwen3-1.7B-Q4_K_M at a genuine
-     * decode-only 16.54 (1,107,409,472 bytes). Calibrated from LFM, the formula predicts
-     * ≈15.5 for granite (real: 6.73, prediction ~2.3x too optimistic) and ≈20.4 for Qwen3
-     * (real: 16.54, prediction ~1.23x too optimistic).
+     * Controlled, repeated measurements, not single samples: `DecodeSpeedBenchmark`
+     * (app/src/androidTest) loaded each model, discarded a warmup generation, then ran 5
+     * repetitions of an identical prompt at temperature=0 with a fixed 150-token budget,
+     * resetting the KV cache between reps so every rep pays the same fixed cost. LFM was
+     * measured twice — first and last — to isolate order/thermal drift from architecture.
      *
-     * **What this is not:** a characterisation of the formula's error profile. codex and
-     * agy both reviewed this exact data and independently gave the same verdict: two
-     * out-of-sample residuals, each a single run of 178-2519 tokens with no repeats, is
-     * not enough to say the error "scales with architectural distance" — that reads a
-     * trend into what could just as easily be measurement noise (thermal state, background
-     * load, sample size all uncontrolled and unmeasured here). Both explicitly warned
-     * against shipping a UI claim like "give or take ~2x": the observed error already
-     * exceeds 2x for granite, and nothing here bounds it from above.
+     * Real medians on this device (CPU decode): LFM2.5-1.2B 35.48 tok/s cold / 34.51 tok/s
+     * warm (695,755,488 bytes), Qwen3-1.7B-Q4_K_M 21.18 tok/s (1,107,409,472 bytes),
+     * granite-4.2-3b-Q2_K 8.40 tok/s (1,455,736,960 bytes). Repeat-run spread was 1.3-4.8%
+     * of the median; the LFM cold-vs-warm drift was 2.7%. Calibrated from either LFM
+     * measurement, the formula predicts Qwen3 within 2-5% (right at the noise floor) and
+     * overpredicts granite by ~96-102% — a gap roughly twenty to forty times the measured
+     * noise, which is what makes it real signal rather than an artifact of one unlucky run.
      *
-     * These two assertions are pinned regression fixtures — real numbers this device
-     * produced, worth re-checking if the formula changes — not proof the estimator is
-     * reliable across architectures. A real accuracy claim needs repeated, controlled runs
-     * (fixed token count, fixed context depth, randomised order, reported dispersion)
-     * across a deliberately stratified model/quant/backend panel, per codex and agy's
-     * shared recommendation, which this session's on-device testing time did not cover.
+     * **What this still is not, per codex and agy's re-review of this exact data:** proof
+     * that *architecture* is what drives granite's miss. granite-4.2-3b here is quantized
+     * to Q2_K (2 bits) against Qwen3's Q4_K_M and LFM's Q4_0 — architecture and
+     * quantization depth are confounded in this panel, and agy specifically flagged that a
+     * 2-bit quant plausibly hits a different bottleneck (dequantization compute, cache
+     * behaviour) than the bandwidth-bound assumption the formula makes, independent of
+     * whatever granite's architecture is doing. Both reviewers also noted: one device, one
+     * CPU backend, one prompt, and three architectures is still too thin a panel to
+     * generalise from, and repeating one deterministic prompt five times is not the same
+     * as five independent workloads. The honest summary neither reviewer disputed:
+     * "formula works for models near this one, fails badly for granite specifically,
+     * cause not yet isolated between architecture and quantization depth."
+     *
+     * These assertions pin what this device actually measured, tightened by the repeated
+     * protocol — not a general accuracy claim, and not evidence for shipping any UI text
+     * that states an error bound.
      */
     @Test
     fun `a cross-architecture prediction is real-world off by more than double`() {
         val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
-        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 32.46, 2519))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 35.48, 2519))
 
         val calibration = matchCalibration(decodeSpeeds, installed)
         val predicted = calibration?.predictFor(1_455_736_960L)
 
-        // Actually measured on this device: 6.73 tokens a second.
+        // Median of 5 controlled reps on this device: 8.40 tokens a second.
         assertThat(predicted).isNotNull()
-        assertThat(predicted!!).isGreaterThan(6.73 * 2)
+        assertThat(predicted!!).isGreaterThan(8.40 * 1.9)
+        assertThat(predicted).isLessThan(8.40 * 2.1)
     }
 
     @Test
-    fun `a same-family dense-transformer prediction is real-world off by a smaller margin`() {
+    fun `a same-family dense-transformer prediction is real-world within measurement noise`() {
         val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
-        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 32.46, 2519))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 35.48, 2519))
 
         val calibration = matchCalibration(decodeSpeeds, installed)
         val predicted = calibration?.predictFor(1_107_409_472L)
 
-        // Actually measured on this device: 16.54 tokens a second (249-token sample).
+        // Median of 5 controlled reps on this device: 21.18 tokens a second.
         assertThat(predicted).isNotNull()
-        assertThat(predicted!!).isGreaterThan(16.54 * 1.1)
-        assertThat(predicted).isLessThan(16.54 * 1.4)
+        assertThat(predicted!!).isGreaterThan(21.18 * 1.0)
+        assertThat(predicted).isLessThan(21.18 * 1.1)
     }
 
     private fun fakeFile(sizeBytes: Long): File {

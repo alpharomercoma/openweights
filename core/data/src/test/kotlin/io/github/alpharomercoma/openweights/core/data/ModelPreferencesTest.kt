@@ -139,4 +139,17 @@ class ModelPreferencesTest {
         assertThat(read.temperature).isEqualTo(0.15f)
         assertThat(read.contextLength).isEqualTo(8_192)
     }
+
+    /**
+     * Caught live: asked a plain factual question with no need to search, LFM2.5-1.2B
+     * correctly answered from memory and then prefaced it with "I'm sorry, but I don't have
+     * a tool that can pull up a quick fact from an external source" — false. web_search was
+     * offered the whole time; the model just correctly chose not to use it, and then
+     * described that choice as a missing capability. The default prompt told it when not to
+     * search; nothing told it not to misdescribe itself when it didn't.
+     */
+    @Test
+    fun `the default tool prompt says not to deny having a tool it is choosing not to use`() {
+        assertThat(ModelPreferences.DEFAULT_TOOL_PROMPT).contains("do not say you lack a tool")
+    }
 }

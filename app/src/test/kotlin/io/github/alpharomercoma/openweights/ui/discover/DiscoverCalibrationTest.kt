@@ -150,6 +150,59 @@ class DiscoverCalibrationTest {
         assertThat(predicted).isLessThan(21.18 * 1.1)
     }
 
+    /**
+     * The same benchmark, same three model files, on a second physical device: a Qualcomm
+     * Device Cloud loan of an SM8750 (Snapdragon 8 Elite), 15.5 GB RAM, reached over the
+     * `sshtunnel@ssh.qdc.qualcomm.com` port-forward. Real medians, CPU decode: LFM2.5-1.2B
+     * 70.55 tok/s cold / 70.95 tok/s warm (0.57% drift — tighter than the first device's
+     * 2.7%, plausibly more thermal headroom), Qwen3-1.7B-Q4_K_M 37.41 tok/s, granite-4.2-3b
+     * 14.91 tok/s. Repeat-run spread 1.4-6.6%.
+     *
+     * **The finding, and its correct scope.** The device-to-device speedup is not one
+     * number: LFM is 1.99x faster on the Snapdragon, but Qwen3 and granite are *both*
+     * 1.77x faster — agreeing with each other, not with LFM. Asked to review this, agy
+     * pointed out the shape that actually matters here: two models landing on the exact
+     * same ratio while the third (architecturally different) one does not reads as a
+     * two-cluster split — hybrid conv-attention (LFM2) vs. dense transformer (Qwen3,
+     * granite) — not as "every model has its own device-dependent speedup", which was
+     * this test's first draft of the claim and overreached what n=3 models can show.
+     * Whatever is true, it means no single per-device correction scalar makes the formula
+     * cross-device-accurate, which is the part both codex and agy signed off on; *why* is
+     * still open, and both said the fastest next check would be one more dense-transformer
+     * model at a different quant to see whether 1.77x holds, or one more hybrid model to
+     * see whether 1.99x does — neither of which this session's remaining cloud time covered.
+     *
+     * Calibrated from the Snapdragon's own LFM measurement, the formula overpredicts Qwen3
+     * by ~19% (looser than the first device's 2-5%) and granite by ~127% (looser than
+     * ~96-102%) — the same qualitative shape, quantitatively worse on the faster chip.
+     */
+    @Test
+    fun `the device-to-device speedup is not a single scalar across models`() {
+        val poco = mapOf("LFM" to 35.48, "Qwen3" to 21.18, "granite" to 8.40)
+        val snapdragon = mapOf("LFM" to 70.55, "Qwen3" to 37.41, "granite" to 14.91)
+
+        val speedups = poco.keys.associateWith { snapdragon.getValue(it) / poco.getValue(it) }
+
+        // Qwen3 and granite agree with each other and disagree with LFM: a two-cluster
+        // split, not three independent per-model ratios.
+        assertThat(speedups.getValue("Qwen3")).isWithin(0.01).of(speedups.getValue("granite"))
+        assertThat(speedups.getValue("LFM") - speedups.getValue("Qwen3")).isGreaterThan(0.15)
+    }
+
+    @Test
+    fun `a cross-device prediction using the other device's own calibration is looser, not tighter`() {
+        val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 70.55, 2519))
+
+        val calibration = matchCalibration(decodeSpeeds, installed)
+        val predictedGranite = calibration?.predictFor(1_455_736_960L)
+
+        // Snapdragon median: 14.91 tokens a second. The Poco's own granite error was
+        // ~1.96-2.02x; this device's is measurably larger, not the same or smaller.
+        assertThat(predictedGranite).isNotNull()
+        assertThat(predictedGranite!!).isGreaterThan(14.91 * 2.2)
+    }
+
     private fun fakeFile(sizeBytes: Long): File {
         val file = File.createTempFile("calibration-test", ".gguf")
         file.deleteOnExit()

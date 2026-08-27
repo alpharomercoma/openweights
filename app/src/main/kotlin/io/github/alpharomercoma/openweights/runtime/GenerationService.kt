@@ -188,8 +188,17 @@ class GenerationService : Service() {
          *
          * So the goal takes its own hold for its whole life and the per-turn hold nests
          * inside it. The service stops when the last holder lets go.
+         *
+         * A count per key, not merely a key's presence: `TURN` and `GOAL` are each held by
+         * exactly one owner at a time, but a Watch's holder name is its own id, reused every
+         * time its ticker restarts (an edited interval, for one), and a restart cancels the
+         * old ticker rather than waiting for it. The new ticker can call [hold] again for
+         * that same name before the old one's `finally` reaches [release] — a presence set
+         * would treat the second `hold` as a no-op and then let the old ticker's `release`
+         * remove the name outright, stopping the service out from under the ticker that
+         * replaced it.
          */
-        private val holders = mutableSetOf<String>()
+        private val holders = mutableMapOf<String, Int>()
 
         /**
          * Raises the process on [holder]'s behalf while [label] is happening.
@@ -200,7 +209,7 @@ class GenerationService : Service() {
          * for and a crash is worse than a turn that might be frozen.
          */
         fun hold(context: Context, holder: String, label: String) {
-            synchronized(holders) { holders += holder }
+            synchronized(holders) { holders[holder] = (holders[holder] ?: 0) + 1 }
             runCatching {
                 context.startForegroundService(
                     Intent(context, GenerationService::class.java)
@@ -226,7 +235,8 @@ class GenerationService : Service() {
          */
         fun release(context: Context, holder: String) {
             val idle = synchronized(holders) {
-                holders -= holder
+                val remaining = (holders[holder] ?: 0) - 1
+                if (remaining > 0) holders[holder] = remaining else holders.remove(holder)
                 holders.isEmpty()
             }
             if (!idle) return

@@ -568,6 +568,28 @@ class GoalLoopTest : ChatFixture() {
         }
 
     /**
+     * The no-progress case independent loop-engineering reviews (codex, cursor-agent, and
+     * vibe/Mistral) converged on: a step that called no tool and said nothing at all is not
+     * evidence of work either, and `tickIfTheModelDidNot` cannot see that on its own. It
+     * does not need a check of its own — `droppingEmptyReply` already turns a blank reply
+     * into `_uiState.error`, which `step()` was already reading. This nails that down as a
+     * real invariant of the goal loop, not an accident of two unrelated pieces of code.
+     */
+    @Test
+    fun `a step that said nothing at all is retried rather than marked done`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("1. Do the first thing\n2. Do the second thing")
+            repeat(4) { engine.scripted += ScriptedPass("") }
+
+            viewModel.startGoal("Do two things")
+            awaitGoalSettled()
+
+            assertThat(goals.goal.value?.state).isEqualTo(GoalState.HALTED)
+            assertThat(goals.goal.value?.plan?.steps?.get(0)?.done).isFalse()
+        }
+
+    /**
      * The exact shape codex's loop-engineering review found: a goal interrupted by the
      * process dying comes back HALTED so a person can review it, and restoring the last chat
      * on the next launch reopens that goal's own conversation automatically. reopen used to

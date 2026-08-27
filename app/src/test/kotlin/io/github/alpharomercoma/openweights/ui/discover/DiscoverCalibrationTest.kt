@@ -255,29 +255,43 @@ class DiscoverCalibrationTest {
 
     /**
      * The same real-dataset benchmark, on the Poco (the local device used throughout this
-     * project, `[[alpha-dev-environment]]`) rather than a QDC loan. Real medians, decode /
-     * prefill tok/s: LFM2.5-1.2B 35.77/141.36, LFM2.5-2.6B 17.32/56.22, Qwen3-1.7B-Q4_K_M
-     * 17.93/40.58 — only three of the intended six models, for a reason worth recording.
+     * project, `[[alpha-dev-environment]]`) rather than a QDC loan, across three attempts.
+     * Real medians, decode / prefill tok/s — consistent across every attempt that reached
+     * them: LFM2.5-1.2B ~35-37/~141-160, LFM2.5-2.6B ~17-19/~56-68, Qwen3-1.7B-Q4_K_M
+     * ~18-19/~41-49. Every attempt stalled on the model in the fourth run position, never
+     * on the first three.
      *
-     * **What actually happened.** Twice during this run the phone entered Android Doze
-     * (`mWakefulness=Dozing`) mid-benchmark despite `svc power stayon true` and an extended
-     * screen timeout, each time silently throttling the app until woken again — a failure
-     * mode the QDC device never showed once across two full runs. After the second wake,
-     * granite-4.2-3b ran for over twenty minutes without completing a single model pass
-     * (confirmed still consuming 380-450% CPU throughout, not hung; `dumpsys thermalservice`
-     * reported nominal temperatures throughout, so this was not classic thermal throttling
-     * either) before the run was deliberately stopped. ai9stars/G9v3-3B and ling-3.0-tiny
-     * never got a turn. The three models that did complete finished in the same 2-3 minutes
-     * each takes everywhere else, so whatever made granite pathological here is specific to
-     * that combination of model and device state, not a general Poco slowdown.
+     * **What actually happened, across three attempts.** Attempt 1: Android Doze
+     * (`mWakefulness=Dozing`) interrupted the run twice despite `svc power stayon true` and
+     * an extended screen timeout — a failure mode the QDC device never showed once across
+     * two full runs. After the second wake, granite-4.2-3b (4th in run order) ran over
+     * twenty minutes without completing a pass, confirmed still consuming 380-450% CPU the
+     * whole time (not hung) with `dumpsys thermalservice` reporting nominal temperatures
+     * (not classic thermal throttling either); stopped deliberately. Attempt 2: with
+     * granite moved aside so ai9stars/G9v3-3B took the 4th slot instead, the whole app
+     * process was killed outright by MIUI's own `ActivityManager: Killing ... SwipeUpClean`
+     * — not a native crash, not this project's code, MIUI's own aggressive background-app
+     * killer, undeterred by `dumpsys deviceidle whitelist` or `appops RUN_IN_BACKGROUND`.
+     * Attempt 3, after also disabling `cached_apps_freezer`: LFM2.5-1.2B, LFM2.5-2.6B and
+     * Qwen3 all completed in their normal 2-3 minutes each, then G9v3-3B — again the 4th
+     * model — ran 10+ minutes without finishing (confirmed alive, 414% CPU, not stuck)
+     * before being stopped.
      *
-     * **Cross-device speedup, on the models this run actually has:** decode speedup
-     * (Snapdragon over Poco) is inconsistent — 1.76x, 1.05x, 1.41x — echoing the earlier
-     * two-device finding that no single scalar fits. Prefill speedup is both larger and far
-     * more consistent: 3.13x, 2.91x, 3.60x. That prefill separates so much more cleanly than
-     * decode across these two chips, while granite alone turns openly pathological on one of
-     * them, is two more open questions this project has real numbers for and no explanation
-     * of yet.
+     * **The real finding is the position, not either model.** granite and G9v3-3B are
+     * architecturally unrelated, yet both became pathological specifically in the 4th slot
+     * of a long back-to-back run on this device, while the same three earlier models never
+     * once showed it in three attempts. The more probable explanation is cumulative
+     * resource pressure across sequential model loads within one process (native heap
+     * fragmentation, memory pressure after three prior model loads on a phone with far less
+     * RAM than the Snapdragon's 15.5 GB) rather than anything specific to the two models
+     * that happened to land there. Unconfirmed — the fix to know for certain is running each
+     * model as the *first* load in its own fresh process, which this session's time did not
+     * cover.
+     *
+     * **Cross-device speedup, on the three models every attempt actually completed:**
+     * decode speedup (Snapdragon over Poco) is inconsistent — 1.76x, 1.05x, 1.41x — echoing
+     * the earlier two-device finding that no single scalar fits. Prefill speedup is both
+     * larger and far more consistent: 3.13x, 2.91x, 3.60x.
      */
     @Test
     fun `prefill speedup between devices is larger and more consistent than decode speedup`() {

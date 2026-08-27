@@ -221,7 +221,7 @@ private fun GgufMetadata.summaryLine(quantizationFromName: String): String {
  */
 private fun FitReport.memoryLine(): String {
     val speed = estimatedDecodeTokensPerSecond
-        ?.let { String.format(Locale.getDefault(), " · about %.0f tokens a second", it) }
+        ?.let { String.format(Locale.getDefault(), " · ≈%.0f tok/s", it) }
         .orEmpty()
     return "needs ${formatBytes(requiredMemoryBytes)}$speed"
 }

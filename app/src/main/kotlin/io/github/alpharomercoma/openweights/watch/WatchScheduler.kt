@@ -147,7 +147,7 @@ class WatchScheduler @Inject constructor(
                 running.cancel()
             }
             periods[watch.id] = watch.everyMinutes
-            GenerationService.hold(appContext, holderFor(watch.id), "Watching")
+            GenerationService.hold(appContext, holderFor(watch.id), watchNotificationLabel(watch))
             tickers[watch.id] = scope.launch {
                 // The hold is released in this coroutine's own finally rather than by
                 // whoever stops it. Every way this can end goes through here: the loop
@@ -219,11 +219,26 @@ class WatchScheduler @Inject constructor(
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L
+        const val MAX_NOTIFICATION_TASK_CHARS = 60
 
         /**
          * One holder per watch, so three fast watches do not each drop the service the
          * others still need. See `GenerationService.holders`.
          */
         fun holderFor(watchId: Long) = "watch-$watchId"
+
+        /**
+         * What the notification says while a fast watch is between ticks.
+         *
+         * Named by the check itself, not just "Watching": three watches running at once
+         * would otherwise show three identical notifications with nothing to tell them
+         * apart, and the one thing a person watching this notification wants to know is
+         * which check it is.
+         */
+        fun watchNotificationLabel(watch: Watch): String {
+            val task = watch.task.take(MAX_NOTIFICATION_TASK_CHARS)
+            val truncated = if (task.length < watch.task.length) "$task…" else task
+            return "Watching: $truncated"
+        }
     }
 }

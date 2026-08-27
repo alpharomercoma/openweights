@@ -512,13 +512,59 @@ class GoalLoopTest : ChatFixture() {
             awaitGoalSettled()
 
             assertThat(goals.goal.value?.state).isEqualTo(GoalState.DONE)
-            // Three real steps and one rejected, wasted attempt at the second: four turns
-            // pointed at a single step, not three. Silently accepting the stale advance call
-            // as though it had closed step two would have needed only three.
+            // Three real steps and two wasted attempts at the second: five turns pointed
+            // at a single step, not three. The fixture has no real `advance` tool
+            // registered, so this stale call actually comes back "no tool called advance"
+            // — a failed call `allToolsFailed` now catches and retries, where it used to
+            // read as silence and let the app's own fallback tick the next step for free.
+            // Silently accepting either the stale call or the failed one as though it had
+            // closed step two would have needed only three.
             val stepTurns = engine.prompts.count { convo ->
                 convo.any { it.text.contains("Carry out this one step of the plan") }
             }
-            assertThat(stepTurns).isEqualTo(4)
+            assertThat(stepTurns).isEqualTo(5)
+        }
+
+    /**
+     * The exact shape a second codex loop-engineering review found: `tickIfTheModelDidNot`
+     * cannot tell a step that needed no tool from a step whose only tool call failed, since
+     * both leave `doneBefore` unchanged — a failed [io.github.alpharomercoma.openweights.core.tools.AgentStep.Ran]
+     * was silently treated the same as no attempt at all, and force-ticked done regardless.
+     */
+    @Test
+    fun `a step whose only tool call failed is retried rather than marked done`() =
+        runTest(dispatcher) {
+            try {
+                loadModel()
+                engine.scripted += ScriptedPass(
+                    "1. Do the first thing\n2. Do the second thing",
+                )
+                val failedCall = ScriptedPass(
+                    text = "",
+                    toolCalls = listOf(
+                        ToolCall(id = "a", name = "web_search", argumentsJson = """{"query":"x"}"""),
+                    ),
+                )
+                ChatFixture.StubTool.fails = true
+                // MAX_STEP_FAILURES is 2: the first failed attempt is retried, and the
+                // second one halts rather than looping on a broken tool forever. Each
+                // attempt is itself more than one model generation: a tool round that
+                // fails is still followed by a closing round once the turn's own round
+                // budget runs out. Queued generously so the fallback plain-text reply the
+                // fake engine hands back once the queue drains — the shape a step that
+                // truly needed no tool takes — never has a chance to masquerade as one
+                // that gave up on a broken tool instead.
+                repeat(8) { engine.scripted += failedCall }
+
+                viewModel.startGoal("Do two things")
+                awaitGoalSettled()
+
+                assertThat(goals.goal.value?.state).isEqualTo(GoalState.HALTED)
+                // Not marked done: a failed tool call is not evidence the step happened.
+                assertThat(goals.goal.value?.plan?.steps?.get(0)?.done).isFalse()
+            } finally {
+                ChatFixture.StubTool.fails = false
+            }
         }
 
     /**

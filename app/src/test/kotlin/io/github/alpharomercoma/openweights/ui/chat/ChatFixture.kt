@@ -247,7 +247,13 @@ abstract class ChatFixture {
             parametersJson = """{"type":"object","properties":{"query":{"type":"string"}}}""",
         )
 
-        override suspend fun run(call: ToolCall): String = "Ada Lovelace, 1815 to 1852."
+        /** A singleton reused across every test in the JVM, so each test resets this itself. */
+        var fails = false
+
+        override suspend fun run(call: ToolCall): String {
+            if (fails) error("the tool would not run")
+            return "Ada Lovelace, 1815 to 1852."
+        }
     }
 
     /**

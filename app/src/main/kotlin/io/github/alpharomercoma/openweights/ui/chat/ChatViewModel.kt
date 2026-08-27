@@ -1658,6 +1658,14 @@ class ChatViewModel @Inject constructor(
         // other direction. A stale or wrong step number is treated the same as too many.
         val calledAdvance = lastTurnSteps.any { it is AgentStep.Ran && it.call.name == "advance" }
         val advancedNothing = calledAdvance && newlyDone.isEmpty()
+        // A step that tried a tool and every one of them failed or was declined is not
+        // evidence of work done, and `tickIfTheModelDidNot` cannot tell that from a step
+        // that needed no tool at all: both leave `doneBefore` unchanged. Checked only when
+        // the model did not call `advance` itself, since a step that closed itself despite a
+        // failed tool call is judged by whether it named the right step, not by this.
+        val allToolsFailed = !calledAdvance &&
+            lastTurnSteps.any { it is AgentStep.Ran || it is AgentStep.Skipped } &&
+            lastTurnSteps.none { it is AgentStep.Ran && it.successful }
 
         when {
             brief.requiresWebEvidence && verifiedSources.isEmpty() -> {
@@ -1688,6 +1696,16 @@ class ChatViewModel @Inject constructor(
                     it.copy(
                         error = "This step's advance call did not close the step it was " +
                             "given, so it was not marked done.",
+                    )
+                }
+            }
+
+            allToolsFailed -> {
+                turns.planning.restore(planBefore)
+                _uiState.update {
+                    it.copy(
+                        error = "This step's tool calls did not succeed, so it was not " +
+                            "marked done.",
                     )
                 }
             }

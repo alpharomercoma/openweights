@@ -307,6 +307,81 @@ class DiscoverCalibrationTest {
         assertThat(prefillSpeedups.max()).isLessThan(4.0)
     }
 
+    /**
+     * Two more models added to the Poco panel this session, at the user's request: Ling-3.0-tiny
+     * (LFM2.5-1.2B, Ling-3.0-tiny) and Nanbeige4.2-3B (LFM2.5-1.2B, Nanbeige4.2-3B, LFM2.5-1.2B
+     * again as the closing drift bookend), each run in isolation — the rest of the 7-model set
+     * moved aside — specifically to separate model identity from the run-position pathology
+     * documented above.
+     *
+     * **Ling-3.0-tiny confirms the position theory, not an architecture theory.** Run in
+     * position 2 (not 4), it completed cleanly in its normal 2-3 minutes: decode 22.13 tok/s,
+     * prefill 39.99 tok/s, tight 5-rep spread. Both granite and G9v3-3B, architecturally
+     * unrelated to each other, only became pathological specifically when they landed in the
+     * 4th run-order slot; the same G9v3-3B file ran fine here (isolated, effectively position 2)
+     * when it wasn't in that slot. This is the strongest evidence yet for cumulative
+     * resource-pressure-by-position over per-model-architecture as the cause of the Poco stalls
+     * — still not proven (that needs each model run first-in-a-fresh-process, not attempted this
+     * session), but every data point collected now points the same direction.
+     *
+     * **Nanbeige4.2-3B is real signal, not a repeat of the position-4 pathology.** It ran in
+     * position 2, same as Ling, so the position theory predicts a clean run — and by "clean"
+     * (no freeze, no crash, steady uninterrupted CPU the entire time) it was. But it took
+     * roughly 19 minutes of continuous, unbroken computation for one warmup + 5 reps at a
+     * 128-token budget, against Ling's 2-3 minutes and every other ~3B model this session's
+     * 1-3 minutes. Decode landed at 3.97 tok/s median, prefill at 8.32 tok/s median —
+     * dramatically slower than every other model tested this session, including granite's
+     * troubled Q2_K quantization (8.40-14.91 tok/s decode). `LLM_ARCH_NANBEIGE` is present and
+     * recognized in this project's vendored llama.cpp fork (`llama-arch.cpp`), so the model
+     * loads and runs correctly — this reads as a missing optimized compute-kernel path for
+     * whatever op Nanbeige's architecture relies on, on this CPU backend specifically, not a
+     * bug in this app or a hang. Unconfirmed without profiling llama.cpp's own op timings,
+     * which this session's time did not cover.
+     *
+     * **A device this session could not get usable data from at all.** A second QDC loan, an
+     * SM7675 ("Snapdragon 7+ Gen 3"), was reached specifically to redo the full panel on a
+     * third device, but every model-write path failed for reasons unrelated to this codebase:
+     * files written as root via `adb shell curl` were POSIX-correct but invisible to the app
+     * (this device's FUSE scoped-storage emulation ties read access to the creating app's UID,
+     * stricter than the Poco or the first QDC device); `run-as` itself refused to run
+     * (`/data readable or writable by others: 40777`, a device-image permission problem);  and
+     * the app's own in-app downloader — which should have sidestepped both — stalled at 0 MB via
+     * WorkManager `CancellationException`, traced to a frozen `dumpsys battery`
+     * (`UPDATES STOPPED`) left over from a prior session on this shared cloud device, which
+     * `dumpsys battery reset` did not fix. All three are pre-existing environment defects on
+     * that specific device image, not app bugs; the device was abandoned for this session.
+     *
+     * **A distinct Poco freeze mode, found and fixed mid-run.** During the Nanbeige run's first
+     * (contaminated) LFM rep, the process froze — CPU time exactly unchanging across repeated
+     * `top` checks — while `mWakefulness=Dozing`, despite `svc power stayon true` and an
+     * extended screen timeout already being active from the start. Waking the *screen*
+     * (`input keyevent KEYCODE_WAKEUP`) did not unfreeze it. Only bringing the app to the
+     * *foreground* (`am start -n <pkg>/MainActivity`) resumed CPU activity. A 20-second
+     * foreground-relaunch loop, not a screen-wake loop, is what carried the rest of that run
+     * (including all of Nanbeige's ~19 minutes) through without a second freeze. Because the
+     * freeze happened mid-rep for that one LFM pass, its logged numbers
+     * (`decodeMedian=34.32, prefillMedian=26.02`) are contaminated by the recovery and are not
+     * used here; the LFM1.2B reference values throughout this file predate that run. The same
+     * run's *closing* LFM bookend, after the fix was in place, came back clean
+     * (`decodeMedian=36.58, prefillMedian=95.62`) — consistent with every other clean LFM
+     * reading on this device.
+     */
+    @Test
+    fun `an unoptimized architecture can miss the file-size formula even harder than a low-bit quantization`() {
+        val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
+        val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 36.14, 2519))
+
+        val calibration = matchCalibration(decodeSpeeds, installed)
+        val predictedNanbeige = calibration?.predictFor(2_684_023_968L)
+
+        // Real, measured: 3.97 tokens a second. Simple inverse-file-size scaling from LFM
+        // predicts roughly 9.4 tok/s here — the formula overpredicts by more than double,
+        // a miss on the same order as granite's Q2_K quantization gap, for a completely
+        // different underlying reason (kernel support, not bit depth).
+        assertThat(predictedNanbeige).isNotNull()
+        assertThat(predictedNanbeige!!).isGreaterThan(3.97 * 2.0)
+    }
+
     private fun fakeFile(sizeBytes: Long): File {
         val file = File.createTempFile("calibration-test", ".gguf")
         file.deleteOnExit()

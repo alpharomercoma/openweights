@@ -235,6 +235,7 @@ class DecodeSpeedBenchmark {
             "granite-4.2-3b-Q2_K.gguf",
             "ai9stars_G9v3-3B-Q4_K_M.gguf",
             "ling-3.0-tiny-Q4_K_M.gguf",
+            "Nanbeige4.2-3B-Q4_K_M.gguf",
         )
     }
 }

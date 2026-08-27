@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.watch
 
+import android.Manifest.permission.POST_NOTIFICATIONS
+import android.app.NotificationManager
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -71,6 +73,9 @@ class WatchRunnerTest {
     @Before
     fun setUp() {
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        // Granted explicitly: Robolectric does not grant a manifest-declared runtime
+        // permission by default, and the alert notification checks for it before posting.
+        org.robolectric.Shadows.shadowOf(context).grantPermissions(POST_NOTIFICATIONS)
         database = Room.inMemoryDatabaseBuilder(context, OpenWeightsDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -156,6 +161,39 @@ class WatchRunnerTest {
     @Test
     fun `a tick for a watch that is gone reports nothing to reschedule`() = runTest {
         assertThat(runner.tick(watchId = 404, now = 1)).isNull()
+    }
+
+    /**
+     * The one alert a watch is allowed to make noise about: a check that actually ran and
+     * has something to say. A skipped tick — busy, hot, low battery — is the ordinary cost
+     * of running unattended and must stay silent, or the feature trains people to mute it.
+     */
+    @Test
+    fun `a check that actually runs posts one notification with its finding`() = runTest {
+        loadedEngine()
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+
+        val outcome = runner.tick(watch.id, now = 1)
+
+        assertThat(outcome).isEqualTo(WatchOutcome.CHECKED)
+        val manager = ApplicationProvider.getApplicationContext<android.app.Application>()
+            .getSystemService(NotificationManager::class.java)
+        val posted = org.robolectric.Shadows.shadowOf(manager).allNotifications
+        assertThat(posted).hasSize(1)
+        assertThat(posted.single().extras.getString(android.app.Notification.EXTRA_TITLE))
+            .isEqualTo("Check the tides")
+    }
+
+    @Test
+    fun `a skipped tick posts no notification`() = runTest {
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+
+        val outcome = runner.tick(watch.id, now = 1)
+
+        assertThat(outcome).isEqualTo(WatchOutcome.SKIPPED)
+        val manager = ApplicationProvider.getApplicationContext<android.app.Application>()
+            .getSystemService(NotificationManager::class.java)
+        assertThat(org.robolectric.Shadows.shadowOf(manager).allNotifications).isEmpty()
     }
 
     /**

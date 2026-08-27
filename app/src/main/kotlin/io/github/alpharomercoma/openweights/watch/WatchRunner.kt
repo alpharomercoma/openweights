@@ -16,11 +16,21 @@
 
 package io.github.alpharomercoma.openweights.watch
 
+import android.Manifest.permission.POST_NOTIFICATIONS
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.BatteryManager
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchOutcome
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
@@ -80,7 +90,73 @@ class WatchRunner @Inject constructor(
         // the ticker slept one more full period before noticing, holding the foreground
         // notification up for a watch that had already given up.
         val after = watches.record(watchId, now, outcome, summary)
+        // Only a check that actually ran is worth a person's attention. Skipped ticks are
+        // routine — busy engine, low battery, the ordinary cost of running unattended — and
+        // alerting on every one of those would be the thing that gets this feature muted.
+        if (outcome == WatchOutcome.CHECKED) alert(watch, summary)
         return outcome.takeIf { after == null || after.isActive }
+    }
+
+    /**
+     * The one notification a watch posts that is not the ongoing "still running" one.
+     *
+     * Distinct channel from [GenerationService]'s: that one is deliberately silent, since it
+     * is up for the entire life of a fast watch and a sound on every tick would be the
+     * opposite of unattended. This one fires once, for the result a person actually asked to
+     * be told about, and is the one place a sound belongs.
+     */
+    private fun alert(watch: Watch, summary: String) {
+        // Android 13+ requires this granted at runtime; the manifest entry alone is not
+        // enough. Checked explicitly rather than left to runCatching, so a missing grant is
+        // a line in logcat and not a silently vanished result.
+        val granted = ContextCompat.checkSelfPermission(appContext, POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            Log.w("OpenWeights", "watch ${watch.id} found something but notifications are off")
+            return
+        }
+        val manager = appContext.getSystemService<NotificationManager>() ?: return
+        ensureAlertChannel(manager)
+        val notification = NotificationCompat.Builder(appContext, ALERT_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(watch.task.take(MAX_TITLE_CHARS))
+            .setContentText(summary)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
+            .setAutoCancel(true)
+            .setContentIntent(openApp())
+            .build()
+        // Namespaced by a string rather than the id itself: watch.id.toInt() truncates a
+        // Long, which could collide two watches whose ids differ by 2^32, and a bare small
+        // int risks colliding with a notification id some other feature happens to use.
+        // hashCode() of a string only this feature constructs avoids both.
+        runCatching { manager.notify("watch-${watch.id}".hashCode(), notification) }
+    }
+
+    private fun openApp() = appContext.packageManager
+        .getLaunchIntentForPackage(appContext.packageName)?.let {
+            PendingIntent.getActivity(
+                appContext,
+                0,
+                it,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+        }
+
+    private fun ensureAlertChannel(manager: NotificationManager) {
+        if (manager.getNotificationChannel(ALERT_CHANNEL) != null) return
+        // The name-based form, not android.resource://pkg/<numeric id>: a NotificationChannel's
+        // sound is set once and Android will not let the app change it later, but a raw
+        // resource's numeric id is not guaranteed stable across a rebuild. The name is.
+        val sound = Uri.parse(
+            "android.resource://${appContext.packageName}/raw/watch_alert",
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(ALERT_CHANNEL, "Watch results", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply {
+                    description = "One notification per watch, when a check actually runs."
+                    setSound(sound, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
+                },
+        )
     }
 
     /**
@@ -180,6 +256,12 @@ class WatchRunner @Inject constructor(
     private companion object {
         /** The same floor a goal uses. Working unattended is what flattens a phone. */
         const val MIN_BATTERY_PERCENT = 15
+
+        /** Separate from GenerationService's ongoing channel. See [alert]. */
+        const val ALERT_CHANNEL = "watch-alert"
+
+        /** A notification title is one line; anything past this is the app's problem, not the OS's. */
+        const val MAX_TITLE_CHARS = 60
     }
 }
 

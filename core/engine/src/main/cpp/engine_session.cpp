@@ -16,8 +16,12 @@
 
 #include "engine_session.h"
 
+#ifdef __ANDROID__
 #include <android/log.h>
 #include <dlfcn.h>
+#else
+#include <cstdio>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -56,8 +60,17 @@ constexpr size_t MAX_ATTACHMENT_BYTES = 64u * 1024u * 1024u;
 constexpr size_t MAX_TOKEN_PIECE_BYTES = 1024u * 1024u;
 
 #define LOG_TAG "OpenWeights"
+#ifdef __ANDROID__
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+// stderr rather than os_log: os_log needs a compile-time format string, which none of
+// these call sites have (every one builds its message from a runtime value), and stderr
+// already reaches Xcode's console on the Simulator and a device under a debugger, which is
+// the same "reaches a developer, not a user" guarantee Logcat gives on Android.
+#define LOGI(...) fprintf(stderr, "[" LOG_TAG "] " __VA_ARGS__), fprintf(stderr, "\n")
+#define LOGE(...) fprintf(stderr, "[" LOG_TAG " ERROR] " __VA_ARGS__), fprintf(stderr, "\n")
+#endif
 
 namespace openweights {
 namespace {
@@ -120,10 +133,18 @@ void log_callback(ggml_log_level level, const char * text, void * /*user_data*/)
     // matching on >= ERROR would log llama.cpp's progress dots as errors.
     switch (level) {
         case GGML_LOG_LEVEL_ERROR:
+#ifdef __ANDROID__
             __android_log_write(ANDROID_LOG_ERROR, LOG_TAG, text);
+#else
+            fprintf(stderr, "[" LOG_TAG " ERROR] %s", text);
+#endif
             break;
         case GGML_LOG_LEVEL_WARN:
+#ifdef __ANDROID__
             __android_log_write(ANDROID_LOG_WARN, LOG_TAG, text);
+#else
+            fprintf(stderr, "[" LOG_TAG " WARN] %s", text);
+#endif
             break;
         default:
             break;
@@ -272,6 +293,14 @@ size_t complete_utf8_prefix(const std::string & text) {
     return index;
 }
 
+// Everything from here to load_gpu_backend() is Android's answer to a question Apple
+// platforms do not ask: which of several *.so files, never extracted from the package, is
+// the right one to dlopen for this CPU. The Apple build links one CPU backend and Metal
+// directly into the binary (see build-xcframework.sh's COMMON_CMAKE_ARGS), so they are
+// already registered by the time init_backend() runs and there is nothing here for it to
+// do on that platform.
+#ifdef __ANDROID__
+
 /**
  * The CPU backend variants built by GGML_CPU_ALL_VARIANTS, best instruction set first.
  * Each exports `ggml_backend_score()`, which inspects the running CPU and returns 0 when
@@ -341,6 +370,8 @@ void load_gpu_backend() {
     LOGI("OpenCL backend registered");
 }
 
+#endif  // __ANDROID__
+
 /** Size of a file in bytes, or 0 when it cannot be read. */
 size_t file_size(const std::string & path) {
     struct stat info {};
@@ -374,8 +405,10 @@ void init_backend() {
         // The projector logs through its own channel; without this its failures go to
         // stderr, which on Android means nowhere.
         mtmd_helper_log_set(log_callback, nullptr);
+#ifdef __ANDROID__
         load_best_cpu_backend();
         load_gpu_backend();
+#endif
         llama_backend_init();
     });
 }

@@ -214,7 +214,16 @@ class ToolCatalogueTest {
          * characters of wording that was not carrying a measurement, and the ceiling then
          * moved by 32 to restore the margin the comment above promises. The property it
          * exists for still holds: a ninth default tool costs 40 to 90 tokens and trips it.
+         *
+         * Moved again by 32 when the media tool was renamed and both search descriptions
+         * were rewritten around what each returns. The day the media tool started
+         * returning real results instead of silently failing, factual questions started
+         * stopping there and being answered with pictures — a live misroute, not a
+         * hypothetical. Measured at temperature zero on a fourteen-case held-out routing
+         * suite: with "search" in the tool's name, five to eight of eight facts misrouted
+         * whatever the descriptions said; named show_pictures, zero did. The tokens this
+         * bought are the ones carrying that measurement.
          */
-        const val FULL_CEILING = 864
+        const val FULL_CEILING = 896
     }
 }

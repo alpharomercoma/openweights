@@ -64,7 +64,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
             // answer" collapsed four different failures into one message, and three device
             // transcripts in a row could not say whether the token page or the endpoint was
             // the problem.
-            Log.i(TAG, "search_media: no vqd token came back from the search page")
+            Log.i(TAG, "media search: no vqd token came back from the search page")
             return null
         }
         val endpoint = when (kind) {
@@ -75,21 +75,21 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         val body = runCatching {
             client.newCall(get(url).build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.i(TAG, "search_media: endpoint answered ${response.code}")
+                    Log.i(TAG, "media search: endpoint answered ${response.code}")
                     null
                 } else {
                     response.peekBody(MAX_BYTES).string()
                 }
             }
         }.onFailure {
-            Log.i(TAG, "search_media: endpoint request failed", it)
+            Log.i(TAG, "media search: endpoint request failed", it)
         }.getOrNull() ?: return null
 
         val results = runCatching {
             Json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
         }.getOrNull()
         if (results == null) {
-            Log.i(TAG, "search_media: no results array in ${body.take(120)}")
+            Log.i(TAG, "media search: no results array in ${body.take(120)}")
             return null
         }
 
@@ -97,7 +97,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         // is a claim about the web, and a scraper that has been rate limited is not entitled
         // to make one.
         return results.mapNotNull { it.asHit(kind) }.take(limit).ifEmpty {
-            Log.i(TAG, "search_media: ${results.size} rows, none drawable")
+            Log.i(TAG, "media search: ${results.size} rows, none drawable")
             null
         }
     }
@@ -148,21 +148,21 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         val page = runCatching {
             client.newCall(get("$HOME/?q=${query.encoded()}").build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.i(TAG, "search_media: token page answered ${response.code}")
+                    Log.i(TAG, "media search: token page answered ${response.code}")
                     null
                 } else {
                     response.peekBody(MAX_BYTES).string()
                 }
             }
         }.onFailure {
-            Log.i(TAG, "search_media: token page request failed", it)
+            Log.i(TAG, "media search: token page request failed", it)
         }.getOrNull() ?: return null
         val token = VQD.find(page)?.groupValues?.getOrNull(1)
         if (token == null) {
             // What came back instead matters: a consent page, a challenge, and an empty
             // shell all look identical from the null.
             val head = page.take(120).replace(Regex("\\s+"), " ")
-            Log.i(TAG, "search_media: ${page.length} chars of page, no vqd; starts $head")
+            Log.i(TAG, "media search: ${page.length} chars of page, no vqd; starts $head")
         }
         return token
     }

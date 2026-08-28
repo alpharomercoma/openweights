@@ -32,8 +32,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchEntity::class,
         WatchRunEntity::class,
         ToolStepEntity::class,
+        EngineHistoryEntity::class,
     ],
-    version = 12,
+    version = 14,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -44,6 +45,7 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
     abstract fun toolSteps(): ToolStepDao
+    abstract fun engineHistory(): EngineHistoryDao
 
     companion object {
         const val NAME = "openweights.db"
@@ -58,6 +60,51 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * along with everything else and cannot be pulled back out, so old rows read as
          * "not measured" rather than a wrong number invented for them.
          */
+        /**
+         * Stamps the engine record with the model that wrote it. Switching models renames
+         * the conversation, so the conversation's own model name cannot say whether a
+         * stored record belongs to the template now loaded; the stamp can. Nothing to
+         * backfill that can be trusted, so existing rows are dropped: a record that cannot
+         * name its model is exactly the kind this column exists to refuse.
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DELETE FROM engine_history")
+                db.execSQL(
+                    "ALTER TABLE engine_history ADD COLUMN modelName TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
+        /**
+         * Adds the engine's own record of each conversation, so the next turn's prompt can
+         * extend the KV cache instead of being rebuilt from the transcript and diverging.
+         * See [EngineHistoryEntity]. Nothing to backfill: a conversation without a snapshot
+         * simply rebuilds its prompt the way every conversation did before this table.
+         */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS engine_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        conversationId INTEGER NOT NULL,
+                        orderIndex INTEGER NOT NULL,
+                        role TEXT NOT NULL,
+                        text TEXT NOT NULL,
+                        toolCallId TEXT NOT NULL,
+                        replyMessageId INTEGER NOT NULL,
+                        FOREIGN KEY(conversationId) REFERENCES conversations(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_engine_history_conversationId " +
+                        "ON engine_history(conversationId)",
+                )
+            }
+        }
+
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN prefillTokensPerSecond REAL")

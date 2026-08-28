@@ -215,6 +215,10 @@ private fun String.asVerb(): String = VERBS[this] ?: replace('_', ' ')
 
 private val VERBS = mapOf(
     "web_search" to "Searched the web for",
+    // Both names, so a chip stored before the rename reads the same as one after it —
+    // and both say the search left the device, which is the disclosure the chip is for.
+    SearchMediaTool.NAME to "Searched the web for pictures of",
+    SearchMediaTool.LEGACY_NAME to "Searched the web for pictures of",
     "fetch_url" to "Opened",
     "search_files" to "Looked through your folder for",
     "read_file" to "Read",
@@ -262,7 +266,10 @@ private const val MILLIS_PER_SECOND = 1000.0
  * than a block of JSON.
  */
 private fun AgentStep.pictures(): List<FoundPicture> = when (this) {
-    is AgentStep.Ran -> if (call.name == SearchMediaTool.NAME) {
+    // The legacy name too: rows stored before the rename hold the same grid.
+    is AgentStep.Ran -> if (
+        call.name == SearchMediaTool.NAME || call.name == SearchMediaTool.LEGACY_NAME
+    ) {
         SearchMediaTool.picturesIn(result)
     } else {
         emptyList()

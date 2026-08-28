@@ -56,8 +56,16 @@ class SearchMediaTool @Inject constructor(
 
     override val definition = ToolDefinition(
         name = NAME,
-        description = "Find pictures or short videos on the web. Use it when the user asks " +
-            "to see something rather than to read about it. Not for pages or facts.",
+        // Described by what it does for the user — show pictures — not by how it does it.
+        // Measured at temperature zero on a fourteen-case routing suite (held-out fact and
+        // visual questions, LFM2.5-1.2B): named search_media, factual questions misrouted
+        // here five to eight times out of eight, whatever the description said, because
+        // "search" in the name outweighed every wording; named show_pictures with this
+        // description, zero of eight misrouted and six of six visual requests arrived.
+        // The name is the signal a small model actually reads.
+        description = "Show the user pictures or short video clips found on the web. " +
+            "Returns thumbnails to display, not text to read. It answers no questions " +
+            "and returns no facts — for information of any kind, use web_search.",
         parametersJson = """
             {
               "type": "object",
@@ -118,7 +126,16 @@ class SearchMediaTool @Inject constructor(
     }
 
     companion object {
-        const val NAME = "search_media"
+        const val NAME = "show_pictures"
+
+        /**
+         * The name this tool carried before the routing measurement renamed it. Steps
+         * stored under it still exist in conversations, a user's on/off choice may be
+         * keyed by it, and both have to keep meaning this tool: the note rebuilt from an
+         * old row must keep its untrusted provenance, and a switch turned off must stay
+         * off across the rename.
+         */
+        const val LEGACY_NAME = "search_media"
 
         /**
          * The marker the interface reads thumbnails back out by.

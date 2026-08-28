@@ -90,6 +90,11 @@ internal class Folding(
         state.update { current ->
             val folded = current.copy(
                 compaction = compaction,
+                // The record described a prompt this fold just rewrote from the root. A
+                // record captured by a turn *after* the fold contains the recap and is a
+                // valid extension again; clearing here is what lets its presence later
+                // mean "captured post-fold" without a marker.
+                engineHistory = null,
                 transcript = current.transcript.mapIndexed { index, entry ->
                     if (index == compaction.foldedThroughIndex + 1) {
                         entry.copy(compactionNote = COMPACTION_NOTE)

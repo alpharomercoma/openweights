@@ -239,6 +239,24 @@ enum class RuntimeState(val label: String) {
     val isBusy: Boolean get() = this != READY && this != NO_MODEL
 }
 
+/**
+ * The engine's record of the conversation through one particular reply.
+ *
+ * [throughCount] is how many transcript entries [messages] stands in for, and
+ * [throughEntryId] pins which entry the record runs through: a transcript whose entry at
+ * that position is no longer the same one — an edit, a regenerate, a reopened chat — makes
+ * the record stale, and stale reads as absent rather than as the truth.
+ */
+data class EngineHistory(
+    val messages: List<ChatMessage>,
+    val throughCount: Int,
+    val throughEntryId: Long,
+) {
+    /** Whether this record still describes the front of [transcript]. */
+    fun covers(transcript: List<TranscriptEntry>): Boolean =
+        transcript.getOrNull(throughCount - 1)?.id == throughEntryId
+}
+
 /** Everything the chat screen renders. */
 data class ChatUiState(
     val modelName: String? = null,
@@ -254,6 +272,16 @@ data class ChatUiState(
      * and a chat reopened from disk starts it again empty. See [ToolNotes].
      */
     val toolNotes: ToolNotes = ToolNotes(),
+    /**
+     * The conversation exactly as the engine last read it, or null when there is no usable
+     * record. What the KV cache holds is this, not the transcript: the questions carry the
+     * notes and grounding they were decorated with, and the tool rounds sit between
+     * question and answer as the template rendered them. A prompt built as an extension of
+     * this is one the cache can answer for; a prompt rebuilt from the transcript diverges
+     * at the first decorated message, which a hybrid model pays as a full re-read. See
+     * [EngineHistoryEntity].
+     */
+    val engineHistory: EngineHistory? = null,
     val contextUsed: Int = 0,
     val contextSize: Int = 0,
     /**
@@ -683,6 +711,14 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 staged = emptyList(),
                 modelName = replacing?.nameWithoutExtension,
+                // The engine's record belongs to the template of the model that wrote it.
+                // Judged here because this is where the old name is last known — by the
+                // time the load finishes, the state already carries the new one.
+                engineHistory = if (it.modelName == replacing?.nameWithoutExtension) {
+                    it.engineHistory
+                } else {
+                    null
+                },
                 modelQuantization = null,
                 backend = null,
                 contextSize = 0,
@@ -770,6 +806,18 @@ class ChatViewModel @Inject constructor(
                     preferences = preferences,
                     transcript = if (keepConversation) it.transcript else emptyList(),
                     toolNotes = if (keepConversation) it.toolNotes else ToolNotes(),
+                    // Only under the model that wrote it. The record holds one template's
+                    // own rendering of tool rounds — raw call syntax, TOOL roles — and
+                    // replaying that into a different model's template is at best foreign
+                    // control text in the conversation and at worst a render refusal.
+                    engineHistory = if (
+                        keepConversation &&
+                        it.modelName == modelFile.nameWithoutExtension
+                    ) {
+                        it.engineHistory
+                    } else {
+                        null
+                    },
                     compaction = if (keepConversation) it.compaction else null,
                     error = if (keepConversation) {
                         it.transcript.unreadableWarning(support)
@@ -1181,6 +1229,7 @@ class ChatViewModel @Inject constructor(
                     transcript = copiedTranscript,
                     compaction = null,
                     toolNotes = ToolNotes(),
+                    engineHistory = null,
                     contextUsed = 0,
                     error = null,
                 )
@@ -1318,6 +1367,9 @@ class ChatViewModel @Inject constructor(
             // one that was stopped before it could.
             var settled: Pair<String, GenerationStats>? = null
             var turnStats: GenerationStats? = null
+            // The turn's engine-side conversation, if it completes normally. Everything
+            // needed to build the next prompt as an extension of this one's cache.
+            var engineTail: List<ChatMessage>? = null
             lastTurnSteps = emptyList()
 
             val listener = object : TurnListener {
@@ -1369,6 +1421,10 @@ class ChatViewModel @Inject constructor(
                 }
 
                 override suspend fun onApproval(call: ToolCall): Boolean = askUser(call)
+
+                override fun onEngineHistory(messages: List<ChatMessage>) {
+                    engineTail = messages
+                }
             }
 
             try {
@@ -1413,7 +1469,12 @@ class ChatViewModel @Inject constructor(
                     ?.takeIf { (text, _) -> text.isNotBlank() }
                     ?.let { (text, stats) ->
                         settledMillis = System.currentTimeMillis() - turnStartedAt
-                        persistReply(text, stats, settledMillis)
+                        // Null for a turn that kept no record — a stopped pass, a turn with
+                        // media in it — and then the stale-record check quietly falls the
+                        // next prompt back to the rebuilt-from-transcript path.
+                        val record = engineRecord(engineTail)
+                        persistReply(text, stats, settledMillis, record?.messages)
+                        _uiState.update { it.copy(engineHistory = record) }
                     }
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
@@ -1990,6 +2051,7 @@ class ChatViewModel @Inject constructor(
                     // Emptied with the transcript it belongs to. A record of what a tool
                     // returned in one chat is not evidence in the next one.
                     toolNotes = ToolNotes(),
+                    engineHistory = null,
                     compaction = null,
                     contextUsed = 0,
                     error = null,
@@ -2057,6 +2119,17 @@ class ChatViewModel @Inject constructor(
         // question with no answer and then resend it.
         val messages = writer.inOrder { messages(id) }
         val stepsByMessage = writer.inOrder { toolSteps(id) }
+        // The engine's own record of this conversation, trusted only when it runs exactly
+        // through the last stored message: one stamped with an earlier reply describes a
+        // history that was edited or continued since, and is left to the fallback path.
+        val storedEngineHistory = writer.inOrder { engineHistory(id) }
+            .takeIf { rows ->
+                rows.isNotEmpty() && rows.first().replyMessageId == messages.lastOrNull()?.id
+            }
+            // Only into the template that wrote it. The conversation's own model name is no
+            // guide here: switching models renames the conversation, so it always claims
+            // the current model, while the record still holds the old one's rendering.
+            ?.takeIf { rows -> rows.first().modelName == _uiState.value.modelName }
         conversationId = id
         nextEntryId = messages.size.toLong()
         // The board is one object for the whole app, so a plan left in it is on screen in
@@ -2104,6 +2177,24 @@ class ChatViewModel @Inject constructor(
         _uiState.update { state ->
             val reopened = state.copy(
                 toolNotes = restoredNotes,
+                // Reopened entries are numbered by index, so the record runs through the
+                // last of them by construction — the replyMessageId check above already
+                // proved it describes exactly these messages. Not under another model,
+                // whose template the record's rendered tool rounds do not belong to, and
+                // not under a stored fold, where there is no way to tell a record captured
+                // after the fold from one the fold made obsolete.
+                engineHistory = storedEngineHistory
+                    ?.takeIf { !mismatch && conversation.compactionSummary == null }
+                    ?.let { rows ->
+                        EngineHistory(
+                            messages = rows.map { row ->
+                                ChatMessage.text(ChatRole.of(row.role), row.text)
+                                    .copy(toolCallId = row.toolCallId)
+                            },
+                            throughCount = messages.size,
+                            throughEntryId = (messages.size - 1).toLong(),
+                        )
+                    },
                 transcript = messages.toTranscript(
                     conversation.compactionSummary?.let { conversation.compactionThroughIndex },
                     stepsByMessage,
@@ -2383,6 +2474,7 @@ class ChatViewModel @Inject constructor(
         text: String,
         stats: GenerationStats?,
         totalMillis: Long? = null,
+        engineHistory: List<ChatMessage>? = null,
     ) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
@@ -2392,9 +2484,45 @@ class ChatViewModel @Inject constructor(
         val steps = lastTurnSteps.toRecords()
         withContext(NonCancellable) {
             reportingFailure {
-                writer.reply(id, text, stats, reasoningMs, totalMillis, steps)
+                writer.reply(
+                    id,
+                    text,
+                    stats,
+                    reasoningMs,
+                    totalMillis,
+                    steps,
+                    engineHistory,
+                    engineHistoryModel = _uiState.value.modelName,
+                )
             }
         }
+    }
+
+    /**
+     * The engine's record of the conversation through the reply just settled, or null when
+     * this turn produced nothing worth extending.
+     *
+     * Null for a turn the runner kept no record of (stopped, failed), and for one whose
+     * prompt carried media: embeddings are never compared against the cache, so a media
+     * turn re-evaluates from scratch regardless and a record of it buys nothing. The
+     * system message is dropped because it is rebuilt fresh each turn from settings that
+     * may legitimately change; while it does not change, the rebuilt one is byte-identical
+     * and the cache keeps it anyway.
+     */
+    private fun engineRecord(turnMessages: List<ChatMessage>?): EngineHistory? {
+        val body = turnMessages?.dropWhile { it.role == ChatRole.SYSTEM } ?: return null
+        if (body.any { it.files.isNotEmpty() }) return null
+        val transcript = _uiState.value.transcript
+        val reply = transcript.lastOrNull()?.takeIf { it.role == ChatRole.ASSISTANT }
+            ?: return null
+        // The reply goes back the way the cache holds it: the history text, with thinking
+        // in the shape the template will re-render. See assistantHistoryText.
+        val history = (reply.history ?: reply.text).takeIf { it.isNotBlank() } ?: return null
+        return EngineHistory(
+            messages = body + ChatMessage.text(ChatRole.ASSISTANT, history),
+            throughCount = transcript.size,
+            throughEntryId = reply.id,
+        )
     }
 
     private suspend fun reportingFailure(write: suspend () -> Unit) =
@@ -2853,6 +2981,38 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         .takeIf { it.isNotBlank() }
         ?.let { listOf(ChatMessage.text(ChatRole.SYSTEM, it)) }
         .orEmpty()
+
+    // The engine's own record of the conversation, where there is a current one. Replaying
+    // it verbatim — decorated questions, tool rounds and all — is what lets the next prompt
+    // extend the KV cache instead of diverging at the first decoration the transcript never
+    // carried, which a hybrid model pays as a full re-read of everything. Deliberately not
+    // put through [asExchange]: these messages are exactly what the template already
+    // rendered and accepted, and joining two adjacent tool results would both change the
+    // bytes and merge results that carry different call ids. Present under a fold means
+    // captured after it — the fold clears the one it invalidated — so a post-fold record,
+    // recap and all, keeps extending.
+    val record = engineHistory?.takeIf { it.covers(transcript) }
+    if (record != null) {
+        val tail = transcript.drop(record.throughCount)
+            // The streaming placeholder is not part of any prompt.
+            .filterNot { it.role == ChatRole.ASSISTANT && it.text.isBlank() }
+            .map { it.toChatMessage() }
+        // The tail alone gets the neighbour-joining [asExchange] would have done — a
+        // question whose reply was stopped before its first token leaves two user turns
+        // in a row, which strict templates refuse — and the boundary is joined too. The
+        // record itself is never joined: two adjacent tool results carrying different
+        // call ids must stay two messages.
+        val joined = tail.fold(record.messages.toMutableList()) { kept, message ->
+            val previous = kept.last()
+            if (previous.role == message.role && previous.role != ChatRole.TOOL) {
+                kept[kept.lastIndex] = previous.copy(parts = previous.parts + message.parts)
+            } else {
+                kept += message
+            }
+            kept
+        }
+        return (system + joined).withToolNotes(toolNotes)
+    }
 
     val remaining = compaction
         ?.let { transcript.drop(it.foldedThroughIndex + 1) }

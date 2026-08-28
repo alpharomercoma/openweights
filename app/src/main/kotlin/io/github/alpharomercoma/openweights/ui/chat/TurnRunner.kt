@@ -69,6 +69,15 @@ interface TurnListener {
 
     /** Asks the user about one tool. Only reached in [AgentMode.ASK]. */
     suspend fun onApproval(call: ToolCall): Boolean
+
+    /**
+     * The conversation exactly as the engine read it, handed over when a turn completes
+     * normally: the decorated question, and every tool-round message the template really
+     * rendered — everything the transcript alone cannot reconstruct. Without the final
+     * reply, which the caller already keeps as the entry's history text. Never called for
+     * a stopped or failed turn, whose cache holds half a story not worth extending.
+     */
+    fun onEngineHistory(messages: List<ChatMessage>) {}
 }
 
 /**
@@ -365,6 +374,14 @@ class TurnRunner @Inject constructor(
         /** The withdrawal, kept as the exception it should always have been. */
         private var withdrawn = false
 
+        /**
+         * Whether any pass carried a pinned plan block. The block is transient and changes
+         * as steps tick, so a turn that pinned one has a cache the accumulator does not
+         * describe, and handing the accumulator out as the engine's record would claim an
+         * extension the cache cannot honour. Those turns keep no record instead.
+         */
+        private var pinned = false
+
         suspend fun run(params: SamplerParams, mode: AgentMode, listener: TurnListener): String {
             while (true) {
                 // Tools are offered from the first pass, which was tried the other way and
@@ -386,8 +403,10 @@ class TurnRunner @Inject constructor(
                 // very end or it moves tokens the cache has already read. Grounding is the
                 // opposite case — the same words every pass — so it lives in [messages]
                 // and is not re-attached here.
+                val plan = plans.plan.value
+                pinned = pinned || !plan?.statusBlock().isNullOrEmpty()
                 val pass = streamOnce(
-                    messages.pinning(plans.plan.value),
+                    messages.pinning(plan),
                     params.deciding(mayCall),
                     active,
                     renderTools,
@@ -414,7 +433,15 @@ class TurnRunner @Inject constructor(
                 } else {
                     withdraw(pass, calls, listener)
                 }
-                if (!again) return lastRaw
+                if (!again) {
+                    // The turn is over and [messages] is the conversation the KV cache now
+                    // holds, minus this last pass's reply. Handed out so the next turn can
+                    // be built as an extension of it rather than a reconstruction — except
+                    // for a turn that pinned a plan block, whose cache holds text the
+                    // accumulator never carried.
+                    if (!pinned) listener.onEngineHistory(messages)
+                    return lastRaw
+                }
                 listener.onNextPass()
             }
         }

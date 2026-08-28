@@ -57,6 +57,13 @@ class ConversationCompactor @Inject constructor(
      * Estimated from the same measured characters-per-token ratio the fold threshold uses,
      * so the two agree about how big a conversation is. Zero when there is nothing to fold,
      * which is the honest answer and the one that stops a pointless fold.
+     *
+     * An undercount when an engine-history record is standing: the record keeps each
+     * question's tool-notes decoration and the tool rounds between question and answer,
+     * none of which the transcript's text lengths see, so a fold frees more than this
+     * claims. That errs cautious — folding later, never sooner — and the 75%-full trigger
+     * reads the engine's own contextUsed, which counts everything, so a genuinely full
+     * window still folds on time.
      */
     private fun ChatUiState.foldableTokens(): Int {
         val range = policy.foldRange(

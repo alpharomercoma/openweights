@@ -106,7 +106,8 @@ class WebSearchTool @Inject constructor(
         // is now exhaustive, and the double check is named as the thing not to do.
         description = "Search the web, only for what you cannot already know: what " +
             "changed, what is recent, or the present state of a named person, product or " +
-            "organisation. Not for definitions, translations, grammar, history, " +
+            "organisation. Returns text to read; to show pictures or clips instead, " +
+            "use ${SearchMediaTool.NAME}. Not for definitions, translations, grammar, history, " +
             "arithmetic, opinions or explanations, and not to double check something you " +
             "already know. Answer those yourself.",
         parametersJson = """

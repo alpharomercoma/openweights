@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.db.CompactionEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
+import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
@@ -70,6 +71,17 @@ class ChatRepository @Inject constructor(
      */
     suspend fun toolSteps(conversationId: Long): Map<Long, List<ToolStepEntity>> =
         database.toolSteps().forConversation(conversationId).groupBy { it.messageId }
+
+    /**
+     * The engine's own record of this conversation, in prompt order. See
+     * [EngineHistoryEntity] for why it is not the same thing as [messages].
+     */
+    suspend fun engineHistory(conversationId: Long): List<EngineHistoryEntity> =
+        database.engineHistory().forConversation(conversationId)
+
+    /** Replaces the conversation's engine record whole. Empty rows just clears it. */
+    suspend fun replaceEngineHistory(conversationId: Long, rows: List<EngineHistoryEntity>) =
+        database.engineHistory().replaceFor(conversationId, rows)
 
     /**
      * Starts a conversation.

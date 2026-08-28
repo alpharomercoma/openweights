@@ -192,6 +192,55 @@ data class ToolStepEntity(
 )
 
 /**
+ * The engine's own record of a conversation, one row per message it was actually sent.
+ *
+ * Not a copy of `messages`: the prompt the engine reads differs from the transcript in
+ * exactly the ways that decide whether the KV cache survives a turn. The user message
+ * carries the tool-notes digest and the grounding block it was decorated with; the tool
+ * rounds sit between the question and the answer as the assistant calls and results the
+ * template really rendered. Rebuilding a prompt from the transcript loses all of that, and
+ * on a hybrid model — which cannot roll its recurrent state back at all — the first
+ * mismatched token costs a full re-read of the whole conversation, measured at 1.7k tokens
+ * on the turn after every tool turn.
+ *
+ * One snapshot per conversation, replaced whole when a reply completes. [replyMessageId]
+ * names the reply the snapshot runs through: a snapshot whose reply is no longer the
+ * conversation's last stored message describes a history that has since been edited,
+ * regenerated or continued elsewhere, and is discarded rather than trusted.
+ */
+@Entity(
+    tableName = "engine_history",
+    foreignKeys = [
+        ForeignKey(
+            entity = ConversationEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["conversationId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("conversationId")],
+)
+data class EngineHistoryEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val conversationId: Long,
+    /** Preserves prompt order; SQLite gives no ordering guarantee by [id] alone. */
+    val orderIndex: Int,
+    val role: String,
+    val text: String,
+    val toolCallId: String,
+    /** The reply this snapshot runs through. Stale when it is not the last message. */
+    val replyMessageId: Long,
+    /**
+     * The model whose template rendered these messages. Not redundant with the
+     * conversation's own model name: switching models renames the conversation, so by the
+     * time a snapshot is read back the conversation may claim the new model while the
+     * snapshot still holds the old one's rendered tool syntax. The snapshot is only
+     * replayed into the template that produced it.
+     */
+    val modelName: String,
+)
+
+/**
  * Lifetime usage, one row per day per model.
  *
  * Append-only and separate from the conversations: a user who deletes a chat

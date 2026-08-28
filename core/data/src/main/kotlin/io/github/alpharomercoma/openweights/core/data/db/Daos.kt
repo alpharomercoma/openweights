@@ -114,6 +114,28 @@ interface ToolStepDao {
 }
 
 @Dao
+interface EngineHistoryDao {
+    @Query(
+        "SELECT * FROM engine_history WHERE conversationId = :conversationId " +
+            "ORDER BY orderIndex",
+    )
+    suspend fun forConversation(conversationId: Long): List<EngineHistoryEntity>
+
+    @Query("DELETE FROM engine_history WHERE conversationId = :conversationId")
+    suspend fun deleteFor(conversationId: Long)
+
+    @Insert
+    suspend fun insertAll(rows: List<EngineHistoryEntity>)
+
+    /** The whole snapshot at once: whatever was there describes a history this replaces. */
+    @Transaction
+    suspend fun replaceFor(conversationId: Long, rows: List<EngineHistoryEntity>) {
+        deleteFor(conversationId)
+        if (rows.isNotEmpty()) insertAll(rows)
+    }
+}
+
+@Dao
 interface UsageDao {
     @Query("SELECT * FROM usage_ledger ORDER BY day DESC")
     fun observeAll(): Flow<List<UsageEntity>>

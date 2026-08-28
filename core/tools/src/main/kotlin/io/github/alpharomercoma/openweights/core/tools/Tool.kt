@@ -245,6 +245,18 @@ interface Tool {
 }
 
 /** What the model is allowed to reach for, and how it is found by name. */
+/**
+ * What a tool used to be called, so a record written under the old name still resolves.
+ *
+ * Load-bearing for provenance rather than cosmetics: a reopened conversation rebuilds its
+ * tool notes by looking each stored step's tool up again, and a name that no longer
+ * resolves loses `returnsUntrustedText` — text a stranger wrote would re-enter the prompt
+ * marked as trusted, which is exactly the gate that must not silently open.
+ */
+private val LEGACY_TOOL_NAMES = mapOf(
+    SearchMediaTool.LEGACY_NAME to SearchMediaTool.NAME,
+)
+
 class ToolRegistry(tools: List<Tool>) {
     private val byName = tools.associateBy { it.definition.name }
 
@@ -254,6 +266,7 @@ class ToolRegistry(tools: List<Tool>) {
     val definitions: List<ToolDefinition> = tools.map { it.definition }
 
     fun find(name: String): Tool? = byName[name]
+        ?: LEGACY_TOOL_NAMES[name]?.let { byName[it] }
 
     /** The subset the user has switched on, in the order they were registered. */
     fun enabled(names: Set<String>): ToolRegistry =

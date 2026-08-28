@@ -16,11 +16,13 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
+import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -102,8 +104,17 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
         reasoningMs: Long?,
         totalMillis: Long? = null,
         steps: List<ToolStepRecord> = emptyList(),
+        /**
+         * The prompt the engine actually read for this turn, decoration and tool rounds
+         * included, or null when there is none to keep. Stored beside the reply and stamped
+         * with its row id, so a snapshot that outlives its reply — an edit, a regenerate,
+         * a turn that kept no record — reads as stale instead of as the truth.
+         */
+        engineHistory: List<ChatMessage>? = null,
+        /** The model whose template rendered [engineHistory]; see [EngineHistoryEntity.modelName]. */
+        engineHistoryModel: String? = null,
     ) = inOrder {
-        addMessage(
+        val messageId = addMessage(
             conversationId = conversationId,
             role = ChatRole.ASSISTANT.wireName,
             text = text,
@@ -117,6 +128,23 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
             cachedTokens = stats?.cachedTokens,
             steps = steps,
         )
+        engineHistory?.let { history ->
+            replaceEngineHistory(
+                conversationId,
+                history.mapIndexed { index, message ->
+                    EngineHistoryEntity(
+                        conversationId = conversationId,
+                        orderIndex = index,
+                        role = message.role.wireName,
+                        text = message.text,
+                        toolCallId = message.toolCallId,
+                        replyMessageId = messageId,
+                        modelName = engineHistoryModel.orEmpty(),
+                    )
+                },
+            )
+        }
+        messageId
     }
 
     /**

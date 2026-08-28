@@ -62,6 +62,8 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_9_10,
         OpenWeightsDatabase.MIGRATION_10_11,
         OpenWeightsDatabase.MIGRATION_11_12,
+        OpenWeightsDatabase.MIGRATION_12_13,
+        OpenWeightsDatabase.MIGRATION_13_14,
     )
 
     @Test
@@ -290,6 +292,56 @@ class MigrationTest {
             db.execSQL("PRAGMA foreign_keys = ON")
             db.execSQL("DELETE FROM messages WHERE id = 1")
             assertThat(db.intAt("SELECT count(*) FROM tool_steps")).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `the engine_history table arrives empty and cascades with its conversation`() {
+        helper.createDatabase(12).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(13, migrations.toList()).use { db ->
+            assertThat(db.intAt("SELECT count(*) FROM engine_history")).isEqualTo(0)
+
+            db.execSQL(
+                "INSERT INTO engine_history " +
+                    "(conversationId, orderIndex, role, text, toolCallId, replyMessageId) " +
+                    "VALUES (1, 0, 'user', 'notes and a question', '', 7)",
+            )
+            assertThat(db.intAt("SELECT count(*) FROM engine_history WHERE conversationId = 1"))
+                .isEqualTo(1)
+
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM conversations WHERE id = 1")
+            assertThat(db.intAt("SELECT count(*) FROM engine_history")).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `a record that cannot name its model does not survive into the version that asks`() {
+        helper.createDatabase(13).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+            db.execSQL(
+                "INSERT INTO engine_history " +
+                    "(conversationId, orderIndex, role, text, toolCallId, replyMessageId) " +
+                    "VALUES (1, 0, 'user', 'notes and a question', '', 7)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(14, migrations.toList()).use { db ->
+            // Dropped rather than defaulted: the column exists to refuse replaying one
+            // model's rendered tool syntax into another model's template, and a row that
+            // cannot say whose it was is exactly the row that must not be trusted.
+            assertThat(db.intAt("SELECT count(*) FROM engine_history")).isEqualTo(0)
         }
     }
 

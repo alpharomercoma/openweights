@@ -44,7 +44,17 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
      * assume true, and a tool that must start off would have started on for everybody who
      * never opened the screen.
      */
-    fun isEnabled(tool: Tool): Boolean = store.getBoolean(tool.definition.name, tool.defaultsOn)
+    fun isEnabled(tool: Tool): Boolean {
+        val name = tool.definition.name
+        if (store.contains(name)) return store.getBoolean(name, tool.defaultsOn)
+        // A choice made under the tool's old name still stands. Without this, renaming a
+        // tool silently turned it back on for anyone who had switched it off.
+        val legacy = SearchMediaTool.LEGACY_NAME.takeIf { name == SearchMediaTool.NAME }
+        if (legacy != null && store.contains(legacy)) {
+            return store.getBoolean(legacy, tool.defaultsOn)
+        }
+        return tool.defaultsOn
+    }
 
     fun setEnabled(name: String, enabled: Boolean) = store.edit { putBoolean(name, enabled) }
 

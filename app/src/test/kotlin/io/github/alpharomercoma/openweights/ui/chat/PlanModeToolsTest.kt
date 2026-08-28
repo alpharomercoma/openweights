@@ -52,10 +52,34 @@ class PlanModeToolsTest {
     }
 
     @Test
-    fun `the running modes say nothing of their own`() {
+    fun `the running modes say nothing of their own with nothing configured`() {
+        // Auto and Yolo's own addition below is appended to the configured prompt, not
+        // sent standing alone, so an empty prompt still yields nothing to say.
         listOf(AgentMode.AUTO, AgentMode.ASK, AgentMode.YOLO).forEach { mode ->
-            // They carry the configured tool prompt, which is a setting rather than a mode.
             assertThat(toolInstruction(mode, configured = "", anyTools = true)).isNull()
+        }
+    }
+
+    @Test
+    fun `ask mode carries the configured prompt exactly, asking really is the point`() {
+        val instruction = toolInstruction(AgentMode.ASK, configured = "anything", anyTools = true)
+
+        assertThat(instruction).isEqualTo("anything")
+    }
+
+    @Test
+    fun `auto and yolo are told they do not need to ask before calling`() {
+        // The live bug this guards: asked something that genuinely needed a search, the
+        // model narrated a plan and asked permission instead of calling, in Auto, where
+        // nothing was ever going to gate on that question. The three modes only differ in
+        // Kotlin, after a call is emitted -- the model itself has no way to know which one
+        // it is running in unless the prompt says so.
+        listOf(AgentMode.AUTO, AgentMode.YOLO).forEach { mode ->
+            val instruction = toolInstruction(mode, configured = "anything", anyTools = true)
+
+            assertThat(instruction).isNotNull()
+            assertThat(instruction).startsWith("anything")
+            assertThat(instruction).contains("do not need to ask")
         }
     }
 

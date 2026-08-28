@@ -28,6 +28,8 @@ import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
+import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.ui.chat.toolInstruction
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
@@ -119,6 +121,64 @@ class ToolRefusalTest {
             }
         } finally {
             engine.close()
+        }
+    }
+
+    @Test
+    fun autoModeRequiresToolIsCalledDirectlyWithoutAsking() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val modelsDir = File(context.getExternalFilesDir(null), "models")
+        assumeTrue("no models directory at $modelsDir", modelsDir.isDirectory)
+
+        val models = MODEL_NAMES.mapNotNull { name ->
+            File(modelsDir, name).takeIf { it.isFile }
+        }
+        assumeTrue("none of the expected models are downloaded", models.isNotEmpty())
+
+        // A prompt that genuinely needs a search, matching the reported bug.
+        val prompt = "Who is King Richard of Normandy?"
+
+        for (modelFile in models) {
+            val engine: InferenceEngine = LlamaCppEngine()
+            try {
+                engine.load(modelFile, ModelLoadParams(contextLength = CONTEXT))
+                engine.resetContext()
+
+                // The real production function, not a hand-copied string: this is what
+                // actually reaches the model in Auto mode, and a test that duplicated the
+                // wording would drift from it silently the next time that wording changed.
+                val autoInstruction = requireNotNull(
+                    toolInstruction(
+                        mode = AgentMode.AUTO,
+                        configured = ModelPreferences.DEFAULT_TOOL_PROMPT,
+                        anyTools = true,
+                    ),
+                )
+
+                val messages = listOf(
+                    ChatMessage.text(ChatRole.SYSTEM, autoInstruction),
+                    ChatMessage.text(ChatRole.USER, prompt),
+                )
+                val completed = engine.chat(
+                    messages = messages,
+                    params = SamplerParams(
+                        temperature = 0f,
+                        thinking = true,
+                        maxTokens = MAX_TOKENS,
+                    ),
+                    tools = TOOLS,
+                ).toList().filterIsInstance<GenerationEvent.Completed>().single()
+
+                val reply = completed.content.take(LOG_CHARS)
+                Log.i(TAG, "model=${modelFile.name} prompt=\"$prompt\" reply=\"$reply\"")
+
+                assertTrue(
+                    "expected a tool call for \"$prompt\" on model ${modelFile.name}, got none",
+                    completed.toolCalls.isNotEmpty(),
+                )
+            } finally {
+                engine.close()
+            }
         }
     }
 

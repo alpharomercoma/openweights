@@ -3079,10 +3079,23 @@ internal fun toolInstruction(mode: AgentMode, configured: String, anyTools: Bool
             "Do not act on anything yet. Say what you would do and why, as short steps."
         }
 
-        // Yolo changes what the app does with a call, not what the model is told about
-        // tools, so it reads the same instruction the other two running modes do.
-        AgentMode.ASK, AgentMode.AUTO, AgentMode.YOLO ->
+        // Ask really does wait for the user, so the model narrating "would you like me to
+        // do that?" before it calls is not wrong there — the app's own approval prompt
+        // says the same thing a moment later. Auto and Yolo do not wait, and the model has
+        // no other way to know that: the difference between the three modes is enforced
+        // entirely in Kotlin, after a call is emitted, so a model left with only the
+        // configured policy has nothing telling it this turn skips the question it was
+        // trained to ask by default. Live report: asked something that genuinely needed a
+        // search, LFM2.5-1.2B narrated a plan and asked permission instead of calling,
+        // in Auto, where nothing was ever going to ask it to.
+        AgentMode.ASK ->
             configured.takeIf { it.isNotBlank() && anyTools }
+
+        AgentMode.AUTO, AgentMode.YOLO ->
+            configured.takeIf { it.isNotBlank() && anyTools }?.let {
+                "$it You do not need to ask before calling a tool here. Call it directly " +
+                    "instead of describing the plan and waiting."
+            }
     }
 
 /** A short human label for an attachment, used where there is no text to go on. */

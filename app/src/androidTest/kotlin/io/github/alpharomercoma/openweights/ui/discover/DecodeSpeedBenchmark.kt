@@ -227,15 +227,16 @@ class DecodeSpeedBenchmark {
                 "make it challenging, so: 1. Do not include any commas in your " +
                 "response. 2. Do not include the letter \"c\" anywhere in your " +
                 "response. 3. Your response should contain at least 250 words."
-
-        val MODEL_NAMES = listOf(
-            "LFM2.5-1.2B-Instruct-QAD-Q4_0.gguf",
-            "LFM2.5-2.6B-QAD-Q4_0.gguf",
-            "Qwen3-1.7B-Q4_K_M.gguf",
-            "granite-4.2-3b-Q2_K.gguf",
-            "ai9stars_G9v3-3B-Q4_K_M.gguf",
-            "ling-3.0-tiny-Q4_K_M.gguf",
-            "Nanbeige4.2-3B-Q4_K_M.gguf",
-        )
     }
 }
+
+/** Every model this device's benchmarks run against, if downloaded. Shared with ToolRefusalTest. */
+internal val MODEL_NAMES = listOf(
+    "LFM2.5-1.2B-Instruct-QAD-Q4_0.gguf",
+    "LFM2.5-2.6B-QAD-Q4_0.gguf",
+    "Qwen3-1.7B-Q4_K_M.gguf",
+    "granite-4.2-3b-Q2_K.gguf",
+    "ai9stars_G9v3-3B-Q4_K_M.gguf",
+    "ling-3.0-tiny-Q4_K_M.gguf",
+    "Nanbeige4.2-3B-Q4_K_M.gguf",
+)

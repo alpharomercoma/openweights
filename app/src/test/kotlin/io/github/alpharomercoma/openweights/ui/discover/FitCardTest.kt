@@ -95,6 +95,46 @@ class FitCardTest {
     }
 
     @Test
+    fun `a prefill estimate is shown alongside decode, not in place of it`() {
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                FitCard(
+                    inspected = InspectedFile(
+                        file = HubFile(
+                            path = "LFM2.5-2.6B-Q4_K_M.gguf",
+                            sizeBytes = 1_600_000_000L,
+                            sha256 = null,
+                        ),
+                        metadata = GgufMetadata(
+                            architecture = "lfm2",
+                            blockCount = 30,
+                            embeddingLength = 2048,
+                            headCount = 32,
+                            keyValueHeadsPerLayer = List(30) { 8 },
+                            trainingContextLength = 32_768,
+                            fileType = GgufFileType.Q4_K_M,
+                            name = "LFM2.5-2.6B",
+                        ),
+                        fit = FitReport(
+                            verdict = FitVerdict.COMFORTABLE,
+                            requiredMemoryBytes = 2_100_000_000L,
+                            usableMemoryBytes = 4_000_000_000L,
+                            kvCacheBytes = 240_000_000L,
+                            estimatedDecodeTokensPerSecond = 13.8,
+                            estimatedPrefillTokensPerSecond = 70.0,
+                            maxContextLength = 8_192,
+                        ),
+                    ),
+                    onDownload = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("14 tok/s decode", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("70 tok/s prefill", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun `an architecture this build cannot load withholds the download`() {
         // The reason the submodule moved: Ling 3.0 is bailingmoe3, which llama.cpp learned
         // after the previous pin was cut. An install that predates it can still find the

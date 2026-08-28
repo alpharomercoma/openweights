@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.discover
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
+import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
 import org.junit.Test
 import java.io.File
 
@@ -380,6 +381,32 @@ class DiscoverCalibrationTest {
         // different underlying reason (kernel support, not bit depth).
         assertThat(predictedNanbeige).isNotNull()
         assertThat(predictedNanbeige!!).isGreaterThan(3.97 * 2.0)
+    }
+
+    /**
+     * `matchPrefillCalibration` is the prefill twin of `matchCalibration`, added once the
+     * usage ledger started recording prompt-processing time separately from decode time —
+     * the fix for the Discover screen never having shown a prefill number at all, only
+     * decode, even where a decode calibration existed.
+     */
+    @Test
+    fun `prefill calibration is matched the same way decode calibration is`() {
+        val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
+        val prefillSpeeds = listOf(
+            ModelPrefillSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 141.0, 12_000),
+        )
+
+        val calibration = matchPrefillCalibration(prefillSpeeds, installed)
+
+        assertThat(calibration?.measuredBytes).isEqualTo(695_755_488L)
+        assertThat(calibration?.measuredTokensPerSecond).isEqualTo(141.0)
+    }
+
+    @Test
+    fun `prefill calibration is also null with nothing measured yet`() {
+        assertThat(
+            matchPrefillCalibration(emptyList(), mapOf("qwen" to fakeFile(1_000_000L))),
+        ).isNull()
     }
 
     private fun fakeFile(sizeBytes: Long): File {

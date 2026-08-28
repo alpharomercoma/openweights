@@ -58,6 +58,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_5_6,
         OpenWeightsDatabase.MIGRATION_6_7,
         OpenWeightsDatabase.MIGRATION_7_8,
+        OpenWeightsDatabase.MIGRATION_8_9,
     )
 
     @Test
@@ -188,6 +189,33 @@ class MigrationTest {
             assertThat(db.intAt("SELECT decodeMs FROM usage_ledger WHERE day = 100"))
                 .isEqualTo(0)
             assertThat(db.intAt("SELECT decodeTokens FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `a usage row from before prefill time was split out keeps its totals and reads as unmeasured`() {
+        // Same shape as decodeMs one version earlier, checked separately because it is a
+        // different migration touching a table that by version eight already has decodeMs
+        // and decodeTokens on it — this is the one that has to add prefillMs and
+        // prefillTokens alongside them without disturbing either.
+        helper.createDatabase(8).use { db ->
+            db.execSQL(
+                "INSERT INTO usage_ledger " +
+                    "(day, modelName, promptTokens, generatedTokens, inferenceMs, replies, " +
+                    "decodeMs, decodeTokens) " +
+                    "VALUES (100, 'qwen', 500, 200, 9000, 3, 7000, 199)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(9, migrations.toList()).use { db ->
+            assertThat(db.intAt("SELECT decodeMs FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(7000)
+            assertThat(db.intAt("SELECT decodeTokens FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(199)
+            assertThat(db.intAt("SELECT prefillMs FROM usage_ledger WHERE day = 100"))
+                .isEqualTo(0)
+            assertThat(db.intAt("SELECT prefillTokens FROM usage_ledger WHERE day = 100"))
                 .isEqualTo(0)
         }
     }

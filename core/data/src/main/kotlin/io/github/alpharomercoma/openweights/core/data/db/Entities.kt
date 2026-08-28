@@ -177,6 +177,21 @@ data class UsageEntity(
      * speed on short replies, where the difference is largest.
      */
     val decodeTokens: Long = 0,
+    /**
+     * Prompt-processing time alone, out of [inferenceMs]. See [decodeMs] — the same reasoning
+     * applies in reverse: [decodeMs] scales with how long the reply happened to run rather
+     * than with anything about the model's prefill bandwidth, so predicting prefill speed
+     * needs its own column rather than a share of the combined total. Zero on a row written
+     * before this column existed, which [UsageDao.prefillSpeedByModel] excludes.
+     */
+    val prefillMs: Long = 0,
+    /**
+     * Tokens counted against [prefillMs] alone. [GenerationStats.prefillTokensPerSecond]'s
+     * own numerator ([promptTokens]), captured separately for the same reason [decodeTokens]
+     * is: a column that only ever grows alongside [prefillMs], in the same write, cannot mix
+     * pre-upgrade and post-upgrade populations.
+     */
+    val prefillTokens: Long = 0,
 )
 
 /**

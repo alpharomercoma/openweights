@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
 import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
+import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
@@ -457,6 +458,7 @@ class DiscoverViewModel @Inject constructor(
             fileSizeBytes = file.sizeBytes,
             contextLength = contextLength,
             calibration = calibration,
+            prefillCalibration = prefillCalibration,
             projectorSizeBytes = _uiState.value.detail?.pairedProjector(file)?.sizeBytes ?: 0,
         )
 
@@ -487,11 +489,16 @@ class DiscoverViewModel @Inject constructor(
      */
     private var calibration: ThroughputCalibration? = null
 
+    /** The prefill mirror of [calibration]. See [matchPrefillCalibration]. */
+    private var prefillCalibration: ThroughputCalibration? = null
+
     private fun loadCalibration() {
         viewModelScope.launch {
             val decodeSpeeds = usageRepository.decodeSpeedByModel()
+            val prefillSpeeds = usageRepository.prefillSpeedByModel()
             val installed = modelStore.availableModels().associateBy { it.nameWithoutExtension }
             calibration = matchCalibration(decodeSpeeds, installed)
+            prefillCalibration = matchPrefillCalibration(prefillSpeeds, installed)
         }
     }
 
@@ -533,6 +540,18 @@ internal fun matchCalibration(
     decodeSpeeds: List<ModelDecodeSpeed>,
     installed: Map<String, File>,
 ): ThroughputCalibration? = decodeSpeeds.firstNotNullOfOrNull { model ->
+    val file = installed[model.modelName] ?: return@firstNotNullOfOrNull null
+    ThroughputCalibration(
+        measuredBytes = file.length(),
+        measuredTokensPerSecond = model.averageTokensPerSecond,
+    )
+}
+
+/** The prefill mirror of [matchCalibration], from [UsageRepository.prefillSpeedByModel]. */
+internal fun matchPrefillCalibration(
+    prefillSpeeds: List<ModelPrefillSpeed>,
+    installed: Map<String, File>,
+): ThroughputCalibration? = prefillSpeeds.firstNotNullOfOrNull { model ->
     val file = installed[model.modelName] ?: return@firstNotNullOfOrNull null
     ThroughputCalibration(
         measuredBytes = file.length(),

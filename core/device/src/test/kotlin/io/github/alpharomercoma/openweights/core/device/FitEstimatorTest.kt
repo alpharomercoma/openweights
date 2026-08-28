@@ -276,4 +276,24 @@ class FitEstimatorTest {
         )
         assertThat(calibrated.estimatedDecodeTokensPerSecond).isWithin(0.1).of(9.0)
     }
+
+    @Test
+    fun `prefill throughput is predicted independently of decode throughput`() {
+        val withoutCalibration =
+            estimator.estimate(phone, hybrid, fileSizeBytes = 1670 * MIB, contextLength = 4096)
+        assertThat(withoutCalibration.estimatedPrefillTokensPerSecond).isNull()
+
+        // Prefill and decode are bandwidth-bound the same way but at very different rates,
+        // so one calibration must not leak into the other's estimate.
+        val calibrated = estimator.estimate(
+            phone,
+            hybrid,
+            fileSizeBytes = 3340 * MIB,
+            contextLength = 4096,
+            calibration = ThroughputCalibration(1670 * MIB, 18.0),
+            prefillCalibration = ThroughputCalibration(1670 * MIB, 70.0),
+        )
+        assertThat(calibrated.estimatedDecodeTokensPerSecond).isWithin(0.1).of(9.0)
+        assertThat(calibrated.estimatedPrefillTokensPerSecond).isWithin(0.1).of(35.0)
+    }
 }

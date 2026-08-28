@@ -141,6 +141,27 @@ interface UsageDao {
     suspend fun decodeSpeedByModel(): List<ModelDecodeSpeed>
 
     /**
+     * Real, measured, prompt-processing-only throughput per model, heaviest-used first.
+     *
+     * The prefill mirror of [decodeSpeedByModel]: same reasoning, same exclusion of rows
+     * that predate the column, weighted by prompt tokens processed rather than tokens
+     * generated, since a prefill measurement's confidence scales with how much prompt it
+     * actually processed.
+     */
+    @Query(
+        """
+        SELECT modelName,
+               SUM(prefillTokens) * 1000.0 / SUM(prefillMs) AS averageTokensPerSecond,
+               SUM(prefillTokens) AS promptTokens
+        FROM usage_ledger
+        WHERE prefillMs > 0
+        GROUP BY modelName
+        ORDER BY promptTokens DESC
+        """,
+    )
+    suspend fun prefillSpeedByModel(): List<ModelPrefillSpeed>
+
+    /**
      * Folds one reply into the day's running totals.
      *
      * A transaction because this is read-modify-write on a shared row, and two replies
@@ -153,7 +174,12 @@ interface UsageDao {
      *   [generatedTokens] verbatim: one fewer than tokens generated, since decode timing
      *   spans the gaps between tokens rather than the tokens themselves. Zero exactly when
      *   [decodeMs] is, so the two can never end up counting a different population.
+     * @param prefillMs zero unless this reply actually had a prompt to process (a full cache
+     *   hit has nothing to prefill).
+     * @param prefillTokens [GenerationStats.prefillTokensPerSecond]'s own numerator: zero
+     *   exactly when [prefillMs] is.
      */
+    @Suppress("LongParameterList")
     @Transaction
     suspend fun record(
         day: Long,
@@ -163,6 +189,8 @@ interface UsageDao {
         inferenceMs: Long,
         decodeMs: Long,
         decodeTokens: Long,
+        prefillMs: Long,
+        prefillTokens: Long,
     ) {
         val existing = forDay(day, modelName)
         upsert(
@@ -175,6 +203,8 @@ interface UsageDao {
                 replies = (existing?.replies ?: 0) + 1,
                 decodeMs = (existing?.decodeMs ?: 0) + decodeMs,
                 decodeTokens = (existing?.decodeTokens ?: 0) + decodeTokens,
+                prefillMs = (existing?.prefillMs ?: 0) + prefillMs,
+                prefillTokens = (existing?.prefillTokens ?: 0) + prefillTokens,
             ),
         )
     }
@@ -185,6 +215,13 @@ data class ModelDecodeSpeed(
     val modelName: String,
     val averageTokensPerSecond: Double,
     val generatedTokens: Long,
+)
+
+/** One model's real, measured, prompt-processing-only throughput. See [UsageDao.prefillSpeedByModel]. */
+data class ModelPrefillSpeed(
+    val modelName: String,
+    val averageTokensPerSecond: Double,
+    val promptTokens: Long,
 )
 
 /** Reads and writes the reports the user filed against model output. */

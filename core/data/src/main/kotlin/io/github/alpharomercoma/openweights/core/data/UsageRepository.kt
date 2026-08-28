@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.data
 
 import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
+import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.data.db.UsageEntity
 import kotlinx.coroutines.flow.Flow
@@ -119,6 +120,12 @@ class UsageRepository @Inject constructor(
      * anything about the model. See [UsageDao.decodeSpeedByModel].
      */
     suspend fun decodeSpeedByModel(): List<ModelDecodeSpeed> = database.usage().decodeSpeedByModel()
+
+    /**
+     * Real, measured, prompt-processing-only throughput per model on this device, the
+     * prefill mirror of [decodeSpeedByModel]. See [UsageDao.prefillSpeedByModel].
+     */
+    suspend fun prefillSpeedByModel(): List<ModelPrefillSpeed> = database.usage().prefillSpeedByModel()
 
     internal fun List<UsageEntity>.toSummary(conversationCount: Int) = UsageSummary(
         lifetimePromptTokens = sumOf { it.promptTokens },

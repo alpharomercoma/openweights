@@ -121,6 +121,10 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
         // prefill one, and recording zero for both keeps this pass out of the calibration
         // average rather than counting it as an infinitely fast one.
         val decoded = stats.decodeMs > 0 && stats.generatedTokens > 1
+        // Mirrors GenerationStats.prefillTokensPerSecond's own guard: a full cache hit has
+        // nothing to prefill, and recording zero for both keeps it out of the average rather
+        // than counting it as an infinitely fast one.
+        val prefilled = stats.prefillMs > 0 && stats.promptTokens > 0
         recordUsage(
             modelName = modelName,
             promptTokens = stats.promptTokens,
@@ -128,6 +132,8 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
             inferenceMs = stats.prefillMs + stats.decodeMs,
             decodeMs = if (decoded) stats.decodeMs else 0,
             decodeTokens = if (decoded) (stats.generatedTokens - 1).toLong() else 0,
+            prefillMs = if (prefilled) stats.prefillMs else 0,
+            prefillTokens = if (prefilled) stats.promptTokens.toLong() else 0,
         )
     }
 }

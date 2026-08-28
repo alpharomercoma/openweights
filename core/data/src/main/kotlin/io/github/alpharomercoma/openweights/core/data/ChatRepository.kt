@@ -201,6 +201,7 @@ class ChatRepository @Inject constructor(
      * tokens were generated whether or not the conversation is still around, and a
      * dashboard that shrinks when you tidy up would be lying.
      */
+    @Suppress("LongParameterList")
     suspend fun recordUsage(
         modelName: String,
         promptTokens: Int,
@@ -208,6 +209,8 @@ class ChatRepository @Inject constructor(
         inferenceMs: Long,
         decodeMs: Long,
         decodeTokens: Long,
+        prefillMs: Long = 0,
+        prefillTokens: Long = 0,
     ) = database.usage().record(
         day = clock.today(),
         modelName = modelName,
@@ -216,6 +219,8 @@ class ChatRepository @Inject constructor(
         inferenceMs = inferenceMs,
         decodeMs = decodeMs,
         decodeTokens = decodeTokens,
+        prefillMs = prefillMs,
+        prefillTokens = prefillTokens,
     )
 
     /**

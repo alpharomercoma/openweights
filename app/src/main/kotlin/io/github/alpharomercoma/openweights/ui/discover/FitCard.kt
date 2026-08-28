@@ -158,14 +158,18 @@ fun FitCard(
         if (inspected.unsupportedArchitecture == null) {
             inspected.fit?.let { fit -> VerdictLine(fit) }
         }
-        // One line each, and each short enough to be one line. Both of these used to run
-        // past the card and wrap, which on a list of eight files turned a scannable column
-        // into a wall: the eye cannot compare quantisations down a page whose rows are
-        // different heights.
-        inspected.metadata?.let { metadata ->
-            Metric(metadata.summaryLine(inspected.file.quantizationLabel), maxLines = 1)
+        // One line each, and each short enough to be one line. All three of these used to
+        // run past the card and wrap, which on a list of eight files turned a scannable
+        // column into a wall: the eye cannot compare files down a page whose rows are
+        // different heights. The quantisation itself is dropped here rather than given a
+        // line of its own: it is already the filename in the row above, and repeating it
+        // was the same word twice for a card that is short on lines to spend.
+        val window = inspected.metadata?.rememberLine()
+        val needs = inspected.fit?.memoryLine()
+        listOfNotNull(window, needs).takeIf { it.isNotEmpty() }?.let { parts ->
+            Metric(parts.joinToString(" · "), maxLines = 1)
         }
-        inspected.fit?.let { fit -> Metric(fit.memoryLine(), maxLines = 1) }
+        inspected.fit?.speedLine()?.let { speed -> Metric(speed, maxLines = 1) }
     }
 }
 
@@ -196,34 +200,32 @@ private fun VerdictLine(fit: FitReport) {
 private fun signal(dark: Color, light: Color, isDark: Boolean) = if (isDark) dark else light
 
 /**
- * What this particular file is, in the two facts that decide between one file and the next.
- *
- * It used to open with the architecture and the block count, on a screen whose title is
- * already the repository: "lfm2" under a heading saying LFM2.5 is the same word twice, and
- * "16 blocks" is a number nobody can act on, since a user comparing Q4_K_M against Q5_K_M is
- * not weighing layer counts. What is left is the quantisation, which is the actual choice,
- * and how much the model can hold, which used to read "trained to 128000 tokens" and is a
+ * How much the model can hold, which used to read "trained to 128000 tokens" and is a
  * sentence about the training run rather than about what you get.
+ *
+ * The quantisation used to open this line, but it is already the filename in the row above
+ * it, and this card is short on lines to spend repeating it.
  */
-private fun GgufMetadata.summaryLine(quantizationFromName: String): String {
-    val quantization = fileType.takeIf { it != GgufFileType.UNKNOWN }?.label ?: quantizationFromName
-    val window = trainingContextLength.takeIf { it > 0 }?.let { " · remembers ${it.asTokens()}" }
-    return quantization + window.orEmpty()
-}
+private fun GgufMetadata.rememberLine(): String? =
+    trainingContextLength.takeIf { it > 0 }?.let { "remembers ${it.asTokens()}" }
 
 /**
- * What running it costs and what it gives back.
- *
- * The comparison against usable memory went, and the verdict line directly above says the
- * same thing in words a person can act on: "Runs comfortably" is the answer that "1.12 GB of
- * 7.15 GB usable" was arithmetic towards. The KV cache went with it, because it is already
- * inside the number beside it and the slider moves both.
+ * What running it costs, in words the verdict line above has already framed: "Runs
+ * comfortably" is the answer that this arithmetic is towards.
  */
-private fun FitReport.memoryLine(): String {
-    val speed = estimatedDecodeTokensPerSecond
-        ?.let { String.format(Locale.getDefault(), " · ≈%.0f tok/s", it) }
-        .orEmpty()
-    return "needs ${formatBytes(requiredMemoryBytes)}$speed"
+private fun FitReport.memoryLine(): String = "needs ${formatBytes(requiredMemoryBytes)}"
+
+/**
+ * What it gives back, kept off the memory line rather than trailing it: cost and throughput
+ * are two different questions, and cramming both onto one line either wraps the card or
+ * shrinks the type past the point either number is worth reading.
+ */
+private fun FitReport.speedLine(): String? {
+    val prefill = estimatedPrefillTokensPerSecond
+        ?.let { String.format(Locale.getDefault(), "≈%.0f tok/s prefill", it) }
+    val decode = estimatedDecodeTokensPerSecond
+        ?.let { String.format(Locale.getDefault(), "≈%.0f tok/s decode", it) }
+    return listOfNotNull(prefill, decode).takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
 /** 128000 as "128k tokens", because six digits is a number nobody reads. */

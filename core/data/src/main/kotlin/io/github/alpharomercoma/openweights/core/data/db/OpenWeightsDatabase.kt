@@ -32,7 +32,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchEntity::class,
         WatchRunEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -45,6 +45,26 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "openweights.db"
+
+        /**
+         * Adds prompt-processing-only time to the usage ledger, the prefill mirror of
+         * [MIGRATION_7_8]'s decode-only columns.
+         *
+         * The Discover screen could predict a new model's decode speed from a real
+         * measurement but not its prefill speed, because nothing this device recorded
+         * isolated prefill from the reply time it happened to be followed by. Same shape,
+         * same reasoning, same zero-default for rows that predate it.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE usage_ledger ADD COLUMN prefillMs INTEGER NOT NULL DEFAULT 0",
+                )
+                db.execSQL(
+                    "ALTER TABLE usage_ledger ADD COLUMN prefillTokens INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
 
         /**
          * Adds decode-only time to the usage ledger, alongside the prefill-plus-decode

@@ -40,6 +40,8 @@ enum class FitVerdict {
  * @param requiredMemoryBytes weights plus KV cache plus runtime overhead.
  * @param estimatedDecodeTokensPerSecond null when there is no calibration to base it on;
  *   an invented number is worse than none.
+ * @param estimatedPrefillTokensPerSecond the prefill mirror of [estimatedDecodeTokensPerSecond]:
+ *   null under the same condition, for the same reason.
  * @param maxContextLength the largest context this device can hold for this model.
  */
 data class FitReport(
@@ -49,6 +51,7 @@ data class FitReport(
     val kvCacheBytes: Long,
     val estimatedDecodeTokensPerSecond: Double?,
     val maxContextLength: Int,
+    val estimatedPrefillTokensPerSecond: Double? = null,
 ) {
     val headroomBytes: Long get() = usableMemoryBytes - requiredMemoryBytes
 }
@@ -71,6 +74,8 @@ class FitEstimator @Inject constructor() {
         contextLength: Int,
         /** Measured decode throughput for a model of known size on this device, if any. */
         calibration: ThroughputCalibration? = null,
+        /** Measured prefill throughput for a model of known size on this device, if any. */
+        prefillCalibration: ThroughputCalibration? = null,
         /**
          * The multimodal projector downloaded alongside this model, if any.
          *
@@ -107,6 +112,7 @@ class FitEstimator @Inject constructor() {
             kvCacheBytes = kvCache,
             estimatedDecodeTokensPerSecond = calibration?.predictFor(fileSizeBytes),
             maxContextLength = maxContextLength(device, metadata, weights),
+            estimatedPrefillTokensPerSecond = prefillCalibration?.predictFor(fileSizeBytes),
         )
     }
 

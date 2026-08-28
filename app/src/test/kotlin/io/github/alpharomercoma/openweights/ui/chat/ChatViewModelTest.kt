@@ -324,6 +324,14 @@ class ChatViewModelTest : ChatFixture() {
         // usage tab is about work done rather than about replies kept.
         val usage = database.usage().observeAll().first().single()
         assertThat(usage.generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
+
+        // And the reply's own row agrees with the ledger now. It used to keep only the
+        // final pass's numbers, so a tool turn whose first pass re-read the whole
+        // conversation reported the cost of the short closing pass instead — which is how
+        // a real device investigation came to read "cached: 0" off rows whose turns had
+        // reused thousands of tokens, and vice versa.
+        assertThat(stored.last().generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
+        assertThat(stored.last().promptTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
     }
 
     @Test

@@ -173,13 +173,14 @@ class TurnRunnerTest {
         }
 
     @Test
-    fun `the restated question does not follow a tool round into the cache`() = runBlocking<Unit> {
-        // Tried and measured: restating it every pass, not only the first, moved the
-        // divergence point the cache is compared from back to right after the bare question,
-        // discarding the tool call and its results behind it -- the same class of regression
-        // `assistantHistoryText` is replayed rather than stripped to avoid. Round zero is
-        // where every reproduction of the conflation this exists for was actually decided, so
-        // it is the only round worth that cost.
+    fun `a tool round extends the grounded prompt instead of rewriting it`() = runBlocking<Unit> {
+        // The block has to sit on the same user message in every pass, because the cache is
+        // compared from the front and a hybrid model that cannot roll back pays any
+        // difference as a full re-read. Both wanderings were tried: re-attached to the
+        // newest message each pass it diverged right after the question, and attached to a
+        // transient round-zero copy only, round one was a conversation without a block the
+        // cache had with it -- measured on-device as every tool turn re-reading the whole
+        // conversation, and eight exchanges slowing from 20s to 95s.
         engine.scripted += ScriptedPass(
             "Looking.",
             toolCalls = listOf(
@@ -195,11 +196,19 @@ class TurnRunnerTest {
 
         run(withTools = true, notes = priorNotes, question = "who is arjhine ty?")
 
-        val firstPass = engine.prompts[0].last()
-        assertThat(firstPass.text).contains("This turn's question")
+        val firstPass = engine.prompts[0]
+        assertThat(firstPass.last().text).contains("This turn's question")
 
-        val secondPass = engine.prompts[1].last()
-        assertThat(secondPass.text).doesNotContain("This turn's question")
+        // The second pass begins with the first, byte for byte -- the definition of a
+        // prompt the cache can extend -- and the block is not restated after the results.
+        val secondPass = engine.prompts[1]
+        firstPass.forEachIndexed { index, message ->
+            assertThat(secondPass[index].text).isEqualTo(message.text)
+        }
+        assertThat(secondPass.size).isGreaterThan(firstPass.size)
+        secondPass.drop(firstPass.size).forEach {
+            assertThat(it.text).doesNotContain("This turn's question")
+        }
     }
 
     @Test

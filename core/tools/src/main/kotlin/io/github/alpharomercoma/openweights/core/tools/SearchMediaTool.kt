@@ -18,6 +18,8 @@ package io.github.alpharomercoma.openweights.core.tools
 
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -76,9 +78,13 @@ class SearchMediaTool @Inject constructor(
     override val leavesTheDevice: Boolean = true
     override val returnsUntrustedText: Boolean = true
 
-    override suspend fun run(call: ToolCall): String {
+    // On the IO dispatcher like every other tool that dials out; this one was the only
+    // network tool without it, so its very first DNS lookup threw
+    // NetworkOnMainThreadException, runCatching swallowed it, and every search reported
+    // "probably rate limited" without a single packet having left the phone.
+    override suspend fun run(call: ToolCall): String = withContext(Dispatchers.IO) {
         val query = call.argument("query", "q", "search")
-            ?: return "No query was given. Call $NAME again with what to look for."
+            ?: return@withContext "No query was given. Call $NAME again with what to look for."
         val kind = if (call.argument("kind", "type")?.startsWith("video") == true) {
             MediaResultKind.VIDEO
         } else {
@@ -87,11 +93,12 @@ class SearchMediaTool @Inject constructor(
 
         val provider = DuckDuckGoMediaProvider(settings.client(httpClient))
         val hits = provider.search(query, kind, LIMIT)
-            ?: return "The search did not answer, which usually means it is rate limiting " +
-                "rather than that there is nothing. Try again, or search the web instead."
+            ?: return@withContext "The search did not answer, which usually means it is " +
+                "rate limiting rather than that there is nothing. Try again, or search " +
+                "the web instead."
 
         val what = if (kind == MediaResultKind.VIDEO) "clips" else "pictures"
-        return buildString {
+        buildString {
             append("Found ${hits.size} $what for \"$query\".\n")
             hits.forEachIndexed { index, hit ->
                 append("\n${index + 1}. ${hit.title.ifBlank { "Untitled" }}")

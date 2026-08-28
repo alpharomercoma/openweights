@@ -340,7 +340,19 @@ class TurnRunner @Inject constructor(
          */
         private var renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
 
-        private var messages = conversation.describing(active, needed = withTools && !native)
+        // Grounded once, into the accumulator itself, so the block sits on the same user
+        // message in every pass of the turn. It was a transient decoration on round zero's
+        // copy only, and round one's prompt — the same conversation without it — was no
+        // longer an extension of what round zero left in the KV cache. A transformer pays
+        // that as a few hundred re-read tokens; a hybrid like LFM2.5 cannot roll its
+        // recurrent state back at all, so it paid a full reset and re-read the entire
+        // conversation on every tool round. Measured on-device: the second pass of each
+        // tool turn re-prefilled 2-3k tokens, and turns grew from 20s to 95s across eight
+        // exchanges. See [grounding] for what the block is; the gate for whether there is
+        // one is in `turn()`.
+        private var messages = conversation
+            .describing(active, needed = withTools && !native)
+            .grounding(question)
         private var round = 0
         private var lastRaw = ""
 
@@ -371,10 +383,11 @@ class TurnRunner @Inject constructor(
                     withTools && round < maxRounds && ToolBudget(headroomTokens()).hasRoom
                 // Pinned for this pass only, never folded into the accumulator: the block
                 // changes as steps are ticked, and anything that changes has to sit at the
-                // very end or it moves tokens the cache has already read. See [grounding] for
-                // why it is round zero only, unlike this one.
+                // very end or it moves tokens the cache has already read. Grounding is the
+                // opposite case — the same words every pass — so it lives in [messages]
+                // and is not re-attached here.
                 val pass = streamOnce(
-                    messages.pinning(plans.plan.value).grounding(question?.takeIf { round == 0 }),
+                    messages.pinning(plans.plan.value),
                     params.deciding(mayCall),
                     active,
                     renderTools,
@@ -767,18 +780,20 @@ private fun ChatMessage.withTrailer(block: String): ChatMessage =
  * device where this was measured directly. See [ToolNotes.render]'s trailer for the other half
  * of this fix; that says the notes are not the question, this says what the question is.
  *
- * Round zero only, not every pass the way [pinning] is. A tool round's own results are the
- * newest thing by the second pass and the same pull would apply to them, and it was tried:
- * measured, it cost the very cache reuse the round trip exists to buy. [messages] never
- * carries this text -- only the transient copy handed to one pass does -- so round one's tail
- * is the question with the block on it, and round two's tail is a tool result message with
- * no block on it in [messages] either. Attaching one there anyway restates the same words on
- * a *different* message than round one sent, and the cache is compared from the front: the
- * divergence lands right after the bare question, at the exact point round one's cache holds
- * this block and round two's prompt does not, discarding the tool call and its results behind
- * it. The turn's subject is decided in round zero or not at all -- every reproduction of the
- * conflation this exists for was a wrong choice made there -- so that is the only round worth
- * paying for.
+ * Attached once, to the turn's own user message, and left there for every pass of the turn.
+ * Both alternatives were tried and both broke the KV cache, from opposite directions.
+ * Re-attaching it to whichever message was newest each pass restated the same words on a
+ * *different* message than the previous pass sent, and the cache is compared from the front:
+ * the divergence landed right after the bare question, discarding the tool call and results
+ * behind it. Attaching it to round zero's transient copy only — the previous fix — made
+ * round one's prompt a conversation *without* a block round zero's cache had *with* it,
+ * which is the same divergence one message earlier; a transformer pays a few hundred
+ * re-read tokens there, and a hybrid like LFM2.5, which cannot roll back its recurrent
+ * state, pays a full reset and re-reads the whole conversation every tool round — measured
+ * on-device as turns growing 20s to 95s over eight exchanges. On the same message every
+ * pass, each pass's prompt extends the last one's cache and nobody pays anything. The
+ * turn's subject is still decided in round zero — the block simply keeps standing where
+ * round zero read it.
  *
  * The caller also passes null rather than the question itself whenever there is no risk this
  * fixes: no tools offered, or no tool notes yet for this turn's subject to be conflated with.

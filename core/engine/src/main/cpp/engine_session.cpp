@@ -1135,6 +1135,12 @@ StopReason Session::generate(
             const bool rolled_back = llama_memory_seq_rm(
                 llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
             if (!rolled_back) {
+                // Said out loud, because the divergence line above only names the
+                // candidate. Reading that line as what was reused sent a whole
+                // investigation the wrong way: on a hybrid model this branch turns
+                // "re-reading 674" into re-reading everything.
+                LOGI("kv: rollback to %zu refused (recurrent state), re-reading all %zu",
+                     reusable, prompt_tokens.size());
                 reset();
                 reusable = 0;
             }

@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.tools
 
+import android.util.Log
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
@@ -57,7 +58,15 @@ enum class MediaResultKind { IMAGE, VIDEO }
  */
 class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
     suspend fun search(query: String, kind: MediaResultKind, limit: Int): List<MediaHit>? {
-        val token = vqd(query) ?: return null
+        val token = vqd(query)
+        if (token == null) {
+            // The one line that says which of the two requests died. "The search did not
+            // answer" collapsed four different failures into one message, and three device
+            // transcripts in a row could not say whether the token page or the endpoint was
+            // the problem.
+            Log.i(TAG, "search_media: no vqd token came back from the search page")
+            return null
+        }
         val endpoint = when (kind) {
             MediaResultKind.IMAGE -> IMAGES
             MediaResultKind.VIDEO -> VIDEOS
@@ -65,18 +74,32 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         val url = "$endpoint?l=us-en&o=json&q=${query.encoded()}&vqd=$token&p=-1"
         val body = runCatching {
             client.newCall(get(url).build()).execute().use { response ->
-                if (!response.isSuccessful) null else response.peekBody(MAX_BYTES).string()
+                if (!response.isSuccessful) {
+                    Log.i(TAG, "search_media: endpoint answered ${response.code}")
+                    null
+                } else {
+                    response.peekBody(MAX_BYTES).string()
+                }
             }
+        }.onFailure {
+            Log.i(TAG, "search_media: endpoint request failed", it)
         }.getOrNull() ?: return null
 
         val results = runCatching {
             Json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
-        }.getOrNull() ?: return null
+        }.getOrNull()
+        if (results == null) {
+            Log.i(TAG, "search_media: no results array in ${body.take(120)}")
+            return null
+        }
 
         // Null rather than empty, for the reason every provider here does it: an empty list
         // is a claim about the web, and a scraper that has been rate limited is not entitled
         // to make one.
-        return results.mapNotNull { it.asHit(kind) }.take(limit).ifEmpty { null }
+        return results.mapNotNull { it.asHit(kind) }.take(limit).ifEmpty {
+            Log.i(TAG, "search_media: ${results.size} rows, none drawable")
+            null
+        }
     }
 
     /**
@@ -124,10 +147,24 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
     private fun vqd(query: String): String? {
         val page = runCatching {
             client.newCall(get("$HOME/?q=${query.encoded()}").build()).execute().use { response ->
-                if (!response.isSuccessful) null else response.peekBody(MAX_BYTES).string()
+                if (!response.isSuccessful) {
+                    Log.i(TAG, "search_media: token page answered ${response.code}")
+                    null
+                } else {
+                    response.peekBody(MAX_BYTES).string()
+                }
             }
+        }.onFailure {
+            Log.i(TAG, "search_media: token page request failed", it)
         }.getOrNull() ?: return null
-        return VQD.find(page)?.groupValues?.getOrNull(1)
+        val token = VQD.find(page)?.groupValues?.getOrNull(1)
+        if (token == null) {
+            // What came back instead matters: a consent page, a challenge, and an empty
+            // shell all look identical from the null.
+            val head = page.take(120).replace(Regex("\\s+"), " ")
+            Log.i(TAG, "search_media: ${page.length} chars of page, no vqd; starts $head")
+        }
+        return token
     }
 
     private fun get(url: String) = Request.Builder()
@@ -136,6 +173,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         .header("Referer", "$HOME/")
 
     private companion object {
+        const val TAG = "OpenWeights"
         const val HOME = "https://duckduckgo.com"
         const val IMAGES = "https://duckduckgo.com/i.js"
         const val VIDEOS = "https://duckduckgo.com/v.js"

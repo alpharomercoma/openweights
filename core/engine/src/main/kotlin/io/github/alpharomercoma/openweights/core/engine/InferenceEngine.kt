@@ -102,6 +102,27 @@ data class GenerationStats(
      */
     val cacheHitRate: Double?
         get() = totalPromptTokens.takeIf { it > 0 }?.let { cachedTokens.toDouble() / it }
+
+    /**
+     * These stats and [next]'s as one measurement, for a reply produced in several passes.
+     *
+     * A turn with a tool in it is two or more generations, and keeping only the last one's
+     * numbers made the reply's row lie: a first pass that re-read the whole conversation
+     * reported nothing, because the pass that happened to finish the turn was the one
+     * written down. Token counts and times add; the rates are computed from the sums, so
+     * they come out as the honest whole-turn throughput. What describes a moment rather
+     * than a total — where the context stands, whether thinking was prefilled — is taken
+     * from [next], the pass that ended the turn. Time to first token stays this side's:
+     * the wait the user felt ended when the first pass started writing.
+     */
+    fun through(next: GenerationStats): GenerationStats = next.copy(
+        promptTokens = promptTokens + next.promptTokens,
+        generatedTokens = generatedTokens + next.generatedTokens,
+        prefillMs = prefillMs + next.prefillMs,
+        decodeMs = decodeMs + next.decodeMs,
+        cachedTokens = cachedTokens + next.cachedTokens,
+        timeToFirstTokenMs = timeToFirstTokenMs,
+    )
 }
 
 private const val MILLIS_PER_SECOND = 1000.0

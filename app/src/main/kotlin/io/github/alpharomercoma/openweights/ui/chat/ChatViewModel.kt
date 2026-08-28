@@ -1309,11 +1309,15 @@ class ChatViewModel @Inject constructor(
             // reopened conversation losing track of its own number.
             var settledMillis: Long? = null
 
-            // What the turn will write down, replaced by each pass that completes, so what
-            // survives is the pass the turn ended on rather than the one that asked for a
-            // tool. Null until a pass completes at all, which is what tells the difference
-            // between a turn that answered and one that was stopped before it could.
+            // What the turn will write down: the last completed pass's text, with the
+            // stats of every pass folded together. The text is rightly the final pass's --
+            // it is the answer -- but keeping only that pass's numbers made a tool turn's
+            // row lie: the first pass re-read the whole conversation and the row reported
+            // whatever the short closing pass happened to cost. Null until a pass completes
+            // at all, which is what tells the difference between a turn that answered and
+            // one that was stopped before it could.
             var settled: Pair<String, GenerationStats>? = null
+            var turnStats: GenerationStats? = null
             lastTurnSteps = emptyList()
 
             val listener = object : TurnListener {
@@ -1337,7 +1341,9 @@ class ChatViewModel @Inject constructor(
                 }
 
                 override fun onPass(event: GenerationEvent.Completed, raw: String) {
-                    settled = applyCompletion(event, raw) to event.stats
+                    val merged = turnStats?.through(event.stats) ?: event.stats
+                    turnStats = merged
+                    settled = applyCompletion(event, raw, merged) to merged
                 }
 
                 override fun onSteps(steps: List<AgentStep>) {
@@ -2213,7 +2219,15 @@ class ChatViewModel @Inject constructor(
      * what is re-read on reopening, and what is sent as history next turn are all the same
      * string.
      */
-    private fun applyCompletion(event: GenerationEvent.Completed, raw: String): String {
+    private fun applyCompletion(
+        event: GenerationEvent.Completed,
+        raw: String,
+        // The whole turn so far, every pass folded together. The entry under the reply
+        // describes the reply, and a reply that took three passes took what the three of
+        // them took; [event]'s own stats stay in use below for the things that are genuinely
+        // this pass's — the work ledger, and where the context now stands.
+        turnStats: GenerationStats = event.stats,
+    ): String {
         val parsed = parseAssistantReply(raw)
         val streamed = _uiState.value.transcript.lastOrNull()
         // Whichever source has it. llama.cpp separates thinking itself for the formats it
@@ -2253,12 +2267,12 @@ class ChatViewModel @Inject constructor(
                 reasoning = reasoning,
                 isStreaming = false,
                 isReasoningInProgress = false,
-                tokensPerSecond = event.stats.decodeTokensPerSecond,
-                prefillTokensPerSecond = event.stats.prefillTokensPerSecond,
-                timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
-                generatedTokens = event.stats.generatedTokens,
-                promptTokens = event.stats.totalPromptTokens,
-                cachedTokens = event.stats.cachedTokens,
+                tokensPerSecond = turnStats.decodeTokensPerSecond,
+                prefillTokensPerSecond = turnStats.prefillTokensPerSecond,
+                timeToFirstTokenMs = turnStats.timeToFirstTokenMs,
+                generatedTokens = turnStats.generatedTokens,
+                promptTokens = turnStats.totalPromptTokens,
+                cachedTokens = turnStats.cachedTokens,
             )
         }
         recordWork(event.stats)

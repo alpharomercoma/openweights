@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(openweights_engine CXX)
+project(openweights_engine CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,6 +44,7 @@ add_subdirectory(
 
 add_library(openweights_engine STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../engine_session.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/OWEngineBridge.mm
 )
 
 target_include_directories(openweights_engine PRIVATE
@@ -62,4 +63,5 @@ target_link_libraries(openweights_engine
     ggml
     llama-common
     mtmd
+    "-framework Foundation"
 )

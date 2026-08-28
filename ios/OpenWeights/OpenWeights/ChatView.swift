@@ -88,7 +88,14 @@ struct ChatView: View {
                 Text("Not loaded").foregroundStyle(.secondary)
             }
             Spacer()
-            if let stats = engine.lastStats {
+            // Session-wide totals, summed from what is actually persisted on each turn
+            // (`ChatSession.sessionTokens()`) rather than `engine.lastStats` alone -- the
+            // latter is only ever the *last* turn's numbers and lives in `EngineClient`'s
+            // in-memory `@Published` state, so it reads as blank the moment this screen is
+            // reopened even though the conversation has plenty of measured turns behind it.
+            // This is iOS's fix for the same bug report ("the input, output, context etc"
+            // disappearing on reopen) Android's `messages` table columns were added for.
+            if let stats = session.sessionTokens() {
                 Text(statsLine(stats)).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
         }
@@ -105,9 +112,9 @@ struct ChatView: View {
         }
     }
 
-    private func statsLine(_ stats: TurnStats) -> String {
+    private func statsLine(_ stats: SessionTokens) -> String {
         let hitPercent = Int((stats.cacheHitRate * 100).rounded())
-        return "↑\(stats.totalPromptTokens) ↓\(stats.generatedTokens) · CH\(hitPercent)%"
+        return "↑\(stats.inputTokens) ↓\(stats.outputTokens) · CH\(hitPercent)%"
     }
 
     private func transcript(_ session: ChatSession) -> some View {
@@ -220,11 +227,14 @@ struct ChatView: View {
                     appendToReply(piece, replyID: replyID)
                 }
             } catch is CancellationError {
+                attachStats(replyID: replyID)
                 return
             } catch {
                 appendToReply("\n[error: \(error.localizedDescription)]", replyID: replyID)
+                attachStats(replyID: replyID)
                 return
             }
+            attachStats(replyID: replyID)
 
             let calls = engine.lastToolCalls
             guard !calls.isEmpty, round < maxToolRounds - 1 else { return }
@@ -260,6 +270,25 @@ struct ChatView: View {
         guard var current = session else { return }
         guard let index = current.turns.firstIndex(where: { $0.id == replyID }) else { return }
         current.turns[index].text += piece
+        session = current
+    }
+
+    /// Stores `engine.lastStats` onto the turn that just finished (or was cancelled/errored
+    /// partway through -- `Session::generate` still reports what it measured up to that
+    /// point). `promptTokens` here holds the *total* input length (`totalPromptTokens`,
+    /// fresh + cached), matching what `sessionTokens()`'s `cacheHitRate = cached/input`
+    /// expects the field to mean -- the same UI-level convention `TranscriptEntry.promptTokens`
+    /// uses on Android, not the raw C++ `GenerationStats.prompt_tokens` (which excludes the
+    /// cached prefix).
+    private func attachStats(replyID: UUID) {
+        guard let stats = engine.lastStats else { return }
+        guard var current = session else { return }
+        guard let index = current.turns.firstIndex(where: { $0.id == replyID }) else { return }
+        current.turns[index].promptTokens = stats.totalPromptTokens
+        current.turns[index].cachedTokens = stats.cachedTokens
+        current.turns[index].generatedTokens = stats.generatedTokens
+        current.turns[index].prefillMillis = stats.prefillMillis
+        current.turns[index].decodeMillis = stats.decodeMillis
         session = current
     }
 }

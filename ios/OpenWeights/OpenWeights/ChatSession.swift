@@ -32,12 +32,53 @@ struct PersistedTurn: Codable, Identifiable, Equatable, Hashable {
     /** Set on a `tool` role turn: which call this is the result of. Mirrors `ChatMessage.tool_call_id`. */
     var toolCallID: String?
 
-    init(id: UUID = UUID(), role: String, text: String, toolCallID: String? = nil) {
+    /**
+     * Set on an `assistant` turn once its generation completes, from `EngineClient.lastStats`.
+     * Mirrors the `promptTokens`/`cachedTokens`/`totalMillis` columns Room's `messages` table
+     * added on Android for the exact bug this session originally traced there: turn timings
+     * and token counts disappearing when a chat was reopened, because they lived only in
+     * view-model memory. Storing them on the turn itself, not just in `EngineClient`'s
+     * transient `@Published lastStats`, is what makes them survive a relaunch here too.
+     */
+    var promptTokens: Int32?
+    var cachedTokens: Int32?
+    var generatedTokens: Int32?
+    var prefillMillis: Int64?
+    var decodeMillis: Int64?
+
+    init(
+        id: UUID = UUID(),
+        role: String,
+        text: String,
+        toolCallID: String? = nil,
+        promptTokens: Int32? = nil,
+        cachedTokens: Int32? = nil,
+        generatedTokens: Int32? = nil,
+        prefillMillis: Int64? = nil,
+        decodeMillis: Int64? = nil
+    ) {
         self.id = id
         self.role = role
         self.text = text
         self.toolCallID = toolCallID
+        self.promptTokens = promptTokens
+        self.cachedTokens = cachedTokens
+        self.generatedTokens = generatedTokens
+        self.prefillMillis = prefillMillis
+        self.decodeMillis = decodeMillis
     }
+}
+
+/// This conversation's running input/output token counts and cache hit rate, for the status
+/// line above the composer -- mirrors `ChatUiState.sessionTokens()`/`SessionTokens` on
+/// Android exactly, including summing from the transcript itself rather than a separate
+/// running counter, for the same reason: every place turns are cleared or replaced (a reset,
+/// reopening from disk) already has to get the turns themselves right, so a sum over what is
+/// actually stored can never drift from it the way an independently-maintained counter could.
+struct SessionTokens: Equatable {
+    let inputTokens: Int32
+    let outputTokens: Int32
+    let cacheHitRate: Double
 }
 
 /// One conversation, persisted as its own JSON file. Reopening a session re-sends its full
@@ -69,6 +110,21 @@ struct ChatSession: Codable, Identifiable, Equatable, Hashable {
         self.turns = turns
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    /// `nil` until at least one assistant turn has recorded stats -- the only time the
+    /// status line has anything to show, matching `sessionTokens()`'s own `null` case.
+    func sessionTokens() -> SessionTokens? {
+        let measured = turns.filter { $0.role == "assistant" && $0.promptTokens != nil }
+        guard !measured.isEmpty else { return nil }
+        let input = measured.reduce(Int32(0)) { $0 + ($1.promptTokens ?? 0) }
+        let output = measured.reduce(Int32(0)) { $0 + ($1.generatedTokens ?? 0) }
+        let cached = measured.reduce(Int32(0)) { $0 + ($1.cachedTokens ?? 0) }
+        return SessionTokens(
+            inputTokens: input,
+            outputTokens: output,
+            cacheHitRate: input > 0 ? Double(cached) / Double(input) : 0.0
+        )
     }
 }
 

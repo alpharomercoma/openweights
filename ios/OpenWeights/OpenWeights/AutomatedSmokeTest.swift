@@ -66,7 +66,14 @@ enum AutomatedSmokeTest {
         if let reloaded = await reopened.sessions.first(where: { $0.id == session.id }) {
             let turnsMatch = reloaded.turns.map(\.text) == session.turns.map(\.text)
             let samplerMatches = reloaded.sampler == session.sampler
-            log("reload: turnsMatch=\(turnsMatch) samplerMatches=\(samplerMatches) turnCount=\(reloaded.turns.count)")
+            let statsMatch = reloaded.sessionTokens() != nil
+                && reloaded.sessionTokens()?.inputTokens == session.sessionTokens()?.inputTokens
+                && reloaded.sessionTokens()?.outputTokens == session.sessionTokens()?.outputTokens
+            log(
+                "reload: turnsMatch=\(turnsMatch) samplerMatches=\(samplerMatches) "
+                    + "statsMatch=\(statsMatch) sessionTokens=\(String(describing: reloaded.sessionTokens())) "
+                    + "turnCount=\(reloaded.turns.count)"
+            )
         } else {
             log("reload: session missing after reopen")
         }
@@ -94,9 +101,12 @@ enum AutomatedSmokeTest {
             log("\(label): generate threw \(error.localizedDescription)")
         }
 
-        await store.save(current)
-
-        if let stats = await engine.lastStats {
+        if let stats = await engine.lastStats, let index = current.turns.firstIndex(where: { $0.id == replyID }) {
+            current.turns[index].promptTokens = stats.totalPromptTokens
+            current.turns[index].cachedTokens = stats.cachedTokens
+            current.turns[index].generatedTokens = stats.generatedTokens
+            current.turns[index].prefillMillis = stats.prefillMillis
+            current.turns[index].decodeMillis = stats.decodeMillis
             let reply = current.turns.last?.text.prefix(120) ?? ""
             log(
                 "\(label): reply=\(reply) | promptTokens=\(stats.promptTokens) "
@@ -106,6 +116,8 @@ enum AutomatedSmokeTest {
         } else {
             log("\(label): no stats produced")
         }
+
+        await store.save(current)
         return current
     }
 

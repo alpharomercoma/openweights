@@ -42,8 +42,18 @@ kotlin {
         compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
+    // A static framework, not a klib: an Xcode project links a framework, and until this
+    // existed the two iOS targets above compiled and were never actually consumable from
+    // Swift. `iosArm64` is the phone; `iosSimulatorArm64` is the booted Simulator this app's
+    // own first milestone builds and runs against.
+    val xcf = org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFrameworkConfig(project, "OpenWeightsCommon")
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        target.binaries.framework {
+            baseName = "OpenWeightsCommon"
+            isStatic = true
+            xcf.add(this)
+        }
+    }
 
     // Android and the JVM share a source set of their own, and it exists for one file.
     // CpuTopology reads /sys/devices/system/cpu to count the big cores, which is a Linux

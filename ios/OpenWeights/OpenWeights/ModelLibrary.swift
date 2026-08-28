@@ -33,6 +33,11 @@ final class ModelLibrary: ObservableObject {
 
     private let directory: URL
 
+    /// Where a fresh Hub download should land -- `DiscoverView` writes here directly, then
+    /// calls `reload()`, rather than routing a downloaded file through `importModel(from:)`
+    /// as though it were an externally-picked one.
+    var directoryURL: URL { directory }
+
     init() {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         directory = documents.appendingPathComponent("Models", isDirectory: true)

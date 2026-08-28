@@ -17,6 +17,9 @@
 		9A6FA090E43E4D1D8444AA26 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 399D3B0659CF4EA6BDD8642D /* ChatView.swift */; };
 		F55847AF97DB4732A51BCEEE /* AutomatedSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C92FF0615E554803B243D1EE /* AutomatedSmokeTest.swift */; };
 		DD557AB6B30649FCB1542BB7 /* ToolKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8A6B56072FE42E58FD7043B /* ToolKit.swift */; };
+		04594DAD1899445BAFFD5163 /* HuggingFaceHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536FC3BC47114A8EA042567D /* HuggingFaceHub.swift */; };
+		7E74ADEFB0464B60BCA7537A /* ModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 951479966AD6418F922E8230 /* ModelDownloader.swift */; };
+		54161D1F19604BE8BF90F9E8 /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF71939127C4210AEAE1FD0 /* DiscoverView.swift */; };
 		101786A86EDD4569BA724AC0 /* libopenweights_engine_combined.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8EA8216754024A2EA1F7B388 /* libopenweights_engine_combined.a */; };
 		74D250F909924F2AAF460A3A /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D047CC65027A4949968D055D /* Metal.framework */; };
 		70956A3321A04B3395A98016 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A3C5F4FA99848CEB32F8C76 /* Accelerate.framework */; };
@@ -34,6 +37,9 @@
 		399D3B0659CF4EA6BDD8642D /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		C92FF0615E554803B243D1EE /* AutomatedSmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomatedSmokeTest.swift; sourceTree = "<group>"; };
 		D8A6B56072FE42E58FD7043B /* ToolKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolKit.swift; sourceTree = "<group>"; };
+		536FC3BC47114A8EA042567D /* HuggingFaceHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceHub.swift; sourceTree = "<group>"; };
+		951479966AD6418F922E8230 /* ModelDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloader.swift; sourceTree = "<group>"; };
+		0FF71939127C4210AEAE1FD0 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		948326D8136F4C9F85D34569 /* OpenWeights-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenWeights-Bridging-Header.h"; sourceTree = "<group>"; };
 		8EA8216754024A2EA1F7B388 /* libopenweights_engine_combined.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libopenweights_engine_combined.a; path = "../../core/engine/src/main/cpp/apple/build-ios-sim/libopenweights_engine_combined.a"; sourceTree = "<group>"; };
 		D047CC65027A4949968D055D /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
@@ -84,6 +90,9 @@
 				399D3B0659CF4EA6BDD8642D /* ChatView.swift */,
 				C92FF0615E554803B243D1EE /* AutomatedSmokeTest.swift */,
 				D8A6B56072FE42E58FD7043B /* ToolKit.swift */,
+				536FC3BC47114A8EA042567D /* HuggingFaceHub.swift */,
+				951479966AD6418F922E8230 /* ModelDownloader.swift */,
+				0FF71939127C4210AEAE1FD0 /* DiscoverView.swift */,
 				948326D8136F4C9F85D34569 /* OpenWeights-Bridging-Header.h */,
 			);
 			path = OpenWeights;
@@ -170,6 +179,9 @@
 				9A6FA090E43E4D1D8444AA26 /* ChatView.swift in Sources */,
 				F55847AF97DB4732A51BCEEE /* AutomatedSmokeTest.swift in Sources */,
 				DD557AB6B30649FCB1542BB7 /* ToolKit.swift in Sources */,
+				04594DAD1899445BAFFD5163 /* HuggingFaceHub.swift in Sources */,
+				7E74ADEFB0464B60BCA7537A /* ModelDownloader.swift in Sources */,
+				54161D1F19604BE8BF90F9E8 /* DiscoverView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

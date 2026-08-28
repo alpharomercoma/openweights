@@ -22,13 +22,15 @@ private func formattedSize(_ bytes: Int64) -> String {
 }
 
 /// Picks a model to start a new chat with, from whatever GGUF files have already been
-/// imported plus an "Import" action for a new one. There is no download flow yet -- same gap
-/// Android's Discover screen fills with a curated catalog and a fit estimate, both explicitly
-/// out of scope for this milestone.
+/// imported, plus "Import" for a local file and "Discover" to search and download one from
+/// the Hugging Face Hub (`DiscoverView`). No fit estimate here yet (how much RAM a quant
+/// needs, whether it fits this device) -- that is Android's `FitEstimator`/fit-card, separate
+/// follow-on work.
 struct ModelPickerView: View {
     @EnvironmentObject private var modelLibrary: ModelLibrary
     @Environment(\.dismiss) private var dismiss
     @State private var isImporterPresented = false
+    @State private var isDiscoverPresented = false
     @State private var importError: String?
 
     let onPick: (LocalModel) -> Void
@@ -64,7 +66,16 @@ struct ModelPickerView: View {
             .navigationTitle("Choose a model")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Import") { isImporterPresented = true }
+                    Menu {
+                        Button { isDiscoverPresented = true } label: {
+                            Label("Discover on Hugging Face", systemImage: "magnifyingglass")
+                        }
+                        Button { isImporterPresented = true } label: {
+                            Label("Import a local file", systemImage: "folder")
+                        }
+                    } label: {
+                        Label("Add model", systemImage: "plus")
+                    }
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -76,6 +87,12 @@ struct ModelPickerView: View {
             allowedContentTypes: [UTType(filenameExtension: "gguf") ?? .data],
             onCompletion: handleImport
         )
+        .sheet(isPresented: $isDiscoverPresented) {
+            DiscoverView { model in
+                onPick(model)
+                dismiss()
+            }
+        }
     }
 
     private func handleImport(_ result: Result<URL, Error>) {

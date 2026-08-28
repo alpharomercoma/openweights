@@ -57,6 +57,8 @@ enum AutomatedSmokeTest {
             log("tool-turn: skipped, model's chat template does not support tools (supportsTools=false)")
         }
 
+        await runHubTurn()
+
         // Simulate "navigate away and back": a brand new SessionStore re-reading from disk,
         // exactly what relaunching the app produces, rather than reusing the in-memory one
         // that already has the answer.
@@ -156,6 +158,44 @@ enum AutomatedSmokeTest {
         let finalReply = current.turns.last(where: { $0.role == "assistant" })?.text.prefix(160) ?? ""
         log("tool-turn: calledTool=\(calledTool) toolResult=\(toolResultText) finalReply=\(finalReply)")
         return current
+    }
+
+    /// Milestone 6: proves `HuggingFaceHub`/`ModelDownloader` work against the real Hub from
+    /// inside the Simulator, not just that they compile. Searches for a small model, lists
+    /// its GGUF files, and downloads the smallest one (files are already sorted ascending) --
+    /// capped to whatever is actually smallest for the query chosen, kept small on purpose so
+    /// this finishes in a reasonable time.
+    private static func runHubTurn() async {
+        let hub = HuggingFaceHub()
+        do {
+            let results = try await hub.search(query: "smollm2 135m")
+            log("hub: search returned \(results.count) repos, first=\(results.first?.id ?? "none")")
+            guard let first = results.first else { return }
+
+            let files = try await hub.files(inRepository: first.id)
+            log("hub: \(first.id) has \(files.count) gguf files, smallest=\(files.first.map { "\($0.fileName) (\($0.sizeBytes) bytes)" } ?? "none")")
+            guard let smallest = files.first(where: { !$0.isProjector }) else { return }
+
+            let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let destination = documents.appendingPathComponent("Models").appendingPathComponent(smallest.fileName)
+            let url = await hub.downloadURL(repoId: first.id, path: smallest.path)
+            let downloader = ModelDownloader()
+
+            var finalState = "never finished"
+            for await update in await downloader.download(from: url, to: destination, totalBytes: smallest.sizeBytes) {
+                switch update {
+                case .progress: continue
+                case .finished(let finishedURL):
+                    let size = (try? finishedURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? -1
+                    finalState = "finished, bytesOnDisk=\(size), expected=\(smallest.sizeBytes)"
+                case .failed(let error):
+                    finalState = "failed: \(error.localizedDescription)"
+                }
+            }
+            log("hub: download \(finalState)")
+        } catch {
+            log("hub: threw \(error.localizedDescription)")
+        }
     }
 
     private static func log(_ line: String) {

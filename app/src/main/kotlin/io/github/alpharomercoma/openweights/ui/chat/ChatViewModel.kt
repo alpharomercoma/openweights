@@ -103,6 +103,14 @@ data class TranscriptEntry(
     val tokensPerSecond: Double? = null,
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
+    /**
+     * This turn's prompt, cached and freshly-decoded tokens together. Null on a turn with no
+     * measurement at all (a reply reloaded from storage, or one that never finished), which
+     * is a different claim from zero — a turn really can prefill nothing on a full cache hit.
+     */
+    val promptTokens: Int? = null,
+    /** How much of [promptTokens] the KV cache answered for free. See [GenerationStats.cachedTokens]. */
+    val cachedTokens: Int? = null,
     val isStreaming: Boolean = false,
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
@@ -2156,6 +2164,8 @@ class ChatViewModel @Inject constructor(
                 tokensPerSecond = event.stats.decodeTokensPerSecond,
                 timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
                 generatedTokens = event.stats.generatedTokens,
+                promptTokens = event.stats.totalPromptTokens,
+                cachedTokens = event.stats.cachedTokens,
             )
         }
         recordWork(event.stats)
@@ -2948,6 +2958,35 @@ internal fun ChatUiState.estimatedPromptTokens(): Int {
 /** Characters to a token as this model was last seen to tokenise, or null before then. */
 internal fun GenerationStats.charsPerToken(chars: Int): Float? =
     (chars.toFloat() / contextUsed).takeIf { contextUsed > 0 && it.isFinite() && it > 0f }
+
+/**
+ * This conversation's running input/output token counts and cache hit rate, for the status
+ * line above the composer.
+ *
+ * Summed from the transcript itself rather than kept as separate running counters: every
+ * place this conversation's transcript is cleared or replaced — a new chat, switching
+ * conversations, an edit that drops later turns, reopening one from storage — already has to
+ * get that right for the messages themselves, and a sum over what is actually on screen can
+ * never drift from it. A separate counter would need its own reset at every one of those
+ * sites and would eventually miss one.
+ */
+internal fun ChatUiState.sessionTokens(): SessionTokens? {
+    val measured = transcript.filter { it.role == ChatRole.ASSISTANT && it.promptTokens != null }
+    if (measured.isEmpty()) return null
+    val input = measured.sumOf { it.promptTokens ?: 0 }
+    val output = measured.sumOf { it.generatedTokens ?: 0 }
+    val cached = measured.sumOf { it.cachedTokens ?: 0 }
+    return SessionTokens(
+        inputTokens = input,
+        outputTokens = output,
+        // input is 0 only in the unreachable case of every measured turn being a full cache
+        // hit on an empty prompt; guarded rather than assumed away.
+        cacheHitRate = if (input > 0) cached.toDouble() / input else 0.0,
+    )
+}
+
+/** See [ChatUiState.sessionTokens]. */
+internal data class SessionTokens(val inputTokens: Int, val outputTokens: Int, val cacheHitRate: Double)
 
 /**
  * A transcript entry as the engine sees it.

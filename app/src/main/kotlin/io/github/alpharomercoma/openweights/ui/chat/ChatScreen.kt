@@ -705,8 +705,16 @@ private fun StatusStrip(state: ChatUiState, dictationError: String?) {
     ) {
         when {
             state.isCompacting -> FoldingLine()
-            state.contextUsed > 0 && state.contextSize > 0 ->
-                ContextMeter(used = state.contextUsed, total = state.contextSize)
+            state.contextUsed > 0 && state.contextSize > 0 -> {
+                val session = state.sessionTokens()
+                ContextMeter(
+                    used = state.contextUsed,
+                    total = state.contextSize,
+                    inputTokens = session?.inputTokens,
+                    outputTokens = session?.outputTokens,
+                    cacheHitRate = session?.cacheHitRate,
+                )
+            }
         }
     }
 }

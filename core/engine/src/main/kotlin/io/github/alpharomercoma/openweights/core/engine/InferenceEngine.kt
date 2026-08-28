@@ -62,6 +62,17 @@ data class GenerationStats(
      * nineteen seconds on every turn after it.
      */
     val thinkingPrefilled: Boolean = false,
+    /**
+     * Tokens this turn's prompt reused from the KV cache rather than re-decoding.
+     *
+     * [promptTokens] above is already just the freshly-decoded remainder — a follow-up turn
+     * in a running conversation only pays for what changed — so `cachedTokens + promptTokens`
+     * is the conversation's full length as tokenized this turn, and [cacheHitRate] is what
+     * fraction of that the cache answered for free. Zero on a turn with an attachment:
+     * embeddings are never compared against the cache, so media always re-evaluates the
+     * whole conversation from scratch.
+     */
+    val cachedTokens: Int = 0,
 ) {
     /** Prompt-processing throughput, or null when nothing needed decoding (full cache hit). */
     val prefillTokensPerSecond: Double?
@@ -78,6 +89,19 @@ data class GenerationStats(
         } else {
             null
         }
+
+    /** This turn's prompt, cached and fresh tokens together. */
+    val totalPromptTokens: Int get() = cachedTokens + promptTokens
+
+    /**
+     * What fraction of this turn's prompt the KV cache answered for free.
+     *
+     * A conversation's first turn is a real, honest 0%: there was nothing in the cache yet
+     * to match against, and that is exactly what a full miss is. Null only guards the
+     * degenerate case of no prompt at all, which nothing sends in practice.
+     */
+    val cacheHitRate: Double?
+        get() = totalPromptTokens.takeIf { it > 0 }?.let { cachedTokens.toDouble() / it }
 }
 
 private const val MILLIS_PER_SECOND = 1000.0

@@ -101,27 +101,57 @@ private val RAIL_WIDTH = 2.dp
  * How full the model's context window is, drawn as a hairline that spans the screen just
  * above the composer. The place you are already looking while typing.
  *
+ * Session token counts share this line rather than a row of their own — a CLI status bar's
+ * `↑ input ↓ output` convention, next to the number it already keeps closest company with,
+ * since both answer the same question of "what has this conversation cost so far."
+ *
  * @param used tokens currently held in the KV cache.
  * @param total the context length the model was loaded with.
+ * @param inputTokens this conversation's prompt tokens so far, cached and fresh together.
+ *   Null hides the whole session-stats segment — a conversation with no replies yet has
+ *   nothing to report and showing zeroes would read as a real, measured "nothing happened"
+ *   rather than as "there is nothing to measure yet."
+ * @param outputTokens this conversation's generated tokens so far.
+ * @param cacheHitRate what fraction of [inputTokens] the KV cache answered for free, 0 to 1.
+ *   Null omits just the `CH` segment, distinct from omitting the whole line: a model whose
+ *   engine has not reported a cache figure yet is not the same as a conversation that has
+ *   not started.
  */
 @Composable
-fun ContextMeter(used: Int, total: Int, modifier: Modifier = Modifier) {
+fun ContextMeter(
+    used: Int,
+    total: Int,
+    modifier: Modifier = Modifier,
+    inputTokens: Int? = null,
+    outputTokens: Int? = null,
+    cacheHitRate: Double? = null,
+) {
     val fraction = if (total > 0) (used.toFloat() / total).coerceIn(0f, 1f) else 0f
     val dark = LocalIsDarkTheme.current
     // Headroom, not fill, drives the colour: a nearly full context is the hot end.
     val color = signalColor(1f - fraction, dark)
     val percent = (fraction * 100).roundToInt()
+    val sessionText = sessionStatusText(inputTokens, outputTokens, cacheHitRate)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription = "Context $percent percent full, $used of $total tokens"
+                contentDescription = listOfNotNull(
+                    sessionText?.let {
+                        "This conversation: $inputTokens tokens in, $outputTokens tokens out" +
+                            (cacheHitRate?.let { rate ->
+                                ", cache reused ${(rate * 100).roundToInt()} percent"
+                            } ?: "")
+                    },
+                    "Context $percent percent full, $used of $total tokens",
+                ).joinToString(". ")
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        sessionText?.let { Metric(text = it, maxLines = 1) }
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -143,6 +173,21 @@ fun ContextMeter(used: Int, total: Int, modifier: Modifier = Modifier) {
         // screen reader was told which and nobody looking at it was.
         Metric(text = "ctx $percent%", color = color, maxLines = 1)
     }
+}
+
+/**
+ * `↑1.2k ↓340 · CH92%`, or null with nothing yet to report. Kept as a plain function rather
+ * than inlined so the format has one place to test without standing up a Compose rule for it.
+ */
+internal fun sessionStatusText(
+    inputTokens: Int?,
+    outputTokens: Int?,
+    cacheHitRate: Double?,
+): String? {
+    if (inputTokens == null || outputTokens == null) return null
+    val tokens = "↑${formatTokenCount(inputTokens)} ↓${formatTokenCount(outputTokens)}"
+    val hitRate = cacheHitRate?.let { " · CH${(it * 100).roundToInt()}%" }.orEmpty()
+    return tokens + hitRate
 }
 
 /**
@@ -204,6 +249,13 @@ private fun TelemetryPreview() {
     OpenWeightsTheme(dynamicColor = false) {
         androidx.compose.foundation.layout.Column {
             ContextMeter(used = 1204, total = 4096)
+            ContextMeter(
+                used = 1204,
+                total = 4096,
+                inputTokens = 1840,
+                outputTokens = 512,
+                cacheHitRate = 0.92,
+            )
             androidx.compose.foundation.layout.Row(
                 modifier = Modifier.height(40.dp),
             ) {

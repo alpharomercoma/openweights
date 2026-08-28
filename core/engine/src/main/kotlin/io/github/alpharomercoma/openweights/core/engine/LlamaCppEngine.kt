@@ -271,6 +271,7 @@ class LlamaCppEngine internal constructor(
             contextUsed = stats[CONTEXT_USED].toInt(),
             contextSize = stats[7].toInt(),
             thinkingPrefilled = stats.getOrElse(THINKING_PREFILLED) { 0L } == TRUE_FLAG,
+            cachedTokens = stats.getOrElse(CACHED_TOKENS) { 0L }.toInt(),
         ),
     )
 
@@ -374,6 +375,9 @@ class LlamaCppEngine internal constructor(
         /** Index and native truth value for whether the thinking prefix was reused. */
         const val THINKING_PREFILLED = 8
         const val TRUE_FLAG = 1L
+
+        /** Index of the cached-tokens field: how much of this turn's prompt was reused. */
+        const val CACHED_TOKENS = 9
 
         /** Long enough for a cancelled decode step to return; short enough not to hang. */
         const val SHUTDOWN_TIMEOUT_SECONDS = 10L

@@ -131,6 +131,15 @@ struct GenerationStats {
     int32_t context_used      = 0;
     int32_t context_size      = 0;
     /**
+     * Tokens this turn's prompt reused from the KV cache rather than re-decoding.
+     *
+     * Zero on a media turn: embeddings are never compared against the cache, so an
+     * attachment always re-evaluates the whole conversation. `prompt_tokens` above is
+     * already just the freshly-decoded remainder, so `cached_tokens + prompt_tokens` is the
+     * conversation's full length as tokenized this turn.
+     */
+    int32_t cached_tokens      = 0;
+    /**
      * Whether the template opened a thinking block that the reply continues from.
      *
      * The caller needs this to store a reply that will match the cache next turn. LFM2.5's

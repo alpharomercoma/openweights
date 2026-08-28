@@ -52,11 +52,41 @@ class GenerationStatsTest {
         assertThat(stats.prefillTokensPerSecond).isEqualTo(64.0)
     }
 
+    @Test
+    fun `cache hit rate is null with no prompt at all`() {
+        // The degenerate case the divide has to guard against, not one anything actually
+        // sends: every real turn has at least the rendered chat template in it.
+        val stats = stats(promptTokens = 0, cachedTokens = 0)
+
+        assertThat(stats.cacheHitRate).isNull()
+    }
+
+    @Test
+    fun `cache hit rate is the reused share of this turn's full prompt`() {
+        // A follow-up turn that reused 900 of the 1000 tokens the conversation now
+        // tokenizes to only paid for the 100 that changed.
+        val stats = stats(promptTokens = 100, cachedTokens = 900)
+
+        assertThat(stats.totalPromptTokens).isEqualTo(1000)
+        assertThat(stats.cacheHitRate).isEqualTo(0.9)
+    }
+
+    @Test
+    fun `a conversation's first turn is a real, honest zero, not null`() {
+        // There is nothing yet in the cache to match against, and that is exactly what a
+        // full miss is — a genuinely different claim from the no-prompt-at-all case above,
+        // which is why that one is null and this one is a real 0.0.
+        val stats = stats(promptTokens = 400, cachedTokens = 0, generatedTokens = 2)
+
+        assertThat(stats.cacheHitRate).isEqualTo(0.0)
+    }
+
     private fun stats(
         promptTokens: Int = 0,
         generatedTokens: Int = 0,
         prefillMs: Long = 0,
         decodeMs: Long = 0,
+        cachedTokens: Int = 0,
     ) = GenerationStats(
         promptTokens = promptTokens,
         generatedTokens = generatedTokens,
@@ -65,5 +95,6 @@ class GenerationStatsTest {
         timeToFirstTokenMs = 0,
         contextUsed = 0,
         contextSize = 2048,
+        cachedTokens = cachedTokens,
     )
 }

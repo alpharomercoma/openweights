@@ -328,6 +328,74 @@ class EngineMessagesTest {
     }
 
     @Test
+    fun `session tokens are null before anything has been generated`() {
+        // A fresh conversation has nothing to report, and showing zeroes would read as a
+        // real, measured "nothing happened" rather than as "nothing to measure yet".
+        val state = ChatUiState(transcript = transcript(1))
+
+        assertThat(state.sessionTokens()).isNull()
+    }
+
+    @Test
+    fun `session tokens sum every measured assistant turn`() {
+        val state = ChatUiState(
+            transcript = listOf(
+                TranscriptEntry(
+                    id = 1,
+                    role = ChatRole.USER,
+                    text = "hello",
+                ),
+                TranscriptEntry(
+                    id = 2,
+                    role = ChatRole.ASSISTANT,
+                    text = "hi",
+                    generatedTokens = 40,
+                    promptTokens = 500,
+                    cachedTokens = 400,
+                ),
+                TranscriptEntry(
+                    id = 3,
+                    role = ChatRole.USER,
+                    text = "and then?",
+                ),
+                TranscriptEntry(
+                    id = 4,
+                    role = ChatRole.ASSISTANT,
+                    text = "then this",
+                    generatedTokens = 60,
+                    // A follow-up turn's prompt tokenizes to the whole conversation again,
+                    // so this is not the delta on top of turn one — it is turn two's own
+                    // full (cached + fresh) count.
+                    promptTokens = 560,
+                    cachedTokens = 540,
+                ),
+            ),
+        )
+
+        val session = state.sessionTokens()
+
+        assertThat(session?.inputTokens).isEqualTo(1_060)
+        assertThat(session?.outputTokens).isEqualTo(100)
+        // 940 of 1060 reused.
+        assertThat(session?.cacheHitRate).isWithin(0.0001).of(940.0 / 1060.0)
+    }
+
+    @Test
+    fun `a reply reloaded from storage without measurements does not count`() {
+        // A conversation reopened from disk has replies with no promptTokens on them at
+        // all — the engine has not touched this conversation yet — which is a different
+        // claim from a real, measured zero and has to be excluded rather than summed as one.
+        val state = ChatUiState(
+            transcript = listOf(
+                TranscriptEntry(id = 1, role = ChatRole.USER, text = "hello"),
+                TranscriptEntry(id = 2, role = ChatRole.ASSISTANT, text = "hi"),
+            ),
+        )
+
+        assertThat(state.sessionTokens()).isNull()
+    }
+
+    @Test
     fun `what the tools found rides in the question, not in a turn of its own`() {
         // A turn of its own would be a second user message in a row, which is the wall the
         // compaction summary already hit: the templates that enforce alternation refuse to

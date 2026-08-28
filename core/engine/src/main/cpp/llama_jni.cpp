@@ -469,7 +469,7 @@ catch (const std::exception & failure) {
  * this method stays valid for the callbacks and no thread attachment is needed.
  *
  * Returns [stopReasonOrdinal, promptTokens, generatedTokens, prefillMs, decodeMs,
- * timeToFirstTokenMs, contextUsed, contextSize].
+ * timeToFirstTokenMs, contextUsed, contextSize, thinkingPrefilled, cachedTokens].
  */
 JNIEXPORT jlongArray JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate(
@@ -623,7 +623,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
         return nullptr;
     }
 
-    jlong values[9] = {
+    jlong values[10] = {
         stop_reason_ordinal(reason),
         stats.prompt_tokens,
         stats.generated_tokens,
@@ -633,9 +633,10 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
         stats.context_used,
         stats.context_size,
         stats.thinking_prefilled ? 1 : 0,
+        stats.cached_tokens,
     };
-    jlongArray result = env->NewLongArray(9);
-    env->SetLongArrayRegion(result, 0, 9, values);
+    jlongArray result = env->NewLongArray(10);
+    env->SetLongArrayRegion(result, 0, 10, values);
     return result;
 }
 // A function try block, so the body below is untouched: C++ exceptions must not

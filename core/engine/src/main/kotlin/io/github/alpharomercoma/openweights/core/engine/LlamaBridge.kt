@@ -107,7 +107,7 @@ internal class LlamaBridge {
      * Blocks until generation finishes, calling [sink] on the calling thread for each token.
      *
      * @return `[stopReasonOrdinal, promptTokens, generatedTokens, prefillMs, decodeMs,
-     * timeToFirstTokenMs, contextUsed, contextSize]`.
+     * timeToFirstTokenMs, contextUsed, contextSize, thinkingPrefilled, cachedTokens]`.
      */
     @Suppress("LongParameterList")
     external fun nativeGenerate(

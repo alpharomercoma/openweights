@@ -1157,6 +1157,7 @@ StopReason Session::generate(
         }
 
         stats.prompt_tokens = static_cast<int32_t>(prompt_tokens.size() - reusable);
+        stats.cached_tokens = static_cast<int32_t>(reusable);
         cached_ = prompt_tokens;
         n_past_ = static_cast<int32_t>(prompt_tokens.size());
         cached_covers_context_ = true;

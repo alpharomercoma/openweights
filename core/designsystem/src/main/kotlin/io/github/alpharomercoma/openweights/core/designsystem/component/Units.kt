@@ -41,3 +41,26 @@ fun formatBytes(bytes: Long): String {
 
 private const val BYTES_PER_MIB = 1024.0 * 1024.0
 private const val BYTES_PER_GIB = BYTES_PER_MIB * 1024.0
+
+/**
+ * How this app writes a token count in a status line: `847`, `12.4k`, `1.2M`.
+ *
+ * Decimal, not binary, unlike [formatBytes]: a token count is a count of things, not a size
+ * of memory, and "12.4k tokens" is the unit everyone already reads model context windows in
+ * ("128k context") rather than a binary kibi that would read as a typo beside it. One decimal
+ * place above a thousand, none below: a phone conversation's token counts spend most of
+ * their time in the hundreds to low thousands, where a bare integer is exact and a fraction
+ * would be manufactured precision.
+ */
+fun formatTokenCount(count: Int): String {
+    val locale = Locale.getDefault()
+    val magnitude = kotlin.math.abs(count)
+    return when {
+        magnitude < THOUSAND -> count.toString()
+        magnitude < MILLION -> String.format(locale, "%.1fk", count / THOUSAND.toDouble())
+        else -> String.format(locale, "%.1fM", count / MILLION.toDouble())
+    }
+}
+
+private const val THOUSAND = 1_000
+private const val MILLION = 1_000_000

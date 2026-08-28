@@ -29,6 +29,8 @@ struct SessionListView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @State private var isModelPickerPresented = false
     @State private var path = NavigationPath()
+    @State private var renamingSession: ChatSession?
+    @State private var renameText = ""
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -43,6 +45,28 @@ struct SessionListView: View {
                             Text("\((session.modelPath as NSString).lastPathComponent) · \(dateFormatter.localizedString(for: session.updatedAt, relativeTo: Date()))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            renameText = session.title
+                            renamingSession = session
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
+                    .contextMenu {
+                        Button {
+                            renameText = session.title
+                            renamingSession = session
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            sessionStore.delete(session)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
                         }
                     }
                 }
@@ -70,6 +94,22 @@ struct SessionListView: View {
                 let session = ChatSession(title: "New chat", modelPath: model.path)
                 sessionStore.save(session)
                 path.append(session.id)
+            }
+        }
+        .alert("Rename chat", isPresented: Binding(
+            get: { renamingSession != nil },
+            set: { if !$0 { renamingSession = nil } }
+        )) {
+            TextField("Title", text: $renameText)
+            Button("Cancel", role: .cancel) { renamingSession = nil }
+            Button("Save") {
+                guard var session = renamingSession else { return }
+                let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    session.title = trimmed
+                    sessionStore.save(session)
+                }
+                renamingSession = nil
             }
         }
     }

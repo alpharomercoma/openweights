@@ -168,7 +168,7 @@ struct ChatView: View {
         prompt = ""
 
         current.turns.append(PersistedTurn(role: "user", text: text))
-        if current.turns.count == 1 {
+        if current.turns.count == 1 && current.title == "New chat" {
             current.title = String(text.prefix(40))
         }
         session = current

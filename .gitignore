@@ -26,3 +26,9 @@ keystore.properties
 .playwright-mcp/
 build-mnn-host/
 build-mnn-host-cl/
+
+# CMake's own build directories under the Apple engine target, which the disposable
+# build-ios-sim.sh script (and later, real ones) create beside the CMakeLists.txt they
+# build from -- source only is committed, the same as every other CMake build directory in
+# this project is kept out.
+core/engine/src/main/cpp/apple/build-*/

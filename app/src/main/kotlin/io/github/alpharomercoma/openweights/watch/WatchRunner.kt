@@ -151,11 +151,17 @@ class WatchRunner @Inject constructor(
             "android.resource://${appContext.packageName}/raw/watch_alert",
         )
         manager.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL, "Watch results", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply {
-                    description = "One notification per watch, when a check actually runs."
-                    setSound(sound, AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
-                },
+            NotificationChannel(
+                ALERT_CHANNEL,
+                "Watch results",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = "One notification per watch, when a check actually runs."
+                val attributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build()
+                setSound(sound, attributes)
+            },
         )
     }
 

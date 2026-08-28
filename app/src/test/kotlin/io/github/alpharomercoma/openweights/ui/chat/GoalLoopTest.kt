@@ -542,7 +542,11 @@ class GoalLoopTest : ChatFixture() {
                 val failedCall = ScriptedPass(
                     text = "",
                     toolCalls = listOf(
-                        ToolCall(id = "a", name = "web_search", argumentsJson = """{"query":"x"}"""),
+                        ToolCall(
+                            id = "a",
+                            name = "web_search",
+                            argumentsJson = """{"query":"x"}""",
+                        ),
                     ),
                 )
                 ChatFixture.StubTool.fails = true

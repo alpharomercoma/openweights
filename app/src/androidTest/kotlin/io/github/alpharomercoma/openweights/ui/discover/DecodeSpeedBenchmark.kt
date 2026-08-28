@@ -111,7 +111,9 @@ class DecodeSpeedBenchmark {
             val line = "OWBenchmark $label bytes=${model.length()} reps=${stats.size} " +
                 "decodeTps=${decode.map { "%.2f".format(it) }} " +
                 "decodeMedian=%.2f decodeMin=%.2f decodeMax=%.2f ".format(
-                    decodeMedian, decode.first(), decode.last(),
+                    decodeMedian,
+                    decode.first(),
+                    decode.last(),
                 ) +
                 "prefillTps=${prefill.map { "%.2f".format(it) }} " +
                 "prefillMedian=%.2f promptTokens=${stats.first().promptTokens}".format(
@@ -149,11 +151,10 @@ class DecodeSpeedBenchmark {
         }
     }
 
-    private suspend fun runOnce(engine: InferenceEngine) =
-        engine.chat(
-            messages = listOf(ChatMessage.text(ChatRole.USER, BENCHMARK_PROMPT)),
-            params = SamplerParams(temperature = 0f, maxTokens = TOKEN_BUDGET, seed = 7),
-        ).toList().filterIsInstance<GenerationEvent.Completed>().last().stats
+    private suspend fun runOnce(engine: InferenceEngine) = engine.chat(
+        messages = listOf(ChatMessage.text(ChatRole.USER, BENCHMARK_PROMPT)),
+        params = SamplerParams(temperature = 0f, maxTokens = TOKEN_BUDGET, seed = 7),
+    ).toList().filterIsInstance<GenerationEvent.Completed>().last().stats
 
     private companion object {
         const val TAG = "OWBenchmark"

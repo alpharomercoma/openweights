@@ -1277,8 +1277,12 @@ private fun Measurements(entry: TranscriptEntry) {
             // the actual shape of a turn -- the prompt is read start to finish before the
             // first generated token exists. Labelled alternatives (PP/TG, in/out) were tried;
             // this is the one that was asked for after seeing them.
+            // Wrapped in a first-strong isolate (FSI/PDI) so an RTL layout cannot reorder
+            // the two numbers around the arrow: digits are bidirectionally weak and the
+            // arrow is neutral, so unisolated, an Arabic screen rendered decode→prefill —
+            // the same characters, read as the phases happening backwards.
             text = if (prefill != null) {
-                String.format(locale, "%.0f→%.0f tok/s", prefill, speed)
+                "\u2068" + String.format(locale, "%.0f→%.0f tok/s", prefill, speed) + "\u2069"
             } else {
                 String.format(locale, "%.1f tok/s", speed)
             },

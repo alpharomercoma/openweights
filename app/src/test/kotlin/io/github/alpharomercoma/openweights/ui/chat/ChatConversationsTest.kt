@@ -244,7 +244,11 @@ class ChatConversationsTest : ChatFixture() {
             engine.scripted += ScriptedPass(
                 text = "Looking.",
                 toolCalls = listOf(
-                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"alpha"}"""),
+                    ToolCall(
+                        id = "1",
+                        name = "web_search",
+                        argumentsJson = """{"query":"alpha"}""",
+                    ),
                 ),
             )
             engine.scripted += ScriptedPass("Found alpha.")
@@ -264,7 +268,11 @@ class ChatConversationsTest : ChatFixture() {
             engine.scripted += ScriptedPass(
                 text = "Looking again.",
                 toolCalls = listOf(
-                    ToolCall(id = "3", name = "web_search", argumentsJson = """{"query":"alpha"}"""),
+                    ToolCall(
+                        id = "3",
+                        name = "web_search",
+                        argumentsJson = """{"query":"alpha"}""",
+                    ),
                 ),
             )
             engine.scripted += ScriptedPass("Found alpha again.")
@@ -750,6 +758,36 @@ class ChatConversationsTest : ChatFixture() {
         assertThat(viewModel.uiState.value.transcript.count { it.role == ChatRole.ASSISTANT })
             .isEqualTo(1)
     }
+
+    @Test
+    fun `a discarded reply's tool results do not keep grounding the conversation`() =
+        runTest(dispatcher) {
+            // Regenerate deletes the reply and its stored steps, and the live notes have to
+            // lose them too: left in place, a result the user threw away kept riding in
+            // every later prompt — and then vanished on the next reopen, when the rebuild
+            // read a storage that had never kept it. The live conversation and the reopened
+            // one told two different stories about what had been looked up.
+            engine.supportsTools = true
+            loadModel()
+            engine.scripted += ScriptedPass(
+                text = "Looking.",
+                toolCalls = listOf(
+                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            viewModel.send("Who is Ada Lovelace?")
+            settle(steps = FOLD_SETTLE_STEPS)
+            assertThat(viewModel.uiState.value.toolNotes.render()).contains("Ada Lovelace")
+
+            // The second attempt answers from memory: no call, no steps, nothing to note.
+            engine.scripted += ScriptedPass("She was a mathematician.")
+            viewModel.regenerate()
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            assertThat(viewModel.uiState.value.toolNotes.render().orEmpty())
+                .doesNotContain("Ada Lovelace")
+        }
 
     @Test
     fun `a stopped reply keeps its place when the next question follows immediately`() =

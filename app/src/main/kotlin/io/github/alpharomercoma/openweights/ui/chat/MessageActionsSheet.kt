@@ -53,7 +53,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
-import java.util.Locale
 
 /**
  * Actions for one message, opened by long-pressing it.
@@ -225,24 +224,23 @@ private fun Context.copyToClipboard(text: String) {
  *
  * Null while a reply is still arriving, because half a measurement is worse than none.
  */
+@Composable
 private fun TranscriptEntry.detail(): String? {
-    if (tokensPerSecond == null) return null
-    val locale = Locale.getDefault()
+    val decode = tokensPerSecond ?: return null
     return listOfNotNull(
         // Labelled now that there are two: unlabelled, "142.0 tok/s · 36.1 tok/s" reads as
         // the same measurement said twice rather than the two different phases it is. Prefill
-        // first because it happens first — reading a prompt, then writing a reply.
-        prefillTokensPerSecond?.let { String.format(locale, "%.1f tok/s prefill", it) },
-        String.format(locale, "%.1f tok/s decode", tokensPerSecond),
+        // first because it happens first — reading a prompt, then writing a reply. Resources
+        // rather than literals: this line shipped hard-coded English into four translated
+        // locales for as long as it existed, and adding two more labels to it was the wrong
+        // moment to keep the habit.
+        prefillTokensPerSecond?.let { stringResource(R.string.detail_prefill_speed, it) },
+        stringResource(R.string.detail_decode_speed, decode),
         timeToFirstTokenMs?.let {
-            String.format(
-                locale,
-                "%.1fs to first token",
-                it / MILLIS_PER_SECOND,
-            )
+            stringResource(R.string.detail_first_token, it / MILLIS_PER_SECOND)
         },
-        generatedTokens?.let { "$it tokens" },
-        totalMillis?.let { String.format(locale, "%.1fs in total", it / MILLIS_PER_SECOND) },
+        generatedTokens?.let { stringResource(R.string.detail_token_count, it) },
+        totalMillis?.let { stringResource(R.string.detail_total_time, it / MILLIS_PER_SECOND) },
     ).joinToString(" · ")
 }
 

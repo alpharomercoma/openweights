@@ -285,7 +285,15 @@ class TurnRunner @Inject constructor(
         // it with either, which is every plain single-turn chat and the first tool call of
         // any conversation. Gating on both is what keeps this paid for by the turns it fixes
         // rather than charged to every turn there is.
-        val groundingQuestion = question.takeIf { withTools && notes.notes.isNotEmpty() }
+        //
+        // Long questions are out too, on both sides of the ledger. The block repeats the
+        // question verbatim, so a pasted page would be prefilled twice — unbudgeted, since
+        // everything that sized this prompt did so before the block existed — and it buys
+        // nothing: the conflation this fixes is a short question drowned out by the notes
+        // above it, and a question this long *is* the tail of the prompt already.
+        val groundingQuestion = question.takeIf {
+            withTools && notes.notes.isNotEmpty() && question.length <= GROUNDING_MAX_CHARS
+        }
 
         return Turn(
             active,
@@ -732,9 +740,20 @@ private fun List<ChatMessage>.pinning(plan: TaskPlan?): List<ChatMessage> {
     val block = plan?.statusBlock().orEmpty()
     if (block.isEmpty()) return this
     val last = lastOrNull() ?: return this
-    return dropLast(1) +
-        ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
+    return dropLast(1) + last.withTrailer(block)
 }
+
+/**
+ * The same message with [block] appended after everything it already carries.
+ *
+ * Appended as one more part rather than rebuilt from [ChatMessage.text], which is how both
+ * tail blocks used to be attached: that constructor keeps only the text, so a message that
+ * also carried an attachment reached the engine without it — send an image with tools on in
+ * a conversation that already had tool notes, and the model answered as though no image had
+ * ever been attached.
+ */
+private fun ChatMessage.withTrailer(block: String): ChatMessage =
+    copy(parts = parts + MessagePart.Text("\n\n$block"))
 
 /**
  * The conversation with this turn's actual question restated at the tail of the last message.
@@ -775,8 +794,7 @@ private fun List<ChatMessage>.grounding(question: String?): List<ChatMessage> {
         "Answer that question. If an earlier turn's tool notes or results are not about it, " +
         "they are not evidence for it: treat it as its own subject rather than continuing " +
         "or summarising whatever came right before it."
-    return dropLast(1) +
-        ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
+    return dropLast(1) + last.withTrailer(block)
 }
 
 /**
@@ -807,6 +825,16 @@ private fun String.invitesRepair(tools: ToolRegistry): Boolean {
  * complete answers that mentioned a tool in passing.
  */
 private const val ANNOUNCEMENT_CHARS = 160
+
+/**
+ * The longest question worth restating at the tail of the prompt.
+ *
+ * Roughly a hundred tokens. Every reproduction of the conflation [grounding] fixes was a
+ * one-line question mistaken for the previous turn's subject; nothing anywhere near this
+ * long has ever needed it, and past it the restatement's cost stops being "a few dozen
+ * tokens" and becomes a second copy of whatever was pasted.
+ */
+private const val GROUNDING_MAX_CHARS = 400
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
 private fun AgentDecision.steps(): List<AgentStep> = when (this) {

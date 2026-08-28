@@ -216,4 +216,18 @@ class FetchUrlToolTest {
     fun `an ordinary page is not refused as a walled garden`() {
         assertThat(walledGardenRefusal("https://example.com/article".toHttpUrl())).isNull()
     }
+
+    @Test
+    fun `a walled garden's public documentation subdomain is read, not refused`() {
+        // The blog and API docs are served whole to a logged-out request; refusing them
+        // claimed a sign-in wall on pages that have none. The profile subdomains stay
+        // refused — that is the test above this section, on ph.linkedin.com.
+        assertThat(
+            walledGardenRefusal("https://engineering.linkedin.com/blog/topic".toHttpUrl()),
+        ).isNull()
+        assertThat(
+            walledGardenRefusal("https://developers.facebook.com/docs/graph-api".toHttpUrl()),
+        ).isNull()
+        assertThat(walledGardenRefusal("https://about.instagram.com/blog".toHttpUrl())).isNull()
+    }
 }

@@ -484,6 +484,7 @@ internal fun refuseAddress(url: HttpUrl): String? {
  */
 internal fun walledGardenRefusal(url: HttpUrl): String? {
     val host = url.host.removePrefix("www.")
+    if (host in PUBLIC_GARDEN_HOSTS) return null
     if (WALLED_GARDENS.none { host == it || host.endsWith(".$it") }) return null
     return "${url.host} requires signing in to show anything beyond its own login page, so " +
         "this could not be read. Answer from a search result instead, or say the page needs " +
@@ -499,6 +500,21 @@ private val WALLED_GARDENS = setOf(
     "linkedin.com",
     "facebook.com",
     "instagram.com",
+)
+
+/**
+ * The corners of those sites that are genuinely public: documentation and blogs served whole
+ * to a logged-out request, on subdomains that never host the gated content. Named one by one
+ * rather than by pattern, because the pattern is the problem — profiles live on arbitrary
+ * country subdomains (`ph.linkedin.com/in/...` is the exact page this refusal was written
+ * for), so "subdomains are fine" is wrong and "subdomains are walled" was refusing an API
+ * reference that would have read perfectly well. A host in neither list falls through to the
+ * refusal, which fails honest: the model says the page needs an account instead of reading it.
+ */
+private val PUBLIC_GARDEN_HOSTS = setOf(
+    "engineering.linkedin.com",
+    "developers.facebook.com",
+    "about.instagram.com",
 )
 
 /**

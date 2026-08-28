@@ -191,7 +191,7 @@ class DiscoverCalibrationTest {
     }
 
     @Test
-    fun `a cross-device prediction using the other device's own calibration is looser, not tighter`() {
+    fun `a cross-device prediction using the other device's calibration is looser, not tighter`() {
         val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
         val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 70.55, 2519))
 
@@ -368,7 +368,7 @@ class DiscoverCalibrationTest {
      * reading on this device.
      */
     @Test
-    fun `an unoptimized architecture can miss the file-size formula even harder than a low-bit quantization`() {
+    fun `an unoptimized architecture can miss the file-size formula harder than a low-bit quant`() {
         val installed = mapOf("LFM2.5-1.2B-Instruct-QAD-Q4_0" to fakeFile(695_755_488L))
         val decodeSpeeds = listOf(ModelDecodeSpeed("LFM2.5-1.2B-Instruct-QAD-Q4_0", 36.14, 2519))
 

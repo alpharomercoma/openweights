@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -227,6 +228,53 @@ class TurnRunnerTest {
         )
 
         run(withTools = false, notes = priorNotes, question = "who is arjhine ty?")
+
+        assertThat(engine.prompts.single().last().text).doesNotContain("This turn's question")
+    }
+
+    @Test
+    fun `an attachment on the question survives the grounding block`() = runBlocking<Unit> {
+        // The block used to be attached by rebuilding the last message from its text alone,
+        // so an image sent with tools on, in a conversation that already had notes, reached
+        // the engine as words with no image behind them — and the model described a picture
+        // it was never shown.
+        engine.scripted += ScriptedPass("An answer about the image.")
+        val priorNotes = ToolNotes(
+            listOf(ToolNote(call = "web_search(someone else)", result = "Someone else...")),
+        )
+        val questionWithImage = ChatMessage(
+            role = ChatRole.USER,
+            parts = listOf(
+                MessagePart.File(path = "/photos/receipt.jpg", mediaType = "image/jpeg"),
+                MessagePart.Text("what does this receipt say?"),
+            ),
+        )
+
+        run(
+            withTools = true,
+            conversation = listOf(questionWithImage),
+            notes = priorNotes,
+            question = "what does this receipt say?",
+        )
+
+        val sent = engine.prompts.single().last()
+        assertThat(sent.text).contains("This turn's question")
+        assertThat(sent.files.single().path).isEqualTo("/photos/receipt.jpg")
+    }
+
+    @Test
+    fun `a pasted page of a question is not restated at the tail`() = runBlocking<Unit> {
+        // The block repeats the question verbatim, and nothing that sized the prompt knows
+        // it exists: a pasted page restated whole is that page prefilled twice. It also
+        // buys nothing at that length — the conflation grounding fixes is a short question
+        // drowned out by the notes above it, and a page-long question is its own tail.
+        engine.scripted += ScriptedPass("An answer.")
+        val priorNotes = ToolNotes(
+            listOf(ToolNote(call = "web_search(someone else)", result = "Someone else...")),
+        )
+        val pasted = "why does this happen? ".repeat(40).trim()
+
+        run(withTools = true, notes = priorNotes, question = pasted)
 
         assertThat(engine.prompts.single().last().text).doesNotContain("This turn's question")
     }

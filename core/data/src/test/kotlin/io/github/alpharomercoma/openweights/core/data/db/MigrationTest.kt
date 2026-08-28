@@ -170,7 +170,7 @@ class MigrationTest {
     }
 
     @Test
-    fun `a usage row from before decode time was split out keeps its totals and reads as unmeasured`() {
+    fun `a usage row from before decode time was split out keeps its totals, reads unmeasured`() {
         // decodeMs did not exist at version seven, so every row already on a device is
         // exactly this shape: a real inferenceMs total with nothing to say about how much
         // of it was decode. The calibration query is what has to treat that as "no
@@ -197,7 +197,7 @@ class MigrationTest {
     }
 
     @Test
-    fun `a usage row from before prefill time was split out keeps its totals and reads as unmeasured`() {
+    fun `a usage row from before prefill time was split out keeps its totals, reads unmeasured`() {
         // Same shape as decodeMs one version earlier, checked separately because it is a
         // different migration touching a table that by version eight already has decodeMs
         // and decodeTokens on it — this is the one that has to add prefillMs and
@@ -294,7 +294,7 @@ class MigrationTest {
     }
 
     @Test
-    fun `a reply from before prefill speed was split out keeps its decode speed and reads unmeasured`() {
+    fun `a reply from before prefill speed was split out keeps decode speed, reads unmeasured`() {
         // Same shape as the decodeMs migration two versions earlier: the number this adds
         // did not exist on a row written before it, and there is nothing in an old row to
         // derive it from, so it has to read as "not measured" rather than a wrong number.

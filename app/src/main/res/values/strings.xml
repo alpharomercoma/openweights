@@ -227,6 +227,11 @@
     <string name="delete_conversation_named">Delete %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="generated_at_speed_with_prefill">Prompt read at %1$d tokens per second, generated at %2$d tokens per second</string>
+    <string name="detail_prefill_speed">%1$.1f tok/s prefill</string>
+    <string name="detail_decode_speed">%1$.1f tok/s decode</string>
+    <string name="detail_first_token">%1$.1fs to first token</string>
+    <string name="detail_token_count">%1$d tokens</string>
+    <string name="detail_total_time">%1$.1fs in total</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>
     <string name="leave_mode">Leave %1$s mode</string>
     <string name="show_more_answer">Show the rest</string>

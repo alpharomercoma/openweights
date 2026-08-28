@@ -926,6 +926,24 @@ class ChatViewModel @Inject constructor(
     fun stageDocument(uri: Uri?) = attachments.stageDocument(uri)
 
     /**
+     * The grounding record a stored conversation adds up to, folded once per message.
+     *
+     * The one way [ToolNotes.withSteps] is safe to replay: per message, in storage order,
+     * which is the sequence a live conversation produced it in. Both places that rebuild the
+     * record — reopening a chat, and regenerating a reply whose steps were just deleted —
+     * go through here so they cannot drift apart again: regenerate used to leave the
+     * discarded turn's results in the live notes while storage had already lost them, and
+     * the two versions of the conversation disagreed until the next reopen.
+     */
+    private fun restoredToolNotes(
+        messages: List<MessageEntity>,
+        stepsByMessage: Map<Long, List<ToolStepEntity>>,
+    ): ToolNotes = messages.fold(ToolNotes()) { notes, message ->
+        val steps = stepsByMessage[message.id].orEmpty().map { it.toAgentStep() }
+        if (steps.isEmpty()) notes else notes.withSteps(steps, turns::toolNamed)
+    }
+
+    /**
      * Discards the last model reply and asks again.
      *
      * The engine reuses the cached prompt prefix, so a regeneration costs only new tokens.
@@ -964,6 +982,10 @@ class ChatViewModel @Inject constructor(
                         val firstDiscarded =
                             stored.indexOfLast { it.role != ChatRole.ASSISTANT.wireName } + 1
                         stored.getOrNull(firstDiscarded)?.let { deleteFrom(id, it.id) }
+                        // What the notes are now that the discarded replies' steps are gone.
+                        // Read back after the delete, so the cascade has already taken the
+                        // dead steps with it and the fold sees only what survived.
+                        restoredToolNotes(stored.take(firstDiscarded), toolSteps(id))
                     }
                 }
             }
@@ -974,6 +996,13 @@ class ChatViewModel @Inject constructor(
                 Log.w("OpenWeights", "a reply could not be discarded", discarded.exceptionOrNull())
                 _uiState.update { it.copy(isGenerating = false, error = STORAGE_FAILED) }
                 return@launch
+            }
+            // The notes the discarded reply's tool calls added are discarded with it, before
+            // the new attempt runs: left in place, a result the user threw away kept
+            // grounding every prompt after it — and then silently vanished on the next
+            // reopen, when the rebuild read a storage that had never kept it.
+            discarded.getOrNull()?.let { notes ->
+                _uiState.update { it.copy(toolNotes = notes) }
             }
             generate()
         }
@@ -2064,10 +2093,7 @@ class ChatViewModel @Inject constructor(
         // current tool registry rather than stored, so a tool a build no longer ships answers
         // null here and the note reads as neither rather than the reopen failing over a
         // conversation from an older version.
-        val restoredNotes = messages.fold(ToolNotes()) { notes, message ->
-            val steps = stepsByMessage[message.id].orEmpty().map { it.toAgentStep() }
-            if (steps.isEmpty()) notes else notes.withSteps(steps, turns::toolNamed)
-        }
+        val restoredNotes = restoredToolNotes(messages, stepsByMessage)
 
         _uiState.update { state ->
             val reopened = state.copy(

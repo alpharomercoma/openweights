@@ -125,7 +125,8 @@ class UsageRepository @Inject constructor(
      * Real, measured, prompt-processing-only throughput per model on this device, the
      * prefill mirror of [decodeSpeedByModel]. See [UsageDao.prefillSpeedByModel].
      */
-    suspend fun prefillSpeedByModel(): List<ModelPrefillSpeed> = database.usage().prefillSpeedByModel()
+    suspend fun prefillSpeedByModel(): List<ModelPrefillSpeed> =
+        database.usage().prefillSpeedByModel()
 
     internal fun List<UsageEntity>.toSummary(conversationCount: Int) = UsageSummary(
         lifetimePromptTokens = sumOf { it.promptTokens },

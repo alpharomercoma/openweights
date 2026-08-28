@@ -185,6 +185,11 @@
     <string name="delete_conversation_named">%1$s を削除</string>
     <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
     <string name="generated_at_speed_with_prefill">プロンプトを毎秒 %1$d トークンで読み込み、毎秒 %2$d トークンで生成</string>
+    <string name="detail_prefill_speed">読み込み %1$.1f tok/s</string>
+    <string name="detail_decode_speed">生成 %1$.1f tok/s</string>
+    <string name="detail_first_token">最初のトークンまで %1$.1f 秒</string>
+    <string name="detail_token_count">%1$d トークン</string>
+    <string name="detail_total_time">合計 %1$.1f 秒</string>
     <string name="choose_a_model_spoken">モデルを選ぶ。%1$s</string>
     <string name="leave_mode">%1$sモードを終了</string>
     <string name="show_more_answer">残りを表示</string>

@@ -189,6 +189,11 @@
     <string name="delete_conversation_named">Tanggalin ang %1$s</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
     <string name="generated_at_speed_with_prefill">Nabasa ang prompt sa %1$d na token kada segundo, ginawa sa %2$d na token kada segundo</string>
+    <string name="detail_prefill_speed">%1$.1f tok/s sa pagbasa ng prompt</string>
+    <string name="detail_decode_speed">%1$.1f tok/s sa paggawa</string>
+    <string name="detail_first_token">%1$.1fs hanggang sa unang token</string>
+    <string name="detail_token_count">%1$d na token</string>
+    <string name="detail_total_time">%1$.1fs sa kabuuan</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>
     <string name="leave_mode">Umalis sa %1$s mode</string>
     <string name="show_more_answer">Ipakita ang natitira</string>

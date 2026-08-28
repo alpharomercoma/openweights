@@ -1,0 +1,303 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		7DCAAE1B3BB94F11847BFF2F /* OpenWeightsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CD1E39AFA44A779793104B /* OpenWeightsApp.swift */; };
+		BECA198D65FE421C9C5B0DDD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B085557A253C4F2690A5E93D /* ContentView.swift */; };
+		157CE25B540A454EB678402A /* EngineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0D12D371AC43099ABFC3E7 /* EngineClient.swift */; };
+		101786A86EDD4569BA724AC0 /* libopenweights_engine_combined.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8EA8216754024A2EA1F7B388 /* libopenweights_engine_combined.a */; };
+		74D250F909924F2AAF460A3A /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D047CC65027A4949968D055D /* Metal.framework */; };
+		70956A3321A04B3395A98016 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A3C5F4FA99848CEB32F8C76 /* Accelerate.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		01D8608448784BA8A9585B17 /* OpenWeights.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenWeights.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		12CD1E39AFA44A779793104B /* OpenWeightsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenWeightsApp.swift; sourceTree = "<group>"; };
+		B085557A253C4F2690A5E93D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		ED0D12D371AC43099ABFC3E7 /* EngineClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineClient.swift; sourceTree = "<group>"; };
+		948326D8136F4C9F85D34569 /* OpenWeights-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenWeights-Bridging-Header.h"; sourceTree = "<group>"; };
+		8EA8216754024A2EA1F7B388 /* libopenweights_engine_combined.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libopenweights_engine_combined.a; path = "../../core/engine/src/main/cpp/apple/build-ios-sim/libopenweights_engine_combined.a"; sourceTree = "<group>"; };
+		D047CC65027A4949968D055D /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		0A3C5F4FA99848CEB32F8C76 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		9D1C0CCE36F64691905EB5F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				101786A86EDD4569BA724AC0 /* libopenweights_engine_combined.a in Frameworks */,
+				74D250F909924F2AAF460A3A /* Metal.framework in Frameworks */,
+				70956A3321A04B3395A98016 /* Accelerate.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		6E78AD8A596E4274A2E3BA73 = {
+			isa = PBXGroup;
+			children = (
+				24DE70DE04704854803E465E /* OpenWeights */,
+				B57B3BAB4527416B80DFB8CB /* Products */,
+				70E0DA04F2E148CBBE0DC25A /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		B57B3BAB4527416B80DFB8CB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				01D8608448784BA8A9585B17 /* OpenWeights.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		24DE70DE04704854803E465E /* OpenWeights */ = {
+			isa = PBXGroup;
+			children = (
+				12CD1E39AFA44A779793104B /* OpenWeightsApp.swift */,
+				B085557A253C4F2690A5E93D /* ContentView.swift */,
+				ED0D12D371AC43099ABFC3E7 /* EngineClient.swift */,
+				948326D8136F4C9F85D34569 /* OpenWeights-Bridging-Header.h */,
+			);
+			path = OpenWeights;
+			sourceTree = "<group>";
+		};
+		70E0DA04F2E148CBBE0DC25A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8EA8216754024A2EA1F7B388 /* libopenweights_engine_combined.a */,
+				D047CC65027A4949968D055D /* Metal.framework */,
+				0A3C5F4FA99848CEB32F8C76 /* Accelerate.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3C402CEF84DF4D7B8FB45A47 /* OpenWeights */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2D30275F895A498EB2F6AE04 /* Build configuration list for PBXNativeTarget "OpenWeights" */;
+			buildPhases = (
+				E905ACBEF85D4C509049ADAA /* Sources */,
+				9D1C0CCE36F64691905EB5F3 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenWeights;
+			packageProductDependencies = (
+			);
+			productName = OpenWeights;
+			productReference = 01D8608448784BA8A9585B17 /* OpenWeights.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		54D13EF2A5C14E9AABFB4DA3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					3C402CEF84DF4D7B8FB45A47 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 3A20856B0E9B46BBB8CC9679 /* Build configuration list for PBXProject "OpenWeights" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 6E78AD8A596E4274A2E3BA73;
+			packageReferences = (
+			);
+			productRefGroup = B57B3BAB4527416B80DFB8CB /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3C402CEF84DF4D7B8FB45A47 /* OpenWeights */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		E905ACBEF85D4C509049ADAA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7DCAAE1B3BB94F11847BFF2F /* OpenWeightsApp.swift in Sources */,
+				BECA198D65FE421C9C5B0DDD /* ContentView.swift in Sources */,
+				157CE25B540A454EB678402A /* EngineClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4F522F08D9D4452B916A1BB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		2FC96A11D1CD456F9F6CA752 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4E6843DE63CF4CE4A37388CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../core/engine/src/main/cpp/apple",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../core/engine/src/main/cpp/apple/build-ios-sim",
+				);
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.alpharomercoma.openweights.ios";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "OpenWeights/OpenWeights-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		75D44F7FAE724EAD919155C7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../core/engine/src/main/cpp/apple",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../../core/engine/src/main/cpp/apple/build-ios-sim",
+				);
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.alpharomercoma.openweights.ios";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "OpenWeights/OpenWeights-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3A20856B0E9B46BBB8CC9679 /* Build configuration list for PBXProject "OpenWeights" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F522F08D9D4452B916A1BB6 /* Debug */,
+				2FC96A11D1CD456F9F6CA752 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2D30275F895A498EB2F6AE04 /* Build configuration list for PBXNativeTarget "OpenWeights" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E6843DE63CF4CE4A37388CF /* Debug */,
+				75D44F7FAE724EAD919155C7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 54D13EF2A5C14E9AABFB4DA3 /* Project object */;
+}

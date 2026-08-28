@@ -27,9 +27,30 @@ NSError * makeError(NSInteger code, const std::string & message) {
 }
 }  // namespace
 
+@interface OWGenerationStats ()
+- (instancetype)initWithStats:(const openweights::GenerationStats &)stats;
+@end
+
+@implementation OWGenerationStats
+
+- (instancetype)initWithStats:(const openweights::GenerationStats &)stats {
+    self = [super init];
+    if (self == nil) return nil;
+    _promptTokens = stats.prompt_tokens;
+    _cachedTokens = stats.cached_tokens;
+    _generatedTokens = stats.generated_tokens;
+    _prefillMillis = stats.prefill_ms;
+    _decodeMillis = stats.decode_ms;
+    return self;
+}
+
+@end
+
 @implementation OWEngineSession {
     openweights::Session * _session;
 }
+
+@synthesize lastStats = _lastStats;
 
 - (nullable instancetype)initWithModelPath:(NSString *)modelPath
                                 contextSize:(int32_t)contextSize
@@ -93,6 +114,8 @@ NSError * makeError(NSInteger code, const std::string & message) {
         stats,
         reply,
         generateError);
+
+    _lastStats = [[OWGenerationStats alloc] initWithStats:stats];
 
     if (reason == openweights::StopReason::ERROR) {
         if (error != nil) *error = makeError(2, generateError);

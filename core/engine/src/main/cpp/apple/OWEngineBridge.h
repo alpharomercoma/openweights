@@ -19,6 +19,20 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /**
+ * The subset of `openweights::GenerationStats` a chat screen needs to render
+ * `↑input ↓output · CHn%` -- see `Telemetry.kt`'s `ContextMeter` on Android for the metric
+ * this mirrors. Not a 1:1 struct mirror: `context_used`/`context_size`/`time_to_first_token_ms`
+ * aren't wired to any UI yet, so they stay out until something reads them.
+ */
+@interface OWGenerationStats : NSObject
+@property (nonatomic, readonly) int32_t promptTokens;
+@property (nonatomic, readonly) int32_t cachedTokens;
+@property (nonatomic, readonly) int32_t generatedTokens;
+@property (nonatomic, readonly) int64_t prefillMillis;
+@property (nonatomic, readonly) int64_t decodeMillis;
+@end
+
+/**
  * The narrow boundary between Swift and `openweights::Session`.
  *
  * Deliberately not a 1:1 mirror of `Session`'s C++ API: no `std::vector`, `std::string` or
@@ -51,6 +65,9 @@ NS_ASSUME_NONNULL_BEGIN
                                  maxTokens:(int32_t)maxTokens
                                    onToken:(void (^)(NSString * piece))onToken
                                      error:(NSError * _Nullable * _Nullable)error;
+
+/** Stats for the most recently completed `generateWithPrompt:...` call, or nil before one runs. */
+@property (nonatomic, readonly, nullable) OWGenerationStats * lastStats;
 
 /** Drops the KV cache. See `Session::reset`. */
 - (void)reset;

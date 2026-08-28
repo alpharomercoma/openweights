@@ -27,5 +27,18 @@ cmake -B build-ios-sim -G Xcode \
 
 cmake --build build-ios-sim --config Release -j "${JOBS}" -- -quiet
 
+# One archive, not twelve. CMake's own static-library linking only resolves transitively
+# within one Xcode project; an app project consuming this one would otherwise need to
+# enumerate llama, ggml, ggml-cpu, ggml-metal, ggml-blas, ggml-base, llama-common,
+# llama-common-base, mtmd, cpp-httplib and vendor-hash by hand and keep that list in step
+# with whatever llama.cpp links next. `libtool -static` merges them once, here, into the
+# one archive an app target actually links against.
+rm -f build-ios-sim/libopenweights_engine_combined.a
+archives=()
+while IFS= read -r -d '' archive; do
+    archives+=("${archive}")
+done < <(find build-ios-sim -name "*.a" -print0)
+libtool -static -o build-ios-sim/libopenweights_engine_combined.a "${archives[@]}"
+
 echo "openweights_engine built for iOS Simulator (arm64):"
-find build-ios-sim -name "libopenweights_engine.a"
+echo "  build-ios-sim/libopenweights_engine_combined.a"

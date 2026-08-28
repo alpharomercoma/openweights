@@ -83,22 +83,31 @@ final class EngineClient: ObservableObject {
         }
     }
 
-    /// Streams one turn's reply piece by piece. Cancelling the returned stream's task calls
-    /// `OWEngineSession.cancel`, same as pulling the stop button mid-generation on Android.
-    func generate(prompt: String, maxTokens: Int32 = 512) -> AsyncThrowingStream<String, Error> {
+    /// Streams one turn's reply piece by piece over the *full* conversation so far --
+    /// `Session::generate` re-renders the whole transcript every call and relies on its own
+    /// prefix match against the KV cache to skip re-decoding what it already has, so passing
+    /// only the newest message here would silently drop everything before it. Cancelling the
+    /// returned stream's task calls `OWEngineSession.cancel`, same as pulling the stop button
+    /// mid-generation on Android.
+    func generate(history: [PersistedTurn], sampler: SamplerSettings) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream<String, Error>(bufferingPolicy: .unbounded) { continuation in
             guard let session else {
                 continuation.finish(throwing: EngineError.notLoaded)
                 return
             }
 
+            let messages = history.map { OWChatMessage(role: $0.role, content: $0.text) }
+
             isGenerating = true
             let task = Task.detached(priority: .userInitiated) { [weak self] in
                 var thrown: Error?
                 do {
                     _ = try session.generate(
-                        withPrompt: prompt,
-                        maxTokens: maxTokens,
+                        with: messages,
+                        temperature: Float(sampler.temperature),
+                        topP: Float(sampler.topP),
+                        topK: Int32(sampler.topK),
+                        maxTokens: Int32(sampler.maxTokens),
                         onToken: { piece in
                             continuation.yield(piece)
                         }

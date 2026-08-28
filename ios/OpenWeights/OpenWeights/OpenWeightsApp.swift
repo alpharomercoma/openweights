@@ -18,9 +18,15 @@ import SwiftUI
 
 @main
 struct OpenWeightsApp: App {
+    @StateObject private var sessionStore = SessionStore()
+    @StateObject private var modelLibrary = ModelLibrary()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SessionListView()
+                .environmentObject(sessionStore)
+                .environmentObject(modelLibrary)
+                .task { await AutomatedSmokeTest.runIfConfigured() }
         }
     }
 }

@@ -27,6 +27,18 @@ NSError * makeError(NSInteger code, const std::string & message) {
 }
 }  // namespace
 
+@implementation OWChatMessage
+
+- (instancetype)initWithRole:(NSString *)role content:(NSString *)content {
+    self = [super init];
+    if (self == nil) return nil;
+    _role = [role copy];
+    _content = [content copy];
+    return self;
+}
+
+@end
+
 @interface OWGenerationStats ()
 - (instancetype)initWithStats:(const openweights::GenerationStats &)stats;
 @end
@@ -83,17 +95,26 @@ NSError * makeError(NSInteger code, const std::string & message) {
     delete _session;
 }
 
-- (nullable NSString *)generateWithPrompt:(NSString *)prompt
-                                 maxTokens:(int32_t)maxTokens
-                                   onToken:(void (^)(NSString * piece))onToken
-                                     error:(NSError **)error {
-    std::vector<openweights::ChatMessage> messages;
-    openweights::ChatMessage message;
-    message.role = "user";
-    message.content = std::string([prompt UTF8String]);
-    messages.push_back(message);
+- (nullable NSString *)generateWithMessages:(NSArray<OWChatMessage *> *)messages
+                                 temperature:(float)temperature
+                                        topP:(float)topP
+                                        topK:(int32_t)topK
+                                   maxTokens:(int32_t)maxTokens
+                                     onToken:(void (^)(NSString * piece))onToken
+                                       error:(NSError **)error {
+    std::vector<openweights::ChatMessage> cppMessages;
+    cppMessages.reserve(messages.count);
+    for (OWChatMessage * message in messages) {
+        openweights::ChatMessage cppMessage;
+        cppMessage.role = std::string([message.role UTF8String]);
+        cppMessage.content = std::string([message.content UTF8String]);
+        cppMessages.push_back(cppMessage);
+    }
 
     openweights::SamplerConfig sampler;
+    sampler.temperature = temperature;
+    sampler.top_p = topP;
+    sampler.top_k = topK;
     sampler.max_tokens = maxTokens;
     openweights::ReasoningConfig reasoning;
     reasoning.enabled = false;
@@ -103,7 +124,7 @@ NSError * makeError(NSInteger code, const std::string & message) {
     std::string generateError;
 
     const auto reason = _session->generate(
-        messages,
+        cppMessages,
         {},
         sampler,
         reasoning,

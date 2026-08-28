@@ -17,12 +17,14 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
+import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
@@ -304,6 +306,43 @@ class ChatViewModelTest : ChatFixture() {
         // usage tab is about work done rather than about replies kept.
         val usage = database.usage().observeAll().first().single()
         assertThat(usage.generatedTokens).isEqualTo(FAKE_TOKENS_PER_PASS * PASSES)
+    }
+
+    @Test
+    fun `thinking is forced on whenever tools are offered, whatever the switch says`() =
+        runTest(dispatcher) {
+            // The bug this guards: asked a trivial question with tools on and thinking off,
+            // LFM2.5-1.2B answered correctly but opened with an apology about lacking a
+            // tool for it — a routing decision ("no tool fits, just answer") is itself a
+            // small reasoning step, and skipping it left the model unable to make that
+            // decision cleanly. See ToolRefusalTest for the on-device reproduction.
+            engine.supportsTools = true
+            loadModel()
+            viewModel.savePreferences(viewModel.uiState.value.preferences.copy(thinking = false))
+            settle()
+
+            viewModel.send("Name three planets.")
+            settle()
+
+            assertThat(engine.paramsUsed.last().thinking).isTrue()
+        }
+
+    @Test
+    fun `thinking follows the switch when no tool is offered at all`() = runTest(dispatcher) {
+        // The fix is scoped to when tools are actually visible to the model, not a blanket
+        // override: a person who turned thinking off for an ordinary chat should still get
+        // that choice once every tool switch is off.
+        engine.supportsTools = true
+        loadModel()
+        ToolSwitches(ApplicationProvider.getApplicationContext())
+            .setEnabled(StubTool.definition.name, false)
+        viewModel.savePreferences(viewModel.uiState.value.preferences.copy(thinking = false))
+        settle()
+
+        viewModel.send("Name three planets.")
+        settle()
+
+        assertThat(engine.paramsUsed.last().thinking).isFalse()
     }
 
     @Test

@@ -1318,7 +1318,9 @@ class ChatViewModel @Inject constructor(
                 val offerAsk = offerAskOverride.also { offerAskOverride = null }
                 produced = turns.run(
                     conversation = conversation,
-                    params = state.preferences.toSamplerParams(),
+                    params = state.preferences.toSamplerParams().let {
+                        if (state.toolsAvailable) it.copy(thinking = true) else it
+                    },
                     mode = _uiState.value.mode,
                     // Offering a tool to a template that cannot render one wastes the
                     // context it takes up and leaves the model describing what it would
@@ -2286,7 +2288,11 @@ class ChatViewModel @Inject constructor(
      * Stop cancels the job this is called from, and a reply the user watched being written
      * is exactly what they expect to still be there.
      */
-    private suspend fun persistReply(text: String, stats: GenerationStats?, totalMillis: Long? = null) {
+    private suspend fun persistReply(
+        text: String,
+        stats: GenerationStats?,
+        totalMillis: Long? = null,
+    ) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
         withContext(NonCancellable) {
@@ -3003,7 +3009,11 @@ internal fun ChatUiState.sessionTokens(): SessionTokens? {
 }
 
 /** See [ChatUiState.sessionTokens]. */
-internal data class SessionTokens(val inputTokens: Int, val outputTokens: Int, val cacheHitRate: Double)
+internal data class SessionTokens(
+    val inputTokens: Int,
+    val outputTokens: Int,
+    val cacheHitRate: Double,
+)
 
 /**
  * A transcript entry as the engine sees it.

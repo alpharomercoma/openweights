@@ -124,6 +124,9 @@ class FakeInferenceEngine : InferenceEngine {
      */
     val offered = mutableListOf<List<ToolDefinition>>()
 
+    /** The sampler settings each call actually ran with, in order. */
+    val paramsUsed = mutableListOf<SamplerParams>()
+
     /**
      * Replies to hand back, one per call, before falling back to a plain answer.
      *
@@ -199,6 +202,7 @@ class FakeInferenceEngine : InferenceEngine {
     ): Flow<GenerationEvent> {
         prompts += messages
         offered += tools
+        paramsUsed += params
         if (failChat) return flow { throw LlamaException("the turn did not finish") }
         if (!hold) {
             val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)

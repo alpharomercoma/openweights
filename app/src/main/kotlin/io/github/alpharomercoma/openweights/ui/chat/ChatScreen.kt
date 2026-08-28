@@ -545,7 +545,7 @@ private fun ChatContent(
                         leading = {
                             ThinkingControl(
                                 supportsEffort = state.supportsReasoningEffort,
-                                supportsThinking = state.supportsThinking,
+                                supportsThinking = state.supportsThinking && !state.toolsAvailable,
                                 effort = ReasoningEffort.fromName(
                                     state.preferences.reasoningEffort,
                                 ),

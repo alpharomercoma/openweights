@@ -88,12 +88,18 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
      *
      * A stopped reply has no numbers, since they only arrive with a completion, and it is
      * written without them rather than with invented ones.
+     *
+     * @param totalMillis wall clock from send to finished. Not part of [stats]: the engine
+     *   only ever measures its own prefill and decode time, and the gap between them — a
+     *   tool call, the user's own thinking about whether to keep reading — is real elapsed
+     *   time nothing else would otherwise account for. Null exactly when [stats] is.
      */
     suspend fun reply(
         conversationId: Long,
         text: String,
         stats: GenerationStats?,
         reasoningMs: Long?,
+        totalMillis: Long? = null,
     ) = inOrder {
         addMessage(
             conversationId = conversationId,
@@ -103,6 +109,9 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
             timeToFirstTokenMs = stats?.timeToFirstTokenMs,
             generatedTokens = stats?.generatedTokens,
             reasoningMs = reasoningMs,
+            totalMillis = totalMillis,
+            promptTokens = stats?.totalPromptTokens,
+            cachedTokens = stats?.cachedTokens,
         )
     }
 

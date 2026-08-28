@@ -114,6 +114,16 @@ data class MessageEntity(
      * never queried across conversations, so a join would buy nothing.
      */
     val attachments: String? = null,
+    /**
+     * Wall clock from send to finished, kept here for the same reason [tokensPerSecond] is:
+     * it belongs to this specific reply, and a reopened conversation used to lose it, since
+     * nothing on this row remembered it. Null on a stopped reply, same as the other numbers.
+     */
+    val totalMillis: Long? = null,
+    /** This turn's prompt, cached and fresh tokens together. See [GenerationStats.totalPromptTokens]. */
+    val promptTokens: Int? = null,
+    /** How much of [promptTokens] the KV cache answered for free. See [GenerationStats.cachedTokens]. */
+    val cachedTokens: Int? = null,
 )
 
 /**

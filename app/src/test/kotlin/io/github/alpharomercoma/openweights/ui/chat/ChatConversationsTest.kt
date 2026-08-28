@@ -160,6 +160,33 @@ class ChatConversationsTest : ChatFixture() {
     }
 
     @Test
+    fun `a reopened conversation still shows how long its replies took and what they cached`() =
+        runTest(dispatcher) {
+            // Every other measurement on a reply survived a reopen already; these two lived
+            // only on the in-memory transcript entry, so leaving the chat and coming back —
+            // or the process dying and restarting — silently dropped the seconds-elapsed
+            // reading and the session's ↑ ↓ CH line back to nothing, with no error to say so.
+            loadModel()
+            viewModel.send("Something worth a few tokens of context")
+            settle()
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            val beforeReopen = viewModel.uiState.value.transcript.last()
+            assertThat(beforeReopen.totalMillis).isNotNull()
+            assertThat(beforeReopen.promptTokens).isNotNull()
+
+            viewModel.newChat()
+            settle()
+            viewModel.openConversation(id)
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            val afterReopen = viewModel.uiState.value.transcript.last()
+            assertThat(afterReopen.totalMillis).isEqualTo(beforeReopen.totalMillis)
+            assertThat(afterReopen.promptTokens).isEqualTo(beforeReopen.promptTokens)
+            assertThat(afterReopen.cachedTokens).isEqualTo(beforeReopen.cachedTokens)
+            assertThat(viewModel.uiState.value.sessionTokens()).isNotNull()
+        }
+
+    @Test
     fun `reopening a conversation shows its transcript before context reset finishes`() =
         runTest(dispatcher) {
             // resetContext shares the engine's single-threaded dispatcher with load, so a

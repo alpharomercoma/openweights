@@ -1243,6 +1243,12 @@ class ChatViewModel @Inject constructor(
             var lastFrameAt = 0L
             var reasoningEndedAt: Long? = null
             var produced = ""
+            // Set once, at the one place a completed turn is persisted, and read again by
+            // settleTurn below rather than recomputed: two separate System.currentTimeMillis()
+            // calls a few suspension points apart do not agree to the millisecond, and the
+            // live transcript entry disagreeing with the row just written under it read as a
+            // reopened conversation losing track of its own number.
+            var settledMillis: Long? = null
 
             // What the turn will write down, replaced by each pass that completes, so what
             // survives is the pass the turn ended on rather than the one that asked for a
@@ -1337,7 +1343,10 @@ class ChatViewModel @Inject constructor(
                 // is resent as an empty assistant turn, which some templates refuse.
                 settled
                     ?.takeIf { (text, _) -> text.isNotBlank() }
-                    ?.let { (text, stats) -> persistReply(text, stats) }
+                    ?.let { (text, stats) ->
+                        settledMillis = System.currentTimeMillis() - turnStartedAt
+                        persistReply(text, stats, settledMillis)
+                    }
             } catch (cancellation: CancellationException) {
                 // Stop was pressed. What arrived before it is real output the user watched
                 // being written, so it is kept and stored like any other reply.
@@ -1358,7 +1367,7 @@ class ChatViewModel @Inject constructor(
                 isDecoding = false
             }
 
-            settleTurn(produced, turnStartedAt)
+            settleTurn(produced, turnStartedAt, settledMillis)
         }
         generationJob = job
         job.invokeOnCompletion(::releaseTurn)
@@ -1371,7 +1380,7 @@ class ChatViewModel @Inject constructor(
      * in an error, and because the last act of a turn is the easiest thing to lose sight of
      * at the bottom of a long one.
      */
-    private suspend fun settleTurn(raw: String, turnStartedAt: Long) {
+    private suspend fun settleTurn(raw: String, turnStartedAt: Long, settledMillis: Long?) {
         // A stream that ends without a completion event, which happens if the engine's
         // channel closes under it, would otherwise leave the entry streaming forever.
         if (_uiState.value.transcript.lastOrNull()?.isStreaming == true) {
@@ -1379,7 +1388,12 @@ class ChatViewModel @Inject constructor(
         }
 
         _uiState.update { it.droppingEmptyReply() ?: it }
-        updateLastEntry { it.copy(totalMillis = System.currentTimeMillis() - turnStartedAt) }
+        // The same value just persisted, when there is one, rather than a second reading of
+        // the clock: a completed turn's row and its live entry must agree to the millisecond,
+        // or a reopened conversation shows a different number than the one it just showed.
+        updateLastEntry {
+            it.copy(totalMillis = settledMillis ?: (System.currentTimeMillis() - turnStartedAt))
+        }
         // Re-read rather than leave the last reading standing: a phone that has cooled
         // between replies should stop claiming it is hot.
         _uiState.update {
@@ -2272,11 +2286,11 @@ class ChatViewModel @Inject constructor(
      * Stop cancels the job this is called from, and a reply the user watched being written
      * is exactly what they expect to still be there.
      */
-    private suspend fun persistReply(text: String, stats: GenerationStats?) {
+    private suspend fun persistReply(text: String, stats: GenerationStats?, totalMillis: Long? = null) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
         withContext(NonCancellable) {
-            reportingFailure { writer.reply(id, text, stats, reasoningMs) }
+            reportingFailure { writer.reply(id, text, stats, reasoningMs, totalMillis) }
         }
     }
 
@@ -2920,6 +2934,9 @@ private fun List<MessageEntity>.toTranscript(foldedThrough: Int?): List<Transcri
             generatedTokens = message.generatedTokens,
             reasoningMs = message.reasoningMs,
             attachments = message.attachments.decodeAttachments(),
+            totalMillis = message.totalMillis,
+            promptTokens = message.promptTokens,
+            cachedTokens = message.cachedTokens,
             compactionNote = COMPACTION_NOTE.takeIf {
                 foldedThrough != null &&
                     index == foldedThrough + 1

@@ -59,6 +59,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_6_7,
         OpenWeightsDatabase.MIGRATION_7_8,
         OpenWeightsDatabase.MIGRATION_8_9,
+        OpenWeightsDatabase.MIGRATION_9_10,
     )
 
     @Test
@@ -219,6 +220,39 @@ class MigrationTest {
                 .isEqualTo(0)
         }
     }
+
+    @Test
+    fun `a reply from before this ran keeps its other numbers and reports no elapsed time`() {
+        // Unlike the usage-ledger columns above, these three are genuinely optional even on
+        // a current install — a stopped reply has none of them either — so the migration
+        // leaves them NULL rather than zeroing them. A zero here would read as "answered
+        // instantly" and "used no cache at all", both false claims about a reply this
+        // column simply did not exist yet to measure.
+        helper.createDatabase(9).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+            db.execSQL(
+                "INSERT INTO messages " +
+                    "(id, conversationId, role, text, createdAt, tokensPerSecond, " +
+                    "generatedTokens) " +
+                    "VALUES (1, 1, 'assistant', 'Ada Lovelace wrote the first algorithm.', " +
+                    "30, 24.3, 128)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(10, migrations.toList()).use { db ->
+            assertThat(db.doubleAt("SELECT tokensPerSecond FROM messages WHERE id = 1"))
+                .isEqualTo(24.3)
+            assertThat(db.intAt("SELECT generatedTokens FROM messages WHERE id = 1"))
+                .isEqualTo(128)
+            assertThat(db.isNullAt("SELECT totalMillis FROM messages WHERE id = 1")).isTrue()
+            assertThat(db.isNullAt("SELECT promptTokens FROM messages WHERE id = 1")).isTrue()
+            assertThat(db.isNullAt("SELECT cachedTokens FROM messages WHERE id = 1")).isTrue()
+        }
+    }
 }
 
 private fun SQLiteConnection.textAt(sql: String): String = prepare(sql).use { statement ->
@@ -229,4 +263,14 @@ private fun SQLiteConnection.textAt(sql: String): String = prepare(sql).use { st
 private fun SQLiteConnection.intAt(sql: String): Int = prepare(sql).use { statement ->
     check(statement.step()) { "no row for: $sql" }
     statement.getInt(0)
+}
+
+private fun SQLiteConnection.doubleAt(sql: String): Double = prepare(sql).use { statement ->
+    check(statement.step()) { "no row for: $sql" }
+    statement.getDouble(0)
+}
+
+private fun SQLiteConnection.isNullAt(sql: String): Boolean = prepare(sql).use { statement ->
+    check(statement.step()) { "no row for: $sql" }
+    statement.isNull(0)
 }

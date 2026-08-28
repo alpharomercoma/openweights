@@ -32,7 +32,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchEntity::class,
         WatchRunEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -45,6 +45,25 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "openweights.db"
+
+        /**
+         * Adds the per-reply numbers that were being computed and then thrown away: total
+         * wall clock, and how much of the prompt the KV cache answered for free.
+         *
+         * Every other measurement on a reply — tok/s, time to first token, tokens generated —
+         * lived on the row from the start; these two were kept only on the in-memory
+         * transcript entry, so leaving a conversation and coming back to it, or the process
+         * dying and restarting, silently dropped the seconds-elapsed reading and the
+         * session's `↑ ↓ CH` line back to nothing. Nulled on a stopped reply and every row
+         * that predates this column, same as the rest of this row's numbers.
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN totalMillis INTEGER")
+                db.execSQL("ALTER TABLE messages ADD COLUMN promptTokens INTEGER")
+                db.execSQL("ALTER TABLE messages ADD COLUMN cachedTokens INTEGER")
+            }
+        }
 
         /**
          * Adds prompt-processing-only time to the usage ledger, the prefill mirror of

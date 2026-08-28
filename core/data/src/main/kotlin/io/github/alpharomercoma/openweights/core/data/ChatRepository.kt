@@ -61,6 +61,7 @@ class ChatRepository @Inject constructor(
         )
     }
 
+    @Suppress("LongParameterList")
     suspend fun addMessage(
         conversationId: Long,
         role: String,
@@ -70,6 +71,9 @@ class ChatRepository @Inject constructor(
         generatedTokens: Int? = null,
         reasoningMs: Long? = null,
         attachments: List<MessagePart.File> = emptyList(),
+        totalMillis: Long? = null,
+        promptTokens: Int? = null,
+        cachedTokens: Int? = null,
     ): Long {
         touch(conversationId)
         return database.messages().insert(
@@ -83,6 +87,9 @@ class ChatRepository @Inject constructor(
                 generatedTokens = generatedTokens,
                 reasoningMs = reasoningMs,
                 attachments = attachments.encodeAttachments(),
+                totalMillis = totalMillis,
+                promptTokens = promptTokens,
+                cachedTokens = cachedTokens,
             ),
         )
     }

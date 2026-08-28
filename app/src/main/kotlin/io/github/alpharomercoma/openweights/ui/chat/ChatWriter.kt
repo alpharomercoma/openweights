@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
+import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
@@ -100,18 +101,21 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
         stats: GenerationStats?,
         reasoningMs: Long?,
         totalMillis: Long? = null,
+        steps: List<ToolStepRecord> = emptyList(),
     ) = inOrder {
         addMessage(
             conversationId = conversationId,
             role = ChatRole.ASSISTANT.wireName,
             text = text,
             tokensPerSecond = stats?.decodeTokensPerSecond,
+            prefillTokensPerSecond = stats?.prefillTokensPerSecond,
             timeToFirstTokenMs = stats?.timeToFirstTokenMs,
             generatedTokens = stats?.generatedTokens,
             reasoningMs = reasoningMs,
             totalMillis = totalMillis,
             promptTokens = stats?.totalPromptTokens,
             cachedTokens = stats?.cachedTokens,
+            steps = steps,
         )
     }
 

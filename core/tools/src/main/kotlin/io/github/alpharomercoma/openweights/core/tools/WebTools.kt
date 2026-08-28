@@ -308,6 +308,7 @@ class FetchUrlTool @Inject constructor(
         var hops = 0
         while (true) {
             refuseAddress(next)?.let { return@withContext ToolExecution.failure(it) }
+            walledGardenRefusal(next)?.let { return@withContext ToolExecution.failure(it) }
 
             val request = Request.Builder()
                 .url(next)
@@ -460,6 +461,45 @@ internal fun refuseAddress(url: HttpUrl): String? {
     }
     return null
 }
+
+/**
+ * Why a page will not be fetched at all, or null when it is worth dialling.
+ *
+ * A device transcript found the failure mode this exists for: LinkedIn answers HTTP 200 with
+ * a genuine `<main>` landmark full of prose, so every check in [FetchUrlTool] waves it through,
+ * and what is inside is the same "sign in to see the full profile" prompt repeated once per
+ * gated section — About, Experience, contact info, connections. The model was handed
+ * a fluent, wrong biography from that prompt, because nothing said the words it read were a
+ * wall rather than a page. Distinguishing wall prose from article prose in general is not a
+ * problem this tool can solve reliably: a heuristic tried against the actual response that
+ * motivated this — repetition of the gating sentence — covered as little as 7% of the text,
+ * because the sentence that repeats verbatim is short and the paragraphs around it are not,
+ * so it is not a signal worth trusting site to site.
+ *
+ * What is reliable is that these specific sites are known, by name, to gate everything a
+ * public request could ask for behind a sign-in wall, every time, regardless of the page.
+ * Refusing before the request is also faster than the round trip that used to end in the same
+ * refusal, and honest: the model is told the page requires an account rather than being handed
+ * boilerplate that reads like an answer.
+ */
+internal fun walledGardenRefusal(url: HttpUrl): String? {
+    val host = url.host.removePrefix("www.")
+    if (WALLED_GARDENS.none { host == it || host.endsWith(".$it") }) return null
+    return "${url.host} requires signing in to show anything beyond its own login page, so " +
+        "this could not be read. Answer from a search result instead, or say the page needs " +
+        "an account rather than guessing its contents."
+}
+
+/**
+ * Sites confirmed to gate their public pages behind a sign-in prompt rather than showing
+ * anything a logged-out request asked for. Not a judgement about the site, only about whether
+ * fetching it as this tool does — one request, no session, no script — can ever succeed.
+ */
+private val WALLED_GARDENS = setOf(
+    "linkedin.com",
+    "facebook.com",
+    "instagram.com",
+)
 
 /**
  * Where a response says to look instead, or null when it is not sending us anywhere.

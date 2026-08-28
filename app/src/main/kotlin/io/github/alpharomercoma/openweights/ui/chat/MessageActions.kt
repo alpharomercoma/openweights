@@ -31,7 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,8 +53,11 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsT
  * every desktop client uses, has no mobile equivalent at all. The long-press sheet stays
  * for the rarer things.
  *
- * @param onRetry null when this is not the last reply, or while one is being generated
- *   regenerating anything other than the last turn would silently discard what came after.
+ * Retry used to be one of them, alongside copy and read aloud. It is not any more: it is the
+ * same action as "Regenerate reply" in the sheet [onMore] opens, so a reader who has that
+ * sheet open sees the choice once instead of twice, and the row here stays down to the two
+ * actions worth a permanent touch target -- copy and read aloud are done in one tap from
+ * anywhere; retry is rarer and, for most replies, not even offered.
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -63,7 +65,6 @@ fun MessageActions(
     isSpeaking: Boolean,
     onCopy: () -> Unit,
     onReadAloud: () -> Unit,
-    onRetry: (() -> Unit)?,
     /** Opens the sheet with the rarer actions, which the long press used to. */
     onMore: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -102,7 +103,6 @@ fun MessageActions(
                 description = if (isSpeaking) "Stop reading aloud" else "Read aloud",
                 onClick = onReadAloud,
             )
-            onRetry?.let { Action(Icons.Rounded.Refresh, "Try again", it) }
             onMore?.let { Action(Icons.Rounded.MoreHoriz, "More actions", it) }
         }
 
@@ -161,6 +161,6 @@ fun rememberMessageClipboard(): MessageClipboard {
 @Composable
 private fun MessageActionsPreview() {
     OpenWeightsTheme(dynamicColor = false) {
-        MessageActions(isSpeaking = false, onCopy = {}, onReadAloud = {}, onRetry = {})
+        MessageActions(isSpeaking = false, onCopy = {}, onReadAloud = {})
     }
 }

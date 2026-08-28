@@ -21,7 +21,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
+import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -184,6 +186,102 @@ class ChatConversationsTest : ChatFixture() {
             assertThat(afterReopen.promptTokens).isEqualTo(beforeReopen.promptTokens)
             assertThat(afterReopen.cachedTokens).isEqualTo(beforeReopen.cachedTokens)
             assertThat(viewModel.uiState.value.sessionTokens()).isNotNull()
+        }
+
+    @Test
+    fun `a reopened conversation still shows its tool call and remembers what it found`() =
+        runTest(dispatcher) {
+            // The one part of a reopen that used to come back empty on purpose: the chip
+            // under the reply, and the record TurnRunner's tail-pinned re-grounding depends
+            // on to stop a small model conflating this turn's subject with an earlier one.
+            // Both lived only in the in-memory turn and vanished the moment the chat was
+            // closed, so a follow-up in a reopened conversation asked a model with no memory
+            // of what it had just looked up -- the same shape of bug a fourth turn causes,
+            // just triggered by a chat switch instead.
+            engine.supportsTools = true
+            loadModel()
+            engine.scripted += ScriptedPass(
+                text = "Looking that up.",
+                toolCalls = listOf(
+                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            viewModel.send("Who is Ada Lovelace?")
+            settle(steps = FOLD_SETTLE_STEPS)
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+
+            viewModel.newChat()
+            settle()
+            viewModel.openConversation(id)
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            val reply = viewModel.uiState.value.transcript.last()
+            val steps = reply.blocks.filterIsInstance<TurnBlock.Step>().map { it.step }
+            assertThat(steps).hasSize(1)
+            val ran = steps.single() as AgentStep.Ran
+            assertThat(ran.call.name).isEqualTo("web_search")
+            assertThat(ran.result).contains("Ada Lovelace")
+
+            // And not only shown: usable. The next question should not have to ask again.
+            assertThat(viewModel.uiState.value.toolNotes.render()).contains("Ada Lovelace")
+        }
+
+    @Test
+    fun `a repeated call reopens as the newest note, not stuck where it first appeared`() =
+        runTest(dispatcher) {
+            // ToolNotes.withSteps is written to be called once per turn: a call repeated
+            // later replaces the old note and moves to the end, which is what the budget
+            // trim in ToolNotes reads as "the newest". Folding a reopened conversation's
+            // whole history through one withSteps call instead of one per message got the
+            // replacement right and the position wrong -- associateBy keeps a repeated key's
+            // *first* position, not its last -- so a call repeated three turns apart came
+            // back reading as the oldest fact in the record rather than the newest, which is
+            // exactly backwards from what the budget trim needs to keep the right one under
+            // pressure.
+            engine.supportsTools = true
+            loadModel()
+            engine.scripted += ScriptedPass(
+                text = "Looking.",
+                toolCalls = listOf(
+                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"alpha"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Found alpha.")
+            viewModel.send("Search alpha")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            engine.scripted += ScriptedPass(
+                text = "Looking.",
+                toolCalls = listOf(
+                    ToolCall(id = "2", name = "web_search", argumentsJson = """{"query":"beta"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Found beta.")
+            viewModel.send("Search beta")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            engine.scripted += ScriptedPass(
+                text = "Looking again.",
+                toolCalls = listOf(
+                    ToolCall(id = "3", name = "web_search", argumentsJson = """{"query":"alpha"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Found alpha again.")
+            viewModel.send("Search alpha again")
+            settle(steps = FOLD_SETTLE_STEPS)
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+
+            viewModel.newChat()
+            settle()
+            viewModel.openConversation(id)
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // beta was never repeated, so its only note is exactly as old as the turn that
+            // made it. alpha's second call is the newest thing in the whole record. The
+            // rendered order has to put beta before alpha for that to be true.
+            val rendered = requireNotNull(viewModel.uiState.value.toolNotes.render())
+            assertThat(rendered.indexOf("alpha")).isGreaterThan(rendered.indexOf("beta"))
         }
 
     @Test
@@ -519,9 +617,13 @@ class ChatConversationsTest : ChatFixture() {
 
         // The cache is gone, so the transcript is the only thing carrying the conversation
         // across. If it is not resent, the new model answers the last question blind.
+        //
+        // Substring rather than exact equality on the newest question: that message also
+        // carries the current turn's tail-pinned re-grounding text, appended past the
+        // question itself for the same reason the plan block is.
         val sent = engine.prompts.last().map { message -> message.text }
         assertThat(sent).contains("Carry me over")
-        assertThat(sent).contains("And this one")
+        assertThat(sent.any { it.contains("And this one") }).isTrue()
     }
 
     @Test

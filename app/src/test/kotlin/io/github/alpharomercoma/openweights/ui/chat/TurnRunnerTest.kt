@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
+import io.github.alpharomercoma.openweights.core.tools.ToolNote
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -134,6 +135,101 @@ class TurnRunnerTest {
             assertThat(search.calls).hasSize(1)
             assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(1)
         }
+
+    @Test
+    fun `a new question is restated at the tail, even beside notes from an earlier one`() =
+        runBlocking<Unit> {
+            // Reproduces the device transcript that motivated this: two "who is X" turns leave
+            // their tool notes riding in the question, a third name none of them mention is
+            // asked about, and the model should not be left to guess which one is current from
+            // position alone.
+            engine.scripted += ScriptedPass("Arjhine Ty is a developer.")
+            val staleNotes = ToolNotes(
+                listOf(
+                    ToolNote(call = "fetch_url(alpharomer.com)", result = "Alpha Romer Coma..."),
+                    ToolNote(call = "web_search(xynil jhed lacap)", result = "Xynil Jhed Lacap..."),
+                ),
+            )
+            // What ChatViewModel.withToolNotes actually builds: the notes ahead of the
+            // question, inside the one user message the engine sees.
+            val userTurn = "${staleNotes.render()}\n\nwho is arjhine ty?"
+
+            run(
+                withTools = true,
+                conversation = listOf(ChatMessage.text(ChatRole.USER, userTurn)),
+                notes = staleNotes,
+                question = "who is arjhine ty?",
+            )
+
+            val sent = engine.prompts.single().last()
+            // The restated question names the actual subject of this turn...
+            assertThat(sent.text).contains("This turn's question: \"who is arjhine ty?\"")
+            // ...and it is the last thing in the message, past the stale notes, which is the
+            // position the rest of this file's comments already establish a small model
+            // attends to best.
+            assertThat(sent.text.indexOf("This turn's question"))
+                .isGreaterThan(sent.text.indexOf("Alpha Romer Coma"))
+        }
+
+    @Test
+    fun `the restated question does not follow a tool round into the cache`() = runBlocking<Unit> {
+        // Tried and measured: restating it every pass, not only the first, moved the
+        // divergence point the cache is compared from back to right after the bare question,
+        // discarding the tool call and its results behind it -- the same class of regression
+        // `assistantHistoryText` is replayed rather than stripped to avoid. Round zero is
+        // where every reproduction of the conflation this exists for was actually decided, so
+        // it is the only round worth that cost.
+        engine.scripted += ScriptedPass(
+            "Looking.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"ty"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Here is the answer.")
+        // Grounding is gated on there being a note to conflate the question with; empty
+        // notes are the common case (a plain single-turn question) this test is not about.
+        val priorNotes = ToolNotes(
+            listOf(ToolNote(call = "web_search(someone else)", result = "Someone else...")),
+        )
+
+        run(withTools = true, notes = priorNotes, question = "who is arjhine ty?")
+
+        val firstPass = engine.prompts[0].last()
+        assertThat(firstPass.text).contains("This turn's question")
+
+        val secondPass = engine.prompts[1].last()
+        assertThat(secondPass.text).doesNotContain("This turn's question")
+    }
+
+    @Test
+    fun `a plain single-turn question pays nothing for grounding it does not need`() =
+        runBlocking<Unit> {
+            // The conflation this restates the question to fix needs a stale tool note to
+            // conflate it with. A first-ever question, or any turn with tools off, has none:
+            // adding the block there is prefill spent on every turn there is to fix a problem
+            // that can only happen on some of them.
+            engine.scripted += ScriptedPass("An answer.")
+
+            run(withTools = true, question = "who is arjhine ty?")
+
+            assertThat(engine.prompts.single().last().text).doesNotContain("This turn's question")
+        }
+
+    @Test
+    fun `grounding stays off when tools are off, even with notes left over`() = runBlocking<Unit> {
+        // Notes from an earlier tool-enabled turn can still be sitting in the conversation
+        // after tools are switched off mid-chat. With no tools offered this pass, nothing it
+        // decides can be confused with them the way a tool choice can, so there is nothing
+        // for the block to correct.
+        engine.scripted += ScriptedPass("An answer.")
+        val priorNotes = ToolNotes(
+            listOf(ToolNote(call = "web_search(someone else)", result = "Someone else...")),
+        )
+
+        run(withTools = false, notes = priorNotes, question = "who is arjhine ty?")
+
+        assertThat(engine.prompts.single().last().text).doesNotContain("This turn's question")
+    }
 
     @Test
     fun `a tool with nothing to work with is never described to the model`() = runBlocking<Unit> {
@@ -609,6 +705,11 @@ class TurnRunnerTest {
         withTools: Boolean,
         mode: AgentMode = AgentMode.AUTO,
         beside: List<Tool> = emptyList(),
+        conversation: List<ChatMessage> = listOf(
+            ChatMessage.text(ChatRole.USER, "Who is Ada Lovelace?"),
+        ),
+        notes: ToolNotes = ToolNotes(),
+        question: String = "",
     ): List<AgentStep> {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
         val runner = TurnRunner(
@@ -620,12 +721,13 @@ class TurnRunnerTest {
         )
         val steps = mutableListOf<AgentStep>()
         runner.run(
-            conversation = listOf(ChatMessage.text(ChatRole.USER, "Who is Ada Lovelace?")),
+            conversation = conversation,
             params = SamplerParams(),
             mode = mode,
             withTools = withTools,
-            notes = ToolNotes(),
+            notes = notes,
             listener = Collecting(steps),
+            question = question,
         )
         return steps
     }

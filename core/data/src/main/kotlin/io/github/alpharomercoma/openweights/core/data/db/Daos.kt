@@ -98,6 +98,22 @@ interface MessageDao {
 }
 
 @Dao
+interface ToolStepDao {
+    @Query(
+        """
+        SELECT tool_steps.* FROM tool_steps
+        JOIN messages ON messages.id = tool_steps.messageId
+        WHERE messages.conversationId = :conversationId
+        ORDER BY tool_steps.messageId, tool_steps.orderIndex
+        """,
+    )
+    suspend fun forConversation(conversationId: Long): List<ToolStepEntity>
+
+    @Insert
+    suspend fun insertAll(steps: List<ToolStepEntity>)
+}
+
+@Dao
 interface UsageDao {
     @Query("SELECT * FROM usage_ledger ORDER BY day DESC")
     fun observeAll(): Flow<List<UsageEntity>>

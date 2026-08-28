@@ -226,6 +226,7 @@
     <string name="unknown_command_suggestion">Did you mean %1$s?</string>
     <string name="delete_conversation_named">Delete %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
+    <string name="generated_at_speed_with_prefill">Prompt read at %1$d tokens per second, generated at %2$d tokens per second</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>
     <string name="leave_mode">Leave %1$s mode</string>
     <string name="show_more_answer">Show the rest</string>

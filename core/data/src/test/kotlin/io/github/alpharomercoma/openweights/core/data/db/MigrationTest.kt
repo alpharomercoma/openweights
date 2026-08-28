@@ -60,6 +60,8 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_7_8,
         OpenWeightsDatabase.MIGRATION_8_9,
         OpenWeightsDatabase.MIGRATION_9_10,
+        OpenWeightsDatabase.MIGRATION_10_11,
+        OpenWeightsDatabase.MIGRATION_11_12,
     )
 
     @Test
@@ -251,6 +253,70 @@ class MigrationTest {
             assertThat(db.isNullAt("SELECT totalMillis FROM messages WHERE id = 1")).isTrue()
             assertThat(db.isNullAt("SELECT promptTokens FROM messages WHERE id = 1")).isTrue()
             assertThat(db.isNullAt("SELECT cachedTokens FROM messages WHERE id = 1")).isTrue()
+        }
+    }
+
+    @Test
+    fun `the tool_steps table arrives empty and cascades on its message being deleted`() {
+        helper.createDatabase(10).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+            db.execSQL(
+                "INSERT INTO messages (id, conversationId, role, text, createdAt) " +
+                    "VALUES (1, 1, 'assistant', 'Ada Lovelace wrote the first algorithm.', 30)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(11, migrations.toList()).use { db ->
+            assertThat(db.intAt("SELECT count(*) FROM tool_steps")).isEqualTo(0)
+
+            db.execSQL(
+                "INSERT INTO tool_steps " +
+                    "(messageId, orderIndex, toolName, argumentsJson, result, successful, " +
+                    "millis) " +
+                    "VALUES (1, 0, 'web_search', '{\"query\":\"ada lovelace\"}', 'found it', " +
+                    "1, 500)",
+            )
+            assertThat(db.intAt("SELECT count(*) FROM tool_steps WHERE messageId = 1"))
+                .isEqualTo(1)
+
+            // Off by default on a bare connection; Room's own runtime turns it on for every
+            // database it opens, which is what actually makes the FOREIGN KEY clause above
+            // do anything. Set here so this test exercises the same cascade the app relies on
+            // rather than one SQLite would otherwise skip.
+            db.execSQL("PRAGMA foreign_keys = ON")
+            db.execSQL("DELETE FROM messages WHERE id = 1")
+            assertThat(db.intAt("SELECT count(*) FROM tool_steps")).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `a reply from before prefill speed was split out keeps its decode speed and reads unmeasured`() {
+        // Same shape as the decodeMs migration two versions earlier: the number this adds
+        // did not exist on a row written before it, and there is nothing in an old row to
+        // derive it from, so it has to read as "not measured" rather than a wrong number.
+        helper.createDatabase(11).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+            db.execSQL(
+                "INSERT INTO messages " +
+                    "(id, conversationId, role, text, createdAt, tokensPerSecond) " +
+                    "VALUES (1, 1, 'assistant', 'Ada Lovelace wrote the first algorithm.', " +
+                    "30, 24.3)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(12, migrations.toList()).use { db ->
+            assertThat(db.doubleAt("SELECT tokensPerSecond FROM messages WHERE id = 1"))
+                .isEqualTo(24.3)
+            assertThat(db.isNullAt("SELECT prefillTokensPerSecond FROM messages WHERE id = 1"))
+                .isTrue()
         }
     }
 }

@@ -185,4 +185,35 @@ class FetchUrlToolTest {
         assertThat(target.host).isEqualTo("example.com")
         assertThat(refuseAddress(target)).isNull()
     }
+
+    @Test
+    fun `a linkedin profile is refused before it is dialled`() = runTest {
+        // Reproduces a device transcript: LinkedIn answers HTTP 200 with a real page full of
+        // prose, and every other check here waves it through. What was inside was the same
+        // sign-in prompt repeated once per gated section, and the model wrote a fluent, wrong
+        // biography out of it. No request in this test's flow means no boilerplate to
+        // misread.
+        assertThat(fetch("https://ph.linkedin.com/in/someone")).contains("requires signing in")
+    }
+
+    @Test
+    fun `a subdomain of a walled garden is refused the same as the bare domain`() {
+        assertThat(walledGardenRefusal("https://www.linkedin.com/in/someone".toHttpUrl()))
+            .contains("requires signing in")
+        assertThat(walledGardenRefusal("https://m.facebook.com/someone".toHttpUrl()))
+            .contains("requires signing in")
+    }
+
+    @Test
+    fun `a host that only contains a walled garden's name is not refused`() {
+        // "notlinkedin.com" ends in "linkedin.com" as a string but is not the site, and
+        // "linkedin.com.evil.test" is the reverse trick. Neither is a subdomain of it.
+        assertThat(walledGardenRefusal("https://notlinkedin.com/".toHttpUrl())).isNull()
+        assertThat(walledGardenRefusal("https://linkedin.com.evil.test/".toHttpUrl())).isNull()
+    }
+
+    @Test
+    fun `an ordinary page is not refused as a walled garden`() {
+        assertThat(walledGardenRefusal("https://example.com/article".toHttpUrl())).isNull()
+    }
 }

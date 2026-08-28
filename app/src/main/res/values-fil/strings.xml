@@ -188,6 +188,7 @@
     <string name="unknown_command_suggestion">Ibig mo bang sabihin %1$s?</string>
     <string name="delete_conversation_named">Tanggalin ang %1$s</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
+    <string name="generated_at_speed_with_prefill">Nabasa ang prompt sa %1$d na token kada segundo, ginawa sa %2$d na token kada segundo</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>
     <string name="leave_mode">Umalis sa %1$s mode</string>
     <string name="show_more_answer">Ipakita ang natitira</string>

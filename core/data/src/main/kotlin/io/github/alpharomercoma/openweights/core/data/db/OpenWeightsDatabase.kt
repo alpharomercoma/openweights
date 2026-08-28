@@ -31,8 +31,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CompactionEntity::class,
         WatchEntity::class,
         WatchRunEntity::class,
+        ToolStepEntity::class,
     ],
-    version = 10,
+    version = 12,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -42,9 +43,62 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
+    abstract fun toolSteps(): ToolStepDao
 
     companion object {
         const val NAME = "openweights.db"
+
+        /**
+         * Adds prefill speed to the reply row alongside the decode speed [MIGRATION_9_10]
+         * already put there.
+         *
+         * The engine has measured both since before either was stored — [MessageEntity]
+         * simply never asked for the other one. A reply written before this migration has no
+         * way to answer it after the fact: prefill time was folded into [MessageEntity.totalMillis]
+         * along with everything else and cannot be pulled back out, so old rows read as
+         * "not measured" rather than a wrong number invented for them.
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN prefillTokensPerSecond REAL")
+            }
+        }
+
+        /**
+         * Adds the record of what a reply's tool calls found, so a reopened conversation
+         * remembers them instead of behaving as though none had ever run. See [ToolStepEntity].
+         *
+         * A new table rather than a column on `messages`: one reply can hold several calls,
+         * and cramming a variable-length list into one row is the JSON-in-a-column shape this
+         * database avoids everywhere else it has this same choice — [CompactionEntity] and
+         * [WatchRunEntity] both chose a child table over a blob for it. Nothing to backfill:
+         * a reply written before this migration never had its steps recorded anywhere, so
+         * there is nothing to construct rows from, and a conversation with turns on both
+         * sides of the upgrade shows chips only for the ones after it.
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS tool_steps (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        messageId INTEGER NOT NULL,
+                        orderIndex INTEGER NOT NULL,
+                        toolName TEXT NOT NULL,
+                        argumentsJson TEXT NOT NULL,
+                        result TEXT NOT NULL,
+                        successful INTEGER NOT NULL,
+                        millis INTEGER NOT NULL,
+                        FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_tool_steps_messageId " +
+                        "ON tool_steps(messageId)",
+                )
+            }
+        }
 
         /**
          * Adds the per-reply numbers that were being computed and then thrown away: total

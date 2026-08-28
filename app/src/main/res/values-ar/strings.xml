@@ -190,6 +190,7 @@
     <string name="unknown_command_suggestion">هل تقصد %1$s؟</string>
     <string name="delete_conversation_named">حذف %1$s</string>
     <string name="generated_at_speed">تم التوليد بسرعة %1$d رمز في الثانية</string>
+    <string name="generated_at_speed_with_prefill">تمت قراءة الطلب بسرعة %1$d رمز في الثانية، وتم التوليد بسرعة %2$d رمز في الثانية</string>
     <string name="choose_a_model_spoken">اختيار نموذج. %1$s</string>
     <string name="leave_mode">الخروج من وضع %1$s</string>
     <string name="show_more_answer">عرض الباقي</string>

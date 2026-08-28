@@ -152,8 +152,9 @@ class TurnRunner @Inject constructor(
         notes: ToolNotes,
         listener: TurnListener,
         offerAsk: Boolean? = null,
+        question: String = "",
     ): String = engineInUse.withLock {
-        turn(conversation, params, mode, withTools, notes, listener, offerAsk)
+        turn(conversation, params, mode, withTools, notes, listener, offerAsk, question)
     }
 
     /**
@@ -172,10 +173,11 @@ class TurnRunner @Inject constructor(
         notes: ToolNotes,
         listener: TurnListener,
         offerAsk: Boolean? = null,
+        question: String = "",
     ): String? {
         if (!engineInUse.tryLock()) return null
         return try {
-            turn(conversation, params, mode, withTools, notes, listener, offerAsk)
+            turn(conversation, params, mode, withTools, notes, listener, offerAsk, question)
         } finally {
             engineInUse.unlock()
         }
@@ -189,6 +191,7 @@ class TurnRunner @Inject constructor(
         notes: ToolNotes,
         listener: TurnListener,
         offerAsk: Boolean? = null,
+        question: String = "",
     ): String {
         // Read once per turn, not once per app start: a tool switched off mid-conversation
         // should be off for the next thing asked, and a registry captured at construction
@@ -274,8 +277,26 @@ class TurnRunner @Inject constructor(
         // `native` would have left the model it was written for still broken.
         val readsResults = engine.loadedModel?.supportsToolResults == true
 
-        return Turn(active, agent, maxRounds, withTools, native, readsResults, conversation)
-            .run(params, mode, listener)
+        // Costs a few dozen tokens of prefill on round zero, on every turn it applies to, so
+        // it only applies where the risk it was written for actually exists: a small model
+        // conflating this turn's subject with a *tool note* left over from an earlier one.
+        // Withdrawn tools mean nothing was ever going to be looked up and there is nothing to
+        // confuse the question with; no notes yet means there is nothing left over to confuse
+        // it with either, which is every plain single-turn chat and the first tool call of
+        // any conversation. Gating on both is what keeps this paid for by the turns it fixes
+        // rather than charged to every turn there is.
+        val groundingQuestion = question.takeIf { withTools && notes.notes.isNotEmpty() }
+
+        return Turn(
+            active,
+            agent,
+            maxRounds,
+            withTools,
+            native,
+            readsResults,
+            conversation,
+            groundingQuestion,
+        ).run(params, mode, listener)
     }
 
     /**
@@ -294,6 +315,7 @@ class TurnRunner @Inject constructor(
         private val native: Boolean,
         private val readsResults: Boolean,
         private val conversation: List<ChatMessage>,
+        private val question: String?,
     ) {
         /**
          * Whether the engine is handed the schemas, decided once for the whole turn.
@@ -341,9 +363,10 @@ class TurnRunner @Inject constructor(
                     withTools && round < maxRounds && ToolBudget(headroomTokens()).hasRoom
                 // Pinned for this pass only, never folded into the accumulator: the block
                 // changes as steps are ticked, and anything that changes has to sit at the
-                // very end or it moves tokens the cache has already read.
+                // very end or it moves tokens the cache has already read. See [grounding] for
+                // why it is round zero only, unlike this one.
                 val pass = streamOnce(
-                    messages.pinning(plans.plan.value),
+                    messages.pinning(plans.plan.value).grounding(question?.takeIf { round == 0 }),
                     params.deciding(mayCall),
                     active,
                     renderTools,
@@ -709,6 +732,49 @@ private fun List<ChatMessage>.pinning(plan: TaskPlan?): List<ChatMessage> {
     val block = plan?.statusBlock().orEmpty()
     if (block.isEmpty()) return this
     val last = lastOrNull() ?: return this
+    return dropLast(1) +
+        ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
+}
+
+/**
+ * The conversation with this turn's actual question restated at the tail of the last message.
+ *
+ * Everything the conversation carries by the middle of a turn -- tool notes from earlier
+ * questions, the results of this turn's own earlier rounds -- sits closer to the end of the
+ * prompt than the question itself did, which is the one place a small model attends best. That
+ * is fine when it is evidence for the question being answered and wrong when it is not: three
+ * "who is X" turns in a row left two prior people's calls and results in that position, and a
+ * fourth name none of them mentioned was answered from their shape instead of its own, on a
+ * device where this was measured directly. See [ToolNotes.render]'s trailer for the other half
+ * of this fix; that says the notes are not the question, this says what the question is.
+ *
+ * Round zero only, not every pass the way [pinning] is. A tool round's own results are the
+ * newest thing by the second pass and the same pull would apply to them, and it was tried:
+ * measured, it cost the very cache reuse the round trip exists to buy. [messages] never
+ * carries this text -- only the transient copy handed to one pass does -- so round one's tail
+ * is the question with the block on it, and round two's tail is a tool result message with
+ * no block on it in [messages] either. Attaching one there anyway restates the same words on
+ * a *different* message than round one sent, and the cache is compared from the front: the
+ * divergence lands right after the bare question, at the exact point round one's cache holds
+ * this block and round two's prompt does not, discarding the tool call and its results behind
+ * it. The turn's subject is decided in round zero or not at all -- every reproduction of the
+ * conflation this exists for was a wrong choice made there -- so that is the only round worth
+ * paying for.
+ *
+ * The caller also passes null rather than the question itself whenever there is no risk this
+ * fixes: no tools offered, or no tool notes yet for this turn's subject to be conflated with.
+ * A turn with neither has nothing in the position this block is meant to correct for, so the
+ * block is pure prefill cost with nothing to buy -- and it is paid on the most common turn
+ * there is, a plain single-turn question, if it is not gated. See `TurnRunner.turn`'s
+ * `groundingQuestion`.
+ */
+private fun List<ChatMessage>.grounding(question: String?): List<ChatMessage> {
+    if (question.isNullOrBlank()) return this
+    val last = lastOrNull() ?: return this
+    val block = "This turn's question: \"$question\"\n" +
+        "Answer that question. If an earlier turn's tool notes or results are not about it, " +
+        "they are not evidence for it: treat it as its own subject rather than continuing " +
+        "or summarising whatever came right before it."
     return dropLast(1) +
         ChatMessage.text(last.role, "${last.text}\n\n$block").copy(toolCallId = last.toolCallId)
 }

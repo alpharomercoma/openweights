@@ -229,7 +229,11 @@ private fun TranscriptEntry.detail(): String? {
     if (tokensPerSecond == null) return null
     val locale = Locale.getDefault()
     return listOfNotNull(
-        String.format(locale, "%.1f tok/s", tokensPerSecond),
+        // Labelled now that there are two: unlabelled, "142.0 tok/s · 36.1 tok/s" reads as
+        // the same measurement said twice rather than the two different phases it is. Prefill
+        // first because it happens first — reading a prompt, then writing a reply.
+        prefillTokensPerSecond?.let { String.format(locale, "%.1f tok/s prefill", it) },
+        String.format(locale, "%.1f tok/s decode", tokensPerSecond),
         timeToFirstTokenMs?.let {
             String.format(
                 locale,

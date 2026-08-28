@@ -47,7 +47,9 @@ import io.github.alpharomercoma.openweights.core.common.model.parseAssistantRepl
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
+import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
+import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
 import io.github.alpharomercoma.openweights.core.data.layersFor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
@@ -101,6 +103,8 @@ data class TranscriptEntry(
     val isReasoningInProgress: Boolean = false,
     val reasoningMs: Long? = null,
     val tokensPerSecond: Double? = null,
+    /** The prefill half of [tokensPerSecond]. See [MessageEntity.prefillTokensPerSecond]. */
+    val prefillTokensPerSecond: Double? = null,
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
     /**
@@ -151,7 +155,11 @@ data class TranscriptEntry(
  * moment the engine is called instead would take whatever this turn has already changed,
  * which is not the question the model is about to answer.
  */
-private data class OpenedTurn(val conversation: List<ChatMessage>, val state: ChatUiState)
+private data class OpenedTurn(
+    val conversation: List<ChatMessage>,
+    val state: ChatUiState,
+    val question: String,
+)
 
 /**
  * One rewrite of a question already asked, as a value rather than as a sequence of steps.
@@ -1233,6 +1241,12 @@ class ChatViewModel @Inject constructor(
             return null
         }
 
+        // Taken from the transcript rather than from `conversation`'s last message: that one
+        // has already had the tool notes folded into it by `withToolNotes`, and what a pass
+        // needs re-grounded on is the question the user actually asked, not the notes riding
+        // along beside it.
+        val question = state.transcript.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
+
         _uiState.update { current ->
             current.copy(
                 transcript = current.transcript +
@@ -1240,7 +1254,7 @@ class ChatViewModel @Inject constructor(
                 isGenerating = true,
             )
         }
-        return OpenedTurn(conversation = conversation, state = state)
+        return OpenedTurn(conversation = conversation, state = state, question = question)
     }
 
     private fun generate() {
@@ -1354,6 +1368,7 @@ class ChatViewModel @Inject constructor(
                     notes = state.toolNotes,
                     listener = listener,
                     offerAsk = offerAsk,
+                    question = opened.question,
                 )
                 // Here, so a turn that used a tool is written down once. Skipped by both
                 // catches below, where finishInterrupted writes what was produced instead.
@@ -2006,6 +2021,7 @@ class ChatViewModel @Inject constructor(
         // may not have been inserted yet, and reopening the same chat without it would show a
         // question with no answer and then resend it.
         val messages = writer.inOrder { messages(id) }
+        val stepsByMessage = writer.inOrder { toolSteps(id) }
         conversationId = id
         nextEntryId = messages.size.toLong()
         // The board is one object for the whole app, so a plan left in it is on screen in
@@ -2034,13 +2050,31 @@ class ChatViewModel @Inject constructor(
             currentModel != null &&
             conversation.modelName != currentModel
 
+        // Folded once per message rather than once over the whole history, because that is
+        // what withSteps is written to be called as: it replaces a repeated call with the
+        // newer one but does not move it, so a call repeated three messages apart landed back
+        // in its *first* message's position rather than its last when this folded the whole
+        // conversation in a single call. Order matters here because trimming reads it as
+        // recency -- the newest note is "whichever the list ends with" -- so that one bug
+        // could make a reopened conversation trim away the actually-newest fact under budget
+        // pressure while keeping a stale one in its place. Folding per message is exactly the
+        // sequence a live conversation already produces one [TurnRunner] pass at a time.
+        //
+        // Whether a note is private or carries a stranger's text is looked up from the
+        // current tool registry rather than stored, so a tool a build no longer ships answers
+        // null here and the note reads as neither rather than the reopen failing over a
+        // conversation from an older version.
+        val restoredNotes = messages.fold(ToolNotes()) { notes, message ->
+            val steps = stepsByMessage[message.id].orEmpty().map { it.toAgentStep() }
+            if (steps.isEmpty()) notes else notes.withSteps(steps, turns::toolNamed)
+        }
+
         _uiState.update { state ->
             val reopened = state.copy(
-                // Nothing restores this: the notes were never written down, so a chat opened
-                // from storage starts with none and behaves as it did before they existed.
-                toolNotes = ToolNotes(),
+                toolNotes = restoredNotes,
                 transcript = messages.toTranscript(
                     conversation.compactionSummary?.let { conversation.compactionThroughIndex },
+                    stepsByMessage,
                 ),
                 compaction = conversation.compactionSummary?.let {
                     Compaction(it, conversation.compactionThroughIndex, 0)
@@ -2194,6 +2228,7 @@ class ChatViewModel @Inject constructor(
                 isStreaming = false,
                 isReasoningInProgress = false,
                 tokensPerSecond = event.stats.decodeTokensPerSecond,
+                prefillTokensPerSecond = event.stats.prefillTokensPerSecond,
                 timeToFirstTokenMs = event.stats.timeToFirstTokenMs,
                 generatedTokens = event.stats.generatedTokens,
                 promptTokens = event.stats.totalPromptTokens,
@@ -2311,8 +2346,14 @@ class ChatViewModel @Inject constructor(
     ) {
         val id = conversationId ?: return
         val reasoningMs = _uiState.value.transcript.lastOrNull()?.reasoningMs
+        // Read here rather than passed in: every call site just finished the same turn
+        // `lastTurnSteps` was accumulated for, and threading it through would be the same
+        // value with three extra parameters to carry it.
+        val steps = lastTurnSteps.toRecords()
         withContext(NonCancellable) {
-            reportingFailure { writer.reply(id, text, stats, reasoningMs, totalMillis) }
+            reportingFailure {
+                writer.reply(id, text, stats, reasoningMs, totalMillis, steps)
+            }
         }
     }
 
@@ -2941,28 +2982,59 @@ private fun ChatUiState.droppingEmptyReply(): ChatUiState? {
  *
  * @param foldedThrough index of the last entry a fold covered, or null if there was none.
  */
-private fun List<MessageEntity>.toTranscript(foldedThrough: Int?): List<TranscriptEntry> =
-    mapIndexed { index, message ->
-        val parsed = parseAssistantReply(message.text)
-        TranscriptEntry(
-            id = index.toLong(),
-            role = ChatRole.entries.firstOrNull { it.wireName == message.role }
-                ?: ChatRole.ASSISTANT,
-            text = message.text,
-            reasoning = parsed.reasoning,
-            answer = parsed.answer,
-            tokensPerSecond = message.tokensPerSecond,
-            timeToFirstTokenMs = message.timeToFirstTokenMs,
-            generatedTokens = message.generatedTokens,
-            reasoningMs = message.reasoningMs,
-            attachments = message.attachments.decodeAttachments(),
-            totalMillis = message.totalMillis,
-            promptTokens = message.promptTokens,
-            cachedTokens = message.cachedTokens,
-            compactionNote = COMPACTION_NOTE.takeIf {
-                foldedThrough != null &&
-                    index == foldedThrough + 1
-            },
+private fun List<MessageEntity>.toTranscript(
+    foldedThrough: Int?,
+    stepsByMessage: Map<Long, List<ToolStepEntity>> = emptyMap(),
+): List<TranscriptEntry> = mapIndexed { index, message ->
+    val parsed = parseAssistantReply(message.text)
+    TranscriptEntry(
+        id = index.toLong(),
+        role = ChatRole.entries.firstOrNull { it.wireName == message.role }
+            ?: ChatRole.ASSISTANT,
+        text = message.text,
+        reasoning = parsed.reasoning,
+        answer = parsed.answer,
+        tokensPerSecond = message.tokensPerSecond,
+        prefillTokensPerSecond = message.prefillTokensPerSecond,
+        timeToFirstTokenMs = message.timeToFirstTokenMs,
+        generatedTokens = message.generatedTokens,
+        reasoningMs = message.reasoningMs,
+        attachments = message.attachments.decodeAttachments(),
+        totalMillis = message.totalMillis,
+        promptTokens = message.promptTokens,
+        cachedTokens = message.cachedTokens,
+        compactionNote = COMPACTION_NOTE.takeIf {
+            foldedThrough != null &&
+                index == foldedThrough + 1
+        },
+        blocks = stepsByMessage[message.id].orEmpty().map { TurnBlock.Step(it.toAgentStep()) },
+    )
+}
+
+/** A stored tool step, read back as the same shape a live turn produces. */
+private fun ToolStepEntity.toAgentStep(): AgentStep = AgentStep.Ran(
+    call = ToolCall(id = "", name = toolName, argumentsJson = argumentsJson),
+    result = result,
+    millis = millis,
+    successful = successful,
+)
+
+/**
+ * What a turn's steps are worth writing down, in the shape [ChatRepository.addMessage] wants.
+ *
+ * Only [AgentStep.Ran] survives. [AgentStep.Requested] never resolved to anything and
+ * [AgentStep.Skipped] taught the model nothing a future turn could use — [ToolNotes.withSteps]
+ * already discards both the same way, and a reopened conversation should not remember more
+ * about a turn than the turn itself was allowed to.
+ */
+private fun List<AgentStep>.toRecords(): List<ToolStepRecord> =
+    filterIsInstance<AgentStep.Ran>().map {
+        ToolStepRecord(
+            toolName = it.call.name,
+            argumentsJson = it.call.argumentsJson,
+            result = it.result,
+            successful = it.successful,
+            millis = it.millis,
         )
     }
 

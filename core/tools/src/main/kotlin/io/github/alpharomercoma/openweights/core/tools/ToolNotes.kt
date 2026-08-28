@@ -83,10 +83,25 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
      * Introduced as a record of what the tools returned, because this rides inside the user's
      * own message and a model this size will otherwise read it as something the user typed and
      * answer it instead of the question.
+     *
+     * The trailer exists because the notes sit directly above the question, which is the
+     * position [pinning] and [withToolNotes] both use because it is where a small model attends
+     * most. That worked against a fresh, unrelated question: three "who is X" turns in a row
+     * left the calls and results for the first two people sitting right above a fourth name the
+     * notes said nothing about, and the model answered from the shape in front of it — a list of
+     * people it had just looked up — rather than noticing none of them were this one. It reused
+     * the second person's URL and recapped the first two, and never asked about the one it was
+     * asked. So the heading now says in words what the position was implying on its own: these
+     * notes answer *earlier* questions, and a name they do not cover is a new question, not a
+     * a summary of the old ones.
      */
     fun render(): String? {
         if (notes.isEmpty()) return null
-        return notes.joinToString(separator = "\n", prefix = "$HEADING\n") { it.line() }
+        return notes.joinToString(
+            separator = "\n",
+            prefix = "$HEADING\n",
+            postfix = "\n$TRAILER",
+        ) { it.line() }
     }
 
     /**
@@ -105,7 +120,10 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
      */
     private fun List<ToolNote>.trimmedToBudget(): List<ToolNote> {
         if (isEmpty()) return this
-        var spent = HEADING.length
+        // The trailer is not one of the lines being trimmed, but render() always adds it, so
+        // the budget has to leave room for it too or the same overrun this comment already
+        // describes for the heading comes back for the other fixed piece of the render.
+        var spent = HEADING.length + 1 + TRAILER.length
         return asReversed()
             .filterIndexed { index, note ->
                 spent += note.line().length + 1
@@ -148,6 +166,21 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
         private const val HEADING =
             "Notes from tools already used in this chat. They are a record of what the tools " +
                 "returned, not part of the question:"
+
+        /**
+         * What follows the last note, spelling out what the heading only implied.
+         *
+         * The notes are evidence about *earlier* questions, so a small model reads them as the
+         * most recent thing in view and, faced with a name none of them mention, answers from
+         * the shape in front of it — a list of people already looked up — instead of noticing
+         * the gap. This says so directly: a subject the notes do not cover is a new question,
+         * not a summary of the old ones.
+         */
+        private const val TRAILER =
+            "These notes are about earlier questions in this chat, not the one being asked now. " +
+                "If the current question names someone or something not covered above, that is a " +
+                "new subject: answer or search for it on its own, and do not reuse a call or an " +
+                "answer from these notes for it."
     }
 }
 

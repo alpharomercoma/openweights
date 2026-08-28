@@ -25,9 +25,26 @@ import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
+import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * What a reply's tool call looked like, in the shape [ChatRepository] can write down.
+ *
+ * A plain record rather than `core.tools.AgentStep`: this module does not depend on that one
+ * and should not start to, since the tools a turn can call have no business knowing how a
+ * conversation is stored. The caller — [io.github.alpharomercoma.openweights.ui.chat.ChatViewModel],
+ * which already depends on both — does the translation.
+ */
+data class ToolStepRecord(
+    val toolName: String,
+    val argumentsJson: String,
+    val result: String,
+    val successful: Boolean,
+    val millis: Long,
+)
 
 /** Reads and writes conversations, and records what each reply cost. */
 @Singleton
@@ -42,6 +59,17 @@ class ChatRepository @Inject constructor(
 
     suspend fun messages(conversationId: Long): List<MessageEntity> =
         database.messages().forConversation(conversationId)
+
+    /**
+     * Every tool step any reply in this conversation recorded, keyed by the message it belongs
+     * to.
+     *
+     * One query for the whole conversation rather than one per message: a reopen already reads
+     * every message at once, and joining here costs nothing a per-message call would not have
+     * paid many times over.
+     */
+    suspend fun toolSteps(conversationId: Long): Map<Long, List<ToolStepEntity>> =
+        database.toolSteps().forConversation(conversationId).groupBy { it.messageId }
 
     /**
      * Starts a conversation.
@@ -67,6 +95,7 @@ class ChatRepository @Inject constructor(
         role: String,
         text: String,
         tokensPerSecond: Double? = null,
+        prefillTokensPerSecond: Double? = null,
         timeToFirstTokenMs: Long? = null,
         generatedTokens: Int? = null,
         reasoningMs: Long? = null,
@@ -74,15 +103,25 @@ class ChatRepository @Inject constructor(
         totalMillis: Long? = null,
         promptTokens: Int? = null,
         cachedTokens: Int? = null,
-    ): Long {
+        /**
+         * What this reply's own tool calls found, in the order they ran.
+         *
+         * Written in the same transaction as the message, not after it: a process killed
+         * between the two writes should not leave a reply on disk that claims no tool ever
+         * ran when one did, which is a stronger and wronger claim than the row simply not
+         * existing yet.
+         */
+        steps: List<ToolStepRecord> = emptyList(),
+    ): Long = database.withTransaction {
         touch(conversationId)
-        return database.messages().insert(
+        val messageId = database.messages().insert(
             MessageEntity(
                 conversationId = conversationId,
                 role = role,
                 text = text,
                 createdAt = clock.nowMillis(),
                 tokensPerSecond = tokensPerSecond,
+                prefillTokensPerSecond = prefillTokensPerSecond,
                 timeToFirstTokenMs = timeToFirstTokenMs,
                 generatedTokens = generatedTokens,
                 reasoningMs = reasoningMs,
@@ -92,6 +131,22 @@ class ChatRepository @Inject constructor(
                 cachedTokens = cachedTokens,
             ),
         )
+        if (steps.isNotEmpty()) {
+            database.toolSteps().insertAll(
+                steps.mapIndexed { index, step ->
+                    ToolStepEntity(
+                        messageId = messageId,
+                        orderIndex = index,
+                        toolName = step.toolName,
+                        argumentsJson = step.argumentsJson,
+                        result = step.result,
+                        successful = step.successful,
+                        millis = step.millis,
+                    )
+                },
+            )
+        }
+        messageId
     }
 
     /** Drops a message and everything after it: what regenerating a reply needs. */

@@ -88,8 +88,27 @@ class MessageActionsSheetTest {
     fun `the measurements for this reply are shown`() {
         showSheet()
 
-        compose.onNodeWithText("13.8 tok/s", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
         compose.onNodeWithText("to first token", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `prefill speed is shown here, labelled apart from decode`() {
+        // Not on the row beside the reply -- there is no room to say which number is which
+        // there -- but there is room here, and unlabelled the two would read as the same
+        // measurement said twice rather than the two different phases they are.
+        showSheet(prefillTokensPerSecond = 142.0)
+
+        compose.onNodeWithText("142.0 tok/s prefill", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a reply from before prefill speed was measured shows decode speed alone`() {
+        showSheet(prefillTokensPerSecond = null)
+
+        compose.onNodeWithText("tok/s prefill", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -155,6 +174,7 @@ class MessageActionsSheetTest {
         onEdit: () -> Unit = {},
         onSavePdf: () -> Unit = {},
         onBranch: () -> Unit = {},
+        prefillTokensPerSecond: Double? = null,
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -164,6 +184,7 @@ class MessageActionsSheetTest {
                         role = role,
                         text = "A KV cache stores past attention tensors.",
                         tokensPerSecond = 13.8,
+                        prefillTokensPerSecond = prefillTokensPerSecond,
                         timeToFirstTokenMs = 412,
                         generatedTokens = 61,
                         totalMillis = 4_800,

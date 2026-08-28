@@ -104,6 +104,15 @@ data class MessageEntity(
     val text: String,
     val createdAt: Long,
     val tokensPerSecond: Double? = null,
+    /**
+     * The other half of [tokensPerSecond]: how fast the prompt itself was processed, before
+     * the first generated token. Kept apart because a phone measures them apart — prefill is
+     * the batch pass over everything already written, decode is one token at a time — and a
+     * single combined rate would hide whichever phase actually cost the reply its time. Null
+     * on a full cache hit, where there is nothing left to prefill, same as
+     * [GenerationStats.prefillTokensPerSecond].
+     */
+    val prefillTokensPerSecond: Double? = null,
     val timeToFirstTokenMs: Long? = null,
     val generatedTokens: Int? = null,
     val reasoningMs: Long? = null,
@@ -139,6 +148,47 @@ data class ConversationMatch(
     val modelName: String?,
     val updatedAt: Long,
     val snippet: String?,
+)
+
+/**
+ * One tool call a reply made on its way to being written, kept past the turn that ran it.
+ *
+ * Only [MessageEntity.text] used to survive a reopen: the round trip that produced it — what
+ * was called, with what arguments, and what came back — lived only in the in-memory turn and
+ * was gone the moment the conversation was closed. Two things depended on it staying: the chip
+ * the screen shows under a reply ("Searched the web for …"), and [ToolNotes], which a small
+ * model needs re-grounded on every turn precisely because it cannot be trusted to carry a
+ * fact forward on its own — see the tail-pinning in `TurnRunner.grounding`. A reopened
+ * conversation had neither: no chips, and a model answering a follow-up with no memory of
+ * what it had just looked up, which is the shape of a stale-entity conflation bug all over
+ * again, just triggered by a chat switch instead of a fourth turn.
+ *
+ * Only [AgentStep.Ran] is worth a row. [AgentStep.Requested] never resolved to anything, and
+ * [AgentStep.Skipped] taught the model nothing a future turn could use — both are already
+ * filtered the same way before they reach [ToolNotes.withSteps].
+ */
+@Entity(
+    tableName = "tool_steps",
+    foreignKeys = [
+        ForeignKey(
+            entity = MessageEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["messageId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("messageId")],
+)
+data class ToolStepEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val messageId: Long,
+    /** Preserves call order within a reply; SQLite gives no ordering guarantee by [id] alone. */
+    val orderIndex: Int,
+    val toolName: String,
+    val argumentsJson: String,
+    val result: String,
+    val successful: Boolean,
+    val millis: Long,
 )
 
 /**

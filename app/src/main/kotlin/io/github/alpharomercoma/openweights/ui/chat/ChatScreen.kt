@@ -806,9 +806,6 @@ private fun Transcript(
                     // means by "copy the reply" is the reply.
                     onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
                     onReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
-                    // Only the last reply can be retried: regenerating an earlier one would
-                    // silently discard everything said after it.
-                    onRetry = onRegenerate.takeIf { entry.id == lastId && !state.isGenerating },
                     collapseByDefault = entry.id == lastId && haltedRightHere,
                 )
             }
@@ -1021,7 +1018,6 @@ private fun AssistantTurn(
     onMore: () -> Unit,
     onCopy: () -> Unit,
     onReadAloud: () -> Unit,
-    onRetry: (() -> Unit)?,
     collapseByDefault: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1081,7 +1077,6 @@ private fun AssistantTurn(
                 isSpeaking = isSpeaking,
                 onCopy = onCopy,
                 onReadAloud = onReadAloud,
-                onRetry = onRetry,
                 onMore = onMore,
                 modifier = Modifier.padding(top = 2.dp),
                 measurements = entry.tokensPerSecond?.let { { Measurements(entry) } },
@@ -1261,15 +1256,32 @@ private fun Measurements(entry: TranscriptEntry) {
     val dark = LocalIsDarkTheme.current
     val locale = LocalConfiguration.current.locales[0]
     val speed = entry.tokensPerSecond ?: return
+    val prefill = entry.prefillTokensPerSecond
     // Read here rather than inside the semantics block, which is not a composition.
-    val spokenSpeed = stringResource(R.string.generated_at_speed, speed.roundToInt())
+    val spokenSpeed = if (prefill != null) {
+        stringResource(
+            R.string.generated_at_speed_with_prefill,
+            prefill.roundToInt(),
+            speed.roundToInt(),
+        )
+    } else {
+        stringResource(R.string.generated_at_speed, speed.roundToInt())
+    }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = String.format(locale, "%.1f tok/s", speed),
+            // Prefill, then decode: an arrow reads as "one phase into the next", which is
+            // the actual shape of a turn -- the prompt is read start to finish before the
+            // first generated token exists. Labelled alternatives (PP/TG, in/out) were tried;
+            // this is the one that was asked for after seeing them.
+            text = if (prefill != null) {
+                String.format(locale, "%.0f→%.0f tok/s", prefill, speed)
+            } else {
+                String.format(locale, "%.1f tok/s", speed)
+            },
             style = MetricTextStyle,
             color = signalColor((speed / FAST_TOKENS_PER_SECOND).toFloat(), dark),
             maxLines = 1,

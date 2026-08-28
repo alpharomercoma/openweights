@@ -54,7 +54,10 @@ final class EngineClient: ObservableObject {
     @Published private(set) var isLoaded = false
     @Published private(set) var isLoadingModel = false
     @Published private(set) var isGenerating = false
+    /** Whether the loaded model's chat template renders tool definitions at all. See `OWEngineSession.supportsTools`. */
+    @Published private(set) var supportsTools = false
     @Published private(set) var lastStats: TurnStats?
+    @Published private(set) var lastToolCalls: [ToolCall] = []
     @Published private(set) var loadError: String?
 
     private var session: OWEngineSession?
@@ -76,6 +79,7 @@ final class EngineClient: ObservableObject {
         switch result {
         case .success(let session):
             self.session = session
+            supportsTools = session.supportsTools
             isLoaded = true
         case .failure(let error):
             loadError = error.localizedDescription
@@ -89,14 +93,23 @@ final class EngineClient: ObservableObject {
     /// only the newest message here would silently drop everything before it. Cancelling the
     /// returned stream's task calls `OWEngineSession.cancel`, same as pulling the stop button
     /// mid-generation on Android.
-    func generate(history: [PersistedTurn], sampler: SamplerSettings) -> AsyncThrowingStream<String, Error> {
+    func generate(
+        history: [PersistedTurn],
+        sampler: SamplerSettings,
+        tools: [ToolDefinition] = []
+    ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream<String, Error>(bufferingPolicy: .unbounded) { continuation in
             guard let session else {
                 continuation.finish(throwing: EngineError.notLoaded)
                 return
             }
 
-            let messages = history.map { OWChatMessage(role: $0.role, content: $0.text) }
+            let messages = history.map {
+                OWChatMessage(role: $0.role, content: $0.text, toolCallID: $0.toolCallID)
+            }
+            let owTools = tools.map {
+                OWToolDefinition(name: $0.name, toolDescription: $0.description, parametersJSON: $0.parametersJSON)
+            }
 
             isGenerating = true
             let task = Task.detached(priority: .userInitiated) { [weak self] in
@@ -104,6 +117,7 @@ final class EngineClient: ObservableObject {
                 do {
                     _ = try session.generate(
                         with: messages,
+                        tools: owTools,
                         temperature: Float(sampler.temperature),
                         topP: Float(sampler.topP),
                         topK: Int32(sampler.topK),
@@ -116,11 +130,24 @@ final class EngineClient: ObservableObject {
                     thrown = error
                 }
 
+                // Read the ObjC-side results into plain Swift values on this same thread,
+                // right where they were produced, before hopping to MainActor -- crossing
+                // that boundary while still holding a reference into `session`'s ObjC
+                // properties was observed to crash reading `lastToolCalls` specifically
+                // (verified via NSLog: the ivar was a valid, non-null pointer on the ObjC
+                // side the instant it was set, so the corruption was on the Swift/bridging
+                // side of the hop, not the C++/ObjC++ side).
+                let finishedStats = session.lastStats.map { TurnStats($0) }
+                let finishedToolCalls = session.lastToolCalls.map {
+                    ToolCall(id: $0.callID, name: $0.name, argumentsJSON: $0.argumentsJSON)
+                }
+
                 await MainActor.run {
                     self?.isGenerating = false
-                    if let stats = session.lastStats {
-                        self?.lastStats = TurnStats(stats)
+                    if let finishedStats {
+                        self?.lastStats = finishedStats
                     }
+                    self?.lastToolCalls = finishedToolCalls
                 }
 
                 if let thrown {

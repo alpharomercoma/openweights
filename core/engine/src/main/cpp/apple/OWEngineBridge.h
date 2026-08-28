@@ -44,7 +44,32 @@ NS_ASSUME_NONNULL_BEGIN
 @interface OWChatMessage : NSObject
 @property (nonatomic, copy, readonly) NSString * role;
 @property (nonatomic, copy, readonly) NSString * content;
+/** Set on a `tool` role message: which call this is the result of. See `ChatMessage::tool_call_id`. */
+@property (nonatomic, copy, readonly, nullable) NSString * toolCallID;
 - (instancetype)initWithRole:(NSString *)role content:(NSString *)content;
+- (instancetype)initWithRole:(NSString *)role
+                      content:(NSString *)content
+                   toolCallID:(nullable NSString *)toolCallID NS_DESIGNATED_INITIALIZER;
+- (instancetype)init NS_UNAVAILABLE;
+@end
+
+/** A tool the model may call, described the OpenAI-schema way. See `ToolDefinition`. */
+@interface OWToolDefinition : NSObject
+@property (nonatomic, copy, readonly) NSString * name;
+@property (nonatomic, copy, readonly) NSString * toolDescription;
+/** JSON Schema for the arguments object. */
+@property (nonatomic, copy, readonly) NSString * parametersJSON;
+- (instancetype)initWithName:(NSString *)name
+              toolDescription:(NSString *)toolDescription
+               parametersJSON:(NSString *)parametersJSON;
+@end
+
+/** A call the model asked for, not yet executed. See `ToolCall`. */
+@interface OWToolCall : NSObject
+@property (nonatomic, copy, readonly) NSString * callID;
+@property (nonatomic, copy, readonly) NSString * name;
+/** Arguments as JSON, exactly as the model produced them. */
+@property (nonatomic, copy, readonly) NSString * argumentsJSON;
 @end
 
 /**
@@ -78,6 +103,7 @@ NS_ASSUME_NONNULL_BEGIN
  * context fills," same as the C++ default.
  */
 - (nullable NSString *)generateWithMessages:(NSArray<OWChatMessage *> *)messages
+                                       tools:(NSArray<OWToolDefinition *> *)tools
                                  temperature:(float)temperature
                                         topP:(float)topP
                                         topK:(int32_t)topK
@@ -87,6 +113,21 @@ NS_ASSUME_NONNULL_BEGIN
 
 /** Stats for the most recently completed `generateWithMessages:...` call, or nil before one runs. */
 @property (nonatomic, readonly, nullable) OWGenerationStats * lastStats;
+
+/**
+ * Tool calls the model asked for in the most recently completed `generateWithMessages:...`
+ * call. Empty when the model answered directly instead of calling anything.
+ */
+@property (nonatomic, readonly) NSArray<OWToolCall *> * lastToolCalls;
+
+/**
+ * Whether the loaded model's chat template renders tool definitions at all. See
+ * `Session::supports_tools`. A model whose template does not support tools was never told
+ * about them by `common_chat_templates_apply` even when `tools` is non-empty, and free-runs
+ * text that only looks like a tool call (no grammar constraining it) -- callers should check
+ * this before offering tools, the same way `ChatViewModel.kt` does on Android.
+ */
+@property (nonatomic, readonly) BOOL supportsTools;
 
 /** Drops the KV cache. See `Session::reset`. */
 - (void)reset;

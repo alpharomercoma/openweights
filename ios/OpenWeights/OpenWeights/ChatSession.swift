@@ -29,11 +29,14 @@ struct PersistedTurn: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     var role: String
     var text: String
+    /** Set on a `tool` role turn: which call this is the result of. Mirrors `ChatMessage.tool_call_id`. */
+    var toolCallID: String?
 
-    init(id: UUID = UUID(), role: String, text: String) {
+    init(id: UUID = UUID(), role: String, text: String, toolCallID: String? = nil) {
         self.id = id
         self.role = role
         self.text = text
+        self.toolCallID = toolCallID
     }
 }
 

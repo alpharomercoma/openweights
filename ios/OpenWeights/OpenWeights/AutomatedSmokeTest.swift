@@ -45,6 +45,18 @@ enum AutomatedSmokeTest {
         await engine.resetConversation()
         session = await runTurn("Name three planets in one short sentence.", session: session, engine: engine, store: store, label: "turn3-after-reset")
 
+        await engine.resetConversation()
+        if await engine.supportsTools {
+            session = await runToolTurn(
+                "What is the exact current date and time? Answer with the exact value, not an approximation.",
+                session: session,
+                engine: engine,
+                store: store
+            )
+        } else {
+            log("tool-turn: skipped, model's chat template does not support tools (supportsTools=false)")
+        }
+
         // Simulate "navigate away and back": a brand new SessionStore re-reading from disk,
         // exactly what relaunching the app produces, rather than reusing the in-memory one
         // that already has the answer.
@@ -92,6 +104,57 @@ enum AutomatedSmokeTest {
         } else {
             log("\(label): no stats produced")
         }
+        return current
+    }
+
+    /// Exercises the same offer/call/execute/feed-back loop `ChatView.runTurnLoop` drives,
+    /// standalone so this file has no SwiftUI/`@State` dependency, to prove tool calling works
+    /// end to end -- not just that the prompt engineering compiles.
+    private static func runToolTurn(
+        _ text: String,
+        session: ChatSession,
+        engine: EngineClient,
+        store: SessionStore
+    ) async -> ChatSession {
+        var current = session
+        current.turns.append(PersistedTurn(role: "user", text: text))
+
+        let instruction = ToolPrompting.instruction(anyTools: true) ?? ""
+        var calledTool = false
+        var toolResultText = ""
+
+        for round in 0..<4 {
+            let replyID = UUID()
+            current.turns.append(PersistedTurn(id: replyID, role: "assistant", text: ""))
+            let historyForModel = [PersistedTurn(role: "system", text: instruction)] + current.turns
+
+            do {
+                for try await piece in await engine.generate(history: historyForModel, sampler: current.sampler, tools: BuiltInTools.all) {
+                    if let index = current.turns.firstIndex(where: { $0.id == replyID }) {
+                        current.turns[index].text += piece
+                    }
+                }
+            } catch {
+                log("tool-turn: generate threw \(error.localizedDescription)")
+                break
+            }
+
+            let calls = await engine.lastToolCalls
+            guard !calls.isEmpty, round < 3 else { break }
+            calledTool = true
+            if let index = current.turns.firstIndex(where: { $0.id == replyID }), current.turns[index].text.isEmpty {
+                current.turns.remove(at: index)
+            }
+            for call in calls {
+                let result = BuiltInTools.execute(call)
+                toolResultText = result
+                current.turns.append(PersistedTurn(role: "tool", text: result, toolCallID: call.id))
+            }
+        }
+
+        await store.save(current)
+        let finalReply = current.turns.last(where: { $0.role == "assistant" })?.text.prefix(160) ?? ""
+        log("tool-turn: calledTool=\(calledTool) toolResult=\(toolResultText) finalReply=\(finalReply)")
         return current
     }
 

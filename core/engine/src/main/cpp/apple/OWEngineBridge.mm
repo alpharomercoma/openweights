@@ -30,10 +30,49 @@ NSError * makeError(NSInteger code, const std::string & message) {
 @implementation OWChatMessage
 
 - (instancetype)initWithRole:(NSString *)role content:(NSString *)content {
+    return [self initWithRole:role content:content toolCallID:nil];
+}
+
+- (instancetype)initWithRole:(NSString *)role
+                      content:(NSString *)content
+                   toolCallID:(nullable NSString *)toolCallID {
     self = [super init];
     if (self == nil) return nil;
     _role = [role copy];
     _content = [content copy];
+    _toolCallID = [toolCallID copy];
+    return self;
+}
+
+@end
+
+@implementation OWToolDefinition
+
+- (instancetype)initWithName:(NSString *)name
+              toolDescription:(NSString *)toolDescription
+               parametersJSON:(NSString *)parametersJSON {
+    self = [super init];
+    if (self == nil) return nil;
+    _name = [name copy];
+    _toolDescription = [toolDescription copy];
+    _parametersJSON = [parametersJSON copy];
+    return self;
+}
+
+@end
+
+@interface OWToolCall ()
+- (instancetype)initWithCall:(const openweights::ToolCall &)call;
+@end
+
+@implementation OWToolCall
+
+- (instancetype)initWithCall:(const openweights::ToolCall &)call {
+    self = [super init];
+    if (self == nil) return nil;
+    _callID = [NSString stringWithUTF8String:call.id.c_str()];
+    _name = [NSString stringWithUTF8String:call.name.c_str()];
+    _argumentsJSON = [NSString stringWithUTF8String:call.arguments_json.c_str()];
     return self;
 }
 
@@ -63,12 +102,14 @@ NSError * makeError(NSInteger code, const std::string & message) {
 }
 
 @synthesize lastStats = _lastStats;
+@synthesize lastToolCalls = _lastToolCalls;
 
 - (nullable instancetype)initWithModelPath:(NSString *)modelPath
                                 contextSize:(int32_t)contextSize
                                       error:(NSError **)error {
     self = [super init];
     if (self == nil) return nil;
+    _lastToolCalls = @[];
 
     std::string loadError;
     // Threads, GPU layers and mmap all default to the same "let the caller decide later"
@@ -96,6 +137,7 @@ NSError * makeError(NSInteger code, const std::string & message) {
 }
 
 - (nullable NSString *)generateWithMessages:(NSArray<OWChatMessage *> *)messages
+                                       tools:(NSArray<OWToolDefinition *> *)tools
                                  temperature:(float)temperature
                                         topP:(float)topP
                                         topK:(int32_t)topK
@@ -108,7 +150,20 @@ NSError * makeError(NSInteger code, const std::string & message) {
         openweights::ChatMessage cppMessage;
         cppMessage.role = std::string([message.role UTF8String]);
         cppMessage.content = std::string([message.content UTF8String]);
+        if (message.toolCallID != nil) {
+            cppMessage.tool_call_id = std::string([message.toolCallID UTF8String]);
+        }
         cppMessages.push_back(cppMessage);
+    }
+
+    std::vector<openweights::ToolDefinition> cppTools;
+    cppTools.reserve(tools.count);
+    for (OWToolDefinition * tool in tools) {
+        openweights::ToolDefinition cppTool;
+        cppTool.name = std::string([tool.name UTF8String]);
+        cppTool.description = std::string([tool.toolDescription UTF8String]);
+        cppTool.parameters_json = std::string([tool.parametersJSON UTF8String]);
+        cppTools.push_back(cppTool);
     }
 
     openweights::SamplerConfig sampler;
@@ -125,7 +180,7 @@ NSError * makeError(NSInteger code, const std::string & message) {
 
     const auto reason = _session->generate(
         cppMessages,
-        {},
+        cppTools,
         sampler,
         reasoning,
         [onToken](const char * piece) -> bool {
@@ -138,11 +193,21 @@ NSError * makeError(NSInteger code, const std::string & message) {
 
     _lastStats = [[OWGenerationStats alloc] initWithStats:stats];
 
+    NSMutableArray<OWToolCall *> * toolCalls = [NSMutableArray arrayWithCapacity:reply.tool_calls.size()];
+    for (const auto & call : reply.tool_calls) {
+        [toolCalls addObject:[[OWToolCall alloc] initWithCall:call]];
+    }
+    _lastToolCalls = toolCalls;
+
     if (reason == openweights::StopReason::ERROR) {
         if (error != nil) *error = makeError(2, generateError);
         return nil;
     }
     return [NSString stringWithUTF8String:reply.content.c_str()];
+}
+
+- (BOOL)supportsTools {
+    return _session->supports_tools() ? YES : NO;
 }
 
 - (void)reset {

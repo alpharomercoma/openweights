@@ -411,6 +411,22 @@ data class ChatUiState(
             !isGenerating &&
             !isLoadingModel &&
             !isCompacting
+
+    /**
+     * Whether the composer may be typed into, staged with a file, or dictated to.
+     *
+     * [canSend] minus the loading check: a model coming into memory is the one reason to
+     * disable the composer that has nothing to do with whether *this* draft could be
+     * finished and sent the moment it is ready. A message written while the weights load is
+     * not wasted work — [Composer] still refuses to submit it until [canSend] is true, so
+     * nothing races the load; it only stops the field itself from sitting there disabled
+     * for however long the model takes, inviting a tap that used to do nothing.
+     */
+    val canType: Boolean get() =
+        modelName != null &&
+            outputModality == OutputModality.TEXT &&
+            !isGenerating &&
+            !isCompacting
 }
 
 @HiltViewModel

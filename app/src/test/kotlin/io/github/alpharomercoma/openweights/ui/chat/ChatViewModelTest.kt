@@ -46,6 +46,24 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 class ChatViewModelTest : ChatFixture() {
     @Test
+    fun `a loading model blocks sending but not typing`() {
+        // canType is canSend minus the loading check: a draft written while the weights
+        // come into memory is still worth having typed, even though Composer refuses to
+        // submit it -- via canSend, unchanged -- until the model is actually ready.
+        val state = ChatUiState(modelName = "model-a", isLoadingModel = true)
+
+        assertThat(state.canType).isTrue()
+        assertThat(state.canSend).isFalse()
+    }
+
+    @Test
+    fun `nothing types into a composer with no model at all`() {
+        val state = ChatUiState(modelName = null, isLoadingModel = false)
+
+        assertThat(state.canType).isFalse()
+    }
+
+    @Test
     fun `a detected speech model is refused before it reaches the text generator`() =
         runTest(dispatcher) {
             engine.outputModalities["voice.gguf"] = OutputModality.SPEECH

@@ -102,10 +102,11 @@ fun Composer(
     enabled: Boolean,
     isGenerating: Boolean,
     /**
-     * Why [enabled] is false when it's a model still coming into memory rather than one of
-     * the composer's other reasons (already generating, nothing installed). Send already
-     * refuses silently either way; this is the difference between a control that looks
-     * broken and one that visibly says what it's waiting for.
+     * True while a model is coming into memory. [enabled] does not depend on this: typing,
+     * attaching and dictating all work while the weights load, so a message can be finished
+     * and is ready to go the instant loading ends. Only [SendButton] checks this directly,
+     * to refuse the one thing that genuinely cannot happen yet, and [LoadingModelHint] uses
+     * it to say what Send is waiting for.
      */
     isLoadingModel: Boolean = false,
     staged: List<MessagePart.File>,
@@ -351,11 +352,9 @@ fun Composer(
             BasicTextField(
                 value = draft,
                 onValueChange = { draft = it },
-                // Every other control in this bar already stops for this: Attach, Dictate,
-                // Send. The field itself did not, so a goal or a question waiting for its own
-                // answer still looked and behaved like an ordinary, ready-to-type composer,
-                // and text typed into it went nowhere Send could reach — the button beside it
-                // was already Stop, wired to end the run rather than to send anything.
+                // False while an unattended goal owns the conversation, or while the field
+                // has nothing to answer to (no model installed at all) — not while a model
+                // is merely loading, where a draft written now is still worth having typed.
                 enabled = enabled,
                 // maxLines rather than a height cap: a fixed dp ceiling is six lines at the
                 // default font scale and barely three at 200%, which quietly punishes the
@@ -560,7 +559,9 @@ private fun ComposerActions(
         }
         SendButton(
             isGenerating = isGenerating,
-            enabled = isGenerating || (enabled && hasSomethingToSend),
+            // The one control that still waits on the model itself: everything else in this
+            // bar works on a loading model, but there is nothing to send it to yet.
+            enabled = isGenerating || (enabled && !isLoadingModel && hasSomethingToSend),
             onClick = {
                 if (isGenerating) {
                     onStop()

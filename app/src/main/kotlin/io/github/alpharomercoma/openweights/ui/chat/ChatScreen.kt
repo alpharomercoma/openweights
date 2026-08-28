@@ -530,8 +530,10 @@ private fun ChatContent(
                         conversationKey = state.activeConversationId,
                         // A normal message would race the unattended loop between steps.
                         // GoalCard owns bounded steering until the goal reaches a terminal
-                        // state, so there is exactly one writer to the conversation.
-                        enabled = composerEnabled(state.canSend, goal),
+                        // state, so there is exactly one writer to the conversation. Typing
+                        // is allowed while the model is still loading; sending is not, and
+                        // Composer enforces that second half itself via isLoadingModel.
+                        enabled = composerEnabled(state.canType, goal),
                         isGenerating = state.isGenerating,
                         isLoadingModel = state.isLoadingModel,
                         staged = state.staged,
@@ -665,8 +667,8 @@ private fun GoalSection(
     }
 }
 
-private fun composerEnabled(canSend: Boolean, goal: Goal?): Boolean =
-    canSend && goal?.isRunning != true
+private fun composerEnabled(canType: Boolean, goal: Goal?): Boolean =
+    canType && goal?.isRunning != true
 
 /**
  * The narrow band between the transcript and the composer.

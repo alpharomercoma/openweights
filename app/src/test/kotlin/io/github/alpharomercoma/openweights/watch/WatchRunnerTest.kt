@@ -117,7 +117,7 @@ class WatchRunnerTest {
     fun `a tick cancelled mid turn is not counted as a failure`() = runTest {
         loadedEngine()
         engine.hold = true
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         val ticking = launch { runner.tick(watch.id, now = 1) }
         advanceUntilIdle()
@@ -135,7 +135,7 @@ class WatchRunnerTest {
     fun `three interruptions do not stop a watch that never failed`() = runTest {
         loadedEngine()
         engine.hold = true
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         repeat(3) { round ->
             val ticking = launch { runner.tick(watch.id, now = round.toLong()) }
@@ -150,7 +150,7 @@ class WatchRunnerTest {
 
     @Test
     fun `a tick with no model loaded is skipped rather than failed`() = runTest {
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         val outcome = runner.tick(watch.id, now = 1)
 
@@ -171,7 +171,7 @@ class WatchRunnerTest {
     @Test
     fun `a check that actually runs posts one notification with its finding`() = runTest {
         loadedEngine()
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         val outcome = runner.tick(watch.id, now = 1)
 
@@ -186,7 +186,7 @@ class WatchRunnerTest {
 
     @Test
     fun `a skipped tick posts no notification`() = runTest {
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         val outcome = runner.tick(watch.id, now = 1)
 
@@ -207,12 +207,23 @@ class WatchRunnerTest {
     @Test
     fun `the tick prompt tells the model a reminder-worded task is already due`() = runTest {
         loadedEngine()
-        val watch = requireNotNull(watches.add("Remind me to stretch", everyMinutes = 5, now = 0))
+        val watch = requireNotNull(watches.add("Remind me to stretch", everyMinutes = 5, now = NOW))
 
         runner.tick(watch.id, now = 1)
 
         val systemPrompt = engine.prompts.last().first { it.role == ChatRole.SYSTEM }.text
         assertThat(systemPrompt).contains("due now")
         assertThat(systemPrompt).contains("not something you need a tool for")
+    }
+
+    private companion object {
+        /**
+         * The clock a watch is made on, which has to be the one it is judged against.
+         *
+         * Zero used to do, and stopped once a watch could expire: the runner stamps a tick
+         * with the real clock, so a watch created in 1970 is two days past its window
+         * before its first tick and ends rather than running.
+         */
+        val NOW: Long = System.currentTimeMillis()
     }
 }

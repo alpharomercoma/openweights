@@ -42,7 +42,7 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
         database.watches().observeAll().map { rows -> rows.map { it.asWatch() } }
 
     fun observeRuns(watchId: Long, limit: Int = RUN_HISTORY): Flow<List<WatchRun>> =
-        database.watches().observeRuns(watchId, limit).map { rows -> rows.map { it.asRun() } }
+        database.watchRuns().observeRuns(watchId, limit).map { rows -> rows.map { it.asRun() } }
 
     suspend fun active(): List<Watch> =
         database.watches().inState(WatchState.ACTIVE.name).map { it.asWatch() }
@@ -57,18 +57,68 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
      * about the limit, and so a tool call cannot talk its way past it.
      */
     suspend fun add(task: String, everyMinutes: Int, now: Long): Watch? {
-        if (database.watches().countInState(WatchState.ACTIVE.name) >= Watch.MAX_ACTIVE) {
+        // The rows rather than a count of them: there are at most four, and one statement
+        // that answers both "how many" and "which ones" is one fewer to keep in step.
+        if (database.watches().inState(WatchState.ACTIVE.name).size >= Watch.MAX_ACTIVE) {
             return null
         }
-        val watch = Watch(task = task.trim(), everyMinutes = everyMinutes, createdAt = now)
+        val watch = Watch(
+            task = task.trim(),
+            everyMinutes = everyMinutes,
+            createdAt = now,
+            nextRunAt = now + everyMinutes * MILLIS_PER_MINUTE,
+        )
         val id = database.watches().insert(watch.asEntity())
         return watch.copy(id = id)
     }
 
-    /** Stops a watch and keeps it, so what it found is still readable. */
-    suspend fun stop(id: Long, state: WatchState = WatchState.STOPPED) {
+    /**
+     * Ends every active watch that has outlived its window, and says how many.
+     *
+     * A watch normally expires in the write that counts its last check, but the clock half
+     * of the bound does not need a check to pass: a watch set every hour, left with the app
+     * closed for two days, is over long before anything ticks. Swept at startup, where the
+     * schedules are rebuilt, so a lapsed watch is never re-scheduled.
+     */
+    suspend fun expireLapsed(now: Long): List<Watch> = database.withTransaction {
+        val lapsed = database.watches().inState(WatchState.ACTIVE.name)
+            .map { it.asWatch() }
+            .filter { it.isSpent(now) }
+        lapsed.forEach { stop(it.id, WatchState.EXPIRED) }
+        lapsed.map { it.copy(state = WatchState.EXPIRED) }
+    }
+
+    /**
+     * Moves the next deadline to one period from [from], for an active watch.
+     *
+     * Called by whatever has just set the alarm — a ticker starting its first sleep, a
+     * scheduled job being enqueued — because only that code knows when the period actually
+     * begins. A stopped watch is left alone: a countdown on something that has ended is
+     * worse than none.
+     */
+    suspend fun reschedule(id: Long, from: Long) {
         val existing = database.watches().byId(id) ?: return
-        database.watches().upsert(existing.copy(state = state.name))
+        database.watches().setNextRunAt(
+            id = id,
+            at = from + existing.everyMinutes * MILLIS_PER_MINUTE,
+        )
+    }
+
+    /** Records a deadline someone else owns — `WorkManager`'s own answer for a slow watch. */
+    suspend fun rescheduleAt(id: Long, at: Long) {
+        database.watches().setNextRunAt(id, at)
+    }
+
+    /**
+     * Stops a watch and keeps it, so what it found is still readable.
+     *
+     * Only an active watch. Without that guard the startup sweep could overwrite a watch
+     * that had already stopped itself after three failures, and the screen would say it
+     * ran out of time when in fact it broke — the two readings lead a person to do
+     * different things next.
+     */
+    suspend fun stop(id: Long, state: WatchState = WatchState.STOPPED) {
+        database.watches().endIfActive(id, state.name)
     }
 
     /** Removes a watch and, by the foreign key, everything it recorded. */
@@ -114,7 +164,7 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
         // Re-read inside the transaction is what makes the failure counter safe; a watch
         // another tick has already stopped must not be revived by this one.
         if (existing.state != WatchState.ACTIVE.name) return existing.asWatch()
-        database.watches().insertRun(
+        database.watchRuns().insertRun(
             WatchRunEntity(
                 watchId = watchId,
                 at = at,
@@ -122,7 +172,7 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
                 summary = summary.take(SUMMARY_CHARS),
             ),
         )
-        database.watches().trimRuns(watchId, RUN_HISTORY)
+        database.watchRuns().trimRuns(watchId, RUN_HISTORY)
 
         val failures = when (outcome) {
             WatchOutcome.FAILED -> existing.consecutiveFailures + 1
@@ -130,12 +180,27 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
             WatchOutcome.SKIPPED -> existing.consecutiveFailures
         }
         val exhausted = failures >= Watch.MAX_CONSECUTIVE_FAILURES
-        val updated = existing.copy(
-            state = if (exhausted) WatchState.FAILED.name else existing.state,
+        val counted = existing.copy(
             lastRunAt = if (outcome == WatchOutcome.SKIPPED) existing.lastRunAt else at,
             lastSummary = summary.take(SUMMARY_CHARS),
             runs = if (outcome == WatchOutcome.SKIPPED) existing.runs else existing.runs + 1,
             consecutiveFailures = failures,
+            // A skipped tick moves the deadline too. It is the attempt that resets the
+            // clock, not the check: the ticker sleeps another full period either way, and a
+            // countdown left pointing at a moment that has already passed is the thing that
+            // made the old screen feel broken.
+            nextRunAt = at + existing.everyMinutes * MILLIS_PER_MINUTE,
+        )
+        // Spending the last check of the budget ends the watch in the same write that
+        // counted it. Deciding this a moment later, from the ticker, would leave a window
+        // where the row says a watch is active with nothing left to do — and the ticker is
+        // exactly what a process death takes away.
+        val updated = counted.copy(
+            state = when {
+                exhausted -> WatchState.FAILED.name
+                counted.asWatch().isSpent(at) -> WatchState.EXPIRED.name
+                else -> existing.state
+            },
         )
         database.watches().upsert(updated)
         return updated.asWatch()
@@ -153,6 +218,8 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
 
         /** One line. A watch that writes an essay every minute is a database, not a check. */
         const val SUMMARY_CHARS = 400
+
+        const val MILLIS_PER_MINUTE = 60_000L
     }
 }
 
@@ -166,6 +233,7 @@ private fun WatchEntity.asWatch() = Watch(
     lastSummary = lastSummary,
     runs = runs,
     consecutiveFailures = consecutiveFailures,
+    nextRunAt = nextRunAt,
 )
 
 private fun Watch.asEntity() = WatchEntity(
@@ -178,6 +246,7 @@ private fun Watch.asEntity() = WatchEntity(
     lastSummary = lastSummary,
     runs = runs,
     consecutiveFailures = consecutiveFailures,
+    nextRunAt = nextRunAt,
 )
 
 private fun WatchRunEntity.asRun() = WatchRun(

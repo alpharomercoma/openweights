@@ -134,7 +134,19 @@
     <string name="watch_failed">Stopped itself after %1$d failed checks</string>
     <string name="watch_every">Every %1$d minutes</string>
     <string name="watch_with_notification">, with a notification while it runs</string>
-    <string name="watch_so_far"> · %1$d so far</string>
+    <string name="watch_expired">Finished on its own after %1$d checks</string>
+    <string name="watch_progress"> · check %1$d of %2$d</string>
+    <string name="watch_next_in"> · next in %1$s</string>
+    <string name="watch_next_due">, next check due now</string>
+    <string name="watch_ends_in"> · stops in %1$s</string>
+    <string name="watch_ends_now"> · stopping</string>
+    <string name="watch_notification_progress">Check %1$d of %2$d · next check</string>
+    <string name="watch_notification_progress_last">Check %1$d of %2$d</string>
+    <string name="watch_notification_ended">Stopped on its own after %1$d checks</string>
+    <string name="watch_duration_hm">%1$dh %2$dm</string>
+    <string name="watch_duration_m">%1$dm</string>
+    <string name="watch_duration_ms">%1$dm %2$02ds</string>
+    <string name="watch_duration_s">%1$ds</string>
     <string name="leaves_device">Leaves the device</string>
     <string name="no_folder_shared">No folder shared</string>
     <string name="folder_none">The file tools stay off until you pick one. Only that folder is shared.</string>
@@ -222,7 +234,6 @@
     <string name="remove_command">Remove %1$s command</string>
     <string name="unknown_command">"%1$s" is not a recognised command. Send again to send it as a message.</string>
     <string name="unknown_command_suggestion">Did you mean %1$s?</string>
-    <string name="delete_conversation_named">Delete %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="generated_at_speed_with_prefill">Prompt read at %1$d tokens per second, generated at %2$d tokens per second</string>
     <string name="detail_prefill_speed">%1$.1f tok/s prefill</string>
@@ -249,5 +260,6 @@
     <string name="language_models_heading">Language Models (GGUF)</string>
     <string name="model_badge_projector_missing">Vision model · download projector (mmproj) to enable image input</string>
     <string name="slash_command_hint">Message, or type / for commands</string>
+    <string name="delete_conversation_named">Delete %1$s</string>
 </resources>
 

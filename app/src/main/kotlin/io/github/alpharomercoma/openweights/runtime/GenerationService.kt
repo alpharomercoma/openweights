@@ -24,6 +24,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.getSystemService
@@ -97,7 +98,23 @@ class GenerationService : Service() {
             return START_NOT_STICKY
         }
 
-        intent?.getStringExtra(EXTRA_LABEL)?.let { promote(it) }
+        intent?.getStringExtra(EXTRA_LABEL)?.let { label ->
+            // Checked here, where the words are actually applied, rather than only where
+            // they were sent. These arrive as intents, so two writers a millisecond apart
+            // are delivered in an order neither of them chose: without this a watch's
+            // countdown could land on top of a chat turn that had taken the notification
+            // over in between, and stay there for a period.
+            val sender = intent.getStringExtra(EXTRA_HOLDER)
+            val stale = sender != null && synchronized(holders) { owner != sender }
+            if (!stale) {
+                promote(
+                    label = label,
+                    detail = intent.getStringExtra(EXTRA_DETAIL),
+                    countdownTo = intent.getLongExtra(EXTRA_COUNTDOWN_TO, 0L)
+                        .takeIf { at -> at > 0 },
+                )
+            }
+        }
         // Not sticky. If the system kills the process the turn died with it, and restarting
         // an empty service would put a notification on screen for work nobody is doing.
         return START_NOT_STICKY
@@ -111,12 +128,12 @@ class GenerationService : Service() {
      * reply is what the user asked for, and a turn that might be frozen is better than a
      * crash.
      */
-    private fun promote(label: String) {
+    private fun promote(label: String, detail: String? = null, countdownTo: Long? = null) {
         runCatching {
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
-                notification(label),
+                notification(label, detail, countdownTo),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
                 } else {
@@ -126,15 +143,39 @@ class GenerationService : Service() {
         }.onFailure { android.util.Log.e("OpenWeights", "startForeground refused", it) }
     }
 
-    private fun notification(label: String) = NotificationCompat.Builder(this, CHANNEL)
-        .setSmallIcon(R.drawable.ic_notification)
-        .setContentTitle(label)
-        .setContentText("Running on this device")
-        .setOngoing(true)
-        .setOnlyAlertOnce(true)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setContentIntent(openApp())
-        .build()
+    /**
+     * The one notification this app keeps up, for whoever is holding the process.
+     *
+     * [countdownTo] is drawn by the system rather than by this app, which is the whole
+     * reason it is a timestamp and not a string. A watch waiting five minutes for its next
+     * check would otherwise have to wake up to rewrite "in 4 minutes", then "in 3", for as
+     * long as it lives — the exact battery this feature is supposed to be careful with.
+     * Handed a deadline, the platform ticks the digits itself while the app sleeps.
+     *
+     * Both extras are cleared by whoever writes next. That is the same last-writer-wins the
+     * label has always had: a turn that starts while a watch is waiting takes the
+     * notification over, and a stale countdown under a turn's label would be a lie about
+     * the wrong thing entirely.
+     */
+    private fun notification(label: String, detail: String?, countdownTo: Long?) =
+        NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(label)
+            .setContentText(detail ?: "Running on this device")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(openApp())
+            .apply {
+                if (countdownTo != null) {
+                    setWhen(countdownTo)
+                    setUsesChronometer(true)
+                    setChronometerCountDown(true)
+                } else {
+                    setShowWhen(false)
+                }
+            }
+            .build()
 
     private fun openApp() = packageManager.getLaunchIntentForPackage(packageName)?.let {
         android.app.PendingIntent.getActivity(
@@ -161,6 +202,9 @@ class GenerationService : Service() {
         private const val CHANNEL = "generation"
         private const val NOTIFICATION_ID = 4201
         private const val EXTRA_LABEL = "label"
+        private const val EXTRA_DETAIL = "detail"
+        private const val EXTRA_HOLDER = "holder"
+        private const val EXTRA_COUNTDOWN_TO = "countdownTo"
 
         /** Asks the service to stop itself, once it has promoted and once nobody holds it. */
         private const val ACTION_STOP = "io.github.alpharomercoma.openweights.STOP_GENERATION"
@@ -201,6 +245,18 @@ class GenerationService : Service() {
         private val holders = mutableMapOf<String, Int>()
 
         /**
+         * Whose words are on the notification at the moment.
+         *
+         * The label has always been last-writer-wins, which was harmless when only a turn
+         * ever wrote it. A watch that refreshes a countdown every period is a second writer,
+         * and without an owner it would paint over a turn that is generating right now, or
+         * leave its own name and a running countdown up after it had ended while another
+         * holder kept the service alive. Writing is allowed to whoever took the last hold;
+         * a watch that is not the owner refreshes nothing and stays quiet.
+         */
+        private var owner: String? = null
+
+        /**
          * Raises the process on [holder]'s behalf while [label] is happening.
          *
          * Failures are swallowed on purpose. Starting a foreground service can be refused,
@@ -208,12 +264,43 @@ class GenerationService : Service() {
          * and the right response is to generate anyway: the reply is what the user asked
          * for and a crash is worse than a turn that might be frozen.
          */
-        fun hold(context: Context, holder: String, label: String) {
-            synchronized(holders) { holders[holder] = (holders[holder] ?: 0) + 1 }
+        /**
+         * Rewrites what the notification says, for a holder that already has it.
+         *
+         * Separate from [hold] because [hold] counts: a watch that called it once per tick
+         * to refresh its countdown would raise the count every minute and never let the
+         * service stop. This changes the words and the deadline and touches nothing else.
+         */
+        fun relabel(
+            context: Context,
+            holder: String,
+            label: String,
+            detail: String?,
+            countdownTo: Long?,
+        ) {
+            val mine = synchronized(holders) { holders.containsKey(holder) && owner == holder }
+            if (!mine) return
             runCatching {
                 context.startForegroundService(
                     Intent(context, GenerationService::class.java)
-                        .putExtra(EXTRA_LABEL, label),
+                        .putExtra(EXTRA_LABEL, label)
+                        .putExtra(EXTRA_DETAIL, detail)
+                        .putExtra(EXTRA_HOLDER, holder)
+                        .putExtra(EXTRA_COUNTDOWN_TO, countdownTo ?: 0L),
+                )
+            }
+        }
+
+        fun hold(context: Context, holder: String, label: String) {
+            synchronized(holders) {
+                holders[holder] = (holders[holder] ?: 0) + 1
+                owner = holder
+            }
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, GenerationService::class.java)
+                        .putExtra(EXTRA_LABEL, label)
+                        .putExtra(EXTRA_HOLDER, holder),
                 )
             }
         }
@@ -234,10 +321,30 @@ class GenerationService : Service() {
          * has promoted, always, because the platform orders them.
          */
         fun release(context: Context, holder: String) {
-            val idle = synchronized(holders) {
+            val (idle, heir) = synchronized(holders) {
                 val remaining = (holders[holder] ?: 0) - 1
                 if (remaining > 0) holders[holder] = remaining else holders.remove(holder)
-                holders.isEmpty()
+                val gone = !holders.containsKey(holder)
+                // Handed on rather than merely dropped. Clearing the owner and leaving it
+                // clear meant that after a chat turn had taken the notification over and
+                // ended, a watch still holding the process could never write to it again:
+                // nobody owned it, so every refresh was refused as stale, and its countdown
+                // stopped moving for the rest of its life.
+                val next = if (gone && owner == holder) holders.keys.firstOrNull() else null
+                if (next != null || (gone && owner == holder)) owner = next
+                holders.isEmpty() to next
+            }
+            // Somebody else still needs the process, and the words on the notification
+            // belonged to whoever just left. Put back the one thing that is certainly still
+            // true; the new owner replaces it with its own on its next refresh.
+            if (heir != null) {
+                runCatching {
+                    context.startForegroundService(
+                        Intent(context, GenerationService::class.java)
+                            .putExtra(EXTRA_LABEL, DEFAULT_LABEL)
+                            .putExtra(EXTRA_HOLDER, heir),
+                    )
+                }
             }
             if (!idle) return
             runCatching {
@@ -249,5 +356,20 @@ class GenerationService : Service() {
 
         /** Whether anything is currently holding the process up. For tests and for logs. */
         fun isHeld(): Boolean = synchronized(holders) { holders.isNotEmpty() }
+
+        /**
+         * Forgets every hold, for a test that needs to start from nothing.
+         *
+         * The count is process-wide, which is right in an app with one process and awkward
+         * in a JVM running a suite: a test asserting that nothing is held any more would
+         * otherwise be asserting about every test that ran before it.
+         */
+        @VisibleForTesting
+        fun forgetHolders() {
+            synchronized(holders) {
+                holders.clear()
+                owner = null
+            }
+        }
     }
 }

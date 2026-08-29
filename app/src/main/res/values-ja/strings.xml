@@ -121,7 +121,19 @@
     <string name="watch_failed">%1$d回続けて失敗したため、自動的に停止しました</string>
     <string name="watch_every">%1$d分ごと</string>
     <string name="watch_with_notification">、実行中は通知を表示します</string>
-    <string name="watch_so_far"> · これまで%1$d回</string>
+    <string name="watch_expired">%1$d 回の確認を終えて自動的に終了しました</string>
+    <string name="watch_progress"> · %2$d 回中 %1$d 回目</string>
+    <string name="watch_next_in"> · 次は %1$s 後</string>
+    <string name="watch_next_due">、次の確認は実行待ちです</string>
+    <string name="watch_ends_in"> · %1$s 後に終了</string>
+    <string name="watch_ends_now"> · 終了中</string>
+    <string name="watch_notification_progress">%2$d 回中 %1$d 回目 · 次の確認</string>
+    <string name="watch_notification_progress_last">%2$d 回中 %1$d 回目</string>
+    <string name="watch_notification_ended">%1$d 回の確認を終えて自動的に停止しました</string>
+    <string name="watch_duration_hm">%1$d 時間 %2$d 分</string>
+    <string name="watch_duration_m">%1$d 分</string>
+    <string name="watch_duration_ms">%1$d 分 %2$02d 秒</string>
+    <string name="watch_duration_s">%1$d 秒</string>
     <string name="leaves_device">端末の外に出ます</string>
     <string name="no_folder_shared">共有フォルダなし</string>
     <string name="folder_none">フォルダを選ぶまでファイルツールは無効です。共有されるのはそのフォルダだけです。</string>
@@ -180,7 +192,6 @@
     <string name="remove_command">%1$s コマンドを削除</string>
     <string name="unknown_command">「%1$s」は認識されないコマンドです。もう一度送信するとメッセージとして送信されます。</string>
     <string name="unknown_command_suggestion">%1$s のことですか?</string>
-    <string name="delete_conversation_named">%1$s を削除</string>
     <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
     <string name="generated_at_speed_with_prefill">プロンプトを毎秒 %1$d トークンで読み込み、毎秒 %2$d トークンで生成</string>
     <string name="detail_prefill_speed">読み込み %1$.1f tok/s</string>
@@ -207,4 +218,5 @@
     <string name="language_models_heading">言語モデル (GGUF)</string>
     <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
     <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
+    <string name="delete_conversation_named">%1$s を削除</string>
 </resources>

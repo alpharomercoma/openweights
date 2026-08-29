@@ -126,7 +126,19 @@
     <string name="watch_failed">توقفت من تلقاء نفسها بعد %1$d عمليات تحقق فاشلة</string>
     <string name="watch_every">كل %1$d دقيقة</string>
     <string name="watch_with_notification">، مع إشعار أثناء التشغيل</string>
-    <string name="watch_so_far"> · %1$d حتى الآن</string>
+    <string name="watch_expired">انتهى تلقائيًا بعد %1$d عمليات تحقق</string>
+    <string name="watch_progress"> · التحقق %1$d من %2$d</string>
+    <string name="watch_next_in"> · التالي بعد %1$s</string>
+    <string name="watch_next_due">، التحقق التالي مستحق الآن</string>
+    <string name="watch_ends_in"> · يتوقف بعد %1$s</string>
+    <string name="watch_ends_now"> · يتوقف الآن</string>
+    <string name="watch_notification_progress">التحقق %1$d من %2$d · التالي</string>
+    <string name="watch_notification_progress_last">التحقق %1$d من %2$d</string>
+    <string name="watch_notification_ended">توقف تلقائيًا بعد %1$d عمليات تحقق</string>
+    <string name="watch_duration_hm">%1$d س %2$d د</string>
+    <string name="watch_duration_m">%1$d د</string>
+    <string name="watch_duration_ms">%1$d د %2$02d ث</string>
+    <string name="watch_duration_s">%1$d ث</string>
     <string name="leaves_device">يغادر الجهاز</string>
     <string name="no_folder_shared">لا يوجد مجلد مشترك</string>
     <string name="folder_none">تظل أدوات الملفات معطلة حتى تختار مجلدًا. يُشارَك ذلك المجلد وحده.</string>
@@ -186,7 +198,6 @@
     <string name="remove_command">إزالة أمر %1$s</string>
     <string name="unknown_command">"%1$s" ليس أمرًا معروفًا. أرسل مرة أخرى لإرساله كرسالة.</string>
     <string name="unknown_command_suggestion">هل تقصد %1$s؟</string>
-    <string name="delete_conversation_named">حذف %1$s</string>
     <string name="generated_at_speed">تم التوليد بسرعة %1$d رمز في الثانية</string>
     <string name="generated_at_speed_with_prefill">تمت قراءة الطلب بسرعة %1$d رمز في الثانية، وتم التوليد بسرعة %2$d رمز في الثانية</string>
     <string name="detail_prefill_speed">قراءة الطلب: %1$.1f رمز/ث</string>
@@ -213,4 +224,5 @@
     <string name="language_models_heading">نماذج اللغة (GGUF)</string>
     <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
     <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
+    <string name="delete_conversation_named">حذف %1$s</string>
 </resources>

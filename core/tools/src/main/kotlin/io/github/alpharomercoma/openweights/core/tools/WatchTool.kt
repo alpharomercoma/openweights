@@ -48,9 +48,10 @@ class WatchTool(private val watches: Watches) : Tool {
     // outweighs every instruction around it — so the intent is kept and the example is not.
     override val definition = ToolDefinition(
         name = NAME,
-        description = "Check something again on a schedule, for as long as the user wants. " +
+        description = "Check something again on a schedule, for a while. " +
             "Use it when they ask to be told about a change, or to look again every so " +
-            "often. Not for anything you can answer now.",
+            "often. Not for anything you can answer now. It stops itself after " +
+            "${Watch.MAX_RUNS} checks or ${Watch.MAX_LIFETIME_HOURS} hours.",
         parametersJson = """
             {
               "type": "object",
@@ -90,13 +91,16 @@ class WatchTool(private val watches: Watches) : Tool {
             ?: return "There are already ${Watch.MAX_ACTIVE} checks running, which is the " +
                 "limit. Ask the user to stop one first."
 
-        // Says what will actually happen rather than what was asked for. A watch faster than
-        // the scheduler's floor keeps a notification up, and the model should be able to
-        // tell the user that without having to know why.
+        // Says what will actually happen rather than what was asked for, and says the end
+        // out loud. A watch faster than the scheduler's floor keeps a notification up, and
+        // the user is entitled to hear both that and the fact that this stops on its own —
+        // from the assistant, in the reply, rather than by going looking for the screen.
+        val ends = "It stops itself after ${Watch.MAX_RUNS} checks or " +
+            "${Watch.MAX_LIFETIME_HOURS} hours, whichever comes first."
         return if (started.needsForegroundService) {
-            "Checking every $minutes minutes, with a notification showing while it runs."
+            "Checking every $minutes minutes, with a notification showing while it runs. $ends"
         } else {
-            "Checking every $minutes minutes."
+            "Checking every $minutes minutes. $ends"
         }
     }
 

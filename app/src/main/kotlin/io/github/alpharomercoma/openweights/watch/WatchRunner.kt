@@ -33,6 +33,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchOutcome
+import io.github.alpharomercoma.openweights.core.common.context.WatchState
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -77,11 +78,18 @@ class WatchRunner @Inject constructor(
      */
     suspend fun tick(watchId: Long, now: Long = System.currentTimeMillis()): WatchOutcome? {
         val watch = watches.byId(watchId) ?: return null
-        if (!watch.isActive) return null
+        // Before anything is spent on it: a watch that is over — stopped by hand, broken,
+        // or past the window it was given while the app was shut — ends here rather than
+        // running one more check nobody asked for. The budget half of the same bound is
+        // enforced where the checks are counted, in the record.
+        if (!watch.isActive || expire(watch, now)) return null
 
         refusal()?.let { why ->
-            watches.record(watchId, now, WatchOutcome.SKIPPED, why)
-            return WatchOutcome.SKIPPED
+            // The recorded state is read back here for the same reason the checked path
+            // reads it: recording is what can end a watch, and a caller told "skipped" for
+            // a watch that has since stopped sleeps another full period before noticing.
+            val after = watches.record(watchId, now, WatchOutcome.SKIPPED, why)
+            return WatchOutcome.SKIPPED.takeIf { after == null || after.isActive }
         }
 
         val (outcome, summary) = check(watch, watchId)
@@ -93,7 +101,10 @@ class WatchRunner @Inject constructor(
         // Only a check that actually ran is worth a person's attention. Skipped ticks are
         // routine — busy engine, low battery, the ordinary cost of running unattended — and
         // alerting on every one of those would be the thing that gets this feature muted.
-        if (outcome == WatchOutcome.CHECKED) alert(watch, summary)
+        if (outcome == WatchOutcome.CHECKED) alert(watch, summary, after ?: watch)
+        // Said once, when the last check of the budget has just run: a watch that stops
+        // itself and says nothing is indistinguishable from one that broke.
+        if (after != null && after.state == WatchState.EXPIRED) announceEnd(after)
         return outcome.takeIf { after == null || after.isActive }
     }
 
@@ -105,7 +116,7 @@ class WatchRunner @Inject constructor(
      * opposite of unattended. This one fires once, for the result a person actually asked to
      * be told about, and is the one place a sound belongs.
      */
-    private fun alert(watch: Watch, summary: String) {
+    private fun alert(watch: Watch, summary: String, after: Watch) {
         // Android 13+ requires this granted at runtime; the manifest entry alone is not
         // enough. Checked explicitly rather than left to runCatching, so a missing grant is
         // a line in logcat and not a silently vanished result.
@@ -122,6 +133,10 @@ class WatchRunner @Inject constructor(
             .setContentTitle(watch.task.take(MAX_TITLE_CHARS))
             .setContentText(summary)
             .setStyle(NotificationCompat.BigTextStyle().bigText(summary))
+            // Which check this was, and what is left of the watch. Without it the same
+            // notification arrives every few minutes with no way to tell one from the next,
+            // and no way to know whether this thing is going to stop on its own.
+            .setSubText(progress(after))
             .setAutoCancel(true)
             .setContentIntent(openApp())
             .build()
@@ -131,6 +146,65 @@ class WatchRunner @Inject constructor(
         // hashCode() of a string only this feature constructs avoids both.
         runCatching { manager.notify("watch-${watch.id}".hashCode(), notification) }
     }
+
+    /**
+     * Ends a watch whose window has closed, and says whether it was ended.
+     *
+     * Split out of [tick] to keep one exit per reason there, and because "is this over" and
+     * "run this" are separate questions that happen to be asked in a row.
+     */
+    private suspend fun expire(watch: Watch, now: Long): Boolean {
+        if (!watch.isSpent(now)) return false
+        watches.stop(watch.id, WatchState.EXPIRED)
+        announceEnd(watch)
+        return true
+    }
+
+    /**
+     * Says, once, that a watch has stopped looking.
+     *
+     * The one notification a watch posts about itself rather than about what it found.
+     *
+     * A watch that has spent its budget or run out of window disappears from the active
+     * list, and the ongoing notification that a fast one keeps up goes with it. Both of
+     * those are silent, and silence is the same shape as a crash. So it says so once, on
+     * the same channel as its results, because whoever asked for the watch is the person
+     * who wants to know it has stopped looking.
+     */
+    fun announceEnd(watch: Watch) {
+        val granted = ContextCompat.checkSelfPermission(appContext, POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) return
+        val manager = appContext.getSystemService<NotificationManager>() ?: return
+        ensureAlertChannel(manager)
+        val ended = appContext.getString(R.string.watch_notification_ended, watch.runs)
+        val notification = NotificationCompat.Builder(appContext, ALERT_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(watch.task.take(MAX_TITLE_CHARS))
+            .setContentText(ended)
+            .setAutoCancel(true)
+            .setContentIntent(openApp())
+            .build()
+        runCatching { manager.notify("watch-end-${watch.id}".hashCode(), notification) }
+    }
+
+    /**
+     * "Check 3 of 60 · next check", or without the promise when there will not be one.
+     *
+     * The last result of a watch that has just spent its budget arrives at the same moment
+     * the watch ends, and the version of this line that always said "next check" made that
+     * notification a small lie — one immediately contradicted by the "stopped on its own"
+     * notice landing beneath it.
+     */
+    private fun progress(watch: Watch): String = appContext.getString(
+        if (watch.isActive) {
+            R.string.watch_notification_progress
+        } else {
+            R.string.watch_notification_progress_last
+        },
+        watch.runs,
+        Watch.MAX_RUNS,
+    )
 
     private fun openApp() = appContext.packageManager
         .getLaunchIntentForPackage(appContext.packageName)?.let {

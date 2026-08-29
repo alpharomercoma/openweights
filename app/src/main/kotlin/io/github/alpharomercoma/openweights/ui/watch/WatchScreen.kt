@@ -43,6 +43,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -51,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
+import kotlinx.coroutines.delay
 
 /**
  * Everything the app is checking on its own, and the way to make it stop.
@@ -100,6 +106,18 @@ fun WatchScreen(
             )
         },
     ) { padding ->
+        // One clock for the screen, not one per row: every countdown on it is reading the
+        // same second, and a timer per row would be four coroutines saying the same thing.
+        // It exists only while this screen is composed, so nothing ticks in the background
+        // on account of the interface.
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        val ticking = watches.any { it.isActive }
+        LaunchedEffect(ticking) {
+            while (ticking) {
+                now = System.currentTimeMillis()
+                delay(SECOND_MS)
+            }
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
@@ -120,7 +138,12 @@ fun WatchScreen(
             }
 
             items(watches, key = { it.id }) { watch ->
-                WatchRow(watch = watch, onStop = { onStop(watch) }, onForget = { onForget(watch) })
+                WatchRow(
+                    watch = watch,
+                    now = now,
+                    onStop = { onStop(watch) },
+                    onForget = { onForget(watch) },
+                )
                 HorizontalDivider(
                     thickness = Dp.Hairline,
                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -131,7 +154,7 @@ fun WatchScreen(
 }
 
 @Composable
-private fun WatchRow(watch: Watch, onStop: () -> Unit, onForget: () -> Unit) {
+private fun WatchRow(watch: Watch, now: Long, onStop: () -> Unit, onForget: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(watch.task, style = MaterialTheme.typography.bodyLarge)
         Text(
@@ -139,6 +162,15 @@ private fun WatchRow(watch: Watch, onStop: () -> Unit, onForget: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // The live half, kept apart from the line above because they answer different
+        // questions: that one is what this watch is, this one is where it has got to.
+        watch.progress(now)?.let { progress ->
+            Text(
+                text = progress,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         watch.lastSummary?.let { summary ->
             Text(
                 text = summary,
@@ -170,9 +202,67 @@ private fun WatchRow(watch: Watch, onStop: () -> Unit, onForget: () -> Unit) {
 private fun Watch.cadence(): String = when (state) {
     WatchState.STOPPED -> stringResource(R.string.watch_stopped, runs)
     WatchState.FAILED -> stringResource(R.string.watch_failed, consecutiveFailures)
+    WatchState.EXPIRED -> stringResource(R.string.watch_expired, runs)
     WatchState.ACTIVE -> buildString {
         append(stringResource(R.string.watch_every, everyMinutes))
         if (needsForegroundService) append(stringResource(R.string.watch_with_notification))
-        if (runs > 0) append(stringResource(R.string.watch_so_far, runs))
     }
 }
+
+/**
+ * How far along this watch is, and how long until it looks again and until it stops.
+ *
+ * Null for a watch that has finished, where the line above already says how it ended.
+ *
+ * "Due now" rather than a negative countdown, and it is not a rounding detail: a scheduled
+ * tick waits on `WorkManager`, which Doze can hold for far longer than the interval, and a
+ * fast watch skips a tick whose engine is busy. The moment can pass without the check
+ * happening, so the interface says the check is owed rather than promising a time.
+ */
+@Composable
+private fun Watch.progress(now: Long): String? {
+    if (!isActive) return null
+    return buildString {
+        append(stringResource(R.string.watch_progress, runs + 1, Watch.MAX_RUNS).trimStart(' '))
+        val untilNext = dueAt - now
+        if (untilNext > 0) {
+            append(stringResource(R.string.watch_next_in, duration(untilNext, seconds = true)))
+        } else {
+            append(stringResource(R.string.watch_next_due))
+        }
+        val untilEnd = expiresAt - now
+        if (untilEnd > 0) {
+            append(stringResource(R.string.watch_ends_in, duration(untilEnd, seconds = true)))
+        } else {
+            // The row still says active because only a tick or the next startup writes the
+            // ending down. Saying nothing here would leave a watch that is over looking
+            // like one that is running.
+            append(stringResource(R.string.watch_ends_now))
+        }
+    }
+}
+
+/**
+ * A short, spoken-sounding length of time.
+ *
+ * Seconds are shown for the next check, because a countdown that only moves once a minute
+ * looks stuck, and withheld from "stops in", where they would be false precision on
+ * something hours away.
+ */
+@Composable
+private fun duration(millis: Long, seconds: Boolean): String {
+    val total = (millis / SECOND_MS).coerceAtLeast(0)
+    val hours = total / SECONDS_PER_HOUR
+    val minutes = (total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE
+    return when {
+        hours > 0 -> stringResource(R.string.watch_duration_hm, hours, minutes)
+        minutes > 0 && !seconds -> stringResource(R.string.watch_duration_m, minutes)
+        minutes > 0 ->
+            stringResource(R.string.watch_duration_ms, minutes, total % SECONDS_PER_MINUTE)
+        else -> stringResource(R.string.watch_duration_s, total)
+    }
+}
+
+private const val SECOND_MS = 1_000L
+private const val SECONDS_PER_MINUTE = 60L
+private const val SECONDS_PER_HOUR = 3_600L

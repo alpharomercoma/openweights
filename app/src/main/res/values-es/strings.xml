@@ -120,7 +120,19 @@
     <string name="watch_failed">Se detuvo sola tras %1$d comprobaciones fallidas</string>
     <string name="watch_every">Cada %1$d minutos</string>
     <string name="watch_with_notification">, con una notificación mientras se ejecuta</string>
-    <string name="watch_so_far"> · %1$d hasta ahora</string>
+    <string name="watch_expired">Terminó por su cuenta tras %1$d comprobaciones</string>
+    <string name="watch_progress"> · comprobación %1$d de %2$d</string>
+    <string name="watch_next_in"> · siguiente en %1$s</string>
+    <string name="watch_next_due">, siguiente comprobación pendiente</string>
+    <string name="watch_ends_in"> · termina en %1$s</string>
+    <string name="watch_ends_now"> · deteniéndose</string>
+    <string name="watch_notification_progress">Comprobación %1$d de %2$d · siguiente</string>
+    <string name="watch_notification_progress_last">Comprobación %1$d de %2$d</string>
+    <string name="watch_notification_ended">Se detuvo por su cuenta tras %1$d comprobaciones</string>
+    <string name="watch_duration_hm">%1$d h %2$d min</string>
+    <string name="watch_duration_m">%1$d min</string>
+    <string name="watch_duration_ms">%1$d min %2$02d s</string>
+    <string name="watch_duration_s">%1$d s</string>
     <string name="leaves_device">Sale del dispositivo</string>
     <string name="no_folder_shared">Ninguna carpeta compartida</string>
     <string name="folder_none">Las herramientas de archivos siguen apagadas hasta que elijas una. Solo se comparte esa carpeta.</string>
@@ -198,7 +210,6 @@
     <string name="remove_command">Quitar el comando %1$s</string>
     <string name="unknown_command">"%1$s" no es un comando reconocido. Vuelve a enviarlo para enviarlo como mensaje.</string>
     <string name="unknown_command_suggestion">¿Quisiste decir %1$s?</string>
-    <string name="delete_conversation_named">Eliminar %1$s</string>
     <string name="generated_at_speed">Generado a %1$d tokens por segundo</string>
     <string name="generated_at_speed_with_prefill">Prompt leído a %1$d tokens por segundo, generado a %2$d tokens por segundo</string>
     <string name="detail_prefill_speed">%1$.1f tok/s de lectura del prompt</string>
@@ -225,4 +236,5 @@
     <string name="language_models_heading">Modelos de lenguaje (GGUF)</string>
     <string name="model_badge_projector_missing">Modelo de visión · descargue el proyector (mmproj) para habilitar entrada de imagen</string>
     <string name="slash_command_hint">Escribe un mensaje, o / para comandos</string>
+    <string name="delete_conversation_named">Eliminar %1$s</string>
 </resources>

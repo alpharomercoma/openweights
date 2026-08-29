@@ -148,4 +148,150 @@ class WatchRepositoryTest {
             assertThat(kept.first().summary).isEqualTo("run 29")
         }
     }
+
+    @Test
+    fun `a watch spends its budget and stops itself`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 1, now = NOW)!!
+
+            repeat(Watch.MAX_RUNS) {
+                repository.record(watch.id, NOW + it, WatchOutcome.CHECKED, "run $it")
+            }
+
+            // In the write that counted the last one, not a period later: the ticker is
+            // what would notice a period later, and the ticker is what a process death
+            // takes away.
+            val after = repository.byId(watch.id)!!
+            assertThat(after.state).isEqualTo(WatchState.EXPIRED)
+            assertThat(after.runs).isEqualTo(Watch.MAX_RUNS)
+        }
+    }
+
+    @Test
+    fun `a skipped tick spends no budget`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 1, now = NOW)!!
+
+            // A busy engine, a low battery: routine, and not the user's watch being used up.
+            repeat(Watch.MAX_RUNS + 5) {
+                repository.record(watch.id, NOW + it, WatchOutcome.SKIPPED, "busy")
+            }
+
+            val after = repository.byId(watch.id)!!
+            assertThat(after.runs).isEqualTo(0)
+            assertThat(after.state).isEqualTo(WatchState.ACTIVE)
+        }
+    }
+
+    @Test
+    fun `a watch that outlives its window is ended by the sweep`() {
+        runBlocking {
+            val old = repository.add("check the tide", everyMinutes = 60, now = NOW)!!
+            val fresh = repository.add("check the sky", everyMinutes = 60, now = NOW)!!
+
+            // Two days and a minute later, with the app having been shut for all of it: the
+            // clock half of the bound needs no tick to pass, so nothing else would end it.
+            val ended = repository.expireLapsed(old.expiresAt + 60_000)
+
+            assertThat(ended.map { it.id }).containsExactly(old.id, fresh.id)
+            assertThat(repository.byId(old.id)!!.state).isEqualTo(WatchState.EXPIRED)
+        }
+    }
+
+    @Test
+    fun `the sweep does not overwrite why a watch already ended`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 60, now = NOW)!!
+            repeat(Watch.MAX_CONSECUTIVE_FAILURES) {
+                repository.record(watch.id, NOW + it, WatchOutcome.FAILED, "no")
+            }
+
+            repository.expireLapsed(watch.expiresAt + 60_000)
+
+            // "It broke" and "it ran out of time" send a person to different places.
+            assertThat(repository.byId(watch.id)!!.state).isEqualTo(WatchState.FAILED)
+        }
+    }
+
+    @Test
+    fun `the next check is written down, and moves even when a tick is skipped`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 5, now = NOW)!!
+            assertThat(watch.nextRunAt).isEqualTo(NOW + 5 * 60_000)
+
+            // A skip leaves lastRunAt alone by design, but the ticker still sleeps a whole
+            // period — so a countdown derived from the last *run* would sit in the past
+            // saying a check was owed when none was.
+            val after = repository.record(
+                watch.id,
+                NOW + 5 * 60_000,
+                WatchOutcome.SKIPPED,
+                "busy",
+            )!!
+
+            assertThat(after.lastRunAt).isNull()
+            assertThat(after.dueAt).isEqualTo(NOW + 10 * 60_000)
+        }
+    }
+
+    @Test
+    fun `a restarted ticker moves the deadline to a period from now`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 5, now = NOW)!!
+
+            repository.reschedule(watch.id, NOW + 3 * 60_000)
+
+            assertThat(repository.byId(watch.id)!!.dueAt).isEqualTo(NOW + 8 * 60_000)
+        }
+    }
+
+    @Test
+    fun `a stopped watch is not given a new deadline`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 5, now = NOW)!!
+            repository.stop(watch.id)
+
+            repository.reschedule(watch.id, NOW + 3 * 60_000)
+
+            assertThat(repository.byId(watch.id)!!.dueAt).isEqualTo(NOW + 5 * 60_000)
+        }
+    }
+
+    @Test
+    fun `two things ending the same watch at once do not overwrite each other`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 60, now = NOW)!!
+
+            // The startup sweep and the user's Stop button, arriving together. Whichever
+            // lands first is the reason, and the second must not repaint it: the guard is a
+            // WHERE clause rather than a read followed by a write, so there is no window
+            // between deciding and writing for the other one to fit into.
+            repository.stop(watch.id, WatchState.EXPIRED)
+            repository.stop(watch.id, WatchState.STOPPED)
+
+            assertThat(repository.byId(watch.id)!!.state).isEqualTo(WatchState.EXPIRED)
+        }
+    }
+
+    @Test
+    fun `a deadline is not written onto a watch that has stopped`() {
+        runBlocking {
+            val watch = repository.add("check the tide", everyMinutes = 5, now = NOW)!!
+            repository.stop(watch.id)
+
+            // A ticker unwinding after cancellation can still reach this. Reviving a
+            // stopped watch by writing to it would be the worst kind of bug here: a check
+            // running on a schedule the user believes they ended.
+            repository.reschedule(watch.id, NOW + 3 * 60_000)
+
+            val after = repository.byId(watch.id)!!
+            assertThat(after.state).isEqualTo(WatchState.STOPPED)
+            assertThat(after.dueAt).isEqualTo(NOW + 5 * 60_000)
+        }
+    }
+
+    private companion object {
+        /** One clock for the watch and for the judgement about it. See `Watch.isSpent`. */
+        val NOW: Long = System.currentTimeMillis()
+    }
 }

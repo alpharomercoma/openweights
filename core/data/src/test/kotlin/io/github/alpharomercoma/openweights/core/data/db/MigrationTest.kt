@@ -64,6 +64,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_11_12,
         OpenWeightsDatabase.MIGRATION_12_13,
         OpenWeightsDatabase.MIGRATION_13_14,
+        OpenWeightsDatabase.MIGRATION_14_15,
     )
 
     @Test
@@ -369,6 +370,26 @@ class MigrationTest {
                 .isEqualTo(24.3)
             assertThat(db.isNullAt("SELECT prefillTokensPerSecond FROM messages WHERE id = 1"))
                 .isTrue()
+        }
+    }
+
+    @Test
+    fun `a watch from before the deadline column keeps running and reads as due by interval`() {
+        // The column is deliberately not backfilled: null means "nothing has scheduled this
+        // one yet", and `Watch.dueAt` then falls back to the interval from when the watch
+        // was made — exactly what the screen showed before the column existed.
+        helper.createDatabase(14).use { db ->
+            db.execSQL(
+                "INSERT INTO watches " +
+                    "(id, task, everyMinutes, state, createdAt, runs, consecutiveFailures) " +
+                    "VALUES (1, 'check the tides', 15, 'ACTIVE', 5, 0, 0)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(15, migrations.toList()).use { db ->
+            assertThat(db.isNullAt("SELECT nextRunAt FROM watches WHERE id = 1")).isTrue()
+            assertThat(db.intAt("SELECT count(*) FROM watches WHERE state = 'ACTIVE'"))
+                .isEqualTo(1)
         }
     }
 }

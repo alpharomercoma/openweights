@@ -48,6 +48,14 @@ package io.github.alpharomercoma.openweights.core.common.context
  * waiting for. [MAX_ACTIVE] bounds how many can exist; [MAX_CONSECUTIVE_FAILURES] stops one
  * that is only producing errors; the runner refuses to start a tick while the engine is busy
  * rather than queueing, because a queue of stale checks is worse than a missed one.
+ *
+ * And no watch runs forever. [MAX_RUNS] and [MAX_LIFETIME_HOURS] give every one of them an
+ * end from the moment it is made — see [expiresAt] — because "until you stop it" is a
+ * promise the user has to remember to collect on, and the one thing they cannot see from
+ * outside is how much of their battery it has spent. [nextRunAt] and [runs] are the other
+ * half of the same argument: a watch should be able to say when it will look again and how
+ * many times it already has, on screen and in its notification, rather than only that it
+ * exists.
  */
 data class Watch(
     val id: Long = 0,
@@ -63,6 +71,22 @@ data class Watch(
     val runs: Int = 0,
     /** Reset by any tick that succeeds. See [MAX_CONSECUTIVE_FAILURES]. */
     val consecutiveFailures: Int = 0,
+    /**
+     * When the next check is due, as whatever scheduled it last worked it out.
+     *
+     * Stored rather than worked out from the last run and the interval, and that is a
+     * correction rather than a preference. Derived, it was wrong in every case that
+     * matters: a tick skipped for a busy engine leaves [lastRunAt] alone but still waits a
+     * whole period, so the derived moment sat in the past while nothing was owed; a ticker
+     * restarted with the process begins a fresh period from now rather than from whenever
+     * the last run happened; and an edited interval recomputed history as though the new
+     * cadence had always been in force. Whoever sets the alarm writes it down here, so the
+     * countdown on screen is the alarm rather than a guess at it.
+     *
+     * Null before anything has scheduled it, where [dueAt] falls back to the interval from
+     * when the watch was made.
+     */
+    val nextRunAt: Long? = null,
 ) {
     init {
         require(task.isNotBlank()) { "a watch needs something to check" }
@@ -75,6 +99,33 @@ data class Watch(
     val needsForegroundService: Boolean get() = everyMinutes < SCHEDULER_FLOOR_MINUTES
 
     val isActive: Boolean get() = state == WatchState.ACTIVE
+
+    /**
+     * When the next check is due, which is never a promise that it will run then.
+     *
+     * Doze stretches a scheduled tick, and a fast watch whose engine is busy records a skip
+     * and waits for the next period. This is what is owed, not what will happen, and the
+     * interface says so.
+     */
+    val dueAt: Long get() = nextRunAt ?: (createdAt + everyMinutes * MILLIS_PER_MINUTE)
+
+    /**
+     * When this watch stops itself for having existed long enough.
+     *
+     * Wall clock alone. The first version of this took the sooner of the clock and the
+     * budget spent at full speed, which reads as prudent and is simply wrong: a budget is
+     * spent in *checks*, each of which takes tens of seconds, and a skipped tick spends
+     * none of it. Turning it into a deadline guaranteed a watch stopped before running the
+     * number of checks it had just promised, and at a daily cadence guaranteed it ran none
+     * at all. The two bounds are independent, and each is honest on its own terms.
+     */
+    val expiresAt: Long get() = createdAt + MAX_LIFETIME_HOURS * MILLIS_PER_HOUR
+
+    /** How many checks are left in the budget, never negative. */
+    val runsLeft: Int get() = (MAX_RUNS - runs).coerceAtLeast(0)
+
+    /** True once this watch has spent its budget or outlived its window. */
+    fun isSpent(now: Long): Boolean = runs >= MAX_RUNS || now >= expiresAt
 
     companion object {
         /**
@@ -112,6 +163,38 @@ data class Watch(
          * asked another two hundred times, and the cost of finding out is battery.
          */
         const val MAX_CONSECUTIVE_FAILURES = 3
+
+        /**
+         * Checks one watch may run before it stops itself.
+         *
+         * A watch used to run until it was stopped by hand, and nothing on screen said so.
+         * That is the wrong default for work nobody is watching: every check is a full model
+         * turn, and a one-minute watch forgotten overnight is some seven hundred of them
+         * against a battery its owner is asleep next to. Sixty is enough for a watch to be
+         * useful — an hour at the fastest cadence, two days at an hourly one — and small
+         * enough that forgetting one costs an hour rather than a night.
+         */
+        const val MAX_RUNS = 60
+
+        /**
+         * The longest a watch may exist, whatever its cadence.
+         *
+         * The budget alone leaves a slow watch effectively unbounded: sixty daily checks is
+         * two months.
+         *
+         * Three days rather than a neater one or two, and the reason is arithmetic rather
+         * than taste. The slowest cadence offered is a day, and the window has to be long
+         * enough for the slowest watch to be worth having made: at twenty-four hours a
+         * daily watch expires at the very moment its first check falls due, and at
+         * forty-eight the second check lands exactly on the deadline and is refused. Since
+         * a tick is allowed to be late — `WorkManager` guarantees only "eventually" — the
+         * window has to clear the second check with room to spare, and seventy-two hours
+         * is the first round number that does.
+         */
+        const val MAX_LIFETIME_HOURS = 72
+
+        internal const val MILLIS_PER_MINUTE = 60_000L
+        private const val MILLIS_PER_HOUR = 3_600_000L
     }
 }
 
@@ -125,6 +208,15 @@ enum class WatchState {
 
     /** Stopped by the app after [Watch.MAX_CONSECUTIVE_FAILURES] failures in a row. */
     FAILED,
+
+    /**
+     * Stopped by the app because it ran out of budget or outlived its window.
+     *
+     * Its own state rather than [STOPPED], because the two answer different questions from
+     * the user's side: one is "I ended this" and the other is "this ended on its own, and
+     * here is how much it did first".
+     */
+    EXPIRED,
 }
 
 /** One tick, and what came of it. */

@@ -296,7 +296,7 @@ interface CompactionDao {
     suspend fun insert(compaction: CompactionEntity): Long
 }
 
-/** Watches and their history. */
+/** The watches themselves: what is scheduled, and what state each one is in. */
 @Dao
 interface WatchDao {
     @Query("SELECT * FROM watches ORDER BY createdAt DESC")
@@ -308,8 +308,20 @@ interface WatchDao {
     @Query("SELECT * FROM watches WHERE id = :id")
     suspend fun byId(id: Long): WatchEntity?
 
-    @Query("SELECT COUNT(*) FROM watches WHERE state = :state")
-    suspend fun countInState(state: String): Int
+    /**
+     * Ends an active watch, and does nothing to one that has already ended.
+     *
+     * A statement rather than a read followed by a write, because the two racing was a real
+     * hole: a startup sweep that had read a row as active could overwrite the FAILED a tick
+     * wrote a moment later, and the screen would then say a broken watch had merely run out
+     * of time. The `WHERE` clause is the whole guard, and SQLite applies it atomically.
+     */
+    @Query("UPDATE watches SET state = :state WHERE id = :id AND state = 'ACTIVE'")
+    suspend fun endIfActive(id: Long, state: String): Int
+
+    /** Moves the next deadline, for a watch that is still running. Same race, same guard. */
+    @Query("UPDATE watches SET nextRunAt = :at WHERE id = :id AND state = 'ACTIVE'")
+    suspend fun setNextRunAt(id: Long, at: Long): Int
 
     @Insert
     suspend fun insert(watch: WatchEntity): Long
@@ -319,7 +331,17 @@ interface WatchDao {
 
     @Query("DELETE FROM watches WHERE id = :id")
     suspend fun delete(id: Long)
+}
 
+/**
+ * One watch's history of ticks, which is its own table and now its own door to it.
+ *
+ * Split from [WatchDao] rather than left beside it: the two answer different questions —
+ * what is scheduled, and what has happened — and the schedule side grew two statements when
+ * ending a watch and moving its deadline stopped being read-then-write.
+ */
+@Dao
+interface WatchRunDao {
     @Query("SELECT * FROM watch_runs WHERE watchId = :watchId ORDER BY at DESC LIMIT :limit")
     fun observeRuns(watchId: Long, limit: Int): Flow<List<WatchRunEntity>>
 

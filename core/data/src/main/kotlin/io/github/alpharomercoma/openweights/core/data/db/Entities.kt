@@ -347,6 +347,8 @@ data class WatchEntity(
     val lastSummary: String? = null,
     val runs: Int = 0,
     val consecutiveFailures: Int = 0,
+    /** When the next check is due, as whoever scheduled it last worked it out. */
+    val nextRunAt: Long? = null,
 )
 
 /**

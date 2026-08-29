@@ -35,6 +35,7 @@ import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.model.ModelStore
+import io.github.alpharomercoma.openweights.runtime.GenerationService
 import io.github.alpharomercoma.openweights.ui.chat.ContextWindows
 import io.github.alpharomercoma.openweights.ui.chat.FakeInferenceEngine
 import io.github.alpharomercoma.openweights.ui.chat.ModelRuntime
@@ -192,7 +193,7 @@ class WatchSchedulerTest {
         }
     }
 
-    private suspend fun WatchRepository.runCountOf(id: Long) = database.watches()
+    private suspend fun WatchRepository.runCountOf(id: Long) = database.watchRuns()
         .observeRuns(id, RUN_HISTORY_LIMIT).first().size
 
     @Test
@@ -202,7 +203,7 @@ class WatchSchedulerTest {
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val scheduler = schedulerOf(context, backgroundScope)
         val watch = requireNotNull(
-            watches.add("Check the tides", everyMinutes = 1, now = 0),
+            watches.add("Check the tides", everyMinutes = 1, now = NOW),
         )
 
         scheduler.schedule(watch)
@@ -235,7 +236,7 @@ class WatchSchedulerTest {
         loadedEngine()
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val scheduler = schedulerOf(context, backgroundScope)
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 1, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 1, now = NOW))
 
         // A watch that never stops on its own has no natural place to land exactly on a
         // period boundary the way the three-strikes watch above does: once real I/O for one
@@ -257,7 +258,7 @@ class WatchSchedulerTest {
         loadedEngine()
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         val scheduler = schedulerOf(context, backgroundScope)
-        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 1, now = 0))
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 1, now = NOW))
 
         // Cancelled before its first period even elapses, rather than after some number of
         // ticks, so there is no question of a tick already in flight when cancel() lands —
@@ -272,7 +273,42 @@ class WatchSchedulerTest {
         assertThat(watches.runCountOf(watch.id)).isEqualTo(0)
     }
 
+    @Test
+    fun `editing the interval of a fast watch does not leak a foreground hold`() = runTest {
+        loadedEngine()
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val scheduler = schedulerOf(context, backgroundScope)
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 1, now = NOW))
+
+        // A changed cadence replaces the ticker: the old coroutine is cancelled and a new
+        // one takes its own hold. The old one used to see itself replaced and release
+        // nothing, so every edit left a hold behind and the notification stayed up for a
+        // ticker that had already finished.
+        // From nothing: the count is process-wide, so without this the assertion below
+        // would be about every test that has run before this one.
+        GenerationService.forgetHolders()
+        scheduler.schedule(watch)
+        scheduler.schedule(watch.copy(everyMinutes = 2))
+        advanceUntilIdle()
+        scheduler.cancel(watch.id)
+        // Polled against a real deadline, like every other multi-coroutine wait here: a
+        // cancelled ticker unwinds through a suspending database write on Room's own
+        // executor, which the virtual clock does not drive.
+        advanceUntilStoppedOr { !GenerationService.isHeld() }
+
+        assertThat(GenerationService.isHeld()).isFalse()
+    }
+
     private companion object {
+        /**
+         * The clock a watch is made on, which has to be the one it is judged against.
+         *
+         * Zero used to do, and stopped once a watch could expire: `WatchRunner` stamps a
+         * tick with the real clock, so a watch created in 1970 is two days over its window
+         * before its first tick and ends instead of running.
+         */
+        val NOW: Long = System.currentTimeMillis()
+
         const val MINUTE = 60_000L
         const val SETTLE_TIMEOUT_MS = 5_000L
         const val SETTLE_PAUSE_MS = 25L

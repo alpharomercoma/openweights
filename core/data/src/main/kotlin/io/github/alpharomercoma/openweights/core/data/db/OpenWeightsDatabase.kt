@@ -34,7 +34,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -44,6 +44,7 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
+    abstract fun watchRuns(): WatchRunDao
     abstract fun toolSteps(): ToolStepDao
     abstract fun engineHistory(): EngineHistoryDao
 
@@ -60,6 +61,20 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * along with everything else and cannot be pulled back out, so old rows read as
          * "not measured" rather than a wrong number invented for them.
          */
+        /**
+         * Gives a watch somewhere to write down when its next check is due.
+         *
+         * Nothing to backfill, and deliberately so: the column is null for every existing
+         * watch and `Watch.dueAt` falls back to the interval from when it was made, which
+         * is exactly what the old screen showed. The first thing that schedules each watch
+         * — the startup sync, moments later — writes the real deadline.
+         */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE watches ADD COLUMN nextRunAt INTEGER")
+            }
+        }
+
         /**
          * Stamps the engine record with the model that wrote it. Switching models renames
          * the conversation, so the conversation's own model name cannot say whether a

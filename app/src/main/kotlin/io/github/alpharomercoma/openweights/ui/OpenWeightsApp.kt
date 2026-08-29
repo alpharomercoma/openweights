@@ -34,9 +34,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
+import io.github.alpharomercoma.openweights.ui.archive.ArchiveViewModel
+import io.github.alpharomercoma.openweights.ui.archive.ArchivedScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatDestinations
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
+import io.github.alpharomercoma.openweights.ui.chat.ConversationActions
 import io.github.alpharomercoma.openweights.ui.chat.MediaViewModel
 import io.github.alpharomercoma.openweights.ui.chat.ReportViewModel
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
@@ -73,6 +76,7 @@ private object Routes {
     const val TOOLS = "tools"
     const val USAGE = "usage"
     const val WATCHES = "watches"
+    const val ARCHIVE = "archive"
     const val SETTINGS = "settings"
 }
 
@@ -184,6 +188,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     onOpenTools = { navController.push(Routes.TOOLS) },
                     onOpenUsage = { navController.push(Routes.USAGE) },
                     onOpenWatches = { navController.push(Routes.WATCHES) },
+                    onOpenArchive = { navController.push(Routes.ARCHIVE) },
                     onOpenSettings = { navController.push(Routes.SETTINGS) },
                     onBrowseModels = { navController.push(Routes.DISCOVER) },
                     onManageModels = { navController.push(Routes.MODELS) },
@@ -204,12 +209,19 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 },
                 chatSearch = chatSearch,
                 onSearchConversations = chatViewModel.search::search,
-                onDeleteConversation = {
-                    chatViewModel.deleteConversation(it)
-                    // Results are a list rather than a live query, so the row it just deleted
-                    // would otherwise stay on screen, tappable, opening nothing.
-                    chatViewModel.search.forget(it)
-                },
+                conversationActions = ConversationActions(
+                    onRename = chatViewModel::renameConversation,
+                    onPin = chatViewModel::setConversationPinned,
+                    onArchive = chatViewModel::setConversationArchived,
+                    onDelete = {
+                        chatViewModel.deleteConversation(it)
+                        // Results are a list rather than a live query, so the row it just
+                        // deleted would otherwise stay on screen, tappable, opening nothing.
+                        // The other three actions need no such help: the row reads its
+                        // title and its state from the live list. See `SearchResults`.
+                        chatViewModel.search.forget(it)
+                    },
+                ),
                 onSavePreferences = chatViewModel::savePreferences,
                 onResetPreferences = chatViewModel::resetPreferences,
                 onAttach = chatViewModel::attach,
@@ -323,6 +335,30 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             val summary by viewModel.uiState.collectAsStateWithLifecycle()
 
             DashboardScreen(summary = summary, onBack = navController::popBackStack)
+        }
+
+        composable(Routes.ARCHIVE) {
+            val viewModel: ArchiveViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+            ArchivedScreen(
+                state = state,
+                onSearch = viewModel::search,
+                onOpen = {
+                    chatViewModel.openConversation(it)
+                    navController.popBackStack()
+                },
+                // The same four actions the drawer offers, through the same view model:
+                // deleting has to collect the files a conversation's messages referred to
+                // before the rows naming them are gone, and that lives in one place.
+                actions = ConversationActions(
+                    onRename = chatViewModel::renameConversation,
+                    onPin = chatViewModel::setConversationPinned,
+                    onArchive = chatViewModel::setConversationArchived,
+                    onDelete = chatViewModel::deleteConversation,
+                ),
+                onBack = navController::popBackStack,
+            )
         }
 
         composable(Routes.WATCHES) {

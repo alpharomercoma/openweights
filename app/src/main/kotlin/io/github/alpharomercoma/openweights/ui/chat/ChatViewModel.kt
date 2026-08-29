@@ -45,6 +45,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
+import io.github.alpharomercoma.openweights.core.data.ArchivedConversations
+import io.github.alpharomercoma.openweights.core.data.ConversationFiling
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
@@ -213,7 +215,14 @@ data class ConversationSummary(
     val title: String,
     val modelName: String?,
     val updatedAt: Long,
-)
+    /** When it was pinned, or null: the drawer shows pinned chats in their own section. */
+    val pinnedAt: Long? = null,
+    /** When it was archived, or null: archived chats leave the list for their own section. */
+    val archivedAt: Long? = null,
+) {
+    val isPinned: Boolean get() = pinnedAt != null
+    val isArchived: Boolean get() = archivedAt != null
+}
 
 /**
  * What the runtime is doing.
@@ -296,6 +305,14 @@ data class ChatUiState(
     val isCompacting: Boolean = false,
     val compaction: Compaction? = null,
     val conversations: List<ConversationSummary> = emptyList(),
+    /**
+     * How many conversations have been filed away.
+     *
+     * A count rather than the rows. The drawer needs one digit to decide whether to offer
+     * the way into the archive and what to write on it; the rows themselves are read by
+     * the archive screen, and only while it is open.
+     */
+    val archivedCount: Int = 0,
     val activeConversationId: Long? = null,
     val preferences: ModelPreferences = ModelPreferences(),
     /** What the loaded model can read. All false without a projector. */
@@ -480,6 +497,10 @@ class ChatViewModel @Inject constructor(
     private val compactor: ConversationCompactor,
     private val staging: Staging,
     private val writer: ChatWriter,
+    /** Naming, pinning and archiving, which are about a conversation rather than in it. */
+    private val filing: ConversationFiling,
+    /** Only for the count the drawer shows; the archive screen reads its own rows. */
+    private val archive: ArchivedConversations,
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
     private val goals: GoalBoard,
@@ -609,6 +630,16 @@ class ChatViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            archive.observeCount()
+                .catch { failure ->
+                    // The list beside it is still readable and the archive is not the
+                    // reason anybody opened the app, so this loses the way in rather than
+                    // the drawer.
+                    Log.w("OpenWeights", "the archive count could not be read", failure)
+                }
+                .collect { count -> _uiState.update { it.copy(archivedCount = count) } }
+        }
+        viewModelScope.launch {
             writer.conversations()
                 // Collected for the life of the view model and awaited by nobody, so an
                 // SQLite error here had no catch above it and took the process with it,
@@ -621,7 +652,14 @@ class ChatViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             conversations = rows.map {
-                                ConversationSummary(it.id, it.title, it.modelName, it.updatedAt)
+                                ConversationSummary(
+                                    id = it.id,
+                                    title = it.title,
+                                    modelName = it.modelName,
+                                    updatedAt = it.updatedAt,
+                                    pinnedAt = it.pinnedAt,
+                                    archivedAt = it.archivedAt,
+                                )
                             },
                         )
                     }
@@ -2043,8 +2081,14 @@ class ChatViewModel @Inject constructor(
             // read or write the very board goals.clear() below is about to reset, or the
             // planning board turns.planning.clear() is.
             goalJob?.join()
-            runtime.resetContext()
+            // Before the engine reset, not after. Resetting the context suspends, and for
+            // as long as it did the screen still had the old conversation's id and a live
+            // Send button: a message sent in that window went to the conversation being
+            // left — which, when newChat is being run *by* a delete, no longer exists, so
+            // the insert had no parent row to hang from. Nothing between here and the
+            // reset reads the id, so moving it up only closes the window sooner.
             conversationId = null
+            runtime.resetContext()
             // A research turn interrupted mid-plan can leave these set; unconsumed, the
             // new chat's first turn would silently inherit an override that belonged to
             // the conversation just left behind. See start().
@@ -2096,6 +2140,24 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The engine's own record of this conversation, or null when it cannot be trusted.
+     *
+     * Trusted only when it runs exactly through the last stored message: one stamped with
+     * an earlier reply describes a history that was edited or continued since, and is left
+     * to the fallback path. And only into the template that wrote it — the conversation's
+     * own model name is no guide, because switching models renames the conversation, so it
+     * always claims the current model while the record still holds the old one's rendering.
+     */
+    private suspend fun usableEngineHistory(
+        id: Long,
+        messages: List<MessageEntity>,
+    ): List<EngineHistoryEntity>? = writer.inOrder { engineHistory(id) }
+        .takeIf { rows ->
+            rows.isNotEmpty() && rows.first().replyMessageId == messages.lastOrNull()?.id
+        }
+        ?.takeIf { rows -> rows.first().modelName == _uiState.value.modelName }
+
     private suspend fun reopen(id: Long) {
         // Read before anything is disturbed. The row's existence does not depend on a reply
         // still being written, so this one read needs no queue, and taking it first means a
@@ -2131,17 +2193,19 @@ class ChatViewModel @Inject constructor(
         // question with no answer and then resend it.
         val messages = writer.inOrder { messages(id) }
         val stepsByMessage = writer.inOrder { toolSteps(id) }
-        // The engine's own record of this conversation, trusted only when it runs exactly
-        // through the last stored message: one stamped with an earlier reply describes a
-        // history that was edited or continued since, and is left to the fallback path.
-        val storedEngineHistory = writer.inOrder { engineHistory(id) }
-            .takeIf { rows ->
-                rows.isNotEmpty() && rows.first().replyMessageId == messages.lastOrNull()?.id
-            }
-            // Only into the template that wrote it. The conversation's own model name is no
-            // guide here: switching models renames the conversation, so it always claims
-            // the current model, while the record still holds the old one's rendering.
-            ?.takeIf { rows -> rows.first().modelName == _uiState.value.modelName }
+        val storedEngineHistory = usableEngineHistory(id, messages)
+
+        // Asked again, and this is the ask that counts. The check above was made several
+        // queued reads and two joins ago, and a delete confirmed in the drawer in the
+        // meantime sits ahead of this in the same queue: adopting the id after that landed
+        // puts a conversation that no longer exists on screen, and its next message
+        // violates the foreign key. Nothing suspends between this and the line below, so
+        // either the delete is already visible here — and this returns — or it is still to
+        // come, and its own `conversationId == id` will close what this just opened.
+        if (writer.inOrder { conversation(id) } == null) {
+            newChat()
+            return
+        }
         conversationId = id
         nextEntryId = messages.size.toLong()
         // The board is one object for the whole app, so a plan left in it is on screen in
@@ -2295,6 +2359,79 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Gives a conversation a name the user chose. Silently does nothing if it is all
+     * whitespace, which is what the dialog's disabled Save button already prevents; this
+     * is the half that holds when the two disagree.
+     */
+    fun renameConversation(id: Long, title: String) {
+        viewModelScope.launch {
+            reportingFailure { filing.rename(id, title) }
+        }
+    }
+
+    /** Pins a conversation to the top of the drawer, or unpins it. */
+    fun setConversationPinned(id: Long, pinned: Boolean) {
+        viewModelScope.launch {
+            reportingFailure { filing.setPinned(id, pinned) }
+        }
+    }
+
+    /**
+     * Files a conversation away, or takes it back out.
+     *
+     * Archiving the open one leaves the screen on a chat that is no longer in the list,
+     * so it starts a fresh one, the same way deleting the open one does. Unarchiving does
+     * not: the conversation being unfiled is one the user is looking at in the archive
+     * section, and closing it would be answering a different question.
+     */
+    fun setConversationArchived(id: Long, archived: Boolean) {
+        viewModelScope.launch {
+            // Stopped and awaited before the write, for the same reason deleting the open
+            // one is, and one more besides: a reply still unwinding writes a message into
+            // this conversation, and `ChatRepository.touch` clears `archivedAt` on every
+            // message — a chat being used is not one that has been put away. Archiving
+            // mid-reply therefore un-archived itself a second later, from a write the user
+            // had no idea was still outstanding.
+            if (archived && conversationId == id) {
+                // The goal's own loop as well as the turn, and this is the line newChat
+                // uses for the same reason: a running goal decides what to do next from
+                // the board rather than from the transcript, so stopping only the turn in
+                // flight leaves it free to join the wait, see the board still say running,
+                // and start another turn into the conversation being filed away. That
+                // turn's message would clear `archivedAt` on its way through `touch`.
+                if (goals.goal.value?.isRunning == true) stopGoal() else stop()
+                generationJob?.join()
+                goalJob?.join()
+            }
+            if (writeOrNull { filing.setArchived(id, archived) } == null) {
+                // Nothing else follows a write that did not go through. Carrying on to
+                // newChat() would replace the conversation the user is looking at with a
+                // blank one, on the strength of a filing that never happened, and clear
+                // the only message on screen explaining why.
+                reportError(STORAGE_FAILED)
+                return@launch
+            }
+            if (!archived) return@launch
+            // Do not bring it back. The saved handle remembers the last conversation on
+            // purpose, but the last thing done to this one was to put it away, and
+            // reopening it on the next launch would leave an archived chat filling the
+            // screen while hidden in the list. `restoring` is the same id in flight: on a
+            // cold start it holds the conversation to reopen for as long as the model
+            // takes to load, which is exactly long enough to open the drawer and archive
+            // it, and it is not `conversationId` yet.
+            if (restoring == id) restoring = null
+            if (savedState.get<Long>(LAST_CONVERSATION) == id) {
+                savedState.remove<Long>(LAST_CONVERSATION)
+            }
+            // Asked again rather than remembered from before the joins. Those suspend for
+            // as long as a reply takes to unwind, and the drawer is still open over the
+            // screen the whole time: another conversation tapped during that wait would
+            // otherwise be the one this closes.
+            if (conversationId == id) newChat()
+        }
+    }
+
     /** Deletes a conversation; if it is the open one, the screen returns to a blank chat. */
     fun deleteConversation(id: Long) {
         viewModelScope.launch {
@@ -2321,7 +2458,10 @@ class ChatViewModel @Inject constructor(
                     attached
                 }
                 staging.discard(orphaned)
-                if (wasOpen) newChat()
+                // Re-read for the same reason archiving re-reads it: the join above waits
+                // out a reply, and a conversation opened from the still-open drawer during
+                // that wait is not the one being deleted and must not be closed with it.
+                if (conversationId == id) newChat()
             }
         }
     }

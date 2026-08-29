@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,15 +31,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Visibility
@@ -51,6 +55,12 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +78,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.data.DayGroup
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.groupByDay
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
@@ -75,6 +86,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
@@ -96,9 +108,13 @@ fun ConversationDrawer(
     conversations: List<ConversationSummary>,
     activeId: Long?,
     onOpen: (Long) -> Unit,
-    onDelete: (Long) -> Unit,
     onNewChat: () -> Unit,
     nowMillis: Long,
+    /** Pin, rename, archive and delete, all behind one row's overflow button. */
+    actions: ConversationActions = ConversationActions(),
+    /** How many conversations have been filed away. Zero hides the way in entirely. */
+    archivedCount: Int = 0,
+    onOpenArchive: () -> Unit = {},
     destinations: ChatDestinations = ChatDestinations(),
     search: String = "",
     results: List<ConversationMatch> = emptyList(),
@@ -113,6 +129,17 @@ fun ConversationDrawer(
     // outside a drawer to shut it is how everybody shuts a drawer. There was nothing
     // outside it. The fraction keeps a strip of the conversation visible at any width, and
     // the cap keeps a tablet from handing the drawer a third of a large screen.
+    // Which conversation the overflow is open for, and what it is being asked of it.
+    //
+    // Ids rather than captured rows, and looked up again on every composition. The list is
+    // a flow: a copy taken when the sheet opened would go stale the moment anything wrote
+    // to that row — pinning it from here is exactly such a write, and the sheet would then
+    // still be offering "Pin". A row that goes away entirely closes the sheet with it,
+    // which is the right answer when the conversation was deleted from somewhere else.
+    var menuFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var renaming by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deleting by rememberSaveable { mutableStateOf<Long?>(null) }
+
     ModalDrawerSheet(
         drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(SHEET_FRACTION).widthIn(max = SHEET_MAX),
@@ -134,6 +161,25 @@ fun ConversationDrawer(
         // its name, which is exactly when a box that says so is worth the row it costs.
         SearchField(value = search, onValueChange = onSearch)
 
+        // The way into the archive, and it sits here for a reason it took a rewrite to get
+        // right. It began as a section at the end of the list, which meant reaching it took
+        // scrolling past every conversation ever had — a fixed thing at the end of an
+        // unbounded list. It is now outside the scrolling list altogether, so where the
+        // history happens to be scrolled to cannot hide it.
+        //
+        // Here rather than in the footer beside Tools and Settings, though that is also
+        // always visible: an archived conversation is still history, and belongs with the
+        // search box and the list rather than beside the app's settings. A fifth footer
+        // item that came and went would also move four controls people already know the
+        // position of, where a row here only shifts the list beneath it.
+        //
+        // Only when there is an archive. Somebody who never files anything gets no dead
+        // control, and the row appears at the moment it first means something — which is
+        // also the answer to "where did that chat go", since it is in view when it happens.
+        if (archivedCount > 0 && search.isBlank()) {
+            ArchiveEntry(count = archivedCount, onClick = onOpenArchive)
+        }
+
         // Weighted, so the footer stays pinned to the bottom whether there are no chats or
         // forty. The empty case used to return early from the sheet, which after the footer
         // arrived would have left somebody with no conversations no route to Settings at all.
@@ -141,11 +187,12 @@ fun ConversationDrawer(
             if (search.isNotBlank()) {
                 SearchResults(
                     results = results,
+                    live = conversations,
                     term = search,
                     hasAnswer = hasSearchAnswer,
                     activeId = activeId,
                     onOpen = onOpen,
-                    onDelete = onDelete,
+                    onMenu = { menuFor = it },
                     nowMillis = nowMillis,
                 )
             } else if (conversations.isEmpty()) {
@@ -160,7 +207,7 @@ fun ConversationDrawer(
                     conversations = conversations,
                     activeId = activeId,
                     onOpen = onOpen,
-                    onDelete = onDelete,
+                    onMenu = { menuFor = it },
                     nowMillis = nowMillis,
                 )
             }
@@ -168,6 +215,87 @@ fun ConversationDrawer(
 
         DrawerFooter(destinations)
     }
+
+    // Looked up in the results as well as in the list, and that is not belt and braces.
+    // The list no longer holds archived conversations at all — the query behind it excludes
+    // them — but a search finds them and marks them, so the row under the finger can be one
+    // the list has never heard of. Without the fallback its overflow button opened nothing.
+    val onScreen = { id: Long? ->
+        conversations.firstOrNull { it.id == id }
+            ?: results.firstOrNull { it.id == id }?.asSummary()
+    }
+
+    onScreen(menuFor)?.let { target ->
+        ConversationActionsSheet(
+            conversation = target,
+            actions = actions,
+            onRename = {
+                renaming = target.id
+                menuFor = null
+            },
+            onConfirmDelete = {
+                deleting = target.id
+                menuFor = null
+            },
+            onDismiss = { menuFor = null },
+        )
+    }
+    onScreen(renaming)?.let { target ->
+        RenameConversationDialog(
+            conversation = target,
+            onRename = {
+                actions.onRename(target.id, it)
+                renaming = null
+            },
+            onDismiss = { renaming = null },
+        )
+    }
+    onScreen(deleting)?.let { target ->
+        DeleteConversationDialog(
+            conversation = target,
+            onConfirm = {
+                actions.onDelete(target.id)
+                deleting = null
+            },
+            onDismiss = { deleting = null },
+        )
+    }
+}
+
+/**
+ * The drawer's list, in the three parts it is read in.
+ *
+ * Pinned chats are lifted out of the day groups rather than marked inside them, because a
+ * pin is a statement that this conversation should stop moving, and a row that stays
+ * pinned but slides from Today to Previous 7 days has kept the badge and lost the point.
+ * Archived chats are not here at all: the query behind this list excludes them, so
+ * [DrawerSections.archived] is normally empty and exists to keep the rule true rather than
+ * to be drawn. It is what guarantees that a filed conversation can never turn up among the
+ * live ones if one ever reaches this function — from a search result, say, whose read
+ * crossed with the archiving.
+ *
+ * A chat that is both pinned and archived is archived. Archiving is about whether a
+ * conversation is in the list at all, and pinning only says where in the list it sits, so
+ * the pin is kept, does nothing while it is filed, and means something again the moment it
+ * comes back.
+ */
+data class DrawerSections(
+    val pinned: List<ConversationSummary>,
+    val days: List<DayGroup<ConversationSummary>>,
+    val archived: List<ConversationSummary>,
+)
+
+/** See [DrawerSections]. Pure, so the ordering rules can be tested without a screen. */
+internal fun List<ConversationSummary>.intoSections(today: LocalDate): DrawerSections {
+    val (archived, live) = partition { it.isArchived }
+    val (pinned, loose) = live.partition { it.isPinned }
+    return DrawerSections(
+        // Most recently pinned first. Not by updatedAt: see the note above about a pin
+        // being the one bit of ordering the user authored.
+        pinned = pinned.sortedByDescending { it.pinnedAt },
+        days = loose.groupByDay(today) { it.updatedAt },
+        archived = archived.sortedByDescending { it.archivedAt },
+    )
 }
 
 /**
@@ -225,30 +353,61 @@ private fun ConversationList(
     conversations: List<ConversationSummary>,
     activeId: Long?,
     onOpen: (Long) -> Unit,
-    onDelete: (Long) -> Unit,
+    onMenu: (Long) -> Unit,
     nowMillis: Long,
 ) {
+    val today = Instant.ofEpochMilli(nowMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+    // Keyed on both, because it sorts and groups the whole history and `nowMillis` ticks:
+    // recomputing it on every frame of a drawer being dragged open is work for nothing.
+    val sections = remember(conversations, today) { conversations.intoSections(today) }
+
+    val listState = rememberLazyListState()
+    // Follow a chat that has just been pinned to where it went.
+    //
+    // Found on a phone and by nothing else. A LazyColumn keyed by item anchors on whatever
+    // is currently first on screen, so inserting a Pinned section *above* that anchor keeps
+    // the list exactly where it was and puts the new section out of view above it: the row
+    // left its day group, no heading appeared, and pinning read as the chat vanishing. The
+    // one thing a pin promises is that the chat is now at the top, so the list goes there.
+    //
+    // Only when the set grows, and never on first composition — the remembered set starts
+    // as whatever is already pinned, so opening the drawer does not scroll it, and neither
+    // does unpinning, where the row moves back into a day group it can be seen in.
+    val pinned = sections.pinned.map { it.id }
+    var alreadyPinned by remember { mutableStateOf(pinned.toSet()) }
+    LaunchedEffect(pinned) {
+        val added = pinned.toSet() - alreadyPinned
+        alreadyPinned = pinned.toSet()
+        if (added.isNotEmpty()) listState.animateScrollToItem(0)
+    }
+
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        if (sections.pinned.isNotEmpty()) {
+            item(key = "header-pinned") {
+                SectionHeader(stringResource(R.string.pinned))
+            }
+            items(sections.pinned, key = { it.id }) { conversation ->
+                ConversationRow(
+                    conversation = conversation,
+                    isActive = conversation.id == activeId,
+                    nowMillis = nowMillis,
+                    onOpen = { onOpen(conversation.id) },
+                    onMenu = { onMenu(conversation.id) },
+                )
+            }
+        }
+
         // Grouped by the day each chat was last touched, the way every assistant
         // does it, because a flat list of forty titles is a list nobody scans.
-        val today = Instant.ofEpochMilli(nowMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-
-        conversations.groupByDay(today) { it.updatedAt }.forEach { group ->
+        sections.days.forEach { group ->
             item(key = "header-${group.label}") {
-                Text(
-                    text = group.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                )
+                SectionHeader(group.label)
             }
             items(group.items, key = { it.id }) { conversation ->
                 ConversationRow(
@@ -256,7 +415,7 @@ private fun ConversationList(
                     isActive = conversation.id == activeId,
                     nowMillis = nowMillis,
                     onOpen = { onOpen(conversation.id) },
-                    onDelete = { onDelete(conversation.id) },
+                    onMenu = { onMenu(conversation.id) },
                 )
             }
         }
@@ -264,13 +423,75 @@ private fun ConversationList(
 }
 
 @Composable
-private fun ConversationRow(
+private fun SectionHeader(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    )
+}
+
+/**
+ * "Archived · 3", and the way to them.
+ *
+ * A destination rather than something that expands in place. Expanding it would put two
+ * unbounded lists in one scroll container with two sets of day headings from two different
+ * timelines, and a large archive could push the active history off the screen again — which
+ * is the problem this row exists to fix, reintroduced one level down.
+ */
+@Composable
+private fun ArchiveEntry(count: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(Radius.sm))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Archive,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = stringResource(R.string.archived_count, count),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+internal fun ConversationRow(
     conversation: ConversationSummary,
     isActive: Boolean,
     nowMillis: Long,
     onOpen: () -> Unit,
-    onDelete: () -> Unit,
+    onMenu: () -> Unit,
     snippet: AnnotatedString? = null,
+    /**
+     * Whether the row has to say "pinned" or "archived" for itself.
+     *
+     * False in the list, where the heading above it already said so and repeating it on
+     * every row under a heading is noise. True in search results, which have no headings.
+     */
+    saysWhereItIs: Boolean = false,
 ) {
     Row(
         modifier = Modifier
@@ -283,7 +504,10 @@ private fun ConversationRow(
                     MaterialTheme.colorScheme.surfaceContainer
                 },
             )
-            .combinedClickable(onClick = onOpen)
+            // Long-press opens the same sheet the button does, which is how this app
+            // already opens actions on one message. The button is what makes it findable;
+            // the gesture is what makes it fast once it has been found once.
+            .combinedClickable(onClick = onOpen, onLongClick = onMenu)
             .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -309,19 +533,24 @@ private fun ConversationRow(
             // One line, because a model name is long and this is a narrow column. Metric
             // wraps by default, so on a small screen "LFM2.5-2.6B-QAD-Q4_0" took a second
             // line, broke mid-token, and made every row in the history a different height.
+            //
+            // Pinned and archived are words in this line rather than badges beside the
+            // title, on the rows that need them at all: it is the one place on the row with
+            // somewhere to put a word that costs the title no width. See [saysWhereItIs].
             Metric(
                 listOfNotNull(
+                    conversation.state().takeIf { saysWhereItIs },
                     conversation.updatedAt.asRelativeTime(nowMillis),
                     conversation.modelName,
                 ).joinToString(" · "),
                 maxLines = 1,
             )
         }
-        IconButton(onClick = onDelete) {
+        IconButton(onClick = onMenu) {
             Icon(
-                imageVector = Icons.Rounded.Delete,
+                imageVector = Icons.Rounded.MoreVert,
                 contentDescription = stringResource(
-                    R.string.delete_conversation_named,
+                    R.string.conversation_actions_named,
                     conversation.title,
                 ),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -331,6 +560,14 @@ private fun ConversationRow(
     }
 }
 
+/** "pinned", "archived", or nothing at all, which is what most rows are. */
+@Composable
+private fun ConversationSummary.state(): String? = when {
+    isArchived -> stringResource(R.string.archived_marker)
+    isPinned -> stringResource(R.string.pinned_marker)
+    else -> null
+}
+
 /**
  * The snippet with the word that matched picked out of it.
  *
@@ -338,7 +575,7 @@ private fun ConversationRow(
  * to read rather than scan. Bold rather than a colour: the palette keeps lime for actions,
  * and a coloured word in a preview reads as a link to somewhere.
  */
-private fun String.highlighting(term: String): AnnotatedString {
+internal fun String.highlighting(term: String): AnnotatedString {
     val at = indexOf(term, ignoreCase = true)
     if (term.isBlank() || at < 0) return AnnotatedString(this)
     return buildAnnotatedString {
@@ -397,6 +634,11 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 /**
  * What a search found, newest first, each with the line that matched.
  *
+ * Archived conversations are in here, and say so on their own row. A search that could not
+ * find a chat because it had been filed away would be a search nobody could trust, and
+ * "which one was that" is exactly the question somebody asks about a chat they put away
+ * three weeks ago.
+ *
  * Not grouped by day. A day heading answers "when was this", which is the question the
  * unsearched list is for; a result list answers "which one said this", and the snippet is
  * what answers it. Sorting stays by recency because two chats about the same thing are
@@ -406,11 +648,13 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit) {
 @Suppress("LongParameterList")
 private fun SearchResults(
     results: List<ConversationMatch>,
+    /** Every conversation, as the drawer has it now. See the note on [ConversationMatch] below. */
+    live: List<ConversationSummary>,
     term: String,
     hasAnswer: Boolean,
     activeId: Long?,
     onOpen: (Long) -> Unit,
-    onDelete: (Long) -> Unit,
+    onMenu: (Long) -> Unit,
     nowMillis: Long,
 ) {
     // Nothing at all until the read has answered for this exact term. Saying "no chat
@@ -432,22 +676,35 @@ private fun SearchResults(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         items(results, key = { it.id }) { match ->
+            // The live row where there is one, and the match only as a fallback.
+            //
+            // A `ConversationMatch` is one read's answer, frozen: renaming, pinning or
+            // archiving a chat from a search result would otherwise leave the row it was
+            // done from showing the old name and offering the opposite action, because
+            // nothing re-runs the query. The list beside it is a flow and already has the
+            // truth, and the only thing the match carries that it does not is the snippet.
             ConversationRow(
-                conversation = ConversationSummary(
-                    id = match.id,
-                    title = match.title,
-                    modelName = match.modelName,
-                    updatedAt = match.updatedAt,
-                ),
+                conversation = live.firstOrNull { it.id == match.id } ?: match.asSummary(),
                 isActive = match.id == activeId,
                 nowMillis = nowMillis,
                 onOpen = { onOpen(match.id) },
-                onDelete = { onDelete(match.id) },
+                onMenu = { onMenu(match.id) },
                 snippet = match.snippet?.highlighting(term),
+                saysWhereItIs = true,
             )
         }
     }
 }
+
+/** One search result as a row, for when the live list has never heard of it. */
+internal fun ConversationMatch.asSummary() = ConversationSummary(
+    id = id,
+    title = title,
+    modelName = modelName,
+    updatedAt = updatedAt,
+    pinnedAt = pinnedAt,
+    archivedAt = archivedAt,
+)
 
 /**
  * "3h ago" rather than a timestamp.
@@ -486,12 +743,18 @@ private fun ConversationDrawerPreview() {
     OpenWeightsTheme(dynamicColor = false) {
         ConversationDrawer(
             conversations = listOf(
-                ConversationSummary(1, "What is a KV cache?", "LFM2.5-2.6B-Q4_K_M", 0),
+                ConversationSummary(
+                    1,
+                    "What is a KV cache?",
+                    "LFM2.5-2.6B-Q4_K_M",
+                    0,
+                    pinnedAt = 1,
+                ),
                 ConversationSummary(2, "Write a Kotlin data class", "LFM2.5-2.6B-Q4_K_M", 0),
+                ConversationSummary(3, "Trip packing list", null, 0, archivedAt = 1),
             ),
             activeId = 1,
             onOpen = {},
-            onDelete = {},
             onNewChat = {},
             nowMillis = TimeUnit.HOURS.toMillis(3),
         )

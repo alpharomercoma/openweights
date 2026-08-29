@@ -93,7 +93,7 @@ class ChatRepository @Inject constructor(
         val now = clock.nowMillis()
         return database.conversations().insert(
             ConversationEntity(
-                title = firstMessage.toTitle(),
+                title = firstMessage.asConversationTitle(),
                 modelName = modelName,
                 createdAt = now,
                 updatedAt = now,
@@ -187,18 +187,13 @@ class ChatRepository @Inject constructor(
                 attachments = attachments.encodeAttachments(),
             ),
         )
-        database.conversations().upsert(
-            conversation.copy(
-                compactionSummary = conversation.compactionSummary.takeUnless {
-                    clearCompaction
-                },
-                compactionThroughIndex = conversation.compactionThroughIndex
-                    .takeUnless { clearCompaction } ?: -1,
-                compactionHeadId = conversation.compactionHeadId.takeUnless {
-                    clearCompaction
-                },
-                updatedAt = clock.nowMillis(),
-            ),
+        database.conversations().setCompaction(
+            id = conversationId,
+            summary = conversation.compactionSummary.takeUnless { clearCompaction },
+            throughIndex = conversation.compactionThroughIndex
+                .takeUnless { clearCompaction } ?: -1,
+            headId = conversation.compactionHeadId.takeUnless { clearCompaction },
+            at = clock.nowMillis(),
         )
     }
 
@@ -210,12 +205,8 @@ class ChatRepository @Inject constructor(
      * Chats can change model partway through, and the drawer shows the model beside each
      * one. Without this the list keeps naming whichever model happened to start it.
      */
-    suspend fun setModel(id: Long, modelName: String?) {
-        val conversation = database.conversations().byId(id) ?: return
-        database.conversations().upsert(
-            conversation.copy(modelName = modelName, updatedAt = clock.nowMillis()),
-        )
-    }
+    suspend fun setModel(id: Long, modelName: String?) =
+        database.conversations().setModel(id, modelName, clock.nowMillis())
 
     /**
      * Appends a summary and moves the head to it, or does neither.
@@ -245,16 +236,15 @@ class ChatRepository @Inject constructor(
                 createdAt = clock.nowMillis(),
             ),
         )
-        database.conversations().upsert(
-            conversation.copy(
-                // Written as well as appended. A conversation folded before the log existed
-                // has its summary only in these two columns, so they stay the fallback and
-                // keeping them current means one code path can read either kind.
-                compactionSummary = summary,
-                compactionThroughIndex = throughIndex,
-                compactionHeadId = head,
-                updatedAt = clock.nowMillis(),
-            ),
+        // Written as well as appended. A conversation folded before the log existed has its
+        // summary only in these two columns, so they stay the fallback and keeping them
+        // current means one code path can read either kind.
+        database.conversations().setCompaction(
+            id = conversationId,
+            summary = summary,
+            throughIndex = throughIndex,
+            headId = head,
+            at = clock.nowMillis(),
         )
     }
 
@@ -332,10 +322,17 @@ class ChatRepository @Inject constructor(
         }
     }
 
-    private suspend fun touch(conversationId: Long) {
-        val conversation = database.conversations().byId(conversationId) ?: return
-        database.conversations().upsert(conversation.copy(updatedAt = clock.nowMillis()))
-    }
+    /**
+     * Marks a conversation as having just been said something in, and unfiles it.
+     *
+     * The archive is a statement about attention, not a lock: a chat that was put away and
+     * is now being used again belongs back in the list, and the alternative is an archived
+     * conversation quietly collecting today's messages where the drawer will never show
+     * them. Pinning is left alone — a pin is a choice about where a chat sits, and nothing
+     * said in it should undo that.
+     */
+    private suspend fun touch(conversationId: Long) =
+        database.conversations().touch(conversationId, clock.nowMillis())
 }
 
 /**
@@ -343,7 +340,7 @@ class ChatRepository @Inject constructor(
  *
  * The backslash first, or escaping the wildcards would then escape their escapes.
  */
-private fun String.escapedForLike(): String = this
+internal fun String.escapedForLike(): String = this
     .replace("\\", "\\\\")
     .replace("%", "\\%")
     .replace("_", "\\_")
@@ -360,7 +357,7 @@ private fun String.escapedForLike(): String = this
  * match inside a reasoning block put `<think>` on screen, and it ran `parseAssistantReply`
  * over user messages too, which mangled anyone who had typed the word `<think>` themselves.
  */
-private fun snippetAround(raw: String, needle: String): String? {
+internal fun snippetAround(raw: String, needle: String): String? {
     val answer = parseAssistantReply(raw).answer.withoutToolMarkup().trim()
     val everything = raw.withoutReasoningTags().withoutToolMarkup().trim()
     val source = when {
@@ -404,7 +401,7 @@ private const val SNIPPET_LEAD = 32
 private fun String.withoutReasoningTags(): String =
     replace("<think>", " ").replace("</think>", " ").trim()
 
-private fun String.toTitle(): String {
+internal fun String.asConversationTitle(): String {
     val cleaned = trim().replace(Regex("\\s+"), " ")
     return when {
         cleaned.isEmpty() -> "New chat"

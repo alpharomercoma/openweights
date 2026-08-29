@@ -23,8 +23,10 @@ import androidx.test.core.app.ApplicationProvider
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import io.github.alpharomercoma.openweights.core.data.ArchivedConversations
 import io.github.alpharomercoma.openweights.core.data.ChatRepository
 import io.github.alpharomercoma.openweights.core.data.Clock
+import io.github.alpharomercoma.openweights.core.data.ConversationFiling
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
@@ -77,6 +79,7 @@ abstract class ChatFixture {
     protected lateinit var database: OpenWeightsDatabase
     protected lateinit var engine: FakeInferenceEngine
     protected lateinit var writer: FailableWriter
+    protected lateinit var filing: FailableFiling
     protected lateinit var viewModel: ChatViewModel
     protected lateinit var chats: ChatRepository
 
@@ -103,6 +106,7 @@ abstract class ChatFixture {
         engine = FakeInferenceEngine()
         chats = ChatRepository(database, Clock.System)
         writer = FailableWriter(chats)
+        filing = FailableFiling(database)
         // Registered but unreachable unless a test says the model supports tools, so the
         // tool loop is available to the tests that want it and invisible to the rest.
         viewModel = newViewModel(savedState)
@@ -131,6 +135,8 @@ abstract class ChatFixture {
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             staging = Staging(AttachmentStore(context), context),
             writer = writer,
+            filing = filing,
+            archive = ArchivedConversations(database),
             turns = turns,
             notifier = ReplyNotifier(context),
             goals = goals,
@@ -218,6 +224,28 @@ abstract class ChatFixture {
         File(models, name).apply { writeText("not a real model") }
 
     /** A write queue that can be told the disk is gone. */
+    /** The same idea as [FailableWriter], for the writes that do not go through it. */
+    class FailableFiling(database: OpenWeightsDatabase) :
+        ConversationFiling(database, Clock.System) {
+        /** Set to make every filing edit from here on throw, as a full disk would. */
+        var broken = false
+
+        override suspend fun rename(id: Long, title: String): Boolean {
+            if (broken) error("the disk would not take it")
+            return super.rename(id, title)
+        }
+
+        override suspend fun setPinned(id: Long, pinned: Boolean) {
+            if (broken) error("the disk would not take it")
+            super.setPinned(id, pinned)
+        }
+
+        override suspend fun setArchived(id: Long, archived: Boolean) {
+            if (broken) error("the disk would not take it")
+            super.setArchived(id, archived)
+        }
+    }
+
     class FailableWriter(chats: ChatRepository) : ChatWriter(chats) {
         /** Set to make every write from here on throw, as a full disk would. */
         var broken = false

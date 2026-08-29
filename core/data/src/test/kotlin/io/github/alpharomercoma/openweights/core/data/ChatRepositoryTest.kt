@@ -40,6 +40,8 @@ import org.robolectric.RobolectricTestRunner
 class ChatRepositoryTest {
     private lateinit var database: OpenWeightsDatabase
     private lateinit var repository: ChatRepository
+    private lateinit var filing: ConversationFiling
+    private lateinit var archived: ArchivedConversations
     private var now = 1_000L
 
     @Before
@@ -49,6 +51,8 @@ class ChatRepositoryTest {
             OpenWeightsDatabase::class.java,
         ).allowMainThreadQueries().build()
         repository = ChatRepository(database, FixedClock { now })
+        filing = ConversationFiling(database, FixedClock { now })
+        archived = ArchivedConversations(database)
     }
 
     @After
@@ -321,5 +325,200 @@ class ChatRepositoryTest {
         assertThat(ledger).hasSize(1)
         assertThat(ledger.single().generatedTokens).isEqualTo(30)
         assertThat(ledger.single().replies).isEqualTo(3)
+    }
+
+    @Test
+    fun `pinning a chat does not make it look like it was just used`() = runTest {
+        // The day headings are made of updatedAt, so a pin that touched it would move the
+        // conversation to Today and have the list claim something was said in it.
+        val id = repository.startConversation("Taxes", modelName = "lfm")
+        val before = repository.conversation(id)!!.updatedAt
+        now += 5_000
+
+        filing.setPinned(id, pinned = true)
+
+        val after = repository.conversation(id)!!
+        assertThat(after.updatedAt).isEqualTo(before)
+        assertThat(after.pinnedAt).isEqualTo(now)
+    }
+
+    @Test
+    fun `unpinning clears the timestamp rather than zeroing it`() = runTest {
+        // Null and zero sort differently, and a chat pinned at the epoch would sit at the
+        // bottom of the pinned section forever instead of leaving it.
+        val id = repository.startConversation("Taxes", modelName = "lfm")
+        filing.setPinned(id, pinned = true)
+
+        filing.setPinned(id, pinned = false)
+
+        assertThat(repository.conversation(id)!!.pinnedAt).isNull()
+    }
+
+    @Test
+    fun `saying something in an archived chat takes it back out of the archive`() = runTest {
+        val id = repository.startConversation("Trip packing", modelName = "lfm")
+        filing.setPinned(id, pinned = true)
+        filing.setArchived(id, archived = true)
+
+        repository.addMessage(id, ChatRole.USER.wireName, "one more thing")
+
+        val after = repository.conversation(id)!!
+        assertThat(after.archivedAt).isNull()
+        // The pin is a choice about where it sits, not about whether it is filed, so
+        // nothing said in the chat should undo it.
+        assertThat(after.pinnedAt).isNotNull()
+    }
+
+    @Test
+    fun `archiving keeps every message, which is the whole difference from deleting`() = runTest {
+        val id = repository.startConversation("Trip packing", modelName = "lfm")
+        repository.addMessage(id, ChatRole.ASSISTANT.wireName, "Take the small bag.")
+
+        filing.setArchived(id, archived = true)
+
+        assertThat(repository.messages(id).single().text).isEqualTo("Take the small bag.")
+    }
+
+    @Test
+    fun `a search still finds a chat that has been archived, and says that it is`() = runTest {
+        val id = repository.startConversation("Trip packing", modelName = "lfm")
+        filing.setArchived(id, archived = true)
+
+        val found = repository.searchConversations("packing").single()
+
+        assertThat(found.id).isEqualTo(id)
+        assertThat(found.archivedAt).isNotNull()
+    }
+
+    @Test
+    fun `a chosen name replaces the one the first message gave it`() = runTest {
+        val id = repository.startConversation("What is a KV cache?", modelName = "lfm")
+
+        assertThat(filing.rename(id, "Cache notes")).isTrue()
+
+        assertThat(repository.conversation(id)!!.title).isEqualTo("Cache notes")
+    }
+
+    @Test
+    fun `a name of nothing but spaces is refused rather than stored`() = runTest {
+        val id = repository.startConversation("What is a KV cache?", modelName = "lfm")
+
+        assertThat(filing.rename(id, "   ")).isFalse()
+
+        assertThat(repository.conversation(id)!!.title).isEqualTo("What is a KV cache?")
+    }
+
+    @Test
+    fun `a pasted paragraph becomes a title, not a paragraph`() = runTest {
+        // The same treatment a first message gets. A row in the drawer is one line at any
+        // width, and a title with a newline in it made every row a different height.
+        val id = repository.startConversation("Notes", modelName = "lfm")
+
+        filing.rename(id, "  a very long name\nspread over lines ".repeat(20))
+
+        val title = repository.conversation(id)!!.title
+        assertThat(title).doesNotContain("\n")
+        assertThat(title.length).isAtMost(80)
+    }
+
+    @Test
+    fun `renaming does not move the chat to today either`() = runTest {
+        val id = repository.startConversation("Notes", modelName = "lfm")
+        val before = repository.conversation(id)!!.updatedAt
+        now += 5_000
+
+        filing.rename(id, "Cache notes")
+
+        assertThat(repository.conversation(id)!!.updatedAt).isEqualTo(before)
+    }
+
+    @Test
+    fun `switching model writes the model and nothing else`() = runTest {
+        // `setModel` and `touch` used to read the whole row and put it back. That is only
+        // safe against writers that also read the whole row, and the filing edits
+        // deliberately do not: a pin or a rename landing between the read and the upsert
+        // was silently undone by a snapshot taken before it. Both are single statements
+        // now. Sequential here, because one virtual thread cannot produce the interleaving
+        // — this holds the columns each write is allowed to touch, which is the property
+        // that makes the interleaving harmless.
+        val id = repository.startConversation("What is a KV cache?", modelName = "model-a")
+        filing.setPinned(id, pinned = true)
+        filing.rename(id, "Cache notes")
+
+        repository.setModel(id, "model-b")
+
+        val after = repository.conversation(id)!!
+        assertThat(after.modelName).isEqualTo("model-b")
+        assertThat(after.title).isEqualTo("Cache notes")
+        assertThat(after.pinnedAt).isNotNull()
+    }
+
+    @Test
+    fun `a message writes the time and unfiles, and nothing else`() = runTest {
+        val id = repository.startConversation("What is a KV cache?", modelName = "model-a")
+        filing.setPinned(id, pinned = true)
+        filing.rename(id, "Cache notes")
+
+        repository.addMessage(id, ChatRole.USER.wireName, "one more thing")
+
+        val after = repository.conversation(id)!!
+        assertThat(after.title).isEqualTo("Cache notes")
+        assertThat(after.pinnedAt).isNotNull()
+        assertThat(after.modelName).isEqualTo("model-a")
+    }
+
+    @Test
+    fun `the drawer's list does not carry the archive around with it`() = runTest {
+        // Excluded in SQL rather than filtered on screen. Reading every conversation into
+        // memory only to drop half of them again would make the archive cost more the more
+        // it was used, which is the opposite of what filing something away is for.
+        val kept = repository.startConversation("Still here", modelName = "lfm")
+        val filed = repository.startConversation("Trip packing", modelName = "lfm")
+        filing.setArchived(filed, archived = true)
+
+        val listed = repository.observeConversations().first()
+
+        assertThat(listed.map { it.id }).containsExactly(kept)
+        assertThat(archived.observe().first().map { it.id }).containsExactly(filed)
+    }
+
+    @Test
+    fun `the archive count is a count, and it follows the filing`() = runTest {
+        val id = repository.startConversation("Trip packing", modelName = "lfm")
+        assertThat(archived.observeCount().first()).isEqualTo(0)
+
+        filing.setArchived(id, archived = true)
+        assertThat(archived.observeCount().first()).isEqualTo(1)
+
+        filing.setArchived(id, archived = false)
+        assertThat(archived.observeCount().first()).isEqualTo(0)
+    }
+
+    @Test
+    fun `searching the archive reads what was said, and only in the archive`() = runTest {
+        // Full text, not the titles: people remember a phrase somebody said, not the title
+        // generated from their own first message.
+        val filed = repository.startConversation("Trip packing", modelName = "lfm")
+        repository.addMessage(filed, "assistant", "Take the small bag.")
+        filing.setArchived(filed, archived = true)
+        val live = repository.startConversation("Other plans", modelName = "lfm")
+        repository.addMessage(live, "assistant", "Take the small bag as well.")
+
+        val found = archived.search("small bag")
+
+        assertThat(found.map { it.id }).containsExactly(filed)
+        assertThat(found.single().snippet).contains("small bag")
+    }
+
+    @Test
+    fun `a wildcard typed into the archive search matches itself`() = runTest {
+        // The same escaping the drawer's search does. Without it "100%" matches everything.
+        val filed = repository.startConversation("Discount", modelName = "lfm")
+        repository.addMessage(filed, "assistant", "It was 100% off.")
+        filing.setArchived(filed, archived = true)
+        val other = repository.startConversation("Nothing to do with it", modelName = "lfm")
+        filing.setArchived(other, archived = true)
+
+        assertThat(archived.search("100%").map { it.id }).containsExactly(filed)
     }
 }

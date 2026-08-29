@@ -222,5 +222,22 @@
     <string name="language_models_heading">Mga Modelo ng Wika (GGUF)</string>
     <string name="model_badge_projector_missing">Vision model · i-download ang projector (mmproj) para paganahin ang image input</string>
     <string name="slash_command_hint">Mag-mensahe, o i-type / para sa mga utos</string>
-    <string name="delete_conversation_named">Tanggalin ang %1$s</string>
+    <string name="conversation_actions_named">Iba pa para sa %1$s</string>
+    <string name="pin_chat">I-pin</string>
+    <string name="unpin_chat">Alisin ang pin</string>
+    <string name="rename_chat">Palitan ang pangalan</string>
+    <string name="chat_name">Pangalan</string>
+    <string name="archive_chat">I-archive</string>
+    <string name="unarchive_chat">Alisin sa archive</string>
+    <string name="delete_chat">Tanggalin</string>
+    <string name="delete_chat_title">Tanggalin ang chat na ito?</string>
+    <string name="delete_chat_message">Tuluyang mawawala ang %1$s at lahat ng laman nito. I-archive na lang ito kung gusto mong alisin sa listahan pero itago pa rin.</string>
+    <string name="pinned">Naka-pin</string>
+    <string name="pinned_marker">naka-pin</string>
+    <string name="archived">Naka-archive</string>
+    <string name="archived_count">Naka-archive · %1$d</string>
+    <string name="archived_marker">naka-archive</string>
+    <string name="search_archived">Maghanap sa archive</string>
+    <string name="nothing_archived">Walang naka-archive. Kapag na-archive ang chat, aalis ito sa listahan pero mananatili.</string>
+    <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
 </resources>

@@ -34,6 +34,8 @@ data class ChatDestinations(
     val onOpenUsage: () -> Unit = {},
     /** Everything running on its own, and the one place to stop it. */
     val onOpenWatches: () -> Unit = {},
+    /** Conversations that have been filed away. Offered only when there are some. */
+    val onOpenArchive: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     /** From inside the model picker, since browsing is what you do when none of yours fit. */
     val onBrowseModels: () -> Unit = {},

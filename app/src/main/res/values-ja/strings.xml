@@ -218,5 +218,22 @@
     <string name="language_models_heading">言語モデル (GGUF)</string>
     <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
     <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
-    <string name="delete_conversation_named">%1$s を削除</string>
+    <string name="conversation_actions_named">%1$s の操作</string>
+    <string name="pin_chat">ピン留め</string>
+    <string name="unpin_chat">ピン留めを解除</string>
+    <string name="rename_chat">名前を変更</string>
+    <string name="chat_name">名前</string>
+    <string name="archive_chat">アーカイブ</string>
+    <string name="unarchive_chat">アーカイブから戻す</string>
+    <string name="delete_chat">削除</string>
+    <string name="delete_chat_title">このチャットを削除しますか？</string>
+    <string name="delete_chat_message">%1$s とその内容はすべて完全に失われます。残したまま一覧から外すにはアーカイブしてください。</string>
+    <string name="pinned">ピン留め</string>
+    <string name="pinned_marker">ピン留め済み</string>
+    <string name="archived">アーカイブ</string>
+    <string name="archived_count">アーカイブ · %1$d</string>
+    <string name="archived_marker">アーカイブ済み</string>
+    <string name="search_archived">アーカイブを検索</string>
+    <string name="nothing_archived">アーカイブは空です。チャットをアーカイブすると、一覧から外れますが残ります。</string>
+    <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
 </resources>

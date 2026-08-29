@@ -224,5 +224,22 @@
     <string name="language_models_heading">نماذج اللغة (GGUF)</string>
     <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
     <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
-    <string name="delete_conversation_named">حذف %1$s</string>
+    <string name="conversation_actions_named">المزيد لـ %1$s</string>
+    <string name="pin_chat">تثبيت</string>
+    <string name="unpin_chat">إلغاء التثبيت</string>
+    <string name="rename_chat">إعادة تسمية</string>
+    <string name="chat_name">الاسم</string>
+    <string name="archive_chat">أرشفة</string>
+    <string name="unarchive_chat">إلغاء الأرشفة</string>
+    <string name="delete_chat">حذف</string>
+    <string name="delete_chat_title">هل تريد حذف هذه المحادثة؟</string>
+    <string name="delete_chat_message">سيختفي %1$s وكل ما فيه نهائيًا. أرشِفه بدلًا من ذلك لإخراجه من القائمة مع الاحتفاظ به.</string>
+    <string name="pinned">مثبّتة</string>
+    <string name="pinned_marker">مثبّتة</string>
+    <string name="archived">المؤرشفة</string>
+    <string name="archived_count">المؤرشفة · %1$d</string>
+    <string name="archived_marker">مؤرشفة</string>
+    <string name="search_archived">ابحث في المؤرشفة</string>
+    <string name="nothing_archived">لا يوجد شيء مؤرشف. أرشفة محادثة تُخرجها من القائمة مع الاحتفاظ بها.</string>
+    <string name="no_archived_match">لا توجد محادثة مؤرشفة تذكر ذلك.</string>
 </resources>

@@ -34,11 +34,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun conversations(): ConversationDao
+    abstract fun conversationFiling(): ConversationFilingDao
+    abstract fun archive(): ArchiveDao
     abstract fun messages(): MessageDao
     abstract fun usage(): UsageDao
     abstract fun reports(): ContentReportDao
@@ -61,6 +63,21 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * along with everything else and cannot be pulled back out, so old rows read as
          * "not measured" rather than a wrong number invented for them.
          */
+        /**
+         * Gives a conversation a way to be filed rather than only deleted.
+         *
+         * Two nullable timestamps, no backfill: every existing conversation is unpinned and
+         * unarchived, which is what it already was. Nullable rather than `NOT NULL DEFAULT 0`
+         * because "not pinned" and "pinned at the epoch" are different facts and the second
+         * one would sort a whole history into the pinned section.
+         */
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE conversations ADD COLUMN pinnedAt INTEGER")
+                db.execSQL("ALTER TABLE conversations ADD COLUMN archivedAt INTEGER")
+            }
+        }
+
         /**
          * Gives a watch somewhere to write down when its next check is due.
          *

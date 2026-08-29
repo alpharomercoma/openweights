@@ -236,5 +236,22 @@
     <string name="language_models_heading">Modelos de lenguaje (GGUF)</string>
     <string name="model_badge_projector_missing">Modelo de visión · descargue el proyector (mmproj) para habilitar entrada de imagen</string>
     <string name="slash_command_hint">Escribe un mensaje, o / para comandos</string>
-    <string name="delete_conversation_named">Eliminar %1$s</string>
+    <string name="conversation_actions_named">Más para %1$s</string>
+    <string name="pin_chat">Fijar</string>
+    <string name="unpin_chat">No fijar</string>
+    <string name="rename_chat">Cambiar nombre</string>
+    <string name="chat_name">Nombre</string>
+    <string name="archive_chat">Archivar</string>
+    <string name="unarchive_chat">Desarchivar</string>
+    <string name="delete_chat">Eliminar</string>
+    <string name="delete_chat_title">¿Eliminar este chat?</string>
+    <string name="delete_chat_message">%1$s y todo lo que contiene se pierde para siempre. Archívalo si solo quieres sacarlo de la lista y conservarlo.</string>
+    <string name="pinned">Fijados</string>
+    <string name="pinned_marker">fijado</string>
+    <string name="archived">Archivados</string>
+    <string name="archived_count">Archivados · %1$d</string>
+    <string name="archived_marker">archivado</string>
+    <string name="search_archived">Buscar en archivados</string>
+    <string name="nothing_archived">No hay nada archivado. Archivar un chat lo saca de la lista y lo conserva.</string>
+    <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
 </resources>

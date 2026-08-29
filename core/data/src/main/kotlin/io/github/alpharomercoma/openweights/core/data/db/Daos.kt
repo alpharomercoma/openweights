@@ -25,7 +25,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ConversationDao {
-    @Query("SELECT * FROM conversations ORDER BY updatedAt DESC")
+    /**
+     * The conversations the drawer lists: everything that has not been filed away.
+     *
+     * Filtered in SQL rather than in the drawer. An archived conversation is not in this
+     * list at all, which is what archiving means, and reading every row into memory only to
+     * drop half of them again would make the archive cost more the more it was used.
+     */
+    @Query("SELECT * FROM conversations WHERE archivedAt IS NULL ORDER BY updatedAt DESC")
     fun observeAll(): Flow<List<ConversationEntity>>
 
     @Query("SELECT * FROM conversations WHERE id = :id")
@@ -34,11 +41,48 @@ interface ConversationDao {
     @Insert
     suspend fun insert(conversation: ConversationEntity): Long
 
-    @Upsert
-    suspend fun upsert(conversation: ConversationEntity)
-
     @Query("DELETE FROM conversations WHERE id = :id")
     suspend fun delete(id: Long)
+
+    /**
+     * The two writes that used to read a whole row and put it back.
+     *
+     * Statements for the same reason the three above are, and it is not a symmetry
+     * argument: read-modify-write is only safe against writers that also read the whole
+     * row, and the filing edits deliberately do not. A `setModel` that read an unpinned row
+     * and upserted it after a pin landed put the row back exactly as it had been — pin
+     * gone, and the new name with it. Nothing here reads what it does not intend to write.
+     */
+    @Query("UPDATE conversations SET updatedAt = :at, archivedAt = NULL WHERE id = :id")
+    suspend fun touch(id: Long, at: Long)
+
+    @Query("UPDATE conversations SET modelName = :modelName, updatedAt = :at WHERE id = :id")
+    suspend fun setModel(id: Long, modelName: String?, at: Long)
+
+    /**
+     * Points the conversation at a summary, or forgets the one it had.
+     *
+     * The last of the whole-row upserts, gone for the reason above: a fold is slow, it
+     * reads the row before it starts, and a pin or a rename made while it ran was undone
+     * by the snapshot it wrote at the end.
+     */
+    @Query(
+        """
+        UPDATE conversations
+           SET compactionSummary = :summary,
+               compactionThroughIndex = :throughIndex,
+               compactionHeadId = :headId,
+               updatedAt = :at
+         WHERE id = :id
+        """,
+    )
+    suspend fun setCompaction(
+        id: Long,
+        summary: String?,
+        throughIndex: Int,
+        headId: Long?,
+        at: Long,
+    )
 
     @Query("SELECT COUNT(*) FROM conversations")
     fun observeCount(): Flow<Int>
@@ -69,6 +113,7 @@ interface ConversationDao {
         SELECT * FROM (
             SELECT c.id AS id, c.title AS title, c.modelName AS modelName,
                    c.updatedAt AS updatedAt,
+                   c.pinnedAt AS pinnedAt, c.archivedAt AS archivedAt,
                    (SELECT m.text FROM messages m
                      WHERE m.conversationId = c.id
                        AND m.text LIKE '%' || :term || '%' ESCAPE '\'
@@ -80,6 +125,84 @@ interface ConversationDao {
         """,
     )
     suspend fun search(term: String): List<ConversationMatch>
+}
+
+/**
+ * The archive: conversations filed out of the drawer, and how many there are.
+ *
+ * Its own DAO and its own queries, not a filter applied to [ConversationDao.observeAll]
+ * after the fact. The drawer needs the count and nothing else — a number, whatever the
+ * archive holds — and the archive screen needs the rows, but only while it is open. Read
+ * together they would put a lifetime of filed conversations in memory to draw one digit.
+ *
+ * Ordered by [ConversationEntity.updatedAt] rather than by when each was archived. The
+ * question somebody brings to an archive is "when did I have that conversation", which is
+ * the same chronology the drawer already sorts by; "when did I file it" is a question about
+ * the filing rather than about the chat, and nobody asks it.
+ */
+@Dao
+interface ArchiveDao {
+    @Query("SELECT * FROM conversations WHERE archivedAt IS NOT NULL ORDER BY updatedAt DESC")
+    fun observeArchived(): Flow<List<ConversationEntity>>
+
+    @Query("SELECT COUNT(*) FROM conversations WHERE archivedAt IS NOT NULL")
+    fun observeArchivedCount(): Flow<Int>
+
+    /**
+     * The same search [ConversationDao.search] runs, over the archive alone.
+     *
+     * Scoped rather than title-only, and the difference matters: people remember a phrase
+     * somebody said, not the title generated from their first message. Backing out of the
+     * archive to use the drawer's search would be the app admitting its own screen cannot
+     * answer the question it exists to answer.
+     */
+    @Query(
+        """
+        SELECT * FROM (
+            SELECT c.id AS id, c.title AS title, c.modelName AS modelName,
+                   c.updatedAt AS updatedAt,
+                   c.pinnedAt AS pinnedAt, c.archivedAt AS archivedAt,
+                   (SELECT m.text FROM messages m
+                     WHERE m.conversationId = c.id
+                       AND m.text LIKE '%' || :term || '%' ESCAPE '\'
+                     ORDER BY m.id LIMIT 1) AS snippet
+            FROM conversations c
+            WHERE c.archivedAt IS NOT NULL
+        )
+        WHERE title LIKE '%' || :term || '%' ESCAPE '\' OR snippet IS NOT NULL
+        ORDER BY updatedAt DESC
+        """,
+    )
+    suspend fun searchArchived(term: String): List<ConversationMatch>
+}
+
+/**
+ * The three edits the drawer's overflow menu makes to a conversation without opening it.
+ *
+ * Its own DAO, matching [ConversationFiling], which is the only thing that calls it: these
+ * write one column of one row and are about a conversation rather than about what is in
+ * one. [ConversationDao] had grown past what static analysis will accept, and this is the
+ * seam that was already there.
+ */
+@Dao
+interface ConversationFilingDao {
+    /**
+     * Written as `UPDATE` rather than read-modify-write on purpose. The read-then-write
+     * shape loses whichever of two concurrent edits finishes first — pin from the sheet
+     * while a reply lands in the same conversation, and the reply's `touch` writes back a
+     * row it read before the pin — and it is the same race the watch scheduler was fixed
+     * for. One statement per column also means none of these touch [ConversationEntity.updatedAt],
+     * which is what the day headings are made of: filing a chat is not talking in it, and a
+     * chat that jumped to "Today" because it was renamed would be lying about itself.
+     */
+    @Query("UPDATE conversations SET title = :title WHERE id = :id")
+    suspend fun rename(id: Long, title: String)
+
+    @Query("UPDATE conversations SET pinnedAt = :at WHERE id = :id")
+    suspend fun setPinned(id: Long, at: Long?)
+
+    @Query("UPDATE conversations SET archivedAt = :at WHERE id = :id")
+    suspend fun setArchived(id: Long, at: Long?)
 }
 
 @Dao

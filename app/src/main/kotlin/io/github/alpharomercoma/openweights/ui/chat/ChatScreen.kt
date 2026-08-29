@@ -167,7 +167,8 @@ fun ChatScreen(
     /** The drawer's chat search, which is its own flow rather than part of [state]. */
     chatSearch: ChatSearchState = ChatSearchState(),
     onSearchConversations: (String) -> Unit = {},
-    onDeleteConversation: (Long) -> Unit = {},
+    /** Pin, rename, archive and delete, from the drawer's overflow. See [ConversationActions]. */
+    conversationActions: ConversationActions = ConversationActions(),
     onSavePreferences: (ModelPreferences) -> Unit = {},
     onResetPreferences: () -> Unit = {},
     onAttach: (Uri) -> Unit = {},
@@ -231,7 +232,12 @@ fun ChatScreen(
                     onOpenConversation(it)
                     scope.launch { drawerState.close() }
                 },
-                onDelete = onDeleteConversation,
+                actions = conversationActions,
+                archivedCount = state.archivedCount,
+                onOpenArchive = {
+                    scope.launch { drawerState.close() }
+                    destinations.onOpenArchive()
+                },
                 // Closed on the way out, so returning from Settings does not land back on an
                 // open drawer over the conversation.
                 destinations = ChatDestinations(

@@ -65,6 +65,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_12_13,
         OpenWeightsDatabase.MIGRATION_13_14,
         OpenWeightsDatabase.MIGRATION_14_15,
+        OpenWeightsDatabase.MIGRATION_15_16,
     )
 
     @Test
@@ -390,6 +391,28 @@ class MigrationTest {
             assertThat(db.isNullAt("SELECT nextRunAt FROM watches WHERE id = 1")).isTrue()
             assertThat(db.intAt("SELECT count(*) FROM watches WHERE state = 'ACTIVE'"))
                 .isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `every existing conversation arrives unpinned and unarchived, with its title`() {
+        // No backfill, and nothing to backfill: a conversation from before this migration
+        // was neither pinned nor filed, and null is how both of those are spelled. A
+        // `NOT NULL DEFAULT 0` would have sorted the entire history into the pinned
+        // section at the epoch.
+        helper.createDatabase(15).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(16, migrations.toList()).use { db ->
+            assertThat(db.textAt("SELECT title FROM conversations WHERE id = 1"))
+                .isEqualTo("About Ada")
+            assertThat(db.isNullAt("SELECT pinnedAt FROM conversations WHERE id = 1")).isTrue()
+            assertThat(db.isNullAt("SELECT archivedAt FROM conversations WHERE id = 1")).isTrue()
         }
     }
 }

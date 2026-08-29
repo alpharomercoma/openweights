@@ -42,6 +42,24 @@ data class ConversationEntity(
      * with it; they are written alongside and read only when there is no head yet.
      */
     val compactionHeadId: Long? = null,
+    /**
+     * When this conversation was pinned, or null if it is not.
+     *
+     * A timestamp rather than a boolean, because a list of pinned chats has to be in some
+     * order and "most recently pinned first" is the only one the user authored. Ordering
+     * them by [updatedAt] would defeat the point: a chat is pinned precisely so it stops
+     * moving when newer ones arrive.
+     */
+    val pinnedAt: Long? = null,
+    /**
+     * When this conversation was archived, or null if it is not.
+     *
+     * Archiving is the non-destructive half of the delete the drawer used to offer as its
+     * only action: the rows and the attachments stay, the conversation simply leaves the
+     * list. Cleared by [ChatRepository.touch], so saying anything in an archived chat files
+     * it back — a conversation being used is not one that has been put away.
+     */
+    val archivedAt: Long? = null,
 )
 
 /**
@@ -148,6 +166,10 @@ data class ConversationMatch(
     val modelName: String?,
     val updatedAt: Long,
     val snippet: String?,
+    /** See [ConversationEntity.pinnedAt]. Carried so a result can say which section it is in. */
+    val pinnedAt: Long? = null,
+    /** See [ConversationEntity.archivedAt]. A search finds archived chats; the row says so. */
+    val archivedAt: Long? = null,
 )
 
 /**

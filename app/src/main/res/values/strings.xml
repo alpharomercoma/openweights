@@ -260,6 +260,24 @@
     <string name="language_models_heading">Language Models (GGUF)</string>
     <string name="model_badge_projector_missing">Vision model · download projector (mmproj) to enable image input</string>
     <string name="slash_command_hint">Message, or type / for commands</string>
-    <string name="delete_conversation_named">Delete %1$s</string>
+    <!-- The drawer's per-conversation overflow: pin, rename, archive, delete. -->
+    <string name="conversation_actions_named">More for %1$s</string>
+    <string name="pin_chat">Pin</string>
+    <string name="unpin_chat">Unpin</string>
+    <string name="rename_chat">Rename</string>
+    <string name="chat_name">Name</string>
+    <string name="archive_chat">Archive</string>
+    <string name="unarchive_chat">Unarchive</string>
+    <string name="delete_chat">Delete</string>
+    <string name="delete_chat_title">Delete this chat?</string>
+    <string name="delete_chat_message">%1$s and everything in it goes for good. Archive it instead to take it out of the list and keep it.</string>
+    <string name="pinned">Pinned</string>
+    <string name="pinned_marker">pinned</string>
+    <string name="archived">Archived</string>
+    <string name="archived_count">Archived · %1$d</string>
+    <string name="archived_marker">archived</string>
+    <string name="search_archived">Search archived chats</string>
+    <string name="nothing_archived">Nothing is archived. Archiving a chat takes it out of the list and keeps it.</string>
+    <string name="no_archived_match">No archived chat mentions that.</string>
 </resources>
 

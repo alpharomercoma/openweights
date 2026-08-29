@@ -269,7 +269,7 @@ class FetchUrlTool @Inject constructor(
     override val sendsWhereTheModelSays: Boolean = true
 
     override val definition = ToolDefinition(
-        name = "fetch_url",
+        name = NAME,
         description = "Fetch a public web page and return its readable text, when you were " +
             "given the address. Not for finding a page, and not when a search result " +
             "already answers it.",
@@ -308,8 +308,8 @@ class FetchUrlTool @Inject constructor(
         // Every hop, not only the address the user approved. See [refuseAddress].
         var hops = 0
         while (true) {
-            refuseAddress(next)?.let { return@withContext ToolExecution.failure(it) }
-            walledGardenRefusal(next)?.let { return@withContext ToolExecution.failure(it) }
+            (refuseAddress(next) ?: walledGardenRefusal(next))
+                ?.let { return@withContext ToolExecution.failure(it) }
 
             val request = Request.Builder()
                 .url(next)
@@ -327,25 +327,7 @@ class FetchUrlTool @Inject constructor(
                 )
 
             when (hop) {
-                is Hop.Read -> {
-                    val page = hop.page
-                    if (!page.successful) return@withContext ToolExecution.failure(page.text)
-                    val body = page.text
-                    return@withContext when {
-                        // A page that answered and left nothing to read is almost always one
-                        // that builds itself in the browser: the file holds a script and an
-                        // empty div, and the words arrive later from somewhere this cannot
-                        // follow. Returning the empty string said none of that, and a model
-                        // handed nothing reports that the page does not mention the thing,
-                        // which is a wrong answer rather than a missing one.
-                        body.isBlank() -> ToolExecution.failure(
-                            "That page has no readable text in it. It is probably built in " +
-                                "the browser, so there is nothing in the file to read. Try a " +
-                                "different source.",
-                        )
-                        else -> fetchedPageSuccess(body, requested, next.toString())
-                    }
-                }
+                is Hop.Read -> return@withContext readOutcome(hop.page, requested, next)
                 is Hop.Moved -> {
                     if (++hops > MAX_HOPS) {
                         return@withContext ToolExecution.failure(
@@ -360,6 +342,24 @@ class FetchUrlTool @Inject constructor(
         @Suppress("UNREACHABLE_CODE")
         return@withContext ToolExecution.failure("That page could not be read.")
     }
+
+    /** What a page that actually answered becomes, once its text has been looked at. */
+    private fun readOutcome(page: PageText, requested: String, finalUrl: HttpUrl): ToolExecution =
+        when {
+            !page.successful -> ToolExecution.failure(page.text)
+            // A page that answered and left nothing to read is almost always one that
+            // builds itself in the browser: the file holds a script and an empty div, and
+            // the words arrive later from somewhere this cannot follow. Returning the
+            // empty string said none of that, and a model handed nothing reports that the
+            // page does not mention the thing, which is a wrong answer rather than a
+            // missing one.
+            page.text.isBlank() -> ToolExecution.failure(
+                "That page has no readable text in it. It is probably built in " +
+                    "the browser, so there is nothing in the file to read. Try a " +
+                    "different source.",
+            )
+            else -> fetchedPageSuccess(page.text, requested, finalUrl.toString())
+        }
 
     /**
      * What is worth reading in a response, or why nothing is.
@@ -394,6 +394,8 @@ class FetchUrlTool @Inject constructor(
     private data class PageText(val text: String, val successful: Boolean = true)
 
     internal companion object {
+        const val NAME = "fetch_url"
+
         /** Builds a successful page outcome without inferring success from its prose later. */
         fun fetchedPageSuccess(
             body: String,

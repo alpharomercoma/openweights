@@ -48,6 +48,7 @@ import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
+import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
@@ -781,64 +782,7 @@ class ChatViewModel @Inject constructor(
             runtime.load(modelFile, loadParamsFor(modelFile, settings, contextLength), projector)
             settings
         }.onSuccess { preferences ->
-            // The cache belonged to the old weights. Clearing it makes the next reply
-            // re-read the transcript, which is what carries the conversation across.
-            runtime.resetContext()
-            runtime.rememberChoice(modelFile)
-            if (!keepConversation) conversationId = null
-            preferencesKey = modelFile.name
-            loadedFile = modelFile
-            val info = runtime.loadedModel
-            val support = info?.mediaSupport ?: MediaSupport()
-            _uiState.update {
-                it.copy(
-                    isLoadingModel = false,
-                    backend = runtime.backendName(),
-                    offloadBuffers = info?.offloadBuffers.orEmpty(),
-                    hasGpu = runtime.hasGpu(),
-                    modelName = modelFile.nameWithoutExtension,
-                    // The filename's own quantization, not llama's verbose description:
-                    // "Q4_K_M" beside the compute device and context window reads as a
-                    // spec line, "lfm2 1.2B Q4_K - Medium" reads as a sentence.
-                    modelQuantization = GgufFileName.quantization(modelFile.name),
-                    contextSize = info?.contextSize ?: 0,
-                    contextUsed = info?.contextUsed ?: 0,
-                    preferences = preferences,
-                    transcript = if (keepConversation) it.transcript else emptyList(),
-                    toolNotes = if (keepConversation) it.toolNotes else ToolNotes(),
-                    // Only under the model that wrote it. The record holds one template's
-                    // own rendering of tool rounds — raw call syntax, TOOL roles — and
-                    // replaying that into a different model's template is at best foreign
-                    // control text in the conversation and at worst a render refusal.
-                    engineHistory = if (
-                        keepConversation &&
-                        it.modelName == modelFile.nameWithoutExtension
-                    ) {
-                        it.engineHistory
-                    } else {
-                        null
-                    },
-                    compaction = if (keepConversation) it.compaction else null,
-                    error = if (keepConversation) {
-                        it.transcript.unreadableWarning(support)
-                    } else {
-                        null
-                    },
-                ).withCapabilities(info, runtime.ignoresThinkingSwitch(modelFile.name))
-            }
-            // Only ever on the startup load, so switching model still starts fresh.
-            if (!keepConversation) {
-                restoring?.let { id ->
-                    restoring = null
-                    openConversation(id)
-                }
-            }
-
-            if (keepConversation) {
-                conversationId?.let { id ->
-                    writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
-                }
-            }
+            finishLoad(modelFile, preferences, keepConversation)
         }.onFailure { failure ->
             // The name was kept across the swap for the top bar. A load that failed holds no
             // weights, so it goes here rather than staying to describe nothing.
@@ -846,6 +790,70 @@ class ChatViewModel @Inject constructor(
                 it.copy(isLoadingModel = false, modelName = null, error = failure.userMessage())
             }
         }
+    }
+
+    /** The state and bookkeeping of a load that took, split out to stay readable whole. */
+    private suspend fun finishLoad(
+        modelFile: File,
+        preferences: ModelPreferences,
+        keepConversation: Boolean,
+    ) {
+        // The cache belonged to the old weights. Clearing it makes the next reply
+        // re-read the transcript, which is what carries the conversation across.
+        runtime.resetContext()
+        runtime.rememberChoice(modelFile)
+        if (!keepConversation) conversationId = null
+        preferencesKey = modelFile.name
+        loadedFile = modelFile
+        val info = runtime.loadedModel
+        _uiState.update { it.afterLoad(modelFile, info, preferences, keepConversation) }
+        // Only ever on the startup load, so switching model still starts fresh.
+        if (!keepConversation) {
+            restoring?.let { id ->
+                restoring = null
+                openConversation(id)
+            }
+        }
+
+        if (keepConversation) {
+            conversationId?.let { id ->
+                writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
+            }
+        }
+    }
+
+    private fun ChatUiState.afterLoad(
+        modelFile: File,
+        info: LoadedModelInfo?,
+        preferences: ModelPreferences,
+        keepConversation: Boolean,
+    ): ChatUiState {
+        val support = info?.mediaSupport ?: MediaSupport()
+        return copy(
+            isLoadingModel = false,
+            backend = runtime.backendName(),
+            offloadBuffers = info?.offloadBuffers.orEmpty(),
+            hasGpu = runtime.hasGpu(),
+            modelName = modelFile.nameWithoutExtension,
+            // The filename's own quantization, not llama's verbose description:
+            // "Q4_K_M" beside the compute device and context window reads as a
+            // spec line, "lfm2 1.2B Q4_K - Medium" reads as a sentence.
+            modelQuantization = GgufFileName.quantization(modelFile.name),
+            contextSize = info?.contextSize ?: 0,
+            contextUsed = info?.contextUsed ?: 0,
+            preferences = preferences,
+            transcript = if (keepConversation) transcript else emptyList(),
+            toolNotes = if (keepConversation) toolNotes else ToolNotes(),
+            // Only under the model that wrote it. The record holds one template's
+            // own rendering of tool rounds — raw call syntax, TOOL roles — and
+            // replaying that into a different model's template is at best foreign
+            // control text in the conversation and at worst a render refusal.
+            engineHistory = engineHistory.takeIf {
+                keepConversation && modelName == modelFile.nameWithoutExtension
+            },
+            compaction = if (keepConversation) compaction else null,
+            error = if (keepConversation) transcript.unreadableWarning(support) else null,
+        ).withCapabilities(info, runtime.ignoresThinkingSwitch(modelFile.name))
     }
 
     /**
@@ -1796,13 +1804,37 @@ class ChatViewModel @Inject constructor(
         if (!turn(stepPrompt(brief, step.text, steering))) return StepOutcome.STOP
 
         val verifiedSources = lastTurnSteps.correlatedWebResearchSources()
+        val refusal = stepRefusal(brief, verifiedSources, planBefore)
+        if (refusal == null) {
+            researchSources += verifiedSources
+        } else {
+            // Undo an eager `advance` call before retrying. A model saying it searched
+            // is not evidence that a source was actually reached.
+            turns.planning.restore(planBefore)
+            _uiState.update { it.copy(error = refusal) }
+        }
+        return stepVerdict(failures, doneBefore, proposed)
+    }
+
+    /**
+     * Why the step that just ran was not really done, or null when it was.
+     *
+     * Each of these is a way a model marked its own work without the work having
+     * happened, caught on-device; the sentence is what the user sees and what the retry
+     * pass reads.
+     */
+    private fun stepRefusal(
+        brief: Brief,
+        verifiedSources: Set<String>,
+        planBefore: TaskPlan,
+    ): String? {
         // What the turn is pointed at is exactly one step, but nothing before this stopped
         // the model calling `advance` more than once in the same turn — several sequential
         // tool calls are one round to AgentRunner, and each one ticks whichever step it
         // names. A single turn could finish the whole plan at once and still pass the
         // evidence check above, which only asks whether some step was researched, not
         // which one or how many.
-        val planAfter = turns.planning.plan.value ?: proposed
+        val planAfter = turns.planning.plan.value ?: planBefore
         val stepIndex = planBefore.steps.indexOfFirst { !it.done }
         val newlyDone = planAfter.steps.indices.filter { i ->
             planAfter.steps[i].done && planBefore.steps.getOrNull(i)?.done != true
@@ -1813,82 +1845,61 @@ class ChatViewModel @Inject constructor(
         // read that as silence and tick the *next* step on the model's behalf with no evidence
         // it was worked on — the same failure `skippedAhead` exists to catch, reached from the
         // other direction. A stale or wrong step number is treated the same as too many.
-        val calledAdvance = lastTurnSteps.any { it is AgentStep.Ran && it.call.name == "advance" }
+        val calledAdvance = lastTurnSteps.calledAdvance()
         val advancedNothing = calledAdvance && newlyDone.isEmpty()
         // A step that tried a tool and every one of them failed or was declined is not
         // evidence of work done, and `tickIfTheModelDidNot` cannot tell that from a step
         // that needed no tool at all: both leave `doneBefore` unchanged. Checked only when
         // the model did not call `advance` itself, since a step that closed itself despite a
         // failed tool call is judged by whether it named the right step, not by this.
-        val allToolsFailed = !calledAdvance &&
-            lastTurnSteps.any { it is AgentStep.Ran || it is AgentStep.Skipped } &&
-            lastTurnSteps.none { it is AgentStep.Ran && it.successful }
+        val allToolsFailed = !calledAdvance && lastTurnSteps.everyToolFailed()
 
-        when {
-            brief.requiresWebEvidence && verifiedSources.isEmpty() -> {
-                // Undo an eager `advance` call before retrying. A model saying it searched
-                // is not evidence that a source was actually reached.
-                turns.planning.restore(planBefore)
-                _uiState.update {
-                    it.copy(
-                        error = "This research step did not successfully search and read " +
-                            "a source, so it was not marked done.",
-                    )
-                }
-            }
+        return when {
+            brief.requiresWebEvidence && verifiedSources.isEmpty() ->
+                "This research step did not successfully search and read a source, so it " +
+                    "was not marked done."
 
-            skippedAhead -> {
-                turns.planning.restore(planBefore)
-                _uiState.update {
-                    it.copy(
-                        error = "This step closed more than the one it was given, so it " +
-                            "was not marked done.",
-                    )
-                }
-            }
+            skippedAhead ->
+                "This step closed more than the one it was given, so it was not marked done."
 
-            advancedNothing -> {
-                turns.planning.restore(planBefore)
-                _uiState.update {
-                    it.copy(
-                        error = "This step's advance call did not close the step it was " +
-                            "given, so it was not marked done.",
-                    )
-                }
-            }
+            advancedNothing ->
+                "This step's advance call did not close the step it was given, so it was " +
+                    "not marked done."
 
-            allToolsFailed -> {
-                turns.planning.restore(planBefore)
-                _uiState.update {
-                    it.copy(
-                        error = "This step's tool calls did not succeed, so it was not " +
-                            "marked done.",
-                    )
-                }
-            }
+            allToolsFailed ->
+                "This step's tool calls did not succeed, so it was not marked done."
 
-            else -> researchSources += verifiedSources
+            else -> null
         }
-        val failure = _uiState.value.error
-        return if (failure != null) {
-            // A step that ended in an error has not been done, whatever the plan says. One
-            // retry, because the common failure is a tool call the model can repair once it
-            // reads the message, and then a halt: a loop that retries forever on a phone is
-            // a flat battery rather than an answer.
-            if (failures + 1 >= MAX_STEP_FAILURES) {
-                goals.halt(
-                    "Stopped after $MAX_STEP_FAILURES steps in a row that did not finish. " +
-                        "The last problem was: $failure",
-                )
-                StepOutcome.STOP
-            } else {
-                StepOutcome.RETRY
-            }
-        } else {
+    }
+
+    private fun List<AgentStep>.calledAdvance(): Boolean =
+        any { it is AgentStep.Ran && it.call.name == "advance" }
+
+    /** Tools were tried, and not one of them succeeded. */
+    private fun List<AgentStep>.everyToolFailed(): Boolean =
+        any { it is AgentStep.Ran || it is AgentStep.Skipped } &&
+            none { it is AgentStep.Ran && it.successful }
+
+    /** What the step's ending means for the goal: carry on, one retry, or halt. */
+    private fun stepVerdict(failures: Int, doneBefore: Int, proposed: TaskPlan): StepOutcome {
+        val failure = _uiState.value.error ?: run {
             tickIfTheModelDidNot(doneBefore)
             goals.advanced(turns.planning.plan.value ?: proposed)
-            StepOutcome.DONE
+            return StepOutcome.DONE
         }
+        // A step that ended in an error has not been done, whatever the plan says. One
+        // retry, because the common failure is a tool call the model can repair once it
+        // reads the message, and then a halt: a loop that retries forever on a phone is
+        // a flat battery rather than an answer.
+        if (failures + 1 >= MAX_STEP_FAILURES) {
+            goals.halt(
+                "Stopped after $MAX_STEP_FAILURES steps in a row that did not finish. " +
+                    "The last problem was: $failure",
+            )
+            return StepOutcome.STOP
+        }
+        return StepOutcome.RETRY
     }
 
     /**
@@ -2183,18 +2194,12 @@ class ChatViewModel @Inject constructor(
                 // whose template the record's rendered tool rounds do not belong to, and
                 // not under a stored fold, where there is no way to tell a record captured
                 // after the fold from one the fold made obsolete.
-                engineHistory = storedEngineHistory
-                    ?.takeIf { !mismatch && conversation.compactionSummary == null }
-                    ?.let { rows ->
-                        EngineHistory(
-                            messages = rows.map { row ->
-                                ChatMessage.text(ChatRole.of(row.role), row.text)
-                                    .copy(toolCallId = row.toolCallId)
-                            },
-                            throughCount = messages.size,
-                            throughEntryId = (messages.size - 1).toLong(),
-                        )
+                engineHistory = restoredEngineHistory(
+                    storedEngineHistory?.takeIf {
+                        !mismatch && conversation.compactionSummary == null
                     },
+                    messages.size,
+                ),
                 transcript = messages.toTranscript(
                     conversation.compactionSummary?.let { conversation.compactionThroughIndex },
                     stepsByMessage,
@@ -2224,6 +2229,31 @@ class ChatViewModel @Inject constructor(
         // history stayed hidden behind the loading screen for exactly as long as the model
         // took to load, instead of appearing immediately from data already in hand.
         runtime.resetContext()
+    }
+
+    /**
+     * The engine's stored record as live state, from rows already proven to describe
+     * exactly the reopened messages.
+     *
+     * Reopened entries are numbered by index, so the record runs through the last of
+     * them by construction — the replyMessageId check at the read already proved it
+     * describes exactly these messages. The caller withholds the rows under another
+     * model, whose template the record's rendered tool rounds do not belong to, and
+     * under a stored fold, where there is no way to tell a record captured after the
+     * fold from one the fold made obsolete.
+     */
+    private fun restoredEngineHistory(
+        rows: List<EngineHistoryEntity>?,
+        messageCount: Int,
+    ): EngineHistory? = rows?.let {
+        EngineHistory(
+            messages = rows.map { row ->
+                ChatMessage.text(ChatRole.of(row.role), row.text)
+                    .copy(toolCallId = row.toolCallId)
+            },
+            throughCount = messageCount,
+            throughEntryId = (messageCount - 1).toLong(),
+        )
     }
 
     /**
@@ -2510,8 +2540,9 @@ class ChatViewModel @Inject constructor(
      * and the cache keeps it anyway.
      */
     private fun engineRecord(turnMessages: List<ChatMessage>?): EngineHistory? {
-        val body = turnMessages?.dropWhile { it.role == ChatRole.SYSTEM } ?: return null
-        if (body.any { it.files.isNotEmpty() }) return null
+        val body = turnMessages?.dropWhile { it.role == ChatRole.SYSTEM }
+            ?.takeIf { messages -> messages.none { it.files.isNotEmpty() } }
+            ?: return null
         val transcript = _uiState.value.transcript
         val reply = transcript.lastOrNull()?.takeIf { it.role == ChatRole.ASSISTANT }
             ?: return null

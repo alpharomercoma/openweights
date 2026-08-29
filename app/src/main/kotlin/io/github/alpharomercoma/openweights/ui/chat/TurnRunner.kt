@@ -34,6 +34,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.CapabilityDenial
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
@@ -313,6 +314,7 @@ class TurnRunner @Inject constructor(
             readsResults,
             conversation,
             groundingQuestion,
+            question,
         ).run(params, mode, listener)
     }
 
@@ -324,6 +326,10 @@ class TurnRunner @Inject constructor(
      * of tools. Written as one loop it reached twenty branches and three static checks said
      * so on the same line.
      */
+    // The parameters are the turn's fixed inputs, decided once in turn() and read-only
+    // here; bundling them into a holder object would add a type whose only job is to
+    // carry them across one constructor call. Same reasoning as streamOnce below.
+    @Suppress("LongParameterList")
     private inner class Turn(
         private val active: ToolRegistry,
         private val agent: AgentRunner,
@@ -333,6 +339,7 @@ class TurnRunner @Inject constructor(
         private val readsResults: Boolean,
         private val conversation: List<ChatMessage>,
         private val question: String?,
+        private val asked: String,
     ) {
         /**
          * Whether the engine is handed the schemas, decided once for the whole turn.
@@ -375,6 +382,15 @@ class TurnRunner @Inject constructor(
         private var withdrawn = false
 
         /**
+         * Set by a write-shaped denial repair: the retry is meant to be prose, so calls
+         * are neither rendered, invited, nor parsed from it. Parsing is the half that
+         * matters for a model whose template drops tools — its catalogue is baked into
+         * [messages] and cannot be taken back, so without this the "tools withheld"
+         * retry could still write a prompted JSON call and have it run.
+         */
+        private var proseOnly = false
+
+        /**
          * Whether any pass carried a pinned plan block. The block is transient and changes
          * as steps tick, so a turn that pinned one has a cache the accumulator does not
          * describe, and handing the accumulator out as the engine's record would claim an
@@ -396,8 +412,10 @@ class TurnRunner @Inject constructor(
                 // model can see the tools, and sampling follows this one: choosing among
                 // tools is an argmax, and a pass that can only write prose keeps whatever
                 // temperature the user set.
-                val mayCall =
-                    withTools && round < maxRounds && ToolBudget(headroomTokens()).hasRoom
+                val mayCall = withTools &&
+                    !proseOnly &&
+                    round < maxRounds &&
+                    ToolBudget(headroomTokens()).hasRoom
                 // Pinned for this pass only, never folded into the accumulator: the block
                 // changes as steps are ticked, and anything that changes has to sit at the
                 // very end or it moves tokens the cache has already read. Grounding is the
@@ -427,7 +445,7 @@ class TurnRunner @Inject constructor(
                 // cannot render tools has never been offered one, so "I could use web_search
                 // for that" is a remark about what it cannot do. Ungated, that remark
                 // reached the network.
-                val calls = pass.asked(active, withTools)
+                val calls = pass.asked(active, withTools && !proseOnly)
                 val again = if (mayCall) {
                     advance(pass, calls, mode, listener)
                 } else {
@@ -511,11 +529,56 @@ class TurnRunner @Inject constructor(
          * because nothing was run and nothing was read.
          */
         private fun repair(pass: Pass): Boolean {
-            if (repaired || !pass.raw.invitesRepair(active)) return false
+            if (repaired) return false
+            // Denials are classified before announcement salvage: a short denial that
+            // happens to name a real tool ("I can't write code; I only have web_search")
+            // otherwise spends the allowance on the generic tool-preserving repair, which
+            // is the exact wrong push for it. Call-shaped markup still wins — that is a
+            // call that got the syntax wrong, not a claim about capability.
+            if (!pass.raw.containsToolMarkup() && CapabilityDenial.denies(pass.spoken())) {
+                return denialRepair(pass)
+            }
+            if (!pass.raw.invitesRepair(active)) return false
             repaired = true
             messages = messages +
                 ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
                 ChatMessage.text(ChatRole.USER, repairRequest(active))
+            return true
+        }
+
+        /**
+         * A pass that claimed to lack a capability instead of acting gets the push the user
+         * would otherwise have to type.
+         *
+         * Same single allowance as the parse repair above, for the same reason: re-asking a
+         * model that will not move is how a phone spends a minute arriving nowhere. The
+         * split is [CapabilityDenial]'s and is measured there: a denial about looking up or
+         * computing keeps the tools and is told which one fits; any other denial gets its
+         * retry with the tools withheld, because a retry that can still see them calls one
+         * — a haiku request became a web search — and with nothing to call the model
+         * writes the answer it was refusing to write. On the 34-case routing suite this
+         * mechanism took the shipped prompt from 18 to 30, curing every denial; the four
+         * cases still missed are over-eager searches that never denied anything.
+         */
+        private fun denialRepair(pass: Pass): Boolean {
+            repaired = true
+            // The turn's own question, not the conversation's last message: that one is
+            // decorated with tool notes whose text can carry an earlier turn's URLs, and
+            // a stale address would classify a translation denial as a fetch.
+            val fitting = CapabilityDenial.fitting(pass.spoken(), asked)
+                .firstOrNull { active.find(it) != null }
+            // The withheld pass re-renders the prompt without the tool block, which on a
+            // hybrid model is a one-off full re-read — the same price the next turn then
+            // pays once more to put the block back, exactly as a withdrawal already does.
+            // Paid only by a turn that was otherwise ending on an apology.
+            if (fitting == null) {
+                renderTools = false
+                proseOnly = true
+            }
+            messages = messages +
+                ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
+                ChatMessage.text(ChatRole.USER, CapabilityDenial.retryRequest(fitting))
+            Log.i("OpenWeights", "denial repair fitting=$fitting")
             return true
         }
 

@@ -159,27 +159,15 @@ class WatchScheduler @Inject constructor(
                 // one path missed the release is the visible half of that.
                 try {
                     val period = watch.everyMinutes * MILLIS_PER_MINUTE
-                    while (isActive) {
+                    var live = true
+                    while (isActive && live) {
                         delay(period)
                         val current = watches.byId(watch.id)
-                        if (current == null || current.state != WatchState.ACTIVE) break
-                        // One bad tick must not end the loop, and a cancellation must.
-                        // `runCatching` alone caught both and told nobody about either.
-                        try {
-                            // Null is [WatchRunner.tick]'s own signal that recording this
-                            // tick was what stopped the watch — the third failure, or a
-                            // pause that landed between the read above and this call. Acted
-                            // on here rather than left for the top of the loop, which would
-                            // have delayed a full period first: a notification and a
-                            // foreground hold the watch no longer needs, kept for up to
-                            // fourteen more minutes for no reason other than not having
-                            // looked yet.
-                            if (runner.get().tick(watch.id) == null) break
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                            Log.w("OpenWeights", "watch ${watch.id} could not run", failure)
-                        }
+                        // Short-circuit order is the contract: a watch that is gone or
+                        // paused must end the loop without ticking at all.
+                        live = current != null &&
+                            current.state == WatchState.ACTIVE &&
+                            tickOnce(watch.id)
                     }
                 } finally {
                     // Only if this coroutine is still the one registered. Cancellation is
@@ -204,6 +192,26 @@ class WatchScheduler @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * One tick, and whether the watch should keep running afterwards.
+     *
+     * One bad tick must not end the loop, and a cancellation must; `runCatching` alone
+     * caught both and told nobody about either. Null is [WatchRunner.tick]'s own signal
+     * that recording this tick was what stopped the watch — the third failure, or a pause
+     * that landed between the caller's read and this call. Acted on immediately rather
+     * than left for the top of the loop, which would have delayed a full period first: a
+     * notification and a foreground hold the watch no longer needs, kept for up to
+     * fourteen more minutes for no reason other than not having looked yet.
+     */
+    private suspend fun tickOnce(watchId: Long): Boolean = try {
+        runner.get().tick(watchId) != null
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+        Log.w("OpenWeights", "watch $watchId could not run", failure)
+        true
     }
 
     /**

@@ -40,6 +40,12 @@ fun interface Watches {
  * as long as it runs, and the user is the one paying.
  */
 class WatchTool(private val watches: Watches) : Tool {
+    // The task parameter used to teach the rephrasing by example: "'Remind me to stretch'
+    // becomes 'Time to stretch'". Caught on-device: pushed with a bare "go" after an
+    // apology about an unrelated question, the model called this tool with that example
+    // copied out of the schema verbatim, task and all. A worked example in a parameter
+    // description is a prototype the model can complete, and for a 1B model a prototype
+    // outweighs every instruction around it — so the intent is kept and the example is not.
     override val definition = ToolDefinition(
         name = NAME,
         description = "Check something again on a schedule, for as long as the user wants. " +
@@ -51,7 +57,7 @@ class WatchTool(private val watches: Watches) : Tool {
               "properties": {
                 "task": {
                   "type": "string",
-                  "description": "What to check each time, rephrased as the check itself rather than repeated as the user's own words. 'Remind me to stretch' becomes 'Time to stretch' or similar: a check has nobody left to ask it of, and a task that still reads as a request to the assistant reads that way on every tick, including to the model running it."
+                  "description": "The condition or fact to check on each scheduled run, phrased as the check itself rather than as a request to the assistant."
                 },
                 "every_minutes": {
                   "type": "integer",

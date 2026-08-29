@@ -184,15 +184,7 @@ class ModelDownloader @Inject constructor(
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                val totalFromRange = response.header("Content-Range")
-                    ?.substringAfter("*/", "")
-                    ?.toLongOrNull()
-                if (response.code == HubHttp.RANGE_NOT_SATISFIABLE &&
-                    alreadyHave > 0 &&
-                    (totalFromRange == null || alreadyHave >= totalFromRange)
-                ) {
-                    return
-                }
+                if (response.saysAlreadyComplete(alreadyHave)) return
                 throw response.toHubException(hasToken = tokenSource.token() != null)
             }
             // A server that ignores the range header restarts the file, so partial bytes
@@ -208,6 +200,18 @@ class ModelDownloader @Inject constructor(
 
             copyTo(partial, response.body.byteStream(), resuming, alreadyHave, total)
         }
+    }
+
+    /**
+     * A 416 for a file we already hold all of, which is a finished download rather than a
+     * failure: the server cannot serve a range that starts at the end of the file.
+     */
+    private fun Response.saysAlreadyComplete(alreadyHave: Long): Boolean {
+        if (code != HubHttp.RANGE_NOT_SATISFIABLE || alreadyHave <= 0) return false
+        val totalFromRange = header("Content-Range")
+            ?.substringAfter("*/", "")
+            ?.toLongOrNull()
+        return totalFromRange == null || alreadyHave >= totalFromRange
     }
 
     private suspend fun FlowCollector<DownloadProgress>.copyTo(

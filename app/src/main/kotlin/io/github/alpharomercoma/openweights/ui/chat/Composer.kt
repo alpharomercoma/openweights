@@ -95,8 +95,11 @@ import io.github.alpharomercoma.openweights.model.StagedDocument
  * Docked to the bottom edge above the navigation bar, never floating over the last
  * message, which is the single most common mobile chat layout mistake.
  */
+// Complexity here is the layout's conditional surface — every chip, hint and control that
+// comes and goes with state — and splitting it would scatter one visual container across
+// functions that can only be understood together.
 @Composable
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "CyclomaticComplexMethod")
 fun Composer(
     conversationKey: Long?,
     enabled: Boolean,

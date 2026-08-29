@@ -141,9 +141,11 @@ fun ContextMeter(
                 contentDescription = listOfNotNull(
                     sessionText?.let {
                         "This conversation: $inputTokens tokens in, $outputTokens tokens out" +
-                            (cacheHitRate?.let { rate ->
-                                ", cache reused ${(rate * 100).roundToInt()} percent"
-                            } ?: "")
+                            (
+                                cacheHitRate?.let { rate ->
+                                    ", cache reused ${(rate * PERCENT).roundToInt()} percent"
+                                } ?: ""
+                                )
                     },
                     "Context $percent percent full, $used of $total tokens",
                 ).joinToString(". ")
@@ -186,9 +188,12 @@ internal fun sessionStatusText(
 ): String? {
     if (inputTokens == null || outputTokens == null) return null
     val tokens = "↑${formatTokenCount(inputTokens)} ↓${formatTokenCount(outputTokens)}"
-    val hitRate = cacheHitRate?.let { " · CH${(it * 100).roundToInt()}%" }.orEmpty()
+    val hitRate = cacheHitRate?.let { " · CH${(it * PERCENT).roundToInt()}%" }.orEmpty()
     return tokens + hitRate
 }
+
+/** A rate arrives as a fraction and is shown as a percentage. */
+private const val PERCENT = 100
 
 /**
  * A quiet line of words under something.

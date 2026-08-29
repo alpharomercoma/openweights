@@ -227,14 +227,13 @@ enum class SlashCommand(val trigger: String, val description: String) {
         var consumed = 0
         for (word in words) {
             val remaining = normalizedTrigger.removePrefix(matched)
-            if (remaining.isEmpty()) break
             val normalizedWord = word.normalizedForSuggestion()
             // The first word is never checked against this: [parse] already found it plausible
             // enough to suggest this trigger, whatever its length, and that check is not
             // repeated here.
             val looksLikeMoreOfTheTrigger = consumed == 0 ||
                 kotlin.math.abs(normalizedWord.length - remaining.length) <= LENGTH_TOLERANCE
-            if (!looksLikeMoreOfTheTrigger) break
+            if (remaining.isEmpty() || !looksLikeMoreOfTheTrigger) break
             matched += normalizedWord
             consumed++
         }

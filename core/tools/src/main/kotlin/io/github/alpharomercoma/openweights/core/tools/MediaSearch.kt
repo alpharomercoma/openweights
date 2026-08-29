@@ -89,7 +89,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
             Json.parseToJsonElement(body).jsonObject["results"]?.jsonArray
         }.getOrNull()
         if (results == null) {
-            Log.i(TAG, "media search: no results array in ${body.take(120)}")
+            Log.i(TAG, "media search: no results array in ${body.take(LOG_HEAD_CHARS)}")
             return null
         }
 
@@ -161,7 +161,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         if (token == null) {
             // What came back instead matters: a consent page, a challenge, and an empty
             // shell all look identical from the null.
-            val head = page.take(120).replace(Regex("\\s+"), " ")
+            val head = page.take(LOG_HEAD_CHARS).replace(Regex("\\s+"), " ")
             Log.i(TAG, "media search: ${page.length} chars of page, no vqd; starts $head")
         }
         return token
@@ -173,6 +173,9 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         .header("Referer", "$HOME/")
 
     private companion object {
+        /** Enough of a page to say what it was, without logging the page. */
+        const val LOG_HEAD_CHARS = 120
+
         const val TAG = "OpenWeights"
         const val HOME = "https://duckduckgo.com"
         const val IMAGES = "https://duckduckgo.com/i.js"

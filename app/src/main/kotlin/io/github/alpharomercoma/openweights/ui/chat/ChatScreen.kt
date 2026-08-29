@@ -473,7 +473,6 @@ private fun ChatContent(
                             clipboard = clipboard,
                             onActionsForId = onActionsForId,
                             onToggleReadAloud = onToggleReadAloud,
-                            onRegenerate = onRegenerate,
                         )
                     }
 
@@ -765,7 +764,6 @@ private fun Transcript(
     clipboard: MessageClipboard,
     onActionsForId: (Long?) -> Unit,
     onToggleReadAloud: (String) -> Unit,
-    onRegenerate: () -> Unit,
 ) {
     val lastId = state.transcript.lastOrNull()?.id
     // A goal that halted right under this reply, rather than one that finished normally: the

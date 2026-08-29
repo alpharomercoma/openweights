@@ -98,6 +98,15 @@ class Staging @Inject constructor(
             ?.let(Staged::Document)
             ?: Staged.Refused(context.getString(R.string.document_unreadable))
 
+    /**
+     * Why these files cannot be sent to this model, or null when they can.
+     *
+     * The same question [file] answers on the way in, asked again by [Attaching] once the
+     * copy is finished, because the model can be changed while a large file is still moving.
+     */
+    fun unreadable(files: List<MessagePart.File>, support: MediaSupport): String? =
+        files.firstOrNull { !support.accepts(it.kind) }?.let { support.rejection(it, context) }
+
     suspend fun discard(attachment: MessagePart.File) = attachments.discard(attachment)
 
     suspend fun discard(attachments: List<MessagePart.File>) = this.attachments.discard(attachments)

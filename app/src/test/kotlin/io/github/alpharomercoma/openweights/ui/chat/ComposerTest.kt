@@ -16,14 +16,22 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.core.content.getSystemService
+import androidx.test.core.app.ApplicationProvider
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.model.StagedDocument
@@ -45,6 +53,8 @@ import org.robolectric.RobolectricTestRunner
 class ComposerTest {
     @get:Rule
     val compose = createComposeRule()
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
     fun `choosing an argument command from the palette does not run it empty`() {
@@ -265,10 +275,34 @@ class ComposerTest {
         assert(sent == null) { "nothing should have reached onSend before any input" }
     }
 
+    /**
+     * Pasted words go into the field, and only into the field.
+     *
+     * The other half of this — a pasted picture reaching the attachment path — cannot be
+     * proved here: the host clipboard carries text and nothing else, so under Robolectric
+     * every paste is a text paste. It is proved on a device in `PasteImageOnDeviceTest`.
+     */
+    @Test
+    fun `pasted words still go into the field and nowhere else`() {
+        val clipboard = context.getSystemService<ClipboardManager>()!!
+        clipboard.setPrimaryClip(ClipData.newPlainText("note", "a question I typed elsewhere"))
+        var pasted: List<Uri>? = null
+        show(onPasteMedia = { pasted = it })
+
+        compose.onNodeWithContentDescription("Message")
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithContentDescription("Message")
+            .performSemanticsAction(SemanticsActions.PasteText)
+
+        assert(pasted == null) { "text is the field's to paste, not an attachment: $pasted" }
+        compose.onNodeWithText("a question I typed elsewhere").assertExists()
+    }
+
     private fun show(
         onSend: (String) -> Boolean = { true },
         onCommand: (SlashCommand) -> Unit = {},
         editing: String? = null,
+        onPasteMedia: (List<Uri>) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -287,6 +321,7 @@ class ComposerTest {
                     onRemoveStaged = {},
                     onDictate = {},
                     onSend = onSend,
+                    onPasteMedia = onPasteMedia,
                     editing = editing,
                     onStop = {},
                     onCommand = onCommand,

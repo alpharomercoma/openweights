@@ -518,6 +518,7 @@ class ChatViewModel @Inject constructor(
         state = _uiState,
         limitMessage = appContext.getString(R.string.attachment_limit, MAX_STAGED_ATTACHMENTS),
         unreadableMessage = appContext.getString(R.string.attachment_unreadable),
+        loadingMessage = appContext.getString(R.string.attachment_still_loading),
     )
 
     /** Folding older turns into a summary. Built here for the reason [attachments] is. */

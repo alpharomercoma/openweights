@@ -556,6 +556,9 @@ private fun ChatContent(
                         // wants one leaves its trigger in the composer to be finished
                         // rather than running with nothing.
                         onCommand = { command -> dispatch(command, "") },
+                        // The same door a picked file goes through, so a pasted picture is
+                        // staged, counted and refused by exactly the same rules.
+                        onPasteMedia = onAttachAll,
                     )
                 }
             }

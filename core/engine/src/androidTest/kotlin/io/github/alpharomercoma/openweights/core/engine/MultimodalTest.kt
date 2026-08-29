@@ -46,6 +46,8 @@ import java.io.File
  * ```
  * python3 tools/red-octagon.py
  * adb push red-octagon.png /data/local/tmp/openweights/test-image.png
+ * python3 tools/blue-triangle.py
+ * adb push blue-triangle.png /data/local/tmp/openweights/test-image-2.png
  * adb push LFM2.5-VL-3B-Q4_0.gguf /data/local/tmp/openweights/vl.gguf
  * adb push mmproj-LFM2.5-VL-3B-Q4_0.gguf /data/local/tmp/openweights/mmproj.gguf
  * ```
@@ -110,6 +112,42 @@ class MultimodalTest {
         val answer = completed.content.lowercase()
         assertThat(answer).contains("red")
         assertThat(answer).contains("octagon")
+    }
+
+    @Test
+    fun twoPicturesInOneMessageAreBothRead() = runBlocking {
+        assumeTrue("no second test image at ${SECOND_IMAGE.path}", SECOND_IMAGE.isFile)
+        engine.load(MODEL, ModelLoadParams(contextLength = CONTEXT), PROJECTOR)
+
+        // Two markers, two files, matched positionally by the projector. The failure this
+        // guards against is silent: a second attachment that is stored, shown in the sent
+        // message and then dropped before the model, which answers about the first picture
+        // twice and sounds exactly as sure either way.
+        val completed = engine.chat(
+            messages = listOf(
+                ChatMessage(
+                    role = ChatRole.USER,
+                    parts = listOf(
+                        MessagePart.File(IMAGE.absolutePath, "image/png"),
+                        MessagePart.File(SECOND_IMAGE.absolutePath, "image/png"),
+                        MessagePart.Text(
+                            "Two images. Name the shape in each, first then second.",
+                        ),
+                    ),
+                ),
+            ),
+            params = SamplerParams(temperature = 0.1f, maxTokens = BUDGET, seed = 7),
+        ).toList().filterIsInstance<GenerationEvent.Completed>().single()
+
+        Log.i(TAG, "reply=${completed.content}")
+
+        // Measured on the recommended vision model with llama.cpp's own multimodal path:
+        // two and three pictures in one message are read in order and answered
+        // positionally. Beyond about four the model starts dropping one, which is a limit
+        // of the model rather than of the plumbing, so this asserts on two.
+        val answer = completed.content.lowercase()
+        assertThat(answer).contains("octagon")
+        assertThat(answer).contains("triangle")
     }
 
     @Test
@@ -187,6 +225,9 @@ class MultimodalTest {
         val MODEL = File("/data/local/tmp/openweights/vl.gguf")
         val PROJECTOR = File("/data/local/tmp/openweights/mmproj.gguf")
         val IMAGE = File("/data/local/tmp/openweights/test-image.png")
+
+        /** A second, unmistakably different shape, for the two-attachment case. */
+        val SECOND_IMAGE = File("/data/local/tmp/openweights/test-image-2.png")
 
         val AUDIO_MODEL = File("/data/local/tmp/openweights/audio.gguf")
         val AUDIO_PROJECTOR = File("/data/local/tmp/openweights/audio-mmproj.gguf")

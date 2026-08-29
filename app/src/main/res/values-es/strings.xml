@@ -152,6 +152,7 @@
     <string name="continue_search">Continuar búsqueda</string>
     <string name="proxy_search_only_detail">Se usa solo para búsquedas, no para descargas ni páginas abiertas. Un proxy puede ayudar, pero no lo garantiza.</string>
     <string name="attachment_unreadable">No se pudo leer ese archivo.</string>
+    <string name="attachment_still_loading">El modelo aún se está cargando. Adjúntalo cuando esté listo.</string>
     <string name="attachment_too_large">Ese archivo supera %1$d MB.</string>
     <string name="document_unreadable">No se pudo leer ese archivo como texto.</string>
     <string name="model_text_only_attachment">Este modelo solo lee texto. Carga un modelo con proyector para enviar %1$s.</string>

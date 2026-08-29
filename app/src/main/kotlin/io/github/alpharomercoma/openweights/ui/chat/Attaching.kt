@@ -45,6 +45,7 @@ internal class Attaching(
     private val state: MutableStateFlow<ChatUiState>,
     private val limitMessage: String,
     private val unreadableMessage: String,
+    private val loadingMessage: String,
 ) {
     private val attachMutex = Mutex()
 
@@ -93,16 +94,20 @@ internal class Attaching(
         }
         scope.launch {
             attachMutex.withLock {
-                val capacity = MAX_STAGED_ATTACHMENTS - state.value.staged.size
-                if (capacity <= 0) {
+                if (state.value.staged.size >= MAX_STAGED_ATTACHMENTS) {
                     state.update { it.copy(error = limitMessage) }
                     return@withLock
                 }
                 state.update { it.copy(isAttaching = true) }
                 val refusals = mutableListOf<String>()
-                var hitLimit = uris.size > capacity
+                var hitLimit = false
                 try {
-                    uris.take(capacity).forEach { uri ->
+                    // Every one of them, stopping when the slots are full rather than after
+                    // looking at as many files as there were slots when the batch began. A
+                    // file that is refused takes no slot, so truncating the input first
+                    // meant a batch whose first picture was unreadable dropped its last
+                    // picture too, and said the limit had been reached with a slot free.
+                    uris.forEach { uri ->
                         if (state.value.staged.size >= MAX_STAGED_ATTACHMENTS) {
                             hitLimit = true
                             return@forEach
@@ -197,12 +202,39 @@ internal class Attaching(
 
     /** A revoked clipboard/provider URI is a refusal, not a failed composer coroutine. */
     private suspend fun safelyStage(uri: Uri): Staged = try {
-        staging.file(uri, state.value.mediaSupport)
+        // What a model can read is not known until it is loaded, and until then the answer
+        // reads as "none". The composer is deliberately live while the weights come into
+        // memory, so a picture pasted in that window used to be copied in and then refused
+        // with the sentence for a text-only model — about a model that may have eyes.
+        if (state.value.isLoadingModel) {
+            Staged.Refused(loadingMessage)
+        } else {
+            settled(staging.file(uri, state.value.mediaSupport))
+        }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
         android.util.Log.w("Attaching", "Provider refused attachment", failure)
         Staged.Refused(unreadableMessage)
+    }
+
+    /**
+     * The same question, asked again on the far side of the copy.
+     *
+     * Copying a file suspends for as long as the file is large, and a model can be switched
+     * while it does. The check that let this through went in before those bytes moved: a
+     * picture staged against a model with eyes, landing in a composer now pointed at a
+     * text-only one, would sit there looking sendable and be dropped by the engine.
+     */
+    private suspend fun settled(staged: Staged): Staged {
+        if (staged !is Staged.Files) return staged
+        val why = if (state.value.isLoadingModel) {
+            loadingMessage
+        } else {
+            staging.unreadable(staged.files, state.value.mediaSupport)
+        } ?: return staged
+        staging.discard(staged.files)
+        return Staged.Refused(why)
     }
 }
 

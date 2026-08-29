@@ -16,13 +16,18 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.database.Cursor
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.data.Offload
+import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,7 +37,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.io.File
 
 /**
@@ -563,4 +570,118 @@ class ChatViewModelTest : ChatFixture() {
             assertThat(viewModel.uiState.value.staged).isEmpty()
             assertThat(viewModel.uiState.value.error).contains("text only")
         }
+
+    @Test
+    fun `a batch keeps going after one of its files is refused`() = runTest(dispatcher) {
+        // What a paste of several pictures looks like when one of them is not a picture.
+        // A refused file takes no slot, so the ones after it must still be tried: the batch
+        // used to be cut to the free slots up front, and a refusal early in a full-ish
+        // composer then dropped a picture that had room, blaming the attachment limit.
+        engine.mediaSupport["seeing.gguf"] = MediaSupport(vision = true)
+        loadModel(name = "seeing.gguf")
+        // One slot left, and two files for it: the shape the old code got wrong. It cut the
+        // batch to the free slots before looking at anything, so the refusal ate the slot
+        // the picture had.
+        viewModel.attachAll(
+            (1 until MAX_STAGED_ATTACHMENTS).map { provided("held-$it.png", "image/png", "png") },
+        )
+        settle()
+        assertThat(viewModel.uiState.value.staged).hasSize(MAX_STAGED_ATTACHMENTS - 1)
+        val document = provided("notes.txt", "text/plain", "not a picture")
+        val picture = provided("pasted.png", "image/png", "pretend png")
+
+        viewModel.attachAll(listOf(document, picture))
+        settle()
+
+        assertThat(viewModel.uiState.value.staged).hasSize(MAX_STAGED_ATTACHMENTS)
+        assertThat(viewModel.uiState.value.staged.last().name).isEqualTo("pasted.png")
+        assertThat(viewModel.uiState.value.error).doesNotContain("at once")
+    }
+
+    @Test
+    fun `a picture attached while the model is loading says so`() = runTest(dispatcher) {
+        // The composer is deliberately live while weights come into memory, and what a model
+        // can read is not known until it is. Refusing with the text-only sentence there
+        // tells the user their vision model has no eyes, about a model that has not
+        // finished arriving.
+        engine.mediaSupport["seeing.gguf"] = MediaSupport(vision = true)
+        val picture = provided("pasted.png", "image/png", "pretend png")
+
+        engine.loadDelayMs = LOADING_MS
+        viewModel.loadModel(modelFile("seeing.gguf"), keepConversation = false)
+        viewModel.attach(picture)
+        // Part way through the load, deliberately: letting it finish would replace the
+        // screen, and with it the sentence this is about.
+        advanceTimeBy(LOADING_MS / 2)
+
+        assertThat(viewModel.uiState.value.isLoadingModel).isTrue()
+        assertThat(viewModel.uiState.value.error).contains("still loading")
+        assertThat(viewModel.uiState.value.staged).isEmpty()
+    }
+
+    @Test
+    fun `a picture does not survive the model being switched under it`() = runTest(dispatcher) {
+        // The outcome, whichever way the copy and the switch interleave: a composer pointed
+        // at a text-only model holds no picture. The interleaving that motivated the second
+        // capability check — a copy still in flight when the switch lands — is not what this
+        // reproduces, because the copy here finishes in microseconds; the check it guards is
+        // covered directly by `StagingTest`.
+        engine.mediaSupport["seeing.gguf"] = MediaSupport(vision = true)
+        loadModel(name = "seeing.gguf")
+        val picture = provided("pasted.png", "image/png", "pretend png")
+
+        viewModel.attach(picture)
+        viewModel.loadModel(modelFile("text-only.gguf"), keepConversation = true)
+        settle()
+
+        assertThat(viewModel.uiState.value.staged).isEmpty()
+    }
+
+    /** A file behind a provider that answers for it, which is what a picked file is. */
+    private fun provided(name: String, mediaType: String, content: String): Uri {
+        if (types.isEmpty()) {
+            Robolectric.buildContentProvider(TypedFiles::class.java).create(AUTHORITY)
+        }
+        val uri = "content://$AUTHORITY/$name".toUri()
+        val file = File(models, name).apply { writeText(content) }
+        val resolver = ApplicationProvider.getApplicationContext<android.app.Application>()
+            .contentResolver
+        // A supplier rather than one stream: the store reads a picture more than once, to
+        // measure it before it copies it, and a single stream is empty the second time.
+        shadowOf(resolver).registerInputStreamSupplier(uri) { file.inputStream() }
+        types[uri] = mediaType
+        return uri
+    }
+
+    /** Says what it holds, which is the one question the attachment path asks a provider. */
+    class TypedFiles : ContentProvider() {
+        override fun onCreate() = true
+        override fun getType(uri: Uri) = types[uri]
+        override fun query(
+            uri: Uri,
+            projection: Array<String>?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+            sortOrder: String?,
+        ): Cursor? = null
+
+        override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+        override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?) = 0
+        override fun update(
+            uri: Uri,
+            values: ContentValues?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+        ) = 0
+    }
+
+    private companion object {
+        const val AUTHORITY = "openweights.test"
+
+        /** What each staged URI holds, read back by [TypedFiles]. */
+        val types = mutableMapOf<Uri, String>()
+
+        /** Long enough that the attach below happens while the weights are still coming in. */
+        const val LOADING_MS = 5_000L
+    }
 }

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -26,8 +27,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +43,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -60,6 +69,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -99,6 +109,7 @@ import io.github.alpharomercoma.openweights.model.StagedDocument
 // comes and goes with state — and splitting it would scatter one visual container across
 // functions that can only be understood together.
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 fun Composer(
     conversationKey: Long?,
@@ -126,6 +137,14 @@ fun Composer(
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
     /**
+     * Pictures pasted, dropped or inserted by the keyboard into the field itself.
+     *
+     * The same list the attachment sheet produces, and it goes to the same place: whether
+     * this model can read them is decided once, where a picked file is decided, rather than
+     * twice in two voices. See [PastedMedia].
+     */
+    onPasteMedia: (List<Uri>) -> Unit = {},
+    /**
      * A message being edited, dropped into the field for the user to change.
      *
      * Editing happens here rather than in a dialog because this is where the keyboard, the
@@ -141,8 +160,36 @@ fun Composer(
     // the one piece of state here the user cannot get back; keyed because a draft belongs
     // to the chat it was written in, and carrying it into another one would send it to a
     // model that never saw the conversation it was answering.
-    var draft by rememberSaveable(conversationKey) { mutableStateOf("") }
+    //
+    // A TextFieldState rather than a String, and that is not a fashion: a picture pasted
+    // into the field is only offered to the state-based field. The older one takes text
+    // from the keyboard and drops everything else on the floor, which is exactly the paste
+    // that used to do nothing.
+    val field = rememberSaveable(conversationKey, saver = TextFieldState.Saver) {
+        TextFieldState()
+    }
+    val draft = field.text.toString()
     var isFocused by remember { mutableStateOf(false) }
+
+    // Held rather than captured, so the listener built once still calls whatever the current
+    // composition would: a receiver rebuilt on every keystroke is rebuilt while a drag is in
+    // flight, and a receiver that closed over the first frame's callback would stage into a
+    // conversation that has since been left.
+    val context = LocalContext.current
+    val currentPaste by rememberUpdatedState(onPasteMedia)
+    val acceptsPaste by rememberUpdatedState(enabled)
+    val mediaReceiver = remember(context) {
+        PastedMedia.listener(
+            // Asking a provider what it holds is a call into another app, on this thread,
+            // in the middle of a paste: a provider that is gone, or that throws on a URI it
+            // never meant to share, must leave the content unclaimed rather than take the
+            // window down with it.
+            typeOf = { uri -> runCatching { context.contentResolver.getType(uri) }.getOrNull() },
+            // Nothing is staged into a composer that refuses to be typed into: while a goal
+            // owns the conversation there is no message being written to attach it to.
+            onMedia = { uris -> if (acceptsPaste) currentPaste(uris) },
+        )
+    }
 
     // The command an argument is being typed for, chosen from the palette rather than typed.
     // Stored by name because an enum has no built-in Saver; a command survives rotation the
@@ -165,7 +212,7 @@ fun Composer(
     // it overwritten on every recomposition.
     LaunchedEffect(editing) {
         if (editing != null) {
-            draft = editing
+            field.setTextAndPlaceCursorAtEnd(editing)
             // Editing replaces a turn that already happened; parsing the reopened text as a
             // fresh command would run it instead of resending the edit.
             pendingCommandName = null
@@ -187,14 +234,14 @@ fun Composer(
         // meant an edit that happened to read like a failed command ("/tmp is full") needed
         // Send pressed twice, once to clear a warning `submit` was never going to raise.
         if (editing != null) {
-            if (onSend(draft)) draft = ""
+            if (onSend(draft)) field.clearText()
             return
         }
         val command = pendingCommand
         if (command != null) {
             if (draft.isBlank()) return
             if (onSend("${command.trigger} ${draft.trim()}")) {
-                draft = ""
+                field.clearText()
                 pendingCommandName = null
                 unknownAttempt = null
             }
@@ -208,7 +255,7 @@ fun Composer(
             return
         }
         if (onSend(draft)) {
-            draft = ""
+            field.clearText()
             unknownAttempt = null
         }
     }
@@ -247,10 +294,10 @@ fun Composer(
                         // Chosen, not typed: the trigger is state from here on, not
                         // characters in the field an edit or an autocorrect could reach.
                         pendingCommandName = command.name
-                        draft = ""
+                        field.clearText()
                     } else {
                         pendingCommandName = null
-                        draft = ""
+                        field.clearText()
                         onCommand(command)
                     }
                 },
@@ -304,7 +351,9 @@ fun Composer(
                                 // word: "/deep research what changed" against a suggestion
                                 // of "/deep-research" leaves "what changed", not "research
                                 // what changed" with half the trigger still attached to it.
-                                draft = suggestion.argumentAfterNearMiss(draft)
+                                field.setTextAndPlaceCursorAtEnd(
+                                    suggestion.argumentAfterNearMiss(draft),
+                                )
                             } else {
                                 // A no-argument command runs the same way choosing it from
                                 // the palette does. Staging it as pending instead built a
@@ -312,7 +361,7 @@ fun Composer(
                                 // for a command that never takes one, and the correction
                                 // reached the model as prose.
                                 pendingCommandName = null
-                                draft = ""
+                                field.clearText()
                                 onCommand(suggestion)
                             }
                         },
@@ -353,20 +402,23 @@ fun Composer(
             }
 
             BasicTextField(
-                value = draft,
-                onValueChange = { draft = it },
+                state = field,
                 // False while an unattended goal owns the conversation, or while the field
                 // has nothing to answer to (no model installed at all) — not while a model
                 // is merely loading, where a draft written now is still worth having typed.
                 enabled = enabled,
-                // maxLines rather than a height cap: a fixed dp ceiling is six lines at the
-                // default font scale and barely three at 200%, which quietly punishes the
-                // people who need the room most.
-                maxLines = MAX_LINES,
+                // A line ceiling rather than a height in dp: a fixed dp ceiling is six lines
+                // at the default font scale and barely three at 200%, which quietly punishes
+                // the people who need the room most.
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = MAX_LINES),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 10.dp)
                     .onFocusChanged { isFocused = it.isFocused }
+                    // Before the semantics, and on the field rather than on the container:
+                    // this is what makes a pasted, dropped or keyboard-inserted picture
+                    // reach the message instead of being dropped on the floor.
+                    .contentReceiver(mediaReceiver)
                     .semantics { contentDescription = "Message" },
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = if (enabled) {
@@ -376,13 +428,11 @@ fun Composer(
                     },
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    imeAction = ImeAction.Default,
-                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 // A Box, so the placeholder sits behind the text rather than above it.
                 // Laid out as siblings they stack, which silently doubles the height of an
                 // empty composer and opens a gap nobody can explain.
-                decorationBox = { field ->
+                decorator = TextFieldDecorator { field ->
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (draft.isEmpty()) {
                             Text(
@@ -419,7 +469,11 @@ fun Composer(
                 canDictate = canDictate,
                 isListening = isListening,
                 onAttach = onAttach,
-                onDictate = { onDictate { heard -> draft = draft.appended(heard) } },
+                onDictate = {
+                    onDictate { heard ->
+                        field.setTextAndPlaceCursorAtEnd(field.text.toString().appended(heard))
+                    }
+                },
                 onSend = ::trySend,
                 onStop = onStop,
                 hasSomethingToSend = hasSomethingToSend,

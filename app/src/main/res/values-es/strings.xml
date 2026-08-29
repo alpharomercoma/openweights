@@ -31,7 +31,6 @@
     <string name="regenerate_reply">Volver a generar la respuesta</string>
     <string name="edit_resend">Editar y volver a enviar</string>
     <string name="branch_from_here">Ramificar desde aquí</string>
-    <string name="save_as_pdf">Guardar como PDF</string>
     <string name="report_reply">Informar sobre esta respuesta</string>
     <string name="models_phone_yet">Aún no hay modelos en este teléfono.</string>
     <string name="find_one_hugging_face">Busca uno en Hugging Face</string>
@@ -142,8 +141,6 @@
     <string name="goal_send_steering">Aplicar</string>
     <string name="goal_dismiss">Descartar</string>
     <string name="attachment_limit">Puedes adjuntar hasta %1$d elementos multimedia a la vez.</string>
-    <string name="pdf_saved">PDF guardado</string>
-    <string name="pdf_save_failed">No se pudo guardar el PDF.</string>
     <string name="read_aloud">Leer en voz alta</string>
     <string name="stop_reading">Detener lectura</string>
     <string name="discover">Descubrir</string>

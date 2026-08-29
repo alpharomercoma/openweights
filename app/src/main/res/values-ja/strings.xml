@@ -31,7 +31,6 @@
     <string name="regenerate_reply">返答を作り直す</string>
     <string name="edit_resend">編集して送り直す</string>
     <string name="branch_from_here">ここから分岐する</string>
-    <string name="save_as_pdf">PDFとして保存</string>
     <string name="report_reply">この返答を報告</string>
     <string name="models_phone_yet">この端末にはまだモデルがありません。</string>
     <string name="find_one_hugging_face">Hugging Faceで探す</string>
@@ -143,14 +142,12 @@
     <string name="goal_send_steering">適用</string>
     <string name="goal_dismiss">閉じる</string>
     <string name="attachment_limit">一度に添付できるメディアは %1$d 件までです。</string>
-    <string name="pdf_saved">PDF を保存しました</string>
-    <string name="pdf_save_failed">PDF を保存できませんでした。</string>
     <string name="read_aloud">読み上げる</string>
     <string name="stop_reading">読み上げを停止</string>
     <string name="discover">探す</string><string name="back_to_search_results">検索結果に戻る</string>
     <string name="no_filter_matches">フィルターに一致しません</string><string name="no_models_found">モデルが見つかりません</string><string name="try_wider_filters">サイズ範囲を広げるか、フィルターを解除してください。</string><string name="try_different_search">別の検索語を試してください。</string><string name="continue_search">検索を続ける</string>
     <string name="proxy_search_only_detail">検索専用です。ダウンロードや開いたページには使いません。プロキシが役立つ場合がありますが保証はありません。</string>
-    <string name="attachment_unreadable">ファイルを読み取れませんでした。</string><string name="attachment_too_large">ファイルが %1$d MB を超えています。</string><string name="document_unreadable">テキストとして読み取れませんでした。</string><string name="model_text_only_attachment">このモデルはテキスト専用です。%1$s を送るにはプロジェクター付きモデルを読み込んでください。</string><string name="model_attachment_unsupported">このモデルは %1$s を読めません。%2$s を読めます。</string>
+    <string name="attachment_unreadable">ファイルを読み取れませんでした。</string>
     <string name="model_delete_loaded">%1$s は読み込み中です。モデル選択で解除してから削除してください。</string><string name="model_delete_failed">%1$s を削除できませんでした。もう一度お試しください。</string>
     <string name="tool_search_name">ウェブ検索</string><string name="tool_search_detail">最新情報や未知の情報を検索します。</string><string name="tool_page_name">ページを開く</string><string name="tool_page_detail">公開ページのテキストを読みます。</string><string name="tool_find_file_name">ファイルを探す</string><string name="tool_find_file_detail">共有フォルダーを検索します。</string><string name="tool_read_file_name">ファイルを読む</string><string name="tool_read_file_detail">フォルダーのファイルを開きます。</string><string name="tool_save_file_name">ファイルを保存</string><string name="tool_save_file_detail">フォルダーにファイルを書き込みます。</string><string name="tool_script_name">スクリプト実行</string><string name="tool_script_detail">JavaScript で計算します。ファイルや通信は使いません。</string>
     <string name="engine_duckduckgo_detail">アカウント不要。既定です。</string><string name="engine_brave_detail">独立した検索インデックスです。</string><string name="engine_bing_detail">Yahoo などでも使われます。</string><string name="engine_google_detail">一部のネットワークを拒否する場合があります。</string>

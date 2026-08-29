@@ -18,8 +18,6 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -76,8 +74,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -98,7 +94,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -134,17 +129,11 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.signalColor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.UserQuestion
-import io.github.alpharomercoma.openweights.document.MarkdownPdf
 import io.github.alpharomercoma.openweights.model.DictationState
 import io.github.alpharomercoma.openweights.ui.models.ActiveDownload
 import io.github.alpharomercoma.openweights.ui.models.LocalModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
@@ -384,24 +373,6 @@ private fun ChatContent(
     var editingId by remember { mutableStateOf<Long?>(null) }
     val editing = editingId?.let { id -> state.transcript.firstOrNull { it.id == id } }
 
-    // The reply waiting for somewhere to be written, held while the system picker is up.
-    var savingPdf by remember { mutableStateOf<TranscriptEntry?>(null) }
-    val pdfSnackbar = remember { SnackbarHostState() }
-    val pdfScope = rememberCoroutineScope()
-    // Read during composition rather than from the callback. `LocalContext.current
-    // .getString` inside the lambda reads the resource at the moment the save finishes,
-    // outside composition, so a locale change while the picker is up would show the old
-    // language and nothing would recompose it. Lint calls this out by name.
-    val pdfSaved = stringResource(R.string.pdf_saved)
-    val pdfFailed = stringResource(R.string.pdf_save_failed)
-    SavePdf(
-        entry = savingPdf,
-        documentTitle = state.transcript.firstOrNull()?.text?.take(PDF_TITLE).orEmpty(),
-        onDone = { savingPdf = null },
-        onResult = { saved ->
-            pdfScope.launch { pdfSnackbar.showSnackbar(if (saved) pdfSaved else pdfFailed) }
-        },
-    )
     var showParameters by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
     var showAttachments by remember { mutableStateOf(false) }
@@ -410,7 +381,6 @@ private fun ChatContent(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(pdfSnackbar) },
         // The top bar applies the status-bar inset itself and the app's navigation bar owns
         // the bottom one, so this scaffold must not add either, doing both is what left the
         // chrome floating away from the edges it belongs to.
@@ -642,7 +612,6 @@ private fun ChatContent(
         onDismissActions = { onActionsForId(null) },
         onEdit = { editingId = it.id },
         onBranch = { onBranchFrom(it.id) },
-        onSavePdf = { savingPdf = it },
         onReport = onReport,
     )
 }
@@ -828,7 +797,6 @@ private fun ChatSheets(
     /** Puts this turn's text back in the composer. The resend happens from there. */
     onEdit: (TranscriptEntry) -> Unit,
     onBranch: (TranscriptEntry) -> Unit,
-    onSavePdf: (TranscriptEntry) -> Unit,
     onReport: (TranscriptEntry, ReportReason, String) -> Unit,
 ) {
     var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
@@ -887,7 +855,6 @@ private fun ChatSheets(
             },
             onEdit = { onEdit(entry) },
             onBranch = { onBranch(entry) },
-            onSavePdf = { onSavePdf(entry) },
             onReport = {
                 onDismissActions()
                 reportFor = entry
@@ -1610,85 +1577,3 @@ private const val PULSE_MS = 700
  * see [StatusStrip].
  */
 private val STATUS_SLOT = 28.dp
-
-/**
- * Raises the system's file picker for a reply, and writes the PDF where it lands.
- *
- * The system picker rather than writing to Downloads, so the file goes wherever the user
- * keeps documents and the app needs no storage permission to put it there. Writing there
- * directly would mean MediaStore, a permission on older versions, and a location nobody
- * chose.
- *
- * Kept out of the screen body because it is a launcher, a scope and an effect for one
- * action, and the screen it sits in was already at the complexity limit without them.
- */
-@Composable
-private fun SavePdf(
-    entry: TranscriptEntry?,
-    documentTitle: String,
-    onDone: () -> Unit,
-    onResult: (Boolean) -> Unit,
-) {
-    val context = LocalContext.current
-    val create = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/pdf"),
-    ) { target ->
-        val source = entry
-        onDone()
-        if (target == null || source == null) return@rememberLauncherForActivityResult
-        // Off the main thread: laying out a long reply is real work, and a save that janks
-        // the conversation is worse than one that takes a moment.
-        pdfExportScope.launch {
-            val saved = try {
-                val output = checkNotNull(context.contentResolver.openOutputStream(target))
-                output.use { out ->
-                    MarkdownPdf().write(
-                        markdown = source.answer.ifEmpty { source.text },
-                        title = documentTitle,
-                        out = out,
-                    )
-                }
-                true
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                withContext(NonCancellable) {
-                    runCatching { context.contentResolver.delete(target, null, null) }
-                }
-                throw cancelled
-            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
-                android.util.Log.w("PdfExport", "Could not write PDF", failure)
-                false
-            }
-            if (!saved) runCatching { context.contentResolver.delete(target, null, null) }
-            launch(Dispatchers.Main) { onResult(saved) }
-        }
-    }
-    LaunchedEffect(entry) { entry?.let { create.launch(it.pdfName()) } }
-}
-
-/** Owns a picker-confirmed export even if its originating conversation leaves composition. */
-private val pdfExportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-/**
- * A filename that says which conversation and which reply, without a timestamp nobody reads.
- *
- * The first words of the reply, because that is what somebody looking through a folder of
- * these will recognise. Punctuation goes so the name is safe on every filesystem a phone
- * might mount.
- */
-private fun TranscriptEntry.pdfName(): String {
-    val words = (answer.ifEmpty { text })
-        .lineSequence()
-        .firstOrNull { it.isNotBlank() }
-        ?.filter { it.isLetterOrDigit() || it == ' ' }
-        ?.trim()
-        ?.take(PDF_NAME)
-        ?.replace(' ', '-')
-        .orEmpty()
-    return if (words.isBlank()) "openweights.pdf" else "$words.pdf"
-}
-
-/** Enough of the first question to name the document. */
-private const val PDF_TITLE = 80
-
-/** Enough of the reply to recognise the file. Longer names get truncated by the picker. */
-private const val PDF_NAME = 48

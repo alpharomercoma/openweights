@@ -40,7 +40,6 @@
     <string name="regenerate_reply">Regenerate reply</string>
     <string name="edit_resend">Edit and resend</string>
     <string name="branch_from_here">Branch from here</string>
-    <string name="save_as_pdf">Save as PDF</string>
     <string name="report_reply">Report this reply</string>
     <string name="models_phone_yet">No models on this phone yet.</string>
     <string name="find_one_hugging_face">Find one on Hugging Face</string>
@@ -156,8 +155,6 @@
     <string name="goal_send_steering">Apply</string>
     <string name="goal_dismiss">Dismiss</string>
     <string name="attachment_limit">You can attach up to %1$d media items at once.</string>
-    <string name="pdf_saved">PDF saved</string>
-    <string name="pdf_save_failed">The PDF could not be saved.</string>
     <string name="read_aloud">Read aloud</string>
     <string name="stop_reading">Stop reading</string>
     <string name="discover">Discover</string>

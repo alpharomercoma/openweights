@@ -32,7 +32,6 @@
     <string name="regenerate_reply">Gumawa ulit ng sagot</string>
     <string name="edit_resend">I-edit at ipadala ulit</string>
     <string name="branch_from_here">Mag-branch mula rito</string>
-    <string name="save_as_pdf">I-save bilang PDF</string>
     <string name="report_reply">I-report ang sagot na ito</string>
     <string name="models_phone_yet">Wala pang modelo sa teleponong ito.</string>
     <string name="find_one_hugging_face">Maghanap sa Hugging Face</string>
@@ -143,15 +142,13 @@
     <string name="goal_send_steering">Ilapat</string>
     <string name="goal_dismiss">Isara</string>
     <string name="attachment_limit">Maaari kang mag-attach ng hanggang %1$d media item nang sabay.</string>
-    <string name="pdf_saved">Na-save ang PDF</string>
-    <string name="pdf_save_failed">Hindi ma-save ang PDF.</string>
     <string name="read_aloud">Basahin nang malakas</string>
     <string name="stop_reading">Itigil ang pagbasa</string>
     <string name="discover">Tuklasin</string><string name="back_to_search_results">Bumalik sa mga resulta</string>
     <string name="no_filter_matches">Walang tugma sa mga filter</string><string name="no_models_found">Walang modelong nakita</string>
     <string name="try_wider_filters">Palawakin ang laki o alisin ang mga filter at maghanap muli.</string><string name="try_different_search">Subukan ang ibang termino.</string><string name="continue_search">Ipagpatuloy ang paghahanap</string>
     <string name="proxy_search_only_detail">Para lamang sa paghahanap, hindi sa download o binuksang pahina. Maaaring makatulong ang proxy ngunit walang garantiya.</string>
-    <string name="attachment_unreadable">Hindi mabasa ang file.</string><string name="attachment_too_large">Mas malaki sa %1$d MB ang file.</string><string name="document_unreadable">Hindi mabasa bilang teksto ang file.</string>
+    <string name="attachment_unreadable">Hindi mabasa ang file.</string>
     <string name="model_text_only_attachment">Teksto lang ang nababasa ng modelong ito. Mag-load ng modelong may projector upang magpadala ng %1$s.</string><string name="model_attachment_unsupported">Hindi mabasa ng modelo ang %1$s. Nababasa nito ang %2$s.</string>
     <string name="model_delete_loaded">Naka-load ang %1$s. I-unload ito sa model picker bago burahin.</string><string name="model_delete_failed">Hindi mabura ang %1$s. Subukan muli.</string>
     <string name="tool_search_name">Maghanap sa web</string><string name="tool_search_detail">Naghahanap ng bago o hindi alam.</string><string name="tool_page_name">Magbukas ng pahina</string><string name="tool_page_detail">Binabasa ang teksto ng pampublikong pahina.</string>

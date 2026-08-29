@@ -83,8 +83,8 @@ class TranslationsTest {
 
     @Test
     fun `nothing is left in English by accident`() {
-        // Not a check that the words differ, which would be wrong: "Audio", "PDF" and
-        // "Proxy" are the same in several of these. It checks that a language has not been
+        // Not a check that the words differ, which would be wrong: "Audio" and "Proxy"
+        // are the same in several of these. It checks that a language has not been
         // filled in by copying the file, which is what a machine translation run that failed
         // halfway leaves behind.
         val english = translatable()

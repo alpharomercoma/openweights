@@ -1,0 +1,2124 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		63CDF8551484ED6F4CF7E10F /* install */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 459A5B8FAFAB410E8AEF8AB5 /* Build configuration list for PBXAggregateTarget "install" */;
+			buildPhases = (
+				93426DA6A4AC2C2AC9CE883C /* CMake PostBuild Rules */,
+			);
+			dependencies = (
+				2C1BA12D4AD44525A1838919 /* PBXTargetDependency */,
+			);
+			name = install;
+			productName = install;
+		};
+		8F75BB625F20B63924DC4D2E /* ZERO_CHECK */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 3D2D65A5CA93445CB23BE87A /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */;
+			buildPhases = (
+				0E1056E518A79DD3295AA13D /* Generate CMakeFiles/ZERO_CHECK */,
+			);
+			dependencies = (
+			);
+			name = ZERO_CHECK;
+			productName = ZERO_CHECK;
+		};
+		EF5692477062C7C94EA3A64E /* ALL_BUILD */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = D6E1FBC2CF614FA69799FDE4 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */;
+			buildPhases = (
+				D3CFCACF4B362F629DB6F8CA /* Generate CMakeFiles/ALL_BUILD */,
+			);
+			dependencies = (
+				ECE548AC2D954A7E8CD44729 /* PBXTargetDependency */,
+				51A70991F95A41859361C2C5 /* PBXTargetDependency */,
+				F7EE23EED37E40D8994DA9CD /* PBXTargetDependency */,
+				06A28C933D8C4B8E9D8D1DA4 /* PBXTargetDependency */,
+				AE3785753E7A4FAF839AC433 /* PBXTargetDependency */,
+				BA20A0C38345477393E19F87 /* PBXTargetDependency */,
+			);
+			name = ALL_BUILD;
+			productName = ALL_BUILD;
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		0467BB3B4D664B2999BDE881 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.cpp */ = {isa = PBXBuildFile; fileRef = FC4955D8EDB24F9B885772C1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.cpp */; };
+		05828FA727A9466694DF4F14 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h */ = {isa = PBXBuildFile; fileRef = 386612CD3A8C4F1CB3E1869E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h */; };
+		07691CFDAAF34C70BB25D813 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-dl.cpp */ = {isa = PBXBuildFile; fileRef = 5894F5E775A94BAB9BAD42E8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-dl.cpp */; };
+		0C2C64EBDDE64268988C8E5F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp */ = {isa = PBXBuildFile; fileRef = 18A2FE06F0F04717852B8119 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp */; };
+		0E78B11EA5494BE79E7AEA2B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.h */ = {isa = PBXBuildFile; fileRef = 91D64BAC78454584A074E2BE /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.h */; };
+		11B9F2060E7041CBB521727E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = EE1F4F7ED5C2403AA0903B1C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */; };
+		18CA2FF61E8849D8BB96A7AC /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = EC0918532FCE4835BA98CC7E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */; };
+		19F090D69AE84B4E8D20AB20 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-reg.cpp */ = {isa = PBXBuildFile; fileRef = EB73C6B9175942E2B733824F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-reg.cpp */; };
+		1EAEF961D4A74BF693929EF2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp */ = {isa = PBXBuildFile; fileRef = 14A4F0298B1F473E8F7B29F4 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp */; };
+		1FE489A937104FF08569CD63 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.h */ = {isa = PBXBuildFile; fileRef = 16A4E64D40E140A9B6CEA49B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.h */; };
+		25877EE07DF345FFB85DB349 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-alloc.h */ = {isa = PBXBuildFile; fileRef = 925ABF59D50A44D69ADBABE5 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-alloc.h */; };
+		29FCA4B19F37431DA1132C3C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.cpp */ = {isa = PBXBuildFile; fileRef = 96947CB823D74095A6B94CFA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.cpp */; };
+		2A25A69F6425474E90C3D25F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/ggml-blas.cpp */ = {isa = PBXBuildFile; fileRef = 7E3BC26B89474EF49F6DAAD8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/ggml-blas.cpp */; };
+		32501B0383BC48588D2A8BEC /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/gguf.h */ = {isa = PBXBuildFile; fileRef = D0D2BBD23CFB40DEBF1AA61B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/gguf.h */; };
+		38DA4DAB31DF42D3A30C29DD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp */ = {isa = PBXBuildFile; fileRef = 672565026EE4449ABD5FDD96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp */; };
+		3A4C412AB07448E5AAFC7B14 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.cpp */ = {isa = PBXBuildFile; fileRef = C88E0CF639844098A456A835 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.cpp */; };
+		3B2F36E7582B4B378EA6B354 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp */ = {isa = PBXBuildFile; fileRef = F53DE0ACD463423DB1ABC78B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp */; };
+		3D293D4239024EED8E4061CD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 75667AAC2660497A9F7CA6B1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml.dir/Info.plist */; };
+		3EF369DC70994C2C83D43468 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.c */ = {isa = PBXBuildFile; fileRef = 058F91F3BB814497BE22387E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.c */; };
+		4A6EF4792AF94E7981806F5E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.h */ = {isa = PBXBuildFile; fileRef = C01F8F815C134CFFA129826C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.h */; };
+		4E5E24979EB9416796383CFF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.cpp */ = {isa = PBXBuildFile; fileRef = 4B71BF6B580C476F92AAD3F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.cpp */; };
+		51773BC09CA24538A14B23CD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.cpp */ = {isa = PBXBuildFile; fileRef = 39950C6080104C9482C39D43 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.cpp */; };
+		52E1C516AE6B4C09A4DF45AA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.h */ = {isa = PBXBuildFile; fileRef = F0C820DC9C264CE4838C278E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.h */; };
+		536D8CB1056042C68FE307E7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = BCD950E17AD143A6BA7690D2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/Info.plist */; };
+		5FEA54C3888344AEA9978A94 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 21172F100D7C436BAD4BA147 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/Info.plist */; };
+		64E2BF1CC8DD4C34853D3E32 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml.h */ = {isa = PBXBuildFile; fileRef = 767502127872489F8BEE92E6 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml.h */; };
+		681FE663DB1441C5A38DAD4D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/simd-mappings.h */ = {isa = PBXBuildFile; fileRef = F69E8177833C45FEBCEEDAC3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/simd-mappings.h */; };
+		6CA76C45792044C987B6BDB1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/common.h */ = {isa = PBXBuildFile; fileRef = 88B2BF13DC9141F5AA0383A9 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/common.h */; };
+		6DE43A157CA3496DA56B7119 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-alloc.c */ = {isa = PBXBuildFile; fileRef = 22559A0CF63A446E9E1B23EF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-alloc.c */; };
+		70CA66502E42456F9230D3AE /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.h */ = {isa = PBXBuildFile; fileRef = 85DF130AB2584E149C16D0A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.h */; };
+		7320C298D7CC4382B5674444 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.cpp */ = {isa = PBXBuildFile; fileRef = A1DBC690076247B897688F0A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.cpp */; };
+		779C147B60C54B3A81422EAF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/gguf.cpp */ = {isa = PBXBuildFile; fileRef = 7653985E5C2B4E239D9AED02 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/gguf.cpp */; };
+		815DF317CEA6472F89D9EBA4 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.c */ = {isa = PBXBuildFile; fileRef = 3E65E32821C74697A0510F71 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.c */; };
+		82582384FED34421AD930A7D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = 494FA35523C441B5A4127747 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */; };
+		85DE4BA7639F49F2B8D74B37 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.h */ = {isa = PBXBuildFile; fileRef = F15E8BD5A03643CEB490B830 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.h */; };
+		89081588D6454C22928D229A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-opt.cpp */ = {isa = PBXBuildFile; fileRef = 907D617CDA2944418565186C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-opt.cpp */; };
+		8D4442EA4FD04DBCA65E4E1C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m */ = {isa = PBXBuildFile; fileRef = C7DE838F988C4AC69B0EE827 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m */; };
+		95B67942047244BE880F1767 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-base.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 534ABCDF60CD499EA0A51F7D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-base.dir/Info.plist */; };
+		98EFCA2CE2B64525821BC5EB /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/quants.c */ = {isa = PBXBuildFile; fileRef = 4E5E6F8ADDD8450F97D002F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/quants.c */; };
+		9A92D2E9A6A241DCB1212760 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-meta.cpp */ = {isa = PBXBuildFile; fileRef = A54F4BC3CEC6411CA34AD282 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-meta.cpp */; };
+		9D030CEB963146039894D4E7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.h */ = {isa = PBXBuildFile; fileRef = 0B9E1E6AFD4E48A39D6AC38E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.h */; };
+		A04CBE55B0414DD6B9115175 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/Info.plist */ = {isa = PBXBuildFile; fileRef = 75D71279B2DD47E69857DE36 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/Info.plist */; };
+		A487D3F56455439D85C3F577 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.cpp */ = {isa = PBXBuildFile; fileRef = D48924B16E1846EAB6E0DA96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.cpp */; };
+		A5E742B943B34143B5D17EB7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-context.m */ = {isa = PBXBuildFile; fileRef = C7A907020D2642979E6D3D0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-context.m */; };
+		AC698464D6BD45C7A814737C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.cpp */ = {isa = PBXBuildFile; fileRef = 0F253E4A85284C3683E03C6C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.cpp */; };
+		AD9B35B843834B5C8C2A70E2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.h */ = {isa = PBXBuildFile; fileRef = CEE3E482D20645BCBDF5246A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.h */; };
+		B08EECFD174347958606CB4D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp */ = {isa = PBXBuildFile; fileRef = 82B9F936DA174DD4A6BC4D00 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp */; };
+		B2B811CFA9F74FFD9CF6D4F7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.h */ = {isa = PBXBuildFile; fileRef = FFC745ADC0D046BFAF1AE24B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.h */; };
+		C317F6394FA44FF9B8FD6163 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.h */ = {isa = PBXBuildFile; fileRef = 3E9EE9ADAE0A4457B9DFE925 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.h */; };
+		C619B8FCA0944B568FE66B6D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c */ = {isa = PBXBuildFile; fileRef = 00E15F38DB0E48CB9266E7A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c */; };
+		C901372B40C241A6889CE385 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpp.h */ = {isa = PBXBuildFile; fileRef = DE7289A13BFE4F5493389A0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpp.h */; };
+		CB163B0BECD5470D9878DD38 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = 89858109BB184098A16D6BE1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/CMakeLists.txt */; };
+		CD58AE1D77BB492C803F3E84 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp */ = {isa = PBXBuildFile; fileRef = 30D87AF52C3F498B83DAE65D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp */; };
+		CDECA4D4942040AFA9A2FB36 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.cpp */ = {isa = PBXBuildFile; fileRef = 8EF8953E2B4244BBB4D20183 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.cpp */; };
+		CE1C84F46C7042BBACAA3D35 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.h */ = {isa = PBXBuildFile; fileRef = 1B6D1785D46B4B798F13ECA3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.h */; };
+		D9D59010E3F8496CB37C59B6 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.h */ = {isa = PBXBuildFile; fileRef = F6BF07CE6A3046DDA220AC79 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.h */; };
+		DE52A0F74E1849198B09571D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp */ = {isa = PBXBuildFile; fileRef = A704E47838644FE8AAFB098B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp */; };
+		DF34D5546D9447B08FEFD3C0 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-opt.h */ = {isa = PBXBuildFile; fileRef = 9849553B06F544CFAE4810CF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-opt.h */; };
+		E12608C80D2E4A0B8F84996E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.c */ = {isa = PBXBuildFile; fileRef = 7B44475532BE465288FE5EBA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.c */; };
+		E45145458E94491EAA39EE7E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s.rule */ = {isa = PBXBuildFile; fileRef = E88C3023892944628F73D9AB /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s.rule */; };
+		E4C46AA1585C4093A82FA7EC /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.cpp */ = {isa = PBXBuildFile; fileRef = 3DDBB65E793A44518FAA8190 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.cpp */; };
+		E87668639E7942BB95CB2F97 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp */ = {isa = PBXBuildFile; fileRef = 9B8A09C7934A4429B332A0E7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp */; };
+		E987672C13814A78980B39FD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.h */ = {isa = PBXBuildFile; fileRef = 868428F45BEC4CC48386C019 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.h */; };
+		F032B2569C694C408533DE52 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-backend.h */ = {isa = PBXBuildFile; fileRef = 7674BC0EF02B435C828B28B2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-backend.h */; };
+		F784C5B5D19047DA817A9E80 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend.cpp */ = {isa = PBXBuildFile; fileRef = 91C40E383F194B5091790986 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend.cpp */; };
+		F8F540771BFD410AAD37CFA5 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s */ = {isa = PBXBuildFile; fileRef = 2878A48239414FF1ADF54F3A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s */; };
+		F92A184EE77946C1B96B29CD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/CMakeLists.txt */ = {isa = PBXBuildFile; fileRef = 94C403F8F6924559B68CD860 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/CMakeLists.txt */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildStyle section */
+		A286C44AC49A44ADB3083E1D /* Debug */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Debug;
+		};
+		A7A31CAF16D047588FFC9D92 /* MinSizeRel */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = MinSizeRel;
+		};
+		BB20107CEE6F487DB5C790A8 /* Release */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = Release;
+		};
+		D6C27C10AB3344B6929BA694 /* RelWithDebInfo */ = {
+			isa = PBXBuildStyle;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+			};
+			name = RelWithDebInfo;
+		};
+/* End PBXBuildStyle section */
+
+/* Begin PBXContainerItemProxy section */
+		0F2CF79A8F1041EC9BE6CF1C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 89C64FA61DCBBFC27AEB4994;
+			remoteInfo = "ggml-blas";
+		};
+		2F909DE528AA4A95B1E6F1A4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8F75BB625F20B63924DC4D2E;
+			remoteInfo = ZERO_CHECK;
+		};
+		46B7D89AB8BD46729BBD7936 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF5692477062C7C94EA3A64E;
+			remoteInfo = ALL_BUILD;
+		};
+		6DE22BED0101429A8DEDDA05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 883D9D3A9924841C37B58CB5;
+			remoteInfo = "ggml-base";
+		};
+		6FF1E011403544148E7EDF6B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 883D9D3A9924841C37B58CB5;
+			remoteInfo = "ggml-base";
+		};
+		862DB7F8D82E41E4AA1BA996 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 89C64FA61DCBBFC27AEB4994;
+			remoteInfo = "ggml-blas";
+		};
+		AD19988D4B66415586933164 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A8C732A3620C5F61D1E8D3C9;
+			remoteInfo = "ggml-cpu";
+		};
+		CC0C96598E974F02BDF4037A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 883D9D3A9924841C37B58CB5;
+			remoteInfo = "ggml-base";
+		};
+		CCC25EF1238B433591AF3F9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F34D3FA6834F5569E2802CA4;
+			remoteInfo = ggml;
+		};
+		D5734A7FECB4435AABF9FCF1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 883D9D3A9924841C37B58CB5;
+			remoteInfo = "ggml-base";
+		};
+		EA34A7EB3B0A4891B13B3ED7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9088BB9B340EB70DF2A8EEA7;
+			remoteInfo = "ggml-metal";
+		};
+		EAB8E426E53A4F37842D14DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9088BB9B340EB70DF2A8EEA7;
+			remoteInfo = "ggml-metal";
+		};
+		F0315B40DBB041F897FF28D1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A8C732A3620C5F61D1E8D3C9;
+			remoteInfo = "ggml-cpu";
+		};
+		FDAEFE9C991543BDA8298B40 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 242E37123320443992A783C3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 883D9D3A9924841C37B58CB5;
+			remoteInfo = "ggml-base";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		00E15F38DB0E48CB9266E7A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = "ggml-cpu.c"; path = "src/ggml-cpu/ggml-cpu.c"; sourceTree = SOURCE_ROOT; };
+		058F91F3BB814497BE22387E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = quants.c; path = "src/ggml-cpu/quants.c"; sourceTree = SOURCE_ROOT; };
+		0B9E1E6AFD4E48A39D6AC38E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = sgemm.h; path = "src/ggml-cpu/llamafile/sgemm.h"; sourceTree = SOURCE_ROOT; };
+		0F253E4A85284C3683E03C6C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = vec.cpp; path = "src/ggml-cpu/vec.cpp"; sourceTree = SOURCE_ROOT; };
+		14A4F0298B1F473E8F7B29F4 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = mmq.cpp; path = "src/ggml-cpu/amx/mmq.cpp"; sourceTree = SOURCE_ROOT; };
+		16A4E64D40E140A9B6CEA49B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = traits.h; path = "src/ggml-cpu/traits.h"; sourceTree = SOURCE_ROOT; };
+		18A2FE06F0F04717852B8119 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = repack.cpp; path = "src/ggml-cpu/arch/arm/repack.cpp"; sourceTree = SOURCE_ROOT; };
+		1B6D1785D46B4B798F13ECA3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = repack.h; path = "src/ggml-cpu/repack.h"; sourceTree = SOURCE_ROOT; };
+		1C1E63DEAD4C46CE87A0860F /* ggml-blas */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libggml-blas.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		21172F100D7C436BAD4BA147 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/Info.plist"; sourceTree = "<absolute>"; };
+		22559A0CF63A446E9E1B23EF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-alloc.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = "ggml-alloc.c"; path = "src/ggml-alloc.c"; sourceTree = SOURCE_ROOT; };
+		2878A48239414FF1ADF54F3A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s */ = {isa = PBXFileReference; explicitFileType = sourcecode.asm; fileEncoding = 4; name = "ggml-metal-embed.s"; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s"; sourceTree = "<absolute>"; };
+		30D87AF52C3F498B83DAE65D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-metal-device.cpp"; path = "src/ggml-metal/ggml-metal-device.cpp"; sourceTree = SOURCE_ROOT; };
+		386612CD3A8C4F1CB3E1869E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-cpu-impl.h"; path = "src/ggml-cpu/ggml-cpu-impl.h"; sourceTree = SOURCE_ROOT; };
+		39950C6080104C9482C39D43 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = repack.cpp; path = "src/ggml-cpu/repack.cpp"; sourceTree = SOURCE_ROOT; };
+		3DDBB65E793A44518FAA8190 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "unary-ops.cpp"; path = "src/ggml-cpu/unary-ops.cpp"; sourceTree = SOURCE_ROOT; };
+		3E65E32821C74697A0510F71 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = ggml.c; path = src/ggml.c; sourceTree = SOURCE_ROOT; };
+		3E9EE9ADAE0A4457B9DFE925 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "unary-ops.h"; path = "src/ggml-cpu/unary-ops.h"; sourceTree = SOURCE_ROOT; };
+		440F6F728A6A45A6854139D5 /* ggml-metal */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libggml-metal.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		494FA35523C441B5A4127747 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = src/CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		4B71BF6B580C476F92AAD3F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "binary-ops.cpp"; path = "src/ggml-cpu/binary-ops.cpp"; sourceTree = SOURCE_ROOT; };
+		4E5E6F8ADDD8450F97D002F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/quants.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = quants.c; path = "src/ggml-cpu/arch/arm/quants.c"; sourceTree = SOURCE_ROOT; };
+		534ABCDF60CD499EA0A51F7D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-base.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-base.dir/Info.plist"; sourceTree = "<absolute>"; };
+		5894F5E775A94BAB9BAD42E8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-dl.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-backend-dl.cpp"; path = "src/ggml-backend-dl.cpp"; sourceTree = SOURCE_ROOT; };
+		672565026EE4449ABD5FDD96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-metal-common.cpp"; path = "src/ggml-metal/ggml-metal-common.cpp"; sourceTree = SOURCE_ROOT; };
+		75667AAC2660497A9F7CA6B1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml.dir/Info.plist"; sourceTree = "<absolute>"; };
+		75D71279B2DD47E69857DE36 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/Info.plist"; sourceTree = "<absolute>"; };
+		7653985E5C2B4E239D9AED02 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/gguf.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = gguf.cpp; path = src/gguf.cpp; sourceTree = SOURCE_ROOT; };
+		7674BC0EF02B435C828B28B2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-backend.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-backend.h"; path = "include/ggml-backend.h"; sourceTree = SOURCE_ROOT; };
+		767502127872489F8BEE92E6 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ggml.h; path = include/ggml.h; sourceTree = SOURCE_ROOT; };
+		7AAFFC4F1AA944A9B9FB3F90 /* ggml */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libggml.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B44475532BE465288FE5EBA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.c */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.c; fileEncoding = 4; name = "ggml-quants.c"; path = "src/ggml-quants.c"; sourceTree = SOURCE_ROOT; };
+		7E3BC26B89474EF49F6DAAD8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/ggml-blas.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-blas.cpp"; path = "src/ggml-blas/ggml-blas.cpp"; sourceTree = SOURCE_ROOT; };
+		82B9F936DA174DD4A6BC4D00 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = amx.cpp; path = "src/ggml-cpu/amx/amx.cpp"; sourceTree = SOURCE_ROOT; };
+		85DF130AB2584E149C16D0A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = vec.h; path = "src/ggml-cpu/vec.h"; sourceTree = SOURCE_ROOT; };
+		868428F45BEC4CC48386C019 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-quants.h"; path = "src/ggml-quants.h"; sourceTree = SOURCE_ROOT; };
+		88B2BF13DC9141F5AA0383A9 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/common.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = common.h; path = "src/ggml-cpu/common.h"; sourceTree = SOURCE_ROOT; };
+		89858109BB184098A16D6BE1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = "src/ggml-blas/CMakeLists.txt"; sourceTree = SOURCE_ROOT; };
+		8BCE87C38CFD412A8C763B5D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		8EF8953E2B4244BBB4D20183 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-metal.cpp"; path = "src/ggml-metal/ggml-metal.cpp"; sourceTree = SOURCE_ROOT; };
+		907D617CDA2944418565186C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-opt.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-opt.cpp"; path = "src/ggml-opt.cpp"; sourceTree = SOURCE_ROOT; };
+		91C40E383F194B5091790986 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-backend.cpp"; path = "src/ggml-backend.cpp"; sourceTree = SOURCE_ROOT; };
+		91D64BAC78454584A074E2BE /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = mmq.h; path = "src/ggml-cpu/amx/mmq.h"; sourceTree = SOURCE_ROOT; };
+		925ABF59D50A44D69ADBABE5 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-alloc.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-alloc.h"; path = "include/ggml-alloc.h"; sourceTree = SOURCE_ROOT; };
+		94C403F8F6924559B68CD860 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = "src/ggml-metal/CMakeLists.txt"; sourceTree = SOURCE_ROOT; };
+		96947CB823D74095A6B94CFA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ops.cpp; path = "src/ggml-cpu/ops.cpp"; sourceTree = SOURCE_ROOT; };
+		9849553B06F544CFAE4810CF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-opt.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-opt.h"; path = "include/ggml-opt.h"; sourceTree = SOURCE_ROOT; };
+		9B8A09C7934A4429B332A0E7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-cpu.cpp"; path = "src/ggml-cpu/ggml-cpu.cpp"; sourceTree = SOURCE_ROOT; };
+		A1AB19C0BDF1474AADB97FE0 /* ggml-base */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libggml-base.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1DBC690076247B897688F0A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = traits.cpp; path = "src/ggml-cpu/traits.cpp"; sourceTree = SOURCE_ROOT; };
+		A54F4BC3CEC6411CA34AD282 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-meta.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-backend-meta.cpp"; path = "src/ggml-backend-meta.cpp"; sourceTree = SOURCE_ROOT; };
+		A704E47838644FE8AAFB098B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = sgemm.cpp; path = "src/ggml-cpu/llamafile/sgemm.cpp"; sourceTree = SOURCE_ROOT; };
+		BCD950E17AD143A6BA7690D2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/Info.plist */ = {isa = PBXFileReference; explicitFileType = sourcecode.text.plist; fileEncoding = 4; name = Info.plist; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/Info.plist"; sourceTree = "<absolute>"; };
+		C01F8F815C134CFFA129826C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "binary-ops.h"; path = "src/ggml-cpu/binary-ops.h"; sourceTree = SOURCE_ROOT; };
+		C7A907020D2642979E6D3D0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-context.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; fileEncoding = 4; name = "ggml-metal-context.m"; path = "src/ggml-metal/ggml-metal-context.m"; sourceTree = SOURCE_ROOT; };
+		C7DE838F988C4AC69B0EE827 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; fileEncoding = 4; name = "ggml-metal-device.m"; path = "src/ggml-metal/ggml-metal-device.m"; sourceTree = SOURCE_ROOT; };
+		C88E0CF639844098A456A835 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-threading.cpp"; path = "src/ggml-threading.cpp"; sourceTree = SOURCE_ROOT; };
+		CEE3E482D20645BCBDF5246A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = ops.h; path = "src/ggml-cpu/ops.h"; sourceTree = SOURCE_ROOT; };
+		D0D2BBD23CFB40DEBF1AA61B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/gguf.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = gguf.h; path = include/gguf.h; sourceTree = SOURCE_ROOT; };
+		D48924B16E1846EAB6E0DA96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = ggml.cpp; path = src/ggml.cpp; sourceTree = SOURCE_ROOT; };
+		DE7289A13BFE4F5493389A0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpp.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-cpp.h"; path = "include/ggml-cpp.h"; sourceTree = SOURCE_ROOT; };
+		E8405565B29043619B21A2B7 /* ggml-cpu */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libggml-cpu.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E88C3023892944628F73D9AB /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s.rule */ = {isa = PBXFileReference; explicitFileType = default; fileEncoding = 4; name = "ggml-metal-embed.s.rule"; path = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s.rule"; sourceTree = "<absolute>"; };
+		EB73C6B9175942E2B733824F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-reg.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-backend-reg.cpp"; path = "src/ggml-backend-reg.cpp"; sourceTree = SOURCE_ROOT; };
+		EC0918532FCE4835BA98CC7E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = src/CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		EE1F4F7ED5C2403AA0903B1C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */ = {isa = PBXFileReference; explicitFileType = sourcecode.text; fileEncoding = 4; name = CMakeLists.txt; path = src/CMakeLists.txt; sourceTree = SOURCE_ROOT; };
+		F0C820DC9C264CE4838C278E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = quants.h; path = "src/ggml-cpu/quants.h"; sourceTree = SOURCE_ROOT; };
+		F15E8BD5A03643CEB490B830 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = hbm.h; path = "src/ggml-cpu/hbm.h"; sourceTree = SOURCE_ROOT; };
+		F53DE0ACD463423DB1ABC78B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = "ggml-metal-ops.cpp"; path = "src/ggml-metal/ggml-metal-ops.cpp"; sourceTree = SOURCE_ROOT; };
+		F69E8177833C45FEBCEEDAC3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/simd-mappings.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "simd-mappings.h"; path = "src/ggml-cpu/simd-mappings.h"; sourceTree = SOURCE_ROOT; };
+		F6BF07CE6A3046DDA220AC79 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = amx.h; path = "src/ggml-cpu/amx/amx.h"; sourceTree = SOURCE_ROOT; };
+		FC4955D8EDB24F9B885772C1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 4; name = hbm.cpp; path = "src/ggml-cpu/hbm.cpp"; sourceTree = SOURCE_ROOT; };
+		FFC745ADC0D046BFAF1AE24B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 4; name = "ggml-threading.h"; path = "src/ggml-threading.h"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		29DFE436072A40D2912D8B05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		796A73DB73DC4C20957F0C0C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A631FD21DCB488A8C398504 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AC45E637CEE949E3AFD9F043 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B0F715484FED4B25B347836D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0488B1AB77AA41D4BE179F94 /* ggml-blas */ = {
+			isa = PBXGroup;
+			children = (
+				AC718AB5157E4956AE36C6AD /* Resources */,
+				0969DAAFA1A3474BB6F3256E /* Source Files */,
+				89858109BB184098A16D6BE1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/CMakeLists.txt */,
+			);
+			name = "ggml-blas";
+			sourceTree = "<group>";
+		};
+		0969DAAFA1A3474BB6F3256E /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				7E3BC26B89474EF49F6DAAD8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/ggml-blas.cpp */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		1388CD4ECDAA4BFBB2E7A22E /* ggml-base */ = {
+			isa = PBXGroup;
+			children = (
+				E2E646163F794699AAE7CCAD /* Header Files */,
+				E4B7AC46427342D881329A5F /* Resources */,
+				32B5A0EB7D1B426383AA90DD /* Source Files */,
+				EC0918532FCE4835BA98CC7E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */,
+			);
+			name = "ggml-base";
+			sourceTree = "<group>";
+		};
+		1EB006984AE94D9D9BF480F0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7AAFFC4F1AA944A9B9FB3F90 /* ggml */,
+				A1AB19C0BDF1474AADB97FE0 /* ggml-base */,
+				1C1E63DEAD4C46CE87A0860F /* ggml-blas */,
+				E8405565B29043619B21A2B7 /* ggml-cpu */,
+				440F6F728A6A45A6854139D5 /* ggml-metal */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		24454D04EE294FE586771013 = {
+			isa = PBXGroup;
+			children = (
+				42344422010F4C7F918E1563 /* ALL_BUILD */,
+				D5571FB3C8AC4B42BF50A4DB /* ggml */,
+				1388CD4ECDAA4BFBB2E7A22E /* ggml-base */,
+				0488B1AB77AA41D4BE179F94 /* ggml-blas */,
+				832C4C038DEC47BA827AF384 /* ggml-cpu */,
+				B6BD3D5352E3489AB9E950ED /* ggml-metal */,
+				1EB006984AE94D9D9BF480F0 /* Products */,
+				C116B0E2EBB14A6A981B8462 /* Frameworks */,
+				3D4F38231C3241BF8848E986 /* Resources */,
+			);
+			sourceTree = "<group>";
+		};
+		32B5A0EB7D1B426383AA90DD /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				22559A0CF63A446E9E1B23EF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-alloc.c */,
+				A54F4BC3CEC6411CA34AD282 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-meta.cpp */,
+				91C40E383F194B5091790986 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend.cpp */,
+				907D617CDA2944418565186C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-opt.cpp */,
+				7B44475532BE465288FE5EBA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.c */,
+				C88E0CF639844098A456A835 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.cpp */,
+				3E65E32821C74697A0510F71 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.c */,
+				D48924B16E1846EAB6E0DA96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.cpp */,
+				7653985E5C2B4E239D9AED02 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/gguf.cpp */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		3330DE144C264A87979D278E /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				75D71279B2DD47E69857DE36 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		3D4F38231C3241BF8848E986 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		42344422010F4C7F918E1563 /* ALL_BUILD */ = {
+			isa = PBXGroup;
+			children = (
+				5CEA895FC8204D7AB550735F /* CMake Rules */,
+				8BCE87C38CFD412A8C763B5D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/CMakeLists.txt */,
+			);
+			name = ALL_BUILD;
+			sourceTree = "<group>";
+		};
+		5CEA895FC8204D7AB550735F /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+		62A501CEA90E471C838A5224 /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				82B9F936DA174DD4A6BC4D00 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp */,
+				14A4F0298B1F473E8F7B29F4 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp */,
+				4E5E6F8ADDD8450F97D002F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/quants.c */,
+				18A2FE06F0F04717852B8119 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp */,
+				4B71BF6B580C476F92AAD3F3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.cpp */,
+				00E15F38DB0E48CB9266E7A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c */,
+				9B8A09C7934A4429B332A0E7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp */,
+				FC4955D8EDB24F9B885772C1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.cpp */,
+				A704E47838644FE8AAFB098B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp */,
+				96947CB823D74095A6B94CFA /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.cpp */,
+				058F91F3BB814497BE22387E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.c */,
+				39950C6080104C9482C39D43 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.cpp */,
+				A1DBC690076247B897688F0A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.cpp */,
+				3DDBB65E793A44518FAA8190 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.cpp */,
+				0F253E4A85284C3683E03C6C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.cpp */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		77CD6F39D2F147B19D238575 /* CMake Rules */ = {
+			isa = PBXGroup;
+			children = (
+				E88C3023892944628F73D9AB /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s.rule */,
+			);
+			name = "CMake Rules";
+			sourceTree = "<group>";
+		};
+		832C4C038DEC47BA827AF384 /* ggml-cpu */ = {
+			isa = PBXGroup;
+			children = (
+				A836897CE34743D7AFCEAC9B /* Header Files */,
+				9FD18A7F46BE4086908413B1 /* Resources */,
+				62A501CEA90E471C838A5224 /* Source Files */,
+				EE1F4F7ED5C2403AA0903B1C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */,
+			);
+			name = "ggml-cpu";
+			sourceTree = "<group>";
+		};
+		8D89D092BF6A4EBCAA0282BF /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				672565026EE4449ABD5FDD96 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp */,
+				C7A907020D2642979E6D3D0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-context.m */,
+				30D87AF52C3F498B83DAE65D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp */,
+				C7DE838F988C4AC69B0EE827 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m */,
+				F53DE0ACD463423DB1ABC78B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp */,
+				8EF8953E2B4244BBB4D20183 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.cpp */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+		9D2F7A5032744FAC9E45401F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				75667AAC2660497A9F7CA6B1 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		9FD18A7F46BE4086908413B1 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BCD950E17AD143A6BA7690D2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-cpu.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		A836897CE34743D7AFCEAC9B /* Header Files */ = {
+			isa = PBXGroup;
+			children = (
+				F6BF07CE6A3046DDA220AC79 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.h */,
+				91D64BAC78454584A074E2BE /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.h */,
+				C01F8F815C134CFFA129826C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.h */,
+				88B2BF13DC9141F5AA0383A9 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/common.h */,
+				386612CD3A8C4F1CB3E1869E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu-impl.h */,
+				F15E8BD5A03643CEB490B830 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.h */,
+				0B9E1E6AFD4E48A39D6AC38E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.h */,
+				CEE3E482D20645BCBDF5246A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.h */,
+				F0C820DC9C264CE4838C278E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.h */,
+				1B6D1785D46B4B798F13ECA3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.h */,
+				F69E8177833C45FEBCEEDAC3 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/simd-mappings.h */,
+				16A4E64D40E140A9B6CEA49B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.h */,
+				3E9EE9ADAE0A4457B9DFE925 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.h */,
+				85DF130AB2584E149C16D0A2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.h */,
+			);
+			name = "Header Files";
+			sourceTree = "<group>";
+		};
+		AC718AB5157E4956AE36C6AD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				21172F100D7C436BAD4BA147 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		B6BD3D5352E3489AB9E950ED /* ggml-metal */ = {
+			isa = PBXGroup;
+			children = (
+				77CD6F39D2F147B19D238575 /* CMake Rules */,
+				3330DE144C264A87979D278E /* Resources */,
+				8D89D092BF6A4EBCAA0282BF /* Source Files */,
+				2878A48239414FF1ADF54F3A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s */,
+				94C403F8F6924559B68CD860 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/CMakeLists.txt */,
+			);
+			name = "ggml-metal";
+			sourceTree = "<group>";
+		};
+		C116B0E2EBB14A6A981B8462 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D5571FB3C8AC4B42BF50A4DB /* ggml */ = {
+			isa = PBXGroup;
+			children = (
+				9D2F7A5032744FAC9E45401F /* Resources */,
+				F110586C330948FB8CF9F347 /* Source Files */,
+				494FA35523C441B5A4127747 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/CMakeLists.txt */,
+			);
+			name = ggml;
+			sourceTree = "<group>";
+		};
+		E2E646163F794699AAE7CCAD /* Header Files */ = {
+			isa = PBXGroup;
+			children = (
+				925ABF59D50A44D69ADBABE5 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-alloc.h */,
+				7674BC0EF02B435C828B28B2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-backend.h */,
+				DE7289A13BFE4F5493389A0C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpp.h */,
+				9849553B06F544CFAE4810CF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-opt.h */,
+				767502127872489F8BEE92E6 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml.h */,
+				D0D2BBD23CFB40DEBF1AA61B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/gguf.h */,
+				868428F45BEC4CC48386C019 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.h */,
+				FFC745ADC0D046BFAF1AE24B /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.h */,
+			);
+			name = "Header Files";
+			sourceTree = "<group>";
+		};
+		E4B7AC46427342D881329A5F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				534ABCDF60CD499EA0A51F7D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/CMakeFiles/ggml-base.dir/Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		F110586C330948FB8CF9F347 /* Source Files */ = {
+			isa = PBXGroup;
+			children = (
+				5894F5E775A94BAB9BAD42E8 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-dl.cpp */,
+				EB73C6B9175942E2B733824F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-reg.cpp */,
+			);
+			name = "Source Files";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		883D9D3A9924841C37B58CB5 /* ggml-base */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FD4144E7218D428D9CF5FD0D /* Build configuration list for PBXNativeTarget "ggml-base" */;
+			buildPhases = (
+				A98F5D75F1FB427A91773A49 /* Sources */,
+				796A73DB73DC4C20957F0C0C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ggml-base";
+			productName = "ggml-base";
+			productReference = A1AB19C0BDF1474AADB97FE0 /* ggml-base */;
+			productType = "com.apple.product-type.library.static";
+		};
+		89C64FA61DCBBFC27AEB4994 /* ggml-blas */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8DF0FFDDA3EB4E1BABF9CBC7 /* Build configuration list for PBXNativeTarget "ggml-blas" */;
+			buildPhases = (
+				1E2033A9D7BF460588049048 /* Sources */,
+				8A631FD21DCB488A8C398504 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				149B2FAAD43847CEAF60452F /* PBXTargetDependency */,
+			);
+			name = "ggml-blas";
+			productName = "ggml-blas";
+			productReference = 1C1E63DEAD4C46CE87A0860F /* ggml-blas */;
+			productType = "com.apple.product-type.library.static";
+		};
+		9088BB9B340EB70DF2A8EEA7 /* ggml-metal */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CD52290D30B945E383DD248C /* Build configuration list for PBXNativeTarget "ggml-metal" */;
+			buildPhases = (
+				5F7A2DB08B615AB31B0BBEAD /* Generate src/ggml-metal/autogenerated/ggml-metal-embed.s */,
+				7E55E4FE32E84C51B31315DB /* Sources */,
+				B0F715484FED4B25B347836D /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0D52B99F0C5D45898D4C8A2D /* PBXTargetDependency */,
+			);
+			name = "ggml-metal";
+			productName = "ggml-metal";
+			productReference = 440F6F728A6A45A6854139D5 /* ggml-metal */;
+			productType = "com.apple.product-type.library.static";
+		};
+		A8C732A3620C5F61D1E8D3C9 /* ggml-cpu */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9E9549A5363243C4BE337A4E /* Build configuration list for PBXNativeTarget "ggml-cpu" */;
+			buildPhases = (
+				60813ED621B54BD19FE449C3 /* Sources */,
+				29DFE436072A40D2912D8B05 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F5CE19A3D36441C0916A7991 /* PBXTargetDependency */,
+			);
+			name = "ggml-cpu";
+			productName = "ggml-cpu";
+			productReference = E8405565B29043619B21A2B7 /* ggml-cpu */;
+			productType = "com.apple.product-type.library.static";
+		};
+		F34D3FA6834F5569E2802CA4 /* ggml */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F75AD2B2EBF6425CA6DBE709 /* Build configuration list for PBXNativeTarget "ggml" */;
+			buildPhases = (
+				6EFC5CC718D54C6E83173A3D /* Sources */,
+				AC45E637CEE949E3AFD9F043 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0AD2BC1F6E4D4BFD98C438EF /* PBXTargetDependency */,
+				332AD24534644763B6B575C4 /* PBXTargetDependency */,
+				E98433D04B3649A1B512C656 /* PBXTargetDependency */,
+				903D1D5DC8DF40BAAB3903E7 /* PBXTargetDependency */,
+			);
+			name = ggml;
+			productName = ggml;
+			productReference = 7AAFFC4F1AA944A9B9FB3F90 /* ggml */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		242E37123320443992A783C3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2660;
+			};
+			buildConfigurationList = D57FA5DEA9194ECCB83FEC4B /* Build configuration list for PBXProject "ggml" */;
+			buildSettings = {
+			};
+			buildStyles = (
+				A286C44AC49A44ADB3083E1D /* Debug */,
+				BB20107CEE6F487DB5C790A8 /* Release */,
+				A7A31CAF16D047588FFC9D92 /* MinSizeRel */,
+				D6C27C10AB3344B6929BA694 /* RelWithDebInfo */,
+			);
+			compatibilityVersion = "Xcode 3.2";
+			hasScannedForEncodings = 0;
+			mainGroup = 24454D04EE294FE586771013;
+			projectDirPath = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml";
+			projectRoot = "";
+			targets = (
+				EF5692477062C7C94EA3A64E /* ALL_BUILD */,
+				F34D3FA6834F5569E2802CA4 /* ggml */,
+				883D9D3A9924841C37B58CB5 /* ggml-base */,
+				89C64FA61DCBBFC27AEB4994 /* ggml-blas */,
+				A8C732A3620C5F61D1E8D3C9 /* ggml-cpu */,
+				9088BB9B340EB70DF2A8EEA7 /* ggml-metal */,
+				63CDF8551484ED6F4CF7E10F /* install */,
+				8F75BB625F20B63924DC4D2E /* ZERO_CHECK */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		0E1056E518A79DD3295AA13D /* Generate CMakeFiles/ZERO_CHECK */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ZERO_CHECK";
+			outputPaths = (
+"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeFiles/ZERO_CHECK"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  make -f /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  make -f /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  make -f /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeScripts/ReRunCMake.make
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  make -f /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeScripts/ReRunCMake.make
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		3C0110FC8322DE7E50886E21 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		5F7A2DB08B615AB31B0BBEAD /* Generate src/ggml-metal/autogenerated/ggml-metal-embed.s */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+"/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-common.h","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-impl.h","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.metal"			);
+			name = "Generate src/ggml-metal/autogenerated/ggml-metal-embed.s";
+			outputPaths = (
+"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal
+  echo \"Embedding Metal library\"
+  sed -e \"/__embed_ggml-common.h__/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/../ggml-common.h\" -e /__embed_ggml-common.h__/d < /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.metal > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp
+  sed -e \"/#include \\\"ggml-metal-impl.h\\\"/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-impl.h\" -e \"/#include \\\"ggml-metal-impl.h\\\"/d\" < /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal
+  echo \".section __DATA,__ggml_metallib\" > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_start\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_start: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo .incbin \\\"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal\\\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_end\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_end: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal
+  echo \"Embedding Metal library\"
+  sed -e \"/__embed_ggml-common.h__/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/../ggml-common.h\" -e /__embed_ggml-common.h__/d < /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.metal > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp
+  sed -e \"/#include \\\"ggml-metal-impl.h\\\"/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-impl.h\" -e \"/#include \\\"ggml-metal-impl.h\\\"/d\" < /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal
+  echo \".section __DATA,__ggml_metallib\" > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_start\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_start: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo .incbin \\\"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal\\\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_end\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_end: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal
+  echo \"Embedding Metal library\"
+  sed -e \"/__embed_ggml-common.h__/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/../ggml-common.h\" -e /__embed_ggml-common.h__/d < /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.metal > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp
+  sed -e \"/#include \\\"ggml-metal-impl.h\\\"/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-impl.h\" -e \"/#include \\\"ggml-metal-impl.h\\\"/d\" < /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal
+  echo \".section __DATA,__ggml_metallib\" > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_start\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_start: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo .incbin \\\"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal\\\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_end\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_end: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal
+  echo \"Embedding Metal library\"
+  sed -e \"/__embed_ggml-common.h__/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/../ggml-common.h\" -e /__embed_ggml-common.h__/d < /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.metal > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp
+  sed -e \"/#include \\\"ggml-metal-impl.h\\\"/r /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-impl.h\" -e \"/#include \\\"ggml-metal-impl.h\\\"/d\" < /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal.tmp > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal
+  echo \".section __DATA,__ggml_metallib\" > /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_start\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_start: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo .incbin \\\"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.metal\\\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo \".globl _ggml_metallib_end\" >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+  echo _ggml_metallib_end: >> /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		87AF4882E018677E2624B544 = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		93426DA6A4AC2C2AC9CE883C /* CMake PostBuild Rules */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "CMake PostBuild Rules";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  /opt/homebrew/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  /opt/homebrew/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  /opt/homebrew/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  /opt/homebrew/bin/cmake -DBUILD_TYPE=$CONFIGURATION -DEFFECTIVE_PLATFORM_NAME=$EFFECTIVE_PLATFORM_NAME -P cmake_install.cmake
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+		9B50530E35CC49C82C2FACCF = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# shell script goes here
+exit 0";
+			showEnvVarsInLog = 0;
+		};
+		D3CFCACF4B362F629DB6F8CA /* Generate CMakeFiles/ALL_BUILD */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate CMakeFiles/ALL_BUILD";
+			outputPaths = (
+"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/CMakeFiles/ALL_BUILD"			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e
+if test \"$CONFIGURATION\" = \"Debug\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"Release\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"MinSizeRel\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  echo Build\\ all\\ projects
+fi
+if test \"$CONFIGURATION\" = \"RelWithDebInfo\"; then :
+  cd /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml
+  echo Build\\ all\\ projects
+fi
+";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1E2033A9D7BF460588049048 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2A25A69F6425474E90C3D25F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/ggml-blas.cpp */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		60813ED621B54BD19FE449C3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B08EECFD174347958606CB4D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp */,
+				1EAEF961D4A74BF693929EF2 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp */,
+				98EFCA2CE2B64525821BC5EB /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/quants.c */,
+				0C2C64EBDDE64268988C8E5F /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/arch/arm/repack.cpp */,
+				4E5E24979EB9416796383CFF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/binary-ops.cpp */,
+				C619B8FCA0944B568FE66B6D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.c */,
+				E87668639E7942BB95CB2F97 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ggml-cpu.cpp */,
+				0467BB3B4D664B2999BDE881 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/hbm.cpp */,
+				DE52A0F74E1849198B09571D /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/llamafile/sgemm.cpp */,
+				29FCA4B19F37431DA1132C3C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/ops.cpp */,
+				3EF369DC70994C2C83D43468 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/quants.c */,
+				51773BC09CA24538A14B23CD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/repack.cpp */,
+				7320C298D7CC4382B5674444 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/traits.cpp */,
+				E4C46AA1585C4093A82FA7EC /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/unary-ops.cpp */,
+				AC698464D6BD45C7A814737C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu/vec.cpp */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6EFC5CC718D54C6E83173A3D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				07691CFDAAF34C70BB25D813 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-dl.cpp */,
+				19F090D69AE84B4E8D20AB20 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-reg.cpp */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7E55E4FE32E84C51B31315DB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8F540771BFD410AAD37CFA5 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/autogenerated/ggml-metal-embed.s */,
+				38DA4DAB31DF42D3A30C29DD /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-common.cpp */,
+				A5E742B943B34143B5D17EB7 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-context.m */,
+				CD58AE1D77BB492C803F3E84 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.cpp */,
+				8D4442EA4FD04DBCA65E4E1C /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-device.m */,
+				3B2F36E7582B4B378EA6B354 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal-ops.cpp */,
+				CDECA4D4942040AFA9A2FB36 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/ggml-metal.cpp */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A98F5D75F1FB427A91773A49 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DE43A157CA3496DA56B7119 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-alloc.c */,
+				9A92D2E9A6A241DCB1212760 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend-meta.cpp */,
+				F784C5B5D19047DA817A9E80 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-backend.cpp */,
+				89081588D6454C22928D229A /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-opt.cpp */,
+				E12608C80D2E4A0B8F84996E /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-quants.c */,
+				3A4C412AB07448E5AAFC7B14 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-threading.cpp */,
+				815DF317CEA6472F89D9EBA4 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.c */,
+				A487D3F56455439D85C3F577 /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml.cpp */,
+				779C147B60C54B3A81422EAF /* /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/gguf.cpp */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		06A28C933D8C4B8E9D8D1DA4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 883D9D3A9924841C37B58CB5 /* ggml-base */;
+			targetProxy = 6DE22BED0101429A8DEDDA05 /* PBXContainerItemProxy */;
+		};
+		0AD2BC1F6E4D4BFD98C438EF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 89C64FA61DCBBFC27AEB4994 /* ggml-blas */;
+			targetProxy = 0F2CF79A8F1041EC9BE6CF1C /* PBXContainerItemProxy */;
+		};
+		0D52B99F0C5D45898D4C8A2D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 883D9D3A9924841C37B58CB5 /* ggml-base */;
+			targetProxy = CC0C96598E974F02BDF4037A /* PBXContainerItemProxy */;
+		};
+		149B2FAAD43847CEAF60452F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 883D9D3A9924841C37B58CB5 /* ggml-base */;
+			targetProxy = D5734A7FECB4435AABF9FCF1 /* PBXContainerItemProxy */;
+		};
+		2C1BA12D4AD44525A1838919 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF5692477062C7C94EA3A64E /* ALL_BUILD */;
+			targetProxy = 46B7D89AB8BD46729BBD7936 /* PBXContainerItemProxy */;
+		};
+		332AD24534644763B6B575C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9088BB9B340EB70DF2A8EEA7 /* ggml-metal */;
+			targetProxy = EAB8E426E53A4F37842D14DA /* PBXContainerItemProxy */;
+		};
+		51A70991F95A41859361C2C5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9088BB9B340EB70DF2A8EEA7 /* ggml-metal */;
+			targetProxy = EA34A7EB3B0A4891B13B3ED7 /* PBXContainerItemProxy */;
+		};
+		903D1D5DC8DF40BAAB3903E7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A8C732A3620C5F61D1E8D3C9 /* ggml-cpu */;
+			targetProxy = F0315B40DBB041F897FF28D1 /* PBXContainerItemProxy */;
+		};
+		AE3785753E7A4FAF839AC433 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F34D3FA6834F5569E2802CA4 /* ggml */;
+			targetProxy = CCC25EF1238B433591AF3F9F /* PBXContainerItemProxy */;
+		};
+		BA20A0C38345477393E19F87 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A8C732A3620C5F61D1E8D3C9 /* ggml-cpu */;
+			targetProxy = AD19988D4B66415586933164 /* PBXContainerItemProxy */;
+		};
+		E98433D04B3649A1B512C656 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 883D9D3A9924841C37B58CB5 /* ggml-base */;
+			targetProxy = FDAEFE9C991543BDA8298B40 /* PBXContainerItemProxy */;
+		};
+		ECE548AC2D954A7E8CD44729 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 89C64FA61DCBBFC27AEB4994 /* ggml-blas */;
+			targetProxy = 862DB7F8D82E41E4AA1BA996 /* PBXContainerItemProxy */;
+		};
+		F5CE19A3D36441C0916A7991 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 883D9D3A9924841C37B58CB5 /* ggml-base */;
+			targetProxy = 6FF1E011403544148E7EDF6B /* PBXContainerItemProxy */;
+		};
+		F7EE23EED37E40D8994DA9CD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8F75BB625F20B63924DC4D2E /* ZERO_CHECK */;
+			targetProxy = 2F909DE528AA4A95B1E6F1A4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0C86300AA89F4E95A9BAD061 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_CPU,GGML_USE_BLAS,GGML_USE_METAL,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ggml;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		118DD0CDDD55454082BD2B86 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		14717335C5AF4145B3C29EA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_CPU,GGML_USE_BLAS,GGML_USE_METAL,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "   '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ggml;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		153357DE706B46D481A47EAA /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build";
+			};
+			name = RelWithDebInfo;
+		};
+		1EDBE940BF6747C9988D9AA5 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		1F34FA7DA8864B94A8CD373E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		25CF87298F7F46B89108F341 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_BLAS_USE_ACCELERATE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "   '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-blas";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-blas.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		2B3483F0297547048C7A02FE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_VERSION=\"0.20.2\"'","'GGML_COMMIT=\"b2e5e9b\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-base";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-base.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		3DAC2FE290DA43A195035271 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		442FD51834A34D76A0D73F8E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build";
+			};
+			name = Release;
+		};
+		5E69CF9A9ACB4DB2B31A8B60 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_BLAS_USE_ACCELERATE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "       -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-blas";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-blas.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		5F3B12A25A764DD38C8AFC89 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SYMROOT = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build";
+			};
+			name = Debug;
+		};
+		6298C91C14174FC8A5BD34C2 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,GGML_METAL_EMBED_LIBRARY,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-metal";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-metal.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		630DC3FB7CF841A9A232D4DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,GGML_METAL_EMBED_LIBRARY,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("   '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "   '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-metal";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-metal.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		6B5A34AE1E98404388C15666 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		6BA111B914EA44EEA68E19BD /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_BLAS_USE_ACCELERATE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-blas";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-blas.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		6D17877CA76C42588F589CD2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_BLAS_USE_ACCELERATE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-blas/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-blas";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-blas.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		79E2500392BF453C8C35817E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_VERSION=\"0.20.2\"'","'GGML_COMMIT=\"b2e5e9b\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("   '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "   '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-base";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-base.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		7C84A8B932DE4580AE519DE9 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_VERSION=\"0.20.2\"'","'GGML_COMMIT=\"b2e5e9b\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("       -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "       -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-base";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-base.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		87C9B44CE5384FA784B5B1C7 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_ACCELERATE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_USE_LLAMAFILE,GGML_USE_CPU_REPACK,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("       -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "       -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-cpu";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-cpu.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		88D7070F6171478F893B52CE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_CPU,GGML_USE_BLAS,GGML_USE_METAL,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ggml;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		8A1A89E7358545EB8DB20922 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_CPU,GGML_USE_BLAS,GGML_USE_METAL,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CPLUSPLUSFLAGS = "       -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ggml;
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		B005EE28E9474677BA67B36B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		B010D00B335E417C9DE249F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Debug${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_ACCELERATE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_USE_LLAMAFILE,GGML_USE_CPU_REPACK,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("   '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "   '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-cpu";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-cpu.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		BBEB8D38211E49CAAA839D1D /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_ACCELERATE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_USE_LLAMAFILE,GGML_USE_CPU_REPACK,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-cpu";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-cpu.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		C1A9F63D92CB4F33BB594EB3 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		CBF69D5A67814BD28EA1B67D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Debug;
+		};
+		CC4B4C649BA645CBAF4F34B1 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		CCF8E1359F644F699363C270 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ALL_BUILD;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		D8320DB4B554439983E6E739 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/MinSizeRel${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_VERSION=\"0.20.2\"'","'GGML_COMMIT=\"b2e5e9b\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-base";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-base.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		DDBA0AD250A248C288E49F26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'",GGML_USE_ACCELERATE,ACCELERATE_NEW_LAPACK,ACCELERATE_LAPACK_ILP64,GGML_USE_LLAMAFILE,GGML_USE_CPU_REPACK,"'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/.","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-cpu","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-cpu";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-cpu.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+		E0907F6F7CDD458F8599AB49 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = install;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = MinSizeRel;
+		};
+		E124F0EEDA954588AC5A6582 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				INSTALL_PATH = "";
+				OTHER_LDFLAGS = ("","$(inherited)");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = ZERO_CHECK;
+				SECTORDER_FLAGS = "";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		E134F5676D344FEEB18557F4 /* MinSizeRel */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SYMROOT = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build";
+			};
+			name = MinSizeRel;
+		};
+		E394AEE9EC254787A08D1048 /* RelWithDebInfo */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/RelWithDebInfo${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 2;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,GGML_METAL_EMBED_LIBRARY,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("       -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "       -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-metal";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-metal.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = RelWithDebInfo;
+		};
+		F9AD43D58F45417EB0CA53ED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				COMBINE_HIDPI_IMAGES = YES;
+				CONFIGURATION_BUILD_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/Release${EFFECTIVE_PLATFORM_NAME}";
+				EXECUTABLE_PREFIX = lib;
+				EXECUTABLE_SUFFIX = .a;
+				FRAMEWORK_SEARCH_PATHS = (/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks,"$(inherited)");
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREPROCESSOR_DEFINITIONS = ("'CMAKE_INTDIR=\"$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"'","'GGML_SCHED_MAX_COPIES=4'","'_XOPEN_SOURCE=600'",_DARWIN_C_SOURCE,GGML_METAL_EMBED_LIBRARY,"$(inherited)");
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				HEADER_SEARCH_PATHS = ("/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/ggml-metal/..","/Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/src/../include","$(inherited)");
+				INSTALL_PATH = "";
+				LIBRARY_STYLE = STATIC;
+				ONLY_ACTIVE_ARCH = NO;
+				OTHER_CFLAGS = ("    -DNDEBUG '-std=gnu11' -Wshadow -Wstrict-prototypes -Wpointer-arith -Wmissing-prototypes '-Werror=implicit-int' '-Werror=implicit-function-declaration' -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wdouble-promotion ","$(inherited)");
+				OTHER_CPLUSPLUSFLAGS = "    -DNDEBUG '-std=gnu++17' -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wunreachable-code-break -Wunreachable-code-return -Wmissing-prototypes -Wextra-semi ";
+				OTHER_LIBTOOLFLAGS = ("");
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = "ggml-metal";
+				SECTORDER_FLAGS = "";
+				TARGET_TEMP_DIR = "/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/build/ggml-metal.build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)";
+				USE_HEADERMAP = NO;
+				WARNING_CFLAGS = ("$(inherited)");
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3D2D65A5CA93445CB23BE87A /* Build configuration list for PBXAggregateTarget "ZERO_CHECK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3DAC2FE290DA43A195035271 /* Debug */,
+				B005EE28E9474677BA67B36B /* Release */,
+				1EDBE940BF6747C9988D9AA5 /* MinSizeRel */,
+				E124F0EEDA954588AC5A6582 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		459A5B8FAFAB410E8AEF8AB5 /* Build configuration list for PBXAggregateTarget "install" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				118DD0CDDD55454082BD2B86 /* Debug */,
+				6B5A34AE1E98404388C15666 /* Release */,
+				E0907F6F7CDD458F8599AB49 /* MinSizeRel */,
+				CC4B4C649BA645CBAF4F34B1 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8DF0FFDDA3EB4E1BABF9CBC7 /* Build configuration list for PBXNativeTarget "ggml-blas" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25CF87298F7F46B89108F341 /* Debug */,
+				6D17877CA76C42588F589CD2 /* Release */,
+				6BA111B914EA44EEA68E19BD /* MinSizeRel */,
+				5E69CF9A9ACB4DB2B31A8B60 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9E9549A5363243C4BE337A4E /* Build configuration list for PBXNativeTarget "ggml-cpu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B010D00B335E417C9DE249F0 /* Debug */,
+				DDBA0AD250A248C288E49F26 /* Release */,
+				BBEB8D38211E49CAAA839D1D /* MinSizeRel */,
+				87C9B44CE5384FA784B5B1C7 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CD52290D30B945E383DD248C /* Build configuration list for PBXNativeTarget "ggml-metal" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				630DC3FB7CF841A9A232D4DD /* Debug */,
+				F9AD43D58F45417EB0CA53ED /* Release */,
+				6298C91C14174FC8A5BD34C2 /* MinSizeRel */,
+				E394AEE9EC254787A08D1048 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D57FA5DEA9194ECCB83FEC4B /* Build configuration list for PBXProject "ggml" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F3B12A25A764DD38C8AFC89 /* Debug */,
+				442FD51834A34D76A0D73F8E /* Release */,
+				E134F5676D344FEEB18557F4 /* MinSizeRel */,
+				153357DE706B46D481A47EAA /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D6E1FBC2CF614FA69799FDE4 /* Build configuration list for PBXAggregateTarget "ALL_BUILD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CBF69D5A67814BD28EA1B67D /* Debug */,
+				1F34FA7DA8864B94A8CD373E /* Release */,
+				CCF8E1359F644F699363C270 /* MinSizeRel */,
+				C1A9F63D92CB4F33BB594EB3 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F75AD2B2EBF6425CA6DBE709 /* Build configuration list for PBXNativeTarget "ggml" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				14717335C5AF4145B3C29EA1 /* Debug */,
+				88D7070F6171478F893B52CE /* Release */,
+				0C86300AA89F4E95A9BAD061 /* MinSizeRel */,
+				8A1A89E7358545EB8DB20922 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FD4144E7218D428D9CF5FD0D /* Build configuration list for PBXNativeTarget "ggml-base" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79E2500392BF453C8C35817E /* Debug */,
+				2B3483F0297547048C7A02FE /* Release */,
+				D8320DB4B554439983E6E739 /* MinSizeRel */,
+				7C84A8B932DE4580AE519DE9 /* RelWithDebInfo */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 242E37123320443992A783C3 /* Project object */;
+}

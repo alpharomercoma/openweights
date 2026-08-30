@@ -217,6 +217,7 @@
     <string name="context_length_tokens">Context length: %1$d tokens</string>
     <string name="downloading_percent">Downloading %1$d%%</string>
     <string name="needs_newer_version">Needs a newer OpenWeights: this version cannot load %1$s models.</string>
+    <string name="draft_model_not_a_model">A draft model for speculative decoding, not one that answers on its own. It only runs alongside the full model it speeds up.</string>
     <string name="header_read_failed">Could not read this file\'s header: %1$s</string>
     <string name="fit_comfortable">Runs comfortably</string>
     <string name="fit_tight">Runs, but tight: other apps may be closed</string>

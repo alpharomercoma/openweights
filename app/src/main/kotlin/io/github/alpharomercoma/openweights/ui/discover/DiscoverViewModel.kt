@@ -74,6 +74,16 @@ data class InspectedFile(
      * must not withhold a download.
      */
     val unsupportedArchitecture: String? = null,
+
+    /**
+     * The architecture this file declares, when it is a draft head rather than a model.
+     *
+     * Kept apart from [unsupportedArchitecture] because the two want opposite sentences.
+     * An architecture this build does not know is a reason to update the app; a draft is
+     * something no version of this app will ever run on its own, and telling somebody to
+     * update would send them looking for a release that is never coming.
+     */
+    val draftArchitecture: String? = null,
 )
 
 data class DiscoverUiState(
@@ -432,14 +442,21 @@ class DiscoverViewModel @Inject constructor(
             // shape of them at all, and a model released after this build was cut is the
             // case where the answer is no. Asked here, over a couple of kilobytes of
             // header, rather than after several gigabytes of download.
+            //
+            // A draft head reads as unsupported here, because it is dropped from the
+            // supported set for the same reason `clip` is, so it has to be told apart
+            // before the unsupported branch claims it: both are files this build will not
+            // run, and only one of them is waiting on a newer build.
+            val draft = metadata.architecture.takeIf { EngineArchitectures.isDraft(it) }
             val architecture = metadata.architecture
-                .takeUnless { EngineArchitectures.supports(it) }
+                .takeUnless { EngineArchitectures.supports(it) || draft != null }
             updateFile(file.path) {
                 it.copy(
                     isInspecting = false,
                     metadata = metadata,
                     fit = fit,
                     unsupportedArchitecture = architecture,
+                    draftArchitecture = draft,
                 )
             }
         }.onFailure { failure ->

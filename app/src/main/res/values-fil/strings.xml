@@ -182,6 +182,7 @@
     <string name="context_length_tokens">Haba ng konteksto: %1$d token</string>
     <string name="downloading_percent">Dina-download %1$d%%</string>
     <string name="needs_newer_version">Kailangan ng mas bagong OpenWeights: hindi kayang i-load ng bersyong ito ang mga modelong %1$s.</string>
+    <string name="draft_model_not_a_model">Isang draft na modelo para sa speculative decoding, hindi ito sumasagot nang mag-isa. Gumagana lang ito kasama ang buong modelong pinapabilis nito.</string>
     <string name="header_read_failed">Hindi mabasa ang header ng file: %1$s</string>
     <string name="fit_comfortable">Maayos na tatakbo</string>
     <string name="fit_tight">Tatakbo, pero kapos: maaaring isara ang ibang app</string>

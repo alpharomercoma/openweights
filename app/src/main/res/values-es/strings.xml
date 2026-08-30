@@ -196,6 +196,7 @@
     <string name="context_length_tokens">Longitud del contexto: %1$d tokens</string>
     <string name="downloading_percent">Descargando %1$d%%</string>
     <string name="needs_newer_version">Se necesita una versión más reciente de OpenWeights: esta versión no carga modelos %1$s.</string>
+    <string name="draft_model_not_a_model">Un modelo borrador para decodificación especulativa, no uno que responda por sí solo. Solo funciona junto al modelo completo al que acelera.</string>
     <string name="header_read_failed">No se pudo leer la cabecera del archivo: %1$s</string>
     <string name="fit_comfortable">Funciona con holgura</string>
     <string name="fit_tight">Funciona con poca memoria; podrían cerrarse otras apps</string>

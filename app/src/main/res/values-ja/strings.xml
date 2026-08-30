@@ -178,6 +178,7 @@
     <string name="context_length_tokens">コンテキスト長: %1$d トークン</string>
     <string name="downloading_percent">ダウンロード中 %1$d%%</string>
     <string name="needs_newer_version">新しい OpenWeights が必要です。このバージョンは %1$s モデルを読み込めません。</string>
+    <string name="draft_model_not_a_model">投機的デコーディング用のドラフトモデルで、単独では応答しません。高速化の対象となる完全なモデルと組み合わせてのみ動作します。</string>
     <string name="header_read_failed">ファイルのヘッダーを読み取れませんでした: %1$s</string>
     <string name="fit_comfortable">余裕をもって実行できます</string>
     <string name="fit_tight">実行できますが、他のアプリが終了する場合があります</string>

@@ -1,0 +1,23 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-cpu/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-blas/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/ggml/src/ggml-metal/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/src/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/hash/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/miniaudio/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/nlohmann/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/sheredom/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/stb/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/vendor/cpp-httplib/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/common/cmake_install.cmake",
+		"/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/llama.cpp/tools/mtmd/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

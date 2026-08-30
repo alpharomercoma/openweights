@@ -57,6 +57,20 @@ class FitCardTest {
     }
 
     @Test
+    fun `a draft model is refused with the reason, not with a fit`() {
+        // The case that reached a user: LiquidAI's DSpark draft is 168MB, declares an
+        // architecture llama.cpp reads happily, and fits any phone comfortably — so the
+        // card offered it, and selecting it failed deep in the engine. The memory verdict
+        // is true and beside the point here, so it is not shown at all: "runs comfortably"
+        // above "this cannot answer on its own" is the card contradicting itself.
+        showFit(FitVerdict.COMFORTABLE, draftArchitecture = "dflash")
+
+        compose.onNodeWithText("draft model", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Download").assertDoesNotExist()
+        compose.onNodeWithText("Runs comfortably", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun `a tight fit warns that other apps may be closed`() {
         // The middle verdict is the one worth having: comfortable and impossible are both
         // easy calls, and "it will run and cost you your other apps" is the one a user
@@ -159,6 +173,7 @@ class FitCardTest {
         verdict: FitVerdict,
         tokensPerSecond: Double? = 13.8,
         unsupportedArchitecture: String? = null,
+        draftArchitecture: String? = null,
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -180,6 +195,7 @@ class FitCardTest {
                             name = "LFM2.5-2.6B",
                         ),
                         unsupportedArchitecture = unsupportedArchitecture,
+                        draftArchitecture = draftArchitecture,
                         fit = FitReport(
                             verdict = verdict,
                             requiredMemoryBytes = 2_100_000_000L,

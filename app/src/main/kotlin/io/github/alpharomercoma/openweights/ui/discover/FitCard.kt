@@ -104,7 +104,7 @@ fun FitCard(
                 // Before the fit verdict, because it outranks it: a file this engine
                 // cannot parse will not run at any context length, and offering the
                 // slider as a way out would be a lie.
-                inspected.unsupportedArchitecture != null -> Unit
+                inspected.cannotRun -> Unit
                 inspected.fit?.verdict == FitVerdict.WONT_RUN -> Unit
                 downloadFraction != null -> Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -131,17 +131,7 @@ fun FitCard(
             }
         }
 
-        inspected.unsupportedArchitecture?.let { architecture ->
-            Text(
-                text = stringResource(R.string.needs_newer_version, architecture),
-                style = MaterialTheme.typography.bodyMedium,
-                color = signal(
-                    OpenWeightsColors.SignalPoor,
-                    OpenWeightsColors.PaperSignalPoor,
-                    LocalIsDarkTheme.current,
-                ),
-            )
-        }
+        WhyItCannotRun(inspected)
 
         inspected.inspectionError?.let { error ->
             Text(
@@ -155,7 +145,7 @@ fun FitCard(
         // version cannot load bailingmoe3 models" is the card contradicting itself, and
         // the memory arithmetic is beside the point once the engine cannot read the
         // format: there is no context length at which it becomes true.
-        if (inspected.unsupportedArchitecture == null) {
+        if (!inspected.cannotRun) {
             inspected.fit?.let { fit -> VerdictLine(fit) }
         }
         // One line each, and each short enough to be one line. All three of these used to
@@ -195,6 +185,45 @@ private fun VerdictLine(fit: FitReport) {
     }
 
     Text(text = label, style = MaterialTheme.typography.bodyMedium, color = color)
+}
+
+/**
+ * Whether this file is one the engine will not run, whatever the device has free.
+ *
+ * Two reasons, and they are one question to everything that reads them: the download is
+ * withheld, the memory verdict is suppressed, and one sentence is shown instead. Asked as a
+ * property so the card does not grow a branch per reason — the two below already cost it
+ * detekt's complexity ceiling.
+ */
+private val InspectedFile.cannotRun: Boolean
+    get() = unsupportedArchitecture != null || draftArchitecture != null
+
+/**
+ * The sentence for a file that will not run, or nothing when it will.
+ *
+ * The two reasons are kept apart because they ask for opposite things. An architecture this
+ * build does not know is a reason to update the app and will work one day. A
+ * speculative-decoding draft head never will: it carries no vocabulary and no output layer,
+ * borrowing both from the model it drafts for, so telling somebody to update would send
+ * them after a release that is never coming.
+ */
+@Composable
+private fun WhyItCannotRun(inspected: InspectedFile) {
+    val text = when {
+        inspected.draftArchitecture != null -> stringResource(R.string.draft_model_not_a_model)
+        inspected.unsupportedArchitecture != null ->
+            stringResource(R.string.needs_newer_version, inspected.unsupportedArchitecture)
+        else -> return
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = signal(
+            OpenWeightsColors.SignalPoor,
+            OpenWeightsColors.PaperSignalPoor,
+            LocalIsDarkTheme.current,
+        ),
+    )
 }
 
 private fun signal(dark: Color, light: Color, isDark: Boolean) = if (isDark) dark else light

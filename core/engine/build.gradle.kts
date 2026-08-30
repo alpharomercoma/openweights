@@ -139,7 +139,23 @@ abstract class GenerateEngineArchitectures : DefaultTask() {
         //
         // Filtered after the count above, so dropping them cannot be mistaken for a parse
         // that came up short.
-        val names = entries.filter { it != "clip" && !it.startsWith("(") }.toSortedSet()
+        // Draft heads, dropped for exactly the reason `clip` is.
+        //
+        // A speculative-decoding draft is published beside the model it drafts for and
+        // looks like an ordinary model from the outside: LiquidAI's DSpark draft declares
+        // `dflash`, weighs 168 MB, loads without complaint and fits any phone comfortably.
+        // It holds no vocabulary and no output layer — it borrows both from its target —
+        // so it cannot answer a question however well the engine reads it. llama.cpp says
+        // so at the last possible moment, refusing the context with "requires ctx_other to
+        // be set", by which point somebody has chosen it as their model.
+        //
+        // Named here rather than derived, because nothing in llama-arch.cpp says which
+        // architectures are drafts; the table is names, and this is what they are for.
+        val drafts = setOf("dflash", "eagle3")
+        val names = entries
+            .filter { it != "clip" && it !in drafts && !it.startsWith("(") }
+            .toSortedSet()
+        val draftNames = entries.filter { it in drafts }.toSortedSet()
 
         val destination = outputDir.get().asFile
             .resolve("io/github/alpharomercoma/openweights/core/engine/EngineArchitectures.kt")
@@ -153,9 +169,12 @@ abstract class GenerateEngineArchitectures : DefaultTask() {
                 appendLine("/**")
                 appendLine(" * The architectures this APK's llama.cpp can load as a chat model.")
                 appendLine(" *")
-                appendLine(" * Not every architecture it registers: `clip`, which every")
-                appendLine(" * multimodal projector declares, is deliberately absent. Ask this")
-                appendLine(" * about the file somebody is about to download as a model.")
+                appendLine(" * Not every architecture it registers. `clip`, which every")
+                appendLine(" * multimodal projector declares, is deliberately absent, and so")
+                appendLine(" * are the speculative-decoding draft heads in [DRAFT]: both are")
+                appendLine(" * files the engine reads happily and neither can answer a")
+                appendLine(" * question. Ask this about a file somebody is about to download")
+                appendLine(" * as a model.")
                 appendLine(" */")
                 appendLine("public object EngineArchitectures {")
                 appendLine("    public val SUPPORTED: Set<String> = setOf(")
@@ -171,6 +190,23 @@ abstract class GenerateEngineArchitectures : DefaultTask() {
                 appendLine("    public fun supports(architecture: String): Boolean =")
                 appendLine("        architecture.isBlank() ||")
                 appendLine("            architecture.lowercase() in SUPPORTED")
+                appendLine()
+                appendLine("    /**")
+                appendLine("     * Draft heads for speculative decoding.")
+                appendLine("     *")
+                appendLine("     * Held apart from the unknown architectures rather than")
+                appendLine("     * lumped in with them, because the two need opposite things")
+                appendLine("     * said about them: an unknown architecture is a reason to")
+                appendLine("     * update the app, and no version of this app will ever run")
+                appendLine("     * one of these on its own.")
+                appendLine("     */")
+                appendLine("    public val DRAFT: Set<String> = setOf(")
+                draftNames.forEach { appendLine("        \"" + it + "\",") }
+                appendLine("    )")
+                appendLine()
+                appendLine("    /** Whether [architecture] is a draft head rather than a model. */")
+                appendLine("    public fun isDraft(architecture: String): Boolean =")
+                appendLine("        architecture.lowercase() in DRAFT")
                 appendLine("}")
             },
         )

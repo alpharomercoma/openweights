@@ -109,6 +109,38 @@ void note_buffer_line(const char * text) {
     g_load_buffers.emplace_back(name, std::strtod(match[2].str().c_str(), nullptr));
 }
 
+/**
+ * The last thing llama.cpp said went wrong, so a failure can be reported in its words.
+ *
+ * Without this the app had to guess. `llama_init_from_model` returns a null pointer and
+ * nothing else, so every context failure was reported as "context length may be too large
+ * for this device" — a guess that is right often enough to be believed and wrong in a way
+ * the user then acts on: told the context is too big, they lower it and fail again. The
+ * engine had already printed the real reason a line earlier.
+ */
+std::mutex g_error_mutex;
+std::string g_last_error;
+
+void remember_error(const char * text) {
+    if (text == nullptr) return;
+    std::string line(text);
+    // llama.cpp ends its log lines with a newline; a message shown in a dialog should not.
+    while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) line.pop_back();
+    if (line.empty()) return;
+    std::lock_guard<std::mutex> guard(g_error_mutex);
+    g_last_error = line;
+}
+
+std::string take_last_error() {
+    std::lock_guard<std::mutex> guard(g_error_mutex);
+    return g_last_error;
+}
+
+void clear_last_error() {
+    std::lock_guard<std::mutex> guard(g_error_mutex);
+    g_last_error.clear();
+}
+
 void log_callback(ggml_log_level level, const char * text, void * /*user_data*/) {
     // Read before the severity switch, because these arrive at INFO and INFO is dropped.
     // Dropping them is right: llama.cpp is chatty enough to matter on a phone. Reading one
@@ -120,6 +152,7 @@ void log_callback(ggml_log_level level, const char * text, void * /*user_data*/)
     // matching on >= ERROR would log llama.cpp's progress dots as errors.
     switch (level) {
         case GGML_LOG_LEVEL_ERROR:
+            remember_error(text);
             __android_log_write(ANDROID_LOG_ERROR, LOG_TAG, text);
             break;
         case GGML_LOG_LEVEL_WARN:
@@ -423,6 +456,45 @@ Session::~Session() {
     }
 }
 
+/**
+ * Why a context could not be made, in words the person reading them can act on.
+ *
+ * The one case worth naming outright is a speculative-decoding draft head. `dflash` and
+ * `eagle3` files are published beside the models they draft for and look like ordinary
+ * models from the outside: this one is 168 MB, loads without complaint, and fits any phone
+ * comfortably. It has no vocabulary and no output layer — it borrows both from the model it
+ * drafts for — so llama.cpp refuses the context with "requires ctx_other to be set", naming
+ * the target context it was not given. That is precise and means nothing to anybody who has
+ * not read llama.cpp, so it is translated once, here.
+ *
+ * Everything else keeps the engine's own sentence. A guess that reads like a diagnosis is
+ * worse than an unfamiliar sentence that is true.
+ */
+std::string describe_context_failure(const std::string & reported) {
+    if (reported.find("ctx_other") != std::string::npos) {
+        return "this file is a draft model for speculative decoding, not one that can "
+               "answer on its own. It has no vocabulary or output layer of its own and "
+               "only runs alongside the full model it was published to speed up.";
+    }
+    if (!reported.empty()) {
+        return "this model's context could not be created: " + reported;
+    }
+    return "failed to create llama context (context length may be too large for this device)";
+}
+
+/** The same for a model that would not load at all. See [describe_context_failure]. */
+std::string describe_load_failure(const std::string & reported) {
+    if (reported.find("unknown model architecture") != std::string::npos ||
+        reported.find("unknown architecture") != std::string::npos) {
+        return "this build does not know this model's architecture, so it cannot be run: " +
+               reported;
+    }
+    if (!reported.empty()) {
+        return "this model could not be loaded: " + reported;
+    }
+    return "failed to load this model";
+}
+
 Session * Session::load(
     const std::string & model_path,
     const std::string & mmproj_path,
@@ -442,9 +514,10 @@ Session * Session::load(
         std::lock_guard<std::mutex> guard(g_buffers_mutex);
         g_load_buffers.clear();
     }
+    clear_last_error();
     llama_model * model = llama_model_load_from_file(model_path.c_str(), model_params);
     if (model == nullptr) {
-        error = "failed to load model from " + model_path;
+        error = describe_load_failure(take_last_error());
         return nullptr;
     }
 
@@ -468,9 +541,10 @@ Session * Session::load(
     }
     session->model_ = model;
 
+    clear_last_error();
     llama_context * ctx = llama_init_from_model(model, ctx_params);
     if (ctx == nullptr) {
-        error = "failed to create llama context (context length may be too large for this device)";
+        error = describe_context_failure(take_last_error());
         return nullptr;
     }
     session->ctx_ = ctx;

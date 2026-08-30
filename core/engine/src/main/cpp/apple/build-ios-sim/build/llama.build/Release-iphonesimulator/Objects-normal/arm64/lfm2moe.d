@@ -1,0 +1,33 @@
+dependencies: \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/lfm2moe.cpp \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/models.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-model.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/include/llama.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpu.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-backend.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-alloc.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-opt.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/gguf.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-arch.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-graph.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-batch.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-cparams.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-hparams.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-adapter.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/ggml/include/ggml-cpp.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-memory.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-vocab.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-model-loader.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-impl.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/llama-mmap.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-memory-hybrid-iswa.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-batch.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-graph.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-kv-cache-iswa.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-kv-cache.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-kv-cells.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-cparams.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-memory.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-memory-recurrent.h \
+  /Users/alpha/mobile-inference/core/engine/src/main/cpp/llama.cpp/src/models/../llama-memory-hybrid.h

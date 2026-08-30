@@ -49,6 +49,20 @@ class EngineArchitecturesTest {
     }
 
     @Test
+    fun `a speculative-decoding draft head is not a model this app can run`() {
+        // `dflash` and `eagle3` load without complaint and then fail at the last moment,
+        // because a draft carries no vocabulary and no output layer: it borrows both from
+        // the model it drafts for. Dropped from SUPPORTED for the same reason `clip` is,
+        // and named in DRAFT so the reason given can be the true one rather than "update
+        // the app", which would send somebody after a release that is never coming.
+        assertThat(EngineArchitectures.SUPPORTED).containsNoneOf("dflash", "eagle3")
+        assertThat(EngineArchitectures.supports("dflash")).isFalse()
+        assertThat(EngineArchitectures.isDraft("dflash")).isTrue()
+        assertThat(EngineArchitectures.isDraft("DFlash")).isTrue()
+        assertThat(EngineArchitectures.isDraft("lfm2")).isFalse()
+    }
+
+    @Test
     fun `the table's own placeholders are not treated as architectures`() {
         // `clip` is a dummy the table carries for llama-quantize and `(unknown)` is the
         // name of the absent value. A GGUF declaring neither can be loaded, so counting

@@ -184,6 +184,7 @@
     <string name="context_length_tokens">طول السياق: %1$d رمزًا</string>
     <string name="downloading_percent">جارٍ التنزيل %1$d%%</string>
     <string name="needs_newer_version">يلزم إصدار أحدث من OpenWeights: لا يمكن لهذا الإصدار تحميل نماذج %1$s.</string>
+    <string name="draft_model_not_a_model">نموذج مسودة للترميز التخميني، وليس نموذجًا يجيب بمفرده. يعمل فقط إلى جانب النموذج الكامل الذي يسرّعه.</string>
     <string name="header_read_failed">تعذرت قراءة ترويسة الملف: %1$s</string>
     <string name="fit_comfortable">يعمل براحة</string>
     <string name="fit_tight">يعمل بذاكرة محدودة وقد تُغلق تطبيقات أخرى</string>

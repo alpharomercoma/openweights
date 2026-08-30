@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/alpha/mobile-inference/core/engine/src/main/cpp/apple/build-ios-sim/CMakeFiles/4.4.0/CompilerIdCXX/CompilerIdCXX.framework/CompilerIdCXX'
+relocations:     []
+...

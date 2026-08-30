@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.model
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,8 +50,13 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         directory.listFiles { file -> file.isDirectory }?.forEach { it.deleteRecursively() }
     }
 
-    /** Every GGUF currently on disk, newest first. Projectors are not models. */
-    fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
+    /**
+     * Every model currently on disk, newest first, whichever runtime reads it.
+     *
+     * Projectors are not models: they are half of one, and a user offered `mmproj-...gguf`
+     * as something to load would get a failure they could not act on.
+     */
+    fun availableModels(): List<File> = modelFiles().filterNot { it.isProjector }
 
     /**
      * The model to open with: the one last chosen, or any that is present.
@@ -145,6 +151,18 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
     fun projectorDestination(modelFileName: String): File =
         File(directory, GgufFileName.projectorNameFor(modelFileName))
 
+    /** Anything on disk a runtime in this build can open. */
+    private fun modelFiles(): List<File> =
+        directory.listFiles { file -> file.isFile && ModelFormat.of(file.name) != null }
+            ?.sortedByDescending { it.lastModified() }
+            .orEmpty()
+
+    /**
+     * GGUFs only, for pairing a model with its projector.
+     *
+     * Deliberately narrower than [modelFiles]: a projector is always a GGUF, so widening
+     * this would only add files that can never match.
+     */
     private fun ggufFiles(): List<File> =
         directory.listFiles { file -> file.isFile && file.name.endsWith(GGUF_EXTENSION) }
             ?.sortedByDescending { it.lastModified() }

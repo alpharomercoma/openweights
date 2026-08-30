@@ -166,4 +166,31 @@ class ToolCallParserTest {
 
         assertThat(ToolCallParser.parse(raw).calls).isEmpty()
     }
+
+    @Test
+    fun `llama's bare json object is a call`() {
+        val raw = """{"name": "web_search", "parameters": {"query": "Manila weather"}}"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.single().name).isEqualTo("web_search")
+        assertThat(parsed.calls.single().argumentsJson).contains("Manila weather")
+        assertThat(parsed.text).isEmpty()
+    }
+
+    @Test
+    fun `json inside an ordinary answer stays prose`() {
+        // The bare form has no markers, so only a reply that is nothing but the object
+        // can be read as a call; explaining JSON must not trigger one.
+        val raw = """Llama calls look like {"name": "f", "parameters": {}} in text."""
+
+        assertThat(ToolCallParser.parse(raw).calls).isEmpty()
+    }
+
+    @Test
+    fun `a bare object without parameters stays prose`() {
+        val raw = """{"name": "Alice", "age": 30}"""
+
+        assertThat(ToolCallParser.parse(raw).calls).isEmpty()
+    }
 }

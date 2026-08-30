@@ -69,17 +69,42 @@ interface PromptTemplate {
  */
 object PromptTemplates {
 
-    /** The template for [fileName], or null when this build does not know the family. */
+    /**
+     * The template for [fileName], or null when this build does not know the family.
+     *
+     * Matched against the name with every separator removed, because the same family is
+     * spelled `Qwen3`, `qwen_3` and `qwen-3` across publishers. The order is not free:
+     * `Qwen3.5` normalises to a string containing `qwen3`, and it is a different family
+     * with a template nobody here has transcribed, so it is refused before Qwen3 can
+     * claim it — the same reasoning for LFM and any other versioned name.
+     */
     fun forModel(fileName: String): PromptTemplate? {
-        val name = fileName.lowercase()
+        val name = fileName.lowercase().filter { it.isLetterOrDigit() }
         return when {
+            "qwen35" in name -> null
             "qwen3" in name -> Qwen3Template
+            "qwen25" in name -> Qwen25Template
+            "smollm2" in name -> SmolLm2Template
+            "smollm3" in name -> SmolLm3Template
+            "llama32" in name -> Llama32Template
+            "phi4mini" in name -> Phi4Template
+            "gemma3" in name -> Gemma3Template
+            "lfm25" in name -> Lfm25Template
             else -> null
         }
     }
 
     /** Families this build can render, for an error message that tells the user something. */
-    val known: List<String> = listOf("Qwen3")
+    val known: List<String> = listOf(
+        "Qwen3",
+        "Qwen2.5",
+        "SmolLM2",
+        "SmolLM3",
+        "Llama 3.2",
+        "Phi-4-mini",
+        "Gemma 3",
+        "LFM 2.5",
+    )
 }
 
 /**
@@ -104,4 +129,96 @@ private object Qwen3Template : PromptTemplate {
         tools: List<ToolDefinition>,
         thinking: Boolean,
     ): String = Qwen3Prompt.render(messages, tools, thinking, verbatimHistory = true)
+}
+
+/** ChatML end-of-turn, shared by every family that speaks it. */
+private const val IM_END = "<|im_end|>"
+
+/**
+ * [SmolLm2Prompt] as a [PromptTemplate]. Tools are ignored because the format cannot
+ * express them: SmolLM2 has no tool syntax, and inventing one would only confuse a model
+ * that was never trained to read it.
+ */
+private object SmolLm2Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf(IM_END)
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = SmolLm2Prompt.render(messages)
+}
+
+/** [Qwen25Prompt] as a [PromptTemplate]. Verbatim by construction — see its own docs. */
+private object Qwen25Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf(IM_END)
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Qwen25Prompt.render(messages, tools)
+}
+
+/** [SmolLm3Prompt] as a [PromptTemplate]. */
+private object SmolLm3Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf(IM_END)
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = SmolLm3Prompt.render(messages, tools, thinking)
+}
+
+/**
+ * [Llama32Prompt] as a [PromptTemplate]. Rendered without the textual BOS: ExecuTorch's
+ * runner arms BOS itself after every reset, and a second one is a token sequence the
+ * model never saw in training.
+ */
+private object Llama32Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf("<|eot_id|>", "<|end_of_text|>")
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Llama32Prompt.render(messages, tools, includeBos = false)
+}
+
+/** [Phi4Prompt] as a [PromptTemplate]. */
+private object Phi4Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf("<|end|>", "<|endoftext|>")
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Phi4Prompt.render(messages, tools)
+}
+
+/** [Gemma3Prompt] as a [PromptTemplate], without the textual BOS for the same reason. */
+private object Gemma3Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf("<end_of_turn>")
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Gemma3Prompt.render(messages, includeBos = false)
+}
+
+/**
+ * [Lfm25Prompt] as a [PromptTemplate]. History is verbatim for the same reason as
+ * [Qwen3Template]: the template strips earlier turns' reasoning, the KV cache holds it,
+ * and reformatting history throws the cache away. BOS is the runner's job, as above.
+ */
+private object Lfm25Template : PromptTemplate {
+    override val stopMarkers: List<String> = listOf(IM_END)
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Lfm25Prompt.render(messages, tools, verbatimHistory = true, includeBos = false)
 }

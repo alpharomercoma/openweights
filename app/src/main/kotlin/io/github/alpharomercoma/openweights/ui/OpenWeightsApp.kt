@@ -302,7 +302,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     .associate { it.key to it.fraction },
                 onDownload = { repoId, path ->
                     state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
-                        val tokenizer = state.detail?.tokenizer
+                        val tokenizer = state.detail?.tokenizerFor(file)
                         if (ModelFormat.of(file.fileName) == ModelFormat.PTE && tokenizer != null) {
                             // Compiled weights are an install of two files, renamed on the
                             // way in. Neither is usable alone.

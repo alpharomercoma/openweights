@@ -33,12 +33,11 @@ data class ParsedToolCalls(val text: String, val calls: List<ToolCall>)
  */
 object ToolCallParser {
 
-    fun parse(raw: String): ParsedToolCalls {
-        parseLfmStyle(raw)?.let { return it }
-        parseTaggedJson(raw)?.let { return it }
-        parseTaggedXml(raw)?.let { return it }
-        return ParsedToolCalls(raw, emptyList())
-    }
+    fun parse(raw: String): ParsedToolCalls = parseLfmStyle(raw)
+        ?: parseTaggedJson(raw)
+        ?: parseTaggedXml(raw)
+        ?: parseBareJson(raw)
+        ?: ParsedToolCalls(raw, emptyList())
 
     /** `<|tool_call_start|>[name(arg='value', other=2)]<|tool_call_end|>`: LFM2. */
     private fun parseLfmStyle(raw: String): ParsedToolCalls? {
@@ -71,6 +70,26 @@ object ToolCallParser {
         return ParsedToolCalls(
             text,
             listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
+        )
+    }
+
+    /**
+     * `{"name": "web_search", "parameters": {...}}` with no wrapper at all: Llama 3.x.
+     *
+     * Llama emits a call as a bare JSON object and nothing else, so the only safe reading
+     * is the strictest one: the entire reply, trimmed, must be one object carrying a name
+     * and a `parameters` object. Anything looser would eat ordinary answers that happen
+     * to contain JSON, which is why prose around the object disqualifies it.
+     */
+    private fun parseBareJson(raw: String): ParsedToolCalls? {
+        val body = raw.trim()
+        if (!body.startsWith("{") || !body.endsWith("}")) return null
+
+        val name = body.jsonStringField("name") ?: return null
+        val arguments = body.jsonObjectField("parameters") ?: return null
+        return ParsedToolCalls(
+            text = "",
+            calls = listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
         )
     }
 

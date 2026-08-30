@@ -22,6 +22,26 @@ import org.junit.Test
 class ExecuTorchFileNameTest {
 
     @Test
+    fun `a file with a name of its own joins the repository name`() {
+        val name = ExecuTorchFileName.modelNameFor(
+            "software-mansion/react-native-executorch-smolLm-2",
+            "1_7b/xnnpack/smollm2_1_7b_xnnpack_8da4w.pte",
+        )
+
+        // Distinct per file, or the second size downloaded from this repository would
+        // silently overwrite the first — and still carrying "smollm2" for the template.
+        assertThat(name)
+            .isEqualTo("react-native-executorch-smolLm-2-smollm2_1_7b_xnnpack_8da4w.pte")
+    }
+
+    @Test
+    fun `the official single model file keeps the repository name alone`() {
+        // What every already-installed model was saved as, so it must not change.
+        assertThat(ExecuTorchFileName.modelNameFor("pytorch/Qwen3-1.7B-INT8-INT4", "model.pte"))
+            .isEqualTo("Qwen3-1.7B-INT8-INT4.pte")
+    }
+
+    @Test
     fun `names the weights after the repository, not the file inside it`() {
         val name = ExecuTorchFileName.modelNameFor(
             "larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",

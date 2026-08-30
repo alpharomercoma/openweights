@@ -194,8 +194,8 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
      * it carries no metadata the way a GGUF does — so `model.pte` would leave the prompt
      * template unchoosable. See `ExecuTorchFileName`.
      */
-    fun compiledDestination(repoId: String): File =
-        File(directory, ExecuTorchFileName.modelNameFor(repoId))
+    fun compiledDestination(repoId: String, weightsPath: String = ""): File =
+        File(directory, ExecuTorchFileName.modelNameFor(repoId, weightsPath))
 
     /**
      * GGUFs only, for pairing a model with its projector.

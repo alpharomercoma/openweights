@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-"""Render Qwen3's real chat template, so the Kotlin transcription can be proved.
+"""Render each supported family's real chat template, so the Kotlin transcriptions can be proved.
 
 llama.cpp reads a model's chat template out of the GGUF and renders it with a Jinja
 engine. ExecuTorch does neither: a `.pte` is a compiled graph and a tokenizer, and the
-prompt handed to it is whatever the app builds. So `Qwen3Prompt.kt` is a transcription of
-a template maintained by somebody else, and a transcription that drifts does not fail — the
-model answers slightly worse and tool calls quietly stop parsing.
+prompt handed to it is whatever the app builds. So each `<Family>Prompt.kt` is a
+transcription of a template maintained by somebody else, and a transcription that drifts
+does not fail — the model answers slightly worse and tool calls quietly stop parsing.
 
-This renders the template the model actually ships with, over the same conversations the
-Kotlin tests use, and writes the results out as a Kotlin fixture file. Regenerate it when
-the upstream template changes and read the diff:
+This renders the template each model actually ships with, over the same conversations the
+Kotlin tests use, and writes the results out as a Kotlin fixture file. Regenerate when the
+upstream template changes and read the diff:
 
-    tools/executorch/render_reference.py --out core/common/src/jvmAndAndroidTest/kotlin/\
-io/github/alpharomercoma/openweights/core/common/model/Qwen3PromptFixtures.kt
+    tools/executorch/render_reference.py --family qwen3 --out core/common/src/jvmAndAndroidTest/\
+kotlin/io/github/alpharomercoma/openweights/core/common/model/Qwen3PromptFixtures.kt
 
-Requires jinja2. The template is fetched from the Hub rather than vendored, because the
+Requires jinja2. Templates are fetched from the Hub rather than vendored, because the
 point is to compare against upstream rather than against a copy of it.
 """
+
 
 from __future__ import annotations
 
@@ -26,9 +27,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-
-MODEL = "Qwen/Qwen3-1.7B"
-TOKENIZER_CONFIG = f"https://huggingface.co/{MODEL}/raw/main/tokenizer_config.json"
 
 # One tool, spelled the way ToolDefinition holds it: a name, a description and a JSON
 # Schema object. The schema is spliced into the prompt verbatim on the Kotlin side, so it
@@ -47,7 +45,7 @@ SEARCH_TOOL = {
     },
 }
 
-CASES: dict[str, dict] = {
+QWEN3_CASES: dict[str, dict] = {
     # No system message and no tools: Qwen3 has no default system prompt, so the prompt
     # opens straight into the user turn. An empty system block here is a real difference.
     "plain": {
@@ -125,37 +123,311 @@ CASES: dict[str, dict] = {
 }
 
 
-def fetch_template() -> str:
-    """The template as the model ships it. curl, because this Mac's Python has no CA certs."""
-    raw = subprocess.run(
-        ["curl", "-sSf", "--max-time", "30", TOKENIZER_CONFIG],
+USER_Q = {"role": "user", "content": "What is the capital of Japan?"}
+SYSTEM_TERSE = {"role": "system", "content": "You are a terse assistant."}
+USER_WEATHER = {"role": "user", "content": "What is the weather in Manila?"}
+MULTI_TURN = [
+    {"role": "user", "content": "What is 2+2?"},
+    {"role": "assistant", "content": "Four."},
+    {"role": "user", "content": "And 3+3?"},
+]
+WEATHER_CALL = {
+    "type": "function",
+    "function": {"name": "web_search", "arguments": {"query": "Manila weather"}},
+}
+
+# SmolLM2's template knows nothing of tools or thinking: ChatML turns, plus a default
+# system prompt injected when the conversation does not open with one.
+SMOLLM2_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "multiTurn": {"messages": MULTI_TURN},
+    # The default system prompt is injected because the first message is not a system
+    # message; the later one renders inline as an ordinary turn.
+    "systemNotFirst": {
+        "messages": [
+            {"role": "user", "content": "Hello."},
+            {"role": "system", "content": "Be brief from now on."},
+            USER_Q,
+        ],
+    },
+}
+
+# Qwen2.5 is ChatML with a default system prompt and Hermes-style tools — the parts of
+# Qwen3's format that survive with the thinking machinery absent.
+QWEN25_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "withTools": {"messages": [USER_WEATHER], "tools": [SEARCH_TOOL]},
+    "withSystemAndTools": {"messages": [SYSTEM_TERSE, USER_WEATHER], "tools": [SEARCH_TOOL]},
+    "toolRun": {
+        "messages": [
+            USER_WEATHER,
+            {"role": "assistant", "content": "", "tool_calls": [WEATHER_CALL]},
+            {"role": "tool", "content": "Manila: 31C, humid."},
+        ],
+        "tools": [SEARCH_TOOL],
+    },
+    "twoToolResults": {
+        "messages": [
+            {"role": "user", "content": "Compare Manila and Tokyo."},
+            {"role": "assistant", "content": "Looking both up."},
+            {"role": "tool", "content": "Manila: 31C."},
+            {"role": "tool", "content": "Tokyo: 22C."},
+        ],
+        "tools": [SEARCH_TOOL],
+    },
+}
+
+# Phi-4-mini wraps roles in <|role|> and carries tools as a JSON string on the system
+# message itself, in a field of that message rather than as a template variable.
+PHI4_TOOLS_JSON = json.dumps([SEARCH_TOOL])
+PHI4_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "withTools": {
+        "messages": [
+            {"role": "system", "content": "You are a terse assistant.", "tools": PHI4_TOOLS_JSON},
+            USER_WEATHER,
+        ],
+    },
+    # No system message to carry them, so one is synthesised with empty content.
+    "withToolsNoSystem": {
+        "messages": [
+            {"role": "system", "content": "", "tools": PHI4_TOOLS_JSON},
+            USER_WEATHER,
+        ],
+    },
+    "multiTurn": {"messages": MULTI_TURN},
+}
+
+# Gemma 3 has no system role at all: a leading system message becomes a prefix of the
+# first user turn. Roles must strictly alternate and content is trimmed.
+GEMMA3_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "multiTurn": {"messages": MULTI_TURN},
+}
+
+# Llama 3.2 always writes a system block with knowledge-cutoff and today's date, puts
+# tool schemas in the first user turn, emits calls as bare JSON, and feeds results back
+# under an `ipython` header, JSON-quoted.
+LLAMA32_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "withTools": {"messages": [USER_WEATHER], "tools": [SEARCH_TOOL]},
+    "toolCall": {
+        "messages": [
+            USER_WEATHER,
+            {"role": "assistant", "content": "", "tool_calls": [WEATHER_CALL]},
+        ],
+        "tools": [SEARCH_TOOL],
+    },
+    "toolRun": {
+        "messages": [
+            USER_WEATHER,
+            {"role": "assistant", "content": "", "tool_calls": [WEATHER_CALL]},
+            {"role": "tool", "content": "Manila: 31C, humid."},
+        ],
+        "tools": [SEARCH_TOOL],
+    },
+    "multiTurn": {"messages": MULTI_TURN},
+}
+
+# LFM 2.5: ChatML turns with no default system prompt, tools listed inside the system
+# turn, pythonic tool calls, and thinking kept only for the last assistant turn.
+LFM25_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "withTools": {"messages": [USER_WEATHER], "tools": [SEARCH_TOOL]},
+    "priorThinkingDropped": {
+        "messages": [
+            {"role": "user", "content": "What is 2+2?"},
+            {"role": "assistant", "content": "<think>Simple arithmetic.</think>Four."},
+            {"role": "user", "content": "And 3+3?"},
+            {"role": "assistant", "content": "<think>Also simple.</think>Six."},
+        ],
+        "add_generation_prompt": False,
+    },
+    "toolRun": {
+        "messages": [
+            USER_WEATHER,
+            {"role": "assistant", "content": "", "tool_calls": [WEATHER_CALL]},
+            {"role": "tool", "content": "Manila: 31C, humid."},
+        ],
+        "tools": [SEARCH_TOOL],
+    },
+}
+
+# SmolLM3: a system block always opens the prompt, with metadata, a date, the reasoning
+# mode, default or custom instructions and any tools; /no_think closes an empty think
+# block ahead of every assistant turn.
+SMOLLM3_CASES: dict[str, dict] = {
+    "plain": {"messages": [USER_Q]},
+    "plainNoThink": {"messages": [USER_Q], "enable_thinking": False},
+    "withSystem": {"messages": [SYSTEM_TERSE, USER_Q]},
+    "systemOverride": {
+        "messages": [
+            {"role": "system", "content": "You are a terse assistant. /system_override"},
+            USER_Q,
+        ],
+    },
+    # Tools passed as pre-serialised JSON strings: the template stringifies each tool with
+    # `| string`, which turns a dict into Python repr with single quotes. A string passes
+    # through unchanged, so this is the calling convention that puts real JSON in the
+    # prompt — and the one the Kotlin side can reproduce by splicing schemas verbatim.
+    "withTools": {
+        "messages": [USER_WEATHER],
+        "variables": {"xml_tools": [json.dumps(SEARCH_TOOL)]},
+    },
+    "multiTurn": {"messages": MULTI_TURN},
+    "toolRun": {
+        "messages": [
+            USER_WEATHER,
+            {
+                "role": "assistant",
+                "content": (
+                    '<tool_call>\n{"name": "web_search", '
+                    '"arguments": {"query": "Manila weather"}}\n</tool_call>'
+                ),
+            },
+            {"role": "tool", "content": "Manila: 31C, humid."},
+        ],
+        "variables": {"xml_tools": [json.dumps(SEARCH_TOOL)]},
+    },
+}
+
+FAMILIES: dict[str, dict] = {
+    "qwen3": {
+        "model": "Qwen/Qwen3-1.7B",
+        "object": "Qwen3PromptFixtures",
+        "test": "Qwen3PromptTest",
+        "cases": QWEN3_CASES,
+        "fixed_date": "",
+    },
+    "smollm2": {
+        "model": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "object": "SmolLm2PromptFixtures",
+        "test": "SmolLm2PromptTest",
+        "cases": SMOLLM2_CASES,
+        "fixed_date": "",
+    },
+    "qwen25": {
+        "model": "Qwen/Qwen2.5-1.5B-Instruct",
+        "object": "Qwen25PromptFixtures",
+        "test": "Qwen25PromptTest",
+        "cases": QWEN25_CASES,
+        "fixed_date": "",
+    },
+    "phi4": {
+        "model": "microsoft/Phi-4-mini-instruct",
+        "object": "Phi4PromptFixtures",
+        "test": "Phi4PromptTest",
+        "cases": PHI4_CASES,
+        "fixed_date": "",
+        "eos_token": "<|endoftext|>",
+    },
+    "gemma3": {
+        # google/gemma-3-1b-it is gated; unsloth republishes the identical tokenizer.
+        "model": "google/gemma-3-1b-it",
+        "template_repo": "unsloth/gemma-3-1b-it",
+        "object": "Gemma3PromptFixtures",
+        "test": "Gemma3PromptTest",
+        "cases": GEMMA3_CASES,
+        "fixed_date": "",
+        "bos_token": "<bos>",
+    },
+    "llama32": {
+        # meta-llama/Llama-3.2-1B-Instruct is gated; unsloth republishes the tokenizer.
+        "model": "meta-llama/Llama-3.2-1B-Instruct",
+        "template_repo": "unsloth/Llama-3.2-1B-Instruct",
+        "object": "Llama32PromptFixtures",
+        "test": "Llama32PromptTest",
+        "cases": LLAMA32_CASES,
+        # The date the fixtures are pinned to; the Kotlin side takes today's as a
+        # parameter and the tests pass this one.
+        "fixed_date": "26 Jul 2024",
+        "bos_token": "<|begin_of_text|>",
+    },
+    "lfm25": {
+        "model": "LiquidAI/LFM2.5-1.2B-Instruct",
+        "jinja_file": True,
+        "object": "Lfm25PromptFixtures",
+        "test": "Lfm25PromptTest",
+        "cases": LFM25_CASES,
+        "fixed_date": "",
+        "bos_token": "<|startoftext|>",
+    },
+    "smollm3": {
+        "model": "HuggingFaceTB/SmolLM3-3B",
+        "jinja_file": True,
+        "object": "SmolLm3PromptFixtures",
+        "test": "SmolLm3PromptTest",
+        "cases": SMOLLM3_CASES,
+        "fixed_date": "29 August 2026",
+    },
+}
+
+
+def fetch(url: str) -> str:
+    """curl, because this Mac's Python has no CA certs."""
+    return subprocess.run(
+        ["curl", "-sSf", "--max-time", "30", url],
         capture_output=True,
         text=True,
         check=True,
     ).stdout
+
+
+def fetch_template(family: dict) -> str:
+    """The template as the model ships it.
+
+    Newer repositories publish it as `chat_template.jinja`; older ones embed it in
+    `tokenizer_config.json`. `template_repo` overrides where it is fetched from, for
+    families whose canonical repository is gated — the export repos republish the
+    tokenizer, which is the same file the exported model actually runs with.
+    """
+    repo = family.get("template_repo", family["model"])
+    if family.get("jinja_file"):
+        return fetch(f"https://huggingface.co/{repo}/raw/main/chat_template.jinja")
+    raw = fetch(f"https://huggingface.co/{repo}/raw/main/tokenizer_config.json")
     template = json.loads(raw).get("chat_template")
     if not isinstance(template, str):
-        raise SystemExit(f"{MODEL} has no string chat_template")
+        raise SystemExit(f"{repo} has no string chat_template")
     return template
 
 
-def render(template: str, case: dict) -> str:
-    from jinja2 import Environment
+def render(template: str, case: dict, family: dict) -> str:
+    from jinja2 import ChainableUndefined, Environment
     from jinja2.exceptions import TemplateError
 
     def raise_exception(message: str):
         raise TemplateError(message)
 
-    environment = Environment(trim_blocks=True, lstrip_blocks=True)
+    # ChainableUndefined is what transformers renders with: an undefined variable is falsy
+    # and containment checks against it are false, rather than an error. SmolLM3 relies on
+    # this — its template asks whether "/system_override" is in a system message that may
+    # never have been set.
+    environment = Environment(trim_blocks=True, lstrip_blocks=True, undefined=ChainableUndefined)
     environment.filters["tojson"] = lambda value, **kwargs: json.dumps(value, **kwargs)
     environment.globals["raise_exception"] = raise_exception
+    environment.globals["strftime_now"] = lambda fmt: family["fixed_date"]
+    environment.policies["json.dumps_kwargs"] = {"ensure_ascii": False, "sort_keys": False}
 
-    return environment.from_string(template).render(
-        messages=case["messages"],
-        tools=case.get("tools"),
-        add_generation_prompt=case.get("add_generation_prompt", True),
-        enable_thinking=case.get("enable_thinking", True),
-    )
+    variables = {
+        "messages": case["messages"],
+        "tools": case.get("tools"),
+        "add_generation_prompt": case.get("add_generation_prompt", True),
+        "enable_thinking": case.get("enable_thinking", True),
+        "bos_token": family.get("bos_token", ""),
+        "eos_token": family.get("eos_token", ""),
+    }
+    variables.update(case.get("variables", {}))
+    # {% generation %} is a transformers extension marking which spans the model produced,
+    # for training-time loss masks. It renders as nothing, but jinja2 proper has never
+    # heard of it — swap each tag for a no-op with the same whitespace control.
+    template = re.sub(r"\{%(-?)\s*(?:end)?generation\s*(-?)%\}", r"{%\1 set _g = 1 \2%}", template)
+    return environment.from_string(template).render(**variables)
 
 
 # Source lines cap at 100 characters (.editorconfig), and a rendered prompt is one long
@@ -196,7 +468,7 @@ def chunk(text: str) -> str:
     return " +\n".join(lines)
 
 
-def as_kotlin(rendered: dict[str, str]) -> str:
+def as_kotlin(rendered: dict[str, str], object_name: str, model: str, test_name: str) -> str:
     """The fixtures as a Kotlin file, so the expected prompts are visible in review."""
     header = """/*
  * Copyright 2026 The OpenWeights Authors
@@ -220,13 +492,14 @@ package io.github.alpharomercoma.openweights.core.common.model
  * Prompts rendered by the `chat_template` that MODEL_NAME ships with.
  *
  * Generated, not written. `tools/executorch/render_reference.py` fetches the template from
- * the Hub and renders it with Jinja over the same conversations `Qwen3PromptTest` builds,
+ * the Hub and renders it with Jinja over the same conversations `TEST_NAME` builds,
  * so these strings are what upstream produces rather than anybody's idea of what it should
  * produce. Do not edit by hand: rerun the script and read the diff.
  */
-internal object Qwen3PromptFixtures {
+internal object OBJECT_NAME {
 """
-    header = header.replace("MODEL_NAME", MODEL)
+    header = header.replace("OBJECT_NAME", object_name)
+    header = header.replace("MODEL_NAME", model).replace("TEST_NAME", test_name)
 
     body = []
     for name, text in rendered.items():
@@ -237,12 +510,14 @@ internal object Qwen3PromptFixtures {
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--family", default="qwen3", choices=sorted(FAMILIES))
     parser.add_argument("--out", type=Path, help="Kotlin fixture file to write")
     parser.add_argument("--print", action="store_true", help="show each rendered prompt")
     args = parser.parse_args()
 
-    template = fetch_template()
-    rendered = {name: render(template, case) for name, case in CASES.items()}
+    family = FAMILIES[args.family]
+    template = fetch_template(family)
+    rendered = {name: render(template, case, family) for name, case in family["cases"].items()}
 
     if args.print or not args.out:
         for name, text in rendered.items():
@@ -252,10 +527,12 @@ def main() -> int:
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(as_kotlin(rendered))
+        args.out.write_text(
+            as_kotlin(rendered, family["object"], family["model"], family["test"]),
+        )
         print(f"wrote {len(rendered)} fixtures to {args.out}", file=sys.stderr)
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

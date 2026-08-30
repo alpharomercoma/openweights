@@ -43,9 +43,28 @@ object ExecuTorchFileName {
      * `larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK` becomes
      * `Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.pte`, which still says "Qwen3" — and that
      * is the whole point, because that is how the prompt template is chosen.
+     *
+     * [weightsPath] joins in when the file inside the repository has a name of its own.
+     * The official repositories publish exactly one `model.pte`, and for those the
+     * repository name alone is the file name — which is also what every already-installed
+     * model was saved as. But a repository like software-mansion's publishes three sizes
+     * of one family (`1_7b/xnnpack/smollm2_1_7b_xnnpack_8da4w.pte`), and naming them all
+     * after the repository would make the second download silently overwrite the first.
      */
-    fun modelNameFor(repoId: String): String =
-        repoId.substringAfterLast('/').sanitized() + ModelFormat.PTE.suffix
+    fun modelNameFor(repoId: String, weightsPath: String = ""): String {
+        val repo = repoId.substringAfterLast('/').sanitized()
+        val file = weightsPath.substringAfterLast('/')
+        val stem = if (file.endsWith(ModelFormat.PTE.suffix, ignoreCase = true)) {
+            file.dropLast(ModelFormat.PTE.suffix.length)
+        } else {
+            file
+        }
+        val distinct = stem.sanitized().takeIf { it.isNotEmpty() && !it.equals("model", true) }
+        return when (distinct) {
+            null -> repo + ModelFormat.PTE.suffix
+            else -> "$repo-$distinct" + ModelFormat.PTE.suffix
+        }
+    }
 
     /** Where the tokenizer for [modelFileName] lives: beside it, under the same stem. */
     fun tokenizerNameFor(modelFileName: String): String =

@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
 import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
 import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
@@ -422,7 +423,17 @@ class DiscoverViewModel @Inject constructor(
                         .takeIf { ExecuTorchSupport.AVAILABLE && detail.isInstallableCompiled }
                         .orEmpty()
                         .filter { ExecuTorchSupport.canRun(CompiledBackend.of(repoId + it.path)) }
-                    val installedName = ExecuTorchFileName.modelNameFor(repoId)
+                        // No tokenizer in reach means a download that ends in a model
+                        // that cannot open, so the offer is withheld per file.
+                        .filter { detail.tokenizerFor(it) != null }
+                        // Only families this build can render: a `.pte` the prompt
+                        // side has no template for refuses to load, loudly, after a
+                        // gigabyte — so it is not offered in the first place.
+                        .filter {
+                            PromptTemplates.forModel(
+                                ExecuTorchFileName.modelNameFor(repoId, it.path),
+                            ) != null
+                        }
 
                     _uiState.update { state ->
                         state.copy(
@@ -434,9 +445,11 @@ class DiscoverViewModel @Inject constructor(
                             files = compiled.map { file ->
                                 InspectedFile(
                                     file = file,
-                                    // Named after the repository once installed, so that is
+                                    // Named after the repository (and, in a multi-model
+                                    // repository, the file) once installed, so that is
                                     // what says whether it is already here.
-                                    isDownloaded = installedName in downloaded,
+                                    isDownloaded = ExecuTorchFileName
+                                        .modelNameFor(repoId, file.path) in downloaded,
                                 )
                             } + detail.files.map { file ->
                                 InspectedFile(

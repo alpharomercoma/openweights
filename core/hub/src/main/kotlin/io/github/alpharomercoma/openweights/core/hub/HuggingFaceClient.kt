@@ -158,13 +158,15 @@ data class HubModelDetail(
      */
     val compiled: List<HubFile> = emptyList(),
     /**
-     * The tokenizer this repository publishes, which a `.pte` cannot be run without.
+     * The tokenizers this repository publishes, which a `.pte` cannot be run without.
      *
      * A GGUF carries its tokenizer inside it. A `.pte` does not, and says nothing about
      * which one produced it, so a repository offering compiled weights and no tokenizer is
-     * one this app cannot install.
+     * one this app cannot install. A list rather than one file, because a repository that
+     * publishes several sizes of a family keeps a tokenizer beside each — see
+     * [tokenizerFor] for how a weights file finds its own.
      */
-    val tokenizer: HubFile? = null,
+    val tokenizers: List<HubFile> = emptyList(),
     val license: String?,
     val architecture: String?,
     val parameterCount: Long?,
@@ -209,7 +211,29 @@ data class HubModelDetail(
      * A `.pte` without a tokenizer beside it is a download that ends in a model that cannot
      * open, so the offer is withheld rather than made and then broken.
      */
-    val isInstallableCompiled: Boolean get() = compiled.isNotEmpty() && tokenizer != null
+    val isInstallableCompiled: Boolean get() = compiled.isNotEmpty() && tokenizers.isNotEmpty()
+
+    /**
+     * The tokenizer that belongs to [weights]: the one in the nearest enclosing directory.
+     *
+     * A single-model repository keeps `tokenizer.json` at the root and that is the answer.
+     * A multi-size repository keeps one beside each size (`1_2b/tokenizer.json` for
+     * `1_2b/xnnpack/…pte`), and handing every size the root tokenizer would pair weights
+     * with a vocabulary they were not exported against — the model would load and then
+     * speak noise. Deepest matching directory wins; among equals, the JSON form.
+     */
+    fun tokenizerFor(weights: HubFile): HubFile? {
+        val candidates = tokenizers.filter { tokenizer ->
+            val directory = tokenizer.path.substringBeforeLast('/', "")
+            directory.isEmpty() || weights.path.startsWith("$directory/")
+        }
+        return candidates.maxWithOrNull(
+            compareBy(
+                { it.path.count { character -> character == '/' } },
+                { -ExecuTorchFileName.REMOTE_TOKENIZERS.indexOf(it.path.substringAfterLast('/')) },
+            ),
+        )
+    }
 
     /** The projector for the file the user is most likely to take: the first listed. */
     fun defaultProjector(): HubFile? = files.firstOrNull()?.let(::pairedProjector)
@@ -384,12 +408,9 @@ class HuggingFaceClient @Inject constructor(
         // the answer is already in hand, and which one is populated is what says whether
         // this repo needs llama.cpp or ExecuTorch.
         val compiled = filesEnding(ModelFormat.PTE.suffix).sortedBy { it.sizeBytes }
-        val tokenizer = siblings
+        val tokenizers = siblings
             .filter { ExecuTorchFileName.isRemoteTokenizer(it.rfilename) }
-            // Preference order, not alphabetical: a repository can publish both, and
-            // ExecuTorch reads the JSON form.
-            .minByOrNull { ExecuTorchFileName.REMOTE_TOKENIZERS.indexOf(it.rfilename) }
-            ?.let { HubFile(it.rfilename, it.lfs?.size ?: it.size ?: 0L, it.lfs?.sha256) }
+            .map { HubFile(it.rfilename, it.lfs?.size ?: it.size ?: 0L, it.lfs?.sha256) }
 
         val gguf = filesEnding(GGUF_SUFFIX)
             .sortedBy { it.sizeBytes }
@@ -406,7 +427,7 @@ class HuggingFaceClient @Inject constructor(
             files = gguf.filterNot { it.isProjector },
             projectors = gguf.filter { it.isProjector },
             compiled = compiled.take(MAX_FILES_PER_REPO),
-            tokenizer = tokenizer,
+            tokenizers = tokenizers,
             license = payload.cardData?.license,
             architecture = payload.gguf?.architecture,
             parameterCount = payload.gguf?.total,

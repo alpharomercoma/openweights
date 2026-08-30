@@ -297,7 +297,7 @@ class ModelsViewModel @Inject constructor(
      * never arrived rather than one that is quietly broken.
      */
     fun downloadCompiled(repoId: String, weights: HubFile, tokenizer: HubFile) {
-        val destination = modelStore.compiledDestination(repoId)
+        val destination = modelStore.compiledDestination(repoId, weights.path)
         start(repoId, tokenizer, modelStore.tokenizerFor(destination.name))
         start(repoId, weights, destination)
     }

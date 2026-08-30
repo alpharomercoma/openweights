@@ -64,10 +64,13 @@ The XNNPACK export needs **no vendor SDK**, and the Android runtime for it is a 
 artifact:
 
 ```kotlin
-implementation("org.pytorch:executorch-android:1.0.0")
+implementation("org.pytorch:executorch-android:1.4.0")
 ```
 
-AARs exist for XNNPACK, QNN and Vulkan. **MediaTek is not among them** — it requires
+**1.4.0, not the 1.0.0 the documentation shows** — the docs lag Maven Central, which is
+worth knowing before copying a version out of a guide. Maven publishes `executorch-android`
+(XNNPACK), `executorch-android-qnn` and `executorch-android-vulkan`.
+**MediaTek is not among them** — it requires
 building from source with the NeuroPilot SDK in place. So the CPU path is a Gradle
 dependency and the NPU path is a from-source build behind a portal.
 
@@ -81,12 +84,17 @@ nothing here has.
 
 Three of these are permanent, and the first is the one that matters for this app.
 
-1. **No prefix reuse.** llama.cpp keeps a KV cache across turns, so a follow-up pays only
-   for what changed. ExecuTorch's runner takes a prompt and returns a reply and holds
-   nothing between calls, so **every turn re-prefills the whole conversation**. On the
-   multi-turn traffic measured in [`npu-prefill-multiturn.md`](npu-prefill-multiturn.md)
-   that is the dominant cost, and it will partly or wholly eat whatever the accelerator
-   wins. `GenerationStats.cachedTokens` is always zero on this engine, and the zero is true.
+1. **Prefix reuse is unproven — this is the open question, not a settled loss.**
+   *Corrected 2026-08-31.* An earlier version of this document stated flatly that
+   ExecuTorch holds nothing between calls and re-prefills every turn. Reading the shipped
+   API shows that is too strong: `LlmModule` exposes `resetContext()` and
+   `prefillPrompt(String)`, so there **is** carried state. What the signatures cannot say
+   is whether an ordinary `generate` continues from it, and how much of a turn that saves.
+   Until that is measured, `GenerationStats.cachedTokens` reports zero, which is an
+   admission that the engine cannot yet say rather than a claim that nothing was reused.
+   On the multi-turn traffic in [`npu-prefill-multiturn.md`](npu-prefill-multiturn.md)
+   this is the difference between a viable engine and a dead end, so it is the first thing
+   to measure.
 2. **A curated catalogue.** A `.pte` is compiled ahead of time on a desktop, per backend,
    and for an NPU per SoC. Models arrive because somebody ran a build. That is precisely the
    constraint this project exists to escape, which is why this is the second engine.
@@ -95,7 +103,10 @@ Three of these are permanent, and the first is the one that matters for this app
    graph and a tokenizer. ExecuTorch's own documentation says the C++ runner needs the chat
    template "applied manually when running". `Qwen3Prompt` is that, transcribed from
    upstream's Jinja and held to it byte for byte by `Qwen3PromptTest`.
-4. **No projector.** Attachments stay on llama.cpp, via libmtmd.
+4. **No attachments, for now.** *Corrected 2026-08-31:* earlier text implied ExecuTorch
+   could not carry them. It can — there are vision and multimodal model types and prefill
+   entry points for images and audio. Nothing here uses them, so pictures and audio stay
+   on llama.cpp and libmtmd by choice rather than by limitation.
 
 ## How it is wired
 

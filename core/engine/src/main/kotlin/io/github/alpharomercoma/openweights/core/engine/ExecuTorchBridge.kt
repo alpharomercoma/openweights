@@ -65,6 +65,17 @@ interface ExecuTorchBridge {
      */
     fun generate(prompt: String, maxTokens: Int, onToken: (String) -> Unit): ExecuTorchOutcome
 
+    /**
+     * Drops whatever the runtime is holding from previous generations.
+     *
+     * ExecuTorch does keep state between calls — `LlmModule` exposes both this and a
+     * prefill-without-generating entry point — so this is a real operation rather than a
+     * formality. Whether an ordinary [generate] *reuses* that state or starts from the
+     * prompt it was given has not been measured yet, and the answer decides whether this
+     * engine is viable for long conversations at all.
+     */
+    fun resetContext()
+
     /** Asks the running [generate] to stop. Safe from any thread; a no-op when idle. */
     fun stop()
 

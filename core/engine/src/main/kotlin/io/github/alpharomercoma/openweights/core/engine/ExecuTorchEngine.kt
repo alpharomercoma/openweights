@@ -35,12 +35,14 @@ import java.io.File
  * The trade against [LlamaCppEngine] is worth stating plainly, because it is not a matter
  * of one being better written:
  *
- * - **No prefix reuse.** llama.cpp keeps a KV cache across turns, so a follow-up pays only
- *   for what changed. ExecuTorch's runner takes a prompt and returns a reply, holding
- *   nothing in between, so **every turn re-prefills the whole conversation**. On short
- *   chats that is invisible; on the long multi-turn traffic this app is measured against it
- *   is the dominant cost. [GenerationStats.cachedTokens] is therefore always zero here, and
- *   that zero is the truth rather than a missing number.
+ * - **Prefix reuse is unproven.** llama.cpp keeps a KV cache across turns and reports what
+ *   it reused, so a follow-up demonstrably pays only for what changed. ExecuTorch does keep
+ *   state — `LlmModule` has both `resetContext` and a prefill-without-generating call — but
+ *   whether an ordinary generation continues from it, and how much of a turn that saves,
+ *   has not been measured. Until it has, [GenerationStats.cachedTokens] reports zero,
+ *   which is an admission that this engine cannot yet say rather than a claim that nothing
+ *   was reused. On the long multi-turn traffic this app is measured against, the answer
+ *   decides whether the engine is viable at all.
  * - **A curated catalogue.** A `.pte` is compiled on a desktop for one backend, and for an
  *   NPU one SoC, so models arrive because a build was run for them. That is the constraint
  *   this whole project exists to escape, which is why this engine is the second one and not
@@ -141,13 +143,7 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
 
     override fun cancel() = bridge.stop()
 
-    /**
-     * A no-op, and not an oversight: there is no cache to clear.
-     *
-     * Every [chat] sends the whole conversation and the runtime keeps nothing afterwards,
-     * so the state this would reset does not exist between calls.
-     */
-    override suspend fun resetContext() = Unit
+    override suspend fun resetContext() = bridge.resetContext()
 
     /** Thread counts belong to the backend a `.pte` was compiled against, not to a call. */
     override suspend fun setThreads(generateThreads: Int, batchThreads: Int) = Unit
@@ -184,7 +180,8 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
             timeToFirstTokenMs = timeToFirst,
             contextUsed = 0,
             contextSize = contextSize,
-            // Always zero, and true: nothing is carried between turns to reuse.
+            // Zero because this engine cannot yet say, not because nothing was reused.
+            // See the note on prefix reuse in the class documentation.
             cachedTokens = 0,
         )
     }

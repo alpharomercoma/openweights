@@ -44,6 +44,10 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     var stopped: Boolean = false
         private set
 
+    /** How many times the engine dropped the runtime's carried-over state. */
+    var contextResets: Int = 0
+        private set
+
     /** What [generate] hands back, one fragment at a time. */
     var reply: String = ""
 
@@ -69,6 +73,10 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         // Fragment by fragment, because the engine must not assume one callback per reply.
         reply.chunked(FRAGMENT).forEach(onToken)
         return outcome
+    }
+
+    override fun resetContext() {
+        contextResets++
     }
 
     override fun stop() {

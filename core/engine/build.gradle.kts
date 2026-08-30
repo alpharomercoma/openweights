@@ -80,6 +80,12 @@ android {
         // /vendor/etc/OpenCL/vendors, which Android devices do not have: the result is a
         // GPU backend that loads, reports no platforms, and silently runs on the CPU.
         jniLibs.excludes += "**/libOpenCL.so"
+
+        // Our CMake build and the fbjni that ExecuTorch depends on each carry a copy of
+        // the C++ runtime. Needed here as well as in the app because the instrumentation
+        // APK for this module merges native libraries on its own. See app/build.gradle.kts
+        // for why taking the first is safe and when it would stop being.
+        jniLibs.pickFirsts += "**/libc++_shared.so"
     }
 }
 
@@ -241,6 +247,12 @@ androidComponents {
 dependencies {
     api(project(":core:common"))
     implementation(libs.kotlinx.coroutines.android)
+
+    // ExecuTorch's Android runtime, for `.pte` models. This is the XNNPACK build: the
+    // artifact is published per backend and MediaTek is not among the published ones, so
+    // reaching the NPU means building this from source against the NeuroPilot SDK.
+    // It carries native libraries for arm64-v8a and x86_64.
+    implementation(libs.executorch.android)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

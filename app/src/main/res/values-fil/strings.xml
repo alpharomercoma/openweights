@@ -25,6 +25,7 @@
     <string name="nothing_here_yet_whatever_ask">Wala pa rito. Anuman ang itanong mo ay naka-save lamang sa device na ito.</string>
     <string name="search_chats">Maghanap sa mga chat</string>
     <string name="clear_search">I-clear ang paghahanap</string>
+    <string name="close_search">Isara ang paghahanap</string>
     <string name="chat_mentions">Walang chat na bumabanggit niyan.</string>
     <string name="close">Isara</string>
     <string name="sent_message_open_app_came">Ipinadala kasama ng mensaheng ito. Buksan ito sa app na pinanggalingan para i-play.</string>

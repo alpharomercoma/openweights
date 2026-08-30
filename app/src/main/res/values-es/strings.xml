@@ -24,6 +24,7 @@
     <string name="nothing_here_yet_whatever_ask">Aún no hay nada. Lo que preguntes se guarda solo en este dispositivo.</string>
     <string name="search_chats">Buscar en los chats</string>
     <string name="clear_search">Borrar la búsqueda</string>
+    <string name="close_search">Cerrar la búsqueda</string>
     <string name="chat_mentions">Ningún chat menciona eso.</string>
     <string name="close">Cerrar</string>
     <string name="sent_message_open_app_came">Enviado con este mensaje. Ábrelo en la aplicación de origen para reproducirlo.</string>

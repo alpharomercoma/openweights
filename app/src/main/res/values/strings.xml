@@ -33,6 +33,7 @@
     <string name="nothing_here_yet_whatever_ask">Nothing here yet. Whatever you ask is saved on this device only.</string>
     <string name="search_chats">Search chats</string>
     <string name="clear_search">Clear the search</string>
+    <string name="close_search">Close the search</string>
     <string name="chat_mentions">No chat mentions that.</string>
     <string name="close">Close</string>
     <string name="sent_message_open_app_came">Sent with this message. Open it in the app it came from to play it.</string>

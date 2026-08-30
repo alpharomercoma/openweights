@@ -64,6 +64,101 @@ class ConversationDrawerTest {
     private val filed = ConversationSummary(3, "Trip packing", "lfm", NOW, archivedAt = NOW)
 
     @Test
+    fun `the drawer says whose drawer it is`() {
+        // It opened on a button and never named the app, which is the shape of a dialog
+        // rather than of a place, and is what made it read as anonymous beside ChatGPT's
+        // and Claude's.
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ConversationDrawer(
+                    conversations = listOf(loose),
+                    activeId = null,
+                    onOpen = {},
+                    onNewChat = {},
+                    nowMillis = NOW,
+                )
+            }
+        }
+
+        compose.onNodeWithText("OpenWeights").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the search box costs a tap rather than a row`() {
+        // The row the wordmark sits in is the one the permanent search field gave back, so
+        // the branding is free in height. What it costs instead is one tap, and the tap has
+        // to actually produce the box.
+        var term by mutableStateOf("")
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ConversationDrawer(
+                    conversations = listOf(loose),
+                    activeId = null,
+                    onOpen = {},
+                    onNewChat = {},
+                    nowMillis = NOW,
+                    search = term,
+                    onSearch = { term = it },
+                )
+            }
+        }
+
+        compose.onNodeWithText(SEARCH_PLACEHOLDER).assertDoesNotExist()
+
+        compose.onNodeWithContentDescription(SEARCH_PLACEHOLDER).performClick()
+
+        compose.onNodeWithText(SEARCH_PLACEHOLDER).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a search still running keeps its box, however it got there`() {
+        // The box is not derived from the term alone — an empty term is the state a search
+        // starts in — but a term that arrives without one, restored with the drawer or set
+        // by a caller, still has to bring a box with it, or the results underneath have
+        // nothing above them saying what they are results of.
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ConversationDrawer(
+                    conversations = listOf(loose),
+                    activeId = null,
+                    onOpen = {},
+                    onNewChat = {},
+                    nowMillis = NOW,
+                    search = "packing",
+                    results = emptyList(),
+                    hasSearchAnswer = true,
+                )
+            }
+        }
+
+        compose.onNodeWithText("packing").assertIsDisplayed()
+    }
+
+    @Test
+    fun `closing the search puts the history back rather than leaving a term behind`() {
+        var term by mutableStateOf("packing")
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                ConversationDrawer(
+                    conversations = listOf(loose),
+                    activeId = null,
+                    onOpen = {},
+                    onNewChat = {},
+                    nowMillis = NOW,
+                    search = term,
+                    hasSearchAnswer = true,
+                    onSearch = { term = it },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription(CLOSE_SEARCH).performClick()
+
+        assertThat(term).isEmpty()
+        compose.onNodeWithText(SEARCH_PLACEHOLDER).assertDoesNotExist()
+    }
+
+    @Test
     fun `the way into the archive is outside the list, and appears only when there is one`() {
         // The whole point of the rewrite. As a section at the end of the list it could only
         // be reached by scrolling past every conversation ever had; it is now above the
@@ -225,6 +320,10 @@ class ConversationDrawerTest {
     private companion object {
         /** A real clock reading, so "Today" is today whenever the suite runs. */
         val NOW: Long = System.currentTimeMillis()
+
+        /** The words on the box and on the button that summons it. */
+        const val SEARCH_PLACEHOLDER = "Search chats"
+        const val CLOSE_SEARCH = "Close the search"
     }
 }
 

@@ -24,6 +24,7 @@
     <string name="nothing_here_yet_whatever_ask">まだ何もありません。聞いた内容はこの端末にだけ保存されます。</string>
     <string name="search_chats">チャットを検索</string>
     <string name="clear_search">検索を消去</string>
+    <string name="close_search">検索を閉じる</string>
     <string name="chat_mentions">それに触れているチャットはありません。</string>
     <string name="close">閉じる</string>
     <string name="sent_message_open_app_came">このメッセージと一緒に送信しました。再生するには元のアプリで開いてください。</string>

@@ -30,6 +30,7 @@
     <string name="nothing_here_yet_whatever_ask">لا شيء هنا بعد. كل ما تسأل عنه يُحفظ على هذا الجهاز فقط.</string>
     <string name="search_chats">البحث في المحادثات</string>
     <string name="clear_search">مسح البحث</string>
+    <string name="close_search">إغلاق البحث</string>
     <string name="chat_mentions">لا توجد محادثة تذكر ذلك.</string>
     <string name="close">إغلاق</string>
     <string name="sent_message_open_app_came">أُرسل مع هذه الرسالة. افتحه في التطبيق الذي جاء منه لتشغيله.</string>

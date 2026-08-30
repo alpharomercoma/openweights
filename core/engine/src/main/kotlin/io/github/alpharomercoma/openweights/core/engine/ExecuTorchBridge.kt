@@ -53,17 +53,31 @@ interface ExecuTorchBridge {
      * nothing that says which tokenizer produced it, so handing it the wrong one produces
      * fluent nonsense rather than an error.
      *
+     * @param contextLength the whole window, prompt and reply together. ExecuTorch counts
+     * in total sequence length rather than in new tokens, so it belongs to the model rather
+     * than to a call and is kept from here.
      * @return true when the model is ready to generate.
      */
-    fun load(modelPath: String, tokenizerPath: String, temperature: Float): Boolean
+    fun load(
+        modelPath: String,
+        tokenizerPath: String,
+        temperature: Float,
+        contextLength: Int,
+    ): Boolean
 
     /**
      * Runs one generation, calling [onToken] with each fragment as it is produced.
      *
-     * Blocking: callers run it off the main thread. There is no conversation state to carry
-     * between calls — see [ExecuTorchEngine] for what that costs.
+     * Blocking: callers run it off the main thread.
+     *
+     * @param maxNewTokens how many tokens to *add*, which is not how ExecuTorch's simpler
+     * entry point counts. `generate(prompt, seqLen, ...)` takes a total sequence length, so
+     * passing a reply budget of 24 against a 907-token prompt resolves to -883 new tokens
+     * and fails with "Max new tokens 0 is less than or equal to 0". Measured on device; the
+     * distinction is invisible until a prompt grows past the budget, which is to say until
+     * a real conversation.
      */
-    fun generate(prompt: String, maxTokens: Int, onToken: (String) -> Unit): ExecuTorchOutcome
+    fun generate(prompt: String, maxNewTokens: Int, onToken: (String) -> Unit): ExecuTorchOutcome
 
     /**
      * Drops whatever the runtime is holding from previous generations.

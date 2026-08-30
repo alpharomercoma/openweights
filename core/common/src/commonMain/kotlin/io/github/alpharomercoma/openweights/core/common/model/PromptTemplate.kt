@@ -25,7 +25,18 @@ package io.github.alpharomercoma.openweights.core.common.model
  * needs its format written out by hand — and is the concrete reason that engine has a
  * curated catalogue while the other one does not.
  */
-fun interface PromptTemplate {
+interface PromptTemplate {
+
+    /**
+     * Text that ends a turn and must never reach the user.
+     *
+     * llama.cpp knows a model's end-of-turn tokens from the GGUF and stops on them.
+     * ExecuTorch streams whatever it decodes, so `<|im_end|>` arrives as ordinary text and
+     * was printed at the end of every reply until this existed — measured on device, not
+     * reasoned about.
+     */
+    val stopMarkers: List<String> get() = emptyList()
+
     /**
      * @param thinking whether the model may reason before answering. Families that support
      * it spell the switch differently, and a family that does not simply ignores it.
@@ -47,13 +58,29 @@ object PromptTemplates {
     fun forModel(fileName: String): PromptTemplate? {
         val name = fileName.lowercase()
         return when {
-            "qwen3" in name -> PromptTemplate { messages, tools, thinking ->
-                Qwen3Prompt.render(messages, tools, thinking)
-            }
+            "qwen3" in name -> Qwen3Template
             else -> null
         }
     }
 
     /** Families this build can render, for an error message that tells the user something. */
     val known: List<String> = listOf("Qwen3")
+}
+
+/**
+ * [Qwen3Prompt] as a [PromptTemplate].
+ *
+ * An adapter rather than making that object implement the interface directly, because its
+ * `render` carries default arguments an override is not allowed to keep, and those defaults
+ * are what `Qwen3PromptTest` calls it through.
+ */
+private object Qwen3Template : PromptTemplate {
+    /** ChatML's end-of-turn marker, which Qwen3 emits and nothing should show a user. */
+    override val stopMarkers: List<String> = listOf("<|im_end|>")
+
+    override fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String = Qwen3Prompt.render(messages, tools, thinking)
 }

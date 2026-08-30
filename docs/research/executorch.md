@@ -84,17 +84,34 @@ nothing here has.
 
 Three of these are permanent, and the first is the one that matters for this app.
 
-1. **Prefix reuse is unproven — this is the open question, not a settled loss.**
-   *Corrected 2026-08-31.* An earlier version of this document stated flatly that
-   ExecuTorch holds nothing between calls and re-prefills every turn. Reading the shipped
-   API shows that is too strong: `LlmModule` exposes `resetContext()` and
-   `prefillPrompt(String)`, so there **is** carried state. What the signatures cannot say
-   is whether an ordinary `generate` continues from it, and how much of a turn that saves.
-   Until that is measured, `GenerationStats.cachedTokens` reports zero, which is an
-   admission that the engine cannot yet say rather than a claim that nothing was reused.
-   On the multi-turn traffic in [`npu-prefill-multiturn.md`](npu-prefill-multiturn.md)
-   this is the difference between a viable engine and a dead end, so it is the first thing
-   to measure.
+1. **No prefix reuse, and the reason is structural.** *Measured 2026-08-31 on the
+   Dimensity 9400, Qwen3-1.7B q8da4w.* Both earlier claims here were wrong in turn: first
+   that ExecuTorch holds nothing between calls, then that it might reuse a prefix. What it
+   actually does is **continue**. `pos_` survives a generation, and `generate` appends the
+   prompt it is given at whatever position it left off — it never compares the new prompt
+   against what it holds.
+
+   That is not prefix matching, and re-sending a conversation is therefore a bug rather
+   than an optimisation: turn one ended at `pos_ 2047` and turn two tried to append 2068
+   more tokens into a 2048-token window and was refused outright. The engine now clears the
+   context before every turn, which is correct and costs a full prefill each time:
+
+   | | prompt | prefill | rate |
+   | --- | ---: | ---: | ---: |
+   | short question | 19 | 212 ms | 89.6 t/s |
+   | turn 1 | 907 | 5,860 ms | 154.8 t/s |
+   | turn 2 | 1,061 | 7,958 ms | 133.3 t/s |
+
+   Decode measured 21 tokens in 773 ms, about 27 t/s. The second turn cost **1.36×** the
+   first for a prompt 1.17× as long, so nothing was reused and the rate got slightly worse
+   as the prompt grew.
+
+   Feeding only the new turn and letting `pos_` carry would avoid the re-prefill, and is
+   the obvious next thing to measure. It is not free correctness: the cache would then hold
+   assistant turns *with* their reasoning, while Qwen3's template says to strip reasoning
+   from everything before the user's last question. Both cannot be true, and choosing wrong
+   degrades answers without ever failing.
+
 2. **A curated catalogue.** A `.pte` is compiled ahead of time on a desktop, per backend,
    and for an NPU per SoC. Models arrive because somebody ran a build. That is precisely the
    constraint this project exists to escape, which is why this is the second engine.
@@ -121,12 +138,30 @@ tokenizer produced it and the wrong one gives fluent nonsense rather than an err
 
 `tools/executorch/export_qwen3.sh` builds both.
 
+## Three things only the device said
+
+None of these are visible from the API, the documentation, or a test against a fake.
+
+- **`seqLen` silently overrides `maxNewTokens`.** Setting both makes the runtime resolve
+  the allowance from the sequence length: asking for 24 new tokens behind a 907-token
+  prompt produced 1,141, which is 2048 − 907. The budget parameter did nothing at all. The
+  bridge sets only `maxNewTokens` and lets the model's own `get_max_seq_len` do the
+  clamping.
+- **Nothing stops on end-of-turn tokens.** llama.cpp knows them from the GGUF; ExecuTorch
+  streams whatever it decodes, so every reply arrived ending in a visible `<|im_end|>`.
+  Stop markers now belong to the prompt template, which is the only thing that knows them.
+- **The stats keys are `prompt_tokens` and `generated_tokens`**, not the `num_`-prefixed
+  names. Guessing wrong reported zero tokens for every generation, which the fallback to
+  wall-clock timing hid rather than surfaced.
+
 ## Open
 
-- No measurement yet. Every number in this document is upstream's or inferred; nothing has
-  run on the phone.
-- Whether re-prefilling every turn leaves any win at all on real multi-turn traffic. This
-  is the first thing to measure once a `.pte` loads, and it could sink the whole idea.
+- Whether feeding only the new turn beats re-prefilling, and what it costs in answer
+  quality given the reasoning-strip conflict above.
+- A like-for-like comparison. These numbers are Qwen3-1.7B at q8da4w on ExecuTorch; the
+  llama.cpp figures in [`npu-prefill-multiturn.md`](npu-prefill-multiturn.md) are
+  LFM2.5-1.2B at Q4_0/Q8_0. Same ballpark, different models, so neither is evidence about
+  the other.
 - Quantization is not comparable to the GGUF path. The recipe is `q8da4w` — 8-bit dynamic
   activations, 4-bit weights — against llama.cpp's Q4_0 or Q8_0 on KleidiAI. Speed and
   quality both need their own comparison rather than an assumption.

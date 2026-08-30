@@ -78,15 +78,21 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
             )
 
         unload()
-        if (!bridge.load(modelFile.absolutePath, tokenizer.absolutePath, DEFAULT_TEMPERATURE)) {
+        contextSize = params.contextLength
+        if (!bridge.load(
+                modelFile.absolutePath,
+                tokenizer.absolutePath,
+                DEFAULT_TEMPERATURE,
+                contextSize,
+            )
+        ) {
             throw LlamaException("ExecuTorch could not open ${modelFile.name}")
         }
 
+        // The window is fixed when the model is exported — the runtime reads its own
+        // `get_max_seq_len` and clamps to it — so what is asked for here is a ceiling
+        // rather than a request, and a value above the model's own is quietly ignored.
         template = rendering
-        // Fixed when the model was exported, not chosen here: `--cache_length` is compiled
-        // into the graph. Asking for a wider window at load is a request the runtime has no
-        // way to honour, so the requested value is recorded as the ceiling it actually is.
-        contextSize = params.contextLength
         info = LoadedModelInfo(
             description = modelFile.nameWithoutExtension,
             parameterCount = 0,
@@ -117,19 +123,47 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
         val rendering = template ?: throw LlamaException("No model loaded")
         val prompt = rendering.render(messages, tools, params.thinking)
 
+        // ExecuTorch's runner continues from wherever it left off rather than matching a
+        // prefix. `pos_` survives a generation, so sending the conversation again appends
+        // a second copy behind the first: measured on device, turn one ended at pos_ 2047
+        // and turn two tried to add 2068 more tokens into a 2048-token window and was
+        // refused. llama.cpp would have recognised the shared prefix and charged for the
+        // difference; this runtime has no such notion, so the honest thing is to start
+        // from nothing and send the whole conversation, which is what the prompt above is.
+        //
+        // That makes every turn pay full prefill. Feeding only the new turn and letting
+        // `pos_` carry would avoid it, and is the obvious next thing to measure — but it
+        // is not free correctness: the cache would then hold assistant turns *with* their
+        // reasoning, while Qwen3's template says to strip reasoning from everything before
+        // the user's last question. The two cannot both be true, and picking wrong is the
+        // kind of error that degrades answers without ever failing.
+        bridge.resetContext()
+
         val reply = StringBuilder()
         val started = System.currentTimeMillis()
         var firstTokenAt = 0L
 
         // Zero means "no limit" to llama.cpp, which stops at the context edge on its own.
-        // ExecuTorch wants a real sequence length, so the window is the limit.
+        // Here that becomes "as many as the window still has room for", and ExecuTorch
+        // clamps it against the prompt for us. Passing the caller's number straight through
+        // is only correct because the bridge takes *new* tokens; the runtime's simpler
+        // entry point takes a total sequence length, where a 24-token reply budget behind a
+        // 907-token prompt resolves to a negative allowance and refuses to generate.
         val budget = params.maxTokens.takeIf { it > 0 } ?: contextSize
         val outcome = bridge.generate(prompt, budget) { fragment ->
             if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
             reply.append(fragment)
         }
 
-        val raw = reply.toString()
+        // Everything from the end-of-turn marker onwards is the format leaking out, not
+        // the answer. llama.cpp stops on these tokens because the GGUF names them;
+        // ExecuTorch streams whatever it decodes, so every reply ended with a visible
+        // `<|im_end|>` until this was here. Found on device, not by reading.
+        val raw = rendering.stopMarkers
+            .mapNotNull { marker -> reply.indexOf(marker).takeIf { it >= 0 } }
+            .minOrNull()
+            ?.let { reply.substring(0, it) }
+            ?: reply.toString()
         val parsed = ToolCallParser.parse(raw)
         emit(
             GenerationEvent.Completed(

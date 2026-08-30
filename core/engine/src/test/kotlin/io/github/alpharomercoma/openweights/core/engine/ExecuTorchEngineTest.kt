@@ -137,6 +137,19 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `clears the runtime's carried position before every turn`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+
+        engine.chat(listOf(user("Hi"))).first()
+        engine.chat(listOf(user("Hi"), user("Again"))).first()
+
+        // Two turns, two resets. Without them the runtime appends the conversation behind
+        // the copy it already holds and runs out of window; measured on device, turn two
+        // was refused for exceeding a 2048-token context with 2068 more tokens.
+        assertThat(bridge.contextResets).isEqualTo(2)
+    }
+
+    @Test
     fun `reports no cached tokens, because nothing is carried between turns`() = runTest {
         bridge.outcome = ExecuTorchOutcome(StopReason.END_OF_TURN, promptTokens = 120)
         engine.load(installed(MODEL), PARAMS)
@@ -151,14 +164,17 @@ class ExecuTorchEngineTest {
     }
 
     @Test
-    fun `asks for a real sequence length when the caller set no limit`() = runTest {
+    fun `asks for the whole window when the caller set no limit`() = runTest {
         engine.load(installed(MODEL), ModelLoadParams(contextLength = 4096))
 
         engine.chat(listOf(user("Hi")), SamplerParams(maxTokens = 0)).first()
 
         // Zero means "no limit" to llama.cpp; passing it straight through would ask
         // ExecuTorch to generate nothing at all.
-        assertThat(bridge.lastMaxTokens).isEqualTo(4096)
+        assertThat(bridge.lastMaxNewTokens).isEqualTo(4096)
+        // And the window itself reaches the runtime, which counts in total sequence length
+        // and cannot work out a new-token allowance without it.
+        assertThat(bridge.loadedContextLength).isEqualTo(4096)
     }
 
     @Test

@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.engine
 
 import org.pytorch.executorch.extension.llm.LlmCallback
+import org.pytorch.executorch.extension.llm.LlmGenerationConfig
 import org.pytorch.executorch.extension.llm.LlmModule
 
 /**
@@ -31,10 +32,17 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
 
     // Written from the runtime's callback rather than returned by it, so they are held
     // here for the duration of one blocking generate rather than passed through.
+    private var window: Int = 0
     private var lastStats: String? = null
     private var lastError: String? = null
 
-    override fun load(modelPath: String, tokenizerPath: String, temperature: Float): Boolean {
+    override fun load(
+        modelPath: String,
+        tokenizerPath: String,
+        temperature: Float,
+        contextLength: Int,
+    ): Boolean {
+        window = contextLength
         close()
         // Anything can come back from here: a missing native library throws
         // UnsatisfiedLinkError rather than an exception, and a .pte built for another
@@ -57,7 +65,7 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
 
     override fun generate(
         prompt: String,
-        maxTokens: Int,
+        maxNewTokens: Int,
         onToken: (String) -> Unit,
     ): ExecuTorchOutcome {
         val running = module ?: throw LlamaException("No model loaded")
@@ -65,9 +73,23 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         lastStats = null
         lastError = null
 
+        // The config form rather than generate(prompt, seqLen, ...), because only this
+        // one separates "how long may the whole thing be" from "how much may be added".
+        val config = LlmGenerationConfig.create()
+            .maxNewTokens(maxNewTokens)
+            // seqLen is deliberately not set. Setting both makes the runtime resolve the
+            // allowance from the sequence length and ignore maxNewTokens: asking for 24
+            // tokens behind a 907-token prompt produced 1141, which is 2048 - 907. The
+            // model reports its own window through get_max_seq_len and clamps to it, so
+            // leaving this alone is both correct and what makes the budget mean anything.
+            // Echo replays the prompt through onResult, and the whole conversation would
+            // arrive looking like something the model had written.
+            .echo(false)
+            .build()
+
         running.generate(
             prompt,
-            maxTokens,
+            config,
             object : LlmCallback {
                 override fun onResult(result: String) = onToken(result)
 
@@ -80,9 +102,6 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
                         message.ifBlank { "ExecuTorch error $errorCode" }
                 }
             },
-            // Echo off. Left on, the runtime replays the prompt through onResult and the
-            // whole conversation arrives as though the model had written it.
-            false,
         )
 
         lastError?.let { throw LlamaException(it) }
@@ -114,8 +133,8 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
     private fun outcomeFrom(stats: String?): ExecuTorchOutcome {
         if (stats == null) return ExecuTorchOutcome(StopReason.END_OF_TURN)
 
-        val promptTokens = stats.longField("num_prompt_tokens")
-        val generatedTokens = stats.longField("num_generated_tokens")
+        val promptTokens = stats.longField("prompt_tokens")
+        val generatedTokens = stats.longField("generated_tokens")
         val inferenceStart = stats.longField("inference_start_ms")
         val promptEval = stats.longField("prompt_eval_end_ms")
         val inferenceEnd = stats.longField("inference_end_ms")

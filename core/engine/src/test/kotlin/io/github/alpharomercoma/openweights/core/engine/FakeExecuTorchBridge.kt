@@ -28,8 +28,12 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     var lastPrompt: String? = null
         private set
 
-    /** The sequence length asked for, so the zero-means-no-limit case can be checked. */
-    var lastMaxTokens: Int = -1
+    /** New tokens asked for, so the zero-means-no-limit case can be checked. */
+    var lastMaxNewTokens: Int = -1
+        private set
+
+    /** The window handed over at load, which ExecuTorch needs as a sequence length. */
+    var loadedContextLength: Int = -1
         private set
 
     var loadedModelPath: String? = null
@@ -56,7 +60,13 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
 
     var outcome: ExecuTorchOutcome = ExecuTorchOutcome(StopReason.END_OF_TURN)
 
-    override fun load(modelPath: String, tokenizerPath: String, temperature: Float): Boolean {
+    override fun load(
+        modelPath: String,
+        tokenizerPath: String,
+        temperature: Float,
+        contextLength: Int,
+    ): Boolean {
+        loadedContextLength = contextLength
         loadedModelPath = modelPath
         loadedTokenizerPath = tokenizerPath
         closed = false
@@ -65,11 +75,11 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
 
     override fun generate(
         prompt: String,
-        maxTokens: Int,
+        maxNewTokens: Int,
         onToken: (String) -> Unit,
     ): ExecuTorchOutcome {
         lastPrompt = prompt
-        lastMaxTokens = maxTokens
+        lastMaxNewTokens = maxNewTokens
         // Fragment by fragment, because the engine must not assume one callback per reply.
         reply.chunked(FRAGMENT).forEach(onToken)
         return outcome

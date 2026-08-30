@@ -25,13 +25,15 @@ Best of twenty, in GOP/s:
 
 | M (tokens in flight) | CPU Q4_K | CPU Q4_0 | CPU Q8_0 | **NPU int8** | NPU advantage |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 — decode | 29.8 | 32.7 | 25.8 | **84.5** | 2.8x |
+| 1 — decode | 29.8 | 32.7 | 25.8 | 84.5 (an outlier — see below) | — |
 | 32 | 166.2 | 140.7 | 150.7 | **1,956** | 11.8x |
 | 128 — prefill chunk | 182.5 | 155.9 | 182.3 | **3,475** | 19.0x |
 | 512 | 193.3 | 158.3 | 186.7 | **1,980** | 10.2x |
 
 By median rather than best, which is the fairer read of sustained behaviour, the
-advantage is 3.0x at M=1, 4.0x at 32, 14.4x at 128 and 8.9x at 512.
+advantage is 4.0x at 32, 14.4x at 128 and 8.9x at 512. The M=1 row does not
+survive repetition and is corrected in the section above: five consecutive runs
+put the NPU level with the CPU at decode width, not ahead of it.
 
 **The NPU is ahead at every width, including decode.** An earlier version of this
 document said decode was a loss for the NPU. That was an artefact of comparing
@@ -59,6 +61,54 @@ fallback boundaries, and a real backend pays a crossing at every op the NPU
 cannot take. Compiling each shape costs 180–240 ms, though
 `NeuronCompilation_storeCompiledNetwork` exists and prefill uses a small number
 of chunk widths.
+
+## Would an 8-bit or unquantised model unlock it?
+
+The obvious escape from "the NPU has no 4-bit type" is to stop shipping 4-bit.
+NeuronAdapter has `FLOAT16`, `FLOAT32` and the `QUANT8` family, so a Q8_0 model's
+weights map straight onto the hardware with no requantisation at all. Measured,
+that is half right, and the half that fails is the interesting one.
+
+Median of twenty, GOP/s, same `[M x 2048] @ [2048 x 8192]`:
+
+| M | CPU Q4_K | CPU Q8_0 | CPU F16 | NPU int8 | NPU f16 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 — decode | 18.9 | 15.9 | 14.8 | ~21 | **will not run** |
+| 32 | 138.7 | 129.8 | 100.5 | — | — |
+| 128 — prefill | 181.8 | 173.9 | 121.4 | 1,776 | 998 |
+| 512 | 191.4 | 185.2 | 125.3 | 1,566 | 1,355 |
+
+**Eight bits is the NPU's format and it is worth about ten times the CPU at
+prefill widths.** No conversion step, no accuracy question beyond the one the
+quantisation already asks: a Q8_0 GGUF's weights are what the MDLA wants.
+
+**Unquantised is worse than 8-bit on this hardware, and cannot decode at all.**
+F16 runs at roughly two thirds of the int8 rate, and at a single token
+`NeuronExecution_compute` returns error 5 — it compiles and then refuses to
+execute. An F16 model could prefill on the NPU and would have to decode
+somewhere else.
+
+**Decode gains nothing either way.** An earlier revision of this document put the
+NPU at 2.8x the CPU at one token. That came from a single run of 84.5 GOP/s;
+five consecutive runs give 30–68 GOP/s best and 20–23 median, against the CPU's
+18.9. At decode width the two are level, and the honest reading is that the NPU
+has no advantage there at all.
+
+So the shape of any NPU design is forced, and it is narrower than "use the NPU":
+**8-bit weights, matmul only, prefill only, decode stays on the CPU.**
+
+That is not free, and the cost lands on the half that gains nothing. Q8_0 is
+about 1.8x the bytes of Q4_K_M — 1.25 GB against 0.7 GB for a 1.2 B model — and
+decode is bandwidth-bound, so it pays that tax on every token while getting no
+NPU benefit. The CPU is also slower on Q8_0 than on Q4_K at every width measured.
+
+Extrapolating from the current 131 t/s prefill and 36.3 t/s decode, and assuming
+matmuls are most of prefill, a 2,000-token prompt with a 200-token reply might go
+from about 21 s to about 13 s, while a 100-token prompt with the same reply goes
+from about 6 s to about 10 s. **The trade is long prompts against short ones**,
+which is a product question rather than an engineering one, and those two figures
+are arithmetic on top of single-operation measurements rather than anything
+observed end to end.
 
 ## What is actually on the device
 

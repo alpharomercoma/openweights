@@ -21,7 +21,7 @@
 namespace {
 
 // A prefill chunk against one FFN projection of a 1.2B model.
-constexpr uint32_t kTokens = 512;   // rows: tokens in flight
+constexpr uint32_t kTokens = 1;   // rows: tokens in flight
 constexpr uint32_t kIn     = 2048;  // embedding width
 constexpr uint32_t kOut    = 8192;  // FFN width
 constexpr int kIterations  = 20;
@@ -43,12 +43,17 @@ double MillisSince(std::chrono::steady_clock::time_point start) {
 
 }  // namespace
 
-int main() {
+// Chosen at run time so the same binary answers both halves of the question:
+// int8 is the narrowest the NPU has, f16 is what an unquantised model would use.
+static bool gUseFloat16 = false;
+
+int main(int argc, char** argv) {
+    gUseFloat16 = (argc > 1 && std::strcmp(argv[1], "f16") == 0);
     // Unbuffered: the interesting failures here are aborts inside the vendor
     // library, and a buffered stdout loses every line that would say where.
     std::setvbuf(stdout, nullptr, _IONBF, 0);
-    std::printf("shape: [%u x %u] @ [%u x %u] int8, %d iterations\n",
-                kTokens, kIn, kIn, kOut, kIterations);
+    std::printf("shape: [%u x %u] @ [%u x %u] %s, %d iterations\n",
+                kTokens, kIn, kIn, kOut, gUseFloat16 ? "f16" : "int8", kIterations);
 
     std::printf("step: model_create\n");
     NeuronModel* model = nullptr;
@@ -64,21 +69,23 @@ int main() {
     const float weightScale = 0.01f;
 
     NeuronOperandType input{};
-    input.type = NEURON_TENSOR_QUANT8_ASYMM;
+    input.type = gUseFloat16 ? NEURON_TENSOR_FLOAT16 : NEURON_TENSOR_QUANT8_ASYMM;
     input.dimensionCount = 2;
     input.dimensions = inputDims;
-    input.scale = inputScale;
-    input.zeroPoint = 128;
+    input.scale = gUseFloat16 ? 0.0f : inputScale;
+    input.zeroPoint = gUseFloat16 ? 0 : 128;
 
     NeuronOperandType weights = input;
     weights.dimensions = weightDims;
-    weights.scale = weightScale;
+    weights.scale = gUseFloat16 ? 0.0f : weightScale;
 
+    // A float graph takes a float bias; a quantised one takes int32 scaled by
+    // the product of the input and weight scales, which the API requires.
     NeuronOperandType bias{};
-    bias.type = NEURON_TENSOR_INT32;
+    bias.type = gUseFloat16 ? NEURON_TENSOR_FLOAT16 : NEURON_TENSOR_INT32;
     bias.dimensionCount = 1;
     bias.dimensions = biasDims;
-    bias.scale = inputScale * weightScale;
+    bias.scale = gUseFloat16 ? 0.0f : inputScale * weightScale;
     bias.zeroPoint = 0;
 
     NeuronOperandType fuse{};
@@ -86,7 +93,7 @@ int main() {
 
     NeuronOperandType output = input;
     output.dimensions = outputDims;
-    output.scale = 0.05f;
+    output.scale = gUseFloat16 ? 0.0f : 0.05f;
 
     CHECK(NeuronModel_addOperand(model, &input));    // 0
     CHECK(NeuronModel_addOperand(model, &weights));  // 1
@@ -97,13 +104,13 @@ int main() {
     // Weights and bias are constants baked into the graph, as they would be for
     // a real model: the NPU compiles them in and they never cross the boundary
     // at execution time. Only the activations move per call.
-    std::vector<uint8_t> weightData(static_cast<size_t>(kOut) * kIn, 0x7f);
-    std::vector<int32_t> biasData(kOut, 0);
+    const size_t elementBytes = gUseFloat16 ? 2 : 1;
+    std::vector<uint8_t> weightData(static_cast<size_t>(kOut) * kIn * elementBytes, 0x30);
+    std::vector<uint8_t> biasData(static_cast<size_t>(kOut) * (gUseFloat16 ? 2 : 4), 0);
     const int32_t fuseNone = NEURON_FUSED_NONE;
 
     CHECK(NeuronModel_setOperandValue(model, 1, weightData.data(), weightData.size()));
-    CHECK(NeuronModel_setOperandValue(model, 2, biasData.data(),
-                                      biasData.size() * sizeof(int32_t)));
+    CHECK(NeuronModel_setOperandValue(model, 2, biasData.data(), biasData.size()));
     CHECK(NeuronModel_setOperandValue(model, 3, &fuseNone, sizeof(fuseNone)));
 
     const uint32_t operationInputs[4] = {0, 1, 2, 3};
@@ -155,8 +162,8 @@ int main() {
     NeuronExecution* execution = nullptr;
     CHECK(NeuronExecution_create(compilation, &execution));
 
-    std::vector<uint8_t> activations(static_cast<size_t>(kTokens) * kIn, 0x40);
-    std::vector<uint8_t> result(static_cast<size_t>(kTokens) * kOut, 0);
+    std::vector<uint8_t> activations(static_cast<size_t>(kTokens) * kIn * elementBytes, 0x30);
+    std::vector<uint8_t> result(static_cast<size_t>(kTokens) * kOut * elementBytes, 0);
 
     std::vector<double> samples;
     samples.reserve(kIterations);

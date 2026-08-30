@@ -116,6 +116,7 @@ int main() {
         Run(GGML_TYPE_Q4_K, "Q4_K", tokens);
         Run(GGML_TYPE_Q4_0, "Q4_0", tokens);
         Run(GGML_TYPE_Q8_0, "Q8_0", tokens);
+        Run(GGML_TYPE_F16,  "F16",  tokens);
     }
     return 0;
 }

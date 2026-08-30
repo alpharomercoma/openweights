@@ -38,10 +38,18 @@ android {
                     "-DGGML_OPENCL=ON",
                     "-DGGML_OPENCL_EMBED_KERNELS=ON",
                     "-DGGML_OPENCL_USE_ADRENO_KERNELS=ON",
-                    // Vulkan stays off: its ggml target needs vendored SPIRV-Headers and a
-                    // host shader compiler, and on the Mali-class GPUs we have measured it
-                    // loses to the tuned CPU path. The engine enumerates backends at
-                    // runtime, so turning it on later needs no other code change.
+                    // Vulkan stays off, and now for a measured reason rather than a
+                    // remembered one. Built for a Mali-G925 and benchmarked against the
+                    // same model on the same tool: decode 39.2 t/s against the CPU's 36.3,
+                    // and prefill 15.4 against 131.1. An 8% gain on decode cannot pay for
+                    // prefill running 8.5 times slower, and prefill is every token of the
+                    // prompt, the conversation and any tool output, on every turn — about
+                    // four times worse per turn overall. Numbers, method and the three
+                    // headers the NDK does not supply are in
+                    // docs/research/gpu-backends.md.
+                    //
+                    // The engine enumerates backends at runtime, so turning it on later
+                    // needs no other code change.
                     // "-DGGML_VULKAN=ON", "-DVulkan_GLSLC_EXECUTABLE=" + glslcPath,
                     "-DLLAMA_CURL=OFF",
                     "-DLLAMA_BUILD_COMMON=ON",

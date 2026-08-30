@@ -61,7 +61,35 @@ void Run(ggml_type weightType, const char* label, int64_t tokens) {
     ggml_tensor* activations = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, kIn, tokens);
     ggml_tensor* out = ggml_mul_mat(ctx, weights, activations);
 
-    ggml_backend_buffer_t buffer = ggml_backend_alloc_ctx_tensors(ctx, backend);
+    // Weights must live on the backend's EXTRA buffer type when there is one.
+    // KleidiAI registers its own, and its set_tensor repacks the weights into
+    // the blocked layout its kernels need; allocating on the default CPU buffer
+    // silently gets the generic path instead. llama.cpp does exactly this via
+    // ggml_backend_dev_get_extra_bufts, and a harness that skips it measures a
+    // slower CPU than the app actually has — which inflates any accelerator it
+    // is being compared against.
+    ggml_backend_dev_t dev = ggml_backend_get_device(backend);
+    ggml_backend_reg_t devreg = ggml_backend_dev_backend_reg(dev);
+    auto get_extra = (ggml_backend_dev_get_extra_bufts_t)
+        ggml_backend_reg_get_proc_address(devreg, "ggml_backend_dev_get_extra_bufts");
+    ggml_backend_buffer_type_t weight_buft = nullptr;
+    if (get_extra) {
+        // The first extra type is the accelerated one (KleidiAI here); llama.cpp
+        // walks the same list and takes the first that fits the tensor.
+        // Only where the accelerated buffer can actually hold this type: KleidiAI
+        // repacks Q4_0, Q8_0 and F32 and asserts on anything else, so Q4_K, F16
+        // and BF16 must stay on the default buffer. That asymmetry is the finding,
+        // not a nuisance: it is exactly why Q4_K never sees an accelerated kernel.
+        const bool kleidi_ok = (weightType == GGML_TYPE_Q4_0 ||
+                                weightType == GGML_TYPE_Q8_0 ||
+                                weightType == GGML_TYPE_F32);
+        ggml_backend_buffer_type_t * p = get_extra(dev);
+        if (kleidi_ok && p && *p) weight_buft = *p;
+    }
+    const char * buft_name = weight_buft ? ggml_backend_buft_name(weight_buft) : "default";
+    ggml_backend_buffer_t buffer = weight_buft
+        ? ggml_backend_alloc_ctx_tensors_from_buft(ctx, weight_buft)
+        : ggml_backend_alloc_ctx_tensors(ctx, backend);
     if (buffer == nullptr) {
         std::printf("%s M=%lld: allocation failed\n", label, (long long) tokens);
         ggml_free(ctx);
@@ -95,9 +123,9 @@ void Run(ggml_type weightType, const char* label, int64_t tokens) {
     const double median = samples[samples.size() / 2];
     const double ops = 2.0 * tokens * kIn * kOut;
     std::printf("RESULT cpu %s M=%lld K=%lld N=%lld best_ms=%.4f median_ms=%.4f "
-                "best_gops=%.1f median_gops=%.1f\n",
+                "best_gops=%.1f median_gops=%.1f buft=%s\n",
                 label, (long long) tokens, (long long) kIn, (long long) kOut,
-                best, median, ops / (best * 1e6), ops / (median * 1e6));
+                best, median, ops / (best * 1e6), ops / (median * 1e6), buft_name);
 
     ggml_backend_buffer_free(buffer);
     ggml_free(ctx);
@@ -117,9 +145,10 @@ int main(int argc, char** argv) {
         kIn    = std::atoll(argv[2]);
         kOut   = std::atoll(argv[3]);
     }
+    Run(GGML_TYPE_Q4_0, "Q4_0", tokens);
+    Run(GGML_TYPE_Q4_K, "Q4_K", tokens);
     Run(GGML_TYPE_Q8_0, "Q8_0", tokens);
     Run(GGML_TYPE_F16,  "F16",  tokens);
     Run(GGML_TYPE_BF16, "BF16", tokens);
-    Run(GGML_TYPE_Q4_K, "Q4_K", tokens);
     return 0;
 }

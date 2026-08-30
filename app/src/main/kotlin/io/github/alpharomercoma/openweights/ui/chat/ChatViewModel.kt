@@ -36,9 +36,11 @@ import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -46,6 +48,7 @@ import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryTe
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ArchivedConversations
+import io.github.alpharomercoma.openweights.core.data.ComputeTarget
 import io.github.alpharomercoma.openweights.core.data.ConversationFiling
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
@@ -341,6 +344,15 @@ data class ChatUiState(
     val hasGpu: Boolean = false,
     /** Whether an accelerator is enumerated; see `ModelRuntime.hasNpu`. */
     val hasNpu: Boolean = false,
+    /**
+     * The processor a compiled model was built for, or null for a GGUF.
+     *
+     * Non-null turns the two processor controls into a statement. A `.pte` holds delegate
+     * identifiers and loading resolves those exact ones, so where it runs was decided when
+     * somebody exported it and no setting here can move it. Saying so is better than
+     * hiding the section, which reads as the app having no opinion.
+     */
+    val compiledProcessor: ComputeTarget? = null,
     /**
      * How hot the device is, sampled while a reply is being written.
      *
@@ -885,6 +897,15 @@ class ChatViewModel @Inject constructor(
             offloadBuffers = info?.offloadBuffers.orEmpty(),
             hasGpu = runtime.hasGpu(),
             hasNpu = runtime.hasNpu(),
+            compiledProcessor = modelFile.name
+                .takeIf { ModelFormat.of(it) == ModelFormat.PTE }
+                ?.let {
+                    when (CompiledBackend.of(it).processor) {
+                        CompiledBackend.Processor.CPU -> ComputeTarget.CPU
+                        CompiledBackend.Processor.GPU -> ComputeTarget.GPU
+                        CompiledBackend.Processor.NPU -> ComputeTarget.NPU
+                    }
+                },
             modelName = modelFile.nameWithoutExtension,
             // The filename's own quantization, not llama's verbose description:
             // "Q4_K_M" beside the compute device and context window reads as a

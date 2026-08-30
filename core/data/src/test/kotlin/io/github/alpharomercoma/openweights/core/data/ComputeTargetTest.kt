@@ -30,8 +30,17 @@ import org.junit.Test
 class ComputeTargetTest {
 
     @Test
-    fun `reading on the GPU while writing on the CPU keeps the weights off it`() {
-        val layers = computeLayersFor(
+    fun `asking for the GPU on either half actually reaches the GPU`() {
+        // The correction that matters. llama.cpp can separate the halves with op_offload —
+        // it hands over only batches large enough to repay the transfer, and generation is
+        // always a batch of one — but ggml-opencl leaves .offload_op null, and
+        // ggml_backend_dev_offload_op returns false for a backend that does not implement
+        // it. OpenCL is the GPU backend compiled in here, so with no layers resident the
+        // scheduler moves nothing and both halves run on the CPU.
+        //
+        // An earlier version of this returned zero layers for exactly this combination,
+        // which made "read on the GPU" a label rather than a setting.
+        val readOnGpu = computeLayersFor(
             prefill = ComputeTarget.GPU,
             decode = ComputeTarget.CPU,
             hasGpu = true,
@@ -39,9 +48,9 @@ class ComputeTargetTest {
             generatedTokens = 0,
         )
 
-        // The disaggregated case, and the one worth having. No layers resident, and
-        // op_offload sends the prompt-sized batches over on their own.
-        assertThat(layers).isEqualTo(0)
+        assertThat(readOnGpu).isGreaterThan(0)
+        // The flag is still set, and still correct: it starts separating the halves on its
+        // own the moment a backend that implements offload_op is enabled.
         assertThat(preferences(ComputeTarget.GPU, ComputeTarget.CPU).toLoadParams().opOffload)
             .isTrue()
     }
@@ -66,6 +75,23 @@ class ComputeTargetTest {
         // Otherwise a prompt still leaves for the GPU, and "CPU" would be a label rather
         // than a setting.
         assertThat(params.opOffload).isFalse()
+    }
+
+    @Test
+    fun `both halves pinned to the CPU keep the weights and the batches local`() {
+        val layers = computeLayersFor(
+            prefill = ComputeTarget.CPU,
+            decode = ComputeTarget.CPU,
+            hasGpu = true,
+            promptTokens = 100_000,
+            generatedTokens = 1,
+        )
+
+        // Prompt-heavy history, and still nothing on the GPU: pinning both halves has to
+        // beat the heuristic or it is not a setting.
+        assertThat(layers).isEqualTo(0)
+        assertThat(preferences(ComputeTarget.CPU, ComputeTarget.CPU).toLoadParams().opOffload)
+            .isFalse()
     }
 
     @Test

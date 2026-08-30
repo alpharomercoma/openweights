@@ -247,4 +247,5 @@
     <string name="compiled_runs_on_npu">Naka-compile para sa NPU</string>
     <string name="prefill_processor">Pagbasa ng prompt</string>
     <string name="decode_processor">Pagsulat ng sagot</string>
+    <string name="processor_fixed_at_export">Nakatakda noong na-export</string>
 </resources>

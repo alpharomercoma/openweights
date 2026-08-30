@@ -818,6 +818,7 @@ private fun ChatSheets(
             outputModality = state.outputModality,
             hasGpu = state.hasGpu,
             hasNpu = state.hasNpu,
+            compiledProcessor = state.compiledProcessor,
             offloadBuffers = state.offloadBuffers,
             loadedContext = state.contextSize,
             onSave = {

@@ -102,6 +102,15 @@ fun ParameterSheet(
      */
     hasNpu: Boolean = false,
     /**
+     * The processor a compiled model was built for, or null for a GGUF.
+     *
+     * When set, the two controls below become one statement: a `.pte` holds delegate
+     * identifiers and loading resolves those exact ones, so where it runs was decided at
+     * export and nothing here can move it. Stated rather than hidden, because a missing
+     * section reads as the app having no answer.
+     */
+    compiledProcessor: ComputeTarget? = null,
+    /**
      * What the loaded model emits, which decides what is worth showing.
      *
      * A speech model reads three of these settings and ignores the rest, so the rest are
@@ -338,7 +347,21 @@ fun ParameterSheet(
                 )
                 val decodeTargets = listOf(ComputeTarget.AUTO, ComputeTarget.CPU, ComputeTarget.GPU)
 
-                if (hasGpu) {
+                if (compiledProcessor != null) {
+                    Setting(
+                        label = stringResource(R.string.processor),
+                        explanation = "This model was compiled ahead of time for one " +
+                            "processor. Running it somewhere else means a different " +
+                            "export, not a different setting.",
+                        value = compiledProcessor.label.lowercase(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.processor_fixed_at_export),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (hasGpu) {
                     // Two halves, chosen separately, because they want opposite things: a
                     // GPU reads a prompt several times faster than the CPU and writes an
                     // answer slower. "Read on the GPU, write on the CPU" is a real setting

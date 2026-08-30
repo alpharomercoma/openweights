@@ -249,4 +249,5 @@
     <string name="compiled_runs_on_npu">مُجمَّع لوحدة NPU</string>
     <string name="prefill_processor">قراءة الطلب</string>
     <string name="decode_processor">كتابة الإجابة</string>
+    <string name="processor_fixed_at_export">مُحدَّد عند التصدير</string>
 </resources>

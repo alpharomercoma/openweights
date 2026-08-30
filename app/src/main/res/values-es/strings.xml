@@ -261,4 +261,5 @@
     <string name="compiled_runs_on_npu">Compilado para NPU</string>
     <string name="prefill_processor">Leer la petición</string>
     <string name="decode_processor">Escribir la respuesta</string>
+    <string name="processor_fixed_at_export">Fijado al exportar</string>
 </resources>

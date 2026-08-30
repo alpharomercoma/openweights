@@ -680,15 +680,24 @@ fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long
  * The layers a pair of per-half choices puts on the GPU.
  *
  * Layers are indivisible between the halves: weights resident on the GPU are used to read a
- * prompt *and* to write an answer, so this can only answer for both at once. What separates
- * them is `op_offload`, which [ModelPreferences.toLoadParams] derives from the prefill
- * choice alone.
+ * prompt *and* to write an answer. llama.cpp has a second knob that would separate them —
+ * `op_offload`, which hands over only batches large enough to repay the transfer, and
+ * generation is always a batch of one — and [ModelPreferences.toLoadParams] sets it from
+ * the reading choice.
  *
- * That asymmetry decides the table. Reading on the GPU while writing on the CPU is the
- * combination worth having and the one that is reachable — no layers resident, prompt-sized
- * batches offloaded. The reverse is not expressible at all, and asking for it is read as
- * wanting the GPU rather than as an error, because the alternative is a control that
- * silently does nothing.
+ * **It does nothing on the GPU backend this app ships.** `ggml-opencl.cpp` leaves
+ * `.offload_op` null, and `ggml_backend_dev_offload_op` returns false for a backend that
+ * does not implement it, so with no layers resident the scheduler moves nothing and both
+ * halves run on the CPU. Vulkan, Metal, CUDA, SYCL and CANN all implement it; OpenCL is the
+ * one compiled in here, and Vulkan is switched off for measured reasons in
+ * `docs/research/gpu-backends.md`.
+ *
+ * So asking for the GPU on either half puts the weights there, because residency is the
+ * only mechanism that backend has. The flag stays wired and correct, and the moment a
+ * backend that implements it is enabled, "read on the GPU, write on the CPU" starts working
+ * without another change here. Until then the honest thing is to give the reading choice
+ * the effect it can have rather than the one it is named after — and the loaded-buffers
+ * line under the control reports where the weights actually went.
  */
 fun computeLayersFor(
     prefill: ComputeTarget,
@@ -699,16 +708,16 @@ fun computeLayersFor(
 ): Int {
     if (!hasGpu) return 0
     return when {
-        // Writing on the GPU means the weights live there, which covers reading too.
-        decode == ComputeTarget.GPU -> ALL_LAYERS
+        // Either half asking for the GPU means the weights go there. Residency serves both,
+        // which is why this cannot honour one half without the other on this backend.
+        decode == ComputeTarget.GPU || prefill == ComputeTarget.GPU -> ALL_LAYERS
 
-        // Reading on the GPU with writing pinned to the CPU: exactly what op_offload does,
-        // and it needs no layers resident. This is the disaggregated case.
-        decode == ComputeTarget.CPU -> 0
+        // Both pinned away from it: nothing resident, and op_offload off as well.
+        decode == ComputeTarget.CPU && prefill != ComputeTarget.AUTO -> 0
 
-        // Nothing pinned on the writing half, so the old measured heuristic decides.
+        // Writing pinned to the CPU with reading left open: the measured heuristic decides,
+        // which is what the single control did.
         else -> Offload.AUTO.layersFor(hasGpu, promptTokens, generatedTokens)
-            .takeIf { prefill != ComputeTarget.CPU } ?: 0
     }
 }
 

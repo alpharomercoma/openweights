@@ -293,5 +293,7 @@
 
     <string name="prefill_processor">Reading the prompt</string>
     <string name="decode_processor">Writing the answer</string>
+
+    <string name="processor_fixed_at_export">Fixed at export</string>
 </resources>
 

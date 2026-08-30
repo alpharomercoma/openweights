@@ -243,4 +243,5 @@
     <string name="compiled_runs_on_npu">NPU 向けにコンパイル済み</string>
     <string name="prefill_processor">プロンプトの読み込み</string>
     <string name="decode_processor">回答の生成</string>
+    <string name="processor_fixed_at_export">エクスポート時に固定</string>
 </resources>

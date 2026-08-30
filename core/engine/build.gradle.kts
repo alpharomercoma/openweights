@@ -65,6 +65,26 @@ android {
         }
     }
 
+    /**
+     * Whether this build carries a second inference runtime.
+     *
+     * ExecuTorch adds about 8.6 MB of uncompressed native library per ABI, and it is
+     * uncompressed because Play wants 16 KB-aligned shared libraries. That is a real cost
+     * on every install, paid for a runtime most users will never give a model to, since a
+     * `.pte` has to be compiled for a specific backend by somebody rather than downloaded
+     * as found. So it is a variant rather than a default.
+     *
+     * The app declares the same dimension, so the two resolve together.
+     */
+    flavorDimensions += "runtime"
+    productFlavors {
+        /** llama.cpp only. Any GGUF on the Hub, and nothing else to carry. */
+        create("standard") { dimension = "runtime" }
+
+        /** llama.cpp plus ExecuTorch, for models compiled ahead of time. */
+        create("accelerated") { dimension = "runtime" }
+    }
+
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -248,11 +268,11 @@ dependencies {
     api(project(":core:common"))
     implementation(libs.kotlinx.coroutines.android)
 
-    // ExecuTorch's Android runtime, for `.pte` models. This is the XNNPACK build: the
+    // ExecuTorch's Android runtime, in the accelerated flavour only. The XNNPACK build:
     // artifact is published per backend and MediaTek is not among the published ones, so
     // reaching the NPU means building this from source against the NeuroPilot SDK.
     // It carries native libraries for arm64-v8a and x86_64.
-    implementation(libs.executorch.android)
+    "acceleratedImplementation"(libs.executorch.android)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

@@ -138,6 +138,20 @@ android {
         }
     }
 
+    /**
+     * Mirrors core:engine's dimension, which is where the second runtime actually lives.
+     * The accelerated variant carries ExecuTorch and can open a `.pte`; the standard one
+     * ships llama.cpp alone and never offers models it could not run.
+     */
+    flavorDimensions += "runtime"
+    productFlavors {
+        create("standard") { dimension = "runtime" }
+        create("accelerated") {
+            dimension = "runtime"
+            versionNameSuffix = "-accelerated"
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

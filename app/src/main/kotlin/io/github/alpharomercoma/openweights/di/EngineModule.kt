@@ -23,9 +23,9 @@ import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
-import io.github.alpharomercoma.openweights.core.engine.NativeExecuTorchBridge
 import io.github.alpharomercoma.openweights.core.engine.RoutingInferenceEngine
 import javax.inject.Singleton
 
@@ -45,10 +45,15 @@ object EngineModule {
     @Provides
     @Singleton
     fun provideInferenceEngine(): InferenceEngine = RoutingInferenceEngine(
-        backends = mapOf(
-            ModelFormat.GGUF to { LlamaCppEngine() },
-            ModelFormat.PTE to { ExecuTorchEngine(NativeExecuTorchBridge()) },
-        ),
+        backends = buildMap<ModelFormat, () -> InferenceEngine> {
+            put(ModelFormat.GGUF) { LlamaCppEngine() }
+            // Registered only where there is something to run: in the standard flavour a
+            // .pte is never offered, downloaded or listed, so a router entry for it could
+            // only ever produce a failure.
+            if (ExecuTorchSupport.AVAILABLE) {
+                put(ModelFormat.PTE) { ExecuTorchEngine(ExecuTorchSupport.bridge()) }
+            }
+        },
     )
 
     /** Defaults are tuned for phone-sized context windows; see the policy's documentation. */

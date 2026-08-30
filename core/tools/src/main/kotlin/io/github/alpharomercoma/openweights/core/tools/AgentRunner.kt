@@ -196,6 +196,20 @@ class AgentRunner(
      */
     private val settled = ConcurrentHashMap<String, String>()
 
+    /**
+     * How many calls this turn has actually put through, across every round.
+     *
+     * The round budget was never a budget on work. A round is one decision by the model, and
+     * nothing stopped one decision from being twelve calls: a malformed reply that repeats
+     * its call block, or a model that answers "compare these" by asking for a search per
+     * item, spends twelve searches and a phone's radio on a turn whose results are then
+     * trimmed to what is left of a 4k window anyway. Two rounds of that is two dozen.
+     *
+     * So the calls are counted as well as the rounds, and the same argument sizes both: what
+     * is scarce here is seconds and battery, not steps.
+     */
+    private var callsMade = 0
+
     suspend fun step(
         calls: List<ToolCall>,
         round: Int,
@@ -205,23 +219,32 @@ class AgentRunner(
     ): AgentDecision {
         if (calls.isEmpty()) return AgentDecision.Finished
         // Counted in rounds rather than in calls, because a model that asks for three
-        // things at once has not looped, it has been efficient.
+        // things at once has not looped, it has been efficient. Being efficient twenty times
+        // over is a different thing, and [callsMade] is what says so.
         if (round >= maxRounds) {
             return AgentDecision.Exhausted(
                 calls.map { AgentStep.Skipped(it, "stopped after $maxRounds rounds of tools") },
             )
         }
 
-        val steps = if (canRunInParallel(calls, mode)) {
+        // Trimmed in the order the model wrote them, so what survives is what it asked for
+        // first. Everything past the line is still answered — a call with no result of any
+        // kind leaves the model unable to finish the turn — but answered without running.
+        val room = (MAX_CALLS_PER_TURN - callsMade).coerceAtLeast(0)
+        val allowed = calls.take(minOf(MAX_CALLS_PER_ROUND, room))
+        val excess = calls.drop(allowed.size).map { AgentStep.Skipped(it, tooMany()) }
+
+        val steps = if (canRunInParallel(allowed, mode)) {
             // Every call in this branch is a read-only, no-approval lookup. Keeping the
             // result list in model order makes the transcript deterministic even though the
             // wall-clock completion order differs.
             coroutineScope {
-                calls.map { call -> async { decide(call, mode, approve, now) } }.map { it.await() }
+                allowed.map { call -> async { decide(call, mode, approve, now) } }
+                    .map { it.await() }
             }
         } else {
-            calls.map { call -> decide(call, mode, approve, now) }
-        }
+            allowed.map { call -> decide(call, mode, approve, now) }
+        } + excess
         // Every step answers, including the ones that did not run: a model told nothing
         // about a call it made has no way to finish the turn.
         val messages = steps.map { ChatMessage.toolResult(it.callId(), it.report()) }
@@ -281,7 +304,13 @@ class AgentRunner(
     ): AgentStep {
         // Before the tool is even looked up, because the cheapest round trip is the one that
         // does not happen and the answer here does not depend on the tool.
+        //
+        // Counted after this rather than before, so a repeat the breaker catches does not
+        // spend the turn's allowance. A model that asks for the same search four times has
+        // done one search, and charging it four would let malformed repetition starve the
+        // calls that were going to be useful — the exact thing the breaker exists to stop.
         settled[call.settledKey()]?.let { return AgentStep.Skipped(call, it) }
+        countCall()
 
         val tool = registry.find(call.name)
             ?: return AgentStep.Skipped(
@@ -316,10 +345,20 @@ class AgentRunner(
                 "${call.name} failed: ${failure.message ?: "unknown error"}",
             )
         }
-        // Set after the run rather than before it, so a tool that failed to read anything
-        // does not spend the turn's freedom on text that never arrived.
-        if (execution.successful && tool.returnsUntrustedText) readUntrustedText = true
-        if (execution.successful && tool.readsPrivateData) readPrivateData = true
+        // Set on having run at all, not on having succeeded, and that distinction is a
+        // security boundary rather than a nicety. A failed call can still put the text in
+        // the turn: `run_script` reads the files a program names before running it, and a
+        // program that then throws returns the exception message — which can contain what
+        // it had already read — as the failure text. Gated on success, a script that read a
+        // private file and crashed would leave the turn untainted, and the next web_search
+        // could carry that file off the device in AUTO without asking anybody.
+        //
+        // It was gated on success while every one of these tools reported success whatever
+        // happened, so the gate had never once been false for them and the hole was
+        // theoretical. Typed failures made it reachable, which is the sort of thing typed
+        // failures are for.
+        if (tool.returnsUntrustedText) readUntrustedText = true
+        if (tool.readsPrivateData) readPrivateData = true
         // Pointed at rather than repeated. The result is already in the conversation as a
         // tool message, so sending it a second time would spend the context twice over to
         // tell the model something it can see.
@@ -330,6 +369,16 @@ class AgentRunner(
         if (execution.successful) {
             settled[call.settledKey()] = "Already run this turn with these same arguments. " +
                 "Its result is above; answer from that rather than calling it again."
+        } else if (!execution.retryable) {
+            // A refusal is as settled as a success, and for the reason the breaker exists.
+            // A malformed call, or one naming a file that is not there, fails identically
+            // however many times it is made, and a model this size asks for it again word
+            // for word because the shape is the one most recently in front of it. Left
+            // unsettled that costs a full prefill and the round in which the answer was
+            // going to be written. What it must not settle is a socket that went away, and
+            // that is exactly the line [ToolExecution.retryable] draws.
+            settled[call.settledKey()] = "Already refused this turn with these same " +
+                "arguments, for the reason above. Change the arguments or answer without it."
         }
         return AgentStep.Ran(
             call = call,
@@ -423,7 +472,44 @@ class AgentRunner(
         return mode == AgentMode.AUTO || !tool.needsApproval || approve(call)
     }
 
+    /**
+     * What a call that did not fit is told, phrased so the model can act on it.
+     *
+     * It says the work was not done, rather than reporting an error, because a model handed
+     * an error tends to apologise and stop. Told that the rest were not run, it either asks
+     * again next round for the one that mattered or answers from what did run.
+     */
+    /** One more call against the turn's allowance. Synchronised, because a round is parallel. */
+    @Synchronized
+    private fun countCall() {
+        callsMade++
+    }
+
+    private fun tooMany(): String =
+        "Not run: a turn runs at most $MAX_CALLS_PER_ROUND tools at once and " +
+            "$MAX_CALLS_PER_TURN in total. Ask again for the one that matters most, or " +
+            "answer from the results above."
+
     companion object {
+        /**
+         * How many tools may run in one round.
+         *
+         * Three is "search two things and read a file", which is a real shape. Past that a
+         * batch is not a plan, it is a model repeating its own call block, and each extra
+         * call costs a network round trip and a share of a context window that will trim
+         * most of it away unread.
+         */
+        const val MAX_CALLS_PER_ROUND = 3
+
+        /**
+         * And how many across the whole turn.
+         *
+         * Deliberately not rounds times the per-round cap. The point is the wall clock: on a
+         * phone six tool calls plus the prefills between them is already most of a minute
+         * before a word is written.
+         */
+        const val MAX_CALLS_PER_TURN = 6
+
         /**
          * How many rounds of tools one question may take.
          *

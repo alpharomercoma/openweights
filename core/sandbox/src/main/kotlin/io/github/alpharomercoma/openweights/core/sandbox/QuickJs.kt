@@ -17,7 +17,22 @@
 package io.github.alpharomercoma.openweights.core.sandbox
 
 /** What running a script produced, and whether the script got there on purpose. */
-data class ScriptResult(val output: String, val failed: Boolean)
+data class ScriptResult(
+    val output: String,
+    val failed: Boolean,
+    /**
+     * Whether the failure was the sandbox rather than the program.
+     *
+     * The two want opposite treatment from whatever is holding the round budget. A program
+     * that threw will throw again on the same source, so asking twice is a wasted round; a
+     * runner that could not be bound, or a process the system reclaimed, has nothing to do
+     * with the source and may well work on the next attempt.
+     *
+     * Only set where the sandbox itself failed outside the interpreter, so it never has to
+     * survive the binder round trip that carries an ordinary result back.
+     */
+    val transient: Boolean = false,
+)
 
 /**
  * The interpreter itself, one runtime per call.

@@ -128,6 +128,158 @@ class AgentRunnerTest {
         ToolCall(id = id, name = name, argumentsJson = args)
 
     @Test
+    fun `a round runs at most three tools and answers the rest anyway`() = runTest {
+        val calls = (1..6).map { call("echo", id = "c$it", args = """{"n":$it}""") }
+
+        val decision = runner.step(calls, round = 0, mode = AgentMode.AUTO, approve = { true })
+
+        // Every call is answered, or the model cannot finish the turn: the ones past the
+        // line come back as skipped rather than as nothing at all.
+        assertThat(decision).isInstanceOf(AgentDecision.Continue::class.java)
+        val steps = (decision as AgentDecision.Continue).steps
+        assertThat(steps).hasSize(6)
+        assertThat(steps.filterIsInstance<AgentStep.Ran>()).hasSize(3)
+        assertThat(decision.messages).hasSize(6)
+        // In the order the model wrote them, so what survives is what it asked for first.
+        assertThat(ran).hasSize(3)
+    }
+
+    @Test
+    fun `the whole turn runs at most six tools however many rounds it takes`() = runTest {
+        // Given rounds to spare, so that what stops the third round is the call ceiling
+        // rather than the round ceiling: the two limits are separate and this is about the
+        // one that counts work.
+        val runner = AgentRunner(registry, maxRounds = AgentRunner.CHAINED_MAX_ROUNDS)
+        repeat(2) { round ->
+            runner.step(
+                (1..3).map { call("echo", id = "r$round-$it", args = """{"r":$round,"n":$it}""") },
+                round = round,
+                mode = AgentMode.AUTO,
+                approve = { true },
+            )
+        }
+        assertThat(ran).hasSize(6)
+
+        val third = runner.step(
+            listOf(call("echo", id = "last", args = """{"last":true}""")),
+            round = 2,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        assertThat(ran).hasSize(6)
+        val steps = (third as AgentDecision.Continue).steps
+        assertThat(steps.single()).isInstanceOf(AgentStep.Skipped::class.java)
+        assertThat((steps.single() as AgentStep.Skipped).why).contains("in total")
+    }
+
+    @Test
+    fun `a tool that failed still taints the turn it read in`() = runTest {
+        // The gate used to be "successful && readsPrivateData", which was invisible while
+        // every tool of this kind reported success whatever happened. A script that reads
+        // the files its source names and then throws returns the exception text, which can
+        // contain what it had already read; untainted, the next search could carry that off
+        // the device in AUTO without asking anybody.
+        val failedRead = object : Tool {
+            override val definition = ToolDefinition("failed_read", "d", "{}")
+            override val readsPrivateData = true
+            override suspend fun run(call: ToolCall): String = execute(call).text
+            override suspend fun execute(call: ToolCall) =
+                ToolExecution.rejected("the script threw: could not parse secrets.txt")
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(failedRead, sender)))
+        var asked = false
+
+        runner.step(listOf(call("failed_read")), 0, AgentMode.AUTO, approve = { true })
+        runner.step(listOf(call("sender", id = "s")), 1, AgentMode.AUTO, approve = {
+            asked = true
+            true
+        })
+
+        assertThat(asked).isTrue()
+    }
+
+    @Test
+    fun `a repeat the breaker catches does not spend the turn's allowance`() = runTest {
+        // Otherwise malformed repetition starves the calls that were going to be useful,
+        // which is the exact thing the breaker exists to prevent.
+        val runner = AgentRunner(registry, maxRounds = AgentRunner.CHAINED_MAX_ROUNDS)
+        repeat(3) { round ->
+            runner.step(
+                listOf(call("echo", id = "r$round", args = """{"same":true}""")),
+                round = round,
+                mode = AgentMode.AUTO,
+                approve = { true },
+            )
+        }
+
+        // One run and two repeats caught, so five of the six are still to spend.
+        assertThat(ran).hasSize(1)
+        val next = runner.step(
+            (1..3).map { call("echo", id = "n$it", args = """{"n":$it}""") },
+            round = 3,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+        assertThat((next as AgentDecision.Continue).steps.filterIsInstance<AgentStep.Ran>())
+            .hasSize(3)
+    }
+
+    @Test
+    fun `a refusal is settled so the same bad call does not cost a second round`() = runTest {
+        val rejects = TypedOutcome(ToolExecution.rejected("There is no file at notes.md."))
+        val runner = AgentRunner(ToolRegistry(listOf(rejects)))
+
+        val first = runner.step(
+            listOf(call("typed", id = "a")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+        val second = runner.step(
+            listOf(call("typed", id = "b")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        // It ran once and was told why. Asked again for exactly the same thing, it is told
+        // that too rather than running it a second time for the same answer.
+        assertThat((first as AgentDecision.Continue).steps.single())
+            .isInstanceOf(AgentStep.Ran::class.java)
+        val repeat = (second as AgentDecision.Continue).steps.single()
+        assertThat(repeat).isInstanceOf(AgentStep.Skipped::class.java)
+        assertThat((repeat as AgentStep.Skipped).why).contains("Already refused")
+    }
+
+    @Test
+    fun `a failure that might not happen twice is asked again`() = runTest {
+        // The socket that went away. This is the one case where repeating the identical
+        // call is the right move, so it must not be settled alongside the refusals.
+        val flaky = TypedOutcome(ToolExecution.failure("that host did not respond"))
+        val runner = AgentRunner(ToolRegistry(listOf(flaky)))
+
+        runner.step(listOf(call("typed", id = "a")), 0, AgentMode.AUTO, approve = { true })
+        val second =
+            runner.step(listOf(call("typed", id = "b")), 1, AgentMode.AUTO, approve = { true })
+
+        assertThat((second as AgentDecision.Continue).steps.single())
+            .isInstanceOf(AgentStep.Ran::class.java)
+    }
+
+    @Test
+    fun `a tool that failed is not recorded as work that succeeded`() = runTest {
+        val rejects = TypedOutcome(ToolExecution.rejected("No path was given."))
+        val runner = AgentRunner(ToolRegistry(listOf(rejects)))
+
+        val decision =
+            runner.step(listOf(call("typed")), 0, AgentMode.AUTO, approve = { true })
+
+        val step = (decision as AgentDecision.Continue).steps.single() as AgentStep.Ran
+        assertThat(step.successful).isFalse()
+    }
+
+    @Test
     fun `sending something away is not questioned before a file has been read`() = runTest {
         // The ordinary case, and the one that must stay free of taps: looking something up
         // when nothing on the device has entered the turn. Nothing asks about this any

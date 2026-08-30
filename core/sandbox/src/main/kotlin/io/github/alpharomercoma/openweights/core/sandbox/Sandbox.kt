@@ -66,7 +66,7 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
         val intent = Intent(context, ScriptService::class.java)
         if (!context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
             runCatching { context.unbindService(connection) }
-            return@withContext ScriptResult(CANNOT_START, failed = true)
+            return@withContext ScriptResult(CANNOT_START, failed = true, transient = true)
         }
 
         try {
@@ -90,12 +90,12 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
                         },
                     )
                     result.await().decoded()
-                } ?: ScriptResult(STOPPED, failed = true)
+                } ?: ScriptResult(STOPPED, failed = true, transient = true)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
                 Log.w("Sandbox", "Isolated runner stopped before returning", failure)
-                ScriptResult(STOPPED, failed = true)
+                ScriptResult(STOPPED, failed = true, transient = true)
             }
         } finally {
             runCatching { context.unbindService(connection) }

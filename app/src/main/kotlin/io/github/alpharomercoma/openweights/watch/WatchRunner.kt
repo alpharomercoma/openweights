@@ -264,6 +264,10 @@ class WatchRunner @Inject constructor(
                 withTools = true,
                 notes = ToolNotes(),
                 listener = Unwatched,
+                // Not this run's plan. The board is process-wide and holds whatever the
+                // person was working on in the chat; a scheduled check must not be able to
+                // tick a step of it.
+                offerPlan = false,
             )
         }
 

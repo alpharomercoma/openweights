@@ -41,7 +41,8 @@ class MemoryTest {
 
     @Test
     fun `a fact is kept and comes back in the prompt`() {
-        assertThat(memory.remember("Prefers answers without preamble")).isEqualTo("Remembered.")
+        assertThat(memory.remember("Prefers answers without preamble").text)
+            .isEqualTo("Remembered.")
 
         val prompt = memory.asPrompt()
         assertThat(prompt).contains("Prefers answers without preamble")
@@ -59,14 +60,18 @@ class MemoryTest {
     @Test
     fun `the same fact twice is kept once`() {
         memory.remember("Lives in Manila")
-        assertThat(memory.remember("lives in MANILA")).isEqualTo("Already remembered.")
+        assertThat(memory.remember("lives in MANILA").text).isEqualTo("Already remembered.")
         assertThat(memory.facts.value).hasSize(1)
     }
 
     @Test
     fun `an empty or oversized note is refused with a reason`() {
-        assertThat(memory.remember("   ")).contains("empty")
-        assertThat(memory.remember("x".repeat(Memory.MAX_CHARS + 1))).contains("Too long")
+        val empty = memory.remember("   ")
+        assertThat(empty.text).contains("empty")
+        assertThat(empty.successful).isFalse()
+        val long = memory.remember("x".repeat(Memory.MAX_CHARS + 1))
+        assertThat(long.text).contains("Too long")
+        assertThat(long.successful).isFalse()
         assertThat(memory.facts.value).isEmpty()
     }
 

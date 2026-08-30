@@ -76,20 +76,24 @@ class WatchTool(private val watches: Watches) : Tool {
     /** It schedules unattended work, so it asks in AUTO too. See [Tool.alwaysAsks]. */
     override val alwaysAsks: Boolean = true
 
-    override suspend fun run(call: ToolCall): String {
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution {
         val task = call.argument("task", "what", "check")
         val minutes = call.intArgument("every_minutes", "minutes", "interval")
-        refusal(task, minutes)?.let { return it }
+        refusal(task, minutes)?.let { return ToolExecution.rejected(it) }
 
         // Checked here rather than forced with `!!`. [refusal] already returns non-null
         // whenever either of these is missing, so both are known good, but the compiler
         // cannot see that through a function boundary and `!!` asks a reader to take it on
         // trust. Folding both into one branch keeps that safety without a third exit.
-        if (task == null || minutes == null) return NO_TASK
+        if (task == null || minutes == null) return ToolExecution.rejected(NO_TASK)
 
         val started = watches.start(task, minutes)
-            ?: return "There are already ${Watch.MAX_ACTIVE} checks running, which is the " +
-                "limit. Ask the user to stop one first."
+            ?: return ToolExecution.rejected(
+                "There are already ${Watch.MAX_ACTIVE} checks running, which is the " +
+                    "limit. Ask the user to stop one first.",
+            )
 
         // Says what will actually happen rather than what was asked for, and says the end
         // out loud. A watch faster than the scheduler's floor keeps a notification up, and
@@ -97,11 +101,14 @@ class WatchTool(private val watches: Watches) : Tool {
         // from the assistant, in the reply, rather than by going looking for the screen.
         val ends = "It stops itself after ${Watch.MAX_RUNS} checks or " +
             "${Watch.MAX_LIFETIME_HOURS} hours, whichever comes first."
-        return if (started.needsForegroundService) {
-            "Checking every $minutes minutes, with a notification showing while it runs. $ends"
-        } else {
-            "Checking every $minutes minutes. $ends"
-        }
+        return ToolExecution(
+            if (started.needsForegroundService) {
+                "Checking every $minutes minutes, with a notification showing while it " +
+                    "runs. $ends"
+            } else {
+                "Checking every $minutes minutes. $ends"
+            },
+        )
     }
 
     /**

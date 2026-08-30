@@ -39,9 +39,31 @@ data class ToolExecution(
     val text: String,
     val successful: Boolean = true,
     val evidence: ToolEvidence? = null,
+    /**
+     * Whether asking again with these same arguments could give a different answer.
+     *
+     * The two kinds of failure want opposite treatment from the loop, and collapsing them
+     * into one flag gets one of them wrong whichever way it is set. A socket that went away
+     * is worth asking again, which is why [failure] leaves this true and the runner does not
+     * settle it. A call that was malformed, or that named a file which is not there, will
+     * fail identically forever, and a model this size will ask for it again word for word:
+     * that one is [rejected], and the runner settles it so the repeat costs nothing instead
+     * of a whole round of the turn's small budget.
+     */
+    val retryable: Boolean = true,
 ) {
     companion object {
+        /** A tool that tried and did not get there, and might if asked again. */
         fun failure(text: String) = ToolExecution(text = text, successful = false)
+
+        /**
+         * A call this tool will refuse the same way every time it is made.
+         *
+         * Validation, a path that does not exist, a folder that was never shared. The text
+         * still says what to do instead, because that is what the model needs to move on.
+         */
+        fun rejected(text: String) =
+            ToolExecution(text = text, successful = false, retryable = false)
     }
 }
 

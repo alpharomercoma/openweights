@@ -116,6 +116,17 @@ class Workspace @Inject constructor(
     val acceptsNewFiles: Boolean get() = grant.state() == GrantState.READ_WRITE
 
     /** What to tell the model when there is nothing to work in, in its own words. */
+    /**
+     * The same answer as [unavailable], typed, for a tool about to hand it to the runner.
+     *
+     * Null when there is a folder, which reads as "carry on". A missing folder is refused
+     * rather than merely failed: it is not going to appear part way through a turn, and a
+     * model told "no folder has been shared" will otherwise ask the next file tool the same
+     * question and spend the turn's whole budget discovering the same thing three times.
+     */
+    fun refusal(): ToolExecution? = unavailable().takeIf { it.isNotEmpty() }
+        ?.let(ToolExecution::rejected)
+
     fun unavailable(): String = when (grant.state()) {
         GrantState.NONE ->
             "No folder has been shared with this app. Ask the user to choose one under Tools."
@@ -236,9 +247,11 @@ class Workspace @Inject constructor(
      */
     // Each return is a distinct storage refusal; flattening them would obscure the boundary.
     @Suppress("ReturnCount")
-    suspend fun put(path: String, text: String, replace: Boolean = false): String {
+    suspend fun put(path: String, text: String, replace: Boolean = false): ToolExecution {
         val segments = path.workspaceSegments()
-            ?: return "$path is not a path inside the shared folder. Try one like notes/todo.md."
+            ?: return ToolExecution.rejected(
+                "$path is not a path inside the shared folder. Try one like notes/todo.md.",
+            )
         val existing = resolve(path)
         if (existing != null) {
             // Still refused by default, for the reason above. What changed is that a caller
@@ -248,35 +261,51 @@ class Workspace @Inject constructor(
             // there is no way to fix a script and run it again, which is the loop the
             // sandbox exists for.
             if (!replace) {
-                return "$path already exists, and this tool does not replace files unless " +
-                    "asked. Call it again with replace set to true to overwrite it, or " +
-                    "choose a name that is not taken."
+                return ToolExecution.rejected(
+                    "$path already exists, and this tool does not replace files unless " +
+                        "asked. Call it again with replace set to true to overwrite it, or " +
+                        "choose a name that is not taken.",
+                )
             }
-            if (existing.isDirectory) return "$path is a folder, not a file."
+            if (existing.isDirectory) {
+                return ToolExecution.rejected("$path is a folder, not a file.")
+            }
             val uri = uriFor(existing)
-                ?: return "$path could not be opened for writing."
+                ?: return ToolExecution.failure("$path could not be opened for writing.")
             return if (overwrite(uri, text)) {
-                "Replaced $path with ${text.length} characters."
+                ToolExecution("Replaced $path with ${text.length} characters.")
             } else {
-                "$path could not be written."
+                ToolExecution.failure("$path could not be written.")
             }
         }
         val parentPath = segments.dropLast(1).joinToString("/")
         val parent = if (parentPath.isEmpty()) {
             null
         } else {
-            resolve(parentPath) ?: return "There is no folder called $parentPath to save into."
+            resolve(parentPath) ?: return ToolExecution.rejected(
+                "There is no folder called $parentPath to save into.",
+            )
         }
         return putInto(parent, segments.last(), text, path)
     }
 
-    private suspend fun putInto(parent: Entry?, name: String, text: String, path: String): String {
+    private suspend fun putInto(
+        parent: Entry?,
+        name: String,
+        text: String,
+        path: String,
+    ): ToolExecution {
         val uri = create(parent, name, mediaTypeFor(name))
-            ?: return "$path could not be created. The folder may not accept new files."
+            ?: return ToolExecution.failure(
+                "$path could not be created. The folder may not accept new files.",
+            )
         return if (write(uri, text)) {
-            "Saved ${text.length} characters to $path."
+            ToolExecution("Saved ${text.length} characters to $path.")
         } else {
-            "$path was created but nothing could be written into it."
+            // The worst outcome here, and the one worth naming: a file exists with the
+            // right name and nothing in it. Reported as a failure so that a goal step
+            // cannot count it as the work having been done.
+            ToolExecution.failure("$path was created but nothing could be written into it.")
         }
     }
 

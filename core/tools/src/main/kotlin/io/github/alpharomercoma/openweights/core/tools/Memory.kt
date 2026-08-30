@@ -71,14 +71,19 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
      * several turns will offer the same sentence more than once, and a list with the user's
      * name in it four times is worse than one that refused three of them.
      */
-    fun remember(text: String, now: Long = System.currentTimeMillis()): String {
+    fun remember(text: String, now: Long = System.currentTimeMillis()): ToolExecution {
         val fact = text.trim().replace(WHITESPACE, " ")
-        if (fact.isEmpty()) return "Nothing to remember: the note was empty."
+        if (fact.isEmpty()) {
+            return ToolExecution.rejected("Nothing to remember: the note was empty.")
+        }
         if (fact.length > MAX_CHARS) {
-            return "Too long to remember. Keep it under $MAX_CHARS characters, one fact."
+            return ToolExecution.rejected(
+                "Too long to remember. Keep it under $MAX_CHARS characters, one fact.",
+            )
         }
         if (known.value.any { it.text.equals(fact, ignoreCase = true) }) {
-            return "Already remembered."
+            // The fact is in memory, which is what was asked for. Nothing failed here.
+            return ToolExecution("Already remembered.")
         }
 
         // Oldest first, so the cap costs the least recent thing rather than refusing the
@@ -86,7 +91,7 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
         val kept = (known.value + Remembered(fact, now)).takeLast(MAX_FACTS).withinBudget()
         known.value = kept
         write(kept)
-        return "Remembered."
+        return ToolExecution("Remembered.")
     }
 
     /**

@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
 import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
@@ -163,8 +164,9 @@ class TurnRunner @Inject constructor(
         listener: TurnListener,
         offerAsk: Boolean? = null,
         question: String = "",
+        offerPlan: Boolean = true,
     ): String = engineInUse.withLock {
-        turn(conversation, params, mode, withTools, notes, listener, offerAsk, question)
+        turn(conversation, params, mode, withTools, notes, listener, offerAsk, question, offerPlan)
     }
 
     /**
@@ -184,10 +186,21 @@ class TurnRunner @Inject constructor(
         listener: TurnListener,
         offerAsk: Boolean? = null,
         question: String = "",
+        offerPlan: Boolean = true,
     ): String? {
         if (!engineInUse.tryLock()) return null
         return try {
-            turn(conversation, params, mode, withTools, notes, listener, offerAsk, question)
+            turn(
+                conversation,
+                params,
+                mode,
+                withTools,
+                notes,
+                listener,
+                offerAsk,
+                question,
+                offerPlan,
+            )
         } finally {
             engineInUse.unlock()
         }
@@ -202,6 +215,7 @@ class TurnRunner @Inject constructor(
         listener: TurnListener,
         offerAsk: Boolean? = null,
         question: String = "",
+        offerPlan: Boolean = true,
     ): String {
         // Read once per turn, not once per app start: a tool switched off mid-conversation
         // should be off for the next thing asked, and a registry captured at construction
@@ -226,6 +240,13 @@ class TurnRunner @Inject constructor(
         // two tools are machinery, so they follow availability alone; a stale "off" left in
         // the preferences by the screen that used to list them must not disable them now.
         val offered = tools.all.filter { it.isAvailable }
+            // The plan belongs to the conversation the user is looking at, and the board
+            // holding it is one object for the whole process. Anything that is not that
+            // conversation must not be handed `advance`: a watch coming due mid-plan runs
+            // through this same loop, in AUTO, with no approval on the way, and was offered
+            // a tick for a step it knows nothing about. It also inherited the longer round
+            // budget, because ticking a plan is a chaining tool.
+            .filter { offerPlan || it.definition.name != AdvanceTool.NAME }
         val active = tools.enabled(
             offered
                 // Plan mode gets the machinery and nothing else.
@@ -257,10 +278,10 @@ class TurnRunner @Inject constructor(
         // something up. A turn that works with files is a different shape: find it, read it,
         // write it, which is three before the model has said anything. At two the last of
         // those is refused and the work is thrown away on the step that mattered.
-        val maxRounds = active.roundLimit()
+        val ceiling = active.roundLimit()
         val agent = AgentRunner(
             active,
-            maxRounds,
+            ceiling,
             // The notes put an earlier turn's page back into this question, so the guard that
             // asks before anything leaves the device has to know it is there. Without this the
             // suspicion died with the turn that earned it while the text it was about did not.
@@ -307,8 +328,9 @@ class TurnRunner @Inject constructor(
 
         return Turn(
             active,
+            offerPlan,
             agent,
-            maxRounds,
+            ceiling,
             withTools,
             native,
             readsResults,
@@ -332,8 +354,13 @@ class TurnRunner @Inject constructor(
     @Suppress("LongParameterList")
     private inner class Turn(
         private val active: ToolRegistry,
+        /** Whether the plan on the board belongs to this run. See [turn]'s `offerPlan`. */
+        private val ownsPlan: Boolean,
         private val agent: AgentRunner,
-        private val maxRounds: Int,
+        /**
+         * The most rounds this turn could reach, if it earns them. See [maxRounds].
+         */
+        private val ceiling: Int,
         private val withTools: Boolean,
         private val native: Boolean,
         private val readsResults: Boolean,
@@ -355,6 +382,19 @@ class TurnRunner @Inject constructor(
          * that asks anyway pays the old price, once, in [withdraw].
          */
         private var renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
+
+        /**
+         * The rounds this turn may take, which starts small and is earned rather than given.
+         *
+         * The extra rounds exist for one shape: find the file, read it, write it, which is
+         * three before a word reaches anybody. That shape is recognisable from what the model
+         * actually called, and it used to be guessed from what was merely switched on — so a
+         * user who had shared a folder gave every question in the app twice the budget,
+         * including "who won last night", which then searched, read, searched and read again
+         * for a minute and a half. A turn now gets the second pair of rounds at the moment it
+         * runs a tool that chains, and not before.
+         */
+        private var maxRounds = minOf(AgentRunner.DEFAULT_MAX_ROUNDS, ceiling)
 
         // Grounded once, into the accumulator itself, so the block sits on the same user
         // message in every pass of the turn. It was a transient decoration on round zero's
@@ -421,7 +461,11 @@ class TurnRunner @Inject constructor(
                 // very end or it moves tokens the cache has already read. Grounding is the
                 // opposite case — the same words every pass — so it lives in [messages]
                 // and is not re-attached here.
-                val plan = plans.plan.value
+                // Withheld whole, not merely the tool. Taking `advance` away stopped a watch
+                // ticking somebody's plan and still pinned the plan's text to the end of its
+                // prompt, which is the position a small model attends to best: a scheduled
+                // check would answer about the steps of a chat it has never seen.
+                val plan = plans.plan.value.takeIf { ownsPlan }
                 pinned = pinned || !plan?.statusBlock().isNullOrEmpty()
                 val pass = streamOnce(
                     messages.pinning(plan),
@@ -446,10 +490,20 @@ class TurnRunner @Inject constructor(
                 // for that" is a remark about what it cannot do. Ungated, that remark
                 // reached the network.
                 val calls = pass.asked(active, withTools && !proseOnly)
-                val again = if (mayCall) {
-                    advance(pass, calls, mode, listener)
-                } else {
-                    withdraw(pass, calls, listener)
+                val again = when {
+                    mayCall -> advance(pass, calls, mode, listener)
+                    // The budget was two rounds because nothing had chained yet, and the
+                    // model has now asked for the step the longer budget exists for:
+                    // "research this and save it" is search, read, then write, and the
+                    // write is the round that was about to be refused. Earned on the ask
+                    // here rather than only on the run, because by this point there is no
+                    // round left in which to run one. It can only happen once, and only up
+                    // to a ceiling the registry already justified.
+                    wantsToChain(calls) -> {
+                        maxRounds = ceiling
+                        advance(pass, calls, mode, listener)
+                    }
+                    else -> withdraw(pass, calls, listener)
                 }
                 if (!again) {
                     // The turn is over and [messages] is the conversation the KV cache now
@@ -463,6 +517,15 @@ class TurnRunner @Inject constructor(
                 listener.onNextPass()
             }
         }
+
+        /**
+         * Whether these calls include the kind of step the longer budget was written for.
+         *
+         * Only true while the budget is still the short one, so a turn cannot keep buying
+         * rounds by naming a file tool: the ceiling is the ceiling.
+         */
+        private fun wantsToChain(calls: List<ToolCall>): Boolean =
+            maxRounds < ceiling && calls.any { active.find(it.name)?.chains == true }
 
         /** A pass whose calls can still run: run them, or spend the one repair. */
         private suspend fun advance(
@@ -480,7 +543,12 @@ class TurnRunner @Inject constructor(
             pass.spoken().takeIf { it.isNotEmpty() }?.let(listener::onIntermediate)
 
             val decision = agent.step(calls, round, mode, listener::onApproval)
-            listener.onSteps(decision.steps())
+            val steps = decision.steps()
+            listener.onSteps(steps)
+            // Earned here, on the evidence of what ran rather than what was offered.
+            if (steps.any { it is AgentStep.Ran && active.find(it.call.name)?.chains == true }) {
+                maxRounds = ceiling
+            }
 
             // Sized here rather than once for the whole turn, and after the pass rather than
             // before it, so what the model has just written is already counted.
@@ -656,6 +724,11 @@ class TurnRunner @Inject constructor(
     ): Pass? {
         val reply = StringBuilder()
         var completed: GenerationEvent.Completed? = null
+        // Where the reply had reached when it was last judged, so the check runs once every
+        // few hundred characters rather than once per token. Sliding a window over the whole
+        // reply on every token would be quadratic in the length of the answer, which is a
+        // worse tax than the failure it looks for.
+        var checkedAt = 0
 
         engine.chat(
             messages = messages,
@@ -671,6 +744,26 @@ class TurnRunner @Inject constructor(
                     reply.append(event.text)
                     publishRaw(reply.toString())
                     listener.onText(reply.toString())
+                    if (reply.length - checkedAt >= Degeneration.CHECK_EVERY) {
+                        checkedAt = reply.length
+                        if (Degeneration.dominates(reply.toString())) {
+                            // Thrown out of the turn rather than swallowed here, and that is
+                            // the difference between ending the turn and corrupting it. The
+                            // caller records a finished reply from the last *completed*
+                            // pass, which on a tool turn is the one that said "let me look
+                            // that up"; returning normally from the middle of a later pass
+                            // would store that as the answer and then store the repeated
+                            // text as a second reply to the same question. Raised, it takes
+                            // the path a failed decode already takes: one row holding what
+                            // was actually produced, the cache reset because what it holds
+                            // is half a reply, and a sentence on screen saying so.
+                            Log.w(
+                                "OpenWeights",
+                                "stopped a reply repeating itself at ${reply.length} chars",
+                            )
+                            throw RepeatingReply()
+                        }
+                    }
                 }
 
                 is GenerationEvent.Completed -> {
@@ -689,6 +782,20 @@ class TurnRunner @Inject constructor(
         return completed?.let { Pass(reply.toString(), it) }
     }
 }
+
+/**
+ * The model stopped answering and started echoing, so the turn was cut short.
+ *
+ * A real failure rather than a quiet end, because the reply is not one: what the user has is
+ * the beginning of an answer followed by the same line several times over. Raised so the
+ * turn takes the path a failed decode takes — the produced text stored once, the cache
+ * cleared because it holds half a reply, and this sentence on screen.
+ */
+class RepeatingReply :
+    RuntimeException(
+        "The model got stuck repeating itself, so this reply was stopped. " +
+            "Ask again, or try a lower repetition penalty in model settings.",
+    )
 
 /**
  * How many rounds a turn gets, which depends on whether its tools are steps or errands.

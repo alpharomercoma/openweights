@@ -70,17 +70,23 @@ class SearchFilesTool @Inject constructor(private val workspace: Workspace) : To
     override val readsPrivateData: Boolean = true
     override val returnsUntrustedText: Boolean = true
 
-    override suspend fun run(call: ToolCall): String =
-        workspace.unavailable().ifEmpty { search(call) }
+    override suspend fun run(call: ToolCall): String = execute(call).text
 
-    private suspend fun search(call: ToolCall): String {
+    override suspend fun execute(call: ToolCall): ToolExecution =
+        workspace.refusal() ?: search(call)
+
+    private suspend fun search(call: ToolCall): ToolExecution {
         val pattern = call.argument("pattern", "name", "glob", "query")
-            ?: return "No pattern was given. Call search_files again with a pattern like *.md."
+            ?: return ToolExecution.rejected(
+                "No pattern was given. Call search_files again with a pattern like *.md.",
+            )
         val contains = call.argument("contains", "text", "containing")
         val hunt = Hunt(workspace, pattern.asNameMatcher(), contains)
 
         val finished = withTimeoutOrNull(DEADLINE_MILLIS) { hunt.walk(workspace.root(), 0) }
-        return hunt.report(ranOut = finished == null)
+        // A search that matched nothing still searched. Nothing here failed, and saying it
+        // did would keep a true answer out of the notes and invite the same walk again.
+        return ToolExecution(hunt.report(ranOut = finished == null))
     }
 }
 
@@ -133,23 +139,31 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
     /** And by the same argument, the single point where the user's own text enters it. */
     override val readsPrivateData: Boolean = true
 
-    override suspend fun run(call: ToolCall): String =
-        workspace.unavailable().ifEmpty { read(call) }
+    override suspend fun run(call: ToolCall): String = execute(call).text
 
-    private suspend fun read(call: ToolCall): String {
+    override suspend fun execute(call: ToolCall): ToolExecution = workspace.refusal()
+        ?: read(call)
+
+    private suspend fun read(call: ToolCall): ToolExecution {
         val path = call.argument("path", "file", "name")
-            ?: return "No path was given. Call read_file again with a path."
+            ?: return ToolExecution.rejected(
+                "No path was given. Call read_file again with a path.",
+            )
         val entry = workspace.resolve(path)
-            ?: return "There is no file at $path in the shared folder. Use search_files first."
+            ?: return ToolExecution.rejected(
+                "There is no file at $path in the shared folder. Use search_files first.",
+            )
         val skip = call.argument("offset", "start", "skip")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         return window(entry, path, skip)
     }
 
     // Guard clauses keep each incompatible file shape next to its user-facing explanation.
     @Suppress("ReturnCount")
-    private suspend fun window(entry: Entry, path: String, skip: Int): String {
+    private suspend fun window(entry: Entry, path: String, skip: Int): ToolExecution {
         if (entry.isDirectory) {
-            return "$path is a folder, not a file. Use search_files to see what is in it."
+            return ToolExecution.rejected(
+                "$path is a folder, not a file. Use search_files to see what is in it.",
+            )
         }
         // A picture is not a failed text file, and saying so is the difference between a
         // model that asks for it and one that gives up.
@@ -161,17 +175,23 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         // thing that would work, which is the user attaching it to a message.
         entry.mediaType.substringBefore('/').let { family ->
             if (family in NOT_TEXT) {
-                return "$path is $family rather than text, so read_file cannot show it to " +
-                    "you. Ask the user to attach it to a message if you need to see it."
+                return ToolExecution.rejected(
+                    "$path is $family rather than text, so read_file cannot show it to " +
+                        "you. Ask the user to attach it to a message if you need to see it.",
+                )
             }
         }
 
         // One character past the window, so whether anything follows is a fact rather than an
         // inference from having filled the buffer exactly.
         val text = workspace.readText(entry, skip, WINDOW_CHARS + 1)
-            ?: return "$path could not be read. It may not be text."
-        if (text.isEmpty()) return "$path has nothing more to read from character $skip."
-        return text.take(WINDOW_CHARS) + rest(read = text.length, skip = skip)
+            ?: return ToolExecution.rejected("$path could not be read. It may not be text.")
+        if (text.isEmpty()) {
+            return ToolExecution.rejected(
+                "$path has nothing more to read from character $skip.",
+            )
+        }
+        return ToolExecution(text.take(WINDOW_CHARS) + rest(read = text.length, skip = skip))
     }
 
     /**
@@ -252,17 +272,25 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
     override fun asksInAuto(call: ToolCall): Boolean =
         alwaysAsks || call.flag("replace", "overwrite")
 
-    override suspend fun run(call: ToolCall): String =
-        workspace.unavailable().ifEmpty { create(call) }
+    override suspend fun run(call: ToolCall): String = execute(call).text
 
-    private suspend fun create(call: ToolCall): String {
+    override suspend fun execute(call: ToolCall): ToolExecution =
+        workspace.refusal() ?: create(call)
+
+    private suspend fun create(call: ToolCall): ToolExecution {
         val path = call.argument("path", "file", "name")
-            ?: return "No path was given. Call write_file again with a path."
+            ?: return ToolExecution.rejected(
+                "No path was given. Call write_file again with a path.",
+            )
         val content = call.textArgument("content", "text", "body")
-            ?: return "No content was given. Call write_file again with the file's text."
+            ?: return ToolExecution.rejected(
+                "No content was given. Call write_file again with the file's text.",
+            )
         if (content.length > MAX_WRITE_CHARS) {
-            return "That is longer than this tool writes at once. Keep it under " +
-                "$MAX_WRITE_CHARS characters, or save it in parts."
+            return ToolExecution.rejected(
+                "That is longer than this tool writes at once. Keep it under " +
+                    "$MAX_WRITE_CHARS characters, or save it in parts.",
+            )
         }
         return workspace.put(path, content, replace = call.flag("replace", "overwrite"))
     }

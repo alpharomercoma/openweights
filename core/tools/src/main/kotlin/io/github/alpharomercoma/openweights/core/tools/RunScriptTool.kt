@@ -121,7 +121,9 @@ class RunScriptTool @Inject constructor(
      */
     override val readsPrivateData: Boolean = true
 
-    override suspend fun run(call: ToolCall): String {
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution {
         // Two ways in, because writing a program and running it are two turns and the
         // second one should not have to repeat the first. `write_file` saves the source,
         // and this runs what was saved, which is the loop a person means by "code a file
@@ -131,11 +133,15 @@ class RunScriptTool @Inject constructor(
         val source = when {
             inline != null -> inline
             from != null ->
-                readProgram(from)?.asProgram() ?: return "There is no file at $from to run. " +
-                    "Save it with write_file first, or pass the program as source."
+                readProgram(from)?.asProgram() ?: return ToolExecution.rejected(
+                    "There is no file at $from to run. " +
+                        "Save it with write_file first, or pass the program as source.",
+                )
             else ->
-                return "No script was given. Call run_script again with source, " +
-                    "or with path pointing at a file you saved."
+                return ToolExecution.rejected(
+                    "No script was given. Call run_script again with source, " +
+                        "or with path pointing at a file you saved.",
+                )
         }
 
         // What the script asked for, and what it forgot to ask for. Both, because the model
@@ -144,18 +150,33 @@ class RunScriptTool @Inject constructor(
         // have had by naming it in the argument.
         val wanted = (call.paths() + mentionedPaths(source)).distinct().take(MAX_FILES)
         if (wanted.isNotEmpty() && !workspace.isReady) {
-            return "No folder has been shared, so there are no files to read. " +
-                "Run the script without files, or ask the user to choose a folder under Tools."
+            return ToolExecution.rejected(
+                "No folder has been shared, so there are no files to read. Run the script " +
+                    "without files, or ask the user to choose a folder under Tools.",
+            )
         }
 
         val inputs = gather(wanted)
         val result = sandbox.run(source = NODE_SHIM + source, inputsJson = inputs)
+        val why = "The script did not finish: ${result.output}" +
+            hostApiHint(source, result.output) +
+            repairRoute(from)
         return if (result.failed) {
-            "The script did not finish: ${result.output}" +
-                hostApiHint(source, result.output) +
-                repairRoute(from)
+            // Refused rather than merely failed. The sandbox has no network and no clock the
+            // program can steer by, so the same source over the same inputs fails the same
+            // way every time; the sentences below say how to change it, and changing it
+            // makes a different call. This is the branch that used to be reported as a
+            // successful step, which is how a goal could tick off a step whose only action
+            // was a program that crashed.
+            // A program that threw will throw again on the same source, so that one is
+            // settled and the sentences above say how to change it. A sandbox that could
+            // not be started, or a runner the system reclaimed, is nothing to do with the
+            // source and is worth another go.
+            if (result.transient) ToolExecution.failure(why) else ToolExecution.rejected(why)
         } else {
-            result.output.ifBlank { "The script ran and produced nothing." }
+            // A program that ran and printed nothing did what it was asked; saying so is a
+            // result, not a failure.
+            ToolExecution(result.output.ifBlank { "The script ran and produced nothing." })
         }
     }
 

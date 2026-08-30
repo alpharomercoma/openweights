@@ -26,6 +26,7 @@ import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
+import io.github.alpharomercoma.openweights.core.engine.StopReason
 import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
@@ -135,12 +136,28 @@ class ConversationCompactor @Inject constructor(
         }
         val request = listOf(ChatMessage.text(ChatRole.USER, compactionPrompt(transcript)))
 
+        var reason: StopReason? = null
         return try {
             buildString {
                 engine.chat(request, SUMMARY_PARAMS.copy(maxTokens = budget)).collect { event ->
-                    if (event is GenerationEvent.Token) append(event.text)
+                    when (event) {
+                        is GenerationEvent.Token -> append(event.text)
+                        is GenerationEvent.Completed -> reason = event.reason
+                    }
                 }
             }
+                // A summary that stopped because it ran out of room is a fragment, and a
+                // fragment is the one thing this must never store: the turns it claims to
+                // cover are dropped from every future prompt, so a summary cut mid-sentence
+                // silently deletes whatever it had not reached yet. The budget below was
+                // sized by measurement to avoid this, and measurement is not a guarantee —
+                // a longer conversation, a different template or a model that thinks more
+                // reaches the ceiling the table never tested.
+                //
+                // Refused rather than salvaged. The caller treats null as "not folded",
+                // which leaves the real turns in the conversation: worse for the window and
+                // honest about what is in it. Half a summary is neither.
+                .takeIf { reason == StopReason.END_OF_TURN }
         } catch (cancellation: CancellationException) {
             // Stop pressed, or the screen gone. `runCatching` read that as the summary
             // having failed, so a fold the user interrupted came back as a fold that could

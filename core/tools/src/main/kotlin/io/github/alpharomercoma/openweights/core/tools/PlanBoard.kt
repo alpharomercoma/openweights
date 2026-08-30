@@ -100,7 +100,7 @@ class PlanBoard @Inject constructor() {
 @Singleton
 class AdvanceTool @Inject constructor(private val board: PlanBoard) : Tool {
     override val definition = ToolDefinition(
-        name = "advance",
+        name = NAME,
         description = "Mark one step of the plan finished, by its number.",
         parametersJson = """
             {
@@ -127,6 +127,11 @@ class AdvanceTool @Inject constructor(private val board: PlanBoard) : Tool {
     override val runsWhilePlanning: Boolean = true
 
     override val chains: Boolean = true
+
+    companion object {
+        /** Named once, because the turn loop has to be able to withhold it by name. */
+        const val NAME = "advance"
+    }
 
     override suspend fun run(call: ToolCall): String {
         val step = call.argument("step", "number", "index")?.trim()?.toIntOrNull()

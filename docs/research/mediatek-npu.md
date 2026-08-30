@@ -110,6 +110,53 @@ which is a product question rather than an engineering one, and those two figure
 are arithmetic on top of single-operation measurements rather than anything
 observed end to end.
 
+## Is a prefill/decode split even expressible in ggml?
+
+Yes, and it is not a new idea — it is the mechanism CUDA already uses for partial
+offload:
+
+```c
+static bool ggml_backend_cuda_device_offload_op(ggml_backend_dev_t dev, const ggml_tensor * op) {
+    return get_op_batch_size(op) >= dev_ctx->op_offload_min_batch_size;
+}
+```
+
+`ggml_backend_dev_offload_op` asks whether an op should move to a backend even
+though its data lives elsewhere, and CUDA answers with a batch-size threshold.
+That is prefill-on-accelerator, decode-on-CPU, with a tunable cut-off. A Neuron
+backend would answer `supports_op` for `MUL_MAT` alone and `offload_op` for
+batches above a threshold; `ggml_backend_sched` routes everything else to the
+CPU on its own. The KV cache never has to leave the CPU, because attention stays
+there — only matmul activations cross.
+
+So the scheduling is free. What is not free, in the order it would bite:
+
+**Activation quantisation.** ggml activations are F32 and `QUANT8_ASYMM` wants
+per-tensor int8 with a scale, so every offloaded op quantises in and dequantises
+out. ggml already does this for Q8_0 matmuls, but with *per-block* Q8_1; a
+per-tensor asymmetric scale is cruder, and the risk is output quality rather than
+speed.
+
+**Amdahl.** Only matmuls move. RMSNorm, attention, softmax and RoPE stay on the
+CPU, so a tenfold matmul win is about fivefold overall if matmuls are 85–90% of
+prefill — a fraction nobody here has measured.
+
+**Weight residency.** The benchmark baked weights in as graph constants, which
+would mean a second full copy of the model.
+`NeuronModel_setOperandValueFromMemory` with `libneuron_buffer_allocator` exists
+to share a DMA buffer instead, and that path is untested here.
+
+**And the awkward one: this app already removed most of the opportunity.**
+`TurnRunner` is built so each turn extends the KV cache and only new tokens
+prefill — measured earlier at 48 tokens against 1,222 for a tool round that
+reused its prefix. At those widths the NPU advantage is a fraction of its peak
+and the fixed costs are proportionally largest. The turns that would gain are the
+ones the cache work was written to eliminate: a conversation's first turn, a
+pasted document, a large tool result, and any full invalidation — which on a
+hybrid model like LFM2.5 cannot always be avoided. Those are a minority of turns
+and they are also the slowest ones, so the question is not settled by the kernel
+number alone.
+
 ## What is actually on the device
 
 More than expected. The full MediaTek APU stack is present — `libapusys.so`,

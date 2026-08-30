@@ -163,6 +163,38 @@ None of these are visible from the API, the documentation, or a test against a f
   names. Guessing wrong reported zero tokens for every generation, which the fallback to
   wall-clock timing hid rather than surfaced.
 
+## Where a model runs is decided at export, not by the app
+
+*Verified against ExecuTorch v1.4.0 source, 2026-08-31, after asking whether the app could
+offer the user a choice of CPU, GPU or NPU — and separate choices for prefill and decode.
+It cannot, in four independent ways.*
+
+- **A `.pte` holds delegate identifiers, and loading resolves those exact ones.** The
+  processor was chosen on somebody's desktop when the model was exported. Shipping the
+  Vulkan artifact alongside an XNNPACK-exported model leaves it on the CPU; running it on
+  the GPU means a different file, exported with the Vulkan partitioner.
+- **XNNPACK is strictly CPU.** So the Qwen3-1.7B export measured here is CPU-only —
+  ExecuTorch is not reaching the GPU or NPU on this device at all, which is the context for
+  its 133–155 t/s prefill and 27 t/s decode. It is not a slow accelerator; it is not an
+  accelerator.
+- **Prefill and decode cannot use different backends.** `create_text_llm_runner` builds one
+  `TextDecoderRunner` and hands it to both the prefiller and the token generator, so both
+  execute the same statically lowered method. Exporting with several partitioners splits by
+  *operator*, not by phase, and the Java API cannot influence it.
+- **Nothing reports which backend a loaded model is using.** `getRegisteredBackends()` says
+  what the runtime has linked, not what a file needs or uses. There is no
+  `getMethodBackends()`.
+
+Two consequences the app acts on. A model compiled for a delegate that is not linked
+**fails to load** — "backend is not registered", no fallback — so an export this build
+cannot open is filtered out before download rather than after a gigabyte. And the processor
+is displayed as a fact read from the repository name, since that is the only signal short
+of parsing the file.
+
+Also worth recording: `executorch-android-qnn` on Maven Central currently stops at **1.2.0**,
+while the base and Vulkan artifacts are at 1.4.0. And MediaTek has no Maven flavour at all —
+the release workflow defines XNNPACK, Vulkan, QNN and combined, and nothing else.
+
 ## Open
 
 - What verbatim history costs in answer quality. It is a deliberate divergence from

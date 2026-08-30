@@ -5,58 +5,60 @@ MediaTek MT6991 (Dimensity 9400), Android 16 / API 36.**
 
 ## Decision
 
-**Not now, but the reason changed once it was measured.** The NPU is not too
-slow — for prefill it is roughly ten times the CPU's effective rate. What stops
-it is that reaching it means a ggml backend with partial op coverage, weights
-requantised from int4 to int8, and shape bucketing, in an app whose premise is
-that a user downloads whichever GGUF they like. The triggers that would reverse
-this are at the end.
+**Not yet — but the hardware case is strong, and every earlier reason given in
+this document for doubting it turned out to be wrong when measured.** The MDLA
+beats the CPU at this app's central kernel by three times at decode width and
+ten to nineteen times at prefill widths. What stands in the way is engineering
+and product fit: a partial ggml backend, ops the API does not have, and a model
+catalogue the user chooses. The triggers are at the end.
 
-## Measured: does the NPU actually win?
+## Measured: NPU against CPU, same kernel, same phone
 
-Everything below ran on the device through `NeuronAdapter`, one
-`NEURON_FULLY_CONNECTED` of `[M x 2048] @ [2048 x 8192]` in
-`QUANT8_ASYMM` — one FFN projection of a 1.2 B model — pinned to `mtk-mdla`
-(MDLA 5.5), twenty iterations. Source: `tools/npu/npu_matmul_bench.cpp`.
+One `[M x 2048] @ [2048 x 8192]` matrix multiply — one FFN projection of a
+1.2 B model — twenty iterations each. The NPU runs it as a single
+`NEURON_FULLY_CONNECTED` in `QUANT8_ASYMM` pinned to `mtk-mdla` (MDLA 5.5). The
+CPU runs the same shape through ggml's own `MUL_MAT`, loaded through the backend
+registry so it selects the identical `armv9.0` + KleidiAI variant the app uses.
+Sources: `tools/npu/npu_matmul_bench.cpp` and `tools/npu/cpu_matmul_bench.cpp`.
 
-| M (tokens in flight) | best | median | best latency |
-| ---: | ---: | ---: | ---: |
-| 1 — decode | 84.5 GOP/s | 63.7 GOP/s | 0.40 ms |
-| 32 | 1,956 GOP/s | 566 GOP/s | 0.55 ms |
-| 128 — prefill chunk | **3,475 GOP/s** | 2,579 GOP/s | 1.24 ms |
-| 512 | 1,980 GOP/s | 1,697 GOP/s | 8.67 ms |
+Best of twenty, in GOP/s:
 
-The CPU reference is ~307 GOP/s: 131 t/s prefill on this phone against about
-2.34 GFLOP per token for a 1.17 B model. That is a system-level figure derived
-from end-to-end prefill, not the same kernel measured on the CPU, so it counts
-attention, norms and softmax that this matmul does not. Treat it as the bar the
-whole system currently clears, not as the CPU's peak matmul rate.
+| M (tokens in flight) | CPU Q4_K | CPU Q4_0 | CPU Q8_0 | **NPU int8** | NPU advantage |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 — decode | 29.8 | 32.7 | 25.8 | **84.5** | 2.8x |
+| 32 | 166.2 | 140.7 | 150.7 | **1,956** | 11.8x |
+| 128 — prefill chunk | 182.5 | 155.9 | 182.3 | **3,475** | 19.0x |
+| 512 | 193.3 | 158.3 | 186.7 | **1,980** | 10.2x |
 
-Two things fall out, and they point opposite ways.
+By median rather than best, which is the fairer read of sustained behaviour, the
+advantage is 3.0x at M=1, 4.0x at 32, 14.4x at 128 and 8.9x at 512.
 
-**Decode is a loss.** At M=1 the NPU manages 84.5 GOP/s, below the bar. Every
-call carries roughly 0.4 ms of fixed cost, and with one token there is nothing
-to amortise it against. A backend dispatching a few hundred ops per token at
-0.4 ms each would spend more than a tenth of a second per token. The CPU
-already does 36 t/s.
+**The NPU is ahead at every width, including decode.** An earlier version of this
+document said decode was a loss for the NPU. That was an artefact of comparing
+against ~307 GOP/s derived from end-to-end prefill — a figure that folds in
+attention, norms and softmax, and which this measurement shows to be higher than
+the CPU's actual matmul rate. Measured kernel against kernel, the CPU does about
+30 GOP/s at one token and the NPU 84.5.
 
-**Prefill is a large win.** From 32 tokens upward the MDLA runs six to eleven
-times the system's current rate. Prefill is exactly where this app hurts — a
-2,000-token context costs about fifteen seconds — and it is the half of the
-workload that batches, which is why it suits the accelerator.
+The reason is visible in the bandwidth. At M=1 the NPU moves its 16.7 MB of int8
+weights in 0.40 ms, about 42 GB/s. The CPU moves 9.4 MB of Q4_K in 1.12 ms,
+about 8 GB/s — nowhere near this phone's memory limit, so at one token the CPU is
+bound by per-op overhead and dequantisation rather than by bandwidth. The NPU's
+int8 weights are nearly twice the bytes and it still wins, which is the clearest
+refutation of the argument this document previously made from the type system.
 
-This falsifies the claim, made earlier in this document from the type system
-alone, that widening weights to int8 would hand the NPU "a strictly harder
-problem than the CPU currently solves". That is true at M=1 and wrong by an
-order of magnitude at prefill widths: the MDLA has enough compute that the
-2× weight penalty does not decide the outcome.
+One hypothesis died here and is worth recording so nobody re-runs it. KleidiAI
+announces `no kernel for tensor type q4_K, not accelerated by KleidiAI (kernels
+available for Q4_0 and Q8_0)`, which suggests the app's Q4_K_M models are missing
+an acceleration that Q4_0 would get. They are not: Q4_0 is **slower** than Q4_K at
+every width tested. There is nothing to win by changing the shipped quantisation.
 
-Caveats worth keeping with the numbers. Weights are graph constants, as a real
-model's would be, so per-call time excludes streaming them — realistic for
-prefill, and generous to the NPU in the decode row it still loses. Compiling
-each shape costs 180–240 ms, though `NeuronCompilation_storeCompiledNetwork`
-exists and prefill uses a small number of chunk sizes. And this is one
-operation with no RMSNorm, no attention and no fallback boundaries.
+Caveats to carry with these numbers. Weights are graph constants on both sides,
+as a real model's are. This is one operation with no RMSNorm, no attention and no
+fallback boundaries, and a real backend pays a crossing at every op the NPU
+cannot take. Compiling each shape costs 180–240 ms, though
+`NeuronCompilation_storeCompiledNetwork` exists and prefill uses a small number
+of chunk widths.
 
 ## What is actually on the device
 
@@ -227,13 +229,15 @@ Check these rather than re-arguing:
 1. **A MediaTek backend lands upstream in ggml.** OpenVINO and Hexagon both did.
    Then this becomes a build flag beside `GGML_OPENCL`, and the answer flips
    immediately.
-0. **Prefill-only offload becomes worth building.** This is now the most
-   interesting option and it did not exist before the measurement: leave decode
-   on the CPU, where it wins, and send only the prefill matmuls to the MDLA,
-   where it is an order of magnitude ahead. It is bounded work — a partial ggml
-   backend covering `MUL_MAT` at prefill widths, int8 requantisation at load,
-   and a compiled-network cache keyed by chunk shape — and it targets the one
-   number in this app that is genuinely painful.
+0. **A matmul-only ggml backend.** The measurement makes this the interesting
+   option: cover `MUL_MAT` on the MDLA and let everything else — RMSNorm,
+   attention, the ops NeuronAdapter does not have — fall back to the CPU, with
+   int8 requantisation at load and a compiled-network cache keyed by shape. The
+   open question is not whether the NPU is fast enough. It is whether the
+   per-op crossings and the fallbacks eat a 10x kernel advantage, and that is
+   answerable with a second experiment rather than by argument: run one
+   transformer block end to end, split that way, and compare against the same
+   block on the CPU.
 2. **LiteRT-LM broadens** to a large model catalogue or accepts GGUF, *and*
    names D9400. Then a "these particular models run on the NPU" mode becomes a
    coherent feature rather than a second app.

@@ -193,12 +193,16 @@ object Qwen3Prompt {
                 character == '\n' -> append("\\n")
                 character == '\r' -> append("\\r")
                 character == '\t' -> append("\\t")
-                character < ' ' -> append("\\u").append(character.code.toString(16).padStart(4, '0'))
+                character < ' ' -> append("\\u")
+                    .append(character.code.toString(HEX).padStart(ESCAPE_DIGITS, '0'))
                 else -> append(character)
             }
         }
         append('"')
     }
+
+    private const val HEX = 16
+    private const val ESCAPE_DIGITS = 4
 
     private const val RESPONSE_OPEN = "<tool_response>"
     private const val RESPONSE_CLOSE = "</tool_response>"

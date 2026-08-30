@@ -16,8 +16,10 @@
 
 package io.github.alpharomercoma.openweights.core.hub
 
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName.GGUF_SUFFIX
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -137,6 +139,21 @@ data class HubModelDetail(
     val files: List<HubFile>,
     /** Multimodal projectors offered by this repository, smallest first. */
     val projectors: List<HubFile>,
+    /**
+     * Weights compiled ahead of time, for ExecuTorch. Empty for an ordinary GGUF repo.
+     *
+     * Almost always exactly one, and almost always called `model.pte`, which is why
+     * [ExecuTorchFileName] renames it on the way in.
+     */
+    val compiled: List<HubFile> = emptyList(),
+    /**
+     * The tokenizer this repository publishes, which a `.pte` cannot be run without.
+     *
+     * A GGUF carries its tokenizer inside it. A `.pte` does not, and says nothing about
+     * which one produced it, so a repository offering compiled weights and no tokenizer is
+     * one this app cannot install.
+     */
+    val tokenizer: HubFile? = null,
     val license: String?,
     val architecture: String?,
     val parameterCount: Long?,
@@ -166,6 +183,22 @@ data class HubModelDetail(
 
     /** True when this repository ships a vision or audio encoder. */
     val isMultimodal: Boolean get() = projectors.isNotEmpty()
+
+    /** The runtime this repository's weights need, or null when it offers neither. */
+    val runtime: HubRuntime?
+        get() = when {
+            files.isNotEmpty() -> HubRuntime.LLAMA_CPP
+            compiled.isNotEmpty() -> HubRuntime.EXECUTORCH
+            else -> null
+        }
+
+    /**
+     * True when the compiled weights here can actually be installed.
+     *
+     * A `.pte` without a tokenizer beside it is a download that ends in a model that cannot
+     * open, so the offer is withheld rather than made and then broken.
+     */
+    val isInstallableCompiled: Boolean get() = compiled.isNotEmpty() && tokenizer != null
 
     /** The projector for the file the user is most likely to take: the first listed. */
     fun defaultProjector(): HubFile? = files.firstOrNull()?.let(::pairedProjector)
@@ -219,7 +252,12 @@ class HuggingFaceClient @Inject constructor(
         limit: Int = DEFAULT_LIMIT,
     ): HubSearchPage {
         val url = apiUrl("models")
-            .addQueryParameter("apps", LLAMA_CPP)
+            .apply {
+                when (query.runtime) {
+                    HubRuntime.LLAMA_CPP -> addQueryParameter("apps", LLAMA_CPP)
+                    HubRuntime.EXECUTORCH -> addQueryParameter("filter", EXECUTORCH)
+                }
+            }
             .addQueryParameter("limit", limit.toString())
             .apply { cursor?.let { addQueryParameter("cursor", it) } }
             .addQueryParameter("sort", query.sort.parameter)
@@ -265,8 +303,9 @@ class HuggingFaceClient @Inject constructor(
             .build()
         val payload = json.decodeFromString<DetailEntry>(get(url))
 
-        val gguf = payload.siblings.orEmpty()
-            .filter { it.rfilename.endsWith(GGUF_SUFFIX, ignoreCase = true) }
+        val siblings = payload.siblings.orEmpty()
+        fun filesEnding(vararg suffixes: String) = siblings
+            .filter { sibling -> suffixes.any { sibling.rfilename.endsWith(it, true) } }
             .map { sibling ->
                 HubFile(
                     path = sibling.rfilename,
@@ -274,6 +313,19 @@ class HuggingFaceClient @Inject constructor(
                     sha256 = sibling.lfs?.sha256,
                 )
             }
+
+        // A repository is one or the other in practice, and asking for both costs nothing:
+        // the answer is already in hand, and which one is populated is what says whether
+        // this repo needs llama.cpp or ExecuTorch.
+        val compiled = filesEnding(ModelFormat.PTE.suffix).sortedBy { it.sizeBytes }
+        val tokenizer = siblings
+            .filter { ExecuTorchFileName.isRemoteTokenizer(it.rfilename) }
+            // Preference order, not alphabetical: a repository can publish both, and
+            // ExecuTorch reads the JSON form.
+            .minByOrNull { ExecuTorchFileName.REMOTE_TOKENIZERS.indexOf(it.rfilename) }
+            ?.let { HubFile(it.rfilename, it.lfs?.size ?: it.size ?: 0L, it.lfs?.sha256) }
+
+        val gguf = filesEnding(GGUF_SUFFIX)
             .sortedBy { it.sizeBytes }
             // Bounded, because everything downstream is per file: the screen builds a row
             // for each, and the inspector launches a coroutine for each to read its header
@@ -287,6 +339,8 @@ class HuggingFaceClient @Inject constructor(
             model = payload.toModel(),
             files = gguf.filterNot { it.isProjector },
             projectors = gguf.filter { it.isProjector },
+            compiled = compiled.take(MAX_FILES_PER_REPO),
+            tokenizer = tokenizer,
             license = payload.cardData?.license,
             architecture = payload.gguf?.architecture,
             parameterCount = payload.gguf?.total,
@@ -395,6 +449,15 @@ class HuggingFaceClient @Inject constructor(
 
         /** The Hub's identifier for the local app this project is built on. */
         const val LLAMA_CPP = "llama.cpp"
+
+        /**
+         * The tag ExecuTorch repositories carry, used through `filter` rather than `apps`.
+         *
+         * The Hub computes `apps` for a handful of tools and ExecuTorch is not one of them,
+         * so the tag is what there is. `library=executorch` is not a substitute: the Hub
+         * accepts it and returns ordinary results, so it fails by looking like it worked.
+         */
+        const val EXECUTORCH = "executorch"
     }
 }
 
@@ -504,6 +567,24 @@ val RECOMMENDED = listOf(
  */
 data class Publisher(val avatarUrl: String? = null, val isOrganisation: Boolean = false)
 
+/**
+ * Which runtime a search is looking for models for.
+ *
+ * The Hub cannot answer "models this phone can run" — it answers "models packaged for this
+ * tool", and the two runtimes are packaged, tagged and searched differently. A GGUF repo is
+ * found through the `apps` filter the Hub computes for llama.cpp; an ExecuTorch repo is
+ * found through its `executorch` tag. Measured against the live Hub, `library=executorch`
+ * is accepted and silently ignored, returning ordinary GGUF repositories, which is exactly
+ * the kind of filter that looks like it works.
+ */
+enum class HubRuntime(val format: ModelFormat) {
+    /** Anything llama.cpp can read, which is most of the Hub. */
+    LLAMA_CPP(ModelFormat.GGUF),
+
+    /** Compiled ahead of time. A much smaller, curated corner of the Hub. */
+    EXECUTORCH(ModelFormat.PTE),
+}
+
 /** One page of Hub results, and the way back for the next one. */
 data class HubSearchPage(
     val models: List<HubModel>,
@@ -516,6 +597,14 @@ data class HubSearchPage(
 /** Everything the Discover screen can ask the Hub for. */
 data class HubQuery(
     val text: String = "",
+    /**
+     * Which runtime to find models for.
+     *
+     * Not a filter among the others and deliberately not counted in [activeCount]: it
+     * changes which corner of the Hub is being searched rather than narrowing a result set,
+     * and it is only ever offered in a build that has both runtimes to choose between.
+     */
+    val runtime: HubRuntime = HubRuntime.LLAMA_CPP,
     val sort: HubSort = HubSort.TRENDING,
     /** The task the model is published for. Null means any. */
     val task: HubTask? = null,

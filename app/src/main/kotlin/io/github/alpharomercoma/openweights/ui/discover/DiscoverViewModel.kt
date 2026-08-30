@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.ui.discover
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
@@ -29,10 +30,12 @@ import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
 import io.github.alpharomercoma.openweights.core.device.ThroughputCalibration
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSearchPage
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
@@ -170,6 +173,25 @@ class DiscoverViewModel @Inject constructor(
     }
 
     fun onSortChange(sort: HubSort) = onQueryChange(_uiState.value.query.copy(sort = sort))
+
+    /**
+     * Switches which runtime's models are being browsed.
+     *
+     * Clears the results rather than filtering them, because the two searches reach
+     * different corners of the Hub and blending a stale page of one into the other would
+     * show models the current runtime cannot open. Only reachable in a build carrying both
+     * runtimes; see [ExecuTorchSupport].
+     */
+    fun onRuntimeChange(runtime: HubRuntime) {
+        if (!ExecuTorchSupport.AVAILABLE || _uiState.value.query.runtime == runtime) return
+        onQueryChange(
+            _uiState.value.query.copy(
+                runtime = runtime,
+                // The shortlist is GGUF repositories by name, so it means nothing here.
+                recommendedOnly = runtime == HubRuntime.LLAMA_CPP,
+            ),
+        )
+    }
 
     /**
      * Narrows the search to models this phone can hold, or widens it again.
@@ -382,6 +404,16 @@ class DiscoverViewModel @Inject constructor(
             runCatching { client.detail(repoId) }
                 .onSuccess { detail ->
                     val downloaded = modelStore.availableModels().map { it.name }.toSet()
+
+                    // A repository offers one or the other. Compiled weights are listed
+                    // only when the tokenizer is there too, because a `.pte` without one
+                    // downloads fine and then cannot open, and only in a build that has a
+                    // runtime for them.
+                    val compiled = detail.compiled
+                        .takeIf { ExecuTorchSupport.AVAILABLE && detail.isInstallableCompiled }
+                        .orEmpty()
+                    val installedName = ExecuTorchFileName.modelNameFor(repoId)
+
                     _uiState.update { state ->
                         state.copy(
                             detail = detail,
@@ -390,10 +422,21 @@ class DiscoverViewModel @Inject constructor(
                                     file = file,
                                     isDownloaded = file.path.substringAfterLast('/') in downloaded,
                                 )
+                            } + compiled.map { file ->
+                                InspectedFile(
+                                    file = file,
+                                    // Named after the repository once installed, so that is
+                                    // what says whether it is already here.
+                                    isDownloaded = installedName in downloaded,
+                                )
                             },
                         )
                     }
                     coroutineScope {
+                        // GGUF only. Inspection reads a header over the network with range
+                        // requests; a `.pte` has no header to read, and asking would spend
+                        // requests to learn nothing. Its row shows what the Hub said and
+                        // no fit estimate, which is honest rather than blank-because-broken.
                         detail.files.forEach { file -> launch { inspect(repoId, file) } }
                     }
                 }

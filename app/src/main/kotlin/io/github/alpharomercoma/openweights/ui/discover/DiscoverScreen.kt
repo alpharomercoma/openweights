@@ -21,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,8 +76,10 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.formatBy
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -91,6 +95,7 @@ fun DiscoverScreen(
     onSearch: () -> Unit,
     onLoadMore: () -> Unit = {},
     onSortChange: (HubSort) -> Unit,
+    onRuntimeChange: (HubRuntime) -> Unit,
     onFiltersChange: (HubQuery) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
     onOfficialOnlyChange: (Boolean) -> Unit,
@@ -200,6 +205,10 @@ fun DiscoverScreen(
                 ),
             )
 
+            if (ExecuTorchSupport.AVAILABLE) {
+                RuntimeSwitch(selected = state.query.runtime, onSelect = onRuntimeChange)
+            }
+
             DiscoverFilterBar(
                 query = state.query,
                 parameterCeilingBillions = state.parameterCeilingBillions,
@@ -295,6 +304,46 @@ fun DiscoverScreen(
 }
 
 private const val LOAD_MORE_THRESHOLD = 4
+
+/**
+ * Which runtime's models the Hub is being searched for.
+ *
+ * Above the filter chips and outside their scrolling row, because it is not a filter. It
+ * changes the subject of the search rather than narrowing its results, and it was tried
+ * inside that row first: two more chips at the head of it pushed the sort and Official
+ * chips off the edge of the screen, which the screen tests caught. A mode switch that
+ * hides the controls beside it is in the wrong place.
+ *
+ * Rendered only where there is a choice to make. A build without the ExecuTorch runtime
+ * shows nothing here rather than a control with one option.
+ */
+@Composable
+private fun RuntimeSwitch(selected: HubRuntime, onSelect: (HubRuntime) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HubRuntime.entries.forEach { runtime ->
+            FilterChip(
+                selected = runtime == selected,
+                onClick = { onSelect(runtime) },
+                label = {
+                    Text(
+                        text = stringResource(
+                            when (runtime) {
+                                HubRuntime.LLAMA_CPP -> R.string.runtime_gguf
+                                HubRuntime.EXECUTORCH -> R.string.runtime_executorch
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+            )
+        }
+    }
+}
 
 @Composable
 private fun LoadMoreEffect(
@@ -494,6 +543,7 @@ private fun DiscoverScreenPreview() {
             onPhoneSizedChange = {},
             onOfficialOnlyChange = {},
             onRecommendedOnlyChange = {},
+            onRuntimeChange = {},
             onClearFilters = {},
             onOpenModel = {},
             onCloseModel = {},

@@ -33,6 +33,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.ui.archive.ArchiveViewModel
 import io.github.alpharomercoma.openweights.ui.archive.ArchivedScreen
@@ -284,6 +285,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onSearch = { viewModel.search() },
                 onLoadMore = viewModel::loadMore,
                 onSortChange = viewModel::onSortChange,
+                onRuntimeChange = viewModel::onRuntimeChange,
                 onFiltersChange = viewModel::onQueryChange,
                 onPhoneSizedChange = viewModel::onPhoneSizedChange,
                 onOfficialOnlyChange = viewModel::onOfficialOnlyChange,
@@ -300,12 +302,19 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                     .associate { it.key to it.fraction },
                 onDownload = { repoId, path ->
                     state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
-                        modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)
-                        // The projector is not optional for a multimodal model: without
-                        // it the weights load but every attachment is refused, which
-                        // reads as a broken app rather than a missing file.
-                        state.detail?.pairedProjector(file)?.let { projector ->
-                            modelsViewModel.downloadProjector(repoId, projector, file.fileName)
+                        val tokenizer = state.detail?.tokenizer
+                        if (ModelFormat.of(file.fileName) == ModelFormat.PTE && tokenizer != null) {
+                            // Compiled weights are an install of two files, renamed on the
+                            // way in. Neither is usable alone.
+                            modelsViewModel.downloadCompiled(repoId, file, tokenizer)
+                        } else {
+                            modelsViewModel.download(repoId, path, file.sizeBytes, file.sha256)
+                            // The projector is not optional for a multimodal model: without
+                            // it the weights load but every attachment is refused, which
+                            // reads as a broken app rather than a missing file.
+                            state.detail?.pairedProjector(file)?.let { projector ->
+                                modelsViewModel.downloadProjector(repoId, projector, file.fileName)
+                            }
                         }
                         // To the installed list, which is where the download it has just
                         // started shows its progress.

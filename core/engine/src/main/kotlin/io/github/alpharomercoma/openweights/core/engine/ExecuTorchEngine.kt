@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.engine
 
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.PromptTemplate
 import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
@@ -193,7 +194,8 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
      * files around: `Qwen3-1.7B.pte` is answered by `Qwen3-1.7B.tokenizer.json`.
      */
     private fun tokenizerFor(model: File): File? =
-        File(model.parentFile, model.nameWithoutExtension + TOKENIZER_SUFFIX).takeIf { it.isFile }
+        File(model.parentFile, ExecuTorchFileName.tokenizerNameFor(model.name))
+            .takeIf { it.isFile }
 
     private fun String.reasoning(): String {
         val open = indexOf(THINK_OPEN)
@@ -211,7 +213,6 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
     private companion object {
         const val THINK_OPEN = "<think>"
         const val THINK_CLOSE = "</think>"
-        const val TOKENIZER_SUFFIX = ".tokenizer.json"
 
         /**
          * ExecuTorch fixes temperature when the runner is built rather than per call, so

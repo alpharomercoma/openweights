@@ -56,21 +56,53 @@ So there is no shortcut of dlopen'ing the vendor runtime. The supported route is
 to bundle MediaTek's own adapter libraries in the APK, which is what ExecuTorch's
 backend does. Getting them is easier than expected — see below.
 
-## Why there is no ggml backend, and why writing one is not on the table
+## Why there is no ggml backend — corrected
 
-ggml dispatches operations one at a time against a dynamic graph. MediaTek's
-published interface is the opposite shape: `ncc-tflite` (or `mtk_neuron`)
-compiles a **whole** graph ahead of time into a proprietary `.dla` — a Deep
-Learning Archive, a statically compiled binary for the MDLA and VPU — which
-`NeuronRuntime` then executes.
+An earlier version of this document said MediaTek publishes nothing below
+whole-graph compilation, so the API a ggml backend would need "is not public".
+**That was wrong, and it was never checked.** `NeuronAdapter.h` ships in the
+freely-downloadable SDK and is an NNAPI-shaped, op-level graph API:
 
-The contrast with Qualcomm is the whole argument. llama.cpp has a Hexagon
-backend because the Hexagon SDK lets you write and load **custom kernels** onto
-the DSP; the repository carries its own `ggml/src/ggml-hexagon/htp/` sources and
-a `libggml-htp.inf`. MediaTek publishes no equivalent. So a ggml MediaTek
-backend is not hard work that nobody has done — the API it would need is not
-public. Every shipped NPU backend for llama.cpp (Hexagon, CANN, OpenVINO)
-exists because its vendor exposed something below whole-graph compilation.
+```c
+int NeuronModel_addOperand(NeuronModel* model, const NeuronOperandType* type);
+int NeuronModel_addOperation(NeuronModel*, NeuronOperationType, uint32_t inputCount, ...);
+int NeuronModel_addOperationExtension(...);
+int NeuronModel_getSupportedOperations(...);
+```
+
+with 174 operation constants including `NEURON_BATCH_MATMUL`,
+`NEURON_FULLY_CONNECTED`, `NEURON_SOFTMAX`, `NEURON_ADD`, `NEURON_MUL`,
+`NEURON_GATHER` and `NEURON_QUANTIZE`. A graph can be built programmatically and
+then compiled. So a ggml backend is *architecturally* conceivable, in the way
+the Qualcomm QNN, Rockchip, CANN and OpenVINO backends are.
+
+The decision does not change, but the reasons have to be the true ones. Reading
+the same header for what it cannot represent:
+
+**There are no 4-bit tensors.** The complete list of tensor types is `BOOL8`,
+`FLOAT16`, `FLOAT32`, `INT32`, `QUANT16_ASYMM`, `QUANT16_SYMM`, `QUANT8_ASYMM`,
+`QUANT8_ASYMM_PER_CHANNEL`, `QUANT8_ASYMM_SIGNED`, `QUANT8_SYMM` and
+`QUANT8_SYMM_PER_CHANNEL`. Nothing narrower than eight bits exists. Every model
+this app ships is Q4_K_M or Q4_0, so reaching the NPU means widening the weights
+to int8 or fp16 first — two to four times the memory traffic, in a decode step
+whose cost is dominated by streaming weights. The accelerator would be handed a
+strictly harder problem than the CPU currently solves.
+
+**There is no RMSNorm.** The only normalisations are
+`INSTANCE_NORMALIZATION`, `L2_NORMALIZATION` and
+`LOCAL_RESPONSE_NORMALIZATION` — the convolutional-vision set. Every model in
+the catalogue uses RMSNorm, so each one would have to be composed from
+primitives or fall back to the CPU, and every fallback is a round trip across
+the device boundary, twice per layer.
+
+**Compilation is per shape.** `NeuronCompilation_finish` invokes the AOT
+compiler. A ggml graph changes shape on every token as the KV cache grows, so a
+backend needs shape bucketing and a compiled-network cache to avoid recompiling
+constantly. This is solvable and it is real work.
+
+So the honest summary is: not "impossible", but "the API is a poor fit for
+4-bit LLM inference, and the two mismatches that matter are in the type system
+rather than in the effort".
 
 ## The two real paths, and what each would cost
 

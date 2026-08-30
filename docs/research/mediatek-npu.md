@@ -5,12 +5,23 @@ MediaTek MT6991 (Dimensity 9400), Android 16 / API 36.**
 
 ## Decision
 
-**Not yet — but the hardware case is strong, and every earlier reason given in
-this document for doubting it turned out to be wrong when measured.** The MDLA
-beats the CPU at this app's central kernel by three times at decode width and
-ten to nineteen times at prefill widths. What stands in the way is engineering
-and product fit: a partial ggml backend, ops the API does not have, and a model
-catalogue the user chooses. The triggers are at the end.
+**No.** The hardware margin is far smaller than this document reported for most
+of its life. Measured against a CPU whose weights are actually repacked for
+KleidiAI — which is what llama.cpp does and what the earlier numbers here failed
+to do — the MDLA is **level with the CPU at decode width and worth about 1.3× to
+2.1× at prefill widths**, not the three-to-nineteen times claimed before that
+error was found.
+
+Against a margin that size stands the same integration cost as ever: a partial
+ggml backend, ops the API does not have (there is no RMSNorm), a crossing at
+every operation the NPU cannot take, weights requantised from int4 to int8, and
+a model catalogue the user chooses rather than the developer.
+
+The exercise did produce a cheaper win with no NPU in it. **Q4_K has no KleidiAI
+kernel and Q4_0 does**, so changing which file the app downloads is worth 1.26×
+end to end — more than this accelerator offers, for none of the work. See
+[`npu-prefill-multiturn.md`](npu-prefill-multiturn.md). The triggers that would
+reverse the NPU decision are at the end.
 
 ## Measured: NPU against CPU, same kernel, same phone
 

@@ -14,53 +14,40 @@ catalogue the user chooses. The triggers are at the end.
 
 ## Measured: NPU against CPU, same kernel, same phone
 
-One `[M x 2048] @ [2048 x 8192]` matrix multiply — one FFN projection of a
-1.2 B model — twenty iterations each. The NPU runs it as a single
-`NEURON_FULLY_CONNECTED` in `QUANT8_ASYMM` pinned to `mtk-mdla` (MDLA 5.5). The
-CPU runs the same shape through ggml's own `MUL_MAT`, loaded through the backend
-registry so it selects the identical `armv9.0` + KleidiAI variant the app uses.
-Sources: `tools/npu/npu_matmul_bench.cpp` and `tools/npu/cpu_matmul_bench.cpp`.
+**These numbers were wrong when first published and are corrected here.** The CPU
+side allocated weights with `ggml_backend_alloc_ctx_tensors`, on the default
+buffer. KleidiAI registers its own buffer type whose `set_tensor` **repacks**
+weights into the layout its kernels need, and llama.cpp allocates there through
+`ggml_backend_dev_get_extra_bufts`. Skipping that measured the generic CPU path,
+and the NPU's advantage was reported as up to 19× when it is nearer 2×.
 
-Best of twenty, in GOP/s:
+One `NEURON_FULLY_CONNECTED` of `[M x 2048] @ [2048 x 8192]` in `QUANT8_ASYMM`
+pinned to `mtk-mdla`, against the same multiply through ggml's `MUL_MAT`.
+**Median** of twenty on both sides — the earlier version compared the NPU's best
+against the CPU's best, which is noisier and flattered the accelerator.
 
-| M (tokens in flight) | CPU Q4_K | CPU Q4_0 | CPU Q8_0 | **NPU int8** | NPU advantage |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 — decode | 29.8 | 32.7 | 25.8 | 84.5 (an outlier — see below) | — |
-| 32 | 166.2 | 140.7 | 150.7 | **1,956** | 11.8x |
-| 128 — prefill chunk | 182.5 | 155.9 | 182.3 | **3,475** | 19.0x |
-| 512 | 193.3 | 158.3 | 186.7 | **1,980** | 10.2x |
+| M (tokens) | CPU Q4_K | CPU Q4_0 | CPU Q8_0 | CPU F16 | CPU BF16 | NPU int8 | **NPU × vs best CPU** |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 — decode | 17.0 | 19.3 | **20.5** | 14.0 | 6.3 | ~21 | **1.02** |
+| 32 | 143.3 | 318.6 | **448.9** | 97.8 | 10.7 | 566 | **1.26** |
+| 128 — prefill chunk | 181.6 | 493.5 | **833.4** | 120.2 | 10.8 | 1,776 | **2.13** |
+| 512 | 188.8 | 547.9 | **1,101.4** | 125.0 | 10.8 | 1,566 | **1.42** |
 
-By median rather than best, which is the fairer read of sustained behaviour, the
-advantage is 4.0x at 32, 14.4x at 128 and 8.9x at 512. The M=1 row does not
-survive repetition and is corrected in the section above: five consecutive runs
-put the NPU level with the CPU at decode width, not ahead of it.
+*(GOP/s, higher is better. `Q4_0` and `Q8_0` sit on the KleidiAI buffer; `Q4_K`,
+`F16` and `BF16` cannot and stay on the default one — which is the finding.)*
 
-**The NPU is ahead at every width, including decode.** An earlier version of this
-document said decode was a loss for the NPU. That was an artefact of comparing
-against ~307 GOP/s derived from end-to-end prefill — a figure that folds in
-attention, norms and softmax, and which this measurement shows to be higher than
-the CPU's actual matmul rate. Measured kernel against kernel, the CPU does about
-30 GOP/s at one token and the NPU 84.5.
+**At decode width the two are level. At prefill widths the NPU is worth about
+1.3× to 2.1×.** Not the order of magnitude this document previously claimed.
 
-The reason is visible in the bandwidth. At M=1 the NPU moves its 16.7 MB of int8
-weights in 0.40 ms, about 42 GB/s. The CPU moves 9.4 MB of Q4_K in 1.12 ms,
-about 8 GB/s — nowhere near this phone's memory limit, so at one token the CPU is
-bound by per-op overhead and dequantisation rather than by bandwidth. The NPU's
-int8 weights are nearly twice the bytes and it still wins, which is the clearest
-refutation of the argument this document previously made from the type system.
+The CPU ordering is the more useful result: **Q8_0 > Q4_0 > Q4_K**, with Q8_0
+reaching 1,101 GOP/s at width 512 against Q4_K's 189. Q4_K has no KleidiAI
+kernel, so most of what looked like an NPU win was really the CPU being measured
+on its slow path.
 
-One hypothesis died here and is worth recording so nobody re-runs it. KleidiAI
-announces `no kernel for tensor type q4_K, not accelerated by KleidiAI (kernels
-available for Q4_0 and Q8_0)`, which suggests the app's Q4_K_M models are missing
-an acceleration that Q4_0 would get. They are not: Q4_0 is **slower** than Q4_K at
-every width tested. There is nothing to win by changing the shipped quantisation.
-
-Caveats to carry with these numbers. Weights are graph constants on both sides,
-as a real model's are. This is one operation with no RMSNorm, no attention and no
-fallback boundaries, and a real backend pays a crossing at every op the NPU
-cannot take. Compiling each shape costs 180–240 ms, though
-`NeuronCompilation_storeCompiledNetwork` exists and prefill uses a small number
-of chunk widths.
+Caveats that remain. Weights are graph constants on both sides. This is one
+operation with no RMSNorm, no attention and no fallback boundaries, and a real
+backend pays a crossing at every op the NPU cannot take. Compiling each shape
+costs 180–240 ms.
 
 ## Would an 8-bit or unquantised model unlock it?
 
@@ -73,10 +60,13 @@ Median of twenty, GOP/s, same `[M x 2048] @ [2048 x 8192]`:
 
 | M | CPU Q4_K | CPU Q8_0 | CPU F16 | NPU int8 | NPU f16 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 — decode | 18.9 | 15.9 | 14.8 | ~21 | **will not run** |
-| 32 | 138.7 | 129.8 | 100.5 | — | — |
-| 128 — prefill | 181.8 | 173.9 | 121.4 | 1,776 | 998 |
-| 512 | 191.4 | 185.2 | 125.3 | 1,566 | 1,355 |
+| 1 — decode | 17.0 | 20.5 | 14.0 | ~21 | **will not run** |
+| 32 | 143.3 | 448.9 | 97.8 | 566 | — |
+| 128 — prefill | 181.6 | 833.4 | 120.2 | 1,776 | 998 |
+| 512 | 188.8 | 1,101.4 | 125.0 | 1,566 | 1,355 |
+
+*(CPU Q8_0 corrected onto the KleidiAI buffer; the earlier figures here were the
+unaccelerated path.)*
 
 **Eight bits is the NPU's format and it is worth about ten times the CPU at
 prefill widths.** No conversion step, no accuracy question beyond the one the

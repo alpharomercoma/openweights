@@ -21,7 +21,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,9 +38,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +67,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -207,10 +205,6 @@ fun DiscoverScreen(
                 ),
             )
 
-            if (ExecuTorchSupport.AVAILABLE) {
-                RuntimeBoxes(selected = state.query.runtimes, onToggle = onRuntimeToggled)
-            }
-
             DiscoverFilterBar(
                 query = state.query,
                 parameterCeilingBillions = state.parameterCeilingBillions,
@@ -219,6 +213,8 @@ fun DiscoverScreen(
                 onOfficialOnlyChange = onOfficialOnlyChange,
                 onRecommendedOnlyChange = onRecommendedOnlyChange,
                 onOpenFilters = { filtersOpen = true },
+                onRuntimeToggled = onRuntimeToggled,
+                showRuntime = ExecuTorchSupport.AVAILABLE,
             )
 
             if (state.isSearching) {
@@ -306,59 +302,6 @@ fun DiscoverScreen(
 }
 
 private const val LOAD_MORE_THRESHOLD = 4
-
-/**
- * Which runtimes the Hub is being searched for. Boxes, not a choice.
- *
- * Both are ticked to begin with: a build carrying two runtimes can run models for either,
- * and making the user pick would hide half the Hub behind a control they have not found
- * yet. They sit above the filter chips and outside their scrolling row, because this is not
- * a filter — it changes the subject of the search rather than narrowing its results. It was
- * tried inside that row first and two more chips at its head pushed the sort and Official
- * chips off the screen, which the screen tests caught.
- *
- * Rendered only where there is a choice to make: a build without the ExecuTorch runtime
- * shows nothing here rather than a control with one option.
- */
-@Composable
-private fun RuntimeBoxes(selected: Set<HubRuntime>, onToggle: (HubRuntime, Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        HubRuntime.entries.forEach { runtime ->
-            val on = runtime in selected
-            FilterChip(
-                selected = on,
-                onClick = { onToggle(runtime, !on) },
-                leadingIcon = if (on) {
-                    {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                } else {
-                    null
-                },
-                label = {
-                    Text(
-                        text = stringResource(
-                            when (runtime) {
-                                HubRuntime.LLAMA_CPP -> R.string.runtime_gguf
-                                HubRuntime.EXECUTORCH -> R.string.runtime_executorch
-                            },
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                },
-            )
-        }
-    }
-}
 
 @Composable
 private fun LoadMoreEffect(
@@ -480,20 +423,28 @@ private fun ModelDetail(
             }
         }
 
-        item {
-            Column {
-                // The slider is the point: KV cache scales with context, so the same file
-                // can be comfortable at 4k and impossible at 64k. Changing it re-runs the
-                // maths locally, with no further network use.
-                Caption(
-                    stringResource(R.string.context_length_tokens, state.contextLength),
-                )
-                StepSlider(
-                    value = state.contextLength.toFloat(),
-                    onValueChange = { onContextLengthChange(it.roundToInt()) },
-                    valueRange = CONTEXT_RANGE,
-                    steps = ModelLoadParams.CONTEXT_STEPS,
-                )
+        // The slider only moves the maths for GGUF files: their KV cache scales with
+        // context, so the same file can be comfortable at 4k and impossible at 64k. A
+        // compiled graph's window was fixed at export, so on a repository with nothing but
+        // compiled files the slider would be a control that changes nothing — say the fact
+        // instead of offering the dead control.
+        if (state.files.any { ModelFormat.of(it.file.fileName) == ModelFormat.GGUF }) {
+            item {
+                Column {
+                    Caption(
+                        stringResource(R.string.context_length_tokens, state.contextLength),
+                    )
+                    StepSlider(
+                        value = state.contextLength.toFloat(),
+                        onValueChange = { onContextLengthChange(it.roundToInt()) },
+                        valueRange = CONTEXT_RANGE,
+                        steps = ModelLoadParams.CONTEXT_STEPS,
+                    )
+                }
+            }
+        } else if (state.files.isNotEmpty()) {
+            item {
+                Caption(stringResource(R.string.context_fixed_at_export))
             }
         }
 

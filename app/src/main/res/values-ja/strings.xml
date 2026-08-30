@@ -217,7 +217,7 @@
     <string name="about_network_detail">ネットワークに出るのは、ウェブ検索とモデルのダウンロードだけです。どちらもツールで切れます。</string>
     <string name="access_token_detail">制限付きまたは非公開のモデル専用です。この端末のハードウェアが持つ鍵で暗号化し、huggingface.co にだけ送ります。</string>
     <string name="cpu_only_build">このビルドは CPU で動きます。計測した端末では、そちらのほうが結局は速い経路です。</string>
-    <string name="language_models_heading">言語モデル (GGUF)</string>
+    <string name="language_models_heading">言語モデル</string>
     <string name="model_badge_projector_missing">ビジョンモデル · 画像入力を有効にするためプロジェクター(mmproj)をダウンロードしてください</string>
     <string name="slash_command_hint">メッセージを入力、または / でコマンド</string>
     <string name="conversation_actions_named">%1$s の操作</string>
@@ -238,6 +238,8 @@
     <string name="search_archived">アーカイブを検索</string>
     <string name="nothing_archived">アーカイブは空です。チャットをアーカイブすると、一覧から外れますが残ります。</string>
     <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
+    <string name="runtime">ランタイム</string>
+    <string name="context_fixed_at_export">コンテキストウィンドウはこのモデルのエクスポート時に固定されています</string>
     <string name="compiled_runs_on_cpu">CPU 向けにコンパイル済み</string>
     <string name="compiled_runs_on_gpu">GPU 向けにコンパイル済み</string>
     <string name="compiled_runs_on_npu">NPU 向けにコンパイル済み</string>

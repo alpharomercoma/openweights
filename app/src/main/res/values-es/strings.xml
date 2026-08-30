@@ -235,7 +235,7 @@
     <string name="about_network_detail">Buscar en la web y descargar un modelo son las partes que salen a la red. Ambas puedes desactivarlas en Herramientas.</string>
     <string name="access_token_detail">Solo para modelos restringidos o privados. Cifrado con una clave guardada en el hardware de este teléfono, y enviado a huggingface.co y a ningún otro sitio.</string>
     <string name="cpu_only_build">Esta versión funciona en la CPU. En los teléfonos que hemos medido, esa es la vía más rápida de todos modos.</string>
-    <string name="language_models_heading">Modelos de lenguaje (GGUF)</string>
+    <string name="language_models_heading">Modelos de lenguaje</string>
     <string name="model_badge_projector_missing">Modelo de visión · descargue el proyector (mmproj) para habilitar entrada de imagen</string>
     <string name="slash_command_hint">Escribe un mensaje, o / para comandos</string>
     <string name="conversation_actions_named">Más para %1$s</string>
@@ -256,6 +256,8 @@
     <string name="search_archived">Buscar en archivados</string>
     <string name="nothing_archived">No hay nada archivado. Archivar un chat lo saca de la lista y lo conserva.</string>
     <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
+    <string name="runtime">Runtime</string>
+    <string name="context_fixed_at_export">La ventana de contexto quedó fijada al exportar este modelo</string>
     <string name="compiled_runs_on_cpu">Compilado para CPU</string>
     <string name="compiled_runs_on_gpu">Compilado para GPU</string>
     <string name="compiled_runs_on_npu">Compilado para NPU</string>

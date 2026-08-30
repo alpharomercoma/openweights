@@ -221,7 +221,7 @@
     <string name="about_network_detail">Ang paghahanap sa web at ang pag-download ng modelo ang mga bahaging umaabot sa network. Parehong puwede mong patayin sa Mga tool.</string>
     <string name="access_token_detail">Para lang sa mga gated o pribadong modelo. Naka-encrypt gamit ang susing nasa hardware ng teleponong ito, at ipinapadala sa huggingface.co at wala nang iba.</string>
     <string name="cpu_only_build">Sa CPU tumatakbo ang build na ito. Sa mga teleponong nasukat namin, iyon din naman ang mas mabilis na daan.</string>
-    <string name="language_models_heading">Mga Modelo ng Wika (GGUF)</string>
+    <string name="language_models_heading">Mga Modelo ng Wika</string>
     <string name="model_badge_projector_missing">Vision model · i-download ang projector (mmproj) para paganahin ang image input</string>
     <string name="slash_command_hint">Mag-mensahe, o i-type / para sa mga utos</string>
     <string name="conversation_actions_named">Iba pa para sa %1$s</string>
@@ -242,6 +242,8 @@
     <string name="search_archived">Maghanap sa archive</string>
     <string name="nothing_archived">Walang naka-archive. Kapag na-archive ang chat, aalis ito sa listahan pero mananatili.</string>
     <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
+    <string name="runtime">Runtime</string>
+    <string name="context_fixed_at_export">Naitakda ang context window noong i-export ang modelong ito</string>
     <string name="compiled_runs_on_cpu">Naka-compile para sa CPU</string>
     <string name="compiled_runs_on_gpu">Naka-compile para sa GPU</string>
     <string name="compiled_runs_on_npu">Naka-compile para sa NPU</string>

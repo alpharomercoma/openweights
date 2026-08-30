@@ -223,7 +223,7 @@
     <string name="about_network_detail">البحث في الويب وتنزيل نموذج هما الجزءان اللذان يصلان إلى الشبكة. ويمكنك إيقاف كليهما من الأدوات.</string>
     <string name="access_token_detail">للنماذج المقيّدة أو الخاصة فقط. مشفَّر بمفتاح محفوظ داخل عتاد هذا الهاتف، ويُرسل إلى huggingface.co ولا شيء غيره.</string>
     <string name="cpu_only_build">هذه النسخة تعمل على المعالج. على الهواتف التي قسناها، هذا هو المسار الأسرع على أي حال.</string>
-    <string name="language_models_heading">نماذج اللغة (GGUF)</string>
+    <string name="language_models_heading">نماذج اللغة</string>
     <string name="model_badge_projector_missing">نموذج بصري · نزّل المقارن (mmproj) لتفعيل إدخال الصور</string>
     <string name="slash_command_hint">اكتب رسالة، أو / للأوامر</string>
     <string name="conversation_actions_named">المزيد لـ %1$s</string>
@@ -244,6 +244,8 @@
     <string name="search_archived">ابحث في المؤرشفة</string>
     <string name="nothing_archived">لا يوجد شيء مؤرشف. أرشفة محادثة تُخرجها من القائمة مع الاحتفاظ بها.</string>
     <string name="no_archived_match">لا توجد محادثة مؤرشفة تذكر ذلك.</string>
+    <string name="runtime">بيئة التشغيل</string>
+    <string name="context_fixed_at_export">نافذة السياق ثُبِّتت عند تصدير هذا النموذج</string>
     <string name="compiled_runs_on_cpu">مُجمَّع لوحدة CPU</string>
     <string name="compiled_runs_on_gpu">مُجمَّع لوحدة GPU</string>
     <string name="compiled_runs_on_npu">مُجمَّع لوحدة NPU</string>

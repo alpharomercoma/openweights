@@ -259,7 +259,7 @@
     <string name="about_network_detail">Searching the web and downloading a model are the parts that reach the network. Both are yours to switch off in Tools.</string>
     <string name="access_token_detail">Only for gated or private models. Encrypted with a key held in this phone\'s hardware, and sent to huggingface.co and nowhere else.</string>
     <string name="cpu_only_build">This build runs on the CPU. On the phones we have measured, that is the faster path anyway.</string>
-    <string name="language_models_heading">Language Models (GGUF)</string>
+    <string name="language_models_heading">Language Models</string>
     <string name="model_badge_projector_missing">Vision model · download projector (mmproj) to enable image input</string>
     <string name="slash_command_hint">Message, or type / for commands</string>
     <!-- The drawer's per-conversation overflow: pin, rename, archive, delete. -->
@@ -283,10 +283,12 @@
     <string name="no_archived_match">No archived chat mentions that.</string>
 
     <!-- Runtime chips on Discover. Format names, so the same in every language. -->
+    <string name="runtime">Runtime</string>
     <string name="runtime_gguf" translatable="false">GGUF</string>
     <string name="runtime_executorch" translatable="false">ExecuTorch</string>
 
     <!-- Which silicon a compiled model was exported for. Decided at export, not a setting. -->
+    <string name="context_fixed_at_export">Context window fixed when this model was exported</string>
     <string name="compiled_runs_on_cpu">Compiled for CPU</string>
     <string name="compiled_runs_on_gpu">Compiled for GPU</string>
     <string name="compiled_runs_on_npu">Compiled for NPU</string>

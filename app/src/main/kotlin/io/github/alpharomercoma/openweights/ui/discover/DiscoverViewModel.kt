@@ -186,7 +186,9 @@ class DiscoverViewModel @Inject constructor(
      */
     fun onRuntimeToggled(runtime: HubRuntime, enabled: Boolean) {
         if (!ExecuTorchSupport.AVAILABLE) return
-        val current = _uiState.value.query.runtimes
+        // An empty set means "all of them", so the boxes render as all ticked — start from
+        // that reading, or unticking one from the empty state would be a silent no-op.
+        val current = _uiState.value.query.runtimes.ifEmpty { HubRuntime.entries.toSet() }
         val next = if (enabled) current + runtime else current - runtime
         if (next == current) return
         onQueryChange(

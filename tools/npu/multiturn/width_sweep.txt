@@ -1,0 +1,180 @@
+RESULT npu int8 M=16 K=2048 N=8192 best_ms=0.7385 median_ms=1.2852 best_gops=726.9 median_gops=417.7 compile_ms=230.3
+RESULT npu f16 M=16 K=2048 N=8192 best_ms=1.3416 median_ms=1.8838 best_gops=400.2 median_gops=285.0 compile_ms=114.7
+RESULT cpu Q8_0 M=16 K=2048 N=8192 best_ms=3.8884 median_ms=5.0535 best_gops=138.1 median_gops=106.2
+RESULT cpu F16 M=16 K=2048 N=8192 best_ms=5.8002 median_ms=6.4865 best_gops=92.6 median_gops=82.8
+RESULT cpu BF16 M=16 K=2048 N=8192 best_ms=52.7542 median_ms=53.5865 best_gops=10.2 median_gops=10.0
+RESULT cpu Q4_K M=16 K=2048 N=8192 best_ms=3.6502 median_ms=4.3440 best_gops=147.1 median_gops=123.6
+RESULT npu int8 M=16 K=8192 N=2048 best_ms=1.0369 median_ms=2.0385 best_gops=517.8 median_gops=263.4 compile_ms=177.0
+RESULT npu f16 M=16 K=8192 N=2048 best_ms=4.5059 median_ms=5.9542 best_gops=119.1 median_gops=90.2 compile_ms=120.6
+RESULT cpu Q8_0 M=16 K=8192 N=2048 best_ms=4.5728 median_ms=5.2212 best_gops=117.4 median_gops=102.8
+RESULT cpu F16 M=16 K=8192 N=2048 best_ms=5.8376 median_ms=6.5142 best_gops=92.0 median_gops=82.4
+RESULT cpu BF16 M=16 K=8192 N=2048 best_ms=54.2541 median_ms=55.4153 best_gops=9.9 median_gops=9.7
+RESULT cpu Q4_K M=16 K=8192 N=2048 best_ms=4.0238 median_ms=4.5538 best_gops=133.4 median_gops=117.9
+RESULT npu int8 M=16 K=2048 N=6144 best_ms=0.6111 median_ms=1.5135 best_gops=658.9 median_gops=266.0 compile_ms=150.0
+RESULT npu f16 M=16 K=2048 N=6144 best_ms=1.2446 median_ms=2.2801 best_gops=323.5 median_gops=176.6 compile_ms=124.6
+RESULT cpu Q8_0 M=16 K=2048 N=6144 best_ms=3.4228 median_ms=3.9775 best_gops=117.6 median_gops=101.2
+RESULT cpu F16 M=16 K=2048 N=6144 best_ms=4.5514 median_ms=4.9978 best_gops=88.5 median_gops=80.6
+RESULT cpu BF16 M=16 K=2048 N=6144 best_ms=39.6637 median_ms=40.7858 best_gops=10.2 median_gops=9.9
+RESULT cpu Q4_K M=16 K=2048 N=6144 best_ms=3.1972 median_ms=3.6292 best_gops=125.9 median_gops=110.9
+RESULT npu int8 M=16 K=2048 N=2048 best_ms=0.3969 median_ms=0.7958 best_gops=338.1 median_gops=168.7 compile_ms=89.1
+RESULT npu f16 M=16 K=2048 N=2048 best_ms=0.6102 median_ms=1.9345 best_gops=219.9 median_gops=69.4 compile_ms=69.2
+RESULT cpu Q8_0 M=16 K=2048 N=2048 best_ms=1.6508 median_ms=2.0856 best_gops=81.3 median_gops=64.4
+RESULT cpu F16 M=16 K=2048 N=2048 best_ms=1.8422 median_ms=2.4988 best_gops=72.9 median_gops=53.7
+RESULT cpu BF16 M=16 K=2048 N=2048 best_ms=14.0298 median_ms=14.9116 best_gops=9.6 median_gops=9.0
+RESULT cpu Q4_K M=16 K=2048 N=2048 best_ms=1.8736 median_ms=2.5038 best_gops=71.6 median_gops=53.6
+RESULT npu int8 M=16 K=2048 N=512 best_ms=1.1235 median_ms=1.4277 best_gops=29.9 median_gops=23.5 compile_ms=70.6
+RESULT npu f16 M=16 K=2048 N=512 best_ms=0.8508 median_ms=1.6021 best_gops=39.4 median_gops=20.9 compile_ms=71.4
+RESULT cpu Q8_0 M=16 K=2048 N=512 best_ms=0.9732 median_ms=1.7317 best_gops=34.5 median_gops=19.4
+RESULT cpu F16 M=16 K=2048 N=512 best_ms=1.1505 median_ms=1.4625 best_gops=29.2 median_gops=22.9
+RESULT cpu BF16 M=16 K=2048 N=512 best_ms=4.0776 median_ms=5.1828 best_gops=8.2 median_gops=6.5
+RESULT cpu Q4_K M=16 K=2048 N=512 best_ms=0.8812 median_ms=1.3785 best_gops=38.1 median_gops=24.3
+RESULT npu int8 M=32 K=2048 N=8192 best_ms=0.7671 median_ms=0.9249 best_gops=1399.8 median_gops=1160.9 compile_ms=178.0
+RESULT npu f16 M=32 K=2048 N=8192 best_ms=1.5418 median_ms=2.1215 best_gops=696.4 median_gops=506.1 compile_ms=116.8
+RESULT cpu Q8_0 M=32 K=2048 N=8192 best_ms=6.7821 median_ms=7.9837 best_gops=158.3 median_gops=134.5
+RESULT cpu F16 M=32 K=2048 N=8192 best_ms=10.0479 median_ms=10.8685 best_gops=106.9 median_gops=98.8
+RESULT cpu BF16 M=32 K=2048 N=8192 best_ms=104.4561 median_ms=105.6425 best_gops=10.3 median_gops=10.2
+RESULT cpu Q4_K M=32 K=2048 N=8192 best_ms=7.1239 median_ms=7.6271 best_gops=150.7 median_gops=140.8
+RESULT npu int8 M=32 K=8192 N=2048 best_ms=0.8473 median_ms=2.0278 best_gops=1267.2 median_gops=529.5 compile_ms=180.4
+RESULT npu f16 M=32 K=8192 N=2048 best_ms=1.9914 median_ms=2.4332 best_gops=539.2 median_gops=441.3 compile_ms=133.1
+RESULT cpu Q8_0 M=32 K=8192 N=2048 best_ms=7.1004 median_ms=8.3852 best_gops=151.2 median_gops=128.1
+RESULT cpu F16 M=32 K=8192 N=2048 best_ms=10.1880 median_ms=10.7975 best_gops=105.4 median_gops=99.4
+RESULT cpu BF16 M=32 K=8192 N=2048 best_ms=107.0305 median_ms=108.3800 best_gops=10.0 median_gops=9.9
+RESULT cpu Q4_K M=32 K=8192 N=2048 best_ms=7.2058 median_ms=7.8805 best_gops=149.0 median_gops=136.3
+RESULT npu int8 M=32 K=2048 N=6144 best_ms=0.9243 median_ms=1.3279 best_gops=871.3 median_gops=606.4 compile_ms=163.6
+RESULT npu f16 M=32 K=2048 N=6144 best_ms=1.1338 median_ms=1.7720 best_gops=710.2 median_gops=454.5 compile_ms=107.6
+RESULT cpu Q8_0 M=32 K=2048 N=6144 best_ms=6.1249 median_ms=6.6693 best_gops=131.5 median_gops=120.7
+RESULT cpu F16 M=32 K=2048 N=6144 best_ms=7.6739 median_ms=8.4558 best_gops=104.9 median_gops=95.2
+RESULT cpu BF16 M=32 K=2048 N=6144 best_ms=79.1596 median_ms=79.6855 best_gops=10.2 median_gops=10.1
+RESULT cpu Q4_K M=32 K=2048 N=6144 best_ms=5.2236 median_ms=5.9622 best_gops=154.2 median_gops=135.1
+RESULT npu int8 M=32 K=2048 N=2048 best_ms=0.8565 median_ms=2.3526 best_gops=313.4 median_gops=114.1 compile_ms=103.6
+RESULT npu f16 M=32 K=2048 N=2048 best_ms=1.3015 median_ms=1.9562 best_gops=206.3 median_gops=137.2 compile_ms=84.7
+RESULT cpu Q8_0 M=32 K=2048 N=2048 best_ms=2.7865 median_ms=3.2935 best_gops=96.3 median_gops=81.5
+RESULT cpu F16 M=32 K=2048 N=2048 best_ms=3.2138 median_ms=3.7402 best_gops=83.5 median_gops=71.8
+RESULT cpu BF16 M=32 K=2048 N=2048 best_ms=26.8572 median_ms=27.3675 best_gops=10.0 median_gops=9.8
+RESULT cpu Q4_K M=32 K=2048 N=2048 best_ms=2.4493 median_ms=3.1311 best_gops=109.6 median_gops=85.7
+RESULT npu int8 M=32 K=2048 N=512 best_ms=0.5944 median_ms=0.9744 best_gops=112.9 median_gops=68.9 compile_ms=71.2
+RESULT npu f16 M=32 K=2048 N=512 best_ms=0.6228 median_ms=0.9024 best_gops=107.8 median_gops=74.4 compile_ms=69.9
+RESULT cpu Q8_0 M=32 K=2048 N=512 best_ms=1.2538 median_ms=1.8838 best_gops=53.5 median_gops=35.6
+RESULT cpu F16 M=32 K=2048 N=512 best_ms=1.6348 median_ms=2.1388 best_gops=41.0 median_gops=31.4
+RESULT cpu BF16 M=32 K=2048 N=512 best_ms=7.7556 median_ms=8.7785 best_gops=8.7 median_gops=7.6
+RESULT cpu Q4_K M=32 K=2048 N=512 best_ms=1.3218 median_ms=1.6753 best_gops=50.8 median_gops=40.1
+RESULT npu int8 M=64 K=2048 N=8192 best_ms=0.9925 median_ms=1.8312 best_gops=2163.6 median_gops=1172.7 compile_ms=179.2
+RESULT npu f16 M=64 K=2048 N=8192 best_ms=2.6163 median_ms=3.0439 best_gops=820.8 median_gops=705.5 compile_ms=139.3
+RESULT cpu Q8_0 M=64 K=2048 N=8192 best_ms=13.5612 median_ms=14.1046 best_gops=158.4 median_gops=152.3
+RESULT cpu F16 M=64 K=2048 N=8192 best_ms=18.9969 median_ms=19.5889 best_gops=113.0 median_gops=109.6
+RESULT cpu BF16 M=64 K=2048 N=8192 best_ms=206.6889 median_ms=209.2582 best_gops=10.4 median_gops=10.3
+RESULT cpu Q4_K M=64 K=2048 N=8192 best_ms=12.5773 median_ms=12.8801 best_gops=170.7 median_gops=166.7
+RESULT npu int8 M=64 K=8192 N=2048 best_ms=1.1938 median_ms=2.2782 best_gops=1798.8 median_gops=942.6 compile_ms=182.7
+RESULT npu f16 M=64 K=8192 N=2048 best_ms=3.0252 median_ms=4.0087 best_gops=709.9 median_gops=535.7 compile_ms=123.8
+RESULT cpu Q8_0 M=64 K=8192 N=2048 best_ms=13.4010 median_ms=14.4741 best_gops=160.2 median_gops=148.4
+RESULT cpu F16 M=64 K=8192 N=2048 best_ms=18.7252 median_ms=19.6532 best_gops=114.7 median_gops=109.3
+RESULT cpu BF16 M=64 K=8192 N=2048 best_ms=212.5517 median_ms=213.6985 best_gops=10.1 median_gops=10.0
+RESULT cpu Q4_K M=64 K=8192 N=2048 best_ms=12.7671 median_ms=13.2572 best_gops=168.2 median_gops=162.0
+RESULT npu int8 M=64 K=2048 N=6144 best_ms=0.9649 median_ms=1.4156 best_gops=1669.2 median_gops=1137.7 compile_ms=154.9
+RESULT npu f16 M=64 K=2048 N=6144 best_ms=1.5161 median_ms=2.0807 best_gops=1062.4 median_gops=774.1 compile_ms=107.0
+RESULT cpu Q8_0 M=64 K=2048 N=6144 best_ms=10.3873 median_ms=10.9485 best_gops=155.1 median_gops=147.1
+RESULT cpu F16 M=64 K=2048 N=6144 best_ms=14.0799 median_ms=15.1645 best_gops=114.4 median_gops=106.2
+RESULT cpu BF16 M=64 K=2048 N=6144 best_ms=156.2816 median_ms=157.5422 best_gops=10.3 median_gops=10.2
+RESULT cpu Q4_K M=64 K=2048 N=6144 best_ms=9.3818 median_ms=10.2555 best_gops=171.7 median_gops=157.0
+RESULT npu int8 M=64 K=2048 N=2048 best_ms=0.7750 median_ms=1.3495 best_gops=692.7 median_gops=397.8 compile_ms=104.4
+RESULT npu f16 M=64 K=2048 N=2048 best_ms=1.2135 median_ms=2.6292 best_gops=442.4 median_gops=204.2 compile_ms=91.3
+RESULT cpu Q8_0 M=64 K=2048 N=2048 best_ms=3.7378 median_ms=4.6151 best_gops=143.6 median_gops=116.3
+RESULT cpu F16 M=64 K=2048 N=2048 best_ms=5.5373 median_ms=6.0372 best_gops=97.0 median_gops=88.9
+RESULT cpu BF16 M=64 K=2048 N=2048 best_ms=52.3237 median_ms=53.2339 best_gops=10.3 median_gops=10.1
+RESULT cpu Q4_K M=64 K=2048 N=2048 best_ms=3.9766 median_ms=4.3198 best_gops=135.0 median_gops=124.3
+RESULT npu int8 M=64 K=2048 N=512 best_ms=0.7058 median_ms=1.2388 best_gops=190.2 median_gops=108.3 compile_ms=76.5
+RESULT npu f16 M=64 K=2048 N=512 best_ms=0.8307 median_ms=1.5578 best_gops=161.6 median_gops=86.2 compile_ms=57.6
+RESULT cpu Q8_0 M=64 K=2048 N=512 best_ms=1.6218 median_ms=2.4267 best_gops=82.8 median_gops=55.3
+RESULT cpu F16 M=64 K=2048 N=512 best_ms=2.1705 median_ms=2.5487 best_gops=61.8 median_gops=52.7
+RESULT cpu BF16 M=64 K=2048 N=512 best_ms=13.7342 median_ms=14.6039 best_gops=9.8 median_gops=9.2
+RESULT cpu Q4_K M=64 K=2048 N=512 best_ms=1.6699 median_ms=2.1363 best_gops=80.4 median_gops=62.8
+RESULT npu int8 M=128 K=2048 N=8192 best_ms=1.3656 median_ms=2.5114 best_gops=3145.1 median_gops=1710.2 compile_ms=184.0
+RESULT npu f16 M=128 K=2048 N=8192 best_ms=3.5682 median_ms=5.0037 best_gops=1203.7 median_gops=858.4 compile_ms=126.1
+RESULT cpu Q8_0 M=128 K=2048 N=8192 best_ms=25.1037 median_ms=26.0929 best_gops=171.1 median_gops=164.6
+RESULT cpu F16 M=128 K=2048 N=8192 best_ms=36.6295 median_ms=37.0424 best_gops=117.3 median_gops=115.9
+RESULT cpu BF16 M=128 K=2048 N=8192 best_ms=415.1270 median_ms=416.7209 best_gops=10.3 median_gops=10.3
+RESULT cpu Q4_K M=128 K=2048 N=8192 best_ms=23.8262 median_ms=24.3588 best_gops=180.3 median_gops=176.3
+RESULT npu int8 M=128 K=8192 N=2048 best_ms=2.5110 median_ms=3.3588 best_gops=1710.5 median_gops=1278.7 compile_ms=181.7
+RESULT npu f16 M=128 K=8192 N=2048 best_ms=5.8065 median_ms=7.0111 best_gops=739.7 median_gops=612.6 compile_ms=133.2
+RESULT cpu Q8_0 M=128 K=8192 N=2048 best_ms=25.5425 median_ms=26.2206 best_gops=168.1 median_gops=163.8
+RESULT cpu F16 M=128 K=8192 N=2048 best_ms=34.8792 median_ms=36.7872 best_gops=123.1 median_gops=116.8
+RESULT cpu BF16 M=128 K=8192 N=2048 best_ms=422.7382 median_ms=424.0661 best_gops=10.2 median_gops=10.1
+RESULT cpu Q4_K M=128 K=8192 N=2048 best_ms=24.1745 median_ms=24.5674 best_gops=177.7 median_gops=174.8
+RESULT npu int8 M=128 K=2048 N=6144 best_ms=1.5748 median_ms=2.4755 best_gops=2045.5 median_gops=1301.3 compile_ms=169.0
+RESULT npu f16 M=128 K=2048 N=6144 best_ms=3.7108 median_ms=4.9036 best_gops=868.1 median_gops=656.9 compile_ms=110.8
+RESULT cpu Q8_0 M=128 K=2048 N=6144 best_ms=18.8567 median_ms=20.0025 best_gops=170.8 median_gops=161.0
+RESULT cpu F16 M=128 K=2048 N=6144 best_ms=27.0385 median_ms=27.8286 best_gops=119.1 median_gops=115.8
+RESULT cpu BF16 M=128 K=2048 N=6144 best_ms=311.3564 median_ms=313.1237 best_gops=10.3 median_gops=10.3
+RESULT cpu Q4_K M=128 K=2048 N=6144 best_ms=18.1061 median_ms=18.7458 best_gops=177.9 median_gops=171.8
+RESULT npu int8 M=128 K=2048 N=2048 best_ms=1.0431 median_ms=1.7766 best_gops=1029.4 median_gops=604.4 compile_ms=87.8
+RESULT npu f16 M=128 K=2048 N=2048 best_ms=1.3404 median_ms=2.3493 best_gops=801.1 median_gops=457.0 compile_ms=83.4
+RESULT cpu Q8_0 M=128 K=2048 N=2048 best_ms=6.9490 median_ms=7.9765 best_gops=154.5 median_gops=134.6
+RESULT cpu F16 M=128 K=2048 N=2048 best_ms=9.6225 median_ms=10.2642 best_gops=111.6 median_gops=104.6
+RESULT cpu BF16 M=128 K=2048 N=2048 best_ms=103.7714 median_ms=104.2876 best_gops=10.3 median_gops=10.3
+RESULT cpu Q4_K M=128 K=2048 N=2048 best_ms=6.8988 median_ms=7.6428 best_gops=155.6 median_gops=140.5
+RESULT npu int8 M=128 K=2048 N=512 best_ms=1.0505 median_ms=1.7330 best_gops=255.5 median_gops=154.9 compile_ms=76.0
+RESULT npu f16 M=128 K=2048 N=512 best_ms=1.0985 median_ms=1.7092 best_gops=244.4 median_gops=157.1 compile_ms=70.7
+RESULT cpu Q8_0 M=128 K=2048 N=512 best_ms=2.7840 median_ms=3.2486 best_gops=96.4 median_gops=82.6
+RESULT cpu F16 M=128 K=2048 N=512 best_ms=3.3098 median_ms=3.9136 best_gops=81.1 median_gops=68.6
+RESULT cpu BF16 M=128 K=2048 N=512 best_ms=26.5908 median_ms=27.2511 best_gops=10.1 median_gops=9.9
+RESULT cpu Q4_K M=128 K=2048 N=512 best_ms=2.6035 median_ms=3.1480 best_gops=103.1 median_gops=85.3
+RESULT npu int8 M=256 K=2048 N=8192 best_ms=5.9842 median_ms=7.4532 best_gops=1435.4 median_gops=1152.5 compile_ms=182.8
+RESULT npu f16 M=256 K=2048 N=8192 best_ms=7.0809 median_ms=7.8815 best_gops=1213.1 median_gops=1089.9 compile_ms=122.1
+RESULT cpu Q8_0 M=256 K=2048 N=8192 best_ms=49.1843 median_ms=50.0154 best_gops=174.6 median_gops=171.7
+RESULT cpu F16 M=256 K=2048 N=8192 best_ms=71.9359 median_ms=72.6209 best_gops=119.4 median_gops=118.3
+RESULT cpu BF16 M=256 K=2048 N=8192 best_ms=820.7840 median_ms=831.0203 best_gops=10.5 median_gops=10.3
+RESULT cpu Q4_K M=256 K=2048 N=8192 best_ms=47.3046 median_ms=47.7594 best_gops=181.6 median_gops=179.9
+RESULT npu int8 M=256 K=8192 N=2048 best_ms=4.3516 median_ms=5.0935 best_gops=1974.0 median_gops=1686.5 compile_ms=179.3
+RESULT npu f16 M=256 K=8192 N=2048 best_ms=10.7680 median_ms=12.1628 best_gops=797.7 median_gops=706.2 compile_ms=122.4
+RESULT cpu Q8_0 M=256 K=8192 N=2048 best_ms=50.2681 median_ms=50.9888 best_gops=170.9 median_gops=168.5
+RESULT cpu F16 M=256 K=8192 N=2048 best_ms=70.7332 median_ms=71.3523 best_gops=121.4 median_gops=120.4
+RESULT cpu BF16 M=256 K=8192 N=2048 best_ms=843.1761 median_ms=844.9508 best_gops=10.2 median_gops=10.2
+RESULT cpu Q4_K M=256 K=8192 N=2048 best_ms=47.3628 median_ms=47.7828 best_gops=181.4 median_gops=179.8
+RESULT npu int8 M=256 K=2048 N=6144 best_ms=3.7575 median_ms=4.4175 best_gops=1714.5 median_gops=1458.4 compile_ms=154.2
+RESULT npu f16 M=256 K=2048 N=6144 best_ms=5.8400 median_ms=6.3665 best_gops=1103.2 median_gops=1011.9 compile_ms=122.2
+RESULT cpu Q8_0 M=256 K=2048 N=6144 best_ms=37.0225 median_ms=37.7945 best_gops=174.0 median_gops=170.5
+RESULT cpu F16 M=256 K=2048 N=6144 best_ms=53.3945 median_ms=54.1757 best_gops=120.7 median_gops=118.9
+RESULT cpu BF16 M=256 K=2048 N=6144 best_ms=622.9252 median_ms=624.2561 best_gops=10.3 median_gops=10.3
+RESULT cpu Q4_K M=256 K=2048 N=6144 best_ms=35.4762 median_ms=36.0176 best_gops=181.6 median_gops=178.9
+RESULT npu int8 M=256 K=2048 N=2048 best_ms=1.9637 median_ms=2.6938 best_gops=1093.6 median_gops=797.2 compile_ms=97.0
+RESULT npu f16 M=256 K=2048 N=2048 best_ms=3.1289 median_ms=3.7886 best_gops=686.3 median_gops=566.8 compile_ms=84.0
+RESULT cpu Q8_0 M=256 K=2048 N=2048 best_ms=13.2978 median_ms=13.9712 best_gops=161.5 median_gops=153.7
+RESULT cpu F16 M=256 K=2048 N=2048 best_ms=18.4284 median_ms=19.0621 best_gops=116.5 median_gops=112.7
+RESULT cpu BF16 M=256 K=2048 N=2048 best_ms=206.6068 median_ms=207.6434 best_gops=10.4 median_gops=10.3
+RESULT cpu Q4_K M=256 K=2048 N=2048 best_ms=12.3182 median_ms=12.9719 best_gops=174.3 median_gops=165.5
+RESULT npu int8 M=256 K=2048 N=512 best_ms=1.3664 median_ms=1.9302 best_gops=392.9 median_gops=278.1 compile_ms=69.0
+RESULT npu f16 M=256 K=2048 N=512 best_ms=1.3698 median_ms=2.2608 best_gops=391.9 median_gops=237.5 compile_ms=73.1
+RESULT cpu Q8_0 M=256 K=2048 N=512 best_ms=4.5107 median_ms=5.3034 best_gops=119.0 median_gops=101.2
+RESULT cpu F16 M=256 K=2048 N=512 best_ms=4.9887 median_ms=6.1151 best_gops=107.6 median_gops=87.8
+RESULT cpu BF16 M=256 K=2048 N=512 best_ms=52.3778 median_ms=52.9418 best_gops=10.2 median_gops=10.1
+RESULT cpu Q4_K M=256 K=2048 N=512 best_ms=4.3215 median_ms=4.7150 best_gops=124.2 median_gops=113.9
+RESULT npu int8 M=512 K=2048 N=8192 best_ms=8.2806 median_ms=11.2013 best_gops=2074.7 median_gops=1533.7 compile_ms=189.1
+RESULT npu f16 M=512 K=2048 N=8192 best_ms=11.4378 median_ms=14.1941 best_gops=1502.0 median_gops=1210.4 compile_ms=130.8
+RESULT cpu Q8_0 M=512 K=2048 N=8192 best_ms=97.2282 median_ms=98.1517 best_gops=176.7 median_gops=175.0
+RESULT cpu F16 M=512 K=2048 N=8192 best_ms=142.1517 median_ms=142.9991 best_gops=120.9 median_gops=120.1
+RESULT cpu BF16 M=512 K=2048 N=8192 best_ms=1658.3867 median_ms=1660.9338 best_gops=10.4 median_gops=10.3
+RESULT cpu Q4_K M=512 K=2048 N=8192 best_ms=93.3325 median_ms=94.7317 best_gops=184.1 median_gops=181.4
+RESULT npu int8 M=512 K=8192 N=2048 best_ms=6.0650 median_ms=8.0911 best_gops=2832.6 median_gops=2123.3 compile_ms=185.5
+RESULT npu f16 M=512 K=8192 N=2048 best_ms=17.6880 median_ms=20.1192 best_gops=971.3 median_gops=853.9 compile_ms=119.1
+RESULT cpu Q8_0 M=512 K=8192 N=2048 best_ms=98.0618 median_ms=99.6996 best_gops=175.2 median_gops=172.3
+RESULT cpu F16 M=512 K=8192 N=2048 best_ms=138.1761 median_ms=139.6272 best_gops=124.3 median_gops=123.0
+RESULT cpu BF16 M=512 K=8192 N=2048 best_ms=1679.6413 median_ms=1685.2760 best_gops=10.2 median_gops=10.2
+RESULT cpu Q4_K M=512 K=8192 N=2048 best_ms=93.3221 median_ms=93.9437 best_gops=184.1 median_gops=182.9
+RESULT npu int8 M=512 K=2048 N=6144 best_ms=5.8129 median_ms=6.8843 best_gops=2216.6 median_gops=1871.6 compile_ms=153.4
+RESULT npu f16 M=512 K=2048 N=6144 best_ms=9.7978 median_ms=12.3761 best_gops=1315.1 median_gops=1041.1 compile_ms=137.2
+RESULT cpu Q8_0 M=512 K=2048 N=6144 best_ms=72.1514 median_ms=73.7921 best_gops=178.6 median_gops=174.6
+RESULT cpu F16 M=512 K=2048 N=6144 best_ms=104.3764 median_ms=105.2470 best_gops=123.4 median_gops=122.4
+RESULT cpu BF16 M=512 K=2048 N=6144 best_ms=1236.9781 median_ms=1243.4042 best_gops=10.4 median_gops=10.4
+RESULT cpu Q4_K M=512 K=2048 N=6144 best_ms=70.6182 median_ms=71.3791 best_gops=182.5 median_gops=180.5
+RESULT npu int8 M=512 K=2048 N=2048 best_ms=3.1905 median_ms=3.7058 best_gops=1346.2 median_gops=1159.0 compile_ms=101.9
+RESULT npu f16 M=512 K=2048 N=2048 best_ms=5.9329 median_ms=6.5880 best_gops=723.9 median_gops=651.9 compile_ms=77.6
+RESULT cpu Q8_0 M=512 K=2048 N=2048 best_ms=24.1277 median_ms=24.9351 best_gops=178.0 median_gops=172.2
+RESULT cpu F16 M=512 K=2048 N=2048 best_ms=34.6329 median_ms=35.3132 best_gops=124.0 median_gops=121.6
+RESULT cpu BF16 M=512 K=2048 N=2048 best_ms=413.8982 median_ms=414.7089 best_gops=10.4 median_gops=10.4
+RESULT cpu Q4_K M=512 K=2048 N=2048 best_ms=24.1236 median_ms=24.7717 best_gops=178.0 median_gops=173.4
+RESULT npu int8 M=512 K=2048 N=512 best_ms=1.5452 median_ms=2.4047 best_gops=694.9 median_gops=446.5 compile_ms=78.0
+RESULT npu f16 M=512 K=2048 N=512 best_ms=2.6289 median_ms=3.5468 best_gops=408.4 median_gops=302.7 compile_ms=57.8
+RESULT cpu Q8_0 M=512 K=2048 N=512 best_ms=7.3425 median_ms=8.3350 best_gops=146.2 median_gops=128.8
+RESULT cpu F16 M=512 K=2048 N=512 best_ms=9.5142 median_ms=10.5705 best_gops=112.9 median_gops=101.6
+RESULT cpu BF16 M=512 K=2048 N=512 best_ms=103.8022 median_ms=104.2495 best_gops=10.3 median_gops=10.3
+RESULT cpu Q4_K M=512 K=2048 N=512 best_ms=7.4867 median_ms=8.3016 best_gops=143.4 median_gops=129.3

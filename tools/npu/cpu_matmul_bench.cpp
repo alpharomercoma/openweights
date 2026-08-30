@@ -18,12 +18,13 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <vector>
 
 namespace {
 
-constexpr int64_t kIn  = 2048;
-constexpr int64_t kOut = 8192;
+int64_t kIn  = 2048;
+int64_t kOut = 8192;
 constexpr int kIterations = 20;
 constexpr int kThreads = 6;
 
@@ -93,9 +94,10 @@ void Run(ggml_type weightType, const char* label, int64_t tokens) {
     const double best = samples.front();
     const double median = samples[samples.size() / 2];
     const double ops = 2.0 * tokens * kIn * kOut;
-    std::printf("%-6s M=%-4lld best %7.2f ms  %8.1f GOP/s   median %7.2f ms  %8.1f GOP/s\n",
-                label, (long long) tokens, best, ops / (best * 1e6),
-                median, ops / (median * 1e6));
+    std::printf("RESULT cpu %s M=%lld K=%lld N=%lld best_ms=%.4f median_ms=%.4f "
+                "best_gops=%.1f median_gops=%.1f\n",
+                label, (long long) tokens, (long long) kIn, (long long) kOut,
+                best, median, ops / (best * 1e6), ops / (median * 1e6));
 
     ggml_backend_buffer_free(buffer);
     ggml_free(ctx);
@@ -104,19 +106,20 @@ void Run(ggml_type weightType, const char* label, int64_t tokens) {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
     ggml_backend_load_all();
-    std::printf("cpu backend: %s\n",
-                ggml_backend_dev_description(
-                    ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU)));
-    std::printf("[M x %lld] @ [%lld x %lld], %d threads, %d iterations\n\n",
-                (long long) kIn, (long long) kIn, (long long) kOut, kThreads, kIterations);
-    for (int64_t tokens : {1, 32, 128, 512}) {
-        Run(GGML_TYPE_Q4_K, "Q4_K", tokens);
-        Run(GGML_TYPE_Q4_0, "Q4_0", tokens);
-        Run(GGML_TYPE_Q8_0, "Q8_0", tokens);
-        Run(GGML_TYPE_F16,  "F16",  tokens);
+    // argv: M K N  — one shape per invocation, so a driver can walk the real
+    // matmul mix of an actual model.
+    int64_t tokens = 128;
+    if (argc >= 4) {
+        tokens = std::atoll(argv[1]);
+        kIn    = std::atoll(argv[2]);
+        kOut   = std::atoll(argv[3]);
     }
+    Run(GGML_TYPE_Q8_0, "Q8_0", tokens);
+    Run(GGML_TYPE_F16,  "F16",  tokens);
+    Run(GGML_TYPE_BF16, "BF16", tokens);
+    Run(GGML_TYPE_Q4_K, "Q4_K", tokens);
     return 0;
 }

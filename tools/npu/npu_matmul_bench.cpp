@@ -21,10 +21,12 @@
 namespace {
 
 // A prefill chunk against one FFN projection of a 1.2B model.
-constexpr uint32_t kTokens = 1;   // rows: tokens in flight
-constexpr uint32_t kIn     = 2048;  // embedding width
-constexpr uint32_t kOut    = 8192;  // FFN width
-constexpr int kIterations  = 20;
+// Shape comes from the command line so the harness can walk a real model's
+// actual matmul mix rather than one representative size.
+uint32_t kTokens = 128;   // rows: tokens in flight
+uint32_t kIn     = 2048;  // input width
+uint32_t kOut    = 8192;  // output width
+constexpr int kIterations = 20;
 
 double MillisSince(std::chrono::steady_clock::time_point start) {
     return std::chrono::duration<double, std::milli>(
@@ -46,16 +48,21 @@ double MillisSince(std::chrono::steady_clock::time_point start) {
 // Chosen at run time so the same binary answers both halves of the question:
 // int8 is the narrowest the NPU has, f16 is what an unquantised model would use.
 static bool gUseFloat16 = false;
+static double gCompileMs = 0.0;
 
 int main(int argc, char** argv) {
-    gUseFloat16 = (argc > 1 && std::strcmp(argv[1], "f16") == 0);
+    // argv: M K N [f16|int8]
+    if (argc >= 4) {
+        kTokens = (uint32_t) std::atoi(argv[1]);
+        kIn     = (uint32_t) std::atoi(argv[2]);
+        kOut    = (uint32_t) std::atoi(argv[3]);
+    }
+    gUseFloat16 = (argc >= 5 && std::strcmp(argv[4], "f16") == 0);
     // Unbuffered: the interesting failures here are aborts inside the vendor
     // library, and a buffered stdout loses every line that would say where.
     std::setvbuf(stdout, nullptr, _IONBF, 0);
-    std::printf("shape: [%u x %u] @ [%u x %u] %s, %d iterations\n",
-                kTokens, kIn, kIn, kOut, gUseFloat16 ? "f16" : "int8", kIterations);
 
-    std::printf("step: model_create\n");
+
     NeuronModel* model = nullptr;
     CHECK(NeuronModel_create(&model));
 
@@ -121,7 +128,6 @@ int main(int argc, char** argv) {
     const uint32_t modelInputs[1] = {0};
     const uint32_t modelOutputs[1] = {4};
     CHECK(NeuronModel_identifyInputsAndOutputs(model, 1, modelInputs, 1, modelOutputs));
-    std::printf("step: model_finish\n");
     CHECK(NeuronModel_finish(model));
 
     // Compilation is the ahead-of-time step, and its cost is a finding in its
@@ -132,7 +138,6 @@ int main(int argc, char** argv) {
     // considers every device, and this phone's GPU/MVPU path fails to dlopen
     // OpenCL and aborts inside the adapter. The MDLA is the NPU proper and the
     // only one this question is about.
-    std::printf("step: enumerate devices\n");
     uint32_t deviceCount = 0;
     CHECK(Neuron_getDeviceCount(&deviceCount));
     const NeuronDevice* mdla = nullptr;
@@ -143,8 +148,7 @@ int main(int argc, char** argv) {
         if (NeuronDevice_getName(device, &name) != NEURON_NO_ERROR) continue;
         if (std::strstr(name, "mdla") != nullptr) {
             mdla = device;
-            std::printf("device: %s\n", name);
-        }
+            }
     }
     if (mdla == nullptr) {
         std::printf("no MDLA device on this phone\n");
@@ -154,10 +158,9 @@ int main(int argc, char** argv) {
     NeuronCompilation* compilation = nullptr;
     CHECK(NeuronCompilation_createForDevices(model, &mdla, 1, &compilation));
     CHECK(NeuronCompilation_setPreference(compilation, NEURON_PREFER_SUSTAINED_SPEED));
-    std::printf("step: compile\n");
     auto compileStart = std::chrono::steady_clock::now();
     CHECK(NeuronCompilation_finish(compilation));
-    std::printf("compile: %.1f ms\n", MillisSince(compileStart));
+    gCompileMs = MillisSince(compileStart);
 
     NeuronExecution* execution = nullptr;
     CHECK(NeuronExecution_create(compilation, &execution));
@@ -182,11 +185,11 @@ int main(int argc, char** argv) {
     const double median = samples[samples.size() / 2];
     // Two operations per multiply-accumulate.
     const double ops = 2.0 * kTokens * kIn * kOut;
-    std::printf("execute: best %.2f ms, median %.2f ms\n", best, median);
-    std::printf("throughput: best %.1f GOP/s, median %.1f GOP/s\n",
-                ops / (best * 1e6), ops / (median * 1e6));
-    std::printf("\nCPU reference on this phone: ~307 GOP/s at int4 (131 t/s prefill)\n");
-    std::printf("verdict: NPU int8 %s the CPU's int4 rate\n",
-                (ops / (best * 1e6)) > 307.0 ? "BEATS" : "does NOT beat");
+
+    // One machine-readable line so a driver script can consume this directly.
+    std::printf("RESULT npu %s M=%u K=%u N=%u best_ms=%.4f median_ms=%.4f "
+                "best_gops=%.1f median_gops=%.1f compile_ms=%.1f\n",
+                gUseFloat16 ? "f16" : "int8", kTokens, kIn, kOut, best, median,
+                ops / (best * 1e6), ops / (median * 1e6), gCompileMs);
     return 0;
 }

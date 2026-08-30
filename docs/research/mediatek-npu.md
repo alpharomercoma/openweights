@@ -5,11 +5,58 @@ MediaTek MT6991 (Dimensity 9400), Android 16 / API 36.**
 
 ## Decision
 
-**No. Not now.** The blocker is not effort or access — it is that MediaTek's NPU
-is an ahead-of-time whole-graph target and this app is a GGUF runner for models
-its users choose. Those two facts cannot both hold. The triggers that would
-reverse this are listed at the end; check them rather than re-deriving the
-argument.
+**Not now, but the reason changed once it was measured.** The NPU is not too
+slow — for prefill it is roughly ten times the CPU's effective rate. What stops
+it is that reaching it means a ggml backend with partial op coverage, weights
+requantised from int4 to int8, and shape bucketing, in an app whose premise is
+that a user downloads whichever GGUF they like. The triggers that would reverse
+this are at the end.
+
+## Measured: does the NPU actually win?
+
+Everything below ran on the device through `NeuronAdapter`, one
+`NEURON_FULLY_CONNECTED` of `[M x 2048] @ [2048 x 8192]` in
+`QUANT8_ASYMM` — one FFN projection of a 1.2 B model — pinned to `mtk-mdla`
+(MDLA 5.5), twenty iterations. Source: `tools/npu/npu_matmul_bench.cpp`.
+
+| M (tokens in flight) | best | median | best latency |
+| ---: | ---: | ---: | ---: |
+| 1 — decode | 84.5 GOP/s | 63.7 GOP/s | 0.40 ms |
+| 32 | 1,956 GOP/s | 566 GOP/s | 0.55 ms |
+| 128 — prefill chunk | **3,475 GOP/s** | 2,579 GOP/s | 1.24 ms |
+| 512 | 1,980 GOP/s | 1,697 GOP/s | 8.67 ms |
+
+The CPU reference is ~307 GOP/s: 131 t/s prefill on this phone against about
+2.34 GFLOP per token for a 1.17 B model. That is a system-level figure derived
+from end-to-end prefill, not the same kernel measured on the CPU, so it counts
+attention, norms and softmax that this matmul does not. Treat it as the bar the
+whole system currently clears, not as the CPU's peak matmul rate.
+
+Two things fall out, and they point opposite ways.
+
+**Decode is a loss.** At M=1 the NPU manages 84.5 GOP/s, below the bar. Every
+call carries roughly 0.4 ms of fixed cost, and with one token there is nothing
+to amortise it against. A backend dispatching a few hundred ops per token at
+0.4 ms each would spend more than a tenth of a second per token. The CPU
+already does 36 t/s.
+
+**Prefill is a large win.** From 32 tokens upward the MDLA runs six to eleven
+times the system's current rate. Prefill is exactly where this app hurts — a
+2,000-token context costs about fifteen seconds — and it is the half of the
+workload that batches, which is why it suits the accelerator.
+
+This falsifies the claim, made earlier in this document from the type system
+alone, that widening weights to int8 would hand the NPU "a strictly harder
+problem than the CPU currently solves". That is true at M=1 and wrong by an
+order of magnitude at prefill widths: the MDLA has enough compute that the
+2× weight penalty does not decide the outcome.
+
+Caveats worth keeping with the numbers. Weights are graph constants, as a real
+model's would be, so per-call time excludes streaming them — realistic for
+prefill, and generous to the NPU in the decode row it still loses. Compiling
+each shape costs 180–240 ms, though `NeuronCompilation_storeCompiledNetwork`
+exists and prefill uses a small number of chunk sizes. And this is one
+operation with no RMSNorm, no attention and no fallback boundaries.
 
 ## What is actually on the device
 
@@ -180,6 +227,13 @@ Check these rather than re-arguing:
 1. **A MediaTek backend lands upstream in ggml.** OpenVINO and Hexagon both did.
    Then this becomes a build flag beside `GGML_OPENCL`, and the answer flips
    immediately.
+0. **Prefill-only offload becomes worth building.** This is now the most
+   interesting option and it did not exist before the measurement: leave decode
+   on the CPU, where it wins, and send only the prefill matmuls to the MDLA,
+   where it is an order of magnitude ahead. It is bounded work — a partial ggml
+   backend covering `MUL_MAT` at prefill widths, int8 requantisation at load,
+   and a compiled-network cache keyed by chunk shape — and it targets the one
+   number in this app that is genuinely painful.
 2. **LiteRT-LM broadens** to a large model catalogue or accepts GGUF, *and*
    names D9400. Then a "these particular models run on the NPU" mode becomes a
    coherent feature rather than a second app.

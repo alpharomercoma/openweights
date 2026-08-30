@@ -22,9 +22,11 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.common.context.CompactionPolicy
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.engine.RoutingInferenceEngine
+import io.github.alpharomercoma.openweights.core.engine.UnavailableExecuTorchBridge
 import javax.inject.Singleton
 
 @Module
@@ -45,6 +47,10 @@ object EngineModule {
     fun provideInferenceEngine(): InferenceEngine = RoutingInferenceEngine(
         backends = mapOf(
             ModelFormat.GGUF to { LlamaCppEngine() },
+            // Registered before the runtime ships, because the model list already shows
+            // .pte files: a user who sideloads one gets a sentence explaining why it will
+            // not open rather than whatever the wiring happens to throw.
+            ModelFormat.PTE to { ExecuTorchEngine(UnavailableExecuTorchBridge()) },
         ),
     )
 

@@ -1,0 +1,225 @@
+/*
+ * Copyright 2026 The OpenWeights Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.github.alpharomercoma.openweights.core.engine
+
+import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
+import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.PromptTemplate
+import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
+import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
+import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
+import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import java.io.File
+
+/**
+ * Runs a model that was compiled ahead of time, through ExecuTorch.
+ *
+ * The trade against [LlamaCppEngine] is worth stating plainly, because it is not a matter
+ * of one being better written:
+ *
+ * - **No prefix reuse.** llama.cpp keeps a KV cache across turns, so a follow-up pays only
+ *   for what changed. ExecuTorch's runner takes a prompt and returns a reply, holding
+ *   nothing in between, so **every turn re-prefills the whole conversation**. On short
+ *   chats that is invisible; on the long multi-turn traffic this app is measured against it
+ *   is the dominant cost. [GenerationStats.cachedTokens] is therefore always zero here, and
+ *   that zero is the truth rather than a missing number.
+ * - **A curated catalogue.** A `.pte` is compiled on a desktop for one backend, and for an
+ *   NPU one SoC, so models arrive because a build was run for them. That is the constraint
+ *   this whole project exists to escape, which is why this engine is the second one and not
+ *   the first.
+ * - **No projector.** Attachments are llama.cpp's, via libmtmd.
+ *
+ * What it buys is the only path to an accelerator that has no ggml backend. See
+ * `docs/research/mediatek-npu.md` for what that is measured to be worth.
+ */
+class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
+
+    private var info: LoadedModelInfo? = null
+    private var template: PromptTemplate? = null
+    private var contextSize: Int = 0
+
+    override val loadedModel: LoadedModelInfo? get() = info
+
+    override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
+        val tokenizer = tokenizerFor(modelFile)
+            ?: throw LlamaException(
+                "${modelFile.name} has no tokenizer beside it. A .pte carries a compiled " +
+                    "graph and nothing that says how to tokenize for it, so both files " +
+                    "have to be installed together.",
+            )
+
+        // Refuse rather than guess. A wrong template does not fail: the model answers, a
+        // little worse, and its tool calls stop parsing, which reads as a bad model.
+        val rendering = PromptTemplates.forModel(modelFile.name)
+            ?: throw LlamaException(
+                "No prompt template for ${modelFile.name}. This build can render: " +
+                    PromptTemplates.known.joinToString(", ") + ".",
+            )
+
+        unload()
+        if (!bridge.load(modelFile.absolutePath, tokenizer.absolutePath, DEFAULT_TEMPERATURE)) {
+            throw LlamaException("ExecuTorch could not open ${modelFile.name}")
+        }
+
+        template = rendering
+        // Fixed when the model was exported, not chosen here: `--cache_length` is compiled
+        // into the graph. Asking for a wider window at load is a request the runtime has no
+        // way to honour, so the requested value is recorded as the ceiling it actually is.
+        contextSize = params.contextLength
+        info = LoadedModelInfo(
+            description = modelFile.nameWithoutExtension,
+            parameterCount = 0,
+            sizeBytes = modelFile.length(),
+            contextSize = contextSize,
+            trainingContextSize = contextSize,
+            layerCount = 0,
+            contextUsed = 0,
+            offloadedTo = "ExecuTorch",
+            supportsThinking = true,
+            supportsTools = true,
+            supportsToolResults = true,
+            modelPath = modelFile.absolutePath,
+        )
+    }
+
+    override suspend fun unload() {
+        bridge.close()
+        info = null
+        template = null
+    }
+
+    override fun chat(
+        messages: List<ChatMessage>,
+        params: SamplerParams,
+        tools: List<ToolDefinition>,
+    ): Flow<GenerationEvent> = flow {
+        val rendering = template ?: throw LlamaException("No model loaded")
+        val prompt = rendering.render(messages, tools, params.thinking)
+
+        val reply = StringBuilder()
+        val started = System.currentTimeMillis()
+        var firstTokenAt = 0L
+
+        // Zero means "no limit" to llama.cpp, which stops at the context edge on its own.
+        // ExecuTorch wants a real sequence length, so the window is the limit.
+        val budget = params.maxTokens.takeIf { it > 0 } ?: contextSize
+        val outcome = bridge.generate(prompt, budget) { fragment ->
+            if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
+            reply.append(fragment)
+        }
+
+        val raw = reply.toString()
+        val parsed = ToolCallParser.parse(raw)
+        emit(
+            GenerationEvent.Completed(
+                reason = outcome.reason,
+                stats = statsFor(outcome, started, firstTokenAt),
+                content = parsed.text.withoutReasoning(),
+                reasoning = raw.reasoning(),
+                toolCalls = parsed.calls,
+            ),
+        )
+    }.flowOn(Dispatchers.IO)
+
+    override fun cancel() = bridge.stop()
+
+    /**
+     * A no-op, and not an oversight: there is no cache to clear.
+     *
+     * Every [chat] sends the whole conversation and the runtime keeps nothing afterwards,
+     * so the state this would reset does not exist between calls.
+     */
+    override suspend fun resetContext() = Unit
+
+    /** Thread counts belong to the backend a `.pte` was compiled against, not to a call. */
+    override suspend fun setThreads(generateThreads: Int, batchThreads: Int) = Unit
+
+    override fun systemInfo(): String = "ExecuTorch"
+
+    override fun computeDevices(): List<ComputeDevice> = emptyList()
+
+    override fun close() {
+        bridge.close()
+        info = null
+        template = null
+    }
+
+    /**
+     * Time to first token is the prefill, and the rest is the decode.
+     *
+     * llama.cpp reports both from inside, having actually measured them. Here they are
+     * split at the first fragment reaching us, which is the same boundary observed from
+     * one step further out — and is exactly the wait the user feels.
+     */
+    private fun statsFor(
+        outcome: ExecuTorchOutcome,
+        started: Long,
+        firstTokenAt: Long,
+    ): GenerationStats {
+        val finished = System.currentTimeMillis()
+        val timeToFirst = if (firstTokenAt > 0) firstTokenAt - started else finished - started
+        return GenerationStats(
+            promptTokens = outcome.promptTokens,
+            generatedTokens = outcome.generatedTokens,
+            prefillMs = outcome.prefillMs.takeIf { it > 0 } ?: timeToFirst,
+            decodeMs = outcome.decodeMs.takeIf { it > 0 } ?: (finished - started - timeToFirst),
+            timeToFirstTokenMs = timeToFirst,
+            contextUsed = 0,
+            contextSize = contextSize,
+            // Always zero, and true: nothing is carried between turns to reuse.
+            cachedTokens = 0,
+        )
+    }
+
+    /**
+     * The tokenizer exported alongside [model], by name.
+     *
+     * A sibling rather than a lookup, because the pairing has to survive a user moving
+     * files around: `Qwen3-1.7B.pte` is answered by `Qwen3-1.7B.tokenizer.json`.
+     */
+    private fun tokenizerFor(model: File): File? =
+        File(model.parentFile, model.nameWithoutExtension + TOKENIZER_SUFFIX).takeIf { it.isFile }
+
+    private fun String.reasoning(): String {
+        val open = indexOf(THINK_OPEN)
+        val close = indexOf(THINK_CLOSE)
+        if (open < 0 || close < open) return ""
+        return substring(open + THINK_OPEN.length, close).trim()
+    }
+
+    private fun String.withoutReasoning(): String {
+        val close = lastIndexOf(THINK_CLOSE)
+        if (close < 0) return this
+        return substring(close + THINK_CLOSE.length).trim()
+    }
+
+    private companion object {
+        const val THINK_OPEN = "<think>"
+        const val THINK_CLOSE = "</think>"
+        const val TOKENIZER_SUFFIX = ".tokenizer.json"
+
+        /**
+         * ExecuTorch fixes temperature when the runner is built rather than per call, so
+         * this is the value the model is opened with and [SamplerParams] cannot move it.
+         */
+        const val DEFAULT_TEMPERATURE = 0.8f
+    }
+}

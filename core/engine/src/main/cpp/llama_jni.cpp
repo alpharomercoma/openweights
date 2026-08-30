@@ -251,13 +251,14 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     jint thread_count,
     jint batch_thread_count,
     jint gpu_layers,
-    jboolean use_mmap) try {
+    jboolean use_mmap,
+    jboolean op_offload) try {
     std::string error;
     Session * session = Session::load(
         to_utf8(env, model_path),
         mmproj_path == nullptr ? std::string() : to_utf8(env, mmproj_path),
         context_length, thread_count, batch_thread_count,
-        gpu_layers, use_mmap == JNI_TRUE, error);
+        gpu_layers, use_mmap == JNI_TRUE, op_offload == JNI_TRUE, error);
     if (session == nullptr) {
         throw_engine_exception(env, error);
         return 0;

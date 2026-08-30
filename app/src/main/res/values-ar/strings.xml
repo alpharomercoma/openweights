@@ -247,4 +247,6 @@
     <string name="compiled_runs_on_cpu">مُجمَّع لوحدة CPU</string>
     <string name="compiled_runs_on_gpu">مُجمَّع لوحدة GPU</string>
     <string name="compiled_runs_on_npu">مُجمَّع لوحدة NPU</string>
+    <string name="prefill_processor">قراءة الطلب</string>
+    <string name="decode_processor">كتابة الإجابة</string>
 </resources>

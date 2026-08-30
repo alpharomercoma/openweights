@@ -187,6 +187,7 @@ public:
         int32_t n_threads_batch,
         int32_t n_gpu_layers,
         bool use_mmap,
+        bool op_offload,
         std::string & error);
 
     /**

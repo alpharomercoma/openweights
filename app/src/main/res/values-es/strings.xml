@@ -259,4 +259,6 @@
     <string name="compiled_runs_on_cpu">Compilado para CPU</string>
     <string name="compiled_runs_on_gpu">Compilado para GPU</string>
     <string name="compiled_runs_on_npu">Compilado para NPU</string>
+    <string name="prefill_processor">Leer la petición</string>
+    <string name="decode_processor">Escribir la respuesta</string>
 </resources>

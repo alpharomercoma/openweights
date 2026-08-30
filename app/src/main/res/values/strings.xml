@@ -290,5 +290,8 @@
     <string name="compiled_runs_on_cpu">Compiled for CPU</string>
     <string name="compiled_runs_on_gpu">Compiled for GPU</string>
     <string name="compiled_runs_on_npu">Compiled for NPU</string>
+
+    <string name="prefill_processor">Reading the prompt</string>
+    <string name="decode_processor">Writing the answer</string>
 </resources>
 

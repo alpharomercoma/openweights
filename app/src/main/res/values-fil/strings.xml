@@ -245,4 +245,6 @@
     <string name="compiled_runs_on_cpu">Naka-compile para sa CPU</string>
     <string name="compiled_runs_on_gpu">Naka-compile para sa GPU</string>
     <string name="compiled_runs_on_npu">Naka-compile para sa NPU</string>
+    <string name="prefill_processor">Pagbasa ng prompt</string>
+    <string name="decode_processor">Pagsulat ng sagot</string>
 </resources>

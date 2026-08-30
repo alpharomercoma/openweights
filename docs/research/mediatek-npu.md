@@ -53,8 +53,8 @@ System.loadLibrary(neuralnetworks)         -> LOADED
 ```
 
 So there is no shortcut of dlopen'ing the vendor runtime. The supported route is
-to bundle MediaTek's own adapter libraries, obtained from the registration-gated
-NeuroPilot Express SDK, in the APK. That is what ExecuTorch's backend does.
+to bundle MediaTek's own adapter libraries in the APK, which is what ExecuTorch's
+backend does. Getting them is easier than expected — see below.
 
 ## Why there is no ggml backend, and why writing one is not on the table
 
@@ -75,10 +75,42 @@ exists because its vendor exposed something below whole-graph compilation.
 ## The two real paths, and what each would cost
 
 **ExecuTorch MediaTek backend.** Explicitly supports D9300 and **D9400**, so the
-target device qualifies. Needs the NeuroPilot Express SDK from MediaTek's portal
-(`mtk_neuron`, `mtk_converter` wheels), a Linux host, and an ahead-of-time export
-from a **PyTorch** model to `.pte`. Quantization is A16W16, A16W8, A16W4, A8W8 or
-A8W4.
+target device qualifies. Needs the NeuroPilot Express SDK, a Linux host, and an
+ahead-of-time export from a **PyTorch** model to `.pte`. Quantization is A16W16,
+A16W8, A16W4, A8W8 or A8W4.
+
+The SDK is **not gated**, which this document previously got wrong. It is a
+plain public download with no account, no NDA and no partner status, from
+<https://neuropilot.mediatek.com/resources/public/npexpress/en/docs/npexpress>
+— note `public` in the path. Verified 2026-08-30 by downloading
+`neuropilot-express-sdk-8.0.8-build20250925.tar.gz` (79 MB, HTTP 200, no
+credentials). It contains exactly what ExecuTorch names, at the documented
+versions:
+
+```
+libneuronusdk_adapter.mtk.so          ELF 64-bit aarch64
+libneuron_buffer_allocator.so         ELF 64-bit aarch64
+mtk_neuron-8.2.23-py3-none-linux_x86_64.whl
+mtk_converter-8.13.0+public-cp310-cp310-manylinux_2_17_x86_64...whl
+api/NeuronAdapter.h
+LICENSE AGREEMENT.pdf
+```
+
+Two practical notes. The tarball is served with an opaque S3 filename, so rename
+it to the package name before extracting. And the wheels are **linux_x86_64 and
+CPython 3.10 only** — an Apple Silicon Mac cannot run the toolchain natively; it
+needs a Linux x86_64 host, a `--platform linux/amd64` container, or a cloud
+instance. Only the host toolchain has that constraint; the two `.so` are aarch64
+for the phone.
+
+The licence is a click-through MediaTek EULA, and its grant is more permissive
+than the "confidential" watermark suggests. It is `royalty- and fee-free`, and
+allows You to "distribute and sublicense the Software solely in object code
+format and as incorporated in Your software application to be used in
+conjunction with MediaTek chipsets" — so shipping the two `.so` inside an APK is
+permitted. What is not permitted is distributing the SDK "on a standalone
+basis". It also explicitly allows use "for the purpose of benchmarking", which
+many vendor licences do not, so published numbers would be above board.
 
 **LiteRT NeuroPilot accelerator.** Google's replacement for the old TFLite
 NeuroPilot delegate, generally available, with a unified `CompiledModel` API that

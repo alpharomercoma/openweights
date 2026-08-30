@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One instance of a variable font, cut by the framework rather than by Compose.
+
+  Compose's `Font(resId, weight, variationSettings = ...)` is ignored on device: every
+  weight declared that way resolved to the same 400 face, so nothing in the app was ever
+  bold, semibold or medium. A font-family resource carries the axis in the form the
+  platform itself applies, and it produces a real instance rather than a faked one.
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/schibsted_grotesk"
+        android:fontStyle="normal"
+        android:fontWeight="600"
+        android:fontVariationSettings="'wght' 600" />
+</font-family>

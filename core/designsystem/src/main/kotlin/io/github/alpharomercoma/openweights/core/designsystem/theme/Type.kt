@@ -17,11 +17,9 @@
 package io.github.alpharomercoma.openweights.core.designsystem.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -39,20 +37,34 @@ import io.github.alpharomercoma.openweights.core.designsystem.R
  * All three ship as single variable fonts with a weight axis, so each family is one file and
  * every weight is a variation of it rather than another download.
  */
-@OptIn(ExperimentalTextApi::class)
+/**
+ * Each weight is a real instance of the variable font, cut in a font-family resource.
+ *
+ * It used to be `Font(R.font.x, FontWeight.Bold, variationSettings = weightAxis(700))`,
+ * which reads correctly and does nothing: those settings are ignored on device, so every
+ * declared weight resolved to the same 400 face. Nothing in this app was ever bold,
+ * semibold or medium — not a heading, not a label, and not a `**word**` in a model's
+ * reply. Worse than merely flat: declaring the faces also told Compose it had them, which
+ * suppressed the synthetic bold that would otherwise have covered for it. `***both***`
+ * looked right only because no italic face exists either, so that one path fell through to
+ * synthesis and got emboldened on the way past.
+ *
+ * Proved on a device by rendering the same file four ways and comparing the pixels; only
+ * this one and Compose's own synthesis produced any weight at all, and this one produces a
+ * true instance rather than a smeared 400. See MarkdownTortureOnDeviceTest.
+ */
 private val Display = FontFamily(
-    Font(R.font.schibsted_grotesk, FontWeight.SemiBold, variationSettings = weightAxis(600)),
-    Font(R.font.schibsted_grotesk, FontWeight.Bold, variationSettings = weightAxis(700)),
+    Font(R.font.schibsted_grotesk, FontWeight.Normal),
+    Font(R.font.schibsted_grotesk_semibold, FontWeight.SemiBold),
+    Font(R.font.schibsted_grotesk_bold, FontWeight.Bold),
 )
 
-@OptIn(ExperimentalTextApi::class)
 private val Body = FontFamily(
-    Font(R.font.hanken_grotesk, FontWeight.Normal, variationSettings = weightAxis(400)),
-    Font(R.font.hanken_grotesk, FontWeight.Medium, variationSettings = weightAxis(500)),
-    Font(R.font.hanken_grotesk, FontWeight.SemiBold, variationSettings = weightAxis(600)),
+    Font(R.font.hanken_grotesk, FontWeight.Normal),
+    Font(R.font.hanken_grotesk_medium, FontWeight.Medium),
+    Font(R.font.hanken_grotesk_semibold, FontWeight.SemiBold),
+    Font(R.font.hanken_grotesk_bold, FontWeight.Bold),
 )
-
-private fun weightAxis(weight: Int) = FontVariation.Settings(FontVariation.weight(weight))
 
 /**
  * Monospace, for anything the user might compare row to row.
@@ -61,10 +73,10 @@ private fun weightAxis(weight: Int) = FontVariation.Settings(FontVariation.weigh
  * digits line up and not who drew them. It was IBM Plex Mono; it is Geist Mono now, and no
  * call site had to change.
  */
-@OptIn(ExperimentalTextApi::class)
 val PlexMono = FontFamily(
-    Font(R.font.geist_mono, FontWeight.Normal, variationSettings = weightAxis(400)),
-    Font(R.font.geist_mono, FontWeight.Medium, variationSettings = weightAxis(500)),
+    Font(R.font.geist_mono, FontWeight.Normal),
+    Font(R.font.geist_mono_medium, FontWeight.Medium),
+    Font(R.font.geist_mono_bold, FontWeight.Bold),
 )
 
 /**

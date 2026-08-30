@@ -28,7 +28,7 @@ class MarkdownWideTableTest {
             1 | 2 | 3 | 4 | 5 | 6
         """.trimIndent()
 
-        assertThat(markdown.containsWideMarkdownTable()).isTrue()
+        assertThat(markdown.wideMarkdownTableChars()).isGreaterThan(0)
     }
 
     @Test
@@ -39,7 +39,7 @@ class MarkdownWideTableTest {
             Runtime | This value is substantially longer than a compact phone can show
         """.trimIndent()
 
-        assertThat(markdown.containsWideMarkdownTable()).isTrue()
+        assertThat(markdown.wideMarkdownTableChars()).isGreaterThan(0)
     }
 
     @Test
@@ -50,6 +50,6 @@ class MarkdownWideTableTest {
             CPU | 4
         """.trimIndent()
 
-        assertThat(markdown.containsWideMarkdownTable()).isFalse()
+        assertThat(markdown.wideMarkdownTableChars()).isEqualTo(0)
     }
 }

@@ -85,6 +85,13 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
             // Echo replays the prompt through onResult, and the whole conversation would
             // arrive looking like something the model had written.
             .echo(false)
+            // Explicit, because this one is applied per call and would otherwise append an
+            // EOS token to the end of every suffix fed in — turning what should be a
+            // continuation into a sequence of terminated fragments. The module's BOS is
+            // the opposite case: it is added once after construction or resetContext and
+            // then suppressed, so incremental feeding cannot duplicate it, and the
+            // per-call numBos in this config is ignored by the JNI layer entirely.
+            .numEos(0)
             .build()
 
         running.generate(

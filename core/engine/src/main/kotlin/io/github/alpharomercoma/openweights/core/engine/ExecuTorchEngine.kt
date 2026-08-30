@@ -25,8 +25,10 @@ import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
 import java.io.File
 
@@ -58,6 +60,26 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
     private var info: LoadedModelInfo? = null
     private var template: PromptTemplate? = null
     private var contextSize: Int = 0
+
+    /**
+     * The text the runtime's KV cache currently holds, prompt and reply together.
+     *
+     * Kept as text rather than as a token count because that is what can be compared: the
+     * next turn is an extension of this one exactly when its rendered prompt starts with
+     * this string. Cleared whenever the cache is, since a stale value would claim the
+     * runtime holds something it does not and skip feeding it.
+     */
+    private var fedText: String = ""
+
+    /**
+     * How many tokens the runtime is holding, counted rather than guessed.
+     *
+     * The runtime reports what each call *gave* it, so the conversation's length is the
+     * running sum of every prompt and reply fed since the cache was last cleared. That sum
+     * is what a turn reusing the cache did not have to re-read, which is exactly what
+     * [GenerationStats.cachedTokens] means.
+     */
+    private var heldTokens: Int = 0
 
     override val loadedModel: LoadedModelInfo? get() = info
 
@@ -111,6 +133,9 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
 
     override suspend fun unload() {
         bridge.close()
+        fedText = ""
+        heldTokens = 0
+
         info = null
         template = null
     }
@@ -119,66 +144,117 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
         messages: List<ChatMessage>,
         params: SamplerParams,
         tools: List<ToolDefinition>,
-    ): Flow<GenerationEvent> = flow {
+    ): Flow<GenerationEvent> = channelFlow {
         val rendering = template ?: throw LlamaException("No model loaded")
         val prompt = rendering.render(messages, tools, params.thinking)
 
-        // ExecuTorch's runner continues from wherever it left off rather than matching a
-        // prefix. `pos_` survives a generation, so sending the conversation again appends
-        // a second copy behind the first: measured on device, turn one ended at pos_ 2047
-        // and turn two tried to add 2068 more tokens into a 2048-token window and was
-        // refused. llama.cpp would have recognised the shared prefix and charged for the
-        // difference; this runtime has no such notion, so the honest thing is to start
-        // from nothing and send the whole conversation, which is what the prompt above is.
+        // What the runtime already holds, and whether this turn extends it.
         //
-        // That makes every turn pay full prefill. Feeding only the new turn and letting
-        // `pos_` carry would avoid it, and is the obvious next thing to measure — but it
-        // is not free correctness: the cache would then hold assistant turns *with* their
-        // reasoning, while Qwen3's template says to strip reasoning from everything before
-        // the user's last question. The two cannot both be true, and picking wrong is the
-        // kind of error that degrades answers without ever failing.
-        bridge.resetContext()
+        // ExecuTorch continues rather than matching a prefix: `pos_` survives a generation
+        // and `generate` appends wherever it left off. That makes re-sending a conversation
+        // a bug — measured, turn one ended at pos_ 2047 and turn two was refused for
+        // appending 2068 more into a 2048 window — but it also means the cache is worth
+        // keeping when the new prompt genuinely begins with what is in it.
+        //
+        // Comparing the rendered text is the whole test, and it is exact. A template that
+        // re-renders an earlier turn differently produces a prompt that is not an extension,
+        // the comparison fails, and the turn starts from nothing. No knowledge of *why* it
+        // changed is needed here, which matters because the reasons are not obvious:
+        // Qwen3 drops `<think>` from assistant turns once a newer user question arrives, the
+        // tool list lives at the very front and this app withdraws it when a turn's budget
+        // is spent, and consecutive tool results collapse into one block whose terminator
+        // moves when a second result lands. Each rewrites text that has already been fed.
+        // An exact hit would leave nothing to send, and this runtime rejects an empty
+        // prompt outright — it only accepts one after a separate native prefill call that
+        // this bridge never makes. Requiring new text keeps that unreachable.
+        val extending = fedText.isNotEmpty() &&
+            prompt.startsWith(fedText) &&
+            prompt.length > fedText.length
+        val reused = if (extending) heldTokens else 0
+        val fresh = if (extending) {
+            prompt.substring(fedText.length)
+        } else {
+            bridge.resetContext()
+            fedText = ""
+            heldTokens = 0
 
-        val reply = StringBuilder()
+            prompt
+        }
+
+        val reply = StreamedReply(rendering)
         val started = System.currentTimeMillis()
         var firstTokenAt = 0L
 
         // Zero means "no limit" to llama.cpp, which stops at the context edge on its own.
-        // Here that becomes "as many as the window still has room for", and ExecuTorch
-        // clamps it against the prompt for us. Passing the caller's number straight through
-        // is only correct because the bridge takes *new* tokens; the runtime's simpler
-        // entry point takes a total sequence length, where a 24-token reply budget behind a
-        // 907-token prompt resolves to a negative allowance and refuses to generate.
+        // Here that becomes "as much as the window still has room for". Passing the number
+        // straight through is only correct because the bridge counts *new* tokens; the
+        // runtime's simpler entry point counts total sequence length, where a 24-token
+        // reply budget behind a 907-token prompt resolved to 1141 and ignored the budget.
         val budget = params.maxTokens.takeIf { it > 0 } ?: contextSize
-        val outcome = bridge.generate(prompt, budget) { fragment ->
-            if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
-            reply.append(fragment)
+
+        // Anything thrown below leaves the runtime's position advanced by however much it
+        // managed to prefill and decode, which no longer matches anything recorded. The
+        // cache is unusable rather than merely unknown, so it is dropped: a retry that
+        // trusted the old record would send the same suffix at an already-advanced position
+        // and duplicate it.
+        val outcome = try {
+            bridge.generate(fresh, budget) { fragment ->
+                if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
+                reply.accept(fragment)?.let { trySend(GenerationEvent.Token(it)) }
+                if (reply.endedCleanly) bridge.stop()
+            }
+        } catch (failure: Throwable) {
+            fedText = ""
+            heldTokens = 0
+            runCatching { bridge.resetContext() }
+            throw failure
         }
 
-        // Everything from the end-of-turn marker onwards is the format leaking out, not
-        // the answer. llama.cpp stops on these tokens because the GGUF names them;
-        // ExecuTorch streams whatever it decodes, so every reply ended with a visible
-        // `<|im_end|>` until this was here. Found on device, not by reading.
-        val raw = rendering.stopMarkers
-            .mapNotNull { marker -> reply.indexOf(marker).takeIf { it >= 0 } }
-            .minOrNull()
-            ?.let { reply.substring(0, it) }
-            ?: reply.toString()
+        // Whatever was held back in case it grew into a marker still belongs to the reply
+        // when nothing came of it. Without this flush the caller's streamed text ends short
+        // of the completed text, and since the app stores what it streamed, its history
+        // would no longer match what was fed.
+        reply.flush()?.let { trySend(GenerationEvent.Token(it)) }
+
+        // What the runtime is *committed* to, which is not what it produced. A sampled token
+        // only enters the KV cache when it is fed back in to produce the next one, so the
+        // token that ended generation never got there: stopping at `<|im_end|>` leaves the
+        // cache holding everything before it and not the marker itself. Recording the marker
+        // would make the next turn skip feeding it, and the two turns would run together
+        // with no end-of-turn between them.
+        //
+        // The same is true of a reply that ran out of budget, except there the uncommitted
+        // token is ordinary text this code cannot identify by character position. So that
+        // case gives up reuse entirely rather than guess: an empty record forces the next
+        // turn to start over, which is slow and correct.
+        if (reply.endedCleanly) {
+            fedText = prompt + reply.answer
+            heldTokens = reused + outcome.promptTokens + outcome.generatedTokens
+        } else {
+            fedText = ""
+            heldTokens = 0
+        }
+
+        val raw = reply.answer
         val parsed = ToolCallParser.parse(raw)
-        emit(
+        send(
             GenerationEvent.Completed(
                 reason = outcome.reason,
-                stats = statsFor(outcome, started, firstTokenAt),
+                stats = statsFor(outcome, started, firstTokenAt, reused, prompt),
                 content = parsed.text.withoutReasoning(),
                 reasoning = raw.reasoning(),
                 toolCalls = parsed.calls,
             ),
         )
-    }.flowOn(Dispatchers.IO)
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
     override fun cancel() = bridge.stop()
 
-    override suspend fun resetContext() = bridge.resetContext()
+    override suspend fun resetContext() {
+        bridge.resetContext()
+        fedText = ""
+        heldTokens = 0
+    }
 
     /** Thread counts belong to the backend a `.pte` was compiled against, not to a call. */
     override suspend fun setThreads(generateThreads: Int, batchThreads: Int) = Unit
@@ -189,6 +265,9 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
 
     override fun close() {
         bridge.close()
+        fedText = ""
+        heldTokens = 0
+
         info = null
         template = null
     }
@@ -204,6 +283,8 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
         outcome: ExecuTorchOutcome,
         started: Long,
         firstTokenAt: Long,
+        reused: Int,
+        prompt: String,
     ): GenerationStats {
         val finished = System.currentTimeMillis()
         val timeToFirst = if (firstTokenAt > 0) firstTokenAt - started else finished - started
@@ -215,9 +296,20 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
             timeToFirstTokenMs = timeToFirst,
             contextUsed = 0,
             contextSize = contextSize,
-            // Zero because this engine cannot yet say, not because nothing was reused.
-            // See the note on prefix reuse in the class documentation.
-            cachedTokens = 0,
+            // What the runtime kept rather than what it re-read. It reports the tokens
+            // it was *given*, which on an extending turn is only the new text, so the rest
+            // of the conversation is the difference between that and the window in use.
+            // Zero on a turn that started from nothing, which is the honest answer there.
+            cachedTokens = reused,
+            // The opener can carry a thinking block the reply continues from — Qwen3
+            // closes an empty one when reasoning is switched off — and it is in the prompt
+            // and never in the reply, so stored history has to have it put back.
+            //
+            // Worth knowing that this does not rescue the cache. The template drops that
+            // block from history however it is stored, so a turn generated with reasoning
+            // off can never be extended: switching reasoning *off* is what costs the cache
+            // here, which is the opposite of what it sounds like.
+            thinkingPrefilled = prompt.endsWith(THINK_CLOSE + "\n\n"),
         )
     }
 
@@ -253,5 +345,46 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
          * this is the value the model is opened with and [SamplerParams] cannot move it.
          */
         const val DEFAULT_TEMPERATURE = 0.8f
+    }
+}
+
+/**
+ * A reply arriving in fragments, and the question of how much of it is safe to show.
+ *
+ * Separate from the engine because the arithmetic is fiddly and entirely about text.
+ * Fragments do not arrive on marker boundaries, so `<|im_end|>` reaches the callback in
+ * pieces; streaming each piece as it lands puts `<|i` on screen and then takes it away.
+ * Nothing that could still grow into a marker is released until it either becomes one or
+ * cannot.
+ */
+private class StreamedReply(private val template: PromptTemplate) {
+    private val text = StringBuilder()
+    private var shown = 0
+    private var ends = -1
+
+    /** True once the model produced an end-of-turn marker rather than merely stopping. */
+    val endedCleanly: Boolean get() = ends >= 0
+
+    /** The reply without the marker or anything after it. */
+    val answer: String get() = text.take(if (ends >= 0) ends else text.length).toString()
+
+    /** Adds [fragment], returning any text that has become safe to show. */
+    fun accept(fragment: String): String? {
+        text.append(fragment)
+        if (ends < 0) {
+            ends = template.stopMarkers
+                .mapNotNull { marker -> text.indexOf(marker).takeIf { at -> at >= 0 } }
+                .minOrNull() ?: -1
+        }
+        val safe = if (ends >= 0) ends else text.length - template.danglingMarkerLength(text)
+        if (safe <= shown) return null
+        return text.substring(shown, safe).also { shown = safe }
+    }
+
+    /** Text withheld in case it became a marker, once it is known that it did not. */
+    fun flush(): String? {
+        val finish = if (ends >= 0) ends else text.length
+        if (finish <= shown) return null
+        return text.substring(shown, finish).also { shown = finish }
     }
 }

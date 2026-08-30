@@ -38,6 +38,21 @@ interface PromptTemplate {
     val stopMarkers: List<String> get() = emptyList()
 
     /**
+     * How much of the tail of [text] could still grow into a stop marker.
+     *
+     * Streaming has to hold that much back. Fragments do not arrive on marker boundaries,
+     * so a marker reaches the caller in pieces, and showing each piece as it lands puts
+     * `<|i` on the screen and then removes it.
+     */
+    fun danglingMarkerLength(text: CharSequence): Int = stopMarkers.maxOfOrNull { marker ->
+        val longest = minOf(marker.length - 1, text.length)
+        (longest downTo 1).firstOrNull { length ->
+            val tail = text.subSequence(text.length - length, text.length)
+            marker.startsWith(tail)
+        } ?: 0
+    } ?: 0
+
+    /**
      * @param thinking whether the model may reason before answering. Families that support
      * it spell the switch differently, and a family that does not simply ignores it.
      */
@@ -73,6 +88,12 @@ object PromptTemplates {
  * An adapter rather than making that object implement the interface directly, because its
  * `render` carries default arguments an override is not allowed to keep, and those defaults
  * are what `Qwen3PromptTest` calls it through.
+ *
+ * History is rendered verbatim here, which upstream's template does not do. Only ExecuTorch
+ * uses this interface, and that runtime's cache holds what was actually generated: applying
+ * the template's history rules would describe a different conversation, the cache would stop
+ * matching, and every turn would re-read the whole thing. The trade is that a reply's
+ * reasoning stays in the context instead of being dropped once a newer question arrives.
  */
 private object Qwen3Template : PromptTemplate {
     /** ChatML's end-of-turn marker, which Qwen3 emits and nothing should show a user. */
@@ -82,5 +103,5 @@ private object Qwen3Template : PromptTemplate {
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         thinking: Boolean,
-    ): String = Qwen3Prompt.render(messages, tools, thinking)
+    ): String = Qwen3Prompt.render(messages, tools, thinking, verbatimHistory = true)
 }

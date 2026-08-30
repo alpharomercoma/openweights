@@ -97,16 +97,12 @@ class ExecuTorchOnDeviceTest {
     }
 
     /**
-     * Whether a second turn costs what the whole conversation costs, or only what is new.
+     * Whether a second turn costs the whole conversation or only what is new.
      *
-     * This is the open question that decides whether this engine is usable for the app's
-     * real traffic. `LlmModule` carries state — it has `resetContext` and a
-     * prefill-without-generating call — but nothing in its signatures says whether an
-     * ordinary generation continues from it, and the app's multi-turn cost is dominated by
-     * the answer. See docs/research/executorch.md.
-     *
-     * Measured rather than asserted, because the honest form of this test is a number in a
-     * log, not a threshold somebody guessed. Assertions here cover only that both turns ran.
+     * The engine keeps the runtime's cache when the next prompt genuinely begins with what
+     * has already been fed, which is what this measures. Two turns, the second extending
+     * the first: if the cache is kept, its prefill is a fraction of turn one's despite the
+     * conversation being longer.
      */
     @Test
     fun reportsWhatASecondTurnCosts(): Unit = runBlocking {
@@ -115,36 +111,84 @@ class ExecuTorchOnDeviceTest {
         val first = listOf(ChatMessage.text(ChatRole.USER, LONG_PROMPT))
         val one = turn(first)
 
+        // Stored the way the app stores it: the raw streamed reply, not the parsed
+        // content. Storing the parsed form drops the reasoning, and the runtime's cache
+        // holds the reasoning, so the next render would describe a different conversation
+        // and throw the cache away. Measured: that is exactly what happened before.
         val second = first +
-            ChatMessage.text(ChatRole.ASSISTANT, one.content.ifEmpty { "Understood." }) +
+            ChatMessage.text(ChatRole.ASSISTANT, one.raw.ifEmpty { "Understood." }) +
             ChatMessage.text(ChatRole.USER, "In one word, what did I just describe?")
         val two = turn(second)
 
         Log.i(
             TAG,
-            "turn 1: prompt=${one.stats.promptTokens} prefill=${one.stats.prefillMs}ms " +
-                "ttft=${one.stats.timeToFirstTokenMs}ms",
+            "turn 1: prompt=${one.stats.promptTokens} cached=${one.stats.cachedTokens} " +
+                "prefill=${one.stats.prefillMs}ms",
         )
         Log.i(
             TAG,
-            "turn 2: prompt=${two.stats.promptTokens} prefill=${two.stats.prefillMs}ms " +
-                "ttft=${two.stats.timeToFirstTokenMs}ms",
+            "turn 2: prompt=${two.stats.promptTokens} cached=${two.stats.cachedTokens} " +
+                "prefill=${two.stats.prefillMs}ms",
         )
-        // The number this test exists to produce. Well under 1 means the second turn only
-        // paid for what was new, and prefix reuse is real; at or above 1 means the whole
-        // conversation was re-read and the engine re-prefills every turn.
         val ratio = two.stats.prefillMs.toDouble() / one.stats.prefillMs.coerceAtLeast(1)
-        Log.i(TAG, "second-turn prefill ratio: $ratio (prompt grew, so <1 means reuse)")
+        Log.i(TAG, "second-turn prefill ratio: $ratio (well under 1 means the cache held)")
+        // Speed is worthless if the answer stopped making sense. Feeding a suffix means the
+        // runtime tokenises text that was previously tokenised as part of a larger string,
+        // and a boundary falling mid-word would corrupt the sequence quietly — a fast reply
+        // that has lost the thread. The split lands on `<|im_start|>`, a special token, so
+        // it should be safe; this is what would catch it if it were not.
+        Log.i(TAG, "turn 2 reply: ${two.content}")
 
         assertThat(one.stats.prefillMs).isGreaterThan(0L)
-        assertThat(two.stats.prefillMs).isGreaterThan(0L)
+        // The point of the whole exercise: turn two must not re-read turn one. Generous,
+        // because this asserts the cache was kept rather than a particular speed.
+        assertThat(two.stats.prefillMs).isLessThan(one.stats.prefillMs)
+        assertThat(two.stats.cachedTokens).isGreaterThan(0)
+        // Still an answer, not debris from a mis-split sequence.
+        assertThat(two.content).isNotEmpty()
+        assertThat(two.content).doesNotContain("<|im_")
     }
 
-    private suspend fun turn(messages: List<ChatMessage>): GenerationEvent.Completed =
-        engine.chat(messages, SamplerParams(maxTokens = 24, thinking = false))
-            .toList()
-            .filterIsInstance<GenerationEvent.Completed>()
-            .single()
+    /** Reasoning off is the case that cannot reuse the cache; it must still be correct. */
+    @Test
+    fun stillAnswersWithReasoningOff(): Unit = runBlocking {
+        engine.load(MODEL, PARAMS)
+
+        val done = turn(listOf(ChatMessage.text(ChatRole.USER, "Name one colour.")))
+
+        Log.i(TAG, "reasoning-off reply: ${done.content}")
+        assertThat(done.content).isNotEmpty()
+        assertThat(done.content).doesNotContain("<|im_end|>")
+    }
+
+    /**
+     * One turn, with reasoning left on.
+     *
+     * Reasoning is deliberately on: Qwen3 disables it by closing an empty `<think>` block
+     * in the assistant opener, that text lands in the cache, and the template never
+     * reproduces it when the turn becomes history — so a turn generated with reasoning off
+     * can never be extended. Switching it off is what costs the cache, which is the
+     * opposite of how it sounds.
+     *
+     * The budget is the default, meaning the rest of the window, and that matters as much.
+     * A reply cut short by a token budget never emits its end-of-turn marker, and without
+     * that marker the engine cannot say which tokens the runtime actually committed, so it
+     * gives up the cache rather than guess. Asking for 48 tokens here measured a ratio of
+     * 1.96 — worse than no cache at all — purely because nothing ever finished.
+     */
+    private suspend fun turn(messages: List<ChatMessage>): Turn {
+        val events = engine.chat(messages, SamplerParams(maxTokens = 48)).toList()
+        return Turn(
+            done = events.filterIsInstance<GenerationEvent.Completed>().single(),
+            raw = events.filterIsInstance<GenerationEvent.Token>().joinToString("") { it.text },
+        )
+    }
+
+    /** A finished turn, with the streamed text the app would store as history. */
+    private data class Turn(val done: GenerationEvent.Completed, val raw: String) {
+        val stats get() = done.stats
+        val content get() = done.content
+    }
 
     private companion object {
         const val TAG = "ExecuTorchOnDevice"

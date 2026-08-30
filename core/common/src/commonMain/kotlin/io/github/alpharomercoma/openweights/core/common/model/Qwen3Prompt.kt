@@ -40,12 +40,19 @@ object Qwen3Prompt {
      * @param thinking whether to let the model reason before answering. Qwen3 disables it
      * by closing an empty `<think>` block in the assistant opener rather than by any flag,
      * so the switch is part of the prompt and costs four tokens.
+     * @param verbatimHistory emit each assistant turn exactly as stored, instead of applying
+     * the template's rules to it. A deliberate divergence from upstream, for a runtime whose
+     * KV cache holds what was actually generated: reformatting an earlier turn — dropping
+     * its reasoning, re-wrapping its tags — describes a conversation the cache is not
+     * holding, and the cache then has to be thrown away and the whole prompt re-read. Off
+     * by default, so `Qwen3PromptTest` still compares against upstream's own output.
      */
     fun render(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition> = emptyList(),
         thinking: Boolean = true,
         addGenerationPrompt: Boolean = true,
+        verbatimHistory: Boolean = false,
     ): String = buildString {
         appendSystem(messages, tools)
 
@@ -56,7 +63,11 @@ object Qwen3Prompt {
                     appendBlock(message.role.wireName, message.text)
 
                 message.role == ChatRole.ASSISTANT ->
-                    appendAssistant(message, index, lastQuery, index == messages.lastIndex)
+                    if (verbatimHistory) {
+                        appendBlock("assistant", message.text)
+                    } else {
+                        appendAssistant(message, index, lastQuery, index == messages.lastIndex)
+                    }
 
                 message.role == ChatRole.TOOL -> {
                     // A run of results is one user turn holding several responses, which is

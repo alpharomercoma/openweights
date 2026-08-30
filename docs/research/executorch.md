@@ -84,33 +84,42 @@ nothing here has.
 
 Three of these are permanent, and the first is the one that matters for this app.
 
-1. **No prefix reuse, and the reason is structural.** *Measured 2026-08-31 on the
-   Dimensity 9400, Qwen3-1.7B q8da4w.* Both earlier claims here were wrong in turn: first
-   that ExecuTorch holds nothing between calls, then that it might reuse a prefix. What it
-   actually does is **continue**. `pos_` survives a generation, and `generate` appends the
-   prompt it is given at whatever position it left off — it never compares the new prompt
-   against what it holds.
+1. **Reuse works, but only by feeding the runtime the way it actually behaves.**
+   *Measured 2026-08-31 on the Dimensity 9400, Qwen3-1.7B q8da4w.* ExecuTorch does not
+   match a prefix — it **continues**. `pos_` survives a generation and `generate` appends
+   wherever it left off. Re-sending a conversation is therefore a bug, not an optimisation:
+   turn one ended at `pos_ 2047` and turn two was refused for appending 2068 more into a
+   2048-token window.
 
-   That is not prefix matching, and re-sending a conversation is therefore a bug rather
-   than an optimisation: turn one ended at `pos_ 2047` and turn two tried to append 2068
-   more tokens into a 2048-token window and was refused outright. The engine now clears the
-   context before every turn, which is correct and costs a full prefill each time:
+   The engine keeps the runtime's cache when the newly rendered prompt genuinely begins
+   with what has already been fed, and sends only the remainder:
 
-   | | prompt | prefill | rate |
+   | | fed | reused | prefill |
    | --- | ---: | ---: | ---: |
-   | short question | 19 | 212 ms | 89.6 t/s |
-   | turn 1 | 907 | 5,860 ms | 154.8 t/s |
-   | turn 2 | 1,061 | 7,958 ms | 133.3 t/s |
+   | turn 1 | 903 | 0 | 5,852 ms |
+   | turn 2 | **20** | **1,192** | **215 ms** |
 
-   Decode measured 21 tokens in 773 ms, about 27 t/s. The second turn cost **1.36×** the
-   first for a prompt 1.17× as long, so nothing was reused and the rate got slightly worse
-   as the prompt grew.
+   A second turn costs **0.037×** the first, against **1.36×** when every turn re-read the
+   whole conversation. Decode is unchanged at about 27 t/s.
 
-   Feeding only the new turn and letting `pos_` carry would avoid the re-prefill, and is
-   the obvious next thing to measure. It is not free correctness: the cache would then hold
-   assistant turns *with* their reasoning, while Qwen3's template says to strip reasoning
-   from everything before the user's last question. Both cannot be true, and choosing wrong
-   degrades answers without ever failing.
+   Three things had to be true for that, and each was found by being wrong first:
+
+   - **History is rendered verbatim, diverging from upstream's template on purpose.** Qwen3
+     drops a reply's reasoning once a newer question arrives. The cache holds what was
+     actually *generated*, reasoning included, so applying that rule describes a
+     conversation the runtime is not holding and throws the cache away. A model that thinks
+     could otherwise never reuse anything. The cost is that old reasoning stays in context.
+   - **Switching reasoning off costs the cache**, which is the opposite of how it sounds.
+     Qwen3 disables it by closing an empty `<think>` block *in the assistant opener*; that
+     text is fed and sits in the cache, and the template never reproduces it when the turn
+     becomes history.
+   - **A reply cut short by a token budget cannot be reused.** A sampled token only enters
+     the cache when it is fed back in to produce the next one, so whatever ended generation
+     never got there. Ending at a stop marker makes that token identifiable and it is simply
+     excluded; ending at a budget leaves it as ordinary text no character position can
+     identify, so the engine gives up the cache rather than guess. Asking for 48 tokens
+     measured a ratio of **1.96 — worse than no cache at all**, purely because nothing ever
+     finished. Production asks for the rest of the window, so replies end naturally.
 
 2. **A curated catalogue.** A `.pte` is compiled ahead of time on a desktop, per backend,
    and for an NPU per SoC. Models arrive because somebody ran a build. That is precisely the
@@ -156,8 +165,14 @@ None of these are visible from the API, the documentation, or a test against a f
 
 ## Open
 
-- Whether feeding only the new turn beats re-prefilling, and what it costs in answer
-  quality given the reasoning-strip conflict above.
+- What verbatim history costs in answer quality. It is a deliberate divergence from
+  upstream's template and it buys 27x on prefill, but nothing here has measured whether
+  keeping old reasoning in context makes replies worse.
+- Token boundaries. The cache is compared as *text* while it holds *tokens*, and
+  `tokenize(A + B)` need not equal `tokenize(A) + tokenize(B)`. Every split currently lands
+  next to `<|im_end|>`, which Qwen3 declares a non-stripping special token and which
+  therefore forces a stable boundary — so this is sound today and would need re-checking
+  for any other model.
 - A like-for-like comparison. These numbers are Qwen3-1.7B at q8da4w on ExecuTorch; the
   llama.cpp figures in [`npu-prefill-multiturn.md`](npu-prefill-multiturn.md) are
   LFM2.5-1.2B at Q4_0/Q8_0. Same ballpark, different models, so neither is evidence about

@@ -28,6 +28,9 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     var lastPrompt: String? = null
         private set
 
+    /** Every prompt fed since construction, so a turn's *delta* can be asserted on. */
+    val prompts: MutableList<String> = mutableListOf()
+
     /** New tokens asked for, so the zero-means-no-limit case can be checked. */
     var lastMaxNewTokens: Int = -1
         private set
@@ -60,6 +63,9 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
 
     var outcome: ExecuTorchOutcome = ExecuTorchOutcome(StopReason.END_OF_TURN)
 
+    /** Set to make [generate] throw partway, as a runtime error would. */
+    var failsDuringGeneration: String? = null
+
     override fun load(
         modelPath: String,
         tokenizerPath: String,
@@ -79,9 +85,11 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         onToken: (String) -> Unit,
     ): ExecuTorchOutcome {
         lastPrompt = prompt
+        prompts += prompt
         lastMaxNewTokens = maxNewTokens
         // Fragment by fragment, because the engine must not assume one callback per reply.
         reply.chunked(FRAGMENT).forEach(onToken)
+        failsDuringGeneration?.let { throw LlamaException(it) }
         return outcome
     }
 

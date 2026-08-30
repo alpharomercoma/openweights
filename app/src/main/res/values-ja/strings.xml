@@ -238,4 +238,7 @@
     <string name="search_archived">アーカイブを検索</string>
     <string name="nothing_archived">アーカイブは空です。チャットをアーカイブすると、一覧から外れますが残ります。</string>
     <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
+    <string name="compiled_runs_on_cpu">CPU 向けにコンパイル済み</string>
+    <string name="compiled_runs_on_gpu">GPU 向けにコンパイル済み</string>
+    <string name="compiled_runs_on_npu">NPU 向けにコンパイル済み</string>
 </resources>

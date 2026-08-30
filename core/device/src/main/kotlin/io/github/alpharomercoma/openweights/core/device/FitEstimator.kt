@@ -117,6 +117,60 @@ class FitEstimator @Inject constructor() {
     }
 
     /**
+     * The same question for weights compiled ahead of time, which carry no metadata.
+     *
+     * A GGUF describes itself — layers, heads, training window — so the KV cache can be
+     * computed for whatever context the user picks. A `.pte` is a compiled graph: its
+     * window was fixed when it was exported and nothing in the file says what it costs.
+     * Measured on a Dimensity 9400, a 1.22 GB Qwen3-1.7B export sat at 2.9 GB resident, so
+     * the cache is most of what it uses and pretending otherwise would call a model
+     * comfortable and then run the phone out of memory.
+     *
+     * So the allowance is a multiple of the weights rather than a computed figure, and it
+     * is deliberately coarse. [FitReport.kvCacheBytes] is reported as zero because zero is
+     * not a claim: the file does not say, and this cannot either.
+     */
+    fun estimateCompiled(
+        device: DeviceProfile,
+        fileSizeBytes: Long,
+        /** Measured throughput for a compiled model on this device. Never a GGUF's. */
+        calibration: ThroughputCalibration? = null,
+        prefillCalibration: ThroughputCalibration? = null,
+    ): FitReport {
+        val required = saturatedSum(
+            fileSizeBytes,
+            (fileSizeBytes * COMPILED_RUNTIME_FACTOR).toLong(),
+            RUNTIME_OVERHEAD_BYTES,
+        )
+        val usable = device.usableMemoryBytes
+
+        val verdict = when {
+            device.freeStorageBytes < saturatedSum(fileSizeBytes, STORAGE_MARGIN_BYTES) ->
+                FitVerdict.NO_ROOM_TO_DOWNLOAD
+
+            required > usable -> FitVerdict.WONT_RUN
+            required > usable * TIGHT_FRACTION -> FitVerdict.TIGHT
+            required > device.availableMemoryBytes -> FitVerdict.TIGHT
+            else -> FitVerdict.COMFORTABLE
+        }
+
+        return FitReport(
+            verdict = verdict,
+            requiredMemoryBytes = required,
+            usableMemoryBytes = usable,
+            // Not zero because there is no cache — it is most of the memory above — but
+            // because the file does not say how big it is, and a number here would be made
+            // up rather than read.
+            kvCacheBytes = 0,
+            estimatedDecodeTokensPerSecond = calibration?.predictFor(fileSizeBytes),
+            // Fixed at export. Offering a context slider for one of these would be a
+            // control that changes nothing.
+            maxContextLength = 0,
+            estimatedPrefillTokensPerSecond = prefillCalibration?.predictFor(fileSizeBytes),
+        )
+    }
+
+    /**
      * The window to open a model with when nobody has chosen one.
      *
      * The app shipped 4096 for every model on every phone, which is three separate mistakes
@@ -251,6 +305,18 @@ class FitEstimator @Inject constructor() {
 
         /** Above this fraction of usable memory, other apps start getting evicted. */
         const val TIGHT_FRACTION = 0.8
+
+        /**
+         * What a compiled model costs beyond its own weights, as a multiple of them.
+         *
+         * From the one measurement there is: a 1.22 GB Qwen3-1.7B export resident at
+         * 2.9 GB on a Dimensity 9400, so roughly 1.4x the weights again once the fixed
+         * runtime allowance is taken off. One point is not a calibration, which is why this
+         * is a constant with its provenance written down rather than a formula pretending
+         * to be one, and why it errs high: the cost of being wrong here is a phone that
+         * runs out of memory after a gigabyte of download.
+         */
+        const val COMPILED_RUNTIME_FACTOR = 1.4
 
         /**
          * The share of usable memory a KV cache may claim by default.

@@ -285,5 +285,10 @@
     <!-- Runtime chips on Discover. Format names, so the same in every language. -->
     <string name="runtime_gguf" translatable="false">GGUF</string>
     <string name="runtime_executorch" translatable="false">ExecuTorch</string>
+
+    <!-- Which silicon a compiled model was exported for. Decided at export, not a setting. -->
+    <string name="compiled_runs_on_cpu">Compiled for CPU</string>
+    <string name="compiled_runs_on_gpu">Compiled for GPU</string>
+    <string name="compiled_runs_on_npu">Compiled for NPU</string>
 </resources>
 

@@ -242,4 +242,7 @@
     <string name="search_archived">Maghanap sa archive</string>
     <string name="nothing_archived">Walang naka-archive. Kapag na-archive ang chat, aalis ito sa listahan pero mananatili.</string>
     <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
+    <string name="compiled_runs_on_cpu">Naka-compile para sa CPU</string>
+    <string name="compiled_runs_on_gpu">Naka-compile para sa GPU</string>
+    <string name="compiled_runs_on_npu">Naka-compile para sa NPU</string>
 </resources>

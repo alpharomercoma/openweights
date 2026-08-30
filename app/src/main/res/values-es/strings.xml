@@ -256,4 +256,7 @@
     <string name="search_archived">Buscar en archivados</string>
     <string name="nothing_archived">No hay nada archivado. Archivar un chat lo saca de la lista y lo conserva.</string>
     <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
+    <string name="compiled_runs_on_cpu">Compilado para CPU</string>
+    <string name="compiled_runs_on_gpu">Compilado para GPU</string>
+    <string name="compiled_runs_on_npu">Compilado para NPU</string>
 </resources>

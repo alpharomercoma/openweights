@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Visibility
@@ -117,6 +118,15 @@ fun ModelRow(
                 // asks about a model on a phone, and on its own line it cost a third of the
                 // row's height to answer a question that fits in four characters.
                 model.parameterHint?.let { Badge(text = it, emphasis = true) }
+                // Before the capability badges, because it is not a capability: it says
+                // which runtime will open this, and on a build with both that is the first
+                // thing separating one row from another.
+                if (model.isCompiled) {
+                    Badge(
+                        text = stringResource(R.string.runtime_executorch),
+                        icon = Icons.Rounded.Bolt,
+                    )
+                }
                 if (model.isVision) {
                     Badge(
                         text = stringResource(R.string.vision),

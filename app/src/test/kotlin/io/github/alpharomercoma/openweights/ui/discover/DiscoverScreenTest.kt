@@ -164,7 +164,7 @@ class DiscoverScreenTest {
                     onQueryChange = onQueryChange,
                     onSearch = onSearch,
                     onSortChange = onSortChange,
-                    onRuntimeChange = {},
+                    onRuntimeToggled = { _, _ -> },
                     onFiltersChange = {},
                     onPhoneSizedChange = onPhoneSizedChange,
                     onOfficialOnlyChange = onOfficialOnlyChange,

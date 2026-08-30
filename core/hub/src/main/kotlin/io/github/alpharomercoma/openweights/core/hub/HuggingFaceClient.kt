@@ -45,7 +45,18 @@ data class HubModel(
     val updatedAt: String?,
     /** The Hub's task tag, absent on a good number of repositories. */
     val pipelineTag: String? = null,
+    /**
+     * Which runtimes this repository has weights for.
+     *
+     * Filled in from the search that found it rather than from the repository listing: the
+     * two runtimes are found through different Hub filters, so which search returned a
+     * result is already the answer, and a repository returned by both has both. Reading it
+     * any other way would cost a request per row.
+     */
+    val runtimes: Set<HubRuntime> = setOf(HubRuntime.LLAMA_CPP),
 ) {
+    /** True when this repository ships weights compiled ahead of time for ExecuTorch. */
+    val isCompiled: Boolean get() = HubRuntime.EXECUTORCH in runtimes
     val owner: String get() = id.substringBefore('/', missingDelimiterValue = "")
     val name: String get() = id.substringAfter('/')
 
@@ -246,14 +257,68 @@ class HuggingFaceClient @Inject constructor(
      * while asking for more forever. The Hub paginates with an opaque cursor handed back in
      * a `Link` header, which is what this follows.
      */
+    /**
+     * One page across every runtime the query asks for.
+     *
+     * The Hub has no single filter for "weights this phone can run": the two runtimes are
+     * found through different parameters, so this is one request per runtime, run together
+     * and merged. Compiled models come first, which is where the user is most likely to be
+     * looking when they have asked for them at all and is also the smaller, curated set —
+     * burying a handful of them under a thousand GGUFs would be the same as not having them.
+     *
+     * A repository returned by both searches appears once, carrying both runtimes, which is
+     * what puts the ExecuTorch label on it.
+     */
     suspend fun searchPage(
         query: HubQuery,
         cursor: String? = null,
         limit: Int = DEFAULT_LIMIT,
+    ): HubSearchPage = coroutineScope {
+        val wanted = query.runtimes.ifEmpty { HubRuntime.entries.toSet() }
+        val pages = HubRuntime.entries
+            .filter { it in wanted }
+            .map { runtime ->
+                async { runtime to runCatching { runtimePage(query, runtime, cursor, limit) } }
+            }
+            .awaitAll()
+
+        // One runtime failing must not empty the screen: the other half is still an answer.
+        // Everything failing is a real failure and is raised, so the error banner still works.
+        val good = pages.mapNotNull { (runtime, result) ->
+            result.getOrNull()?.let { runtime to it }
+        }
+        if (good.isEmpty()) {
+            throw pages.first().second.exceptionOrNull() ?: HubException("Search failed")
+        }
+
+        val merged = LinkedHashMap<String, HubModel>()
+        good.forEach { (runtime, page) ->
+            page.models.forEach { model ->
+                val already = merged[model.id]
+                merged[model.id] = (already ?: model).copy(
+                    runtimes = (already?.runtimes ?: emptySet()) + runtime,
+                )
+            }
+        }
+
+        HubSearchPage(
+            models = merged.values.sortedByDescending { it.isCompiled },
+            // The llama.cpp half is the one worth paging: the compiled corner of the Hub is
+            // small enough to arrive whole. Paging on its cursor would also mean tracking
+            // two cursors that advance at different rates.
+            cursor = good.firstOrNull { it.first == HubRuntime.LLAMA_CPP }?.second?.cursor,
+        )
+    }
+
+    private suspend fun runtimePage(
+        query: HubQuery,
+        runtime: HubRuntime,
+        cursor: String?,
+        limit: Int,
     ): HubSearchPage {
         val url = apiUrl("models")
             .apply {
-                when (query.runtime) {
+                when (runtime) {
                     HubRuntime.LLAMA_CPP -> addQueryParameter("apps", LLAMA_CPP)
                     HubRuntime.EXECUTORCH -> addQueryParameter("filter", EXECUTORCH)
                 }
@@ -274,7 +339,8 @@ class HuggingFaceClient @Inject constructor(
             .build()
 
         val page = getPaged(url)
-        val models = json.decodeFromString<List<SearchEntry>>(page.body).map { it.toModel() }
+        val models = json.decodeFromString<List<SearchEntry>>(page.body)
+            .map { it.toModel().copy(runtimes = setOf(runtime)) }
         return HubSearchPage(models = models, cursor = page.nextCursor)
     }
 
@@ -598,13 +664,17 @@ data class HubSearchPage(
 data class HubQuery(
     val text: String = "",
     /**
-     * Which runtime to find models for.
+     * Which runtimes to find models for. Both, unless the user says otherwise.
      *
-     * Not a filter among the others and deliberately not counted in [activeCount]: it
-     * changes which corner of the Hub is being searched rather than narrowing a result set,
-     * and it is only ever offered in a build that has both runtimes to choose between.
+     * A set rather than a choice, because these are not alternatives to pick between: a
+     * phone that can run both should be offered both, and the Hub is searched once per
+     * runtime and the results merged. Deliberately not counted in [activeCount] — it
+     * changes which corners of the Hub are searched rather than narrowing a result set.
+     *
+     * Empty is treated as "all of them" rather than "none", so unticking every box shows
+     * everything instead of an empty screen the user has to undo.
      */
-    val runtime: HubRuntime = HubRuntime.LLAMA_CPP,
+    val runtimes: Set<HubRuntime> = HubRuntime.entries.toSet(),
     val sort: HubSort = HubSort.TRENDING,
     /** The task the model is published for. Null means any. */
     val task: HubTask? = null,

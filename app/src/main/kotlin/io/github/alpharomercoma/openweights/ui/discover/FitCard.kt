@@ -36,8 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -92,6 +94,11 @@ fun FitCard(
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Metric(formatBytes(inspected.file.sizeBytes))
+                // Stated, not offered. A compiled model's processor was decided when it
+                // was exported — the file holds delegate identifiers and loading resolves
+                // those exact ones — so this is a fact about the download rather than
+                // something the user can change afterwards.
+                inspected.compiledFor?.let { Caption(stringResource(it)) }
             }
 
             when {
@@ -195,6 +202,23 @@ private fun VerdictLine(fit: FitReport) {
  * property so the card does not grow a branch per reason — the two below already cost it
  * detekt's complexity ceiling.
  */
+/**
+ * The processor this file was compiled for, or null when it was not compiled at all.
+ *
+ * Read from the name, because a `.pte` carries no metadata and the runtime has no API
+ * reporting which delegates a loaded model uses. A GGUF has no answer here by design: it
+ * is interpreted at load, so where it runs really is a setting.
+ */
+private val InspectedFile.compiledFor: Int?
+    get() {
+        if (ModelFormat.of(file.fileName) != ModelFormat.PTE) return null
+        return when (CompiledBackend.of(file.path).processor) {
+            CompiledBackend.Processor.CPU -> R.string.compiled_runs_on_cpu
+            CompiledBackend.Processor.GPU -> R.string.compiled_runs_on_gpu
+            CompiledBackend.Processor.NPU -> R.string.compiled_runs_on_npu
+        }
+    }
+
 private val InspectedFile.cannotRun: Boolean
     get() = unsupportedArchitecture != null || draftArchitecture != null
 

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -38,6 +39,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -95,7 +97,7 @@ fun DiscoverScreen(
     onSearch: () -> Unit,
     onLoadMore: () -> Unit = {},
     onSortChange: (HubSort) -> Unit,
-    onRuntimeChange: (HubRuntime) -> Unit,
+    onRuntimeToggled: (HubRuntime, Boolean) -> Unit,
     onFiltersChange: (HubQuery) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
     onOfficialOnlyChange: (Boolean) -> Unit,
@@ -206,7 +208,7 @@ fun DiscoverScreen(
             )
 
             if (ExecuTorchSupport.AVAILABLE) {
-                RuntimeSwitch(selected = state.query.runtime, onSelect = onRuntimeChange)
+                RuntimeBoxes(selected = state.query.runtimes, onToggle = onRuntimeToggled)
             }
 
             DiscoverFilterBar(
@@ -306,19 +308,20 @@ fun DiscoverScreen(
 private const val LOAD_MORE_THRESHOLD = 4
 
 /**
- * Which runtime's models the Hub is being searched for.
+ * Which runtimes the Hub is being searched for. Boxes, not a choice.
  *
- * Above the filter chips and outside their scrolling row, because it is not a filter. It
- * changes the subject of the search rather than narrowing its results, and it was tried
- * inside that row first: two more chips at the head of it pushed the sort and Official
- * chips off the edge of the screen, which the screen tests caught. A mode switch that
- * hides the controls beside it is in the wrong place.
+ * Both are ticked to begin with: a build carrying two runtimes can run models for either,
+ * and making the user pick would hide half the Hub behind a control they have not found
+ * yet. They sit above the filter chips and outside their scrolling row, because this is not
+ * a filter — it changes the subject of the search rather than narrowing its results. It was
+ * tried inside that row first and two more chips at its head pushed the sort and Official
+ * chips off the screen, which the screen tests caught.
  *
- * Rendered only where there is a choice to make. A build without the ExecuTorch runtime
+ * Rendered only where there is a choice to make: a build without the ExecuTorch runtime
  * shows nothing here rather than a control with one option.
  */
 @Composable
-private fun RuntimeSwitch(selected: HubRuntime, onSelect: (HubRuntime) -> Unit) {
+private fun RuntimeBoxes(selected: Set<HubRuntime>, onToggle: (HubRuntime, Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -326,9 +329,21 @@ private fun RuntimeSwitch(selected: HubRuntime, onSelect: (HubRuntime) -> Unit) 
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         HubRuntime.entries.forEach { runtime ->
+            val on = runtime in selected
             FilterChip(
-                selected = runtime == selected,
-                onClick = { onSelect(runtime) },
+                selected = on,
+                onClick = { onToggle(runtime, !on) },
+                leadingIcon = if (on) {
+                    {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                } else {
+                    null
+                },
                 label = {
                     Text(
                         text = stringResource(
@@ -543,7 +558,7 @@ private fun DiscoverScreenPreview() {
             onPhoneSizedChange = {},
             onOfficialOnlyChange = {},
             onRecommendedOnlyChange = {},
-            onRuntimeChange = {},
+            onRuntimeToggled = { _, _ -> },
             onClearFilters = {},
             onOpenModel = {},
             onCloseModel = {},

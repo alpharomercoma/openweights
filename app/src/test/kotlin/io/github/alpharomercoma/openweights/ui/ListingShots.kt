@@ -68,7 +68,7 @@ object ListingShots {
         onQueryChange = {},
         onSearch = {},
         onSortChange = {},
-        onRuntimeChange = {},
+        onRuntimeToggled = { _, _ -> },
         onFiltersChange = {},
         onPhoneSizedChange = {},
         onOfficialOnlyChange = {},

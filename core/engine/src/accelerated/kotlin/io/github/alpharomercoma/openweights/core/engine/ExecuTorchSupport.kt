@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.core.engine
 
+import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
+
 /**
  * Whether this build can run a model compiled ahead of time. It can: this is the
  * accelerated flavour, which carries the ExecuTorch runtime.
@@ -26,6 +28,20 @@ package io.github.alpharomercoma.openweights.core.engine
  */
 object ExecuTorchSupport {
     const val AVAILABLE: Boolean = true
+
+    /**
+     * The delegates this build has linked, and therefore the models it can open.
+     *
+     * A `.pte` whose backend is missing does not fall back to the CPU — the runtime
+     * reports it is not registered and the load fails outright. Checking before offering a
+     * download is the difference between refusing a model up front and refusing it after a
+     * gigabyte. UNKNOWN is included because most published exports are XNNPACK and do not
+     * say so in their name; excluding it would hide nearly all of them.
+     */
+    val BACKENDS: Set<CompiledBackend> = setOf(CompiledBackend.XNNPACK, CompiledBackend.UNKNOWN)
+
+    /** Whether this build could open a model compiled for [backend]. */
+    fun canRun(backend: CompiledBackend): Boolean = backend in BACKENDS
 
     /** A bridge onto the real runtime. */
     fun bridge(): ExecuTorchBridge = NativeExecuTorchBridge()

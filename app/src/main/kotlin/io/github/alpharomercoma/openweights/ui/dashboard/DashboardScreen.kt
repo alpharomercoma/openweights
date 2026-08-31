@@ -402,7 +402,13 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
                 ShareBar(fraction = share)
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Metric("${model.generatedTokens.grouped()} tokens · ${model.replies} replies")
+                    Metric(
+                        listOfNotNull(
+                            "${model.generatedTokens.grouped()} tokens",
+                            "${model.replies} replies",
+                            model.runtime,
+                        ).joinToString(" · "),
+                    )
                     // The one measurement on this screen, so the one thing that earns the
                     // data scale. Token counts are volume, not health: colouring those by
                     // size would say a busy day was a fast one.

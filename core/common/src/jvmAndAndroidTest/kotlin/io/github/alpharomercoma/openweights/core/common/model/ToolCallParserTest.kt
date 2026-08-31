@@ -188,6 +188,18 @@ class ToolCallParserTest {
     }
 
     @Test
+    fun `llama's python tag does not hide the call behind it`() {
+        // Verbatim from a Poco X8 Pro Max run: Llama-3.2-3B-Instruct wrote exactly this
+        // and the call inside was correct; only the tag kept it from being parsed.
+        val raw = """<|python_tag|>{"name": "get_weather", "parameters": {"city": "Manila"}}"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.single().name).isEqualTo("get_weather")
+        assertThat(parsed.calls.single().argumentsJson).contains("Manila")
+    }
+
+    @Test
     fun `a bare object without parameters stays prose`() {
         val raw = """{"name": "Alice", "age": 30}"""
 

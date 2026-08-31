@@ -82,7 +82,10 @@ object ToolCallParser {
      * to contain JSON, which is why prose around the object disqualifies it.
      */
     private fun parseBareJson(raw: String): ParsedToolCalls? {
-        val body = raw.trim()
+        // Llama 3.x opens a call with its own <|python_tag|> token, which reaches this
+        // parser as literal text. Measured on a phone: the call inside was perfect and
+        // the tag alone was what kept it from being read.
+        val body = raw.trim().removePrefix(PYTHON_TAG).trim()
         if (!body.startsWith("{") || !body.endsWith("}")) return null
 
         val name = body.jsonStringField("name") ?: return null
@@ -298,6 +301,8 @@ object ToolCallParser {
         }
         return null
     }
+
+    private const val PYTHON_TAG = "<|python_tag|>"
 
     private const val LFM_START = "<|tool_call_start|>"
     private const val LFM_END = "<|tool_call_end|>"

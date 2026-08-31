@@ -207,11 +207,18 @@ class ExecuTorchEngine(
         // cache is unusable rather than merely unknown, so it is dropped: a retry that
         // trusted the old record would send the same suffix at an already-advanced position
         // and duplicate it.
+        var produced = 0
         val outcome = try {
             bridge.generate(fresh, budget) { fragment ->
                 if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
                 reply.accept(fragment)?.let { trySend(GenerationEvent.Token(it)) }
-                if (reply.endedCleanly) bridge.stop()
+                // The budget is enforced here as well as passed down, because passing it
+                // down turned out to be advisory: on-device, a 768-token budget behind a
+                // 405-token SmolLM3 prompt resolved to 1643 in the runner and the model
+                // wrote until the window was full. One callback is one token, so counting
+                // callbacks is exact, and stop() is the same lever the markers pull.
+                produced += 1
+                if (reply.endedCleanly || produced >= budget) bridge.stop()
             }
         } catch (failure: Throwable) {
             fedText = ""

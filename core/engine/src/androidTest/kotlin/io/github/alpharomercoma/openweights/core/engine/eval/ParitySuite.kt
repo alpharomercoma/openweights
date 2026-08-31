@@ -124,29 +124,45 @@ object ParitySuite {
             )
         }
 
-        // The agentic pair: emit a call, then read its result.
+        // The agentic pair: emit a call, then read its result. Wrapped like every other
+        // case — a model that overruns its exported window must cost its own grade, not
+        // the rest of the matrix. That is not hypothetical: it happened.
         if (toolless) {
             results.put(skipped("tool-call")).put(skipped("tool-result"))
         } else {
             val ask = user("What is the current weather in Manila? Use the tool.")
-            val call = turn(engine, ask, tools = listOf(WEATHER_TOOL))
-            results.put(
-                graded("tool-call", call) {
-                    call.calls.any { it.name == "get_weather" && "manila" in it.argumentsJson.lowercase() }
+            val call = runCatching { turn(engine, ask, tools = listOf(WEATHER_TOOL)) }
+            call.fold(
+                onSuccess = { made ->
+                    results.put(
+                        graded("tool-call", made) {
+                            made.calls.any {
+                                it.name == "get_weather" &&
+                                    "manila" in it.argumentsJson.lowercase()
+                            }
+                        },
+                    )
+                },
+                onFailure = {
+                    results.put(
+                        JSONObject().put("id", "tool-call").put("status", "error")
+                            .put("error", it.toString()),
+                    )
                 },
             )
 
-            val followup = turn(
-                engine,
-                ask,
-                assistantRaw(call),
-                ChatMessage.toolResult(
-                    "get_weather",
-                    """{"temperature_c": 31, "condition": "humid"}""",
-                ),
-                tools = listOf(WEATHER_TOOL),
-            )
-            results.put(graded("tool-result", followup) { Regex("31").containsMatchIn(followup.content) })
+            result(results, "tool-result", Regex("31")) {
+                turn(
+                    engine,
+                    ask,
+                    assistantRaw(call.getOrNull() ?: error("no call turn to extend")),
+                    ChatMessage.toolResult(
+                        "get_weather",
+                        """{"temperature_c": 31, "condition": "humid"}""",
+                    ),
+                    tools = listOf(WEATHER_TOOL),
+                )
+            }
         }
 
         val report = JSONObject()

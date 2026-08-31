@@ -94,22 +94,38 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
             .numEos(0)
             .build()
 
-        running.generate(
-            prompt,
-            config,
-            object : LlmCallback {
+        val attempt = runCatching {
+            running.generate(
+                prompt,
+                config,
+                object : LlmCallback {
                 override fun onResult(result: String) = onToken(result)
 
                 override fun onStats(stats: String) {
                     this@NativeExecuTorchBridge.lastStats = stats
                 }
 
-                override fun onError(errorCode: Int, message: String) {
-                    this@NativeExecuTorchBridge.lastError =
-                        message.ifBlank { "ExecuTorch error $errorCode" }
-                }
-            },
-        )
+                    override fun onError(errorCode: Int, message: String) {
+                        this@NativeExecuTorchBridge.lastError =
+                            message.ifBlank { "ExecuTorch error $errorCode" }
+                    }
+                },
+            )
+        }
+        attempt.exceptionOrNull()?.let { cause ->
+            // The one overflow a conversation can reach in ordinary use, translated: a
+            // .pte's window was fixed at export, and a history that has outgrown it is a
+            // fact about the file, not a crash to show as one.
+            val text = cause.message.orEmpty()
+            if ("Max seq length exceeded" in text || "max_context_len" in text) {
+                throw LlamaException(
+                    "The conversation no longer fits this model's exported context " +
+                        "window. Start a new chat, or use a model exported with a " +
+                        "larger window.",
+                )
+            }
+            throw cause
+        }
 
         lastError?.let { throw LlamaException(it) }
         return outcomeFrom(lastStats)

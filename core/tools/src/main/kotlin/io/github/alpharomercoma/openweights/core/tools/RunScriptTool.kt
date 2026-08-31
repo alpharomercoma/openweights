@@ -63,11 +63,10 @@ class RunScriptTool @Inject constructor(
         // file system and no sockets, and nothing in the description said so. Naming the
         // absences is the same negative-scope lever the rest of these descriptions use.
         description = "Write a JavaScript program, run it in a sandbox, and use what it " +
-            "returns. Use it for real computation: arithmetic, parsing, filtering, " +
-            "regular expressions, JSON, dates, and going through a file too large to read " +
-            "into the conversation. Give source, or path to run a .js file you saved. " +
-            "Modern JavaScript including await. No network, and the only modules are " +
-            "require('fs') and require('path'), which read files you named in files. " +
+            "returns. For real computation: arithmetic, dates, regex, JSON, or going " +
+            "through a file too large to read whole. Give source, or path to a saved " +
+            ".js file. Modern JavaScript with await; no network; the only modules are " +
+            "require('fs') and require('path'), for files you named in files. " +
             "The last expression is the answer.",
         parametersJson = """
             {

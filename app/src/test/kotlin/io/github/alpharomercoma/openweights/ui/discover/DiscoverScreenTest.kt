@@ -21,6 +21,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -89,8 +90,10 @@ class DiscoverScreenTest {
         showDiscover(query = HubQuery(text = "gguf", sort = HubSort.DOWNLOADS))
 
         // Read off the state rather than remembered by the chip row, so that reopening the
-        // screen cannot show one order while the results are in another.
-        compose.onNodeWithText("Downloads").assertIsDisplayed()
+        // screen cannot show one order while the results are in another. Scrolled to
+        // first: the runtime chip pushed the sorts past the right edge of the row, which
+        // scrolls on the phone exactly as it does here.
+        compose.onNodeWithText("Downloads").performScrollTo().assertIsDisplayed()
     }
 
     @Test

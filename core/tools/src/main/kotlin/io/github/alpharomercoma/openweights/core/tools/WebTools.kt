@@ -117,8 +117,8 @@ class WebSearchTool @Inject constructor(
         description = "Search the web, only for what you cannot already know: what " +
             "changed, what is recent, or the present state of a named person, product or " +
             "organisation. Returns text to read; to show pictures or clips instead, " +
-            "use ${SearchMediaTool.NAME}. Not for definitions, translations, grammar, history, " +
-            "arithmetic, opinions or explanations, and not to double check something you " +
+            "use ${SearchMediaTool.NAME}. Not for settled knowledge — definitions, " +
+            "translations, history, arithmetic — and never to double check what you " +
             "already know. Answer those yourself.",
         parametersJson = """
             {

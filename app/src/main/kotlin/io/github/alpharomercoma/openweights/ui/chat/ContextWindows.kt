@@ -53,6 +53,12 @@ class ContextWindows @Inject constructor(
      * is a reason to be careful, not a reason to refuse a model that may run perfectly well.
      */
     suspend fun defaultFor(model: File, projector: File?): Int = runCatching {
+        // A compiled model's window is baked into the export and enforced by the runtime;
+        // there is no header here to read and parsing one as GGUF only put a stack trace
+        // in the log on every load. The engine clamps to the export's own limit either way.
+        if (model.extension.equals("pte", ignoreCase = true)) {
+            return ModelLoadParams.DEFAULT_CONTEXT_LENGTH
+        }
         val metadata = GgufHeaderParser(model.readHeadOnce()).parse()
         estimator.defaultContextLength(
             device = profiler.profile(),

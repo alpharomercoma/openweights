@@ -129,8 +129,7 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
                 when (engine) {
                     SearchEngine.DUCKDUCKGO -> DuckDuckGoProvider(httpClient)
                     SearchEngine.BRAVE -> BraveProvider(httpClient)
-                    SearchEngine.BING -> BingProvider(httpClient)
-                    SearchEngine.GOOGLE -> GoogleProvider(httpClient)
+                    SearchEngine.YAHOO -> YahooProvider(httpClient)
                 },
             )
         }
@@ -188,25 +187,28 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
 /**
  * A general web engine the app can read.
  *
- * Four, and the list is a judgement rather than everything possible. `ddgs` reaches ten,
- * including Yahoo and Startpage, which resell Bing and Google respectively: adding them
- * would offer the user a longer list of the same two indexes. Yandex and Mojeek are real
- * independent indexes and are absent because neither is one this app can recommend for a
- * general question in English.
+ * Three, and every one of them measured rather than assumed. `SearchEnginesOnDeviceTest`
+ * ran the whole list on both of this project's phones on the same afternoon: DuckDuckGo
+ * answered every query, Yahoo answered every query with the most results, Brave answered
+ * two of three, and Bing and Google returned two hundred OK with zero parseable results
+ * on every query on both devices. `ddgs` reached the same verdict from the other side —
+ * its Bing engine is disabled in source, and its Google engine survives only by
+ * impersonating a 2006 Nokia feature phone, which is not a foundation to ship on.
  *
- * So: two independent indexes, Brave and DuckDuckGo, and the two large ones.
+ * So Bing and Google are gone rather than offered as switches that do nothing, and
+ * Yahoo — Bing's index behind a door that opens — carries that index instead. Their old
+ * preference keys are simply never read again; a user who had disabled Bing loses
+ * nothing, because there is no Bing to disable.
  */
 enum class SearchEngine(val key: String, val label: String, val detail: String) {
     /** Answers without a key or an account, and the only one measured to do so reliably. */
     DUCKDUCKGO("engine_duckduckgo", "DuckDuckGo", "Answers without an account. The default."),
 
-    /** Its own index, which is what makes it worth having beside the large two. */
+    /** Its own index, which is what makes it worth having beside the resellers. */
     BRAVE("engine_brave", "Brave", "An index of its own, not a front end for another."),
 
-    BING("engine_bing", "Bing", "Also the index behind Yahoo and several others."),
-
-    /** Last: best index, most likely to refuse a phone. See [SearchSettings.proxy]. */
-    GOOGLE("engine_google", "Google", "The best index, and the most likely to refuse."),
+    /** Bing's index, through the one spelling of it that answers a phone. */
+    YAHOO("engine_yahoo", "Yahoo", "Bing's index, served in a way that actually answers."),
 }
 
 /**

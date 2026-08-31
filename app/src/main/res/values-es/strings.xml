@@ -181,8 +181,7 @@
     <string name="tool_script_name">Ejecutar un script</string><string name="tool_script_detail">Calcula con JavaScript, sin archivos ni red.</string>
     <string name="engine_duckduckgo_detail">Responde sin una cuenta. Predeterminado.</string>
     <string name="engine_brave_detail">Un índice de búsqueda independiente.</string>
-    <string name="engine_bing_detail">También impulsa Yahoo y otros.</string>
-    <string name="engine_google_detail">Un índice amplio que puede rechazar algunas redes.</string>
+    <string name="engine_yahoo_detail">El índice de Bing, servido de una forma que sí responde.</string>
     <string name="on_this_device">En este dispositivo</string><string name="choose_folder">Elegir carpeta</string><string name="change">Cambiar</string><string name="waiting_for_folder">Esperando una carpeta</string><string name="search_engines_status">%1$d de %2$d activos. Se prueban en orden hasta obtener respuesta.</string>
     <string name="storage_on_device">%1$s en este dispositivo</string>
     <string name="models_empty">Todavía no hay descargas. Explora modelos desde el nombre en la parte superior del chat. Cada uno indica si funciona en este teléfono antes de descargarlo.</string>

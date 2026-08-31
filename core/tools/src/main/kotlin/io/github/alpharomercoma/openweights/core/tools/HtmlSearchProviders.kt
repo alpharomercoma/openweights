@@ -63,13 +63,15 @@ internal abstract class HtmlSearchProvider(private val client: OkHttpClient) : S
             }
         }.getOrNull() ?: return null
 
-        val hits = runCatching {
-            results(Jsoup.parse(page)).mapNotNull { hit(it) }
-        }.getOrDefault(emptyList())
+        val hits = runCatching { parse(page, limit) }.getOrDefault(emptyList())
 
         // Never an empty list. See the note on this class.
-        return hits.take(limit).ifEmpty { null }
+        return hits.ifEmpty { null }
     }
+
+    /** The read alone, visible so a captured page can pin it in a test. */
+    internal fun parse(page: String, limit: Int): List<SearchHit> =
+        results(Jsoup.parse(page)).mapNotNull { hit(it) }.take(limit)
 
     protected fun Element.textOf(selector: String): String =
         selectFirst(selector)?.text()?.trim().orEmpty()
@@ -77,6 +79,59 @@ internal abstract class HtmlSearchProvider(private val client: OkHttpClient) : S
     private companion object {
         /** Generous for a results page, and an end where a remote server decides the size. */
         const val MAX_PAGE_BYTES = 1L shl 20
+    }
+}
+
+/**
+ * Yahoo, which is Bing's index behind a door that actually opens for a phone.
+ *
+ * Bing's own results page answered 200 with zero parseable results on both of this
+ * project's phones (and ddgs disabled its Bing engine for the same reason), while Yahoo
+ * returned eleven to twenty-five relevant hits in about a second on both, measured by
+ * `SearchEnginesOnDeviceTest` on the Dimensity and the Snapdragon on the same day. Same
+ * index, working spelling of it.
+ *
+ * The real address hides in the tracking redirect: every organic anchor points at
+ * `r.search.yahoo.com/...RU=<encoded url>/...`, and the `RU` segment is the destination.
+ * Organic anchors are the ones carrying an `h3.title`; the site navigation carries none.
+ */
+internal class YahooProvider(client: OkHttpClient) : HtmlSearchProvider(client) {
+    override val id = "yahoo"
+    override val label = "Yahoo"
+
+    override fun request(query: String): Request = Request.Builder()
+        .url("https://search.yahoo.com/search?p=${query.urlEncoded()}")
+        .header("User-Agent", SEARCH_USER_AGENT_BROWSER)
+        .header("Accept", "text/html")
+        .build()
+
+    override fun results(page: org.jsoup.nodes.Document): List<Element> =
+        page.select("a[href*=/RU=]").filter { it.selectFirst("h3.title") != null }
+
+    override fun hit(block: Element): SearchHit? {
+        val destination = REDIRECT_TARGET.find(block.attr("href"))?.groupValues?.get(1)
+            ?.let { java.net.URLDecoder.decode(it, Charsets.UTF_8.name()) }
+            ?: return null
+        // The ad system resolves through Bing's click tracker; a result that does is paid
+        // placement, not an answer.
+        if (!destination.startsWith("http") || ADVERT in destination) return null
+        val title = block.textOf("h3.title").ifEmpty { return null }
+        // The snippet lives beside the anchor, not inside it. Walking a few parents up
+        // finds the result's own card; further than that would reach the page and pair
+        // every result with the first snippet on it.
+        val snippet = block.parents().take(PARENT_HOPS)
+            .firstNotNullOfOrNull { parent ->
+                parent.selectFirst("p[class*=fc-dustygray]")?.text()?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+            }
+            .orEmpty()
+        return SearchHit(title = title, snippet = snippet, url = destination)
+    }
+
+    private companion object {
+        val REDIRECT_TARGET = Regex("""/RU=([^/]+)/""")
+        const val ADVERT = "bing.com/aclick"
+        const val PARENT_HOPS = 4
     }
 }
 
@@ -110,108 +165,6 @@ internal class BraveProvider(client: OkHttpClient) : HtmlSearchProvider(client) 
             snippet = block.textOf("div.snippet"),
             url = link.attr("href"),
         )
-    }
-}
-
-/**
- * Bing, which also answers for Yahoo and several others, so it is one index rather than two.
- */
-internal class BingProvider(client: OkHttpClient) : HtmlSearchProvider(client) {
-    override val id = "bing"
-    override val label = "Bing"
-
-    override fun request(query: String) = Request.Builder()
-        .url("https://www.bing.com/search?q=${query.urlEncoded()}&pq=${query.urlEncoded()}")
-        .header("User-Agent", SEARCH_USER_AGENT_BROWSER)
-        .header("Accept", "text/html")
-        .build()
-
-    override fun results(page: org.jsoup.nodes.Document) = page.select("li.b_algo")
-
-    override fun hit(block: Element): SearchHit? {
-        val link = block.selectFirst("h2 a[href]") ?: return null
-        val href = link.attr("href")
-        // Adverts wear the same clothes as results on this page.
-        if (href.startsWith(ADVERT)) return null
-        val title = link.text().trim()
-        if (title.isBlank()) return null
-        return SearchHit(title = title, snippet = block.textOf("p"), url = href.unwrapped())
-    }
-
-    /**
-     * Bing wraps outbound links in a redirect carrying the real one in base64.
-     *
-     * Unwrapped so the model is given the site rather than a tracking hop, and so a fetch
-     * of the same URL later goes where it says it does.
-     */
-    private fun String.unwrapped(): String {
-        if (!startsWith(REDIRECT)) return this
-        val encoded = substringAfter("&u=", "").substringBefore('&')
-        if (encoded.length <= PREFIX) return this
-        return runCatching {
-            val body = encoded.substring(PREFIX)
-            val padded = body.padEnd(body.length + (PAD - body.length % PAD) % PAD, '=')
-            String(Base64.getUrlDecoder().decode(padded))
-        }.getOrDefault(this)
-    }
-
-    private companion object {
-        const val ADVERT = "https://www.bing.com/aclick?"
-        const val REDIRECT = "https://www.bing.com/ck/a?"
-
-        /** The two characters Bing puts before the base64, which are not part of it. */
-        const val PREFIX = 2
-        const val PAD = 4
-    }
-}
-
-/**
- * Google, which is the best index and the hardest to read.
- *
- * Offered because it is what people mean by searching, and marked as the one most likely to
- * refuse: Google serves a consent interstitial or a challenge to anything that does not look
- * like a browser it recognises, and from some networks it refuses regardless. That is what
- * the proxy setting is for, and it is not a guarantee. A refusal is reported as "could not
- * answer" so the next engine runs, which is the whole reason the chain exists.
- */
-internal class GoogleProvider(client: OkHttpClient) : HtmlSearchProvider(client) {
-    override val id = "google"
-    override val label = "Google"
-
-    override fun request(query: String) = Request.Builder()
-        .url("https://www.google.com/search?q=${query.urlEncoded()}&num=20")
-        .header("User-Agent", SEARCH_USER_AGENT_BROWSER)
-        .header("Accept", "text/html")
-        // Without this Google answers with the consent page instead of results.
-        .header("Cookie", "CONSENT=YES+")
-        .build()
-
-    override fun results(page: org.jsoup.nodes.Document) = page.select("div[data-hveid]:has(h3)")
-
-    override fun hit(block: Element): SearchHit? {
-        val title = block.selectFirst("h3")?.text()?.trim().orEmpty()
-        val url = block.selectFirst("a[href]")?.attr("href")?.unwrapped().orEmpty()
-        if (title.isBlank() || !url.startsWith("http")) return null
-        // The snippet is the last block of the result, which is the only stable way to find
-        // it: the class names here are generated and change between responses.
-        val snippet = block.select("div").lastOrNull()?.text()?.trim().orEmpty()
-        return SearchHit(title = title, snippet = snippet.take(SNIPPET_CHARS), url = url)
-    }
-
-    /** Google sometimes hands back its own redirect rather than the destination. */
-    private fun String.unwrapped(): String = if (startsWith("/url?q=")) {
-        runCatching {
-            URLDecoder.decode(
-                removePrefix("/url?q=").substringBefore('&'),
-                Charsets.UTF_8.name(),
-            )
-        }.getOrDefault(this)
-    } else {
-        this
-    }
-
-    private companion object {
-        const val SNIPPET_CHARS = 400
     }
 }
 

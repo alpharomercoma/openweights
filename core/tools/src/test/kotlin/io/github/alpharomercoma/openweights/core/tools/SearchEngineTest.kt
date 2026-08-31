@@ -32,23 +32,23 @@ class SearchEngineTest {
     private val client = OkHttpClient()
 
     @Test
-    fun `all four are on to begin with`() {
+    fun `every engine is on to begin with`() {
         assertThat(settings.enabledEngines()).containsExactlyElementsIn(SearchEngine.entries)
     }
 
     @Test
-    fun `google is tried last because it refuses most often`() {
-        // Order is by how often each answers a phone, not by index quality. Putting the one
-        // most likely to refuse first would make most searches wait for a refusal.
-        assertThat(settings.enabledEngines().last()).isEqualTo(SearchEngine.GOOGLE)
+    fun `duckduckgo leads because it answers most reliably`() {
+        // Order is by how often each answers a phone, measured on both of this project's
+        // devices, not by index quality.
+        assertThat(settings.enabledEngines().first()).isEqualTo(SearchEngine.DUCKDUCKGO)
     }
 
     @Test
     fun `switching one off takes it out of the chain`() {
-        settings.setEnabled(SearchEngine.BING, false)
+        settings.setEnabled(SearchEngine.YAHOO, false)
 
-        assertThat(settings.enabledEngines()).doesNotContain(SearchEngine.BING)
-        assertThat(settings.providers(client).map { it.id }).doesNotContain("bing")
+        assertThat(settings.enabledEngines()).doesNotContain(SearchEngine.YAHOO)
+        assertThat(settings.providers(client).map { it.id }).doesNotContain("yahoo")
     }
 
     @Test

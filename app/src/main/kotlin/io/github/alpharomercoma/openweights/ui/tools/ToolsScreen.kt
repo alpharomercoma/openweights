@@ -517,6 +517,5 @@ private fun SearchCard(
 private fun SearchEngine.detailResource(): Int = when (this) {
     SearchEngine.DUCKDUCKGO -> R.string.engine_duckduckgo_detail
     SearchEngine.BRAVE -> R.string.engine_brave_detail
-    SearchEngine.BING -> R.string.engine_bing_detail
-    SearchEngine.GOOGLE -> R.string.engine_google_detail
+    SearchEngine.YAHOO -> R.string.engine_yahoo_detail
 }

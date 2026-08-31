@@ -202,8 +202,7 @@
     <string name="tool_script_detail">Works out sums and dates with JavaScript. No files or network.</string>
     <string name="engine_duckduckgo_detail">Answers without an account. The default.</string>
     <string name="engine_brave_detail">An independent search index.</string>
-    <string name="engine_bing_detail">Also powers Yahoo and several others.</string>
-    <string name="engine_google_detail">A broad index that may refuse some networks.</string>
+    <string name="engine_yahoo_detail">Bing’s index, served in a way that actually answers.</string>
     <string name="on_this_device">On this device</string><string name="choose_folder">Choose a folder</string><string name="change">Change</string><string name="waiting_for_folder">Waiting for a folder</string>
     <string name="search_engines_status">%1$d of %2$d on. Tried in order until one answers; phone-friendly engines come first.</string>
     <string name="storage_on_device">%1$s on this device</string>

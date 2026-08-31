@@ -733,7 +733,7 @@ class TurnRunner @Inject constructor(
             mode: AgentMode,
             listener: TurnListener,
         ): Boolean {
-            if (calls.isEmpty()) return repair(pass)
+            if (calls.isEmpty()) return repair(pass, mode)
 
             // Said first, then the steps, so the transcript reads in the order it happened.
             // The parser's content, not the raw stream: raw still carries the call itself,
@@ -795,7 +795,7 @@ class TurnRunner @Inject constructor(
          * names that do. One round trip, and it does not count against the tool budget,
          * because nothing was run and nothing was read.
          */
-        private fun repair(pass: Pass): Boolean {
+        private fun repair(pass: Pass, mode: AgentMode): Boolean {
             if (repaired) return false
             // Denials are classified before announcement salvage: a short denial that
             // happens to name a real tool ("I can't write code; I only have web_search")
@@ -805,12 +805,17 @@ class TurnRunner @Inject constructor(
             // A knowledge lament ("I don't have enough information about …") is the same
             // reflex with the capability noun missing, and takes the same one push: its
             // sentence classifies lookup-shaped, so the retry names web_search.
-            if (!pass.raw.containsToolMarkup() &&
+            //
+            // Never in plan mode. A plan legitimately says what it cannot do yet — "I
+            // don't have access to the weather, so I would search" reads denial-shaped —
+            // and the prose push would replace the plan the user asked to read with the
+            // direct answer they asked to defer.
+            val deniesInProse = !pass.raw.containsToolMarkup() &&
                 (
                     CapabilityDenial.denies(pass.spoken()) ||
                         CapabilityDenial.lamentsUnknown(pass.spoken())
                     )
-            ) {
+            if (deniesInProse && mode != AgentMode.PLAN) {
                 return denialRepair(pass)
             }
             if (!pass.raw.invitesRepair(active)) return false

@@ -121,6 +121,13 @@ data class ActiveDownload(
 
 data class ModelsUiState(
     val models: List<LocalModel> = emptyList(),
+    /**
+     * Whether the directory has actually been read. "No models" is a real answer and it
+     * is byte-identical to the state this screen is seeded with, so without this flag a
+     * pipeline that never spoke was indistinguishable from an empty phone — on screen
+     * and, worse, in the test meant to catch exactly that.
+     */
+    val listed: Boolean = false,
     val downloads: List<ActiveDownload> = emptyList(),
     val storageUsedBytes: Long = 0,
     /**
@@ -227,6 +234,7 @@ class ModelsViewModel @Inject constructor(
         local.update {
             it.copy(
                 models = models,
+                listed = true,
                 storageUsedBytes = models.sumOf { model -> model.sizeBytes },
                 notice = null,
             )

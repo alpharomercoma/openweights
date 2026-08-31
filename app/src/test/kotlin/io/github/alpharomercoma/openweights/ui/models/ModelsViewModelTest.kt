@@ -104,8 +104,10 @@ class ModelsViewModelTest {
         // The counterweight, and the half that made the bug hard to see: "no models" is a
         // real answer, and it is indistinguishable from a screen that never spoke unless
         // something asserts the state arrived.
-        val viewModel = viewModel()
-        val state = settled(viewModel, done = { it.models.isEmpty() })
+        // Waits on the listing flag, not on emptiness: the seeded state is already empty,
+        // so a condition the seed satisfies would pass without the pipeline ever speaking
+        // — the vacuity the QA pass caught in the first version of this rewrite.
+        val state = settled(done = { it.listed })
         assertThat(state.models).isEmpty()
         assertThat(state.downloads).isEmpty()
     }

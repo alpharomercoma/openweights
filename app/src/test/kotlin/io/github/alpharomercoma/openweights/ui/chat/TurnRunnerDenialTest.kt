@@ -169,6 +169,45 @@ class TurnRunnerDenialTest {
     }
 
     @Test
+    fun `a plan that reads denial-shaped is left standing`() = runBlocking {
+        // A plan legitimately says what it cannot do yet, and the mode's whole promise is
+        // a turn the user reads before anything happens. The push would replace the plan
+        // with the direct answer the user asked to defer — caught by review, pinned here.
+        engine.scripted += ScriptedPass(
+            "I don't have access to the latest information, so I would search the web " +
+                "for it and then summarise what I find.",
+        )
+
+        run(mode = AgentMode.PLAN)
+
+        assertThat(engine.prompts).hasSize(1)
+        assertThat(search.calls).isEmpty()
+    }
+
+    @Test
+    fun `a knowledge lament buys the same pass a capability denial does`() = runBlocking<Unit> {
+        // The Alpha Romer Coma shape: no capability noun, so denies() cannot see it,
+        // and the whole answer is a shrug a working web_search disproves.
+        engine.scripted += ScriptedPass(
+            "I don't have enough information about Alpha Romer Coma to answer that.",
+        )
+        engine.scripted += ScriptedPass(
+            "Searching.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"q"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Here is who that is.")
+
+        run()
+
+        val push = engine.prompts[1].last()
+        assertThat(push.role).isEqualTo(ChatRole.USER)
+        assertThat(push.text).contains("web_search")
+        assertThat(search.calls).hasSize(1)
+    }
+
+    @Test
     fun `sympathy is not a denial and ends the turn untouched`() = runBlocking {
         engine.scripted += ScriptedPass("I'm sorry for your loss. I'm here if you want to talk.")
 
@@ -178,7 +217,7 @@ class TurnRunnerDenialTest {
         assertThat(search.calls).isEmpty()
     }
 
-    private suspend fun run() {
+    private suspend fun run(mode: AgentMode = AgentMode.AUTO) {
         engine.load(modelFile(), ModelLoadParams(contextLength = 4096))
         val runner = TurnRunner(
             engine = engine,
@@ -190,7 +229,7 @@ class TurnRunnerDenialTest {
         runner.run(
             conversation = listOf(ChatMessage.text(ChatRole.USER, "Who is Ada Lovelace?")),
             params = SamplerParams(),
-            mode = AgentMode.AUTO,
+            mode = mode,
             withTools = true,
             notes = ToolNotes(),
             listener = Quiet,

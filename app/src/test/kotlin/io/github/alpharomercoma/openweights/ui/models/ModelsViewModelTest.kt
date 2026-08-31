@@ -36,6 +36,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * What the model list does before anything has ever been downloaded.
@@ -130,7 +131,10 @@ class ModelsViewModelTest {
      */
     private suspend fun settled(): ModelsUiState {
         lateinit var latest: ModelsUiState
-        viewModel().uiState.test {
+        // Thirty seconds of ceiling, milliseconds of typical wait: the directory listing
+        // runs on real dispatchers, and Turbine's three-second default was missed by the
+        // two-core CI runner under a full-suite load while every faster machine passed.
+        viewModel().uiState.test(timeout = 30.seconds) {
             latest = awaitItem()
             while (latest.models.isEmpty()) latest = awaitItem()
             cancelAndIgnoreRemainingEvents()

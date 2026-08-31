@@ -259,3 +259,26 @@ the OpenClaw codebase). They agreed with each other and with this design:
   warmed by the load's own finishing warm instead.
 - **Snapshot RAM.** ~12 MB held for the 1.2B hybrid at a 2k prefix; freed on unload,
   replaced on re-warm. Transformers hold nothing.
+
+## The snapshot had no repair path (2026-09-01)
+
+A plus-button "hi" took 23 s on a session that had earlier been fast. Logcat told the
+whole story: a model reload made a fresh Session (empty snapshot, stale disk file — the
+day had changed), the first head warm was interrupted by a turn at 1536/2197, and from
+then on every head warm found the head already cached, prefilled 0, and **skipped the
+capture** — `maybe_snapshot` can only take a head from a cache that holds exactly the
+head, and after any turn the cache always holds head + conversation. Every new chat then
+diverged by ~1 token, the hybrid refused rollback, and re-read all 2,197 (`snapshot=0KB`
+on every warm line is the tell).
+
+The fix makes the head warm self-healing: when a snapshot-taking warm on a
+hybrid/recurrent model finds the head cached but the snapshot missing or describing
+another day's head, it first tries to arm the RAM snapshot straight from the warm file
+(`arm_warm_file` — a verified read into `prefix_state_`, no touch of the live cache;
+llama validates the blob at restore time, where a refusal already falls back cold), and
+failing that resets and re-reads the head in the background — capture + save at the end,
+paid once instead of on every new chat. Replayed live on the X8 Pro Max: interrupt at
+1024/2188 → turn starts 90 ms later → post-turn warm logs `kv: warm snapshot missing;
+re-reading 2188 tokens to rebuild it` → recapture + `warm state saved` → the open
+conversation re-warms on the restored head (42 tokens, 364 ms) → the next two
+plus-button "hi" turns complete in ~1.4 s each (were 23 s).

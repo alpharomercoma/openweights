@@ -1430,8 +1430,30 @@ bool Session::warm(
         if (snapshot && cached_.size() == tokens.size()) {
             maybe_snapshot();
         }
-        stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
-        return true;
+        const bool stateful =
+            llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_);
+        const bool snapshot_missing = snapshot && stateful &&
+            (prefix_state_.empty() || prefix_tokens_ != tokens);
+        if (!snapshot_missing) {
+            stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
+            return true;
+        }
+        // The head is cached but the snapshot of it is gone or describes another day's
+        // head — a turn interrupted the first warm of this session, and from then on
+        // the cache always holds a conversation the capture cannot take a head from.
+        // Left alone, every new chat re-reads the whole head, because these families
+        // refuse rollback. The disk file is the cheap way back; failing that, the head
+        // is re-read here, while nobody is waiting, so it is paid once instead of on
+        // every plus-button chat.
+        if (store != nullptr && arm_warm_file(store, tokens)) {
+            stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
+            LOGI("kv: warm snapshot armed from disk: %zu tokens, %zu KB",
+                 prefix_tokens_.size(), prefix_state_.size() / 1024);
+            return true;
+        }
+        LOGI("kv: warm snapshot missing; re-reading %zu tokens to rebuild it",
+             tokens.size());
+        reset();
     }
 
     // A state file beats any partial the cache holds: restoring is one read of the
@@ -1478,7 +1500,10 @@ bool Session::warm(
     return true;
 }
 
-bool Session::restore_warm_file(const char * path, const std::vector<llama_token> & tokens) {
+bool Session::read_warm_file(
+    const char * path,
+    const std::vector<llama_token> & tokens,
+    std::vector<uint8_t> & state) {
     FILE * file = fopen(path, "rb");
     if (file == nullptr) return false;
 
@@ -1501,7 +1526,6 @@ bool Session::restore_warm_file(const char * path, const std::vector<llama_token
             stored == tokens;
     }
 
-    std::vector<uint8_t> state;
     if (header_ok) {
         state.resize(state_size);
         header_ok = fread(state.data(), 1, state_size, file) == state_size;
@@ -1512,9 +1536,24 @@ bool Session::restore_warm_file(const char * path, const std::vector<llama_token
         // A stale file — yesterday's date line, changed settings, replaced weights, an
         // older format — never matches twice; holding it only costs the next launch this
         // same read.
+        state.clear();
         remove(path);
         return false;
     }
+    return true;
+}
+
+bool Session::arm_warm_file(const char * path, const std::vector<llama_token> & tokens) {
+    std::vector<uint8_t> state;
+    if (!read_warm_file(path, tokens, state)) return false;
+    prefix_tokens_ = tokens;
+    prefix_state_  = std::move(state);
+    return true;
+}
+
+bool Session::restore_warm_file(const char * path, const std::vector<llama_token> & tokens) {
+    std::vector<uint8_t> state;
+    if (!read_warm_file(path, tokens, state)) return false;
 
     reset();
     if (llama_state_seq_set_data(ctx_, state.data(), state.size(), 0) == 0) {

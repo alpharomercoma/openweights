@@ -379,6 +379,25 @@ private:
     void save_warm_file(const char * path, const std::vector<llama_token> & tokens);
 
     /**
+     * Reads and verifies the warm file at [path] against [tokens], filling [state]. A
+     * malformed or mismatched file is deleted so it never fails the same way twice.
+     */
+    bool read_warm_file(
+        const char * path,
+        const std::vector<llama_token> & tokens,
+        std::vector<uint8_t> & state);
+
+    /**
+     * Arms the in-RAM snapshot from the warm file without touching the live cache. This
+     * is the repair for a hybrid whose head warm was interrupted by a turn: the cache
+     * holds a conversation from then on, the exact-head moment the capture needs never
+     * returns, and this puts the restore machinery back without costing the open chat
+     * its cache. The blob is validated by llama at restore time, where a refusal
+     * already falls back to a cold read.
+     */
+    bool arm_warm_file(const char * path, const std::vector<llama_token> & tokens);
+
+    /**
      * Decides, once per load, how a reply's thinking survives being replayed as history.
      *
      * Two shapes exist in the wild and they are mutually exclusive. Templates the lfm2

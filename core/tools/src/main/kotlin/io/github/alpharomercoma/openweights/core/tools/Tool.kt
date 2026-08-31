@@ -286,8 +286,11 @@ interface Tool {
  * resolves loses `returnsUntrustedText` — text a stranger wrote would re-enter the prompt
  * marked as trusted, which is exactly the gate that must not silently open.
  */
-private val LEGACY_TOOL_NAMES = mapOf(
+internal val LEGACY_TOOL_NAMES = mapOf(
     SearchMediaTool.LEGACY_NAME to SearchMediaTool.NAME,
+    // One switch became two tools; the stored choice under the old name still governs the
+    // half that does what the old tool did, which is saving.
+    SaveMemoryTool.LEGACY_NAME to SaveMemoryTool.NAME,
 )
 
 class ToolRegistry(tools: List<Tool>) {

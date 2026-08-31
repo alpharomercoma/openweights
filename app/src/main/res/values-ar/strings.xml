@@ -257,4 +257,8 @@
     <string name="prefill_processor">قراءة الطلب</string>
     <string name="decode_processor">كتابة الإجابة</string>
     <string name="processor_fixed_at_export">مُحدَّد عند التصدير</string>
+    <string name="tool_save_memory_name">حفظ الذكريات</string>
+    <string name="tool_save_memory_detail">يتيح للنموذج حفظ معلومة قصيرة عنك للمحادثات القادمة. يطلب الإذن دائمًا أولًا.</string>
+    <string name="tool_read_memory_name">قراءة الذكريات</string>
+    <string name="tool_read_memory_detail">يتيح للنموذج الاطلاع على المعلومات التي حفظها عنك.</string>
 </resources>

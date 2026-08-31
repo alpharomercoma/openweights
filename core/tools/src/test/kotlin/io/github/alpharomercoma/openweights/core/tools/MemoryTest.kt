@@ -37,7 +37,7 @@ class MemoryTest {
         Memory(ApplicationProvider.getApplicationContext<android.app.Application>())
 
     private fun call(fact: String) =
-        ToolCall(id = "1", name = "remember", argumentsJson = """{"fact":"$fact"}""")
+        ToolCall(id = "1", name = "save_memory", argumentsJson = """{"fact":"$fact"}""")
 
     @Test
     fun `a fact is kept and comes back in the prompt`() {
@@ -100,7 +100,7 @@ class MemoryTest {
 
     @Test
     fun `the tool is off for anybody who has never opened the screen`() {
-        val tool = RememberTool(memory)
+        val tool = SaveMemoryTool(memory)
         assertThat(tool.defaultsOn).isFalse()
 
         val switches =
@@ -113,7 +113,7 @@ class MemoryTest {
     @Test
     fun `the tool saves what it is given and says so`() {
         runBlocking {
-            val tool = RememberTool(memory)
+            val tool = SaveMemoryTool(memory)
 
             assertThat(tool.run(call("Writes in British English"))).isEqualTo("Remembered.")
             assertThat(memory.facts.value.map { it.text })
@@ -122,10 +122,58 @@ class MemoryTest {
     }
 
     @Test
+    fun `reading gives the saved facts back as one block`() {
+        runBlocking {
+            memory.remember("Writes in British English")
+            memory.remember("Is called Alpha")
+            val answer = ReadMemoryTool(memory).run(call(""))
+
+            assertThat(answer).contains("1. Writes in British English")
+            assertThat(answer).contains("2. Is called Alpha")
+        }
+    }
+
+    @Test
+    fun `reading an empty memory says so instead of failing`() {
+        runBlocking {
+            val execution = ReadMemoryTool(memory).execute(call(""))
+
+            assertThat(execution.successful).isTrue()
+            assertThat(execution.text).contains("Nothing is saved")
+        }
+    }
+
+    @Test
+    fun `both halves start switched off, independently`() {
+        val switches =
+            ToolSwitches(ApplicationProvider.getApplicationContext<android.app.Application>())
+        assertThat(switches.isEnabled(ReadMemoryTool(memory))).isFalse()
+        assertThat(switches.isEnabled(SaveMemoryTool(memory))).isFalse()
+
+        // Turning one on leaves the other off: they are two decisions, not one.
+        switches.setEnabled(SaveMemoryTool.NAME, true)
+        assertThat(switches.isEnabled(SaveMemoryTool(memory))).isTrue()
+        assertThat(switches.isEnabled(ReadMemoryTool(memory))).isFalse()
+    }
+
+    @Test
+    fun `a choice made under the old remember switch still governs saving`() {
+        val switches =
+            ToolSwitches(ApplicationProvider.getApplicationContext<android.app.Application>())
+        // Somebody who had switched the old combined tool on gets its writing half on,
+        // because that is the half the old switch governed.
+        switches.setEnabled(SaveMemoryTool.LEGACY_NAME, true)
+
+        assertThat(switches.isEnabled(SaveMemoryTool(memory))).isTrue()
+        // The reading half is a new decision and starts where new decisions start.
+        assertThat(switches.isEnabled(ReadMemoryTool(memory))).isFalse()
+    }
+
+    @Test
     fun `the tool asks again rather than saving nothing`() {
         runBlocking {
-            val tool = RememberTool(memory)
-            val answer = tool.run(ToolCall(id = "1", name = "remember", argumentsJson = "{}"))
+            val tool = SaveMemoryTool(memory)
+            val answer = tool.run(ToolCall(id = "1", name = "save_memory", argumentsJson = "{}"))
 
             assertThat(answer).contains("No fact was given")
             assertThat(memory.facts.value).isEmpty()

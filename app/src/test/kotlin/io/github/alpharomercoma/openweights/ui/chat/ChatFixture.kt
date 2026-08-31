@@ -36,7 +36,6 @@ import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.ThermalPolicy
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.GoalBoard
-import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -140,7 +139,6 @@ abstract class ChatFixture {
             turns = turns,
             notifier = ReplyNotifier(context),
             goals = goals,
-            memory = Memory(context),
             // Robolectric has no service to start, and GenerationService swallows the
             // failure on purpose: a turn that cannot raise its own priority still has to
             // produce the reply.

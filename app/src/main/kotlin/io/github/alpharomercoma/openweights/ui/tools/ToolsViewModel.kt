@@ -179,6 +179,8 @@ private val LABELS: Map<String, Pair<Int, Int>> = mapOf(
     "read_file" to (R.string.tool_read_file_name to R.string.tool_read_file_detail),
     "write_file" to (R.string.tool_save_file_name to R.string.tool_save_file_detail),
     "run_script" to (R.string.tool_script_name to R.string.tool_script_detail),
+    "save_memory" to (R.string.tool_save_memory_name to R.string.tool_save_memory_detail),
+    "read_memory" to (R.string.tool_read_memory_name to R.string.tool_read_memory_detail),
 )
 
 /**

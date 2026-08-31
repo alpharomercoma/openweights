@@ -268,4 +268,8 @@
     <string name="prefill_processor">Leer la petición</string>
     <string name="decode_processor">Escribir la respuesta</string>
     <string name="processor_fixed_at_export">Fijado al exportar</string>
+    <string name="tool_save_memory_name">Guardar recuerdos</string>
+    <string name="tool_save_memory_detail">Permite al modelo guardar un dato breve sobre ti para futuros chats. Siempre pregunta antes.</string>
+    <string name="tool_read_memory_name">Leer recuerdos</string>
+    <string name="tool_read_memory_detail">Permite al modelo consultar los datos que ha guardado sobre ti.</string>
 </resources>

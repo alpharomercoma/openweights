@@ -48,8 +48,9 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
         val name = tool.definition.name
         if (store.contains(name)) return store.getBoolean(name, tool.defaultsOn)
         // A choice made under the tool's old name still stands. Without this, renaming a
-        // tool silently turned it back on for anyone who had switched it off.
-        val legacy = SearchMediaTool.LEGACY_NAME.takeIf { name == SearchMediaTool.NAME }
+        // tool silently turned it back on for anyone who had switched it off — or, for a
+        // tool that starts off, silently off for anyone who had switched it on.
+        val legacy = LEGACY_TOOL_NAMES.entries.firstOrNull { it.value == name }?.key
         if (legacy != null && store.contains(legacy)) {
             return store.getBoolean(legacy, tool.defaultsOn)
         }

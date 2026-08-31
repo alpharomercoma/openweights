@@ -28,8 +28,9 @@ import io.github.alpharomercoma.openweights.core.tools.DeleteFileTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
-import io.github.alpharomercoma.openweights.core.tools.RememberTool
+import io.github.alpharomercoma.openweights.core.tools.ReadMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
+import io.github.alpharomercoma.openweights.core.tools.SaveMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.ShowDocumentTool
@@ -80,14 +81,15 @@ object ToolsModule {
         advance: AdvanceTool,
         askUser: AskUserTool,
         watch: WatchTool,
-        // Last, and off unless asked for. It is the only one that carries anything out of
-        // one conversation and into the next.
-        remember: RememberTool,
+        // Last, and off unless asked for. They are the only pair that carries anything out
+        // of one conversation and into the next: one half writes, the other reads back.
+        readMemory: ReadMemoryTool,
+        saveMemory: SaveMemoryTool,
     ): ToolRegistry = ToolRegistry(
         listOf(
             search, media, fetch, searchFiles, readFile, writeFile, deleteFile,
             showWebsite, showDocument, showSlides, runScript,
-            advance, askUser, watch, remember,
+            advance, askUser, watch, readMemory, saveMemory,
         ),
     )
 

@@ -88,7 +88,6 @@
     <string name="back">Back</string>
     <string name="speed">Speed</string>
     <string name="draft">Draft</string>
-    <string name="slide_position" translatable="false">%1$d / %2$d</string>
     <string name="week">This week</string>
     <string name="by_model">By model</string>
     <string name="recommended">Recommended</string>
@@ -302,5 +301,9 @@
     <string name="decode_processor">Writing the answer</string>
 
     <string name="processor_fixed_at_export">Fixed at export</string>
+    <string name="tool_save_memory_name">Save memories</string>
+    <string name="tool_save_memory_detail">Lets the model keep one short fact about you for future chats. Always asks first.</string>
+    <string name="tool_read_memory_name">Read memories</string>
+    <string name="tool_read_memory_detail">Lets the model look up the facts it has kept about you.</string>
 </resources>
 

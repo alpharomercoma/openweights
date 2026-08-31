@@ -31,8 +31,11 @@ SYSTEM = d["system"]
 TOOLS = [{"type": "function", "function": t} for t in d["tools"]]
 DAY = "2026-09-01"
 
-USER_LINE = f"(For context: today is {DAY}. Only mention it if asked.)"
-ACK = "Understood."
+# 2026-09-01 second pass: the scoped wording answered greetings cleanly but broke
+# the temp-0 date question on every model in eval/routing_matrix.py; the plain pair
+# answers it 1/1 everywhere and drew the fewest chit-chat calls of any ack (1/30).
+USER_LINE = f"Today is {DAY}."
+ACK = "Understood, I have that."
 
 def arm_shipped(q):
     return [{"role": "system", "content": SYSTEM},

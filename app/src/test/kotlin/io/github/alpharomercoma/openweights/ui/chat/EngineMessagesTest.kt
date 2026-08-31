@@ -67,9 +67,9 @@ class EngineMessagesTest {
         // The date deliberately stays OUT of the instructions — it is the one line that
         // changes daily, and in the head it invalidated the warm snapshot and disk store
         // at every midnight. It opens the conversation as its own acknowledged exchange.
-        assertThat(system.text).doesNotContain("today is")
+        assertThat(system.text).doesNotContain("Today is")
         val firstUser = state.engineMessages().first { it.role == ChatRole.USER }
-        assertThat(firstUser.text).contains("today is")
+        assertThat(firstUser.text).contains("Today is")
     }
 
     /**
@@ -164,7 +164,7 @@ class EngineMessagesTest {
         // The date is its own acknowledged exchange ahead of the recap — kept out of the
         // instructions so the head stays byte-stable across midnight, and kept out of
         // the question so it is never read as something to act on.
-        val day = messages.indexOfFirst { it.text.contains("today is") }
+        val day = messages.indexOfFirst { it.text.startsWith("Today is") }
         assertThat(day).isAtLeast(0)
         assertThat(day).isLessThan(messages.indexOf(recap))
         assertThat(messages[day].role).isEqualTo(ChatRole.USER)

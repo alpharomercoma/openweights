@@ -3584,17 +3584,20 @@ private fun List<ChatMessage>.withConversationDay(): List<ChatMessage> {
     if (at < 0) return this
     return subList(0, at) +
         listOf(
-            // Framed as context with a scope note, because the bare fact leaks: told
-            // plainly "Today is X.", the model recited the date back at greetings 8 of
-            // 30 times ("hello" → "Today is September 1, 2026. This is an important
-            // milestone…"). This wording measured 2/30 echoes and 2/30 tool calls over
-            // five seeds of six chit-chat cases at the shipped temperature, against
-            // 17/30 tool calls for prepending the date to the question.
-            ChatMessage.text(
-                ChatRole.USER,
-                "(For context: today is ${PromptDay.pinned}. Only mention it if asked.)",
-            ),
-            ChatMessage.text(ChatRole.ASSISTANT, "Understood."),
+            // The plain fact, plainly acknowledged. The 33-case routing matrix
+            // (eval/routing_matrix.py, temp 0, both LFM quants) retired two cleverer
+            // wordings: "(For context: … Only mention it if asked.)" broke the date
+            // question itself — 0/1 everywhere, read_memory called for "what is
+            // today's date" — and "(For context: …)" with this ack did the same. This
+            // pair answers the date 1/1 on every model measured and drew the fewest
+            // chit-chat tool calls of any ack at the shipped temperature (1/30).
+            // Known cost, accepted: greetings echo the date back ~8/30 at 0.8 —
+            // cosmetics, priced against wrong answers. The exchange also cannot be
+            // dropped: with no exchange at all, QAD's trivia fell 6/6→4/6 and Q4_0
+            // lost the multi-turn rows — two turns of ordinary conversation are a
+            // worked example the routing visibly leans on.
+            ChatMessage.text(ChatRole.USER, "Today is ${PromptDay.pinned}."),
+            ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
         ) +
         subList(at, size)
 }

@@ -441,11 +441,8 @@ class ToolChoiceBenchmark {
 
     /** The acknowledged exchange ChatViewModel opens every conversation with. */
     private fun dateExchange(): List<ChatMessage> = listOf(
-        ChatMessage.text(
-            ChatRole.USER,
-            "(For context: today is ${LocalDate.now()}. Only mention it if asked.)",
-        ),
-        ChatMessage.text(ChatRole.ASSISTANT, "Understood."),
+        ChatMessage.text(ChatRole.USER, "Today is ${LocalDate.now()}."),
+        ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
     )
 
     /**

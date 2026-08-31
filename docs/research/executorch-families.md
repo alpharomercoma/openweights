@@ -61,19 +61,37 @@ capability, not bit-parity.
 
 ## What the matrix says about the models (not the harness)
 
-- **Qwen3-1.7B is full parity: 7/7 on both engines**, including the complete tool
+Final matrix (after every fix above; P pass, F fail, dash = family has no tool syntax),
+cases in suite order — trap, arithmetic, format, extraction, memory, tool-call,
+tool-result:
+
+| Family | ExecuTorch | llama.cpp |
+|---|---|---|
+| Qwen3-1.7B | **PPPPPPP** | **PPPPPPP** |
+| SmolLM3-3B | PPPPPFP | PPPPPFP |
+| Llama-3.2-3B | FFPPPPF | FFPPPPF |
+| LFM 2.5 1.2B | FFFPPPP | FFPPPPP |
+| Gemma 3 1B | FFFPF-- | FFFPP-- |
+
+- **Qwen3-1.7B is full parity, 7/7 on both engines**, including the complete tool
   loop. It is the reference model for the agentic path on the compiled runtime.
-- **SmolLM3-3B** matches its GGUF twin on the first five cases; both spend the tool
-  call's budget thinking (its default system prompt demands elaborate reasoning), which
-  is a real property of running SmolLM3 on a phone budget, not a porting defect.
-- **Gemma 3 1B fails the same three reasoning cases on both engines** — the 1B is the
-  1B. Its export's window is small enough that one long-budget turn of history
-  overflows it; the friendly error is exactly what a user would now see.
-- **LFM 2.5 1.2B**: identical failures on the two arithmetic traps on both engines
-  (same weights, same rut), one mild divergence on the format constraint (the 8da4w
-  export answers in prose where Q4_K_M emits the JSON array).
-- **Llama 3.2 3B** misses the two arithmetic traps on both engines and needed the two
-  Llama-specific fixes above for its tool loop.
+- **SmolLM3-3B is exact case-for-case parity.** The one shared failure is the tool
+  call: both twins spend the budget thinking before emitting it, which is a property
+  of SmolLM3's own system prompt on a phone budget, not of either runtime.
+- **Llama-3.2-3B is exact parity** once its two format fixes were in — and both twins
+  fail the same two arithmetic traps and both narrate *about* a tool result instead of
+  using it, which is the model, reproduced faithfully twice.
+- **LFM 2.5 1.2B**: identical failures on the two arithmetic traps (same weights, same
+  rut); one divergence, the format constraint, where the 8da4w export answers in prose
+  and Q4_K_M emits the JSON array — a quantisation delta, recorded.
+- **Gemma 3 1B** fails the same three reasoning cases on both engines — the 1B is the
+  1B — and its ET twin says "Bagis" where the GGUF says "Bagwis" on the memory case,
+  the closest thing to a porting delta in the whole matrix and still a near-miss, not
+  noise.
+
+**No hallucination delta was observed in either direction**: on every case where the
+engines disagree, the transcripts show the same kind of answer at different quality,
+never a fabrication unique to one runtime.
 
 ## Answers the goal asked for explicitly
 

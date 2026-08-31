@@ -1,0 +1,82 @@
+{
+  "model": "gemma-3-1b-it-Q4_K_M",
+  "engine": "LlamaCppEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8\n",
+      "reasoning_chars": 0,
+      "raw": "8\n",
+      "calls": [],
+      "prompt_tokens": 39,
+      "cached_tokens": 0,
+      "generated_tokens": 2,
+      "prefill_ms": 752,
+      "decode_ms": 81
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "80",
+      "reasoning_chars": 0,
+      "raw": "80",
+      "calls": [],
+      "prompt_tokens": 43,
+      "cached_tokens": 4,
+      "generated_tokens": 2,
+      "prefill_ms": 823,
+      "decode_ms": 80
+    },
+    {
+      "id": "format-constraint",
+      "status": "fail",
+      "content": "```json\n[\n  \"Mercury\",\n  \"Venus\",\n  \"Mars\"\n]\n```\n",
+      "reasoning_chars": 0,
+      "raw": "```json\n[\n  \"Mercury\",\n  \"Venus\",\n  \"Mars\"\n]\n```\n",
+      "calls": [],
+      "prompt_tokens": 27,
+      "cached_tokens": 4,
+      "generated_tokens": 24,
+      "prefill_ms": 532,
+      "decode_ms": 1012
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 86,
+      "cached_tokens": 4,
+      "generated_tokens": 4,
+      "prefill_ms": 1992,
+      "decode_ms": 162
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 24,
+      "cached_tokens": 53,
+      "generated_tokens": 2,
+      "prefill_ms": 436,
+      "decode_ms": 78
+    },
+    {
+      "id": "tool-call",
+      "status": "skipped",
+      "reason": "family has no tool syntax"
+    },
+    {
+      "id": "tool-result",
+      "status": "skipped",
+      "reason": "family has no tool syntax"
+    }
+  ]
+}

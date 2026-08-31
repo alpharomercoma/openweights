@@ -175,6 +175,7 @@ class ToolsViewModel @Inject constructor(
 private val LABELS: Map<String, Pair<Int, Int>> = mapOf(
     "web_search" to (R.string.tool_search_name to R.string.tool_search_detail),
     "fetch_url" to (R.string.tool_page_name to R.string.tool_page_detail),
+    "find_files" to (R.string.tool_find_file_name to R.string.tool_find_file_detail),
     "search_files" to (R.string.tool_find_file_name to R.string.tool_find_file_detail),
     "read_file" to (R.string.tool_read_file_name to R.string.tool_read_file_detail),
     "write_file" to (R.string.tool_save_file_name to R.string.tool_save_file_detail),

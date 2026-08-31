@@ -288,6 +288,7 @@ interface Tool {
  */
 internal val LEGACY_TOOL_NAMES = mapOf(
     SearchMediaTool.LEGACY_NAME to SearchMediaTool.NAME,
+    SearchFilesTool.LEGACY_NAME to SearchFilesTool.NAME,
     // One switch became two tools; the stored choice under the old name still governs the
     // half that does what the old tool did, which is saving.
     SaveMemoryTool.LEGACY_NAME to SaveMemoryTool.NAME,

@@ -35,7 +35,11 @@ import javax.inject.Singleton
 @Singleton
 class SearchFilesTool @Inject constructor(private val workspace: Workspace) : Tool {
     override val definition = ToolDefinition(
-        name = "search_files",
+        // find_, not search_: the name is the strongest routing signal a 1B reads, and
+        // with "search" in it this tool drew search-shaped questions — "Who is <an
+        // unrecognised person>?" called search_files on the routing matrix, and renaming
+        // it moved those calls to web_search with nothing else changed.
+        name = NAME,
         // The "not for" half is load-bearing and was measured twice. Removing it to save
         // tokens put "read that file for me" back to calling this tool with a guessed
         // pattern instead of asking which file, so it went back in.
@@ -78,7 +82,7 @@ class SearchFilesTool @Inject constructor(private val workspace: Workspace) : To
     private suspend fun search(call: ToolCall): ToolExecution {
         val pattern = call.argument("pattern", "name", "glob", "query")
             ?: return ToolExecution.rejected(
-                "No pattern was given. Call search_files again with a pattern like *.md.",
+                "No pattern was given. Call $NAME again with a pattern like *.md.",
             )
         val contains = call.argument("contains", "text", "containing")
         val hunt = Hunt(workspace, pattern.asNameMatcher(), contains)
@@ -87,6 +91,17 @@ class SearchFilesTool @Inject constructor(private val workspace: Workspace) : To
         // A search that matched nothing still searched. Nothing here failed, and saying it
         // did would keep a true answer out of the notes and invite the same walk again.
         return ToolExecution(hunt.report(ranOut = finished == null))
+    }
+
+    companion object {
+        const val NAME = "find_files"
+
+        /**
+         * The name this tool carried before the routing measurement renamed it. Stored
+         * steps and a user's on/off switch may be keyed by it; both keep meaning this
+         * tool. See [SearchMediaTool.LEGACY_NAME] for the precedent.
+         */
+        const val LEGACY_NAME = "search_files"
     }
 }
 
@@ -103,7 +118,7 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
     override val definition = ToolDefinition(
         name = "read_file",
         description = "Read the text of a file in the folder the user shared. Use the path " +
-            "exactly as search_files gave it. If no path is known, ask which file rather " +
+            "exactly as find_files gave it. If no path is known, ask which file rather " +
             "than inventing one.",
         parametersJson = """
             {
@@ -130,7 +145,7 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
     /**
      * The one tool here that hands the model a stranger's words.
      *
-     * search_files reports paths and never contents, and write_file only carries text the
+     * find_files reports paths and never contents, and write_file only carries text the
      * model already had, so this is the single point where something written by somebody
      * else enters the turn.
      */
@@ -151,7 +166,7 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
             )
         val entry = workspace.resolve(path)
             ?: return ToolExecution.rejected(
-                "There is no file at $path in the shared folder. Use search_files first.",
+                "There is no file at $path in the shared folder. Use find_files first.",
             )
         val skip = call.argument("offset", "start", "skip")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         return window(entry, path, skip)
@@ -162,7 +177,7 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
     private suspend fun window(entry: Entry, path: String, skip: Int): ToolExecution {
         if (entry.isDirectory) {
             return ToolExecution.rejected(
-                "$path is a folder, not a file. Use search_files to see what is in it.",
+                "$path is a folder, not a file. Use find_files to see what is in it.",
             )
         }
         // A picture is not a failed text file, and saying so is the difference between a

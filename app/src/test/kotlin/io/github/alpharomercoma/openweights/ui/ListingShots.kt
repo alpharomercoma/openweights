@@ -125,7 +125,7 @@ object ListingShots {
                     enabled = true,
                 ),
                 tool(
-                    "search_files",
+                    "find_files",
                     "Find a file",
                     "Looks through the folder you shared.",
                     enabled = false,

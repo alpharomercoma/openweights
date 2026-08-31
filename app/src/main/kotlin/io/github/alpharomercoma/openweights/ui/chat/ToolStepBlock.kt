@@ -226,6 +226,7 @@ private val VERBS = mapOf(
     SearchMediaTool.NAME to "Searched the web for pictures of",
     SearchMediaTool.LEGACY_NAME to "Searched the web for pictures of",
     "fetch_url" to "Opened",
+    "find_files" to "Looked through your folder for",
     "search_files" to "Looked through your folder for",
     "read_file" to "Read",
     "write_file" to "Saved",

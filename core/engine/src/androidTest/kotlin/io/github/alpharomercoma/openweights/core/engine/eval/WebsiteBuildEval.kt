@@ -75,7 +75,11 @@ class WebsiteBuildEval {
 /** The build loop and its grading, shared by both engines' tests. */
 internal object WebsiteBuild {
 
-    suspend fun build(engine: InferenceEngine) {
+    suspend fun build(
+        engine: InferenceEngine,
+        params: SamplerParams = PARAMS,
+        ask: String = FULL_ASK,
+    ) {
         val site = InstrumentationRegistry.getInstrumentation()
             .targetContext.filesDir.resolve("e2e-site").apply {
                 deleteRecursively()
@@ -83,27 +87,23 @@ internal object WebsiteBuild {
             }
 
         var shown: String? = null
-        val messages = mutableListOf<ChatMessage>(
-            ChatMessage.text(
-                ChatRole.USER,
-                "Build a small single-page website about the phases of the moon: a " +
-                    "heading, a short paragraph for each of the four main phases, and " +
-                    "simple CSS so it looks deliberate. Save it as site/index.html with " +
-                    "the CSS inline, then show it to me.",
-            ),
-        )
+        val messages = mutableListOf<ChatMessage>(ChatMessage.text(ChatRole.USER, ask))
 
         var rounds = 0
         var nudged = false
         while (rounds < MAX_ROUNDS && shown == null) {
             rounds += 1
-            val events = engine.chat(messages, PARAMS, TOOLS).toList()
+            val events = engine.chat(messages, params, TOOLS).toList()
             val done = events.filterIsInstance<GenerationEvent.Completed>().single()
             val raw = events.filterIsInstance<GenerationEvent.Token>()
                 .joinToString("") { it.text }
             messages += ChatMessage.text(ChatRole.ASSISTANT, raw.ifEmpty { done.content })
 
             if (done.toolCalls.isEmpty()) {
+                Log.i(
+                    TAG,
+                    "round $rounds, no calls; ${raw.length} chars, tail: ${raw.takeLast(220)}",
+                )
                 // The page exists but the model answered in prose instead of showing it.
                 // A person would say "show it, then" once; the loop is allowed the same
                 // single nudge, and only that.
@@ -193,7 +193,17 @@ internal object WebsiteBuild {
     private const val RENDER_TIMEOUT_MS = 20_000L
     val EVAL_DIR = File("/data/local/tmp/openweights/eval")
 
-    private val PARAMS = SamplerParams(temperature = 0f, topK = 1, seed = 7, maxTokens = 2048)
+    val PARAMS = SamplerParams(temperature = 0f, topK = 1, seed = 7, maxTokens = 2048)
+
+    val FULL_ASK = "Build a small single-page website about the phases of the moon: a " +
+        "heading, a short paragraph for each of the four main phases, and " +
+        "simple CSS so it looks deliberate. Save it as site/index.html with " +
+        "the CSS inline, then show it to me."
+
+    /** The same errand cut to fit a 2048-token export window, reasoning included. */
+    val COMPACT_ASK = "Build a tiny single-page website: a heading that says Phases of " +
+        "the Moon and one short sentence about the full moon, minimal inline CSS. " +
+        "Save it as site/index.html, then call show_website. Keep it very short."
 
     private val TOOLS = listOf(
         ToolDefinition(

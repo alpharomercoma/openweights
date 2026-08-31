@@ -93,6 +93,25 @@ tool-result:
 engines disagree, the transcripts show the same kind of answer at different quality,
 never a fabrication unique to one runtime.
 
+## The end-to-end build, on both runtimes
+
+`WebsiteBuildEval` drives the whole agentic development path against a real model on the
+phone: the same write_file and show_website tools the app offers, calls executed against
+a real folder, and the finished page loaded into a real WebView whose DOM is counted —
+"does the page it made actually render into elements", not "did it answer".
+
+- **llama.cpp (Qwen3-1.7B Q8_0, 8k window): passes.** One round: the model wrote a
+  1,315-character page with inline CSS and called show_website unprompted; the WebView
+  parsed it into 14 elements. No hallucinated file paths, no invented tools.
+- **ExecuTorch (Qwen3-1.7B INT8-INT4, 2k window): blocked by the export's window, and
+  both edges are measured.** Reasoning on, the model spends the whole window thinking
+  about the page and is cut before its first call; reasoning off, the INT4 weights
+  greedily sample an end-of-turn token exactly 24 tokens into the call's JSON, on two
+  different prompts. The identical model and engine pass the full parity suite — short
+  tool calls fit the window; a built page does not. The test now skips until an export
+  with a 4096-token window is pushed (`tools/executorch/export_qwen3.sh` with
+  `+export.max_seq_length=4096` on the Linux build host), which is the recorded fix.
+
 ## Answers the goal asked for explicitly
 
 - **Python in the sandbox: no.** The execution tool is QuickJS in an isolated process;

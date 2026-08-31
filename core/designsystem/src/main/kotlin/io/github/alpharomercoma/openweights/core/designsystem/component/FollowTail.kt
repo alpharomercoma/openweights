@@ -16,11 +16,11 @@
 
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -51,22 +51,19 @@ class FollowTailState internal constructor(
     /** Jumps to the newest content and starts following again. */
     fun jumpToLatest() {
         isFollowing = true
-        scope.launch { listState.scrollToBottom() }
+        scope.launch { listState.pinToBottom() }
     }
 }
 
 /**
- * Remembers follow-tail behaviour for [listState] and drives it from [contentSignal].
+ * Remembers follow-tail behaviour for [listState].
  *
- * @param contentSignal any value that changes when new content is appended. The streamed
- *   text itself works well, since it changes on every token.
+ * The caller's recomposition is the content signal: this composable must sit in the
+ * scope that recomposes when the list's content changes, which a chat screen reading
+ * its transcript does on every streamed flush.
  */
 @Composable
-fun rememberFollowTailState(
-    listState: LazyListState,
-    contentSignal: Any?,
-    scope: CoroutineScope,
-): FollowTailState {
+fun rememberFollowTailState(listState: LazyListState, scope: CoroutineScope): FollowTailState {
     val state = remember(listState) { FollowTailState(listState, scope) }
 
     val isAtBottom by remember(listState) {
@@ -93,46 +90,50 @@ fun rememberFollowTailState(
         if (isAtBottom) state.isFollowing = true
     }
 
-    LaunchedEffect(contentSignal, state.isFollowing) {
-        if (state.isFollowing) listState.scrollToBottom()
+    // A SideEffect rather than an effect keyed on the content, because an effect's
+    // coroutine can land after the frame that grew the item has already measured — and
+    // that frame then shows the tail pushed below the fold before the correction, the
+    // residual one-line bob the recording still caught a few times a minute. SideEffect
+    // runs before this frame's layout, so whenever a recomposition grew the list, the
+    // pin request is already pending by the time the growth measures: one frame, one
+    // motion. Gated on no scroll being in progress so a drag or fling is never fought;
+    // the pin request itself is not a scroll session, so it never gates itself out.
+    SideEffect {
+        if (state.isFollowing && !listState.isScrollInProgress) listState.pinToBottom()
     }
 
     return state
 }
 
 /**
- * Scrolls to the very end of the content, including the tail of an item taller than the
- * viewport, which a long streamed reply usually is.
+ * Pins the end of the content to the end of the viewport, atomically with layout.
  *
- * The two cases are different and conflating them is what made streaming
- * unreadable. When the last item is already on screen, all that is needed is a nudge by
- * whatever hangs below the fold. Calling `scrollToItem` there instead, as this first did,
- * snaps the viewport to the *start* of a reply that is taller than the screen, and the
- * following `scrollBy` yanks it back to the end. Once per token, that is a page-height
- * flash on every word.
+ * The predecessor measured how far the tail hung below the fold and scrolled by that
+ * much — after the frame had already been drawn. So every time streaming text wrapped a
+ * new line, the activity row under it was pushed below the fold for a frame or two, and
+ * the correction then pulled the whole page up: a one-line down-then-up bob per wrapped
+ * line, at exactly the place the reader is looking. Filmed on the phone at 20 fps and
+ * measured as direction reversals in the scroll about every half second of a
+ * viewport-filling reply.
+ *
+ * requestScrollToItem instead records the request and applies it during the next measure
+ * pass, so the grown item and the corrected scroll land in the same frame: the page
+ * ratchets upward cleanly and never dips. The absurd offset asks for the last item's
+ * start to sit far above the viewport; the measure pass clamps that to the largest
+ * legal scroll, which is precisely "content end at viewport end" — for a tail item
+ * shorter than the screen and for one far taller than it alike.
  */
-internal suspend fun LazyListState.scrollToBottom() {
-    val layout = layoutInfo
-    val lastIndex = layout.totalItemsCount - 1
+internal fun LazyListState.pinToBottom() {
+    val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
-
-    val last = layout.visibleItemsInfo.lastOrNull()
-    if (last != null && last.index == lastIndex) {
-        val below = last.offset + last.size - layout.viewportEndOffset
-        if (below > 0) scrollBy(below.toFloat())
-        return
-    }
-
-    // Not showing the final item at all: this is a jump, and a jump is allowed to jump.
-    scrollToItem(lastIndex)
-    scrollBy(OVERSCROLL_PX)
+    requestScrollToItem(lastIndex, scrollOffset = PIN_TO_END_OFFSET)
 }
 
 /** Treat "within a few pixels of the end" as being at the bottom; exact equality is fragile. */
 private const val BOTTOM_TOLERANCE_PX = 24
 
-/** Larger than any plausible message; scrollBy clamps, so this just means "to the end". */
-private const val OVERSCROLL_PX = 100_000f
+/** Far past any real item height; the measure pass clamps it to "content end at viewport end". */
+private const val PIN_TO_END_OFFSET = Int.MAX_VALUE / 2
 
 /**
  * Whether enough is hidden below to be worth offering a jump.

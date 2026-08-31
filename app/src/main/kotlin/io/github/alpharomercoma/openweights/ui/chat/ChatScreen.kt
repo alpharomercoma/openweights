@@ -204,12 +204,10 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
-    // The whole last entry, not just its text: finishing a reply adds a throughput line
-    // and a reasoning header above the answer, which grows the item after the final token.
-    // Keying on text alone would leave the reader looking at the middle of the reply.
+    // This screen recomposes on every streamed flush — it reads the transcript — which
+    // is exactly the signal the follow-tail pins from.
     val followTail = rememberFollowTailState(
         listState = listState,
-        contentSignal = state.transcript.lastOrNull() to state.transcript.size,
         scope = scope,
     )
 

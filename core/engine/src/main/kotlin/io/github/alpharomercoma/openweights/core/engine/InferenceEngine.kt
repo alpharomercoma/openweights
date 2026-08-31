@@ -317,6 +317,13 @@ interface InferenceEngine : AutoCloseable {
         tools: List<ToolDefinition> = emptyList(),
         /** Only [SamplerParams.thinking] and [SamplerParams.reasoningEffort] shape the prefix. */
         params: SamplerParams = SamplerParams(),
+        /**
+         * Whether a model that cannot roll back may capture this warm as its restore
+         * snapshot. True for the fresh-chat head; false for a whole conversation — a fold,
+         * a branch, a reopened chat — which rides the cache itself and must not displace
+         * the head snapshot every future new chat restores from.
+         */
+        snapshot: Boolean = true,
     ): WarmResult? = null
 
     /** Stops the running generation. Safe to call from any thread. */

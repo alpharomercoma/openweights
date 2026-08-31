@@ -96,7 +96,8 @@ class RoutingInferenceEngine(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         params: SamplerParams,
-    ): WarmResult? = active?.warm(messages, tools, params)
+        snapshot: Boolean,
+    ): WarmResult? = active?.warm(messages, tools, params, snapshot)
 
     override fun cancel() {
         active?.cancel()

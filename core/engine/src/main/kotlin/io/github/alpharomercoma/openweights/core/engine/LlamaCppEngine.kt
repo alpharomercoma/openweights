@@ -207,6 +207,7 @@ class LlamaCppEngine internal constructor(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         params: SamplerParams,
+        snapshot: Boolean,
     ): WarmResult? = withContext(engineThread) {
         val activeHandle = handle.get()
         if (activeHandle == 0L) return@withContext null
@@ -222,6 +223,7 @@ class LlamaCppEngine internal constructor(
             toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
             enableThinking = params.thinking,
             reasoningEffort = params.reasoningEffort.wireName,
+            snapshot = snapshot,
         ) ?: return@withContext null
         currentModel = currentModel?.copy(
             contextUsed = (stats[0] + stats[1]).toInt(),

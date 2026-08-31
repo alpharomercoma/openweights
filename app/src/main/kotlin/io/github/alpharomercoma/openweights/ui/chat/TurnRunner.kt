@@ -280,7 +280,7 @@ class TurnRunner @Inject constructor(
         )
     }
 
-    /** True while [warmFreshChat] holds the engine, so a turn knows to interrupt it. */
+    /** True while a warm holds the engine, so a turn knows to interrupt it. */
     @Volatile
     private var warming = false
 
@@ -301,6 +301,32 @@ class TurnRunner @Inject constructor(
         system: List<ChatMessage>,
         withTools: Boolean,
         params: SamplerParams,
+    ): WarmResult? = warm(system, withTools, params, snapshot = true)
+
+    /**
+     * Reads an existing conversation into the engine's cache, ahead of its next question.
+     *
+     * The same read as [warmFreshChat] with one difference: no snapshot. The fresh-chat
+     * snapshot is the recovery point every hybrid restore falls back to, and letting a
+     * conversation take that slot would trade every future new chat's floor for one
+     * conversation's convenience. The conversation needs no snapshot anyway — its next
+     * question extends the cache this warm just filled.
+     *
+     * [conversation] must be the exact front of the prompt the next send will render —
+     * in practice `engineMessages()`, whose tool-notes decoration only ever lands on the
+     * question that is not part of this list.
+     */
+    suspend fun warmConversation(
+        conversation: List<ChatMessage>,
+        withTools: Boolean,
+        params: SamplerParams,
+    ): WarmResult? = warm(conversation, withTools, params, snapshot = false)
+
+    private suspend fun warm(
+        conversation: List<ChatMessage>,
+        withTools: Boolean,
+        params: SamplerParams,
+        snapshot: Boolean,
     ): WarmResult? {
         if (!engineInUse.tryLock()) return null
         warming = true
@@ -308,11 +334,12 @@ class TurnRunner @Inject constructor(
             val active = selectTools(AgentMode.AUTO, offerPlan = true, offerAsk = null)
             val native = engine.loadedModel?.supportsTools == true
             val renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
-            val messages = system.describing(active, needed = withTools && !native)
+            val messages = conversation.describing(active, needed = withTools && !native)
             val result = engine.warm(
                 messages = messages,
                 tools = if (renderTools) active.definitions else emptyList(),
                 params = params,
+                snapshot = snapshot,
             )
             result?.let {
                 Log.i(

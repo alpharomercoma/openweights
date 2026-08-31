@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.engine.LlamaException
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.core.engine.WarmResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -260,6 +261,31 @@ class FakeInferenceEngine : InferenceEngine {
         resetCount++
     }
 
+    /** One background warm as it reached the engine: what was composed, and for what. */
+    data class WarmCall(
+        val messages: List<ChatMessage>,
+        val tools: List<ToolDefinition>,
+        val snapshot: Boolean,
+    )
+
+    /** Every [warm], in order, so a test can check what was read ahead and how. */
+    val warmCalls = mutableListOf<WarmCall>()
+
+    override suspend fun warm(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        params: SamplerParams,
+        snapshot: Boolean,
+    ): WarmResult? {
+        warmCalls += WarmCall(messages, tools, snapshot)
+        return WarmResult(
+            warmedTokens = messages.sumOf { it.text.length } / CHARS_PER_TOKEN,
+            reusedTokens = 0,
+            prefillMs = 1,
+            snapshotBytes = 0,
+        )
+    }
+
     override suspend fun setThreads(generateThreads: Int, batchThreads: Int) = Unit
 
     override fun systemInfo(): String = "fake engine"
@@ -290,3 +316,6 @@ class FakeInferenceEngine : InferenceEngine {
         const val REPLY = "A short answer."
     }
 }
+
+/** The rough tokenizer the app itself estimates with; precision is not the point here. */
+private const val CHARS_PER_TOKEN = 4

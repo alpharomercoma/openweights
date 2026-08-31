@@ -1342,22 +1342,33 @@ class ChatViewModel @Inject constructor(
                 reportError(STORAGE_FAILED)
                 return@launch
             }
-            // Straight over, with the cache cleared: the new conversation shares a prefix
-            // with the old one but the engine is about to be asked about a different
-            // conversation id, and leaving a stale cache to be matched against is how a
-            // reply ends up answering the chat somebody just left.
-            runtime.resetContext()
+            // Straight over, and the cache deliberately kept: alignment only ever reuses
+            // positions whose bytes match the new prompt, so the parent's cache can never
+            // leak into a reply — what it can do is spare the branch re-reading the turns
+            // both conversations share. See newChat, which dropped its reset for the same
+            // reason.
             conversationId = branched
             _uiState.update {
                 it.copy(
                     transcript = copiedTranscript,
                     compaction = null,
                     toolNotes = ToolNotes(),
-                    engineHistory = null,
+                    // Carried only when it describes exactly the carried turns: a branch
+                    // from the last reply keeps extending the parent's cache byte for
+                    // byte. A branch from earlier has no way to cut the record at the
+                    // branch point — tool rounds mean its messages do not map one-to-one
+                    // onto transcript entries — so it rebuilds from the transcript below.
+                    engineHistory = state.engineHistory?.takeIf { record ->
+                        record.throughCount == carried.size && record.covers(carried)
+                    },
                     contextUsed = 0,
                     error = null,
                 )
             }
+            // What the branch will re-read, read now in the background: by the time the
+            // user has typed where this conversation should go instead, the carried turns
+            // are already in the cache.
+            warmEngine()
         }
     }
 
@@ -1657,7 +1668,10 @@ class ChatViewModel @Inject constructor(
             val proposed = _uiState.value.transcript.lastOrNull()?.answer.orEmpty()
             turns.planning.propose(proposed)
         }
-        compactIfNeeded()
+        // A fold rewrote the prompt from the root; read the rewritten conversation back
+        // into the cache now, while nobody is waiting, rather than in front of the next
+        // question.
+        if (compactIfNeeded()) warmEngine()
         notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
     }
 
@@ -2190,7 +2204,23 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Reads the fresh-chat prefix into the engine cache while nobody is waiting. */
+    /**
+     * Reads the fresh-chat prefix into the engine cache while nobody is waiting — and,
+     * when a conversation is on screen, the conversation after it.
+     *
+     * Always the head first, because the head warm is where a hybrid model's restore
+     * snapshot is captured, and the conversation warm is forbidden from taking that slot:
+     * a conversation in the snapshot would cost every future new chat its restore. The
+     * order costs nothing — the conversation starts with the head, so its warm reuses
+     * every byte the head warm just read.
+     *
+     * The conversation stage is what makes a fold, a branch, a reopened chat and a
+     * settings change cheap: each rewrites the prompt from the root, and this reads the
+     * rewritten prompt back in the background so the next question pays only for its own
+     * words. Composed by [engineMessages] itself — the warm ends exactly where the next
+     * prompt appends the question, and the tool-notes decoration only ever lands on that
+     * question, so every warmed byte is a byte the send reuses.
+     */
     private fun warmEngine() {
         warmJob?.cancel()
         warmJob = viewModelScope.launch {
@@ -2208,6 +2238,20 @@ class ChatViewModel @Inject constructor(
                 if (state.toolsAvailable) it.copy(thinking = true) else it
             }
             turns.warmFreshChat(head, withTools = state.toolsAvailable, params = params)
+            if (state.transcript.isEmpty()) return@launch
+            val conversation = state.engineMessages()
+            // A conversation carrying media cannot be warmed: the warm path renders text
+            // only, so its bytes diverge at the first picture and warm nothing the send
+            // could use. Media turns re-evaluate the conversation anyway; see the
+            // first-turn-latency notes.
+            if (conversation.any { message -> message.parts.any { it !is MessagePart.Text } }) {
+                return@launch
+            }
+            turns.warmConversation(
+                conversation,
+                withTools = state.toolsAvailable,
+                params = params,
+            )
         }
     }
 
@@ -2277,7 +2321,7 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.isGenerating || _uiState.value.isCompacting) return
         // Folding runs the model to write the summary, so it needs the same check send makes.
         if (loadedModelHasGone()) return
-        viewModelScope.launch { compactIfNeeded(force = true) }
+        viewModelScope.launch { if (compactIfNeeded(force = true)) warmEngine() }
     }
 
     /**
@@ -2443,13 +2487,15 @@ class ChatViewModel @Inject constructor(
             reopened.copy(contextUsed = reopened.estimatedPromptTokens())
         }
 
-        // After the transcript is on screen, not before. This only matters for the next
-        // reply's KV cache, and the engine call behind it shares a single-threaded
-        // dispatcher with model loading: reopening a chat while a model is still loading
-        // used to sit here waiting its turn on that thread, so a previous conversation's
-        // history stayed hidden behind the loading screen for exactly as long as the model
-        // took to load, instead of appearing immediately from data already in hand.
-        runtime.resetContext()
+        // After the transcript is on screen, not before: this only matters for the next
+        // reply's KV cache, and the engine work behind it shares a single-threaded
+        // dispatcher with model loading. The old reset here made the cache state defined;
+        // the warm does that and more — alignment reuses whatever prefix the reopened
+        // conversation shares with the cache, restores the head snapshot where rollback
+        // is refused, and reads the rest in the background, so the first question in a
+        // reopened chat pays only for its own words. Skipped mid-load by the warm's own
+        // guard; the load's finishing warm reads this conversation instead.
+        warmEngine()
     }
 
     /**

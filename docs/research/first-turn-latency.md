@@ -76,6 +76,52 @@ already carries (this suite is where it was first caught in the act: SmolLM3 fli
 "is straightforward" to "should be straightforward" 150 tokens into a think block). For
 them the eval asserts the answer, not the bytes.
 
+## The second pass: prompts rewritten from the root (2026-08-31)
+
+Multi-turn was never the problem — decoding writes its own KV entries, and the
+engine-history record replays the engine's exact bytes, so turn N+1 prefills only its own
+text (measured in `TurnRunner.advance`: 48 tokens instead of 1,222 for the same round).
+What still cost a foreground re-read was every event that *rewrites the prompt from the
+root*: a fold (whose summarization pass also leaves the cache holding the summary
+conversation), a branch (which reset the context outright), a reopened chat (same), and a
+settings change. After any of these, the next question paid for the whole rewritten
+conversation.
+
+Now `warmEngine()` warms in two stages — the fresh head first, then the conversation on
+screen via the same `engineMessages()` builder the next send uses — and fires after a
+post-turn or forced fold, after `branchFrom`, after `reopen`, and on the existing load /
+new-chat / settings triggers. Both resets are gone: alignment only ever reuses positions
+whose bytes match the new prompt, so a stale cache cannot leak into a reply; what it can
+do is spare the re-read. Three rules make this safe:
+
+- **The conversation warm never takes the snapshot slot** (`warm(snapshot = false)`).
+  The fresh-head snapshot is what every future new chat restores from; a conversation in
+  that slot would trade the floor for one chat's convenience. Head-then-conversation
+  ordering exists for the same reason.
+- **The warm list is the next prompt minus the question, byte for byte.** It is built by
+  `engineMessages()` itself, and the tool-notes decoration only ever lands on a *final
+  user* message — a warm list ends with an assistant reply, so its bytes are untouched.
+  `ChatWarmTest` pins this equality on the host.
+- **A branch carries the engine-history record when it covers exactly the carried turns**
+  (a branch from the last reply), and rebuilds otherwise — the record cannot be cut at an
+  earlier point because tool rounds mean its messages do not map one-to-one onto
+  transcript entries. Media conversations are not warmed: the warm path renders text only.
+
+Measured on the Poco (`WarmPrefixEval#conversationWarmExtendsWithoutTakingTheFreshSnapshot`),
+where "reused" shows the conversation warm extending the head rather than re-reading it,
+and the fresh-chat column proves the snapshot survived:
+
+| model | conversation warm | follow-up | fresh chat after |
+|---|---|---|---|
+| LFM2.5-1.2B (hybrid) | reused 1018, read 25, 221 ms | cached 1043, TTFT 140 ms | restored 1018, TTFT 172 ms |
+| Llama-3.2-3B | reused 1038, read 24, 686 ms | cached 1062, TTFT 504 ms | rolled back 1044, TTFT 411 ms |
+| Qwen3-1.7B | reused 1047, read 28, 328 ms | cached 1068, TTFT 223 ms | rolled back 1052, TTFT 201 ms |
+| SmolLM3-3B | reused 1049, read 24, 679 ms | cached 1073, TTFT 467 ms | rolled back 1054, TTFT 401 ms |
+
+The follow-up column is also the proof, per real template, that a conversation rendered
+*without* the generation prompt is a byte prefix of the same conversation rendered with
+one — the property the whole mechanism leans on.
+
 ## What the research said, and what was deliberately not built
 
 Three surveys were run before building (arXiv; Cursor/Copilot/Claude-Code/Manus mechanics;
@@ -112,8 +158,10 @@ the OpenClaw codebase). They agreed with each other and with this design:
 - **ExecuTorch.** The second runtime keeps its own prefix cache (27× reuse within its
   rules) but has no warm/snapshot path; a new conversation there still pays its prefill.
   The llama.cpp fleet — every GGUF — gets the full mechanism.
-- **Media turns.** An attachment still re-evaluates the conversation; unchanged.
-- **A settings change mid-day** re-warms in the background (20 s of battery, once), and a
-  chat opened before the re-warm finishes falls back to exactly the old behaviour.
+- **Media turns.** An attachment still re-evaluates the conversation, and a
+  conversation carrying media is skipped by the conversation warm; unchanged.
+- **A settings change mid-day** re-warms in the background (20 s of battery, once) —
+  head and, now, the open conversation. A chat opened while a model is still loading is
+  warmed by the load's own finishing warm instead.
 - **Snapshot RAM.** ~12 MB held for the 1.2B hybrid at a 2k prefix; freed on unload,
   replaced on re-warm. Transformers hold nothing.

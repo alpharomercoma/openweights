@@ -83,6 +83,7 @@ internal class LlamaBridge {
         toolSchemas: Array<String>,
         enableThinking: Boolean,
         reasoningEffort: String?,
+        snapshot: Boolean,
     ): LongArray?
 
     external fun nativeResetContext(handle: Long)

@@ -1279,6 +1279,7 @@ bool Session::warm(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
     const ReasoningConfig & reasoning,
+    bool snapshot,
     WarmStats & stats,
     std::string & error) {
     cancelled_.store(false, std::memory_order_relaxed);
@@ -1318,7 +1319,7 @@ bool Session::warm(
     if (cached_covers_context_ && tokens.size() <= cached_.size() &&
         std::equal(tokens.begin(), tokens.end(), cached_.begin())) {
         stats.reused_tokens = static_cast<int32_t>(tokens.size());
-        if (cached_.size() == tokens.size()) {
+        if (snapshot && cached_.size() == tokens.size()) {
             maybe_snapshot();
         }
         stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
@@ -1342,7 +1343,9 @@ bool Session::warm(
     cached_ = tokens;
     n_past_ = static_cast<int32_t>(tokens.size());
     cached_covers_context_ = true;
-    maybe_snapshot();
+    if (snapshot) {
+        maybe_snapshot();
+    }
     stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
     LOGI("kv: warmed %d tokens in %lld ms (%d reused)",
          stats.prompt_tokens, static_cast<long long>(stats.prefill_ms), stats.reused_tokens);

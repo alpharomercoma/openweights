@@ -139,6 +139,80 @@ class WarmPrefixEval {
         }
     }
 
+    @Test
+    fun conversationWarmExtendsWithoutTakingTheFreshSnapshot(): Unit = runBlocking {
+        val models = EVAL_DIR.listFiles { file -> file.extension == "gguf" }.orEmpty()
+        assumeTrue("no .gguf files in $EVAL_DIR", models.isNotEmpty())
+        models.sortedBy { it.name }.forEach { checkConversationWarm(it) }
+    }
+
+    /**
+     * The fold/branch/reopen path: after the head, a whole conversation is warmed with
+     * `snapshot = false`. Three claims, per family:
+     * 1. The conversation warm *extends* the head instead of re-reading it.
+     * 2. The next question reuses the whole warmed conversation — which also proves the
+     *    assistant-final render without a generation prompt is a byte prefix of the same
+     *    conversation rendered with one, per template, on real weights.
+     * 3. The fresh-chat snapshot survives: a new chat afterwards still restores (hybrid)
+     *    or rolls back (transformer) to the head, rather than starting cold because a
+     *    conversation displaced the snapshot.
+     */
+    private suspend fun checkConversationWarm(model: File) {
+        Log.i(TAG, "conversation warm eval on ${model.name}")
+        val engine = LlamaCppEngine()
+        try {
+            engine.load(model, ModelLoadParams(contextLength = CONTEXT))
+            val head = engine.warm(listOf(system()), params = PARAMS)
+            assertWithMessage("head warm on ${model.name}").that(head).isNotNull()
+            if (head!!.warmedTokens + head.reusedTokens < 100) {
+                Log.i(TAG, "${model.name}: template carries no warmable prefix, skipping")
+                return
+            }
+
+            val conversation = listOf(
+                system(),
+                ChatMessage.text(ChatRole.USER, QUESTION),
+                ChatMessage.text(ChatRole.ASSISTANT, CARRIED_REPLY),
+            )
+            val warmed = engine.warm(conversation, params = PARAMS, snapshot = false)
+            assertWithMessage("conversation warm on ${model.name}").that(warmed).isNotNull()
+            assertWithMessage("${model.name}: conversation warm re-read the head")
+                .that(warmed!!.reusedTokens).isGreaterThan(200)
+            assertWithMessage("${model.name}: conversation warm took the fresh snapshot")
+                .that(warmed.snapshotBytes).isEqualTo(head.snapshotBytes)
+
+            val followUp = engine.ask(
+                QUESTION,
+                ChatMessage.text(ChatRole.ASSISTANT, CARRIED_REPLY),
+                ChatMessage.text(ChatRole.USER, "Now add ten to it."),
+            )
+            val warmedTotal = warmed.reusedTokens + warmed.warmedTokens
+            assertWithMessage("${model.name}: the follow-up did not extend the warmed turns")
+                .that(followUp.stats.cachedTokens).isAtLeast(warmedTotal - 8)
+            Log.i(
+                TAG,
+                "${model.name}: conversation warmed=${warmed.warmedTokens} " +
+                    "reused=${warmed.reusedTokens} in ${warmed.prefillMs}ms; " +
+                    "follow-up cached=${followUp.stats.cachedTokens} " +
+                    "ttft=${followUp.stats.timeToFirstTokenMs}ms",
+            )
+
+            val fresh = engine.ask(SECOND_QUESTION)
+            assertWithMessage("${model.name}: the fresh chat after a conversation warm went cold")
+                .that(fresh.stats.cachedTokens).isGreaterThan(200)
+            assertWithMessage("${model.name}: fresh chat lost the answer")
+                .that(fresh.text).contains("Paris")
+            Log.i(
+                TAG,
+                "${model.name}: fresh-after-conversation cached=${fresh.stats.cachedTokens} " +
+                    "ttft=${fresh.stats.timeToFirstTokenMs}ms",
+            )
+        } finally {
+            engine.unload()
+            engine.close()
+        }
+    }
+
     private class Reply(
         val text: String,
         val stats: io.github.alpharomercoma.openweights.core.engine.GenerationStats,
@@ -178,6 +252,9 @@ class WarmPrefixEval {
         }
 
         const val QUESTION = "What is 2+2? Reply with just the number."
+
+        /** A reply as it might have been decoded, carried into a branch or reopened chat. */
+        const val CARRIED_REPLY = "4"
         const val SECOND_QUESTION = "What is the capital of France? One word."
     }
 }

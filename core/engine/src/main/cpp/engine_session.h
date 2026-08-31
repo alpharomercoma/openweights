@@ -234,11 +234,16 @@ public:
      * every new conversation: the old conversation's cache cannot be rewound to the shared
      * prefix, but it can be *replaced* by the snapshot. Transformers need no snapshot; for
      * them rollback already keeps the prefix across conversations.
+     *
+     * `snapshot` gates that capture. True for the fresh-chat head; false when warming a
+     * whole conversation — a fold, a branch, a reopened chat — which must ride the cache
+     * itself rather than displace the head snapshot every future new chat restores from.
      */
     bool warm(
         const std::vector<ChatMessage> & messages,
         const std::vector<ToolDefinition> & tools,
         const ReasoningConfig & reasoning,
+        bool snapshot,
         WarmStats & stats,
         std::string & error);
 

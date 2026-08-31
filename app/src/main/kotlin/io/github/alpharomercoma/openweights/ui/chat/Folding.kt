@@ -39,14 +39,21 @@ internal class Folding(
     /**
      * Folds if the window needs it, or because the user asked.
      *
+     * Returns whether a fold was applied, because a fold rewrites the prompt from the
+     * root and the caller may want to read the rewritten prompt back into the engine's
+     * cache while nobody is waiting.
+     *
      * @param conversationId read rather than passed, and read twice. Folding runs the model,
      * which takes long enough for the user to open another chat, and applying chat A's
      * summary to chat B would corrupt both.
      */
-    suspend fun fold(force: Boolean, engineIsDecoding: Boolean, conversationId: () -> Long?) {
+    suspend fun fold(
+        force: Boolean,
+        engineIsDecoding: Boolean,
+        conversationId: () -> Long?,
+    ): Boolean {
         val current = state.value
-        if (current.isCompacting) return
-        if (!force && !compactor.shouldCompact(current)) return
+        if (current.isCompacting || (!force && !compactor.shouldCompact(current))) return false
 
         val startedIn = conversationId()
 
@@ -69,8 +76,7 @@ internal class Folding(
             state.update { it.copy(isCompacting = false) }
         }
 
-        if (startedIn != conversationId()) return
-        if (compaction == null) return
+        if (compaction == null || startedIn != conversationId()) return false
 
         // Without this a folded chat reopens with no summary and re-sends the whole
         // transcript, which walks straight back into the context wall it just escaped.
@@ -110,6 +116,7 @@ internal class Folding(
             // was measured against a window that was not there.
             folded.copy(contextUsed = folded.estimatedPromptTokens())
         }
+        return true
     }
 }
 

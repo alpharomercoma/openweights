@@ -3083,14 +3083,15 @@ private fun StagedDocument.asPrompt(): String = buildString {
 /**
  * The day the prompt claims, pinned.
  *
- * Rendered live, midnight silently cost the whole cache: the date sits about ten tokens
- * into the prefix, every prompt after 00:00 diverged right there, and a hybrid model —
+ * Rendered live, midnight silently cost the whole cache: when the date sat in the
+ * instructions, every prompt after 00:00 diverged ten tokens in, and a hybrid model —
  * unable to roll back, its snapshot and warm file also holding yesterday's bytes — paid
  * a full foreground re-read. Measured live: 2,197 tokens for the word "hi", the first
- * message after midnight. So the day is pinned: a conversation keeps the day it started
- * with, one stale day being the cheaper wrong (the ExecuTorch template pins for the same
- * reason), and a fresh chat's warm refreshes it and re-reads the new head in the
- * background before anybody has typed.
+ * message after midnight. The date now rides on the conversation's first user turn
+ * ([withConversationDay]), which takes the head out of the blast radius entirely, but
+ * the pin is still what keeps an open conversation's own bytes from shifting mid-chat:
+ * a conversation keeps the day it started with, one stale day being the cheaper wrong,
+ * and a fresh chat picks up the new day for free.
  */
 internal object PromptDay {
     @Volatile
@@ -3427,12 +3428,12 @@ private const val MARKDOWN_STYLE: String =
  * function is the guarantee, not a tidiness.
  */
 internal fun ChatUiState.prefixMessages(toolPromptOverride: String? = null): List<ChatMessage> {
+    // Deliberately no date here. The instructions are the root of the KV cache and the
+    // template renders the whole tool block behind them, so a date in this position went
+    // stale at every midnight and cost the warm snapshot, the disk store and a full
+    // background re-read of the head, daily. It rides on the conversation's first user
+    // turn instead — see [withConversationDay].
     val instructions = listOfNotNull(
-        // A model cannot tell that "this year's final" is past its training data if nobody
-        // tells it what year it is, and it will answer from memory rather than look. Eight
-        // tokens, and on the routing set it was most of the difference between eleven right
-        // out of twenty four and eighteen.
-        "Today is ${PromptDay.pinned}.",
         AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
@@ -3494,7 +3495,15 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
             }
             kept
         }
-        return (system + joined).withToolNotes(toolNotes)
+        // The record's first question already carries its date, byte for byte; only a
+        // record that holds no user turn at all leaves the tail's first question bare.
+        val prompt = system + joined
+        val dated = if (record.messages.any { it.role == ChatRole.USER }) {
+            prompt
+        } else {
+            prompt.withConversationDay()
+        }
+        return dated.withToolNotes(toolNotes)
     }
 
     val remaining = compaction
@@ -3502,7 +3511,7 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         ?: transcript
 
     return (system + recap(compaction) + remaining.map { it.toChatMessage() })
-        .asExchange().withToolNotes(toolNotes)
+        .asExchange().withConversationDay().withToolNotes(toolNotes)
 }
 
 /**
@@ -3540,6 +3549,38 @@ private fun recap(compaction: Compaction?): List<ChatMessage> {
         ChatMessage.text(ChatRole.USER, "Earlier in this conversation:\n$summary"),
         ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
     )
+}
+
+/**
+ * The day, carried by the conversation's first user turn rather than by the instructions.
+ *
+ * The model still needs it: it cannot tell that "this year's final" is past its training
+ * data if nobody says what year it is, and it answers from memory rather than look — on
+ * the routing set the date was most of the difference between eleven right out of twenty
+ * four and eighteen. But the instructions are the root of the KV cache and the template
+ * renders the whole tool block behind them, so a date anywhere in the head made every
+ * warmed byte stale at midnight: snapshot, disk store, and a ~2,200-token background
+ * re-read, bought back daily. The first user turn is the first thing the warm never
+ * covers, so the head stays byte-stable for as long as the settings do, and a new day
+ * costs the dozen tokens of a turn that was being read anyway.
+ *
+ * After a fold the first user turn is the recap, which is rebuilt from the root like
+ * everything behind it; the date rides along. The day itself stays pinned per
+ * conversation ([PromptDay]) so an open chat's bytes never shift at midnight.
+ */
+private fun List<ChatMessage>.withConversationDay(): List<ChatMessage> {
+    val at = indexOfFirst { it.role == ChatRole.USER }
+    if (at < 0) return this
+    val first = this[at]
+    val question = first.text
+    val dated = if (question.isBlank()) {
+        "Today is ${PromptDay.pinned}."
+    } else {
+        "Today is ${PromptDay.pinned}.\n\n$question"
+    }
+    return toMutableList().apply {
+        this[at] = first.copy(parts = first.files + MessagePart.Text(dated))
+    }
 }
 
 /**

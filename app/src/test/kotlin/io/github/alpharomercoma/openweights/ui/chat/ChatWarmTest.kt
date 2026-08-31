@@ -123,25 +123,34 @@ class ChatWarmTest : ChatFixture() {
         runTest(dispatcher) {
             loadModel()
             engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            val startDay = PromptDay.pinned
             viewModel.send("Who is Ada Lovelace?")
             settle(steps = FOLD_SETTLE_STEPS)
 
             // Midnight passes with the process alive and a conversation open. Rendered
-            // live, the date line ten tokens into the prefix diverged every prompt from
-            // the cache, and a hybrid model paid a full foreground re-read for the next
-            // "hi" — the measured incident this pins.
+            // live, the date line diverged every prompt from the cache, and a hybrid
+            // model paid a full foreground re-read for the next "hi" — the measured
+            // incident this pins.
             val yesterday = java.time.LocalDate.now().minusDays(1)
             PromptDay.pin(yesterday)
 
             // A warm fired mid-conversation — a branch here — must not move the day:
-            // the conversation keeps the bytes its cache holds.
+            // the conversation keeps the bytes its cache holds, which is the engine
+            // record replaying the first question exactly as it was sent, date and all.
             engine.warmCalls.clear()
             viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
             settle(steps = FOLD_SETTLE_STEPS)
             assertThat(PromptDay.pinned).isEqualTo(yesterday)
+            // The head must stay byte-identical across midnight — that is the point of
+            // moving the date out of it — while the conversation's first question keeps
+            // carrying the day it started with.
+            val branchWarm = engine.warmCalls.last { call ->
+                call.messages.any { it.role == ChatRole.USER }
+            }
+            assertThat(branchWarm.messages.first().text).doesNotContain("Today is")
             assertThat(
-                engine.warmCalls.first().messages.first().text,
-            ).contains("Today is $yesterday.")
+                branchWarm.messages.first { it.role == ChatRole.USER }.text,
+            ).contains("Today is $startDay.")
 
             // A fresh chat is a new start: its warm moves the pin and reads the new
             // head in the background, before anybody has typed.

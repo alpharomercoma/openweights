@@ -64,7 +64,12 @@ class EngineMessagesTest {
         // correctly. So the pin moved off the tool's name and onto the clause that
         // replaced it, which is the part that has to survive an edit.
         assertThat(system.text).contains("Do not search to double check")
-        assertThat(system.text).contains("Today is")
+        // The date deliberately stays OUT of the instructions — it is the one line that
+        // changes daily, and in the head it invalidated the warm snapshot and disk store
+        // at every midnight. It rides on the first user turn instead.
+        assertThat(system.text).doesNotContain("Today is")
+        val firstUser = state.engineMessages().first { it.role == ChatRole.USER }
+        assertThat(firstUser.text).contains("Today is")
     }
 
     /**
@@ -153,9 +158,12 @@ class EngineMessagesTest {
         assertThat(system.text).contains("Do not search to double check")
         assertThat(system.text).doesNotContain("The user is porting a parser.")
         assertThat(system.text).doesNotContain("$")
-        assertThat(messages.map { it.text }).contains(
-            "Earlier in this conversation:\nThe user is porting a parser.",
-        )
+        // Post-fold the recap is the conversation's first user turn, so it also carries
+        // the date — the one line kept out of the instructions so the head stays
+        // byte-stable across midnight.
+        val recap = messages.first { it.text.contains("Earlier in this conversation:") }
+        assertThat(recap.text).contains("The user is porting a parser.")
+        assertThat(recap.text).contains("Today is")
     }
 
     @Test

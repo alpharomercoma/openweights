@@ -623,11 +623,12 @@ class ChatConversationsTest : ChatFixture() {
         // The cache is gone, so the transcript is the only thing carrying the conversation
         // across. If it is not resent, the new model answers the last question blind.
         //
-        // Substring rather than exact equality on the newest question: that message also
-        // carries the current turn's tail-pinned re-grounding text, appended past the
-        // question itself for the same reason the plan block is.
+        // Substring rather than exact equality on both: the first question carries the
+        // conversation's date line, and the newest one carries the current turn's
+        // tail-pinned re-grounding text, appended past the question itself for the same
+        // reason the plan block is.
         val sent = engine.prompts.last().map { message -> message.text }
-        assertThat(sent).contains("Carry me over")
+        assertThat(sent.any { it.contains("Carry me over") }).isTrue()
         assertThat(sent.any { it.contains("And this one") }).isTrue()
     }
 

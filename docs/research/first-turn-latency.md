@@ -282,3 +282,23 @@ paid once instead of on every new chat. Replayed live on the X8 Pro Max: interru
 re-reading 2188 tokens to rebuild it` → recapture + `warm state saved` → the open
 conversation re-warms on the restored head (42 tokens, 364 ms) → the next two
 plus-button "hi" turns complete in ~1.4 s each (were 23 s).
+
+## The date left the head (2026-09-01)
+
+The one line in the instructions that changed daily — `Today is …` — made every warmed
+byte stale at midnight: snapshot, disk store, and a ~2,200-token background re-read,
+bought back every day per model. Moving it to the *end of the system message* would not
+have helped: the template renders the ~1,700-token tool block after the system content,
+so any in-head position leaves most of the prefix behind the divergence. A `get_date`
+tool was considered and rejected — the date is mostly needed implicitly (recency
+judgments, ages, "this week"), a 1–2B model won't reliably think to call for it, and a
+tool round-trip is seconds of foreground latency to save seconds of background compute.
+
+So the date now rides on the conversation's first user turn (`withConversationDay`),
+prepended before the question — after a fold, that is the recap turn. The head contains
+no date at all: the warm file is valid for as long as the settings and weights are, and
+a new day costs the dozen tokens of a turn that was being read anyway. The engine record
+replays the first question byte-for-byte, so an open conversation keeps the day it was
+sent with; `PromptDay`'s per-conversation pin is unchanged. Verified on the X8 Pro Max:
+new head 2,177 tokens (was 2,188), computed once for the byte change, and "What is
+today's date?" answered "September 1, 2026" at CH99%.

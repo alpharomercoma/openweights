@@ -55,7 +55,15 @@ import java.io.File
  * What it buys is the only path to an accelerator that has no ggml backend. See
  * `docs/research/mediatek-npu.md` for what that is measured to be worth.
  */
-class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
+class ExecuTorchEngine(
+    private val bridge: ExecuTorchBridge,
+    /**
+     * The sampling temperature the model is opened with. A constructor parameter rather
+     * than a [SamplerParams] field because ExecuTorch fixes it when the runner is built,
+     * not per call; zero means greedy, which is what a reproducible evaluation loads.
+     */
+    private val temperature: Float = DEFAULT_TEMPERATURE,
+) : InferenceEngine {
 
     private var info: LoadedModelInfo? = null
     private var template: PromptTemplate? = null
@@ -104,7 +112,7 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
         if (!bridge.load(
                 modelFile.absolutePath,
                 tokenizer.absolutePath,
-                DEFAULT_TEMPERATURE,
+                temperature,
                 contextSize,
             )
         ) {
@@ -124,9 +132,11 @@ class ExecuTorchEngine(private val bridge: ExecuTorchBridge) : InferenceEngine {
             layerCount = 0,
             contextUsed = 0,
             offloadedTo = "ExecuTorch",
-            supportsThinking = true,
-            supportsTools = true,
-            supportsToolResults = true,
+            // The template is the authority: a family whose format cannot express tools
+            // must not be offered them, or the agent loop waits for calls that cannot come.
+            supportsThinking = rendering.supportsThinking,
+            supportsTools = rendering.supportsTools,
+            supportsToolResults = rendering.supportsTools,
             modelPath = modelFile.absolutePath,
         )
     }

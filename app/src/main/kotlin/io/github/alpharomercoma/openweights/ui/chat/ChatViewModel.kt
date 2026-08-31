@@ -451,13 +451,34 @@ data class ChatUiState(
         get() = listOfNotNull(
             // Not the quantization: it is already the tail of the model name directly
             // above, and repeating it wastes the only line that can say something new.
-            backend,
+            computeLine,
             contextSize.takeIf { it > 0 }?.let { "$it ctx" },
             // Only when it is not the default, which is the same rule the rest of this line
             // follows. A mode was choosable by typing and then invisible: nothing anywhere
             // said the app was in plan mode, so the only evidence was tools not running.
             mode.takeIf { it != ChatUiState().mode }?.label,
         ).joinToString(" · ")
+
+    /**
+     * Where the work runs, said the way the user chose it.
+     *
+     * One word while both halves are automatic or agree, which is every phone until the
+     * user opens the processor controls. Split into "reads X · writes Y" only when the
+     * halves genuinely differ, and a half left on Auto is reported as what it resolved
+     * to rather than as "auto", because the line answers what *is*, not what was asked.
+     * A compiled model's processor was decided at export, so it is stated flat.
+     */
+    private val computeLine: String?
+        get() {
+            compiledProcessor?.let { return it.name }
+            val reads = preferences.prefillTarget
+            val writes = preferences.decodeTarget
+            if (reads == ComputeTarget.AUTO && writes == ComputeTarget.AUTO) return backend
+            val fallback = backend ?: return null
+            val read = reads.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
+            val write = writes.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
+            return if (read == write) read else "reads $read · writes $write"
+        }
 
     /**
      * Whether the composer may start a turn.

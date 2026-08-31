@@ -803,8 +803,11 @@ class RepeatingReply :
  * Two is search then answer. Find, read, write is three before a word reaches anybody, so a
  * turn holding a tool that chains gets four and no more.
  */
-private fun ToolRegistry.roundLimit(): Int =
-    if (all.any { it.chains }) AgentRunner.CHAINED_MAX_ROUNDS else AgentRunner.DEFAULT_MAX_ROUNDS
+private fun ToolRegistry.roundLimit(): Int = when {
+    all.any { it.builds } -> AgentRunner.BUILDER_MAX_ROUNDS
+    all.any { it.chains } -> AgentRunner.CHAINED_MAX_ROUNDS
+    else -> AgentRunner.DEFAULT_MAX_ROUNDS
+}
 
 /**
  * What a pass asked for, from whichever of the two ways it had of asking.

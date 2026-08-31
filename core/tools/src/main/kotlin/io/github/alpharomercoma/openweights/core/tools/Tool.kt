@@ -177,6 +177,17 @@ interface Tool {
     val chains: Boolean get() = false
 
     /**
+     * Whether this tool is part of building something the user watches take shape.
+     *
+     * A build is the longest errand there is: lay out a project, write three or four
+     * files, show the result, read the mistake, fix it. Four rounds refuses the fixing,
+     * which is the half of building that makes the result worth having, so a turn whose
+     * catalogue carries a builder earns a higher ceiling — still bounded, still spent
+     * only if the model actually keeps working.
+     */
+    val builds: Boolean get() = false
+
+    /**
      * Whether independent calls may run together in one agent round.
      *
      * This is deliberately opt-in. Tools with durable effects, shared mutable state,

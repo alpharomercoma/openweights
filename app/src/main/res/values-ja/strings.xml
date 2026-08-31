@@ -240,6 +240,9 @@
     <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
     <string name="runtime">ランタイム</string>
     <string name="context_fixed_at_export">コンテキストウィンドウはこのモデルのエクスポート時に固定されています</string>
+    <string name="canvas_title">キャンバス</string>
+    <string name="canvas_empty">現在表示中のものはありません。モデルにページやドキュメントの作成を頼んでください。</string>
+    <string name="open_in_browser">ブラウザで開く</string>
     <string name="compiled_runs_on_cpu">CPU 向けにコンパイル済み</string>
     <string name="compiled_runs_on_gpu">GPU 向けにコンパイル済み</string>
     <string name="compiled_runs_on_npu">NPU 向けにコンパイル済み</string>

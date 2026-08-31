@@ -373,6 +373,9 @@ class ModelsViewModel @Inject constructor(
         }
         modelStore.forgetPublisher(model.file.name)
         model.file.sourceSidecar.delete()
+        // A compiled model's tokenizer is useless without it and invisible in the list,
+        // so leaving it behind would quietly keep megabytes with no way to reclaim them.
+        modelStore.tokenizerFor(model.file.name).delete()
         // The projector is useless without its model and is often the larger of the two,
         // so leaving it behind would quietly keep hundreds of megabytes.
         refresh()

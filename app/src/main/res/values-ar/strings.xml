@@ -246,6 +246,9 @@
     <string name="no_archived_match">لا توجد محادثة مؤرشفة تذكر ذلك.</string>
     <string name="runtime">بيئة التشغيل</string>
     <string name="context_fixed_at_export">نافذة السياق ثُبِّتت عند تصدير هذا النموذج</string>
+    <string name="canvas_title">اللوحة</string>
+    <string name="canvas_empty">لا يوجد شيء معروض الآن. اطلب من النموذج إنشاء صفحة أو مستند.</string>
+    <string name="open_in_browser">فتح في المتصفح</string>
     <string name="compiled_runs_on_cpu">مُجمَّع لوحدة CPU</string>
     <string name="compiled_runs_on_gpu">مُجمَّع لوحدة GPU</string>
     <string name="compiled_runs_on_npu">مُجمَّع لوحدة NPU</string>

@@ -221,7 +221,11 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
  * want on a phone, which is to say "save that as a note".
  */
 @Singleton
-class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool {
+class WriteFileTool @Inject constructor(
+    private val workspace: Workspace,
+    private val artifacts: SessionArtifacts,
+    private val canvas: CanvasBoard,
+) : Tool {
     override val definition = ToolDefinition(
         name = "write_file",
         description = "Save a file into the folder the user shared. Pass replace to " +
@@ -269,8 +273,13 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
      * default implementation of [asksInAuto] is the only thing [alwaysAsks] feeds, and this
      * replaces it. Ask mode still questions every write through `needsApproval`.
      */
-    override fun asksInAuto(call: ToolCall): Boolean =
-        alwaysAsks || call.flag("replace", "overwrite")
+    override fun asksInAuto(call: ToolCall): Boolean = alwaysAsks ||
+        (
+            call.flag("replace", "overwrite") &&
+                // Replacing a file this same session created is the agent's ordinary
+                // edit loop, not destruction: nothing of the user's is being lost.
+                call.argument("path", "file", "name")?.let { !artifacts.isOwn(it) } != false
+            )
 
     override suspend fun run(call: ToolCall): String = execute(call).text
 
@@ -292,7 +301,13 @@ class WriteFileTool @Inject constructor(private val workspace: Workspace) : Tool
                     "$MAX_WRITE_CHARS characters, or save it in parts.",
             )
         }
-        return workspace.put(path, content, replace = call.flag("replace", "overwrite"))
+        val written = workspace.put(path, content, replace = call.flag("replace", "overwrite"))
+        if (written.successful) {
+            artifacts.created(path)
+            // The canvas is watching: a save under what it shows repaints the screen.
+            canvas.changed(path)
+        }
+        return written
     }
 }
 

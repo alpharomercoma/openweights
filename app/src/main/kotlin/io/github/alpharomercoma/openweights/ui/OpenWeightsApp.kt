@@ -25,7 +25,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,6 +40,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.ui.archive.ArchiveViewModel
 import io.github.alpharomercoma.openweights.ui.archive.ArchivedScreen
+import io.github.alpharomercoma.openweights.ui.canvas.CanvasScreen
+import io.github.alpharomercoma.openweights.ui.canvas.CanvasViewModel
 import io.github.alpharomercoma.openweights.ui.chat.ChatDestinations
 import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
@@ -79,6 +84,7 @@ private object Routes {
     const val WATCHES = "watches"
     const val ARCHIVE = "archive"
     const val SETTINGS = "settings"
+    const val CANVAS = "canvas"
 }
 
 /** A twelfth of the screen: enough travel to read as arrival, small enough to stay quick. */
@@ -145,6 +151,20 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
         },
     ) {
         composable(Routes.CHAT) {
+            // The canvas opens itself when the model shows something new — one push per
+            // show call, tracked by generation so stepping back does not bounce the user
+            // straight back in while the model keeps editing.
+            val canvasViewModel: CanvasViewModel = hiltViewModel()
+            val canvasShowing by canvasViewModel.showing.collectAsStateWithLifecycle()
+            var openedGeneration by rememberSaveable { mutableIntStateOf(0) }
+            LaunchedEffect(canvasShowing?.generation) {
+                val generation = canvasShowing?.generation ?: return@LaunchedEffect
+                if (generation > openedGeneration) {
+                    openedGeneration = generation
+                    navController.push(Routes.CANVAS)
+                }
+            }
+
             // Collected here rather than above the NavHost. This scope already
             // recomposes on every token, so a download ticking costs nothing extra in
             // it, whereas hoisting it would make the whole shell recompose for both.
@@ -368,6 +388,10 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 ),
                 onBack = navController::popBackStack,
             )
+        }
+
+        composable(Routes.CANVAS) {
+            CanvasScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.WATCHES) {

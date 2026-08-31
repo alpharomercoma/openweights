@@ -289,6 +289,9 @@
 
     <!-- Which silicon a compiled model was exported for. Decided at export, not a setting. -->
     <string name="context_fixed_at_export">Context window fixed when this model was exported</string>
+    <string name="canvas_title">Canvas</string>
+    <string name="canvas_empty">Nothing is being shown right now. Ask the model to build a page or a document.</string>
+    <string name="open_in_browser">Open in browser</string>
     <string name="compiled_runs_on_cpu">Compiled for CPU</string>
     <string name="compiled_runs_on_gpu">Compiled for GPU</string>
     <string name="compiled_runs_on_npu">Compiled for NPU</string>

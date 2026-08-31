@@ -81,7 +81,17 @@ object ToolPrompting {
         val listed = tools.joinToString("\n") { tool ->
             "- ${tool.name}: ${tool.description} Arguments: ${tool.parametersJson.compact()}"
         }
-        return "You can use these tools:\n$listed\n\n" + format.instruction
+        // The folder-per-task convention, stated once where the tools are stated. A jail
+        // would break the other half of the job — reading what the user put in the folder —
+        // so the boundary is a habit the prompt teaches rather than a wall the tools build.
+        val convention = if (tools.any { it.name == "write_file" }) {
+            "\n\nWhen a task means creating files, first create one project folder for it " +
+                "(like projects/quiz-site/) and keep every file of the task inside it. " +
+                "Keep using that same folder for follow-up changes."
+        } else {
+            ""
+        }
+        return "You can use these tools:\n$listed$convention\n\n" + format.instruction
     }
 
     /**

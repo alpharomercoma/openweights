@@ -258,6 +258,9 @@
     <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
     <string name="runtime">Runtime</string>
     <string name="context_fixed_at_export">La ventana de contexto quedó fijada al exportar este modelo</string>
+    <string name="canvas_title">Lienzo</string>
+    <string name="canvas_empty">No se está mostrando nada ahora mismo. Pide al modelo que cree una página o un documento.</string>
+    <string name="open_in_browser">Abrir en el navegador</string>
     <string name="compiled_runs_on_cpu">Compilado para CPU</string>
     <string name="compiled_runs_on_gpu">Compilado para GPU</string>
     <string name="compiled_runs_on_npu">Compilado para NPU</string>

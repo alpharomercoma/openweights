@@ -244,6 +244,9 @@
     <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
     <string name="runtime">Runtime</string>
     <string name="context_fixed_at_export">Naitakda ang context window noong i-export ang modelong ito</string>
+    <string name="canvas_title">Canvas</string>
+    <string name="canvas_empty">Walang ipinapakita sa ngayon. Hilingin sa modelo na gumawa ng page o dokumento.</string>
+    <string name="open_in_browser">Buksan sa browser</string>
     <string name="compiled_runs_on_cpu">Naka-compile para sa CPU</string>
     <string name="compiled_runs_on_gpu">Naka-compile para sa GPU</string>
     <string name="compiled_runs_on_npu">Naka-compile para sa NPU</string>

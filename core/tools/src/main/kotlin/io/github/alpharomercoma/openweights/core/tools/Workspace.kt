@@ -278,15 +278,76 @@ class Workspace @Inject constructor(
                 ToolExecution.failure("$path could not be written.")
             }
         }
-        val parentPath = segments.dropLast(1).joinToString("/")
-        val parent = if (parentPath.isEmpty()) {
-            null
-        } else {
-            resolve(parentPath) ?: return ToolExecution.rejected(
-                "There is no folder called $parentPath to save into.",
+        val parent = ensureFolders(segments.dropLast(1))
+            ?: return ToolExecution.failure(
+                "The folders leading to $path could not be created.",
             )
+        return putInto(parent.takeIf { it.path.isNotEmpty() }, segments.last(), text, path)
+    }
+
+    /**
+     * The raw bytes of [entry], for serving over the canvas — images included.
+     *
+     * Bounded, because this feeds an HTTP response built in memory and the folder is the
+     * user's: a stray video would otherwise become one allocation the size of the video.
+     */
+    suspend fun readBytes(entry: Entry, limit: Int = MAX_SERVED_BYTES): ByteArray? =
+        withContext(Dispatchers.IO) {
+            val uri = uriFor(entry) ?: return@withContext null
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val bytes = stream.readNBytes(limit + 1)
+                    if (bytes.size > limit) null else bytes
+                }
+            }.getOrNull()
         }
-        return putInto(parent, segments.last(), text, path)
+
+    /**
+     * The folder those segments name, created a level at a time where it is missing.
+     *
+     * Creating folders is additive the way creating files is, which is why this happens
+     * without ceremony: an agent laying out a project writes `site/css/style.css` and the
+     * folders are part of the file's name, not a separate favour to ask for. The returned
+     * entry for the root is a placeholder with an empty path, which [put] reads as "no
+     * parent" the way it always has.
+     */
+    private suspend fun ensureFolders(segments: List<String>): Entry? {
+        if (segments.isEmpty()) return ROOT
+        var walked = ""
+        var parent: Entry? = null
+        for (name in segments) {
+            walked = if (walked.isEmpty()) name else "$walked/$name"
+            val found = resolve(walked)
+            parent = when {
+                found == null ->
+                    create(parent, name, DocumentsContract.Document.MIME_TYPE_DIR)
+                        ?.let { resolve(walked) }
+                found.isDirectory -> found
+                else -> null
+            } ?: return null
+        }
+        return parent
+    }
+
+    /**
+     * Removes what that path names, file or folder, and says which it could not.
+     *
+     * Deleting through the provider rather than any path arithmetic, for the same reason
+     * [resolve] walks: the only ids in hand are ones the granted folder handed over.
+     */
+    suspend fun delete(path: String): ToolExecution = withContext(Dispatchers.IO) {
+        val entry = resolve(path)
+            ?: return@withContext ToolExecution.rejected("There is no $path to delete.")
+        val uri = uriFor(entry)
+            ?: return@withContext ToolExecution.failure("$path could not be opened.")
+        val gone = runCatching {
+            DocumentsContract.deleteDocument(context.contentResolver, uri)
+        }.getOrDefault(false)
+        if (gone) {
+            ToolExecution("Deleted $path.")
+        } else {
+            ToolExecution.failure("$path could not be deleted.")
+        }
     }
 
     private suspend fun putInto(
@@ -362,6 +423,19 @@ class Workspace @Inject constructor(
     }
 
     private companion object {
+        /** 16 MB: generous for a page and its assets, small enough to allocate calmly. */
+        const val MAX_SERVED_BYTES = 16 * 1024 * 1024
+
+        /** Stands in for the granted folder itself, which no [Entry] otherwise names. */
+        val ROOT = Entry(
+            path = "",
+            documentId = "",
+            name = "",
+            isDirectory = true,
+            sizeBytes = 0L,
+            mediaType = DocumentsContract.Document.MIME_TYPE_DIR,
+        )
+
         val PROJECTION = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_MIME_TYPE,

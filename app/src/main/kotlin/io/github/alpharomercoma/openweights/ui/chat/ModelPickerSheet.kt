@@ -87,7 +87,10 @@ fun ModelPickerSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        // Fully expanded from the first frame, like the hyperparameter sheet: the list
+        // is the whole point of opening it, and the half state was one more pull before
+        // every model choice.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(

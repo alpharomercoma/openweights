@@ -24,6 +24,7 @@ import dagger.hilt.components.SingletonComponent
 import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
 import io.github.alpharomercoma.openweights.core.tools.AndroidReachability
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
+import io.github.alpharomercoma.openweights.core.tools.DeleteFileTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
@@ -31,6 +32,8 @@ import io.github.alpharomercoma.openweights.core.tools.RememberTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
+import io.github.alpharomercoma.openweights.core.tools.ShowDocumentTool
+import io.github.alpharomercoma.openweights.core.tools.ShowWebsiteTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WatchTool
 import io.github.alpharomercoma.openweights.core.tools.Watches
@@ -58,6 +61,7 @@ object ToolsModule {
      * same shape and come after, and they describe themselves to the model only once a
      * folder has been shared, so an install that never shares one carries none of them.
      */
+    @Suppress("LongParameterList")
     @Provides
     @Singleton
     fun registry(
@@ -67,6 +71,9 @@ object ToolsModule {
         searchFiles: SearchFilesTool,
         readFile: ReadFileTool,
         writeFile: WriteFileTool,
+        deleteFile: DeleteFileTool,
+        showWebsite: ShowWebsiteTool,
+        showDocument: ShowDocumentTool,
         runScript: RunScriptTool,
         advance: AdvanceTool,
         askUser: AskUserTool,
@@ -76,7 +83,8 @@ object ToolsModule {
         remember: RememberTool,
     ): ToolRegistry = ToolRegistry(
         listOf(
-            search, media, fetch, searchFiles, readFile, writeFile, runScript,
+            search, media, fetch, searchFiles, readFile, writeFile, deleteFile,
+            showWebsite, showDocument, runScript,
             advance, askUser, watch, remember,
         ),
     )

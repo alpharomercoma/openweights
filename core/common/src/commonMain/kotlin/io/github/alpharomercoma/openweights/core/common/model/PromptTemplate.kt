@@ -53,6 +53,18 @@ interface PromptTemplate {
     } ?: 0
 
     /**
+     * Whether this family's format can express tools at all.
+     *
+     * The UI and the agent loop gate on this: offering tools to a model whose template
+     * silently drops them is not a degraded feature but a silent lie — the model never
+     * sees the tools and the app waits for calls that cannot come.
+     */
+    val supportsTools: Boolean get() = true
+
+    /** Whether this family reasons before answering, for the thinking toggle. */
+    val supportsThinking: Boolean get() = false
+
+    /**
      * @param thinking whether the model may reason before answering. Families that support
      * it spell the switch differently, and a family that does not simply ignores it.
      */
@@ -123,6 +135,7 @@ object PromptTemplates {
 private object Qwen3Template : PromptTemplate {
     /** ChatML's end-of-turn marker, which Qwen3 emits and nothing should show a user. */
     override val stopMarkers: List<String> = listOf("<|im_end|>")
+    override val supportsThinking: Boolean = true
 
     override fun render(
         messages: List<ChatMessage>,
@@ -141,6 +154,7 @@ private const val IM_END = "<|im_end|>"
  */
 private object SmolLm2Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf(IM_END)
+    override val supportsTools: Boolean = false
 
     override fun render(
         messages: List<ChatMessage>,
@@ -163,6 +177,7 @@ private object Qwen25Template : PromptTemplate {
 /** [SmolLm3Prompt] as a [PromptTemplate]. */
 private object SmolLm3Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf(IM_END)
+    override val supportsThinking: Boolean = true
 
     override fun render(
         messages: List<ChatMessage>,
@@ -200,6 +215,7 @@ private object Phi4Template : PromptTemplate {
 /** [Gemma3Prompt] as a [PromptTemplate], without the textual BOS for the same reason. */
 private object Gemma3Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf("<end_of_turn>")
+    override val supportsTools: Boolean = false
 
     override fun render(
         messages: List<ChatMessage>,
@@ -215,6 +231,7 @@ private object Gemma3Template : PromptTemplate {
  */
 private object Lfm25Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf(IM_END)
+    override val supportsThinking: Boolean = true
 
     override fun render(
         messages: List<ChatMessage>,

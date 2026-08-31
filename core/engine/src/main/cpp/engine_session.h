@@ -244,6 +244,7 @@ public:
         const std::vector<ToolDefinition> & tools,
         const ReasoningConfig & reasoning,
         bool snapshot,
+        const char * store,
         WarmStats & stats,
         std::string & error);
 
@@ -361,6 +362,21 @@ private:
      * memory cannot drop the half-written batch, cancellation concedes the whole cache.
      */
     bool ingest_warm(const std::vector<llama_token> & tokens, size_t from, std::string & error);
+
+    /**
+     * Restores a warmed state from [path], if its tokens are exactly [tokens].
+     *
+     * The file outlives the process, which the state in RAM cannot be made to do on a
+     * phone: the fresh-chat read costs tens of seconds once, and every later startup of
+     * the same model, same settings and same day arms itself from disk in the time a
+     * 26 MB read takes. A stale or foreign file — new day, changed settings, replaced
+     * weights, another llama version — fails the token compare or llama's own state
+     * validation, is deleted, and the caller computes as if it never existed.
+     */
+    bool restore_warm_file(const char * path, const std::vector<llama_token> & tokens);
+
+    /** Writes the current cache — exactly [tokens] — and its state to [path], atomically. */
+    void save_warm_file(const char * path, const std::vector<llama_token> & tokens);
 
     /** Snapshots the cache as the warm prefix, on the families that cannot roll back. */
     void maybe_snapshot();

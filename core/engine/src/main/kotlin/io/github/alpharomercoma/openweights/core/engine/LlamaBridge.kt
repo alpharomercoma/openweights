@@ -84,6 +84,7 @@ internal class LlamaBridge {
         enableThinking: Boolean,
         reasoningEffort: String?,
         snapshot: Boolean,
+        storePath: String?,
     ): LongArray?
 
     external fun nativeResetContext(handle: Long)

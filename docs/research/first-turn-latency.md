@@ -155,6 +155,28 @@ dies in **349 ms keeping 1,024 of 2,197 tokens**, the turn starts **470 ms** aft
 tap (was 26,800), and reads only the remainder. A turn's wait is now bounded by one abort
 landing plus the un-warmed tail, never by the warm's length.
 
+## The warm that outlives the process (2026-08-31, late)
+
+The question that prompted it: can the warm just *be there* at startup? In RAM it cannot
+— Android kills cached processes at will, and pinning a 700 MB model resident forever
+would fight the OS and the battery. On disk it can: after the one computed warm of the
+day, the engine writes the state file (`kv: warm state saved: 2188 tokens, 26442 KB`,
+36 ms), and every later launch of the same model, settings and day restores it instead
+of re-reading — `kv: warm restored from disk: 2188 tokens in 23 ms`. On the day this was
+built, the computed warm cost 64.7 s on a swap-crawling phone; the restore cost 23–55 ms.
+Cold-start-to-answered-"hi", measured live: **1.3 s**, cache reused 100%.
+
+The mechanics: the store lives inside `Session::warm` itself, so byte-parity is
+structural — the same render, the same tokens, and the file is used only when its token
+array equals the freshly rendered prefix exactly. Staleness self-resolves: a new day's
+date line, changed settings or tools, replaced weights (the file is keyed to the model
+file's name, size and mtime), or another llama state version all miss the compare or
+llama's own validation, delete the file, and the warm computes once and rewrites it. On
+hybrids the restore also arms the in-RAM new-chat snapshot from the same bytes, so every
+restore mechanism works from the first second. Conversation warms are never persisted —
+their bytes change every turn. Files live in the app's cache dir, one per model, pruned
+beyond three; the OS may clear them, which costs exactly one recompute.
+
 ## What the research said, and what was deliberately not built
 
 Three surveys were run before building (arXiv; Cursor/Copilot/Claude-Code/Manus mechanics;

@@ -45,6 +45,7 @@ import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
+import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -378,7 +379,9 @@ class TurnRunner @Inject constructor(
         system: List<ChatMessage>,
         withTools: Boolean,
         params: SamplerParams,
-    ): WarmResult? = warm(system, withTools, params, snapshot = true)
+        /** Where the warmed state outlives the process; see [InferenceEngine.warm]. */
+        store: File? = null,
+    ): WarmResult? = warm(system, withTools, params, snapshot = true, store = store)
 
     /**
      * Reads an existing conversation into the engine's cache, ahead of its next question.
@@ -397,13 +400,14 @@ class TurnRunner @Inject constructor(
         conversation: List<ChatMessage>,
         withTools: Boolean,
         params: SamplerParams,
-    ): WarmResult? = warm(conversation, withTools, params, snapshot = false)
+    ): WarmResult? = warm(conversation, withTools, params, snapshot = false, store = null)
 
     private suspend fun warm(
         conversation: List<ChatMessage>,
         withTools: Boolean,
         params: SamplerParams,
         snapshot: Boolean,
+        store: File?,
     ): WarmResult? {
         // The other half of run()'s standing interrupt: a warm never starts, and never
         // reaches the engine, while a turn is waiting for it. Checked again inside the
@@ -422,6 +426,7 @@ class TurnRunner @Inject constructor(
                 tools = if (renderTools) active.definitions else emptyList(),
                 params = params,
                 snapshot = snapshot,
+                store = store?.absolutePath,
             )
             result?.let {
                 Log.i(

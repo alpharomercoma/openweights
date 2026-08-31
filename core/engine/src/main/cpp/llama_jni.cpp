@@ -297,7 +297,8 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeWarm(
     jobjectArray tool_schemas,
     jboolean enable_thinking,
     jstring reasoning_effort,
-    jboolean snapshot) try {
+    jboolean snapshot,
+    jstring store_path) try {
     Session * session = as_session(handle);
 
     const jsize message_count = env->GetArrayLength(roles);
@@ -329,10 +330,14 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeWarm(
     thinking.effort =
         reasoning_effort == nullptr ? std::string() : to_utf8(env, reasoning_effort);
 
+    const std::string store =
+        store_path == nullptr ? std::string() : to_utf8(env, store_path);
+
     WarmStats stats;
     std::string error;
-    const bool ok =
-        session->warm(messages, tools, thinking, snapshot == JNI_TRUE, stats, error);
+    const bool ok = session->warm(
+        messages, tools, thinking, snapshot == JNI_TRUE,
+        store.empty() ? nullptr : store.c_str(), stats, error);
     // A cancelled warm is the user arriving, which is what warming is for; the batches it
     // finished are kept and reported rather than raised.
     if (!ok && error != "cancelled") {

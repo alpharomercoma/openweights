@@ -269,6 +269,7 @@ class FakeInferenceEngine : InferenceEngine {
         val messages: List<ChatMessage>,
         val tools: List<ToolDefinition>,
         val snapshot: Boolean,
+        val store: String? = null,
     )
 
     /** Every [warm], in order, so a test can check what was read ahead and how. */
@@ -297,8 +298,9 @@ class FakeInferenceEngine : InferenceEngine {
         tools: List<ToolDefinition>,
         params: SamplerParams,
         snapshot: Boolean,
+        store: String?,
     ): WarmResult? = nativeThread.withLock {
-        warmCalls += WarmCall(messages, tools, snapshot)
+        warmCalls += WarmCall(messages, tools, snapshot, store)
         warmGate?.await()
         val read = messages.sumOf { it.text.length } / CHARS_PER_TOKEN
         return WarmResult(

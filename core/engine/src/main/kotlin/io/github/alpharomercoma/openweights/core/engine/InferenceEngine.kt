@@ -324,6 +324,13 @@ interface InferenceEngine : AutoCloseable {
          * the head snapshot every future new chat restores from.
          */
         snapshot: Boolean = true,
+        /**
+         * A file the warmed state outlives the process in, or null to keep it in RAM
+         * only. When the file already holds exactly this prefix it is restored — a disk
+         * read instead of tens of seconds of prefill — and after a computed warm it is
+         * rewritten. Only for the fresh-chat head, whose bytes are stable for a day.
+         */
+        store: String? = null,
     ): WarmResult? = null
 
     /** Stops the running generation. Safe to call from any thread. */

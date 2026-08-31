@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -61,6 +62,12 @@ constexpr size_t MAX_TOKEN_PIECE_BYTES = 1024u * 1024u;
 
 namespace openweights {
 namespace {
+
+/** The warm-state file format; bumped whenever the layout changes. */
+constexpr uint32_t kWarmFileVersion = 1;
+
+/** A state larger than this is not worth the disk or the write; compute instead. */
+constexpr uint64_t kWarmFileMaxBytes = 512ull * 1024 * 1024;
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -1313,6 +1320,7 @@ bool Session::warm(
     const std::vector<ToolDefinition> & tools,
     const ReasoningConfig & reasoning,
     bool snapshot,
+    const char * store,
     WarmStats & stats,
     std::string & error) {
     cancelled_.store(false, std::memory_order_relaxed);
@@ -1359,6 +1367,18 @@ bool Session::warm(
         return true;
     }
 
+    // A state file beats any partial the cache holds: restoring is one read of the
+    // whole prefix, computed on some earlier launch, against re-reading whatever the
+    // cache cannot offer at seconds per hundred tokens.
+    if (store != nullptr && restore_warm_file(store, tokens)) {
+        stats.reused_tokens = static_cast<int32_t>(tokens.size());
+        stats.prefill_ms    = now_ms() - start;
+        stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
+        LOGI("kv: warm restored from disk: %zu tokens in %lld ms",
+             tokens.size(), static_cast<long long>(stats.prefill_ms));
+        return true;
+    }
+
     const size_t from = align_cache(tokens, /*need_logits=*/false);
     stats.reused_tokens = static_cast<int32_t>(from);
 
@@ -1382,7 +1402,102 @@ bool Session::warm(
     stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
     LOGI("kv: warmed %d tokens in %lld ms (%d reused)",
          stats.prompt_tokens, static_cast<long long>(stats.prefill_ms), stats.reused_tokens);
+    // Written only after a warm that completed, and never while a turn is waiting: the
+    // write costs a few hundred milliseconds this holds the engine for, and a cancel
+    // that has landed means somebody is.
+    if (store != nullptr && !cancelled_.load(std::memory_order_relaxed)) {
+        save_warm_file(store, tokens);
+    }
     return true;
+}
+
+bool Session::restore_warm_file(const char * path, const std::vector<llama_token> & tokens) {
+    FILE * file = fopen(path, "rb");
+    if (file == nullptr) return false;
+
+    char magic[4];
+    uint32_t version = 0;
+    uint32_t count = 0;
+    uint64_t state_size = 0;
+    bool header_ok =
+        fread(magic, 1, 4, file) == 4 && memcmp(magic, "OWWM", 4) == 0 &&
+        fread(&version, sizeof(version), 1, file) == 1 && version == kWarmFileVersion &&
+        fread(&count, sizeof(count), 1, file) == 1 &&
+        count == tokens.size() && count > 0 &&
+        fread(&state_size, sizeof(state_size), 1, file) == 1 &&
+        state_size > 0 && state_size <= kWarmFileMaxBytes;
+
+    std::vector<llama_token> stored;
+    if (header_ok) {
+        stored.resize(count);
+        header_ok = fread(stored.data(), sizeof(llama_token), count, file) == count &&
+            stored == tokens;
+    }
+
+    std::vector<uint8_t> state;
+    if (header_ok) {
+        state.resize(state_size);
+        header_ok = fread(state.data(), 1, state_size, file) == state_size;
+    }
+    fclose(file);
+
+    if (!header_ok) {
+        // A stale file — yesterday's date line, changed settings, replaced weights, an
+        // older format — never matches twice; holding it only costs the next launch this
+        // same read.
+        remove(path);
+        return false;
+    }
+
+    reset();
+    if (llama_state_seq_set_data(ctx_, state.data(), state.size(), 0) == 0) {
+        // llama's own validation refused it: wrong architecture, context, or version.
+        reset();
+        remove(path);
+        return false;
+    }
+    cached_ = tokens;
+    n_past_ = static_cast<int32_t>(tokens.size());
+    cached_covers_context_ = true;
+    if (llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_)) {
+        // The RAM snapshot armed from the same bytes, with no compute: everything the
+        // restore machinery does for a new chat works from the first second.
+        prefix_tokens_ = tokens;
+        prefix_state_  = std::move(state);
+    }
+    return true;
+}
+
+void Session::save_warm_file(const char * path, const std::vector<llama_token> & tokens) {
+    std::vector<uint8_t> state;
+    if (!prefix_state_.empty() && prefix_tokens_ == tokens) {
+        state = prefix_state_;
+    } else {
+        const size_t size = llama_state_seq_get_size(ctx_, 0);
+        if (size == 0 || size > kWarmFileMaxBytes) return;
+        state.resize(size);
+        if (llama_state_seq_get_data(ctx_, state.data(), size, 0) != size) return;
+    }
+
+    const std::string tmp = std::string(path) + ".tmp";
+    FILE * file = fopen(tmp.c_str(), "wb");
+    if (file == nullptr) return;
+    const uint32_t version = kWarmFileVersion;
+    const uint32_t count = static_cast<uint32_t>(tokens.size());
+    const uint64_t state_size = static_cast<uint64_t>(state.size());
+    const bool ok =
+        fwrite("OWWM", 1, 4, file) == 4 &&
+        fwrite(&version, sizeof(version), 1, file) == 1 &&
+        fwrite(&count, sizeof(count), 1, file) == 1 &&
+        fwrite(&state_size, sizeof(state_size), 1, file) == 1 &&
+        fwrite(tokens.data(), sizeof(llama_token), tokens.size(), file) == tokens.size() &&
+        fwrite(state.data(), 1, state.size(), file) == state.size();
+    fclose(file);
+    if (!ok || rename(tmp.c_str(), path) != 0) {
+        remove(tmp.c_str());
+        return;
+    }
+    LOGI("kv: warm state saved: %zu tokens, %zu KB", tokens.size(), state.size() / 1024);
 }
 
 StopReason Session::generate(

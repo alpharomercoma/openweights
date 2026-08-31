@@ -2210,6 +2210,28 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * The file this model's warmed head outlives the process in.
+     *
+     * Keyed to the model file's name, size and modification time, so replaced weights
+     * never meet an old state; the prefix bytes themselves are compared inside the
+     * engine, so a new day's date line or changed settings simply miss and recompute.
+     * Siblings beyond a couple of other models are pruned — each file is roughly the
+     * model's KV for two thousand tokens, tens of megabytes.
+     */
+    private fun warmStore(): File? {
+        val model = loadedFile ?: return null
+        val dir = File(appContext.cacheDir, "warm")
+        if (!dir.isDirectory && !dir.mkdirs()) return null
+        val name = "${model.name}-${model.length()}-${model.lastModified()}.warm"
+        dir.listFiles()
+            ?.filter { it.name != name }
+            ?.sortedByDescending { it.lastModified() }
+            ?.drop(KEPT_WARM_STORES)
+            ?.forEach { it.delete() }
+        return File(dir, name)
+    }
+
+    /**
      * Reads the fresh-chat prefix into the engine cache while nobody is waiting — and,
      * when a conversation is on screen, the conversation after it.
      *
@@ -2246,6 +2268,7 @@ class ChatViewModel @Inject constructor(
                 head,
                 withTools = state.toolsAvailable,
                 params = params,
+                store = warmStore(),
             )
             // A head warm that could not run or kept nothing — the engine refused it, a
             // turn interrupted it at zero, or the compute failed the way a swapping phone
@@ -3045,6 +3068,8 @@ private fun StagedDocument.asPrompt(): String = buildString {
  * being low means folding early. Sharing a constant made a change for one silently a change
  * for the other.
  */
+/** Warm-state files kept for models other than the loaded one. */
+private const val KEPT_WARM_STORES = 2
 private const val PESSIMISTIC_CHARS_PER_TOKEN = 2
 
 private const val STREAM_FRAME_MS = 33L

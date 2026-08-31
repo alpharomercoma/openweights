@@ -119,6 +119,29 @@ class ChatWarmTest : ChatFixture() {
     }
 
     @Test
+    fun `the head warm persists to a model-keyed file and the conversation warm never does`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            viewModel.send("Who is Ada Lovelace?")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            engine.warmCalls.clear()
+            viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // The head's state is worth keeping across processes -- its bytes hold for a
+            // day -- and the file is keyed to the exact weights. A conversation's is not:
+            // it changes every turn and would churn tens of megabytes per reply.
+            val head = engine.warmCalls.first { it.snapshot }
+            val conversation = engine.warmCalls.first { !it.snapshot }
+            assertThat(head.store).isNotNull()
+            assertThat(head.store).contains("model-a.gguf")
+            assertThat(head.store).endsWith(".warm")
+            assertThat(conversation.store).isNull()
+        }
+
+    @Test
     fun `a question arriving mid-warm interrupts it instead of queueing behind it`() =
         runTest(dispatcher) {
             loadModel()

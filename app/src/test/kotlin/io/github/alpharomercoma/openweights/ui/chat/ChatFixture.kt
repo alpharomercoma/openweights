@@ -332,6 +332,26 @@ abstract class ChatFixture {
         advanceUntilIdle()
     }
 
+    /**
+     * Runs the work until [condition] holds, instead of for a fixed number of alternations.
+     *
+     * For work whose length scales with its input rather than with the turn: staging a
+     * seven-file batch is seven sequential IO round trips, which fit inside [settle]'s
+     * grace on a fast laptop and did not on the two-core CI runner — five of seven staged,
+     * red on exactly one machine. Waiting on the state instead of the clock is the fix the
+     * fixed-step comment below was warning about. Exits the moment the condition is true,
+     * so the fast machine stays fast; the ceiling only prices the slow one.
+     */
+    protected fun TestScope.settleUntil(condition: () -> Boolean) {
+        repeat(CONDITION_STEPS) {
+            advanceUntilIdle()
+            if (condition()) return
+            Thread.sleep(SETTLE_PAUSE_MS)
+        }
+        advanceUntilIdle()
+        check(condition()) { "state never settled into the expected shape" }
+    }
+
     protected companion object {
         /**
          * Enough passes for every piece of off-scheduler work in a turn to land.
@@ -348,6 +368,9 @@ abstract class ChatFixture {
 
         /** How many times to re-check the table before giving up and asserting on it. */
         const val AWAIT_STEPS = 20
+
+        /** [settleUntil]'s ceiling: two seconds of real time, paid only when needed. */
+        const val CONDITION_STEPS = 100
 
         /**
          * Passes given to work that has been cancelled and has to unwind.

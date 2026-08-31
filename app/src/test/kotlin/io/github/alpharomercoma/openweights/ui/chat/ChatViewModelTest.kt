@@ -587,13 +587,15 @@ class ChatViewModelTest : ChatFixture() {
         viewModel.attachAll(
             (1 until MAX_STAGED_ATTACHMENTS).map { provided("held-$it.png", "image/png", "png") },
         )
-        settle()
+        // On the state, not the clock: seven sequential stagings outran settle()'s fixed
+        // grace on the two-core CI runner while passing everywhere faster.
+        settleUntil { viewModel.uiState.value.staged.size == MAX_STAGED_ATTACHMENTS - 1 }
         assertThat(viewModel.uiState.value.staged).hasSize(MAX_STAGED_ATTACHMENTS - 1)
         val document = provided("notes.txt", "text/plain", "not a picture")
         val picture = provided("pasted.png", "image/png", "pretend png")
 
         viewModel.attachAll(listOf(document, picture))
-        settle()
+        settleUntil { viewModel.uiState.value.staged.size == MAX_STAGED_ATTACHMENTS }
 
         assertThat(viewModel.uiState.value.staged).hasSize(MAX_STAGED_ATTACHMENTS)
         assertThat(viewModel.uiState.value.staged.last().name).isEqualTo("pasted.png")

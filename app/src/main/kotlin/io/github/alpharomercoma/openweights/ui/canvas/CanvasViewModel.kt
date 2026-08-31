@@ -23,13 +23,9 @@ import io.github.alpharomercoma.openweights.core.tools.Canvas
 import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
 import io.github.alpharomercoma.openweights.core.tools.CanvasKind
 import io.github.alpharomercoma.openweights.core.tools.CanvasServer
-import io.github.alpharomercoma.openweights.core.tools.Workspace
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -43,28 +39,22 @@ import javax.inject.Inject
 class CanvasViewModel @Inject constructor(
     private val board: CanvasBoard,
     private val server: CanvasServer,
-    private val workspace: Workspace,
 ) : ViewModel() {
 
     val showing: StateFlow<Canvas?> = board.showing
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), board.showing.value)
 
-    private val text = MutableStateFlow("")
-
-    /** The document's current text, for [CanvasKind.DOCUMENT]; empty for a site. */
-    val documentText: StateFlow<String> = text.asStateFlow()
-
-    /** The loopback URL for [canvas], which any browser on this phone can open. */
-    fun urlFor(canvas: Canvas): String = server.urlFor(canvas.entry)
-
-    /** Re-reads the document or deck; called when the entry or revision changes. */
-    fun refreshDocument(canvas: Canvas) {
-        // Both Markdown kinds read the same way; only a site is served instead of read.
-        if (canvas.kind == CanvasKind.SITE) return
-        viewModelScope.launch {
-            val entry = workspace.resolve(canvas.entry) ?: return@launch
-            text.value = workspace.readBytes(entry)?.toString(Charsets.UTF_8).orEmpty()
-        }
+    /**
+     * The loopback URL that renders [canvas] — which any browser on this phone can open.
+     *
+     * A site is served as itself; the Markdown kinds go through the bundled viewers,
+     * which lay a document out as A4 pages and a deck as 16:9 slides. The app's WebView
+     * and a Chrome tab read the same URL, so what the user shares is what they saw.
+     */
+    fun viewerUrlFor(canvas: Canvas): String = when (canvas.kind) {
+        CanvasKind.SITE -> server.urlFor(canvas.entry)
+        CanvasKind.DOCUMENT -> server.viewerUrlFor("doc", canvas.entry)
+        CanvasKind.SLIDES -> server.viewerUrlFor("deck", canvas.entry)
     }
 
     fun dismiss() = board.dismiss()

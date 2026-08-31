@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.core.tools
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,7 +46,10 @@ import javax.inject.Singleton
  * a chain of names the granted folder handed over, or it is nothing.
  */
 @Singleton
-class CanvasServer @Inject constructor(private val workspace: Workspace) {
+class CanvasServer @Inject constructor(
+    private val workspace: Workspace,
+    @param:ApplicationContext private val context: Context,
+) {
 
     private var socket: ServerSocket? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -53,7 +58,11 @@ class CanvasServer @Inject constructor(private val workspace: Workspace) {
     @Synchronized
     fun port(): Int {
         socket?.takeIf { !it.isClosed }?.let { return it.localPort }
-        val server = ServerSocket(0, BACKLOG, InetAddress.getLoopbackAddress())
+        // The IPv4 loopback by its literal, not getLoopbackAddress(): that call answered
+        // ::1 in some processes on MIUI, the URLs all say 127.0.0.1, and an IPv6-only
+        // socket refuses every IPv4 connect — the canvas showed an error page while the
+        // server listened perfectly well on an address nobody was dialling.
+        val server = ServerSocket(0, BACKLOG, InetAddress.getByName("127.0.0.1"))
         socket = server
         scope.launch { accept(server) }
         return server.localPort
@@ -65,6 +74,17 @@ class CanvasServer @Inject constructor(private val workspace: Workspace) {
         }
         return "http://127.0.0.1:${port()}/$encoded"
     }
+
+    /**
+     * The URL that shows [path] through one of the bundled viewers.
+     *
+     * `doc` lays Markdown out as real A4 pages; `deck` as 16:9 slides. Both are plain
+     * pages any browser on this phone can open, which is the point: the canvas in the app
+     * and the tab in Chrome are the same rendering, byte for byte.
+     */
+    fun viewerUrlFor(kind: String, path: String): String =
+        "http://127.0.0.1:${port()}/$VIEWER_PREFIX/$kind?file=" +
+            URLEncoder.encode(path, "UTF-8")
 
     private fun accept(server: ServerSocket) {
         while (!server.isClosed) {
@@ -91,6 +111,13 @@ class CanvasServer @Inject constructor(private val workspace: Workspace) {
             return
         }
         val path = URLDecoder.decode(parts[1].substringBefore('?'), "UTF-8").trimStart('/')
+        val query = parts[1].substringAfter('?', "")
+        val viewer = viewerResponse(path, query)
+        if (viewer != null) {
+            out.write(viewer)
+            out.flush()
+            return
+        }
         val body = runBlocking { read(path) }
         if (body == null) {
             out.write(response("404 Not Found", "text/plain", "No such file: $path".toByteArray()))
@@ -98,6 +125,66 @@ class CanvasServer @Inject constructor(private val workspace: Workspace) {
             out.write(response("200 OK", contentTypeFor(path), body))
         }
         out.flush()
+    }
+
+    /**
+     * The bundled viewers and their assets, or null when [path] is an ordinary file.
+     *
+     * All read from the APK, never from the shared folder, so the user's files cannot
+     * shadow the machinery that renders them; and the asset names are reduced to their
+     * last segment, so the route cannot be walked anywhere else.
+     */
+    private fun viewerResponse(path: String, query: String): ByteArray? {
+        if (!path.startsWith("$VIEWER_PREFIX/")) return null
+        val rest = path.removePrefix("$VIEWER_PREFIX/")
+        if (rest.startsWith("asset/")) {
+            return assetResponse(rest.removePrefix("asset/").substringAfterLast('/'))
+        }
+        val template = when (rest) {
+            "doc" -> "canvas/doc.html"
+            "deck" -> "canvas/deck.html"
+            else -> return response(
+                "404 Not Found",
+                "text/plain",
+                "No such viewer: $rest".toByteArray(),
+            )
+        }
+        return shellResponse(template, query)
+    }
+
+    private fun assetResponse(name: String): ByteArray {
+        val body = runCatching {
+            context.assets.open("canvas/$name").use { it.readBytes() }
+        }.getOrNull() ?: return response(
+            "404 Not Found",
+            "text/plain",
+            "No such asset: $name".toByteArray(),
+        )
+        return response("200 OK", contentTypeFor(name), body)
+    }
+
+    private fun shellResponse(template: String, query: String): ByteArray {
+        val file = query.split('&')
+            .firstOrNull { it.startsWith("file=") }
+            ?.let { URLDecoder.decode(it.removePrefix("file="), "UTF-8") }
+            .orEmpty()
+        val shell = runCatching {
+            context.assets.open(template).use { it.readBytes().toString(Charsets.UTF_8) }
+        }.getOrNull() ?: return response(
+            "500 Internal Server Error",
+            "text/plain",
+            "viewer missing".toByteArray(),
+        )
+        // Into a JS string literal, so everything that could end the literal is escaped.
+        val escaped = file
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("<", "\\u003c")
+        return response(
+            "200 OK",
+            "text/html; charset=utf-8",
+            shell.replace("__OW_FILE__", escaped).toByteArray(),
+        )
     }
 
     private suspend fun read(path: String): ByteArray? {
@@ -133,6 +220,7 @@ class CanvasServer @Inject constructor(private val workspace: Workspace) {
     }
 
     private companion object {
+        const val VIEWER_PREFIX = "__ow__"
         const val BACKLOG = 8
         const val READ_TIMEOUT_MS = 10_000
     }

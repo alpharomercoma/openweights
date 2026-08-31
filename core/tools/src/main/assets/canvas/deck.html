@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slides</title>
+<script src="/__ow__/asset/marked.min.js"></script>
+<style>
+  /* A real presentation surface: every slide is authored on a fixed 1280x720 stage —
+     the 16:9 the projector expects — and the stage is scaled to whatever screen is
+     watching, letterboxed like any player. */
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #101216;
+    /* Every gesture is ours: without this, a WebView whose layout viewport is wider
+       than its window treats a swipe as a pan and cancels the pointer mid-gesture. */
+    touch-action: none;
+    font-family: -apple-system, Roboto, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  #stage {
+    position: absolute; left: 0; top: 0;
+    width: 1280px; height: 720px;
+    transform-origin: top left;
+    background: #ffffff; border-radius: 2px;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute; inset: 0; padding: 64px 84px;
+    box-sizing: border-box; display: none;
+    color: #1c1e21;
+  }
+  .slide.current { display: flex; flex-direction: column; justify-content: center; }
+  .fit { transform-origin: top left; width: 100%; }
+
+  .slide h1 { font-size: 64px; line-height: 1.15; margin: 0 0 24px; }
+  .slide h2 { font-size: 46px; line-height: 1.2; margin: 0 0 20px; }
+  .slide h3 { font-size: 36px; margin: 0 0 16px; }
+  .slide p, .slide li { font-size: 30px; line-height: 1.45; }
+  .slide p { margin: 0 0 18px; }
+  .slide ul, .slide ol { margin: 0 0 18px; padding-left: 44px; }
+  .slide li { margin-bottom: 10px; }
+  .slide blockquote {
+    margin: 0 0 18px; padding: 6px 26px; border-left: 6px solid #c4c9d4;
+    color: #444; font-style: italic;
+  }
+  .slide code {
+    font-family: "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+    font-size: 0.85em; background: #f2f3f5; border-radius: 6px; padding: 0 8px;
+  }
+  .slide pre {
+    background: #f2f3f5; border-radius: 10px; padding: 22px; margin: 0 0 18px;
+    white-space: pre-wrap; word-break: break-word; font-size: 24px;
+  }
+  .slide pre code { background: none; padding: 0; font-size: inherit; }
+  .slide table { border-collapse: collapse; margin: 0 0 18px; font-size: 26px; }
+  .slide th, .slide td { border: 2px solid #c9cdd6; padding: 10px 16px; text-align: left; }
+  .slide th { background: #eef0f4; }
+  .slide img { max-width: 100%; max-height: 460px; }
+  .slide a { color: #0b57d0; text-decoration: none; }
+
+  #counter {
+    position: absolute; left: 0; top: 0; z-index: 10;
+    transform: translateX(-50%);
+    font-size: 13px; color: #fff; background: rgba(28, 30, 33, 0.72);
+    border-radius: 999px; padding: 4px 12px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="counter"></div>
+<script>
+(function () {
+  var FILE = "__OW_FILE__";
+  var SLIDE_BREAK = /^\s*---\s*$/m;
+  var stage = document.getElementById("stage");
+  var counter = document.getElementById("counter");
+  var slides = [];
+  var index = restoredIndex();
+  var lastText = null;
+
+  function restoredIndex() {
+    try { return Number(sessionStorage.getItem("ow-slide:" + FILE)) || 0; }
+    catch (ignored) { return 0; }
+  }
+  function rememberIndex() {
+    try { sessionStorage.setItem("ow-slide:" + FILE, String(index)); }
+    catch (ignored) {}
+  }
+
+  /* Blocks separated by a line holding only ---, the Marp and Slidev convention. An
+     empty first block — the file opening with a separator, or front matter fenced by
+     two — is dropped rather than shown as a blank title slide. */
+  function split(text) {
+    var blocks = text.split(new RegExp(SLIDE_BREAK.source, "m"))
+      .map(function (block) { return block.trim(); })
+      .filter(function (block) { return block.length > 0; });
+    return blocks.length ? blocks : [text.trim()];
+  }
+
+  /* Sized and placed against the visual viewport, not the layout one. Android's
+     WebView routinely lays the page out wider than the window it shows (664 CSS px of
+     layout behind a 394 px window was measured on one device) and never fires a window
+     resize about it; percentages of that layout put the stage half off screen. The
+     visual viewport is the one truth about what the user can actually see. */
+  function viewport() {
+    var vv = window.visualViewport;
+    if (!vv) return { w: innerWidth, h: innerHeight, x: 0, y: 0 };
+    return { w: vv.width, h: vv.height, x: vv.pageLeft, y: vv.pageTop };
+  }
+
+  function scaleStage() {
+    var v = viewport();
+    var scale = Math.min(v.w / 1280, v.h / 720);
+    stage.style.transform = "scale(" + scale + ")";
+    stage.style.left = (v.x + (v.w - 1280 * scale) / 2) + "px";
+    stage.style.top = (v.y + (v.h - 720 * scale) / 2) + "px";
+    counter.style.left = (v.x + v.w / 2) + "px";
+    counter.style.top = (v.y + v.h - 34) + "px";
+  }
+
+  /* No overflow, guaranteed: a slide taller than the stage is scaled down to fit,
+     which is what a presenter would do by hand. */
+  function fit(slide) {
+    var inner = slide.querySelector(".fit");
+    inner.style.transform = "";
+    inner.style.width = "100%";
+    var room = slide.clientHeight -
+      parseFloat(getComputedStyle(slide).paddingTop) -
+      parseFloat(getComputedStyle(slide).paddingBottom);
+    var height = inner.scrollHeight;
+    if (height > room && height > 0) {
+      var s = room / height;
+      inner.style.transform = "scale(" + s + ")";
+      inner.style.width = (100 / s) + "%";
+      // Centering works on the unscaled layout box, so a fitted slide must pin to the
+      // top or the shrunken content rides up out of the stage.
+      slide.style.justifyContent = "flex-start";
+      return s;
+    }
+    slide.style.justifyContent = "";
+    return 1;
+  }
+
+  function show(next) {
+    if (!slides.length) return;
+    index = Math.max(0, Math.min(next, slides.length - 1));
+    slides.forEach(function (slide, i) {
+      slide.classList.toggle("current", i === index);
+    });
+    counter.textContent = (index + 1) + " / " + slides.length;
+    rememberIndex();
+  }
+
+  function render(text) {
+    stage.innerHTML = "";
+    slides = split(text).map(function (block) {
+      var slide = document.createElement("section");
+      slide.className = "slide";
+      var inner = document.createElement("div");
+      inner.className = "fit";
+      inner.innerHTML = marked.parse(block, { gfm: true, async: false });
+      slide.appendChild(inner);
+      stage.appendChild(slide);
+      return slide;
+    });
+    scaleStage();
+    // Fitting needs layout, and layout needs display: measure each slide visible.
+    var fits = slides.map(function (slide) {
+      slide.classList.add("current");
+      var s = fit(slide);
+      slide.classList.remove("current");
+      return s;
+    });
+    show(Math.min(index, slides.length - 1));
+    window.__ow = { slides: slides.length, stage: { width: 1280, height: 720 }, fits: fits };
+  }
+
+  function refresh() {
+    fetch("/" + FILE.split("/").map(encodeURIComponent).join("/"))
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (text) {
+        if (text === lastText) return;
+        lastText = text;
+        render(text);
+      })
+      .catch(function () { /* keep the deck on screen */ });
+  }
+
+  /* Swipe anywhere; tap the edges; arrows on a keyboard. Every deck control there is. */
+  var downX = null;
+  addEventListener("pointerdown", function (e) { downX = e.clientX; });
+  addEventListener("pointerup", function (e) {
+    if (downX === null) return;
+    var dx = e.clientX - downX;
+    downX = null;
+    if (Math.abs(dx) > 40) { show(index + (dx < 0 ? 1 : -1)); return; }
+    var third = window.innerWidth / 3;
+    if (e.clientX < third) show(index - 1);
+    else if (e.clientX > 2 * third) show(index + 1);
+  });
+  addEventListener("keydown", function (e) {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") show(index + 1);
+    if (e.key === "ArrowLeft" || e.key === "PageUp") show(index - 1);
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  addEventListener("resize", function () { scaleStage(); slides.forEach(fit); });
+  /* Android's WebView settles its layout width shortly after load without firing a
+     window resize, so the one-shot scale computed at load can be wrong forever. The
+     observer sees every layout-size change the window event misses. */
+  new ResizeObserver(function () { scaleStage(); }).observe(document.documentElement);
+  if (window.visualViewport) {
+    visualViewport.addEventListener("resize", scaleStage);
+    visualViewport.addEventListener("scroll", scaleStage);
+  }
+
+  refresh();
+  setInterval(function () { scaleStage(); refresh(); }, 1500);
+})();
+</script>
+</body>
+</html>

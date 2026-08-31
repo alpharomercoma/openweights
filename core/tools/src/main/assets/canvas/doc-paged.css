@@ -1,0 +1,46 @@
+/* The print model: real A4 with margins and a page counter. Everything here is
+   processed by Paged.js, which is why it lives in its own sheet: the polyfill only
+   honours @page rules in stylesheets handed to it. */
+@page {
+  size: A4;
+  margin: 20mm 18mm 22mm 18mm;
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font: 9pt -apple-system, Roboto, "Segoe UI", sans-serif;
+    color: #8a8a8a;
+  }
+}
+
+body {
+  font: 11pt/1.55 -apple-system, Roboto, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: #1c1e21;
+}
+h1 { font-size: 20pt; line-height: 1.25; margin: 0 0 10pt; }
+h2 { font-size: 15pt; line-height: 1.3; margin: 16pt 0 6pt; }
+h3 { font-size: 12.5pt; margin: 12pt 0 4pt; }
+h1, h2, h3, h4 { break-after: avoid; }
+p { margin: 0 0 8pt; }
+ul, ol { margin: 0 0 8pt; padding-left: 22pt; }
+li { margin-bottom: 2pt; }
+blockquote {
+  margin: 8pt 0; padding: 2pt 12pt; border-left: 3pt solid #c4c9d4; color: #444;
+}
+code {
+  font: 9.5pt/1.5 "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  background: #f2f3f5; border-radius: 3px; padding: 0 3px;
+}
+pre {
+  background: #f2f3f5; border-radius: 4px; padding: 8pt; margin: 0 0 8pt;
+  white-space: pre-wrap; word-break: break-word;
+}
+pre code { background: none; padding: 0; }
+table {
+  border-collapse: collapse; margin: 0 0 8pt; width: 100%;
+  table-layout: fixed; word-break: break-word;
+}
+th, td { border: 0.75pt solid #c9cdd6; padding: 4pt 6pt; text-align: left; }
+th { background: #eef0f4; }
+tr { break-inside: avoid; }
+img { max-width: 100%; }
+hr { border: none; border-top: 0.75pt solid #c9cdd6; margin: 12pt 0; }
+a { color: #0b57d0; }

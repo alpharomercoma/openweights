@@ -103,9 +103,9 @@ class ShowDocumentTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_document",
-        description = "Show a Markdown document you saved to the user, rendered like a " +
-            "real page. Point it at the file, like notes/report.md. Call it once after " +
-            "the first save; later saves with replace update the page on screen live.",
+        description = "Show a Markdown document you saved to the user, laid out as real " +
+            "A4 pages. Point it at the file, like notes/report.md. Call it once after " +
+            "the first save; later saves with replace update the pages live.",
         parametersJson = """
             {
               "type": "object",
@@ -161,9 +161,9 @@ class ShowSlidesTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_slides",
-        description = "Show a Markdown file as a slide deck the user swipes through. " +
-            "Separate slides with a line containing only ---. Call it once after the " +
-            "first save; later saves with replace update the deck live.",
+        description = "Show a Markdown file as a 16:9 slide deck the user swipes " +
+            "through. Separate slides with a line containing only ---. Call it once " +
+            "after the first save; later saves with replace update the deck live.",
         parametersJson = """
             {
               "type": "object",

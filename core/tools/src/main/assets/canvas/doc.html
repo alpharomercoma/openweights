@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- A fixed 860-unit viewport: the A4 sheet is 794 CSS px wide, so a phone scales the
+     whole page to fit its width and pinch-zoom still works, which is exactly how a PDF
+     viewer behaves. -->
+<meta name="viewport" content="width=860">
+<title>Document</title>
+<script src="/__ow__/asset/marked.min.js"></script>
+<script>
+  /* Paged.js would otherwise paginate the empty shell on load; content arrives by fetch. */
+  window.PagedConfig = { auto: false };
+</script>
+<script src="/__ow__/asset/paged.polyfill.min.js"></script>
+<style>
+  html { background: #d9dbe0; }
+  body { margin: 0; }
+
+  .pagedjs_page {
+    background: #ffffff;
+    box-shadow: 0 1px 6px rgba(30, 34, 40, 0.28);
+    margin: 10px auto;
+  }
+
+  /* Screen chrome only: where the reader is, floating and out of the print model. */
+  #position {
+    position: fixed; right: 14px; bottom: 14px; z-index: 10;
+    font: 12px -apple-system, Roboto, sans-serif; color: #fff;
+    background: rgba(28, 30, 33, 0.72); border-radius: 999px; padding: 4px 10px;
+  }
+  #plain { display: none; }
+  /* When pagination is unavailable the content still reads as one flowing page. */
+  body.unpaged #plain {
+    display: block; background: #fff; max-width: 794px; margin: 0 auto;
+    padding: 40px 48px; font: 11pt/1.55 -apple-system, Roboto, sans-serif; color: #1c1e21;
+  }
+</style>
+</head>
+<body>
+<div id="plain"></div>
+<div id="position" hidden></div>
+<script>
+(function () {
+  var FILE = "__OW_FILE__";
+  var lastText = null;
+  var rendering = false;
+
+  function markdownToHtml(text) {
+    return marked.parse(text, { gfm: true, async: false });
+  }
+
+  function watchPosition() {
+    var pages = document.querySelectorAll(".pagedjs_page");
+    var pill = document.getElementById("position");
+    if (!pages.length) { pill.hidden = true; return; }
+    pill.hidden = false;
+    var current = 1;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          current = Number(entry.target.getAttribute("data-page-number")) || current;
+          pill.textContent = current + " / " + pages.length;
+        }
+      });
+    }, { threshold: 0.4 });
+    pages.forEach(function (page) { observer.observe(page); });
+    pill.textContent = current + " / " + pages.length;
+  }
+
+  function render(text) {
+    rendering = true;
+    var keep = window.scrollY;
+    // Paged.js renders into a fresh container each time; the old one goes first.
+    document.querySelectorAll(".pagedjs_pages").forEach(function (n) { n.remove(); });
+    var paged = new Paged.Previewer();
+    paged.preview(markdownToHtml(text), ["/__ow__/asset/doc-paged.css"], document.body).then(function (flow) {
+      document.body.classList.remove("unpaged");
+      window.__ow = {
+        pages: flow.total,
+        pageSize: (function () {
+          var page = document.querySelector(".pagedjs_page");
+          return page
+            ? { width: page.offsetWidth, height: page.offsetHeight }
+            : null;
+        })(),
+      };
+      watchPosition();
+      window.scrollTo(0, keep);
+      rendering = false;
+    }).catch(function (error) {
+      // Pagination failing must never mean an empty screen: fall back to one long page.
+      console.error("pagination failed", error);
+      document.body.classList.add("unpaged");
+      document.getElementById("plain").innerHTML = markdownToHtml(text);
+      window.__ow = { pages: 0, error: String(error) };
+      rendering = false;
+    });
+  }
+
+  function refresh() {
+    if (rendering) return;
+    fetch("/" + FILE.split("/").map(encodeURIComponent).join("/"))
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (text) {
+        if (text === lastText) return;
+        lastText = text;
+        render(text);
+      })
+      .catch(function () { /* server gone or file missing; keep what is on screen */ });
+  }
+
+  refresh();
+  setInterval(refresh, 1500);
+})();
+</script>
+</body>
+</html>

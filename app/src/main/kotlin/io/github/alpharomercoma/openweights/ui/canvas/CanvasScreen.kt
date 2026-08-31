@@ -18,19 +18,13 @@ package io.github.alpharomercoma.openweights.ui.canvas
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.OpenInBrowser
@@ -46,7 +40,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,8 +49,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import io.github.alpharomercoma.openweights.R
-import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
-import io.github.alpharomercoma.openweights.core.tools.Canvas
 import io.github.alpharomercoma.openweights.core.tools.CanvasKind
 
 /**
@@ -93,13 +84,15 @@ fun CanvasScreen(onBack: () -> Unit, viewModel: CanvasViewModel = hiltViewModel(
                     }
                 },
                 actions = {
-                    if (canvas?.kind == CanvasKind.SITE) {
+                    if (canvas != null) {
                         val context = LocalContext.current
-                        val url = viewModel.urlFor(canvas)
+                        val url = viewModel.viewerUrlFor(canvas)
                         IconButton(
                             onClick = {
                                 // The same loopback URL the WebView reads; any browser on
-                                // this phone can open it while the app is running.
+                                // this phone can open it while the app is running. True
+                                // for all three kinds now: a document and a deck are
+                                // pages the same server serves.
                                 context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
                             },
                         ) {
@@ -122,20 +115,24 @@ fun CanvasScreen(onBack: () -> Unit, viewModel: CanvasViewModel = hiltViewModel(
             )
 
             CanvasKind.SITE -> Site(
-                url = viewModel.urlFor(canvas),
+                url = viewModel.viewerUrlFor(canvas),
                 revision = canvas.revision,
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
 
-            CanvasKind.DOCUMENT -> Document(
-                canvas = canvas,
-                viewModel = viewModel,
+            // Both Markdown kinds are pages too: the bundled viewers lay a document out
+            // as real A4 pages and a deck as 16:9 slides, and the same URL opens in any
+            // browser on the phone. One rendering, two windows.
+            CanvasKind.DOCUMENT -> Site(
+                url = viewModel.viewerUrlFor(canvas),
+                revision = canvas.revision,
+                zoomable = true,
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
 
-            CanvasKind.SLIDES -> Slides(
-                canvas = canvas,
-                viewModel = viewModel,
+            CanvasKind.SLIDES -> Site(
+                url = viewModel.viewerUrlFor(canvas),
+                revision = canvas.revision,
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
         }
@@ -144,7 +141,13 @@ fun CanvasScreen(onBack: () -> Unit, viewModel: CanvasViewModel = hiltViewModel(
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun Site(url: String, revision: Int, modifier: Modifier = Modifier) {
+private fun Site(
+    url: String,
+    revision: Int,
+    modifier: Modifier = Modifier,
+    /** Pinch zoom, for the document viewer: an A4 page reads like a PDF, zoom included. */
+    zoomable: Boolean = false,
+) {
     val view = remember { mutableListOf<WebView>() }
     // System Back walks the site's own history first, the way any browser does; only
     // when there is nowhere left to go back to does it fall through and close the
@@ -160,7 +163,39 @@ private fun Site(url: String, revision: Int, modifier: Modifier = Modifier) {
                 // loopback; scripts are the point of previewing a site.
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                webViewClient = WebViewClient()
+                // Honour the page's own viewport meta, the way every real browser does.
+                // Without this the deck viewer laid out at its stage width — 1280 CSS px —
+                // so its fit-to-screen scale computed to 1 and the slides rendered at
+                // projector size on a phone.
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
+                if (zoomable) {
+                    settings.setSupportZoom(true)
+                    settings.builtInZoomControls = true
+                    settings.displayZoomControls = false
+                }
+                // The server starts in this same process a moment before the first load,
+                // and on a cold start the connect can lose that race once. A failed load
+                // otherwise sits on an error page forever — nothing bumps the revision —
+                // so the main frame retries, briefly and a bounded number of times.
+                webViewClient = object : WebViewClient() {
+                    private var retries = 0
+
+                    override fun onReceivedError(
+                        view: WebView,
+                        request: WebResourceRequest,
+                        error: WebResourceError,
+                    ) {
+                        if (request.isForMainFrame && retries < MAX_LOAD_RETRIES) {
+                            retries++
+                            view.postDelayed({ view.reload() }, RETRY_DELAY_MS)
+                        }
+                    }
+
+                    override fun onPageFinished(view: WebView, url: String?) {
+                        retries = 0
+                    }
+                }
                 view += this
                 loadUrl(url)
             }
@@ -173,89 +208,5 @@ private fun Site(url: String, revision: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * A Markdown deck, one slide per page, swiped like every deck on a phone.
- *
- * Slides are what the file says they are: blocks separated by a line holding only
- * `---`, the Marp and Slidev convention. The pager keeps its page across revisions,
- * clamped, so the model appending a slide or fixing a typo does not throw the reader
- * back to the title; a deck that shrank below the reader's place lands them on the
- * new last slide rather than a blank page.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun Slides(canvas: Canvas, viewModel: CanvasViewModel, modifier: Modifier = Modifier) {
-    val text by viewModel.documentText.collectAsState()
-    LaunchedEffect(canvas.entry, canvas.revision) {
-        viewModel.refreshDocument(canvas)
-    }
-    val slides = remember(text) { text.asSlides() }
-    val pager = rememberPagerState { slides.size }
-    LaunchedEffect(slides.size) {
-        if (pager.currentPage >= slides.size && slides.isNotEmpty()) {
-            pager.scrollToPage(slides.size - 1)
-        }
-    }
-    Column(modifier = modifier) {
-        HorizontalPager(
-            state = pager,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) { index ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                MarkdownText(
-                    content = slides.getOrElse(index) { "" },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-        // The place marker, and the only chrome a deck needs: everything else is swipe.
-        Text(
-            text = stringResource(
-                R.string.slide_position,
-                (pager.currentPage + 1).coerceAtMost(slides.size),
-                slides.size,
-            ),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 12.dp),
-        )
-    }
-}
-
-/**
- * The deck's slides, split on separator lines.
- *
- * Only a line that is exactly `---` (with nothing but whitespace around it) separates:
- * Markdown also uses `---` under a title as a setext underline, but that form never
- * stands after a blank line in practice, and the cost of a wrong split is one odd page
- * where the cost of no split is no deck at all. An empty first block - the file opening
- * with a separator, or YAML front matter fenced by two of them - is dropped rather than
- * shown as a blank title slide.
- */
-internal fun String.asSlides(): List<String> {
-    val blocks = split(SLIDE_BREAK).map { it.trim() }.filter { it.isNotEmpty() }
-    return blocks.ifEmpty { listOf(trim()) }
-}
-
-private val SLIDE_BREAK = Regex("""(?m)^\s*---\s*$""")
-
-@Composable
-private fun Document(canvas: Canvas, viewModel: CanvasViewModel, modifier: Modifier = Modifier) {
-    val text by viewModel.documentText.collectAsState()
-    LaunchedEffect(canvas.entry, canvas.revision) {
-        viewModel.refreshDocument(canvas)
-    }
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()).padding(20.dp),
-    ) {
-        MarkdownText(content = text, modifier = Modifier.fillMaxWidth())
-    }
-}
+private const val MAX_LOAD_RETRIES = 4
+private const val RETRY_DELAY_MS = 600L

@@ -590,6 +590,7 @@ Session * Session::load(
 
     try {
         session->chat_templates_ = common_chat_templates_init(model, "").release();
+        session->probe_thinking_history();
     } catch (const std::exception & failure) {
         // A model's chat template is untrusted data from someone else's repository. A
         // parse failure must surface as an error, not unwind through JNI and take the
@@ -963,8 +964,12 @@ bool Session::render_prompt(
     inputs.enable_thinking = reasoning.enabled;
     // Send a reply's thinking back with it. LFM2.5's template drops thinking from every
     // assistant turn before the last user turn unless this is set, and dropping it is what
-    // breaks the KV cache: see split_thinking above for the measurement.
+    // breaks the KV cache: see split_thinking above for the measurement. Different
+    // template generations named the switch differently — LFM2.5-Thinking's reads
+    // `keep_past_thinking` — and a template ignores the keys it does not know, so both
+    // are always sent.
     inputs.chat_template_kwargs["preserve_thinking"] = "true";
+    inputs.chat_template_kwargs["keep_past_thinking"] = "true";
     if (!reasoning.effort.empty()) {
         // A template argument rather than a field, because only some models read it. The
         // rest ignore the extra key.
@@ -976,8 +981,10 @@ bool Session::render_prompt(
         msg.role = message.role;
         msg.content = message.content;
         // A reply that was thought about has to go back the way it came, or the prefix
-        // stops matching and the whole conversation is read again. See split_thinking.
-        if (message.role == "assistant") {
+        // stops matching and the whole conversation is read again. See split_thinking —
+        // and probe_thinking_history for the templates whose replay needs the opposite:
+        // the block left in the content, verbatim.
+        if (message.role == "assistant" && split_history_thinking_) {
             split_thinking(msg.content, msg.reasoning_content);
         }
         if (!message.tool_call_id.empty()) {
@@ -1289,6 +1296,66 @@ bool Session::ingest_warm(
         }
     }
     return true;
+}
+
+void Session::probe_thinking_history() {
+    auto * templates = static_cast<common_chat_templates *>(chat_templates_);
+    if (templates == nullptr) return;
+
+    static const std::string REASONING = "R7R";
+    static const std::string ANSWER    = "C7C";
+
+    const auto renders = [&](bool split) -> bool {
+        common_chat_templates_inputs inputs;
+        inputs.add_generation_prompt = true;
+        inputs.use_jinja = true;
+        inputs.reasoning_format = COMMON_REASONING_FORMAT_AUTO;
+        inputs.enable_thinking = true;
+        inputs.chat_template_kwargs["preserve_thinking"] = "true";
+        inputs.chat_template_kwargs["keep_past_thinking"] = "true";
+
+        common_chat_msg user;
+        user.role = "user";
+        user.content = "u";
+        common_chat_msg reply;
+        reply.role = "assistant";
+        if (split) {
+            reply.content = ANSWER;
+            reply.reasoning_content = REASONING;
+        } else {
+            reply.content = "<think>" + REASONING + "</think>" + ANSWER;
+        }
+        common_chat_msg again = user;
+        again.content = "v";
+        inputs.messages = {user, reply, again};
+
+        try {
+            const common_chat_params params = common_chat_templates_apply(templates, inputs);
+            // Survival and order, not exact bytes: families decorate the block with
+            // their own newlines, and the sentinels are unique enough that presence
+            // means the history kept the thought. Byte-exactness is what the kv log's
+            // divergence line checks against real traffic.
+            const size_t thought = params.prompt.find(REASONING);
+            const size_t answer  = params.prompt.find(ANSWER);
+            return thought != std::string::npos && answer != std::string::npos &&
+                thought < answer;
+        } catch (const std::exception &) {
+            return false;
+        }
+    };
+
+    if (renders(/*split=*/true)) {
+        split_history_thinking_ = true;
+        return;
+    }
+    if (renders(/*split=*/false)) {
+        split_history_thinking_ = false;
+        LOGI("kv: this template keeps past thinking inline; replaying it verbatim");
+        return;
+    }
+    split_history_thinking_ = true;
+    LOGI("kv: this template drops past thinking; every turn after a thought reply "
+         "re-reads the conversation");
 }
 
 void Session::maybe_snapshot() {

@@ -378,6 +378,20 @@ private:
     /** Writes the current cache — exactly [tokens] — and its state to [path], atomically. */
     void save_warm_file(const char * path, const std::vector<llama_token> & tokens);
 
+    /**
+     * Decides, once per load, how a reply's thinking survives being replayed as history.
+     *
+     * Two shapes exist in the wild and they are mutually exclusive. Templates the lfm2
+     * handler serves, and Qwen3's family, re-emit thinking from `reasoning_content` — for
+     * them the block is split out of the content. LFM2.5-Thinking's template reads the
+     * block *from the content itself* and only keeps it for past turns when its
+     * `keep_past_thinking` kwarg is set — for it the content must go back verbatim.
+     * Guessing wrong either way costs the whole conversation's cache every turn on a
+     * hybrid, so it is probed: a known assistant turn is rendered both ways through the
+     * production path, and whichever reproduces it byte-for-byte wins.
+     */
+    void probe_thinking_history();
+
     /** Snapshots the cache as the warm prefix, on the families that cannot roll back. */
     void maybe_snapshot();
 
@@ -442,6 +456,9 @@ private:
      * Both live for the session and go with it; a re-warm with a different prefix
      * replaces them.
      */
+    /** See [probe_thinking_history]; true is the reasoning_content shape. */
+    bool split_history_thinking_ = true;
+
     std::vector<llama_token> prefix_tokens_;
     std::vector<uint8_t> prefix_state_;
 

@@ -155,6 +155,38 @@ dies in **349 ms keeping 1,024 of 2,197 tokens**, the turn starts **470 ms** aft
 tap (was 26,800), and reads only the remainder. A turn's wait is now bounded by one abort
 landing plus the un-warmed tail, never by the warm's length.
 
+## The thinking model and midnight (2026-09-01, small hours)
+
+"Prefill is taking too long still", on LFM2.5-1.2B-Thinking — and the kv log named two
+separate causes in two lines.
+
+**Midnight.** `kv: diverged at 10 of 2787` — the `Today is …` line, ten tokens into the
+prefix, rendered live. The process outlived the date; every prompt after 00:00 diverged
+at the head; the hybrid paid a full foreground re-read (2,197 tokens for "hi"), and the
+snapshot and the disk file were both yesterday's bytes. Now the day is *pinned*: a
+conversation keeps the day it started with — one stale day being the cheaper wrong, the
+same trade the ExecuTorch template already made — and a fresh chat's warm refreshes the
+pin and reads the new head in the background before anybody types.
+
+**The thinking replay.** `kv: diverged at 2196 … re-reading 25` on every turn: the
+Thinking variant's chat template reads think blocks *from the content* and strips them
+from every past reply unless its own `keep_past_thinking` kwarg is set — it never reads
+`reasoning_content`, and it carries none of the `<|tool_list_*|>` markers that would route
+it to llama.cpp's LFM2 handler. Our render did exactly the wrong two things for it: moved
+the thinking out of content, and passed the instruct-family kwarg. The snapshot restore
+absorbed each miss (99% reuse), but the re-read grew with the conversation.
+
+The fix probes instead of guessing: at load, a known assistant turn is rendered through
+the production path both ways — reasoning split out, and left inline with both kwargs
+sent — and whichever keeps the thought wins. Instruct, Qwen3 and SmolLM3 keep the split
+path; this template selects `kv: this template keeps past thinking inline; replaying it
+verbatim`; a template that drops thinking either way is named in the log. Verified live
+on the phone: two turns on the Thinking model with **no divergence line at all**, and the
+new post-turn warm — which re-renders the conversation after every settled turn, so any
+residual divergence is absorbed between turns rather than in front of the next question —
+reporting `warmed 2 tokens (2395 reused)`: the per-turn byte-stability monitor, reading
+healthy.
+
 ## The warm that outlives the process (2026-08-31, late)
 
 The question that prompted it: can the warm just *be there* at startup? In RAM it cannot

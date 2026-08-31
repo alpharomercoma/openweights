@@ -20,6 +20,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.BatteryManager
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.getSystemService
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -1673,10 +1674,16 @@ class ChatViewModel @Inject constructor(
             val proposed = _uiState.value.transcript.lastOrNull()?.answer.orEmpty()
             turns.planning.propose(proposed)
         }
-        // A fold rewrote the prompt from the root; read the rewritten conversation back
-        // into the cache now, while nobody is waiting, rather than in front of the next
-        // question.
-        if (compactIfNeeded()) warmEngine()
+        compactIfNeeded()
+        // After every settled turn, not only after a fold. A fold rewrites the prompt
+        // from the root; but so, more quietly, does a template that re-renders history
+        // differently from what was decoded — LFM2.5-Thinking's drops the think block
+        // from every prior reply — and the next prompt then diverges from the cache,
+        // which a hybrid pays as a restore-and-re-read that grows with the conversation.
+        // Warmed here, that read happens between turns, in the background, and the next
+        // question extends it; for a byte-stable template the warm meets a cache that
+        // already starts with its bytes and costs one compare.
+        warmEngine()
         notifier.notifyReply(_uiState.value.transcript.lastOrNull()?.answer.orEmpty())
     }
 
@@ -2257,6 +2264,11 @@ class ChatViewModel @Inject constructor(
             // warm rendered under yesterday's answer warms a prompt nobody will send.
             _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
             val state = _uiState.value
+            // The day refreshes only at a fresh chat's warm. A conversation keeps the
+            // day it started with — flipping it mid-conversation is the midnight bug
+            // below — and a new chat after midnight warms the new day in the background
+            // before anybody has typed.
+            if (state.transcript.isEmpty()) PromptDay.refresh()
             val head = state.prefixMessages()
             if (head.isEmpty()) return@launch
             // The same sampler shape a real turn would pass, because thinking flags reach
@@ -3068,6 +3080,35 @@ private fun StagedDocument.asPrompt(): String = buildString {
  * being low means folding early. Sharing a constant made a change for one silently a change
  * for the other.
  */
+/**
+ * The day the prompt claims, pinned.
+ *
+ * Rendered live, midnight silently cost the whole cache: the date sits about ten tokens
+ * into the prefix, every prompt after 00:00 diverged right there, and a hybrid model —
+ * unable to roll back, its snapshot and warm file also holding yesterday's bytes — paid
+ * a full foreground re-read. Measured live: 2,197 tokens for the word "hi", the first
+ * message after midnight. So the day is pinned: a conversation keeps the day it started
+ * with, one stale day being the cheaper wrong (the ExecuTorch template pins for the same
+ * reason), and a fresh chat's warm refreshes it and re-reads the new head in the
+ * background before anybody has typed.
+ */
+internal object PromptDay {
+    @Volatile
+    var pinned: LocalDate = LocalDate.now()
+        private set
+
+    /** Moves the pin to today. Called at a fresh chat's warm; never mid-conversation. */
+    fun refresh() {
+        pinned = LocalDate.now()
+    }
+
+    /** For tests only: makes "the process outlived midnight" a state a test can set up. */
+    @VisibleForTesting
+    fun pin(date: LocalDate) {
+        pinned = date
+    }
+}
+
 /** Warm-state files kept for models other than the loaded one. */
 private const val KEPT_WARM_STORES = 2
 private const val PESSIMISTIC_CHARS_PER_TOKEN = 2
@@ -3391,7 +3432,7 @@ internal fun ChatUiState.prefixMessages(toolPromptOverride: String? = null): Lis
         // tells it what year it is, and it will answer from memory rather than look. Eight
         // tokens, and on the routing set it was most of the difference between eleven right
         // out of twenty four and eighteen.
-        "Today is ${LocalDate.now()}.",
+        "Today is ${PromptDay.pinned}.",
         AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },

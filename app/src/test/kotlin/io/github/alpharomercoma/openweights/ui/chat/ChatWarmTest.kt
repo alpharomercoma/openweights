@@ -119,6 +119,38 @@ class ChatWarmTest : ChatFixture() {
     }
 
     @Test
+    fun `a conversation keeps its day across midnight and a fresh chat picks up the new one`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            viewModel.send("Who is Ada Lovelace?")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // Midnight passes with the process alive and a conversation open. Rendered
+            // live, the date line ten tokens into the prefix diverged every prompt from
+            // the cache, and a hybrid model paid a full foreground re-read for the next
+            // "hi" — the measured incident this pins.
+            val yesterday = java.time.LocalDate.now().minusDays(1)
+            PromptDay.pin(yesterday)
+
+            // A warm fired mid-conversation — a branch here — must not move the day:
+            // the conversation keeps the bytes its cache holds.
+            engine.warmCalls.clear()
+            viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
+            settle(steps = FOLD_SETTLE_STEPS)
+            assertThat(PromptDay.pinned).isEqualTo(yesterday)
+            assertThat(
+                engine.warmCalls.first().messages.first().text,
+            ).contains("Today is $yesterday.")
+
+            // A fresh chat is a new start: its warm moves the pin and reads the new
+            // head in the background, before anybody has typed.
+            viewModel.newChat()
+            settle(steps = FOLD_SETTLE_STEPS)
+            assertThat(PromptDay.pinned).isEqualTo(java.time.LocalDate.now())
+        }
+
+    @Test
     fun `the head warm persists to a model-keyed file and the conversation warm never does`() =
         runTest(dispatcher) {
             loadModel()
@@ -202,6 +234,8 @@ class ChatWarmTest : ChatFixture() {
             engine.warmCalls.clear()
             viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
             settle(steps = FOLD_SETTLE_STEPS)
+            // Captured before the send: settling the next turn warms again, post-turn.
+            val warmed = engine.warmCalls.last().messages
 
             engine.scripted += ScriptedPass("She was born in 1815.")
             viewModel.send("When was she born?")
@@ -210,7 +244,6 @@ class ChatWarmTest : ChatFixture() {
             // Everything the warm read is reused by the send, and the send adds exactly
             // one thing: the question. This equality is the entire mechanism — the warm
             // is only worth its battery if these bytes match.
-            val warmed = engine.warmCalls.last().messages
             val prompt = engine.prompts.last()
             warmed.forEachIndexed { index, message ->
                 assertThat(prompt[index].role).isEqualTo(message.role)

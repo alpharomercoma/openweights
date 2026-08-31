@@ -66,6 +66,15 @@ internal fun Project.configureAndroidCommon(extension: CommonExtension) {
     extension.testOptions.unitTests.isIncludeAndroidResources = true
     extension.testOptions.unitTests.isReturnDefaultValues = true
 
+    // The whole assertion, in the console. A CI failure used to print one line — the test
+    // name and a ComparisonFailure class — and diagnosing a runner-only failure meant
+    // guessing; the report files it pointed at are not uploaded when the build dies.
+    extension.testOptions.unitTests.all { test ->
+        test.testLogging.events("failed")
+        test.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        test.testLogging.setShowStackTraces(true)
+    }
+
     extensions.getByType<KotlinAndroidProjectExtension>().compilerOptions {
         jvmTarget.set(BuildConfig.JVM_TARGET)
         freeCompilerArgs.addAll("-Xconsistent-data-class-copy-visibility")

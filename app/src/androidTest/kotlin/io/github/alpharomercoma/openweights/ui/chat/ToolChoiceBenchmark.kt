@@ -437,8 +437,7 @@ class ToolChoiceBenchmark {
     /** Assembled the way ChatViewModel assembles it, or it is not the app. The date is
      * deliberately absent: it left the instructions so the warmed head stays byte-stable
      * across midnight, and rides as [dateExchange] instead. */
-    private fun system(): String =
-        "$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
+    private fun system(): String = "$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
 
     /** The acknowledged exchange ChatViewModel opens every conversation with. */
     private fun dateExchange(): List<ChatMessage> = listOf(

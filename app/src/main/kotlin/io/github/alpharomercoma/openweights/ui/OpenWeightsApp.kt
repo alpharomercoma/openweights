@@ -193,6 +193,8 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             }
 
             ChatScreen(
+                canvasActive = canvasShowing != null,
+                onOpenCanvas = { navController.push(Routes.CANVAS) },
                 state = state,
                 onSend = chatViewModel::send,
                 onStop = {

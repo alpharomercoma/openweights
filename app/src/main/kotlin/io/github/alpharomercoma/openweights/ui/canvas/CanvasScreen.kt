@@ -20,6 +20,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -134,6 +135,12 @@ fun CanvasScreen(onBack: () -> Unit, viewModel: CanvasViewModel = hiltViewModel(
 @Composable
 private fun Site(url: String, revision: Int, modifier: Modifier = Modifier) {
     val view = remember { mutableListOf<WebView>() }
+    // System Back walks the site's own history first, the way any browser does; only
+    // when there is nowhere left to go back to does it fall through and close the
+    // canvas. The toolbar arrow always closes — two exits, two meanings.
+    BackHandler(enabled = view.firstOrNull()?.canGoBack() == true) {
+        view.firstOrNull()?.goBack()
+    }
     AndroidView(
         modifier = modifier,
         factory = { context ->

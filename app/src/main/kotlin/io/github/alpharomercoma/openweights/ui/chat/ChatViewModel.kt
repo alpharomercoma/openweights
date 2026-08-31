@@ -477,7 +477,11 @@ data class ChatUiState(
             val fallback = backend ?: return null
             val read = reads.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
             val write = writes.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
-            return if (read == write) read else "reads $read · writes $write"
+            // Compact on purpose: this line ellipsizes at small widths, and
+            // "reads GPU · writes…" hides exactly the half the split exists to say.
+            // Read → write, seven characters, never truncated; the settings sheet
+            // carries the full words.
+            return if (read == write) read else "$read→$write"
         }
 
     /**

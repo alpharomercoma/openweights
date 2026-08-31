@@ -94,6 +94,7 @@ internal object WebsiteBuild {
         )
 
         var rounds = 0
+        var nudged = false
         while (rounds < MAX_ROUNDS && shown == null) {
             rounds += 1
             val events = engine.chat(messages, PARAMS, TOOLS).toList()
@@ -102,7 +103,20 @@ internal object WebsiteBuild {
                 .joinToString("") { it.text }
             messages += ChatMessage.text(ChatRole.ASSISTANT, raw.ifEmpty { done.content })
 
-            if (done.toolCalls.isEmpty()) break
+            if (done.toolCalls.isEmpty()) {
+                // The page exists but the model answered in prose instead of showing it.
+                // A person would say "show it, then" once; the loop is allowed the same
+                // single nudge, and only that.
+                if (!nudged && File(site, "index.html").isFile) {
+                    nudged = true
+                    messages += ChatMessage.text(
+                        ChatRole.USER,
+                        "Now call show_website with the page's path.",
+                    )
+                    continue
+                }
+                break
+            }
             done.toolCalls.forEach { call ->
                 val result = execute(call, site) { shown = it }
                 Log.i(TAG, "round $rounds ${call.name} -> $result")
@@ -153,6 +167,10 @@ internal object WebsiteBuild {
     private suspend fun renderedElementCount(page: File): Int {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val counted = CompletableDeferred<Int>()
+        // Handed to the view as data rather than as a file:// URL, which modern WebViews
+        // refuse by default — the app's own canvas serves over loopback HTTP for the same
+        // reason. What is being verified is the page, not the transport.
+        val html = page.readText()
         instrumentation.runOnMainSync {
             val web = WebView(instrumentation.targetContext)
             web.settings.javaScriptEnabled = true
@@ -163,7 +181,7 @@ internal object WebsiteBuild {
                     }
                 }
             }
-            web.loadUrl("file://${page.absolutePath}")
+            web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
         }
         return withTimeout(RENDER_TIMEOUT_MS) { counted.await() }
     }

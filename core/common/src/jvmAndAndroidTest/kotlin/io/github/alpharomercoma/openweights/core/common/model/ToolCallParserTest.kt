@@ -200,6 +200,18 @@ class ToolCallParserTest {
     }
 
     @Test
+    fun `two envelopes in one reply are two calls`() {
+        val raw = """<tool_call>{"name": "web_search", "arguments": {"query": "a"}}</tool_call>
+<tool_call>{"name": "get_weather", "arguments": {"city": "Manila"}}</tool_call>"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.map { it.name })
+            .containsExactly("web_search", "get_weather")
+            .inOrder()
+    }
+
+    @Test
     fun `a bare object without parameters stays prose`() {
         val raw = """{"name": "Alice", "age": 30}"""
 

@@ -129,3 +129,28 @@ never a fabrication unique to one runtime.
   largest untrusted-input surface, inherent to the feature and shared with the GGUF
   path; the mitigations are source choice (user-selected repos) and hash verification
   where the Hub provides it.
+
+## Codex audit: fixed now vs recorded for later
+
+A second adversarial audit (codex, full source read against the vendored templates)
+found eleven issues. Seven are fixed with regression tests in the same change: the
+JSON re-indenter's escape handling (`\"` closed the string), `model.pte` name
+collisions across sizes of one repository, LFM's thinking toggle that changed nothing,
+prefix instability that silently cost the KV cache (history trims and midnight date
+changes — history is now verbatim and the date pinned per session), vision/coder/guard
+variants riding a base family's name, the root-tokenizer borrow when sizes have their
+own, and multi-call replies of which only the first call was read.
+
+Recorded, deliberately not done here:
+
+- **Revision pinning.** Downloads resolve `main`, and non-LFS files carry no hash, so
+  a republished tokenizer could pair with older weights. The fix is an install
+  manifest pinned to a commit — real work, planned, not a regression of this change.
+- **ExecuTorch position accounting.** `contextUsed` reports zero and the committed
+  position after a stopped turn is inferred, not read. Multi-turn reuse is measured
+  correct on device (27× prefill), but a probe that asserts the runtime's own position
+  is the right next test.
+- **GGUF display-name cosmetics** (bidi and control characters in Hub filenames) —
+  pre-existing, display-layer only, no traversal.
+- **Llama with tools and no user turn** renders schemas nowhere; the app cannot reach
+  that state (a turn always has a user message), noted for the day something else can.

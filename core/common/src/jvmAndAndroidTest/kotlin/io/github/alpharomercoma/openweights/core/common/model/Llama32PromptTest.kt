@@ -94,6 +94,23 @@ class Llama32PromptTest {
         assertThat(rendered).isEqualTo(Llama32PromptFixtures.MULTI_TURN)
     }
 
+    @Test
+    fun `a schema with escaped quotes survives the reindent`() {
+        // codex QA: the walker cleared its escape state before deciding whether a quote
+        // closed the string, so \" ended it and later punctuation became structure.
+        val tricky = ToolDefinition(
+            name = "web_search",
+            description = """Search for "café: météo", quoted.""",
+            parametersJson = """{"type": "object", "properties": {"q": """ +
+                """{"type": "string", "description": "say \"hi\", then: go"}}, """ +
+                """"required": ["q"]}""",
+        )
+
+        val rendered = render(listOf(user("Weather?")), listOf(tricky))
+
+        assertThat(rendered).contains("""say \"hi\", then: go""")
+    }
+
     private fun render(messages: List<ChatMessage>, tools: List<ToolDefinition> = emptyList()) =
         Llama32Prompt.render(messages, tools, date = FIXTURE_DATE)
 

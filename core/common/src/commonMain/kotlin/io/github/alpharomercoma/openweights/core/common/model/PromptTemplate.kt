@@ -92,8 +92,12 @@ object PromptTemplates {
      */
     fun forModel(fileName: String): PromptTemplate? {
         val name = fileName.lowercase().filter { it.isLetterOrDigit() }
+        // Variants whose protocol differs from the base family's, refused before the
+        // family token can claim them: a vision or coder export is not a text-chat
+        // model wearing a longer name (codex QA). Qwen3.5 normalises onto "qwen3" the
+        // same way, so it sits in the same refusal.
+        if (EXCLUDED.any { it in name }) return null
         return when {
-            "qwen35" in name -> null
             "qwen3" in name -> Qwen3Template
             "qwen25" in name -> Qwen25Template
             "smollm2" in name -> SmolLm2Template
@@ -105,6 +109,8 @@ object PromptTemplates {
             else -> null
         }
     }
+
+    private val EXCLUDED = listOf("vl", "vision", "coder", "guard", "qwen35")
 
     /** Families this build can render, for an error message that tells the user something. */
     val known: List<String> = listOf(
@@ -179,11 +185,22 @@ private object SmolLm3Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf(IM_END)
     override val supportsThinking: Boolean = true
 
+    // Pinned at first use rather than read per turn: the date is in the system block,
+    // the system block is the cache's first bytes, and midnight was silently costing the
+    // whole cache mid-conversation (codex QA). One stale day is the cheaper wrong.
+    private val pinnedDate: String by lazy { promptDateToday().asSmolLm3Date() }
+
     override fun render(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         thinking: Boolean,
-    ): String = SmolLm3Prompt.render(messages, tools, thinking)
+    ): String = SmolLm3Prompt.render(
+        messages,
+        tools,
+        thinking,
+        date = pinnedDate,
+        verbatimHistory = true,
+    )
 }
 
 /**
@@ -199,11 +216,19 @@ private object Llama32Template : PromptTemplate {
     override val stopMarkers: List<String> =
         listOf("<|eot_id|>", "<|eom_id|>", "<|end_of_text|>")
 
+    private val pinnedDate: String by lazy { promptDateToday().asLlamaDate() }
+
     override fun render(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         thinking: Boolean,
-    ): String = Llama32Prompt.render(messages, tools, includeBos = false)
+    ): String = Llama32Prompt.render(
+        messages,
+        tools,
+        date = pinnedDate,
+        includeBos = false,
+        verbatimHistory = true,
+    )
 }
 
 /** [Phi4Prompt] as a [PromptTemplate]. */
@@ -226,7 +251,7 @@ private object Gemma3Template : PromptTemplate {
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         thinking: Boolean,
-    ): String = Gemma3Prompt.render(messages, includeBos = false)
+    ): String = Gemma3Prompt.render(messages, includeBos = false, verbatimHistory = true)
 }
 
 /**
@@ -236,7 +261,11 @@ private object Gemma3Template : PromptTemplate {
  */
 private object Lfm25Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf(IM_END)
-    override val supportsThinking: Boolean = true
+
+    // LFM does think, but its template offers no switch for it — the model decides on
+    // its own. Declaring support here put a toggle on screen that changed nothing
+    // (codex QA), and a control that does nothing is worse than no control.
+    override val supportsThinking: Boolean = false
 
     override fun render(
         messages: List<ChatMessage>,

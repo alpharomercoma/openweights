@@ -59,6 +59,12 @@ class PromptTemplatesTest {
         assertThat(PromptTemplates.forModel("react-native-executorch-qwen-3.5.pte")).isNull()
         assertThat(PromptTemplates.forModel("react-native-executorch-gemma-4.pte")).isNull()
         assertThat(PromptTemplates.forModel("react-native-executorch-bielik-v3.0.pte")).isNull()
+        // Variants whose protocol differs from the base family's: the family token is in
+        // the name, and the template would still be wrong (codex QA).
+        assertThat(PromptTemplates.forModel("Qwen2.5-VL-3B-Instruct.pte")).isNull()
+        assertThat(PromptTemplates.forModel("Qwen3-Coder-Next.pte")).isNull()
+        assertThat(PromptTemplates.forModel("Llama-3.2-11B-Vision-Instruct.pte")).isNull()
+        assertThat(PromptTemplates.forModel("Llama-Guard-3-1B-INT4.pte")).isNull()
     }
 
     @Test

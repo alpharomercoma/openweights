@@ -59,7 +59,16 @@ object ExecuTorchFileName {
         } else {
             file
         }
+        // A generic `model.pte` says nothing, but its folder does: a repository holding
+        // `1b/model.pte` and `3b/model.pte` would otherwise install both under one name
+        // and the second download would silently replace the first (codex QA). The root
+        // `model.pte` keeps the bare repository name, which is what every model already
+        // installed was saved as.
+        val directory = weightsPath.substringBeforeLast('/', "")
+            .takeIf { it.isNotEmpty() }
+            ?.sanitized()
         val distinct = stem.sanitized().takeIf { it.isNotEmpty() && !it.equals("model", true) }
+            ?: directory
         return when (distinct) {
             null -> repo + ModelFormat.PTE.suffix
             else -> "$repo-$distinct" + ModelFormat.PTE.suffix

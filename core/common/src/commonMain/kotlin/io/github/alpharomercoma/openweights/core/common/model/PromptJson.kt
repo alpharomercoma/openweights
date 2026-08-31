@@ -100,9 +100,15 @@ private class JsonWalker(
 
     private fun stringCharacter(character: Char) {
         out.append(character)
-        escaped = !escaped && character == '\\'
-        if (character == '"' && !escaped) inString = false
-        if (character != '\\') escaped = false
+        when {
+            // The order is the bug this replaced: deciding whether a quote closes the
+            // string must read the escape state the *previous* character left, not the
+            // state this one is about to write. `\"` closed the string and everything
+            // after it was treated as structure.
+            escaped -> escaped = false
+            character == '\\' -> escaped = true
+            character == '"' -> inString = false
+        }
     }
 
     private fun open(character: Char) {

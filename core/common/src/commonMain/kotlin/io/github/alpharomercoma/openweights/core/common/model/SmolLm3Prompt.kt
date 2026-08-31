@@ -42,6 +42,8 @@ object SmolLm3Prompt {
         thinking: Boolean = true,
         addGenerationPrompt: Boolean = true,
         date: String = promptDateToday().asSmolLm3Date(),
+        /** Emit assistant turns exactly as stored; see Llama32Prompt for why. */
+        verbatimHistory: Boolean = false,
     ): String = buildString {
         val system = messages.firstOrNull()?.takeIf { it.role == ChatRole.SYSTEM }?.text
         // The system message outranks the parameter, and /no_think outranks /think —
@@ -89,7 +91,8 @@ object SmolLm3Prompt {
                 ChatRole.ASSISTANT -> {
                     append("<|im_start|>assistant\n")
                     if (mode == NO_THINK) append("<think>\n\n</think>\n")
-                    append(message.text.trimStart('\n')).append("<|im_end|>\n")
+                    val text = if (verbatimHistory) message.text else message.text.trimStart('\n')
+                    append(text).append("<|im_end|>\n")
                 }
 
                 ChatRole.SYSTEM -> Unit

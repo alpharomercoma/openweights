@@ -38,6 +38,8 @@ object Gemma3Prompt {
         messages: List<ChatMessage>,
         addGenerationPrompt: Boolean = true,
         includeBos: Boolean = true,
+        /** Emit assistant turns exactly as stored; see Llama32Prompt for why. */
+        verbatimHistory: Boolean = false,
     ): String = buildString {
         if (includeBos) append("<bos>")
         val leadingSystem = messages.firstOrNull()?.takeIf { it.role == ChatRole.SYSTEM }
@@ -49,7 +51,9 @@ object Gemma3Prompt {
                 // The prefix is spliced untrimmed — the template only trims turn content.
                 append(leadingSystem.text).append("\n\n")
             }
-            append(message.text.trim()).append("<end_of_turn>\n")
+            val keepRaw = verbatimHistory && message.role == ChatRole.ASSISTANT
+            append(if (keepRaw) message.text else message.text.trim())
+            append("<end_of_turn>\n")
         }
         if (addGenerationPrompt) append("<start_of_turn>model\n")
     }

@@ -35,6 +35,15 @@ class ExecuTorchFileNameTest {
     }
 
     @Test
+    fun `a generic model file in a folder takes the folder's name`() {
+        // codex QA: a repository holding 1b/model.pte and 3b/model.pte installed both
+        // under one name, and the second download silently replaced the first.
+        val name = ExecuTorchFileName.modelNameFor("someone/two-sizes", "3b/xnnpack/model.pte")
+
+        assertThat(name).isEqualTo("two-sizes-3b-xnnpack.pte")
+    }
+
+    @Test
     fun `the official single model file keeps the repository name alone`() {
         // What every already-installed model was saved as, so it must not change.
         assertThat(ExecuTorchFileName.modelNameFor("pytorch/Qwen3-1.7B-INT8-INT4", "model.pte"))

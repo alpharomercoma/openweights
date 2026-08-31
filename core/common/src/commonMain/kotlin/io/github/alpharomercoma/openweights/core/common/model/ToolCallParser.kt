@@ -57,20 +57,31 @@ object ToolCallParser {
 
     /** `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`: Hermes and friends. */
     private fun parseTaggedJson(raw: String): ParsedToolCalls? {
-        val start = raw.indexOf(JSON_START)
-        if (start < 0) return null
-        val end = raw.indexOf(JSON_END, start)
-        if (end < 0) return null
-
-        val body = raw.substring(start + JSON_START.length, end).trim()
-        val name = body.jsonStringField("name") ?: return null
-        val arguments = body.jsonObjectField("arguments") ?: "{}"
-
-        val text = (raw.take(start) + raw.substring(end + JSON_END.length)).trim()
-        return ParsedToolCalls(
-            text,
-            listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
-        )
+        val calls = mutableListOf<ToolCall>()
+        val text = StringBuilder()
+        var cursor = 0
+        // Every envelope, not the first: a model asked for two things calls twice in one
+        // reply, and reading one of them ran half the errand (codex QA).
+        var start = raw.indexOf(JSON_START)
+        while (start >= 0) {
+            val end = raw.indexOf(JSON_END, start)
+            if (end < 0) break
+            val body = raw.substring(start + JSON_START.length, end).trim()
+            val name = body.jsonStringField("name")
+            if (name != null) {
+                val arguments = body.jsonObjectField("arguments") ?: "{}"
+                calls +=
+                    ToolCall(id = "$name-${calls.size}", name = name, argumentsJson = arguments)
+                text.append(raw, cursor, start)
+            } else {
+                text.append(raw, cursor, end + JSON_END.length)
+            }
+            cursor = end + JSON_END.length
+            start = raw.indexOf(JSON_START, cursor)
+        }
+        if (calls.isEmpty()) return null
+        text.append(raw, cursor, raw.length)
+        return ParsedToolCalls(text.toString().trim(), calls)
     }
 
     /**

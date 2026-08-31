@@ -61,6 +61,18 @@ class HubTokenizerTest {
     }
 
     @Test
+    fun `a nested model never borrows the root tokenizer when sizes have their own`() {
+        // codex QA: the borrow loads fine and speaks noise. With scoped tokenizers in
+        // the repository, a size without its own fails closed instead.
+        val detail = detail(
+            compiled = listOf("7b/xnnpack/new_size.pte"),
+            tokenizers = listOf("tokenizer.json", "1_2b/tokenizer.json"),
+        )
+
+        assertThat(detail.tokenizerFor(detail.compiled.first())).isNull()
+    }
+
+    @Test
     fun `the JSON form outranks the model form beside the same file`() {
         val detail = detail(
             compiled = listOf("model.pte"),

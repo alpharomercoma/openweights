@@ -227,12 +227,21 @@ data class HubModelDetail(
             val directory = tokenizer.path.substringBeforeLast('/', "")
             directory.isEmpty() || weights.path.startsWith("$directory/")
         }
-        return candidates.maxWithOrNull(
+        // Scoped tokenizers existing anywhere in the repository means sizes have their
+        // own vocabularies. A weights file in a folder with no tokenizer of its own must
+        // then fail closed rather than borrow the root one: the borrow loads fine and
+        // speaks noise (codex QA). The root file stays the answer only for weights at
+        // the root, or when it is all the repository has.
+        val scoped = tokenizers.any { '/' in it.path }
+        val best = candidates.maxWithOrNull(
             compareBy(
                 { it.path.count { character -> character == '/' } },
                 { -ExecuTorchFileName.REMOTE_TOKENIZERS.indexOf(it.path.substringAfterLast('/')) },
             ),
-        )
+        ) ?: return null
+        val bestIsRoot = '/' !in best.path
+        val weightsNested = '/' in weights.path
+        return best.takeUnless { scoped && bestIsRoot && weightsNested }
     }
 
     /** The projector for the file the user is most likely to take: the first listed. */

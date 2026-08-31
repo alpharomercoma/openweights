@@ -39,6 +39,13 @@ object Llama32Prompt {
         addGenerationPrompt: Boolean = true,
         date: String = promptDateToday().asLlamaDate(),
         includeBos: Boolean = true,
+        /**
+         * Emit assistant turns exactly as stored instead of trimmed. The template's trim
+         * is cosmetic; the KV cache's memory of what was generated is not, and a reply
+         * that happened to end in a newline was being re-rendered without it, which made
+         * the next prompt no longer an extension of the cache (codex QA).
+         */
+        verbatimHistory: Boolean = false,
     ): String = buildString {
         if (includeBos) append("<|begin_of_text|>")
 
@@ -71,9 +78,11 @@ object Llama32Prompt {
                 // iterable, and a string is iterable as far as Jinja is concerned.
                 append(message.text.jsonQuoted()).append("<|eot_id|>")
             } else {
+                val keepRaw = verbatimHistory && message.role == ChatRole.ASSISTANT
                 append("<|start_header_id|>").append(message.role.wireName)
                 append("<|end_header_id|>\n\n")
-                append(message.text.trim()).append("<|eot_id|>")
+                append(if (keepRaw) message.text else message.text.trim())
+                append("<|eot_id|>")
             }
         }
 

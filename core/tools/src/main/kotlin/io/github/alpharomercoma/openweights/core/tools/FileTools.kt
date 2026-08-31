@@ -301,7 +301,16 @@ class WriteFileTool @Inject constructor(
                     "$MAX_WRITE_CHARS characters, or save it in parts.",
             )
         }
-        val written = workspace.put(path, content, replace = call.flag("replace", "overwrite"))
+        // A file this same session created is the model's own scratch, and editing it is
+        // the iteration loop working - deck, document, site, saved again after each turn.
+        // Requiring the flag there was measured stalling exactly that loop: asked to add
+        // a slide "with replace", greedy Qwen3 omitted the flag, read the refusal, and
+        // moved on instead of retrying, so the deck on screen never changed. The user's
+        // own files keep the flag: overwriting what the session did not create destroys
+        // content nothing here can put back, and stays behind both the flag and the
+        // approval above.
+        val replace = call.flag("replace", "overwrite") || artifacts.isOwn(path)
+        val written = workspace.put(path, content, replace = replace)
         if (written.successful) {
             artifacts.created(path)
             // The canvas is watching: a save under what it shows repaints the screen.

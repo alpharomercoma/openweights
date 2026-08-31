@@ -100,8 +100,14 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
-                imageVector = when (step) {
-                    is AgentStep.Skipped -> Icons.Rounded.Block
+                // A refused call is not a done call. The tick on every Ran step, refusals
+                // included, sent a whole debugging session the wrong way: "show slides ·
+                // 0.0s ✓" was a rejection wearing a success mark. Refusals get the same
+                // block mark a skip does, because to the user they are the same news -
+                // this did not happen.
+                imageVector = when {
+                    step is AgentStep.Skipped -> Icons.Rounded.Block
+                    step is AgentStep.Ran && !step.successful -> Icons.Rounded.Block
                     else -> Icons.Rounded.Check
                 },
                 contentDescription = null,

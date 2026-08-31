@@ -36,15 +36,20 @@ import javax.inject.Singleton
 /**
  * What to tell the provider a new file is, worked out from its name.
  *
- * A guess, and a deliberately dull one. Providers use this to decide the icon and sometimes
- * whether to accept the file at all, and plain text is the reading least likely to be
- * refused by any of them.
+ * Not a nicety: providers use this to decide whether the display name needs an extension
+ * *appended*. ExternalStorageProvider asks the platform MIME map what extension fits the
+ * declared type, and a name whose extension does not match gets the "right" one glued on.
+ * Declaring everything text/plain is how `slides.md` came back as `slides.md.txt` on a
+ * real device - and then the replace path could not find `slides.md` and saved a
+ * `slides.md (1).txt` beside it, so the deck the canvas was pointed at never changed. So
+ * the type is asked of the same platform map the provider consults, extension for
+ * extension, and a name the map does not know is declared a plain byte stream, which no
+ * provider decorates.
  */
-private fun mediaTypeFor(name: String): String = when (name.substringAfterLast('.', "")) {
-    "json" -> "application/json"
-    "csv" -> "text/csv"
-    "html", "htm" -> "text/html"
-    else -> "text/plain"
+private fun mediaTypeFor(name: String): String {
+    val extension = name.substringAfterLast('.', "").lowercase()
+    return android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        ?: "application/octet-stream"
 }
 
 internal fun Reader.readAsMuchAs(buffer: CharArray): Int {
@@ -214,6 +219,27 @@ class Workspace @Inject constructor(
             }.getOrNull()
         }
 
+    /** The name the provider actually stored, which is not always the one asked for. */
+    private suspend fun displayNameOf(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.query(
+                uri,
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+        }.getOrNull()
+    }
+
+    /** Asks the provider to rename a document, returning the name it ends up with. */
+    private suspend fun rename(uri: Uri, to: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            DocumentsContract.renameDocument(context.contentResolver, uri, to)
+                ?.let { renamed -> displayNameOf(renamed) ?: to }
+        }.getOrNull()
+    }
+
     /**
      * Reads a window of a document without pulling the rest of it into memory.
      *
@@ -370,6 +396,28 @@ class Workspace @Inject constructor(
             ?: return ToolExecution.failure(
                 "$path could not be created. The folder may not accept new files.",
             )
+        // The belt to the media type's braces: a provider that still decorated the name
+        // is asked to change it back. Verified rather than assumed, because the file the
+        // model just told the user about has to exist under the name it said - the canvas
+        // resolves that exact path, and a silently renamed file is a deck that never
+        // updates. A provider that refuses the rename keeps the decorated name, and the
+        // save says so instead of claiming a path that is not there.
+        val actual = displayNameOf(uri)
+        val served = if (actual != null && actual != name) {
+            rename(uri, name) ?: actual
+        } else {
+            name
+        }
+        if (served != name) {
+            return if (write(uri, text)) {
+                ToolExecution(
+                    "Saved ${text.length} characters, but the folder stored it as " +
+                        "\"$served\" rather than \"$name\". Use that name.",
+                )
+            } else {
+                ToolExecution.failure("$path was created but nothing could be written into it.")
+            }
+        }
         return if (write(uri, text)) {
             ToolExecution("Saved ${text.length} characters to $path.")
         } else {

@@ -23,7 +23,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** What kind of thing the canvas is showing. */
-enum class CanvasKind { SITE, DOCUMENT }
+enum class CanvasKind { SITE, DOCUMENT, SLIDES }
 
 /**
  * Something the model has put on screen: a site being built, or a document being written.

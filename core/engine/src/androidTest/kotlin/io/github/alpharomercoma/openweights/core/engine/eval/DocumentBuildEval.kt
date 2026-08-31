@@ -108,6 +108,71 @@ class DocumentBuildEval {
         assertThat(shown).isNotNull()
     }
 
+    /**
+     * The iteration: the document on screen is asked to grow, in the same conversation,
+     * and the edit has to keep what was already written. A canvas the model can only
+     * write once is a screenshot.
+     */
+    @Test
+    fun editsTheDocumentItAlreadyShowed(): Unit = runBlocking {
+        val model = WebsiteBuild.EVAL_DIR
+            .listFiles { file -> file.name == GGUF_BUILDER }?.firstOrNull()
+        assumeTrue("no $GGUF_BUILDER in ${WebsiteBuild.EVAL_DIR}", model != null)
+
+        val folder = InstrumentationRegistry.getInstrumentation()
+            .targetContext.filesDir.resolve("e2e-doc-edit").apply {
+                deleteRecursively()
+                mkdirs()
+            }
+
+        var shown: String? = null
+        val messages = mutableListOf(ChatMessage.text(ChatRole.USER, ASK))
+
+        LlamaCppEngine().use { engine ->
+            engine.load(model!!, ModelLoadParams(contextLength = 8192))
+            loop(engine, messages, folder) { shown = it }
+            val before = File(folder, "notes.md").readText()
+
+            messages += ChatMessage.text(
+                ChatRole.USER,
+                "Now add a section about Earth's moon to the end of the same document. " +
+                    "Keep every existing section, save it over notes/notes.md with replace.",
+            )
+            loop(engine, messages, folder) { shown = it }
+
+            val after = File(folder, "notes.md").readText()
+            Log.i(TAG, "edit: ${before.length} -> ${after.length} chars")
+            assertThat(after.length).isGreaterThan(before.length)
+            assertThat(after.lowercase()).contains("moon")
+            // The edit extended the document rather than replacing it with the new part.
+            assertThat(after.lowercase()).contains("mercury")
+        }
+    }
+
+    private suspend fun loop(
+        engine: LlamaCppEngine,
+        messages: MutableList<ChatMessage>,
+        folder: File,
+        onShow: (String) -> Unit,
+    ) {
+        var rounds = 0
+        var acted = true
+        while (rounds < MAX_ROUNDS && acted) {
+            rounds += 1
+            val events = engine.chat(messages, WebsiteBuild.PARAMS, TOOLS).toList()
+            val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+            val raw = events.filterIsInstance<GenerationEvent.Token>()
+                .joinToString("") { it.text }
+            messages += ChatMessage.text(ChatRole.ASSISTANT, raw.ifEmpty { done.content })
+            acted = done.toolCalls.isNotEmpty()
+            done.toolCalls.forEach { call ->
+                val result = execute(call, folder, onShow)
+                Log.i(TAG, "round $rounds ${call.name} -> ${result.take(80)}")
+                messages += ChatMessage.toolResult(call.name, result)
+            }
+        }
+    }
+
     private fun execute(call: ToolCall, folder: File, onShow: (String) -> Unit): String {
         val arguments = org.json.JSONObject(call.argumentsJson.ifBlank { "{}" })
         return when (call.name) {

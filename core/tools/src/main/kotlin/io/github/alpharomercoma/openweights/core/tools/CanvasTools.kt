@@ -145,6 +145,64 @@ class ShowDocumentTool @Inject constructor(
 }
 
 /**
+ * Puts a slide deck the model is writing on screen, one slide at a time, live.
+ *
+ * The third canvas kind, and deliberately the same medium as the second: a deck is a
+ * Markdown file whose slides are separated by --- lines, which is the convention every
+ * slide-from-Markdown tool (Marp, reveal.js, Slidev) settled on and the one small models
+ * already know. One file means the iteration loop is the document's: the model saves with
+ * replace, the canvas bumps, and the deck on screen updates without losing the reader's
+ * place.
+ */
+@Singleton
+class ShowSlidesTool @Inject constructor(
+    private val workspace: Workspace,
+    private val board: CanvasBoard,
+) : Tool {
+    override val definition = ToolDefinition(
+        name = "show_slides",
+        description = "Show a Markdown file as a slide deck the user swipes through. " +
+            "Separate slides with a line containing only ---. Call it once after the " +
+            "first save; later saves with replace update the deck live.",
+        parametersJson = """
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "The Markdown deck to show, like talk/slides.md"
+                }
+              },
+              "required": ["path"]
+            }
+        """.trimIndent(),
+    )
+
+    override val isAvailable: Boolean get() = workspace.isReady
+
+    override val chains: Boolean = true
+
+    override val builds: Boolean = true
+
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution {
+        workspace.refusal()?.let { return it }
+        val path = call.argument("path", "file", "deck")
+            ?: return ToolExecution.rejected("No path was given. Which deck?")
+        val entry = workspace.resolve(path)
+        return when {
+            entry == null -> ToolExecution.rejected("There is no $path. Save the deck first.")
+            entry.isDirectory -> ToolExecution.rejected("$path is a folder, not a deck.")
+            else -> {
+                board.show(CanvasKind.SLIDES, path, path.substringBeforeLast('/', ""))
+                ToolExecution("Showing $path as slides. Saves with replace update it live.")
+            }
+        }
+    }
+}
+
+/**
  * Removes a file or folder from the shared folder.
  *
  * The missing quarter of create, read and update. Asks before touching anything the user

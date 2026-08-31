@@ -33,6 +33,7 @@ import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.ShowDocumentTool
+import io.github.alpharomercoma.openweights.core.tools.ShowSlidesTool
 import io.github.alpharomercoma.openweights.core.tools.ShowWebsiteTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WatchTool
@@ -74,6 +75,7 @@ object ToolsModule {
         deleteFile: DeleteFileTool,
         showWebsite: ShowWebsiteTool,
         showDocument: ShowDocumentTool,
+        showSlides: ShowSlidesTool,
         runScript: RunScriptTool,
         advance: AdvanceTool,
         askUser: AskUserTool,
@@ -84,7 +86,7 @@ object ToolsModule {
     ): ToolRegistry = ToolRegistry(
         listOf(
             search, media, fetch, searchFiles, readFile, writeFile, deleteFile,
-            showWebsite, showDocument, runScript,
+            showWebsite, showDocument, showSlides, runScript,
             advance, askUser, watch, remember,
         ),
     )

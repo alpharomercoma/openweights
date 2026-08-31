@@ -253,6 +253,38 @@ class AgentRunnerTest {
     }
 
     @Test
+    fun `a write clears refusals because the world they described is gone`() = runTest {
+        // Watched live: show_slides refused for a missing file, the model then *created*
+        // the file, and the retry was memo-skipped - the deck saved and never showed. A
+        // refusal is only settled while its reason still holds, and a successful durable
+        // write is exactly the reason changing.
+        val rejects = TypedOutcome(ToolExecution.rejected("There is no talk/slides.md."))
+        val writes = object : Tool {
+            override val definition = ToolDefinition("write_thing", "d", "{}")
+            override val writesDurableData: Boolean = true
+            override suspend fun run(call: ToolCall): String = "Saved."
+        }
+        val runner = AgentRunner(ToolRegistry(listOf(rejects, writes)))
+
+        runner.step(
+            listOf(call("typed", id = "a"), call("write_thing", id = "b")),
+            round = 0,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+        val retry = runner.step(
+            listOf(call("typed", id = "c")),
+            round = 1,
+            mode = AgentMode.AUTO,
+            approve = { true },
+        )
+
+        // The file may exist now, so the call runs again instead of being skipped.
+        assertThat((retry as AgentDecision.Continue).steps.single())
+            .isInstanceOf(AgentStep.Ran::class.java)
+    }
+
+    @Test
     fun `a failure that might not happen twice is asked again`() = runTest {
         // The socket that went away. This is the one case where repeating the identical
         // call is the right move, so it must not be settled alongside the refusals.

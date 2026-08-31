@@ -264,9 +264,14 @@ class DiscoverViewModel @Inject constructor(
             val query = _uiState.value.query
             runCatching {
                 when {
-                    // A shortlist is fetched by name, not searched for. Typing in the box
-                    // means the shortlist is not what is being asked for any more.
-                    query.recommendedOnly && query.text.isBlank() ->
+                    // A shortlist is fetched by name, not searched for - and while the
+                    // chip is lit, typing narrows the shortlist rather than abandoning
+                    // it. The old reading, "typing means the shortlist is not what is
+                    // being asked for", put unvetted repositories under a chip that
+                    // promises only measured ones, which reads as the filter lying.
+                    // Whoever wants the whole Hub turns the chip off, and the chip is
+                    // the first one in the row.
+                    query.recommendedOnly ->
                         HubSearchPage(
                             client.recommended().filter {
                                 // A compiled recommendation on a build without the engine
@@ -274,7 +279,7 @@ class DiscoverViewModel @Inject constructor(
                                 // itself away. Dropped here rather than in the client,
                                 // which does not know what this binary shipped with.
                                 !it.isCompiled || ExecuTorchSupport.AVAILABLE
-                            },
+                            }.matching(query.text),
                         )
                     query.officialOnly -> officialPage(query, cursor = null)
                     else -> client.searchPage(query)
@@ -308,7 +313,7 @@ class DiscoverViewModel @Inject constructor(
     /** Appends one page for an ordinary Hub search, preserving the current query generation. */
     fun loadMore() {
         val state = _uiState.value
-        val isRecommendedSearch = state.query.recommendedOnly && state.query.text.isBlank()
+        val isRecommendedSearch = state.query.recommendedOnly
         if (state.isSearching) return
         if (state.isLoadingMore) return
         if (!state.canLoadMore) return
@@ -686,4 +691,16 @@ internal fun matchPrefillCalibration(
         measuredBytes = file.length(),
         measuredTokensPerSecond = model.averageTokensPerSecond,
     )
+}
+
+/**
+ * The shortlist rows this text is about: a word in the repository id or the publisher.
+ *
+ * Case-blind substring over an eight-row list, because that is what searching a curated
+ * shelf means; relevance ranking over eight rows would be ceremony.
+ */
+private fun List<HubModel>.matching(text: String): List<HubModel> {
+    val needle = text.trim()
+    if (needle.isEmpty()) return this
+    return filter { it.id.contains(needle, ignoreCase = true) }
 }

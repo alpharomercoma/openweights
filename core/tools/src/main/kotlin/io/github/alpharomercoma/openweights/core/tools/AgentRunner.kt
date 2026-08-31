@@ -197,6 +197,20 @@ class AgentRunner(
     private val settled = ConcurrentHashMap<String, String>()
 
     /**
+     * The settled entries that are refusals rather than results.
+     *
+     * Kept apart because the two age differently. A success stays settled for the turn -
+     * the result is in the conversation and asking again buys nothing. A refusal is only
+     * settled *while the world it described holds*: "there is no talk/slides.md" stops
+     * being true the moment a write creates it, and a memo that outlived the fact blocked
+     * exactly the retry the model was right to make - watched live as a deck that saved
+     * successfully and then could not be shown, because show had been refused once before
+     * the save. So any tool that changes durable state clears the refusals and only the
+     * refusals.
+     */
+    private val refusals = ConcurrentHashMap.newKeySet<String>()
+
+    /**
      * How many calls this turn has actually put through, across every round.
      *
      * The round budget was never a budget on work. A round is one decision by the model, and
@@ -379,6 +393,14 @@ class AgentRunner(
             // that is exactly the line [ToolExecution.retryable] draws.
             settled[call.settledKey()] = "Already refused this turn with these same " +
                 "arguments, for the reason above. Change the arguments or answer without it."
+            refusals += call.settledKey()
+        }
+        // The world changed, so refusals about the old world no longer hold: a file that
+        // "is not there" may be there now. Successes stay settled - their results are
+        // real regardless.
+        if (execution.successful && tool.writesDurableData) {
+            refusals.forEach(settled::remove)
+            refusals.clear()
         }
         return AgentStep.Ran(
             call = call,

@@ -48,9 +48,16 @@
         </intent>
     </queries>
 
+    <!-- hasFragileUserData is the Android feature for "ask before deleting my data":
+         with it, the system uninstall dialog offers a "Keep app data" checkbox, so the
+         gigabytes of downloaded models and every conversation survive an uninstall the
+         user meant as "remove the app, keep my things" - and reinstalling finds them
+         again. Models already live in the external files dir, which the same choice
+         governs. Without this attribute the dialog never asks and everything goes. -->
     <application
         android:name=".OpenWeightsApplication"
         android:allowBackup="false"
+        android:hasFragileUserData="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

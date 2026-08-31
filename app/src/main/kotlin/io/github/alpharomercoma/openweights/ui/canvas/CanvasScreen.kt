@@ -21,10 +21,14 @@ import android.content.Intent
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -127,6 +132,12 @@ fun CanvasScreen(onBack: () -> Unit, viewModel: CanvasViewModel = hiltViewModel(
                 viewModel = viewModel,
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
+
+            CanvasKind.SLIDES -> Slides(
+                canvas = canvas,
+                viewModel = viewModel,
+                modifier = Modifier.padding(padding).fillMaxSize(),
+            )
         }
     }
 }
@@ -161,6 +172,80 @@ private fun Site(url: String, revision: Int, modifier: Modifier = Modifier) {
         view.firstOrNull()?.reload()
     }
 }
+
+/**
+ * A Markdown deck, one slide per page, swiped like every deck on a phone.
+ *
+ * Slides are what the file says they are: blocks separated by a line holding only
+ * `---`, the Marp and Slidev convention. The pager keeps its page across revisions,
+ * clamped, so the model appending a slide or fixing a typo does not throw the reader
+ * back to the title; a deck that shrank below the reader's place lands them on the
+ * new last slide rather than a blank page.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Slides(canvas: Canvas, viewModel: CanvasViewModel, modifier: Modifier = Modifier) {
+    val text by viewModel.documentText.collectAsState()
+    LaunchedEffect(canvas.entry, canvas.revision) {
+        viewModel.refreshDocument(canvas)
+    }
+    val slides = remember(text) { text.asSlides() }
+    val pager = rememberPagerState { slides.size }
+    LaunchedEffect(slides.size) {
+        if (pager.currentPage >= slides.size && slides.isNotEmpty()) {
+            pager.scrollToPage(slides.size - 1)
+        }
+    }
+    Column(modifier = modifier) {
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) { index ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                MarkdownText(
+                    content = slides.getOrElse(index) { "" },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        // The place marker, and the only chrome a deck needs: everything else is swipe.
+        Text(
+            text = stringResource(
+                R.string.slide_position,
+                (pager.currentPage + 1).coerceAtMost(slides.size),
+                slides.size,
+            ),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 12.dp),
+        )
+    }
+}
+
+/**
+ * The deck's slides, split on separator lines.
+ *
+ * Only a line that is exactly `---` (with nothing but whitespace around it) separates:
+ * Markdown also uses `---` under a title as a setext underline, but that form never
+ * stands after a blank line in practice, and the cost of a wrong split is one odd page
+ * where the cost of no split is no deck at all. An empty first block - the file opening
+ * with a separator, or YAML front matter fenced by two of them - is dropped rather than
+ * shown as a blank title slide.
+ */
+internal fun String.asSlides(): List<String> {
+    val blocks = split(SLIDE_BREAK).map { it.trim() }.filter { it.isNotEmpty() }
+    return blocks.ifEmpty { listOf(trim()) }
+}
+
+private val SLIDE_BREAK = Regex("""(?m)^\s*---\s*$""")
 
 @Composable
 private fun Document(canvas: Canvas, viewModel: CanvasViewModel, modifier: Modifier = Modifier) {

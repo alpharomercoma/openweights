@@ -57,9 +57,10 @@ class CanvasViewModel @Inject constructor(
     /** The loopback URL for [canvas], which any browser on this phone can open. */
     fun urlFor(canvas: Canvas): String = server.urlFor(canvas.entry)
 
-    /** Re-reads the document; called when the entry or revision changes. */
+    /** Re-reads the document or deck; called when the entry or revision changes. */
     fun refreshDocument(canvas: Canvas) {
-        if (canvas.kind != CanvasKind.DOCUMENT) return
+        // Both Markdown kinds read the same way; only a site is served instead of read.
+        if (canvas.kind == CanvasKind.SITE) return
         viewModelScope.launch {
             val entry = workspace.resolve(canvas.entry) ?: return@launch
             text.value = workspace.readBytes(entry)?.toString(Charsets.UTF_8).orEmpty()

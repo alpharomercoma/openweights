@@ -648,12 +648,19 @@ class TurnRunner @Inject constructor(
             // a stale address would classify a translation denial as a fetch.
             val fitting = CapabilityDenial.fitting(pass.spoken(), asked)
                 .firstOrNull { active.find(it) != null }
-            // The withheld pass re-renders the prompt without the tool block, which on a
-            // hybrid model is a one-off full re-read — the same price the next turn then
-            // pays once more to put the block back, exactly as a withdrawal already does.
-            // Paid only by a turn that was otherwise ending on an apology.
+            // proseOnly gates the *parsing*, deliberately not the rendering. The old
+            // version also stripped the tool block from the prompt, which reads as free
+            // and is the most expensive line this file ever had: the block sits a few
+            // hundred tokens into the prompt, so removing it invalidates the KV cache
+            // from that point, the pass re-reads the whole conversation, and the cache
+            // this pass leaves behind lacks the block — so the *next* turn re-reads
+            // everything again to put it back. On a hybrid model, whose cache refuses
+            // partial rollback, both re-reads are full ones: measured live, a three-turn
+            // LFM2.5 chat paid a complete re-prefill on two of its three turns and a
+            // 2,500-token conversation answered with a thirty-second time-to-first-token.
+            // The model does not need the block gone to answer in prose — it needs the
+            // retry message beside this, and any call it writes anyway is not run.
             if (fitting == null) {
-                renderTools = false
                 proseOnly = true
             }
             messages = messages +
@@ -673,7 +680,10 @@ class TurnRunner @Inject constructor(
         private fun withdraw(pass: Pass, calls: List<ToolCall>, listener: TurnListener): Boolean {
             if (calls.isEmpty() || withdrawn) return false
             withdrawn = true
-            renderTools = false
+            // Deliberately does not stop rendering the tool block: see denialRepair for
+            // what stripping it costs. The refusal the model needs to hear is the spent()
+            // result below; the refusal the loop needs is `withdrawn`, which ends the
+            // turn if it asks again. What the cache needs is a prompt that only grows.
             listener.onSteps(calls.map { AgentStep.Skipped(it, spent(maxRounds)) })
             messages = messages +
                 ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +

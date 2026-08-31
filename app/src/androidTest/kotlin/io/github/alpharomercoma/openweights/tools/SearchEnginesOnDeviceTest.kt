@@ -140,7 +140,14 @@ class SearchEnginesOnDeviceTest {
             val row = JSONObject()
                 .put("engine", "media-" + kind.name.lowercase())
                 .put("hits", hits.size)
-                .put("relevant", hits.take(4).any { "retriever" in it.title.lowercase() || "puppy" in it.title.lowercase() || "dog" in it.title.lowercase() })
+                .put(
+                    "relevant",
+                    hits.take(4).any {
+                        "retriever" in it.title.lowercase() ||
+                            "puppy" in it.title.lowercase() ||
+                            "dog" in it.title.lowercase()
+                    },
+                )
                 .put("thumb_type", thumbnailType)
                 .put("ms", System.currentTimeMillis() - started)
                 .put("top", first?.targetUrl ?: "")

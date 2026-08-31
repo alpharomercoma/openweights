@@ -387,9 +387,13 @@ class TurnRunnerTest {
         run(withTools = true)
 
         assertThat(search.calls).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS)
-        // Two rounds of tools, the pass that was told to stop, and the forced one with none.
+        // Two rounds of tools, the pass that was told to stop, and the forced last one.
+        // The last pass still *renders* the definitions - stripping them invalidated the
+        // KV cache at the tool block, and on a hybrid model that was a full re-read of
+        // the conversation, paid again next turn to put the block back. The withdrawal
+        // is the skipped call and the spent() result, not a rewritten prompt.
         assertThat(engine.offered).hasSize(AgentRunner.DEFAULT_MAX_ROUNDS + 2)
-        assertThat(engine.offered.last()).isEmpty()
+        assertThat(engine.offered.last()).isNotEmpty()
     }
 
     @Test

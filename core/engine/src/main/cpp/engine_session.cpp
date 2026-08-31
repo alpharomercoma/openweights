@@ -556,6 +556,17 @@ Session * Session::load(
         return nullptr;
     }
     session->ctx_ = ctx;
+    // Stop must mean now. The cooperative checks between batches and between tokens give
+    // Stop a worst-case latency of one whole prefill batch - several seconds of a long
+    // prompt on a phone - and the user reads that as the button not working. ggml polls
+    // this callback between graph nodes, so a Stop pressed mid-batch lands mid-batch.
+    // The session owns the flag and outlives the context, so the pointer stays valid.
+    llama_set_abort_callback(
+        ctx,
+        [](void * data) -> bool {
+            return static_cast<std::atomic<bool> *>(data)->load(std::memory_order_relaxed);
+        },
+        &session->cancelled_);
 
     if (!mmproj_path.empty()) {
         mtmd_context_params mtmd_params = mtmd_context_params_default();
@@ -1072,6 +1083,12 @@ bool Session::ingest_prompt(
             llama_batch_get_one(const_cast<llama_token *>(tokens.data() + offset), chunk);
         const int ret = llama_decode(ctx_, batch);
         if (ret != 0) {
+            // The abort callback ends a decode from inside the graph, and llama reports
+            // that as a non-zero return. That is Stop working, not the model failing.
+            if (cancelled_.load(std::memory_order_relaxed)) {
+                error = "cancelled";
+                return false;
+            }
             error = "failed to decode prompt (llama_decode returned " + std::to_string(ret) + ")";
             return false;
         }
@@ -1346,6 +1363,20 @@ StopReason Session::generate(
         llama_batch batch = llama_batch_get_one(&committed, 1);
         const int ret = llama_decode(ctx_, batch);
         if (ret != 0) {
+            // See ingest_prompt: an aborted graph is Stop landing mid-batch, and the
+            // one-token decode this loop just lost is exactly the reply.flush() case -
+            // nothing the user was shown is missing. The abort may have left this
+            // position's cells half-written, so they are dropped before the bookkeeping
+            // above them is trusted again; a memory that cannot drop them (recurrent
+            // state) forfeits the cache instead, which reset() records honestly.
+            if (cancelled_.load(std::memory_order_relaxed)) {
+                if (!llama_memory_seq_rm(
+                        llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_), -1)) {
+                    reset();
+                }
+                reason = StopReason::CANCELLED;
+                break;
+            }
             error = "failed to decode (llama_decode returned " + std::to_string(ret) + ")";
             reason = StopReason::ERROR;
             break;

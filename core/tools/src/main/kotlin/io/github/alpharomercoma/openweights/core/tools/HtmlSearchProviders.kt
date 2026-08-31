@@ -21,7 +21,6 @@ import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URLDecoder
-import java.util.Base64
 
 /**
  * The three general engines besides DuckDuckGo, each scraped from its own results page.

@@ -102,7 +102,12 @@ class TurnRunnerDenialTest {
         run()
 
         assertThat(engine.offered).hasSize(2)
-        assertThat(engine.offered[1]).isEmpty()
+        // The retry keeps the definitions rendered: stripping them rewrote the front of
+        // the prompt, which invalidated the KV cache at the tool block and cost a full
+        // conversation re-read - twice, since the next turn put the block back. What is
+        // withheld is the *parsing*: a call written on this pass is not run, which the
+        // test below this one pins.
+        assertThat(engine.offered[1]).isNotEmpty()
         assertThat(engine.prompts[1].last().text).contains("yourself")
         assertThat(search.calls).isEmpty()
     }
@@ -135,7 +140,8 @@ class TurnRunnerDenialTest {
 
         run()
 
-        assertThat(engine.offered[1]).isEmpty()
+        // Rendered but not runnable: see the cache note two tests up.
+        assertThat(engine.offered[1]).isNotEmpty()
         assertThat(engine.prompts[1].last().text).contains("yourself")
     }
 

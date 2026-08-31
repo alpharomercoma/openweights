@@ -1219,6 +1219,16 @@ bool Session::ingest_warm(
     std::string & error) {
     const int32_t n_batch = static_cast<int32_t>(llama_n_batch(ctx_));
 
+    // A recurrent or hybrid memory cannot cut a half-written batch away, so without help
+    // an interrupted warm forfeits everything it read: measured live, sixteen seconds of
+    // prefill kept nothing, and the turn that interrupted it paid the whole read again in
+    // the foreground. So on those families each committed batch is checkpointed — a state
+    // copy, ~26 MB and milliseconds against a batch that costs seconds — and a failed or
+    // aborted batch restores the last checkpoint instead of conceding the cache.
+    const bool checkpoint =
+        llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_);
+    std::vector<uint8_t> committed_state;
+
     for (size_t offset = from; offset < tokens.size(); offset += n_batch) {
         if (cancelled_.load(std::memory_order_relaxed)) {
             error = "cancelled";
@@ -1231,12 +1241,25 @@ bool Session::ingest_warm(
         const int ret = llama_decode(ctx_, batch);
         if (ret != 0) {
             // An aborted or failed batch may have written some of its cells. Committed
-            // progress stays only if the half-written tail can actually be removed; a
-            // memory that refuses gives the whole cache up rather than answering from
-            // positions nobody can account for.
+            // progress stays if the half-written tail can be removed, or — where the
+            // memory refuses — if there is a checkpoint to fall back to; only with
+            // neither does the whole cache go, rather than answering from positions
+            // nobody can account for.
             if (!llama_memory_seq_rm(
                     llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_), -1)) {
-                reset();
+                if (!committed_state.empty()) {
+                    const std::vector<llama_token> kept_tokens = cached_;
+                    const int32_t kept_past = n_past_;
+                    reset();
+                    if (llama_state_seq_set_data(
+                            ctx_, committed_state.data(), committed_state.size(), 0) != 0) {
+                        cached_ = kept_tokens;
+                        n_past_ = kept_past;
+                        LOGI("kv: interrupted warm kept %d committed tokens", n_past_);
+                    }
+                } else {
+                    reset();
+                }
             }
             error = cancelled_.load(std::memory_order_relaxed)
                 ? "cancelled"
@@ -1247,6 +1270,16 @@ bool Session::ingest_warm(
         // reuses the partial prefix instead of starting over.
         cached_.insert(cached_.end(), tokens.begin() + offset, tokens.begin() + offset + chunk);
         n_past_ += chunk;
+        if (checkpoint && offset + chunk < tokens.size()) {
+            const size_t size = llama_state_seq_get_size(ctx_, 0);
+            if (size > 0) {
+                committed_state.resize(size);
+                if (llama_state_seq_get_data(
+                        ctx_, committed_state.data(), size, 0) != size) {
+                    committed_state.clear();
+                }
+            }
+        }
     }
     return true;
 }

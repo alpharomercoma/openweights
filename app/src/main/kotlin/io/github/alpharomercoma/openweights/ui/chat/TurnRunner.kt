@@ -43,8 +43,9 @@ import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -179,12 +180,73 @@ class TurnRunner @Inject constructor(
         // A warm holds the engine for as long as a cold prefill takes, and it exists to
         // serve exactly the turn that is arriving now: interrupt it, keep what it read,
         // and let the turn reuse that.
-        if (warming) engine.cancel()
-        return engineInUse.withLock {
+        //
+        // Interrupted with a standing signal, not a one-shot. A single cancel fired at
+        // one instant can be swallowed -- a warm still entering the engine resets the
+        // cancel flag on the way in, and a warm that starts a moment later was never
+        // cancelled at all -- and the turn then queues behind the whole background read.
+        // On a swapping phone that was measured at seventy seconds for the word "hi".
+        // So the turn declares itself waiting, which stops any further warm from
+        // starting, and repeats the cancel until it holds the engine. A real turn ahead
+        // of it is awaited untouched, suspended, exactly as before.
+        turnsWaiting.incrementAndGet()
+        try {
+            acquireOverWarms()
+        } finally {
+            // Held only through the acquisition: once the lock is ours no warm can start
+            // anyway, and the next warm after this turn should not find a stale waiter.
+            turnsWaiting.decrementAndGet()
+        }
+        return try {
             turn(
                 conversation, params, mode, withTools, notes, listener,
                 offerAsk, question, offerPlan,
             )
+        } finally {
+            engineInUse.unlock()
+        }
+    }
+
+    /**
+     * Ends any warm in progress and holds new ones off until it returns.
+     *
+     * For a caller about to touch the engine on a turn's behalf *before* [run] — thread
+     * planning, a pre-turn fold. Those hops run on the engine's own single thread, and
+     * one made while a warm holds that thread queues behind the whole background read:
+     * measured live, the word "hi" waited twenty-seven seconds in that queue, after the
+     * interrupt inside [run] was already in place. The warm ends within a batch of the
+     * first cancel; the waiter count keeps another from starting in the gap.
+     */
+    suspend fun yieldWarms() {
+        if (!warming) return
+        turnsWaiting.incrementAndGet()
+        try {
+            while (warming) {
+                engine.cancel()
+                delay(WARM_INTERRUPT_RETRY_MS)
+            }
+        } finally {
+            turnsWaiting.decrementAndGet()
+        }
+    }
+
+    /**
+     * Takes the engine, killing any warm in the way, waiting behind any real turn.
+     *
+     * Only ever called with [turnsWaiting] already raised, which is what guarantees the
+     * suspended wait in the second branch cannot be behind a warm: no warm starts, and no
+     * warm proceeds past its own check, while a turn is declared waiting.
+     */
+    private suspend fun acquireOverWarms() {
+        while (true) {
+            if (engineInUse.tryLock()) return
+            if (warming) {
+                engine.cancel()
+                delay(WARM_INTERRUPT_RETRY_MS)
+            } else {
+                engineInUse.lock()
+                return
+            }
         }
     }
 
@@ -207,13 +269,18 @@ class TurnRunner @Inject constructor(
         question: String = "",
         offerPlan: Boolean = true,
     ): String? {
-        if (warming) engine.cancel()
-        if (!engineInUse.tryLock()) {
-            // Busy with a real turn: skip, as documented above. Busy with a warm: the
-            // cancel above is already landing, so wait out the moment it takes to exit
-            // rather than recording a skip for work nobody was waiting on.
-            if (!warming) return null
-            engineInUse.lock()
+        turnsWaiting.incrementAndGet()
+        try {
+            // Busy with a real turn: skip, as documented above. Busy with a warm: kill
+            // it, repeatedly if need be -- see run() -- rather than recording a skip for
+            // work nobody was waiting on.
+            while (!engineInUse.tryLock()) {
+                if (!warming) return null
+                engine.cancel()
+                delay(WARM_INTERRUPT_RETRY_MS)
+            }
+        } finally {
+            turnsWaiting.decrementAndGet()
         }
         return try {
             turn(
@@ -285,6 +352,16 @@ class TurnRunner @Inject constructor(
     private var warming = false
 
     /**
+     * How many turns are waiting for the engine right now.
+     *
+     * Raised for the duration of taking [engineInUse], and read by [warm] as a stop sign:
+     * while any turn waits, no warm starts and no warm that got as far as composing its
+     * prompt reaches the engine. This is what makes the repeated cancel in
+     * [acquireOverWarms] a bounded wait rather than a race.
+     */
+    private val turnsWaiting = AtomicInteger(0)
+
+    /**
      * Reads the head of a fresh conversation into the engine's cache, ahead of anybody
      * asking anything.
      *
@@ -328,6 +405,10 @@ class TurnRunner @Inject constructor(
         params: SamplerParams,
         snapshot: Boolean,
     ): WarmResult? {
+        // The other half of run()'s standing interrupt: a warm never starts, and never
+        // reaches the engine, while a turn is waiting for it. Checked again inside the
+        // lock because the answer can change while tryLock is won.
+        if (turnsWaiting.get() > 0) return null
         if (!engineInUse.tryLock()) return null
         warming = true
         return try {
@@ -335,6 +416,7 @@ class TurnRunner @Inject constructor(
             val native = engine.loadedModel?.supportsTools == true
             val renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
             val messages = conversation.describing(active, needed = withTools && !native)
+            if (turnsWaiting.get() > 0) return null
             val result = engine.warm(
                 messages = messages,
                 tools = if (renderTools) active.definitions else emptyList(),
@@ -1172,6 +1254,9 @@ private const val ANNOUNCEMENT_CHARS = 160
  * tokens" and becomes a second copy of whatever was pasted.
  */
 private const val GROUNDING_MAX_CHARS = 400
+
+/** One beat between interrupt attempts: enough for an abort to land, too short to notice. */
+private const val WARM_INTERRUPT_RETRY_MS = 50L
 
 private const val BYTES_PER_KB = 1024L
 

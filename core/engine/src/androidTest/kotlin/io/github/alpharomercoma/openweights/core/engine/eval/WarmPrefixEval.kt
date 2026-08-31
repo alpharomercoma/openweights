@@ -26,6 +26,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
@@ -213,6 +215,46 @@ class WarmPrefixEval {
         }
     }
 
+    @Test
+    fun cancelInterruptsAWarmMidPrefill(): Unit = runBlocking {
+        val model = EVAL_DIR.listFiles { file -> file.extension == "gguf" }.orEmpty()
+            .minByOrNull { it.name }
+        assumeTrue("no .gguf files in $EVAL_DIR", model != null)
+
+        // The incident this pins: a question queued behind a background warm for as long
+        // as the warm took, because the interrupt was swallowed. The engine-level half of
+        // the contract is here: a cancel landing mid-prefill ends the warm within a graph
+        // node or a batch, the partial read is kept, and the next chat reuses it.
+        val engine = LlamaCppEngine()
+        try {
+            engine.load(model!!, ModelLoadParams(contextLength = CONTEXT))
+            val warm = async { engine.warm(listOf(system()), params = PARAMS) }
+            delay(INTERRUPT_AFTER_MS)
+            val asked = System.currentTimeMillis()
+            engine.cancel()
+            val result = warm.await()
+            val interruptMs = System.currentTimeMillis() - asked
+            assertWithMessage("${model.name}: cancelled warm returned nothing")
+                .that(result).isNotNull()
+            assertWithMessage("${model.name}: the warm outlived its cancel by ${interruptMs}ms")
+                .that(interruptMs).isLessThan(MAX_INTERRUPT_MS)
+
+            val reply = engine.ask(QUESTION)
+            assertThat(reply.text).isNotEmpty()
+            assertWithMessage("${model.name}: the turn re-read what the warm had kept")
+                .that(reply.stats.cachedTokens).isAtLeast(result!!.warmedTokens)
+            Log.i(
+                TAG,
+                "${model.name}: warm interrupted after ${result.warmedTokens} tokens in " +
+                    "${interruptMs}ms; turn cached=${reply.stats.cachedTokens} " +
+                    "ttft=${reply.stats.timeToFirstTokenMs}ms",
+            )
+        } finally {
+            engine.unload()
+            engine.close()
+        }
+    }
+
     private class Reply(
         val text: String,
         val stats: io.github.alpharomercoma.openweights.core.engine.GenerationStats,
@@ -230,6 +272,12 @@ class WarmPrefixEval {
     private companion object {
         const val TAG = "WarmPrefixEval"
         const val CONTEXT = 4096
+
+        /** Deep enough into the prefill to be mid-batch, well short of a full warm. */
+        const val INTERRUPT_AFTER_MS = 400L
+
+        /** ggml polls the abort between graph nodes; whole seconds would mean it did not. */
+        const val MAX_INTERRUPT_MS = 3_000L
         val EVAL_DIR = File("/data/local/tmp/openweights/eval")
 
         val PARAMS = SamplerParams(temperature = 0f, topK = 1, seed = 7, maxTokens = 96)

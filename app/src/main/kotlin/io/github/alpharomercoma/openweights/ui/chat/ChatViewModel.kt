@@ -1472,6 +1472,11 @@ class ChatViewModel @Inject constructor(
         GenerationService.hold(appContext, GenerationService.TURN, "Answering")
 
         val job = viewModelScope.launch {
+            // First, before anything here reaches the engine: the pre-turn fold and the
+            // thread re-plan both hop onto the engine's own thread, and with a warm
+            // holding it they queue behind the whole background read. The turn-side
+            // interrupt in TurnRunner.run cannot help from back there.
+            turns.yieldWarms()
             val opened = openTurn() ?: return@launch
             val conversation = opened.conversation
             val state = opened.state
@@ -2237,7 +2242,19 @@ class ChatViewModel @Inject constructor(
             val params = state.preferences.toSamplerParams().let {
                 if (state.toolsAvailable) it.copy(thinking = true) else it
             }
-            turns.warmFreshChat(head, withTools = state.toolsAvailable, params = params)
+            val headWarm = turns.warmFreshChat(
+                head,
+                withTools = state.toolsAvailable,
+                params = params,
+            )
+            // A head warm that could not run or kept nothing — the engine refused it, a
+            // turn interrupted it at zero, or the compute failed the way a swapping phone
+            // makes it fail — is no base to stack a longer read on. The conversation
+            // stays cold and the next turn reads it once, in front of the user, which is
+            // the price the failure already set.
+            if (headWarm == null || headWarm.warmedTokens + headWarm.reusedTokens == 0) {
+                return@launch
+            }
             if (state.transcript.isEmpty()) return@launch
             val conversation = state.engineMessages()
             // A conversation carrying media cannot be warmed: the warm path renders text
@@ -2321,7 +2338,11 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.isGenerating || _uiState.value.isCompacting) return
         // Folding runs the model to write the summary, so it needs the same check send makes.
         if (loadedModelHasGone()) return
-        viewModelScope.launch { if (compactIfNeeded(force = true)) warmEngine() }
+        viewModelScope.launch {
+            // The summarizer is about to take the engine's thread; see generate().
+            turns.yieldWarms()
+            if (compactIfNeeded(force = true)) warmEngine()
+        }
     }
 
     /**

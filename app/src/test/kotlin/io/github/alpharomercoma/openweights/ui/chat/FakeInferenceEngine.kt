@@ -38,6 +38,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /**
@@ -253,6 +255,7 @@ class FakeInferenceEngine : InferenceEngine {
 
     override fun cancel() {
         cancelCount++
+        warmGate?.complete(Unit)
         events.close()
     }
 
@@ -271,22 +274,44 @@ class FakeInferenceEngine : InferenceEngine {
     /** Every [warm], in order, so a test can check what was read ahead and how. */
     val warmCalls = mutableListOf<WarmCall>()
 
+    /**
+     * When set, [warm] parks on this the way a real warm sits in a long prefill, until
+     * the test completes it or [cancel] does -- which is exactly how a real turn ends a
+     * real warm.
+     */
+    var warmGate: CompletableDeferred<Unit>? = null
+
+    /** When set, [warm] reports it kept nothing, as a compute failure does. */
+    var warmKeepsNothing = false
+
+    /**
+     * The real engine runs every native call on one thread, so a warm in progress makes
+     * every later engine call wait -- which is exactly how a turn's thread re-plan got
+     * stuck behind a background read on the phone. Modelled here as a lock shared by
+     * [warm] and [setThreads], so that failure shape exists in tests too.
+     */
+    private val nativeThread = Mutex()
+
     override suspend fun warm(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
         params: SamplerParams,
         snapshot: Boolean,
-    ): WarmResult? {
+    ): WarmResult? = nativeThread.withLock {
         warmCalls += WarmCall(messages, tools, snapshot)
+        warmGate?.await()
+        val read = messages.sumOf { it.text.length } / CHARS_PER_TOKEN
         return WarmResult(
-            warmedTokens = messages.sumOf { it.text.length } / CHARS_PER_TOKEN,
+            warmedTokens = if (warmKeepsNothing) 0 else read,
             reusedTokens = 0,
             prefillMs = 1,
             snapshotBytes = 0,
         )
     }
 
-    override suspend fun setThreads(generateThreads: Int, batchThreads: Int) = Unit
+    override suspend fun setThreads(generateThreads: Int, batchThreads: Int) {
+        nativeThread.withLock { }
+    }
 
     override fun systemInfo(): String = "fake engine"
 

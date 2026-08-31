@@ -122,6 +122,39 @@ The follow-up column is also the proof, per real template, that a conversation r
 *without* the generation prompt is a byte prefix of the same conversation rendered with
 one — the property the whole mechanism leans on.
 
+## The incident that hardened it (2026-08-31, evening)
+
+"Hi" took sixty-nine seconds on the Poco X8 Pro Max. The ledger of that minute, from
+logcat: the app opened under heavy memory pressure (3.5 GB of swap in use — partly the
+afternoon's five-model eval — and this device's Mali-G925 is not yet supported by the
+OpenCL backend, so prefill ran CPU-only at ~31 tok/s instead of ~100); the load-time warm
+therefore took 70 s instead of 20; and the user's turn queued behind the whole of it.
+Not a leak, not a held model — a swallowed interrupt, magnified by a slow warm.
+
+Three holes, each now closed and each carrying a regression test:
+
+1. **The one-shot cancel.** `run()` cancelled a warm once, then waited. A cancel that
+   lands while a warm is still entering the engine is erased by the warm's own
+   entry-reset of the flag, and a warm that starts a moment later was never cancelled at
+   all. Now a turn declares itself waiting (no warm starts while one is), and repeats the
+   cancel until it holds the engine.
+2. **The pre-turn engine hops.** The turn path touches the engine's single thread before
+   `run()` — the thermal thread re-plan, a pre-turn fold — and those hops queued behind
+   the warm's native call, upstream of any interrupt. Verified live: with fix 1 installed,
+   "hi" still waited 26.8 s at `setThreads`. Now `yieldWarms()` clears the engine before
+   anything in the turn path reaches it.
+3. **The hybrid's forfeited progress.** A mid-batch abort leaves cells a recurrent memory
+   cannot cut away, so an interrupted hybrid warm reset and kept *nothing* — 16 s of read,
+   gone, and the turn paid the whole prompt again in the foreground. Now each committed
+   batch is checkpointed (`llama_state_seq_get_data`, ~26 MB, milliseconds against a batch
+   that costs seconds) and an aborted batch restores the last checkpoint:
+   `kv: interrupted warm kept 1024 committed tokens`.
+
+Replayed on the same phone, same scenario, fixed build: send lands mid-warm, the warm
+dies in **349 ms keeping 1,024 of 2,197 tokens**, the turn starts **470 ms** after the
+tap (was 26,800), and reads only the remainder. A turn's wait is now bounded by one abort
+landing plus the un-warmed tail, never by the warm's length.
+
 ## What the research said, and what was deliberately not built
 
 Three surveys were run before building (arXiv; Cursor/Copilot/Claude-Code/Manus mechanics;

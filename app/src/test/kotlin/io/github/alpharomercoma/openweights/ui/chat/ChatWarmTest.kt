@@ -119,6 +119,56 @@ class ChatWarmTest : ChatFixture() {
     }
 
     @Test
+    fun `a question arriving mid-warm interrupts it instead of queueing behind it`() =
+        runTest(dispatcher) {
+            loadModel()
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // A warm that sits in its prefill the way a real one does on a struggling
+            // phone. The measured incident: "hi" queued behind one for seventy seconds,
+            // because a one-shot cancel had been swallowed. The contract now is a
+            // standing interrupt: the turn cancels until it holds the engine.
+            // Armed after newChat() returns: its own stop() fires a cancel that would
+            // release the gate before the warm ever parked on it. The warm coroutine
+            // only runs once the dispatcher advances, in settle below.
+            viewModel.newChat()
+            engine.warmGate = kotlinx.coroutines.CompletableDeferred()
+            settle(steps = 2)
+            val cancelsBefore = engine.cancelCount
+
+            engine.scripted += ScriptedPass("Hello there.")
+            viewModel.send("hi")
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            assertThat(engine.cancelCount).isGreaterThan(cancelsBefore)
+            assertThat(viewModel.uiState.value.transcript.last().text).contains("Hello there")
+            engine.warmGate = null
+        }
+
+    @Test
+    fun `a head warm that kept nothing does not stack a conversation warm on top`() =
+        runTest(dispatcher) {
+            loadModel()
+            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+            viewModel.send("Who is Ada Lovelace?")
+            settle(steps = FOLD_SETTLE_STEPS)
+            val id = requireNotNull(viewModel.uiState.value.activeConversationId)
+            viewModel.newChat()
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            // The measured failure shape: the head warm died to a compute error after
+            // 42 seconds. Stacking the longer conversation read on that engine is
+            // another minute of background churn on a phone already struggling.
+            engine.warmKeepsNothing = true
+            engine.warmCalls.clear()
+            viewModel.openConversation(id)
+            settle(steps = FOLD_SETTLE_STEPS)
+
+            assertThat(engine.warmCalls.map { it.snapshot }).isEqualTo(listOf(true))
+            engine.warmKeepsNothing = false
+        }
+
+    @Test
     fun `the warmed conversation is byte-for-byte the front of the next prompt`() =
         runTest(dispatcher) {
             loadModel()

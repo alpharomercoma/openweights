@@ -296,8 +296,18 @@ class Workspace @Inject constructor(
             val uri = uriFor(entry) ?: return@withContext null
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val bytes = stream.readNBytes(limit + 1)
-                    if (bytes.size > limit) null else bytes
+                    // By hand rather than readNBytes, which arrived in API 33 and this
+                    // app still serves 31.
+                    val buffer = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(SERVE_CHUNK)
+                    var total = 0
+                    while (total <= limit) {
+                        val read = stream.read(chunk)
+                        if (read < 0) break
+                        buffer.write(chunk, 0, read)
+                        total += read
+                    }
+                    if (total > limit) null else buffer.toByteArray()
                 }
             }.getOrNull()
         }
@@ -425,6 +435,8 @@ class Workspace @Inject constructor(
     private companion object {
         /** 16 MB: generous for a page and its assets, small enough to allocate calmly. */
         const val MAX_SERVED_BYTES = 16 * 1024 * 1024
+
+        const val SERVE_CHUNK = 64 * 1024
 
         /** Stands in for the granted folder itself, which no [Entry] otherwise names. */
         val ROOT = Entry(

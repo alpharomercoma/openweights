@@ -192,7 +192,12 @@ private object SmolLm3Template : PromptTemplate {
  * model never saw in training.
  */
 private object Llama32Template : PromptTemplate {
-    override val stopMarkers: List<String> = listOf("<|eot_id|>", "<|end_of_text|>")
+    // <|eom_id|> is how Llama ends a message that expects a tool result — after a call it
+    // emits that, not <|eot_id|>. Measured on device: without it the model wrote the call,
+    // the end-of-message token as text, and then a second turn explaining the call it had
+    // just made, and the explanation is what reached the parser.
+    override val stopMarkers: List<String> =
+        listOf("<|eot_id|>", "<|eom_id|>", "<|end_of_text|>")
 
     override fun render(
         messages: List<ChatMessage>,

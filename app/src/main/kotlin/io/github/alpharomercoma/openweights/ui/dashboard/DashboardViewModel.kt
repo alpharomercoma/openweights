@@ -22,20 +22,18 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
-import io.github.alpharomercoma.openweights.model.ModelStore
-import kotlinx.coroutines.flow.map
 import io.github.alpharomercoma.openweights.core.data.UsageSummary
+import io.github.alpharomercoma.openweights.model.ModelStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
-class DashboardViewModel @Inject constructor(
-    usage: UsageRepository,
-    modelStore: ModelStore,
-) : ViewModel() {
+class DashboardViewModel @Inject constructor(usage: UsageRepository, modelStore: ModelStore) :
+    ViewModel() {
     val uiState: StateFlow<UsageSummary> = usage.observeSummary()
         // The ledger predates second runtimes, so which engine a model ran on is read off
         // what is installed: a usage row whose weights are a .pte on disk ran ExecuTorch.

@@ -207,18 +207,12 @@ class ExecuTorchEngine(
         // cache is unusable rather than merely unknown, so it is dropped: a retry that
         // trusted the old record would send the same suffix at an already-advanced position
         // and duplicate it.
-        var produced = 0
+        val discipline = StopDiscipline(budget)
         val outcome = try {
             bridge.generate(fresh, budget) { fragment ->
                 if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
                 reply.accept(fragment)?.let { trySend(GenerationEvent.Token(it)) }
-                // The budget is enforced here as well as passed down, because passing it
-                // down turned out to be advisory: on-device, a 768-token budget behind a
-                // 405-token SmolLM3 prompt resolved to 1643 in the runner and the model
-                // wrote until the window was full. One callback is one token, so counting
-                // callbacks is exact, and stop() is the same lever the markers pull.
-                produced += 1
-                if (reply.endedCleanly || produced >= budget) bridge.stop()
+                if (discipline.shouldStop(fragment, reply.endedCleanly)) bridge.stop()
             }
         } catch (failure: Throwable) {
             fedText = ""
@@ -362,6 +356,36 @@ class ExecuTorchEngine(
          * this is the value the model is opened with and [SamplerParams] cannot move it.
          */
         const val DEFAULT_TEMPERATURE = 0.8f
+    }
+}
+
+/**
+ * When a generation has to be cut, decided a callback at a time.
+ *
+ * Three reasons, all enforced here because the runtime enforces none of them. The budget
+ * passed down turned out to be advisory: on-device, a 768-token budget behind a 405-token
+ * SmolLM3 prompt resolved to 1643 in the runner and the model wrote until the window was
+ * full; one callback is one token, so counting callbacks is exact. And this runtime's
+ * sampler has no repetition penalty, so a greedy model in a rut emits one token forever —
+ * measured: SmolLM3 filled its budget with a control character after a tool result. The
+ * same token thirty-two times in a row is a rut, never prose; whole-word loops stay the
+ * model's own.
+ */
+private class StopDiscipline(private val budget: Int) {
+    private var produced = 0
+    private var lastFragment = ""
+    private var repeats = 0
+
+    fun shouldStop(fragment: String, endedCleanly: Boolean): Boolean {
+        produced += 1
+        repeats = if (fragment == lastFragment) repeats + 1 else 0
+        lastFragment = fragment
+        return endedCleanly || produced >= budget || repeats >= MAX_TOKEN_RUT
+    }
+
+    private companion object {
+        /** Identical consecutive tokens before generation is cut as degenerate. */
+        const val MAX_TOKEN_RUT = 32
     }
 }
 

@@ -44,6 +44,14 @@ data class ModelUsage(
     val generatedTokens: Long,
     val replies: Int,
     val averageTokensPerSecond: Double?,
+    /**
+     * The runtime the model runs on, when it is not the default one.
+     *
+     * Filled in by the dashboard from what is installed, not stored: the ledger predates
+     * second runtimes and a usage row is about work done, not about engines. Null for
+     * llama.cpp, which is the unmarked case.
+     */
+    val runtime: String? = null,
 )
 
 /** Everything the dashboard shows. All of it derived from the local ledger. */

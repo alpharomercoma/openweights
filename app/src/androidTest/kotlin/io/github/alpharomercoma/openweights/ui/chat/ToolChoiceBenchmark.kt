@@ -33,12 +33,14 @@ import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
 import io.github.alpharomercoma.openweights.core.tools.CallFormat
+import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
@@ -420,10 +422,10 @@ class ToolChoiceBenchmark {
         return ToolRegistry(
             listOf(
                 WebSearchTool(client, SearchSettings(context), Reachability { true }),
-                FetchUrlTool(client, Reachability { true }),
+                FetchUrlTool(client, Reachability { true }, workspace, SessionArtifacts()),
                 SearchFilesTool(workspace),
                 ReadFileTool(workspace),
-                WriteFileTool(workspace),
+                WriteFileTool(workspace, SessionArtifacts(), CanvasBoard()),
                 RunScriptTool(Sandbox(context), workspace),
             ).filter { it.isAvailable },
         )

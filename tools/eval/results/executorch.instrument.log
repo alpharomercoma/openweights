@@ -10,77 +10,14 @@ INSTRUMENTATION_STATUS: class=io.github.alpharomercoma.openweights.core.engine.e
 INSTRUMENTATION_STATUS: current=1
 INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
 INSTRUMENTATION_STATUS: numtests=1
-INSTRUMENTATION_STATUS: stack=org.pytorch.executorch.ExecutorchRuntimeException$ExecutorchInvalidArgumentException: [ExecuTorch Error 0x12] Invalid argument: Failed to generate | nativeLog=[805816350125 print_report stats.h:205] I Time to first generated token: 2.182000 (seconds) [805816352663 print_report stats.h:212] I Sampling time over 221 tokens: 0.748000 (seconds) [805819870433 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [836074390742 generate text_llm_runner.cpp:207] I Max new tokens resolved: 1643, given pos_ 405, num_prompt_tokens 405, max_context_len 2048 [836074934511 generate text_llm_runner.cpp:230] I RSS after prompt prefill: 3258.941406 MiB (0 if unsupported) [1018921631984 generate text_llm_runner.cpp:260] I RSS after finishing text generation: 3258.941406 MiB (0 if unsupported) [1018921784907 generate text_llm_runner.cpp:263] I Max new tokens 1643 reached! [1018921816907 print_report stats.h:161] I Prompt Tokens: 405 Generated Tokens: 1642 [1018921821907 print_report stats.h:167] I Model Load Time: 0.000000 (seconds) [1018921826445 print_report stats.h:176] I Total inference time: 213.102000 (seconds) Rate: 7.705230 (tokens/second) [1018921831138 print_report stats.h:185] I Prompt evaluation: 30.255000 (seconds) Rate: 13.386217 (tokens/second) [1018921836368 print_report stats.h:197] I Generated 1642 tokens: 182.847000 (seconds) Rate: 8.980186 (tokens/second) [1018921842214 print_report stats.h:205] I Time to first generated token: 30.255000 (seconds) [1018921846138 print_report stats.h:212] I Sampling time over 2047 tokens: 1.811000 (seconds) [1018932843445 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [1018937895676 generate text_llm_runner.cpp:160] E pos_ 0 + num_prompt_tokens 2073 >= max_context_len 2048, Max seq length exceeded - please increase max seq len value in your export script
-	at org.pytorch.executorch.ExecutorchRuntimeException$Companion.makeExecutorchException(ExecutorchRuntimeException.kt:144)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:510)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:379)
-	at io.github.alpharomercoma.openweights.core.engine.NativeExecuTorchBridge.generate(NativeExecuTorchBridge.kt:97)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invokeSuspend(ExecuTorchEngine.kt:211)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:8)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:4)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo$suspendImpl(Builders.kt:316)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo(Builders.kt:0)
-	at kotlinx.coroutines.flow.internal.ChannelFlow$collectToFun$1.invokeSuspend(ChannelFlow.kt:56)
-	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
-	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-
-INSTRUMENTATION_STATUS: stream=
-Error in evaluateEveryPushedPte(io.github.alpharomercoma.openweights.core.engine.eval.ExecuTorchParityEval):
-org.pytorch.executorch.ExecutorchRuntimeException$ExecutorchInvalidArgumentException: [ExecuTorch Error 0x12] Invalid argument: Failed to generate | nativeLog=[805816350125 print_report stats.h:205] I Time to first generated token: 2.182000 (seconds) [805816352663 print_report stats.h:212] I Sampling time over 221 tokens: 0.748000 (seconds) [805819870433 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [836074390742 generate text_llm_runner.cpp:207] I Max new tokens resolved: 1643, given pos_ 405, num_prompt_tokens 405, max_context_len 2048 [836074934511 generate text_llm_runner.cpp:230] I RSS after prompt prefill: 3258.941406 MiB (0 if unsupported) [1018921631984 generate text_llm_runner.cpp:260] I RSS after finishing text generation: 3258.941406 MiB (0 if unsupported) [1018921784907 generate text_llm_runner.cpp:263] I Max new tokens 1643 reached! [1018921816907 print_report stats.h:161] I Prompt Tokens: 405 Generated Tokens: 1642 [1018921821907 print_report stats.h:167] I Model Load Time: 0.000000 (seconds) [1018921826445 print_report stats.h:176] I Total inference time: 213.102000 (seconds) Rate: 7.705230 (tokens/second) [1018921831138 print_report stats.h:185] I Prompt evaluation: 30.255000 (seconds) Rate: 13.386217 (tokens/second) [1018921836368 print_report stats.h:197] I Generated 1642 tokens: 182.847000 (seconds) Rate: 8.980186 (tokens/second) [1018921842214 print_report stats.h:205] I Time to first generated token: 30.255000 (seconds) [1018921846138 print_report stats.h:212] I Sampling time over 2047 tokens: 1.811000 (seconds) [1018932843445 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [1018937895676 generate text_llm_runner.cpp:160] E pos_ 0 + num_prompt_tokens 2073 >= max_context_len 2048, Max seq length exceeded - please increase max seq len value in your export script
-	at org.pytorch.executorch.ExecutorchRuntimeException$Companion.makeExecutorchException(ExecutorchRuntimeException.kt:144)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:510)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:379)
-	at io.github.alpharomercoma.openweights.core.engine.NativeExecuTorchBridge.generate(NativeExecuTorchBridge.kt:97)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invokeSuspend(ExecuTorchEngine.kt:211)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:8)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:4)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo$suspendImpl(Builders.kt:316)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo(Builders.kt:0)
-	at kotlinx.coroutines.flow.internal.ChannelFlow$collectToFun$1.invokeSuspend(ChannelFlow.kt:56)
-	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
-	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
-
+INSTRUMENTATION_STATUS: stream=.
 INSTRUMENTATION_STATUS: test=evaluateEveryPushedPte
-INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 1,019.471
-There was 1 failure:
-1) evaluateEveryPushedPte(io.github.alpharomercoma.openweights.core.engine.eval.ExecuTorchParityEval)
-org.pytorch.executorch.ExecutorchRuntimeException$ExecutorchInvalidArgumentException: [ExecuTorch Error 0x12] Invalid argument: Failed to generate | nativeLog=[805816350125 print_report stats.h:205] I Time to first generated token: 2.182000 (seconds) [805816352663 print_report stats.h:212] I Sampling time over 221 tokens: 0.748000 (seconds) [805819870433 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [836074390742 generate text_llm_runner.cpp:207] I Max new tokens resolved: 1643, given pos_ 405, num_prompt_tokens 405, max_context_len 2048 [836074934511 generate text_llm_runner.cpp:230] I RSS after prompt prefill: 3258.941406 MiB (0 if unsupported) [1018921631984 generate text_llm_runner.cpp:260] I RSS after finishing text generation: 3258.941406 MiB (0 if unsupported) [1018921784907 generate text_llm_runner.cpp:263] I Max new tokens 1643 reached! [1018921816907 print_report stats.h:161] I Prompt Tokens: 405 Generated Tokens: 1642 [1018921821907 print_report stats.h:167] I Model Load Time: 0.000000 (seconds) [1018921826445 print_report stats.h:176] I Total inference time: 213.102000 (seconds) Rate: 7.705230 (tokens/second) [1018921831138 print_report stats.h:185] I Prompt evaluation: 30.255000 (seconds) Rate: 13.386217 (tokens/second) [1018921836368 print_report stats.h:197] I Generated 1642 tokens: 182.847000 (seconds) Rate: 8.980186 (tokens/second) [1018921842214 print_report stats.h:205] I Time to first generated token: 30.255000 (seconds) [1018921846138 print_report stats.h:212] I Sampling time over 2047 tokens: 1.811000 (seconds) [1018932843445 generate text_llm_runner.cpp:93] I RSS after loading model: 3258.941406 MiB (0 if unsupported) [1018937895676 generate text_llm_runner.cpp:160] E pos_ 0 + num_prompt_tokens 2073 >= max_context_len 2048, Max seq length exceeded - please increase max seq len value in your export script
-	at org.pytorch.executorch.ExecutorchRuntimeException$Companion.makeExecutorchException(ExecutorchRuntimeException.kt:144)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:510)
-	at org.pytorch.executorch.extension.llm.LlmModule.generate(LlmModule.kt:379)
-	at io.github.alpharomercoma.openweights.core.engine.NativeExecuTorchBridge.generate(NativeExecuTorchBridge.kt:97)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invokeSuspend(ExecuTorchEngine.kt:211)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:8)
-	at io.github.alpharomercoma.openweights.core.engine.ExecuTorchEngine$chat$1.invoke(ExecuTorchEngine.kt:4)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo$suspendImpl(Builders.kt:316)
-	at kotlinx.coroutines.flow.ChannelFlowBuilder.collectTo(Builders.kt:0)
-	at kotlinx.coroutines.flow.internal.ChannelFlow$collectToFun$1.invokeSuspend(ChannelFlow.kt:56)
-	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
-	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
-	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
-	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:798)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
-	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+Time: 544.32
 
-FAILURES!!!
-Tests run: 1,  Failures: 1
+OK (1 test)
 
 
 INSTRUMENTATION_CODE: -1

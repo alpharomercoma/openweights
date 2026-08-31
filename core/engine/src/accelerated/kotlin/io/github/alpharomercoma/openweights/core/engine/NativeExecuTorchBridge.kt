@@ -99,11 +99,11 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
                 prompt,
                 config,
                 object : LlmCallback {
-                override fun onResult(result: String) = onToken(result)
+                    override fun onResult(result: String) = onToken(result)
 
-                override fun onStats(stats: String) {
-                    this@NativeExecuTorchBridge.lastStats = stats
-                }
+                    override fun onStats(stats: String) {
+                        this@NativeExecuTorchBridge.lastStats = stats
+                    }
 
                     override fun onError(errorCode: Int, message: String) {
                         this@NativeExecuTorchBridge.lastError =

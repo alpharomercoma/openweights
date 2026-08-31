@@ -94,7 +94,11 @@ object ParitySuite {
                 ),
             )
         }
-        result(results, "format-constraint", Regex("mercury[\"',\\s\\]]+venus[\"',\\s\\]]+earth", RegexOption.IGNORE_CASE)) {
+        result(
+            results,
+            "format-constraint",
+            Regex("mercury[\"',\\s\\]]+venus[\"',\\s\\]]+earth", RegexOption.IGNORE_CASE),
+        ) {
             turn(
                 engine,
                 user(
@@ -198,26 +202,25 @@ object ParitySuite {
         )
     }
 
-    private fun graded(id: String, turn: Turn, pass: () -> Boolean): JSONObject =
-        JSONObject()
-            .put("id", id)
-            .put("status", if (pass()) "pass" else "fail")
-            .put("content", turn.content)
-            .put("reasoning_chars", turn.reasoning.length)
-            .put("raw", turn.raw)
-            .put(
-                "calls",
-                JSONArray().apply {
-                    turn.calls.forEach {
-                        put(JSONObject().put("name", it.name).put("arguments", it.argumentsJson))
-                    }
-                },
-            )
-            .put("prompt_tokens", turn.done.stats.promptTokens)
-            .put("cached_tokens", turn.done.stats.cachedTokens)
-            .put("generated_tokens", turn.done.stats.generatedTokens)
-            .put("prefill_ms", turn.done.stats.prefillMs)
-            .put("decode_ms", turn.done.stats.decodeMs)
+    private fun graded(id: String, turn: Turn, pass: () -> Boolean): JSONObject = JSONObject()
+        .put("id", id)
+        .put("status", if (pass()) "pass" else "fail")
+        .put("content", turn.content)
+        .put("reasoning_chars", turn.reasoning.length)
+        .put("raw", turn.raw)
+        .put(
+            "calls",
+            JSONArray().apply {
+                turn.calls.forEach {
+                    put(JSONObject().put("name", it.name).put("arguments", it.argumentsJson))
+                }
+            },
+        )
+        .put("prompt_tokens", turn.done.stats.promptTokens)
+        .put("cached_tokens", turn.done.stats.cachedTokens)
+        .put("generated_tokens", turn.done.stats.generatedTokens)
+        .put("prefill_ms", turn.done.stats.prefillMs)
+        .put("decode_ms", turn.done.stats.decodeMs)
 
     private fun skipped(id: String): JSONObject =
         JSONObject().put("id", id).put("status", "skipped")

@@ -21,12 +21,14 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
+import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
@@ -67,10 +69,10 @@ class ToolCatalogueTest {
             // Online, because this test is about what the catalogue says rather than about
             // when it is offered.
             WebSearchTool(client, SearchSettings(context), Reachability { true }),
-            FetchUrlTool(client, Reachability { true }),
+            FetchUrlTool(client, Reachability { true }, workspace, SessionArtifacts()),
             SearchFilesTool(workspace),
             ReadFileTool(workspace),
-            WriteFileTool(workspace),
+            WriteFileTool(workspace, SessionArtifacts(), CanvasBoard()),
             RunScriptTool(Sandbox(context), workspace),
         )
     }
@@ -185,8 +187,13 @@ class ToolCatalogueTest {
          *
          * The property this ceiling exists for is unchanged: the margin absorbs a copy
          * edit, and a fourth default tool, which costs 40 to 90 tokens, still trips it.
+         *
+         * 512 became 576 when fetch_url gained save_to: a page larger than the context
+         * window can now land in a file for the sandbox to work through, which is the
+         * capability that makes fetch-then-parse a loop instead of a dead end. About 25
+         * tokens after trimming, paid consciously.
          */
-        const val DEFAULT_CEILING = 512
+        const val DEFAULT_CEILING = 576
 
         /**
          * And what all of them cost, once a folder has been shared: was 672 tokens, now
@@ -223,7 +230,14 @@ class ToolCatalogueTest {
          * suite: with "search" in the tool's name, five to eight of eight facts misrouted
          * whatever the descriptions said; named show_pictures, zero did. The tokens this
          * bought are the ones carrying that measurement.
+         *
+         * 896 became 1024 with the agentic development path: delete_file completed the
+         * file quartet, and show_website and show_document put the work on screen, plus
+         * one sentence teaching a project folder per task. About 130 tokens for the
+         * feature the app is for — building things on the phone — and the choice-accuracy
+         * cost is bounded by the same isAvailable gate: none of it is described until a
+         * folder has been shared.
          */
-        const val FULL_CEILING = 896
+        const val FULL_CEILING = 1024
     }
 }

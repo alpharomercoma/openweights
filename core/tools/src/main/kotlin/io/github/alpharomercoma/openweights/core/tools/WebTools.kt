@@ -285,7 +285,7 @@ class FetchUrlTool @Inject constructor(
                 },
                 "save_to": {
                   "type": "string",
-                  "description": "Optional: also save the page's text as this file in the shared folder, like research/page.txt, so a script can work through it"
+                  "description": "Optional file path to save the page's text into the shared folder for scripts"
                 }
               },
               "required": ["url"]

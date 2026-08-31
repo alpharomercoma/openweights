@@ -131,6 +131,7 @@
     <string name="watch_notification_progress">Pagsusuri %1$d ng %2$d · susunod</string>
     <string name="watch_notification_progress_last">Pagsusuri %1$d ng %2$d</string>
     <string name="watch_notification_ended">Kusang tumigil pagkatapos ng %1$d na pagsusuri</string>
+    <string name="watch_notification_failed">Huminto: tatlong sunod-sunod na pagsusuri ang nabigo. Buksan ang app para makita ang huling error.</string>
     <string name="watch_duration_hm">%1$d oras %2$d min</string>
     <string name="watch_duration_m">%1$d min</string>
     <string name="watch_duration_ms">%1$d min %2$02d seg</string>
@@ -141,7 +142,7 @@
     <string name="folder_lost">Hindi maabot ang folder na ito ngayon. Piliin itong muli para magpatuloy.</string>
     <string name="folder_readonly">Nababasa, ngunit hindi ito tatanggap ng bagong file, kaya naka-off ang pag-save.</string>
     <string name="folder_ready">Kayang hanapin, basahin, at pagsave-an ito ng modelo.</string>
-    <string name="proxy_hint">http://host:port o socks5://host:port</string>
+    <string name="proxy_hint">http://user:pass@host:3128 o socks5h://127.0.0.1:9150</string>
     <string name="goal_planning">Pinaplano ang layunin</string>
     <string name="goal_working">Isinasagawa ang layunin</string>
     <string name="goal_done">Tapos na ang layunin</string>
@@ -182,6 +183,7 @@
     <string name="context_length_tokens">Haba ng konteksto: %1$d token</string>
     <string name="downloading_percent">Dina-download %1$d%%</string>
     <string name="needs_newer_version">Kailangan ng mas bagong OpenWeights: hindi kayang i-load ng bersyong ito ang mga modelong %1$s.</string>
+    <string name="draft">Draft</string>
     <string name="draft_model_not_a_model">Isang draft na modelo para sa speculative decoding, hindi ito sumasagot nang mag-isa. Gumagana lang ito kasama ang buong modelong pinapabilis nito.</string>
     <string name="header_read_failed">Hindi mabasa ang header ng file: %1$s</string>
     <string name="fit_comfortable">Maayos na tatakbo</string>

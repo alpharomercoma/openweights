@@ -63,6 +63,7 @@ import io.github.alpharomercoma.openweights.core.data.UsageSummary
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -128,6 +129,7 @@ fun DashboardScreen(
             Column(
                 modifier = Modifier.fillMaxSize().padding(padding)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                    .readableColumn()
                     .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -146,6 +148,7 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .readableColumn()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -213,8 +216,35 @@ private fun StatGrid(summary: UsageSummary) {
             )
             Stat("Computing", summary.lifetimeInferenceMs.asDuration(), Modifier.weight(1f))
         }
+        // The blended figure above answers "how much of the day"; these two answer the
+        // question a developer actually brings here. Prefill is compute-bound and scales
+        // with the prompt, decode is bandwidth-bound and scales with the reply, and one
+        // averaged number moves when conversation habits do rather than when the phone
+        // or the model does. The row appears once a reply has been measured with the
+        // split, so old ledgers do not show two tiles of "not yet".
+        if (summary.prefillTokensPerSecond != null || summary.decodeTokensPerSecond != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.height(IntrinsicSize.Min),
+            ) {
+                Stat(
+                    label = "Prefill",
+                    value = summary.prefillTokensPerSecond.asRate(),
+                    modifier = Modifier.weight(1f),
+                )
+                Stat(
+                    label = "Decode",
+                    value = summary.decodeTokensPerSecond.asRate(),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }
+
+/** A throughput for a tile, or the honest word for one not measured yet. */
+private fun Double?.asRate(): String =
+    this?.let { String.format(Locale.getDefault(), "%.1f tok/s", it) } ?: "not yet"
 
 /**
  * What today added, and how that compares with yesterday.
@@ -414,13 +444,36 @@ private fun ModelBreakdown(models: List<ModelUsage>) {
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    // The one measurement on this screen, so the one thing that earns the
-                    // data scale. Token counts are volume, not health: colouring those by
-                    // size would say a busy day was a fast one.
-                    model.averageTokensPerSecond?.let { rate ->
-                        Metric(
-                            text = String.format(locale, "· %.1f tok/s", rate),
-                            color = signalColor((rate / FAST_TOKENS_PER_SECOND).toFloat(), dark),
+                    // The measurements on this screen, so the things that earn the data
+                    // scale. Token counts are volume, not health: colouring those by size
+                    // would say a busy day was a fast one. Decode is the coloured one,
+                    // because it is the speed the user feels while a reply streams;
+                    // prefill sits beside it in plain type, named, because an unlabelled
+                    // tok/s does not say which half of the work it measured. The blended
+                    // average only appears while no split has been measured for the model.
+                    val decode = model.decodeTokensPerSecond
+                    val prefill = model.prefillTokensPerSecond
+                    val blended = model.averageTokensPerSecond
+                    when {
+                        decode != null -> {
+                            prefill?.let {
+                                Metric(String.format(locale, "· prefill %.0f", it))
+                            }
+                            Metric(
+                                text = String.format(locale, "· decode %.1f tok/s", decode),
+                                color = signalColor(
+                                    (decode / FAST_TOKENS_PER_SECOND).toFloat(),
+                                    dark,
+                                ),
+                            )
+                        }
+
+                        blended != null -> Metric(
+                            text = String.format(locale, "· %.1f tok/s", blended),
+                            color = signalColor(
+                                (blended / FAST_TOKENS_PER_SECOND).toFloat(),
+                                dark,
+                            ),
                         )
                     }
                 }

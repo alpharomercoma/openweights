@@ -66,6 +66,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_13_14,
         OpenWeightsDatabase.MIGRATION_14_15,
         OpenWeightsDatabase.MIGRATION_15_16,
+        OpenWeightsDatabase.MIGRATION_16_17,
     )
 
     @Test
@@ -413,6 +414,25 @@ class MigrationTest {
                 .isEqualTo("About Ada")
             assertThat(db.isNullAt("SELECT pinnedAt FROM conversations WHERE id = 1")).isTrue()
             assertThat(db.isNullAt("SELECT archivedAt FROM conversations WHERE id = 1")).isTrue()
+        }
+    }
+
+    @Test
+    fun `every existing conversation arrives with an empty draft, not a null one`() {
+        // NOT NULL DEFAULT '': "no draft" and "an empty composer" are the same fact, and a
+        // nullable column would have made them two spellings of it for every reader.
+        helper.createDatabase(16).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(17, migrations.toList()).use { db ->
+            assertThat(db.textAt("SELECT draft FROM conversations WHERE id = 1")).isEmpty()
+            assertThat(db.textAt("SELECT title FROM conversations WHERE id = 1"))
+                .isEqualTo("About Ada")
         }
     }
 }

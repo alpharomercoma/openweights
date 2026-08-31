@@ -62,50 +62,70 @@ internal object Degeneration {
      * taken over the whole reply would be diluted by the good part until the bad part
      * outgrew it. Looking only at the tail also keeps the cost flat as the answer grows.
      */
-    private const val TAIL = 800
+    private const val TAIL = 1_800
 
     /**
-     * How many times over the fragment must appear to count.
+     * How many consecutive copies of a long block count as a loop.
      *
-     * Three, back to back. Twice is a sentence someone chose to repeat for effect, or a
-     * heading that follows its own rule; three consecutive identical runs filling the whole
-     * tail of the reply is not something prose does.
+     * Three: twice is a sentence someone chose to repeat for effect, or a heading that
+     * follows its own rule; the same several-hundred-character block three times in a row
+     * with nothing between the copies is not something prose does. Three rather than four,
+     * and against the reply's *suffix* rather than the whole tail, because the failure this
+     * guard was watched missing was SmolLM2 repeating its entire answer: the old test asked
+     * whether the whole examined window was one fragment over and over, so the longest
+     * period it could see was the window over the run count, and a model echoing a block
+     * longer than that ran its whole budget with the guard watching. The user met the
+     * failure as an error that only arrived when the budget did.
      */
-    private const val MIN_RUNS = 4
+    private const val MIN_RUNS = 3
+
+    /**
+     * The least looped text, in characters, accepted as proof at any period.
+     *
+     * Three runs is the right bar for a three-hundred-character block and a terrible one
+     * for a short string: every reply ending in "!!!" would qualify. So short periods must
+     * fill this floor instead — six hundred characters of the same word or line, which is
+     * roughly what the old whole-tail test demanded — and the run count only becomes the
+     * binding rule once one copy is two hundred characters or more.
+     */
+    private const val MIN_EVIDENCE = 600
 
     /**
      * True when the reply now ends in the same fragment written back to back.
      *
-     * Back to back is the whole test, and it is what makes this safe to run on every answer.
-     * An earlier version asked whether some long fragment covered half the reply, which is
-     * the shape Hermes looks for, and it fired on perfectly good output: a list of thirty
-     * items sharing a sixty-character template, or a paragraph pattern reused per section,
-     * is half-identical by construction and is not repeating itself in the sense that
-     * matters. Hermes can afford that measure because it only asks the question about a
-     * reply that already hit its length cap; this asks mid-stream, about everything, so it
-     * has to be the stricter question.
+     * Back to back, at the very end, is the whole test, and it is what makes this safe to
+     * run on every answer. An earlier version asked whether some long fragment covered half
+     * the reply, which is the shape Hermes looks for, and it fired on perfectly good
+     * output: a list of thirty items sharing a sixty-character template, or a paragraph
+     * pattern reused per section, is half-identical by construction and is not repeating
+     * itself in the sense that matters. Hermes can afford that measure because it only asks
+     * the question about a reply that already hit its length cap; this asks mid-stream,
+     * about everything, so it has to be the stricter question.
      *
      * A degenerate model does not sprinkle a fragment through an answer, it emits the same
-     * bytes immediately again, and periodicity says exactly that and nothing else.
+     * bytes immediately again, and suffix periodicity says exactly that and nothing else.
      */
     fun dominates(text: String): Boolean {
         if (text.length < MIN_CHARS) return false
         val tail = text.takeLast(TAIL)
-        val longest = tail.length / MIN_RUNS
-        for (period in 1..longest) {
-            if (repeatsWithPeriod(tail, period)) return true
+        for (period in 1..(tail.length / MIN_RUNS)) {
+            val needed = maxOf(period * MIN_RUNS, MIN_EVIDENCE)
+            if (needed > tail.length) break
+            if (suffixRepeats(tail, period, needed)) return true
         }
         return false
     }
 
     /**
-     * Whether [tail] is the same [period] characters over and over, with nothing else in it.
+     * Whether the last [needed] characters of [tail] are the same [period] characters over
+     * and over, with nothing else in them.
      *
      * Compared against the character [period] places back rather than by cutting the string
      * into pieces, which is the same test without allocating a fragment per candidate.
      */
-    private fun repeatsWithPeriod(tail: String, period: Int): Boolean {
-        for (index in period until tail.length) {
+    private fun suffixRepeats(tail: String, period: Int, needed: Int): Boolean {
+        val start = tail.length - needed
+        for (index in start + period until tail.length) {
             if (tail[index] != tail[index - period]) return false
         }
         return true

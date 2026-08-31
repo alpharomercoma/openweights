@@ -40,6 +40,7 @@ import io.github.alpharomercoma.openweights.ui.chat.FakeInferenceEngine
 import io.github.alpharomercoma.openweights.ui.chat.ModelRuntime
 import io.github.alpharomercoma.openweights.ui.chat.TurnRunner
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -119,7 +120,7 @@ class WatchRunnerTest {
         engine.hold = true
         val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
-        val ticking = launch { runner.tick(watch.id, now = 1) }
+        val ticking = launch { runner.tick(watch.id, now = NOW + 15 * MINUTE) }
         advanceUntilIdle()
         // The turn is in flight and nothing has come back. Whatever stops the process here,
         // a paused watch or a reclaimed worker, arrives as a cancellation.
@@ -138,7 +139,7 @@ class WatchRunnerTest {
         val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
         repeat(3) { round ->
-            val ticking = launch { runner.tick(watch.id, now = round.toLong()) }
+            val ticking = launch { runner.tick(watch.id, now = NOW + (round + 1) * 15 * MINUTE) }
             advanceUntilIdle()
             ticking.cancel()
             advanceUntilIdle()
@@ -149,10 +150,25 @@ class WatchRunnerTest {
     }
 
     @Test
+    fun `a tick ahead of its deadline does nothing at all`() = runTest {
+        // The fifteen-minute backstop arriving while the ticker is alive: running it would
+        // spend budget early and rewrite the countdown under the screen. Nothing recorded,
+        // nothing counted, and the watch untouched.
+        loadedEngine()
+        val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
+
+        val outcome = runner.tick(watch.id, now = NOW + MINUTE)
+
+        assertThat(outcome).isNull()
+        assertThat(database.watchRuns().observeRuns(watch.id, 10).first().size).isEqualTo(0)
+        assertThat(requireNotNull(watches.byId(watch.id)).isActive).isTrue()
+    }
+
+    @Test
     fun `a tick with no model loaded is skipped rather than failed`() = runTest {
         val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
-        val outcome = runner.tick(watch.id, now = 1)
+        val outcome = runner.tick(watch.id, now = NOW + 15 * MINUTE)
 
         assertThat(outcome).isEqualTo(WatchOutcome.SKIPPED)
         assertThat(requireNotNull(watches.byId(watch.id)).consecutiveFailures).isEqualTo(0)
@@ -160,7 +176,7 @@ class WatchRunnerTest {
 
     @Test
     fun `a tick for a watch that is gone reports nothing to reschedule`() = runTest {
-        assertThat(runner.tick(watchId = 404, now = 1)).isNull()
+        assertThat(runner.tick(watchId = 404, now = NOW)).isNull()
     }
 
     /**
@@ -173,7 +189,7 @@ class WatchRunnerTest {
         loadedEngine()
         val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
-        val outcome = runner.tick(watch.id, now = 1)
+        val outcome = runner.tick(watch.id, now = NOW + 15 * MINUTE)
 
         assertThat(outcome).isEqualTo(WatchOutcome.CHECKED)
         val manager = ApplicationProvider.getApplicationContext<android.app.Application>()
@@ -188,7 +204,7 @@ class WatchRunnerTest {
     fun `a skipped tick posts no notification`() = runTest {
         val watch = requireNotNull(watches.add("Check the tides", everyMinutes = 15, now = NOW))
 
-        val outcome = runner.tick(watch.id, now = 1)
+        val outcome = runner.tick(watch.id, now = NOW + 15 * MINUTE)
 
         assertThat(outcome).isEqualTo(WatchOutcome.SKIPPED)
         val manager = ApplicationProvider.getApplicationContext<android.app.Application>()
@@ -209,7 +225,7 @@ class WatchRunnerTest {
         loadedEngine()
         val watch = requireNotNull(watches.add("Remind me to stretch", everyMinutes = 5, now = NOW))
 
-        runner.tick(watch.id, now = 1)
+        runner.tick(watch.id, now = NOW + 5 * MINUTE)
 
         val systemPrompt = engine.prompts.last().first { it.role == ChatRole.SYSTEM }.text
         assertThat(systemPrompt).contains("due now")
@@ -225,5 +241,6 @@ class WatchRunnerTest {
          * before its first tick and ends rather than running.
          */
         val NOW: Long = System.currentTimeMillis()
+        const val MINUTE: Long = 60_000
     }
 }

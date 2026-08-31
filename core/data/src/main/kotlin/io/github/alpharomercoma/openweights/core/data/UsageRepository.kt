@@ -45,6 +45,17 @@ data class ModelUsage(
     val replies: Int,
     val averageTokensPerSecond: Double?,
     /**
+     * Decode-only throughput, from the decode columns alone.
+     *
+     * [averageTokensPerSecond] divides by prefill time as well and is the honest "how much
+     * of the day did this cost" number; this one is the model's own writing speed, which
+     * is what a developer comparing engines actually wants on the row. Null until a reply
+     * has been recorded by a version that measured the split.
+     */
+    val decodeTokensPerSecond: Double? = null,
+    /** Prompt-reading throughput, the prefill mirror of [decodeTokensPerSecond]. */
+    val prefillTokensPerSecond: Double? = null,
+    /**
      * The runtime the model runs on, when it is not the default one.
      *
      * Filled in by the dashboard from what is installed, not stored: the ledger predates
@@ -59,6 +70,10 @@ data class UsageSummary(
     val lifetimePromptTokens: Long = 0,
     val lifetimeGeneratedTokens: Long = 0,
     val lifetimeInferenceMs: Long = 0,
+    val lifetimeDecodeMs: Long = 0,
+    val lifetimeDecodeTokens: Long = 0,
+    val lifetimePrefillMs: Long = 0,
+    val lifetimePrefillTokens: Long = 0,
     val replies: Int = 0,
     val conversations: Int = 0,
     val activeDays: Int = 0,
@@ -94,10 +109,28 @@ data class UsageSummary(
             null
         }
 
+    /**
+     * Lifetime decode-only speed, and its prefill mirror.
+     *
+     * Split out because one blended number answers neither question a developer brings to
+     * this screen: prefill is bound by compute and scales with the prompt, decode is bound
+     * by memory bandwidth and scales with the reply, and averaging them produces a figure
+     * that changes when conversation habits do rather than when anything about the phone
+     * or the model does. Null until a reply has been recorded with the split measured.
+     */
+    val decodeTokensPerSecond: Double? = rate(lifetimeDecodeTokens, lifetimeDecodeMs)
+    val prefillTokensPerSecond: Double? = rate(lifetimePrefillTokens, lifetimePrefillMs)
+
     private companion object {
         const val MILLIS_PER_SECOND = 1000.0
     }
 }
+
+private fun rate(tokens: Long, millis: Long): Double? =
+    if (millis > 0 && tokens > 0) tokens * MILLIS_PER_SECOND_TOP / millis else null
+
+/** File level, because [UsageSummary]'s computed rates run before its companion exists. */
+private const val MILLIS_PER_SECOND_TOP = 1000.0
 
 /**
  * Reads the usage ledger.
@@ -140,6 +173,10 @@ class UsageRepository @Inject constructor(
         lifetimePromptTokens = sumOf { it.promptTokens },
         lifetimeGeneratedTokens = sumOf { it.generatedTokens },
         lifetimeInferenceMs = sumOf { it.inferenceMs },
+        lifetimeDecodeMs = sumOf { it.decodeMs },
+        lifetimeDecodeTokens = sumOf { it.decodeTokens },
+        lifetimePrefillMs = sumOf { it.prefillMs },
+        lifetimePrefillTokens = sumOf { it.prefillTokens },
         replies = sumOf { it.replies },
         conversations = conversationCount,
         activeDays = distinctBy { it.day }.size,
@@ -159,6 +196,18 @@ class UsageRepository @Inject constructor(
                     } else {
                         null
                     },
+                    // Sums over rows, not averages of averages: a model with one long
+                    // reply and one short must not count them equally. Rows written
+                    // before the split existed hold zero in all four columns, so they
+                    // drop out of the rate on their own.
+                    decodeTokensPerSecond = rate(
+                        entries.sumOf { it.decodeTokens },
+                        entries.sumOf { it.decodeMs },
+                    ),
+                    prefillTokensPerSecond = rate(
+                        entries.sumOf { it.prefillTokens },
+                        entries.sumOf { it.prefillMs },
+                    ),
                 )
             }
             .sortedByDescending { it.generatedTokens },

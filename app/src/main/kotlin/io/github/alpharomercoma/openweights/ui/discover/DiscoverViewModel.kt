@@ -267,7 +267,15 @@ class DiscoverViewModel @Inject constructor(
                     // A shortlist is fetched by name, not searched for. Typing in the box
                     // means the shortlist is not what is being asked for any more.
                     query.recommendedOnly && query.text.isBlank() ->
-                        HubSearchPage(client.recommended())
+                        HubSearchPage(
+                            client.recommended().filter {
+                                // A compiled recommendation on a build without the engine
+                                // to run it would be a row whose install button explains
+                                // itself away. Dropped here rather than in the client,
+                                // which does not know what this binary shipped with.
+                                !it.isCompiled || ExecuTorchSupport.AVAILABLE
+                            },
+                        )
                     query.officialOnly -> officialPage(query, cursor = null)
                     else -> client.searchPage(query)
                 }

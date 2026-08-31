@@ -172,4 +172,36 @@ class DegenerationTest {
 
         assertThat(Degeneration.dominates(answer)).isFalse()
     }
+
+    @Test
+    fun `a whole answer repeated is caught after the third copy`() {
+        // The SmolLM2 failure as observed: not one word in a rut but the entire answer,
+        // a block of a few hundred characters, emitted again and again. A window of 800
+        // over four runs could never see a period this long, so the loop ran the whole
+        // budget with the guard watching.
+        val block = buildString {
+            append("The capital of France is Paris. Paris has been the capital since ")
+            append("the tenth century and is home to over two million people within the ")
+            append("city limits. It is known for the Eiffel Tower, the Louvre, and its ")
+            append("many cafes along the Seine. Is there anything else you would like ")
+            append("to know about it today? ")
+        }
+        val looping = "Here is your answer. " + block.repeat(9)
+
+        assertThat(Degeneration.dominates(looping)).isTrue()
+    }
+
+    @Test
+    fun `long varied prose never trips the wider window`() {
+        val prose = buildString {
+            repeat(60) { index ->
+                appendLine(
+                    "Paragraph $index considers a slightly different aspect of the " +
+                        "question, citing figure ${index * 7} and drawing its own conclusion.",
+                )
+            }
+        }
+
+        assertThat(Degeneration.dominates(prose)).isFalse()
+    }
 }

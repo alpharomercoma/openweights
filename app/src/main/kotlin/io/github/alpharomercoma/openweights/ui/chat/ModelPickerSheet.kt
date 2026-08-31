@@ -249,7 +249,12 @@ private fun ModelRow(model: LocalModel, isActive: Boolean, onSelect: () -> Unit)
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
             val badge = stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
-            Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
+            val runtime = stringResource(
+                if (model.isCompiled) R.string.runtime_executorch else R.string.runtime_gguf,
+            )
+            Metric(
+                listOfNotNull(formatBytes(model.sizeBytes), runtime, badge).joinToString(" · "),
+            )
         }
     }
 }

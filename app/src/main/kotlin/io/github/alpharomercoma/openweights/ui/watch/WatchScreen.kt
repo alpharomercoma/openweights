@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import kotlinx.coroutines.delay
 
 /**
@@ -120,7 +121,8 @@ fun WatchScreen(
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .readableColumn(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

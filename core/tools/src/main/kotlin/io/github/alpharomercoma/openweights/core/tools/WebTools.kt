@@ -85,6 +85,16 @@ class WebSearchTool @Inject constructor(
 ) : Tool {
     override val parallelSafe: Boolean = true
 
+    /**
+     * One step of several, not the whole errand: search is how a page is *found*, and the
+     * page still has to be opened. With this false, a research step got exactly two
+     * rounds — search, then a forced answer — while the research prompt beside it ordered
+     * "change the query and search again", which is behavior the budget could not afford:
+     * the retry spent the fetch round, the step failed its own evidence check, and two
+     * such failures halted the goal. The user met that as "the loop is breaking".
+     */
+    override val chains: Boolean = true
+
     /** Not described to the model when it cannot work. See [Reachability]. */
     override val isAvailable: Boolean get() = reachability.isOnline()
 
@@ -224,6 +234,13 @@ class FetchUrlTool @Inject constructor(
     private val workspace: Workspace,
     private val artifacts: SessionArtifacts,
 ) : Tool {
+    /**
+     * Chains for the same reason search does: reading one page is rarely the whole
+     * errand — the page names a better one, or the answer needs a second source, or what
+     * was fetched goes to a file for run_script to work through.
+     */
+    override val chains: Boolean = true
+
     /** Not described to the model when it cannot work. See [Reachability]. */
     override val isAvailable: Boolean get() = reachability.isOnline()
 

@@ -87,6 +87,7 @@
     <string name="usage">Usage</string>
     <string name="back">Back</string>
     <string name="speed">Speed</string>
+    <string name="draft">Draft</string>
     <string name="week">This week</string>
     <string name="by_model">By model</string>
     <string name="recommended">Recommended</string>
@@ -144,6 +145,7 @@
     <string name="watch_notification_progress">Check %1$d of %2$d · next check</string>
     <string name="watch_notification_progress_last">Check %1$d of %2$d</string>
     <string name="watch_notification_ended">Stopped on its own after %1$d checks</string>
+    <string name="watch_notification_failed">Stopped: three checks in a row failed. Open the app to see the last error.</string>
     <string name="watch_duration_hm">%1$dh %2$dm</string>
     <string name="watch_duration_m">%1$dm</string>
     <string name="watch_duration_ms">%1$dm %2$02ds</string>
@@ -154,7 +156,7 @@
     <string name="folder_lost">This folder cannot be reached now. Choose it again to carry on.</string>
     <string name="folder_readonly">Readable, but it will not take new files, so saving stays off.</string>
     <string name="folder_ready">The model can search it, read from it, and save new files into it.</string>
-    <string name="proxy_hint">http://host:port or socks5://host:port</string>
+    <string name="proxy_hint">http://user:pass@host:3128 or socks5h://127.0.0.1:9150</string>
     <string name="goal_planning">Planning goal</string>
     <string name="goal_working">Working on goal</string>
     <string name="goal_done">Goal complete</string>

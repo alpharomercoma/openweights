@@ -230,6 +230,14 @@ fun DiscoverFilterBar(
                 border = chipBorder(query.officialOnly),
             )
 
+            // Directly after Official, because the three leading chips all narrow what is
+            // shown while the sorts only reorder it: the narrowing controls belong
+            // together. The sorts this pushes past the right edge are still reachable —
+            // the row scrolls and the trailing cue below says so.
+            if (showRuntime) {
+                RuntimeChip(selected = query.runtimes, onToggle = onRuntimeToggled)
+            }
+
             HubSort.entries.forEach { sort ->
                 FilterChip(
                     selected = query.sort == sort,
@@ -249,13 +257,6 @@ fun DiscoverFilterBar(
                     // lime ring around a grey pill is two answers to one question.
                     border = chipBorder(selected = false),
                 )
-            }
-
-            // Last in the row rather than first: a chip ahead of the sorts pushed
-            // "Downloads" off a phone screen, which the screen tests caught the first
-            // time this control was tried inside the row.
-            if (showRuntime) {
-                RuntimeChip(selected = query.runtimes, onToggle = onRuntimeToggled)
             }
         }
 

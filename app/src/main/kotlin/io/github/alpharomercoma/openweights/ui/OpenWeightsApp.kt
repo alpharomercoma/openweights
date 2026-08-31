@@ -197,6 +197,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onOpenCanvas = { navController.push(Routes.CANVAS) },
                 state = state,
                 onSend = chatViewModel::send,
+                onDraftChange = chatViewModel::saveComposerDraft,
                 onStop = {
                     if (goal?.isRunning == true) chatViewModel.stopGoal() else chatViewModel.stop()
                 },

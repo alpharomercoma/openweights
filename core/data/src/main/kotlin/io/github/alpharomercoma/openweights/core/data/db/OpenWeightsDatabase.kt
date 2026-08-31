@@ -34,7 +34,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -71,6 +71,22 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * because "not pinned" and "pinned at the epoch" are different facts and the second
          * one would sort a whole history into the pinned section.
          */
+        /**
+         * Gives every conversation somewhere to keep a half-written message.
+         *
+         * `NOT NULL DEFAULT ''` rather than nullable, because an absent draft and an empty
+         * composer are the same fact and two spellings of it would be one more case for
+         * every reader. Nothing to backfill: no conversation had a draft before there was
+         * anywhere to put one.
+         */
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE conversations ADD COLUMN draft TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
         val MIGRATION_15_16 = object : Migration(15, 16) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE conversations ADD COLUMN pinnedAt INTEGER")

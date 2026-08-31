@@ -74,6 +74,17 @@ data class LocalModel(
     val isMultimodal: Boolean get() = projector != null
 
     /**
+     * True for weights compiled ahead of time, which only the ExecuTorch engine can run.
+     *
+     * The extension is the whole truth here: the app names every compiled download
+     * `<name>.pte`, and which engine loads a file is decided the same way. Shown beside
+     * the size wherever a model can be chosen, because two files of the same family and
+     * size behave differently — different speed, different context window — and the
+     * runtime is the only visible thing that says which one this is.
+     */
+    val isCompiled: Boolean get() = file.extension.equals("pte", ignoreCase = true)
+
+    /**
      * True when the filename strongly suggests a vision-language model but no projector
      * has been downloaded.
      *

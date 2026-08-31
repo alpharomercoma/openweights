@@ -50,7 +50,11 @@ class ChatRepositoryTest {
             ApplicationProvider.getApplicationContext(),
             OpenWeightsDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = ChatRepository(database, FixedClock { now })
+        repository = ChatRepository(
+            ApplicationProvider.getApplicationContext(),
+            database,
+            FixedClock { now },
+        )
         filing = ConversationFiling(database, FixedClock { now })
         archived = ArchivedConversations(database)
     }

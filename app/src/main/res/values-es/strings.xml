@@ -130,6 +130,7 @@
     <string name="watch_notification_progress">Comprobación %1$d de %2$d · siguiente</string>
     <string name="watch_notification_progress_last">Comprobación %1$d de %2$d</string>
     <string name="watch_notification_ended">Se detuvo por su cuenta tras %1$d comprobaciones</string>
+    <string name="watch_notification_failed">Detenido: tres comprobaciones seguidas fallaron. Abre la app para ver el último error.</string>
     <string name="watch_duration_hm">%1$d h %2$d min</string>
     <string name="watch_duration_m">%1$d min</string>
     <string name="watch_duration_ms">%1$d min %2$02d s</string>
@@ -140,7 +141,7 @@
     <string name="folder_lost">No se puede acceder a esta carpeta ahora. Vuelve a elegirla para continuar.</string>
     <string name="folder_readonly">Se puede leer, pero no admite archivos nuevos, así que guardar sigue apagado.</string>
     <string name="folder_ready">El modelo puede buscar en ella, leerla y guardar archivos nuevos.</string>
-    <string name="proxy_hint">http://host:puerto o socks5://host:puerto</string>
+    <string name="proxy_hint">http://usuario:clave@host:3128 o socks5h://127.0.0.1:9150</string>
     <string name="goal_planning">Planificando el objetivo</string>
     <string name="goal_working">Trabajando en el objetivo</string>
     <string name="goal_done">Objetivo completado</string>
@@ -196,6 +197,7 @@
     <string name="context_length_tokens">Longitud del contexto: %1$d tokens</string>
     <string name="downloading_percent">Descargando %1$d%%</string>
     <string name="needs_newer_version">Se necesita una versión más reciente de OpenWeights: esta versión no carga modelos %1$s.</string>
+    <string name="draft">Borrador</string>
     <string name="draft_model_not_a_model">Un modelo borrador para decodificación especulativa, no uno que responda por sí solo. Solo funciona junto al modelo completo al que acelera.</string>
     <string name="header_read_failed">No se pudo leer la cabecera del archivo: %1$s</string>
     <string name="fit_comfortable">Funciona con holgura</string>

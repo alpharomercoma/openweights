@@ -120,6 +120,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Markdown
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
 import io.github.alpharomercoma.openweights.core.designsystem.component.hasHiddenTail
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
@@ -144,6 +145,8 @@ import kotlin.time.Duration.Companion.seconds
 fun ChatScreen(
     state: ChatUiState,
     onSend: (String) -> Boolean,
+    /** Persist what is half-written, so leaving the screen does not lose it. */
+    onDraftChange: (String) -> Unit = {},
     onStop: () -> Unit,
     onRegenerate: () -> Unit,
     onNewChat: () -> Unit,
@@ -277,6 +280,7 @@ fun ChatScreen(
             canvasActive = canvasActive,
             onOpenCanvas = onOpenCanvas,
             state = state,
+            onDraftChange = onDraftChange,
             listState = listState,
             followTail = followTail,
             actionsForId = actionsForId,
@@ -333,6 +337,7 @@ private fun ChatContent(
     canvasActive: Boolean,
     onOpenCanvas: () -> Unit,
     state: ChatUiState,
+    onDraftChange: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
     followTail: io.github.alpharomercoma.openweights.core.designsystem.component.FollowTailState,
     actionsForId: Long?,
@@ -512,6 +517,8 @@ private fun ChatContent(
                 if (installedModels.isNotEmpty() || state.modelName != null) {
                     Composer(
                         conversationKey = state.activeConversationId,
+                        initialDraft = state.composerDraft,
+                        onDraftChange = onDraftChange,
                         // A normal message would race the unattended loop between steps.
                         // GoalCard owns bounded steering until the goal reaches a terminal
                         // state, so there is exactly one writer to the conversation. Typing
@@ -760,7 +767,9 @@ private fun Transcript(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        // Capped like every reading surface: a chat bubble stretched across a 1280dp
+        // tablet is a line of text the eye loses on the way back. No-op on phones.
+        modifier = Modifier.fillMaxSize().readableColumn(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {

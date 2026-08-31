@@ -131,6 +131,7 @@
     <string name="watch_notification_progress">%2$d 回中 %1$d 回目 · 次の確認</string>
     <string name="watch_notification_progress_last">%2$d 回中 %1$d 回目</string>
     <string name="watch_notification_ended">%1$d 回の確認を終えて自動的に停止しました</string>
+    <string name="watch_notification_failed">停止しました: 3回連続で確認に失敗しました。アプリで最後のエラーを確認してください。</string>
     <string name="watch_duration_hm">%1$d 時間 %2$d 分</string>
     <string name="watch_duration_m">%1$d 分</string>
     <string name="watch_duration_ms">%1$d 分 %2$02d 秒</string>
@@ -141,7 +142,7 @@
     <string name="folder_lost">このフォルダに今アクセスできません。続けるにはもう一度選んでください。</string>
     <string name="folder_readonly">読み取りはできますが新しいファイルは受け付けないため、保存は無効のままです。</string>
     <string name="folder_ready">モデルは検索、読み取り、新しいファイルの保存ができます。</string>
-    <string name="proxy_hint">http://host:port または socks5://host:port</string>
+    <string name="proxy_hint">http://user:pass@host:3128 または socks5h://127.0.0.1:9150</string>
     <string name="goal_planning">ゴールを計画中</string>
     <string name="goal_working">ゴールを実行中</string>
     <string name="goal_done">ゴール完了</string>
@@ -178,6 +179,7 @@
     <string name="context_length_tokens">コンテキスト長: %1$d トークン</string>
     <string name="downloading_percent">ダウンロード中 %1$d%%</string>
     <string name="needs_newer_version">新しい OpenWeights が必要です。このバージョンは %1$s モデルを読み込めません。</string>
+    <string name="draft">下書き</string>
     <string name="draft_model_not_a_model">投機的デコーディング用のドラフトモデルで、単独では応答しません。高速化の対象となる完全なモデルと組み合わせてのみ動作します。</string>
     <string name="header_read_failed">ファイルのヘッダーを読み取れませんでした: %1$s</string>
     <string name="fit_comfortable">余裕をもって実行できます</string>

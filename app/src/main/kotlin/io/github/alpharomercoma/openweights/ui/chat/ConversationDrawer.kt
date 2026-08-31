@@ -153,7 +153,11 @@ fun ConversationDrawer(
 
     ModalDrawerSheet(
         drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(SHEET_FRACTION).widthIn(max = SHEET_MAX),
+        // Order is load-bearing and was the tablet bug: with the fraction first, its
+        // min-width constraint (0.85 of the whole screen) overrode the cap that follows,
+        // and a 1280dp tablet drew a 1088dp drawer. The cap has to constrain first so the
+        // fraction is taken of the capped width, not of the screen.
+        modifier = Modifier.widthIn(max = SHEET_MAX).fillMaxWidth(SHEET_FRACTION),
     ) {
         // A term that outlived the box — restored with the drawer, or left by a caller —
         // still gets one, or the results below would have nothing above them explaining
@@ -666,6 +670,9 @@ internal fun ConversationRow(
             Metric(
                 listOfNotNull(
                     conversation.state().takeIf { saysWhereItIs },
+                    // The word, not the text: a drawer row is not the place to reread a
+                    // half-written message, only to know one is waiting here.
+                    stringResource(R.string.draft).takeIf { conversation.hasDraft },
                     conversation.updatedAt.asRelativeTime(nowMillis),
                     conversation.modelName,
                 ).joinToString(" · "),

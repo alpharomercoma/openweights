@@ -73,6 +73,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.StepSlider
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
@@ -174,7 +175,8 @@ fun DiscoverScreen(
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .readableColumn(),
         ) {
             if (state.detail != null) {
                 ModelDetail(

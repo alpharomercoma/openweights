@@ -288,7 +288,7 @@ data class ModelPreferences(
                 "memory, just answer: you have working search tools whether or not this " +
                 "question needed one, so do not say you lack a tool, do not explain that " +
                 "none of the available tools fit, cannot look things up, or have no access " +
-                "to external information — none of that is true, and saying it is its own " +
+                "to external information. None of that is true, and saying it is its own " +
                 "way of being confidently wrong."
     }
 }
@@ -423,10 +423,10 @@ private const val CONTEXT_LENGTH_FIXED_AT = 1
  * change: what matters is "does the stored copy match a wording this app has since moved
  * past", not which specific past wording it was.
  */
-private const val TOOL_PROMPT_FIXED_AT = 4
+private const val TOOL_PROMPT_FIXED_AT = 5
 
 /** The build that knows what every field means. Anything older reads as zero. */
-private const val CURRENT = 4
+private const val CURRENT = 5
 
 /**
  * Stores per-model settings.

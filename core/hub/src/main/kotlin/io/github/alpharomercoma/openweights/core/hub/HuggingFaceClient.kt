@@ -349,33 +349,58 @@ class HuggingFaceClient @Inject constructor(
         cursor: String?,
         limit: Int,
     ): HubSearchPage {
-        val url = apiUrl("models")
-            .apply {
-                when (runtime) {
-                    HubRuntime.LLAMA_CPP -> addQueryParameter("apps", LLAMA_CPP)
-                    HubRuntime.EXECUTORCH -> addQueryParameter("filter", EXECUTORCH)
-                }
-            }
-            .addQueryParameter("limit", limit.toString())
-            .apply { cursor?.let { addQueryParameter("cursor", it) } }
-            .addQueryParameter("sort", query.sort.parameter)
-            .addQueryParameter("direction", "-1")
-            .apply {
-                query.text.trim().takeIf { it.isNotEmpty() }
-                    ?.let { addQueryParameter("search", it) }
-                query.task?.let { addQueryParameter("pipeline_tag", it.parameter) }
-                query.author?.trim()?.takeIf { it.isNotEmpty() }
-                    ?.let { addQueryParameter("author", it) }
-                query.parameterBand?.let { addQueryParameter("num_parameters", it) }
-                if (query.hideGated) addQueryParameter("gated", "false")
-            }
-            .build()
-
-        val page = getPaged(url)
+        val page = getPaged(searchUrl(query, runtime, cursor, limit))
         val models = json.decodeFromString<List<SearchEntry>>(page.body)
             .map { it.toModel().copy(runtimes = setOf(runtime)) }
+            // The half of the size cap the Hub cannot apply. searchUrl leaves the band off
+            // the compiled search because the Hub has nothing to count in a `.pte` repo,
+            // so a 30B compiled model would sail past "under 10B" here. The name is what
+            // there is: a hint over the ceiling is dropped, a repo with no hint is kept,
+            // because hiding a model whose size is merely unstated is the very bug this
+            // corner of the code just recovered from.
+            .filter { runtime != HubRuntime.EXECUTORCH || it.withinCeiling(query) }
         return HubSearchPage(models = models, cursor = page.nextCursor)
     }
+
+    /**
+     * The Hub request for one runtime's page, visible so a test can hold it still.
+     *
+     * The size band is only sent on the llama.cpp half. `num_parameters` filters on
+     * metadata the Hub reads out of safetensors files, and a compiled repository holds a
+     * `.pte` and a tokenizer and nothing the Hub can count: measured live, `filter=
+     * executorch&num_parameters=max:10B` returned 16 repositories, none of them the
+     * executorch-community ones, while the same search without the band returned the whole
+     * compiled corner. A size cap that silently removes every model it exists to surface
+     * is worse than no cap, and the compiled corner is small enough not to need one.
+     */
+    internal fun searchUrl(
+        query: HubQuery,
+        runtime: HubRuntime,
+        cursor: String? = null,
+        limit: Int = DEFAULT_LIMIT,
+    ): HttpUrl = apiUrl("models")
+        .apply {
+            when (runtime) {
+                HubRuntime.LLAMA_CPP -> addQueryParameter("apps", LLAMA_CPP)
+                HubRuntime.EXECUTORCH -> addQueryParameter("filter", EXECUTORCH)
+            }
+        }
+        .addQueryParameter("limit", limit.toString())
+        .apply { cursor?.let { addQueryParameter("cursor", it) } }
+        .addQueryParameter("sort", query.sort.parameter)
+        .addQueryParameter("direction", "-1")
+        .apply {
+            query.text.trim().takeIf { it.isNotEmpty() }
+                ?.let { addQueryParameter("search", it) }
+            query.task?.let { addQueryParameter("pipeline_tag", it.parameter) }
+            query.author?.trim()?.takeIf { it.isNotEmpty() }
+                ?.let { addQueryParameter("author", it) }
+            if (runtime == HubRuntime.LLAMA_CPP) {
+                query.parameterBand?.let { addQueryParameter("num_parameters", it) }
+            }
+            if (query.hideGated) addQueryParameter("gated", "false")
+        }
+        .build()
 
     /**
      * The recommended shortlist, fetched by name.
@@ -606,6 +631,26 @@ class HuggingFaceClient @Inject constructor(
  * "it answered from memory instead of searching". Until Qwen3 has been through
  * `ToolChoiceBenchmark` the list is honest about one axis and inferring the other, and
  * that is better than the reverse, which is what shipping Hammer would have been.
+ *
+ * **The compiled entries joined on the backend-parity matrix** rather than on anybody's
+ * card: `docs/research/backend-parity.md`, the same seven graded cases run greedy on both
+ * engines, on this project's two phones (Dimensity 9400 and Snapdragon 8 Gen 3), grades
+ * identical across the two SoCs.
+ *
+ * - **Qwen3 1.7B compiled** is the only model measured at 7 of 7 on both engines, tool
+ *   loop included, so recommending the GGUF and not the `.pte` would be recommending the
+ *   engine rather than the model.
+ * - **LFM2.5 1.2B compiled** is the fastest decode ever measured in this project: 36.6
+ *   tok/s on the Dimensity, 66.6 on the Snapdragon, against 21 to 24 for its own GGUF.
+ *   One known divergence, a format-constraint case answered in prose, is the 8da4w
+ *   export's quantisation rather than a harness fault, and it is written down.
+ * - **SmolLM3 3B compiled** matched its GGUF case for case, including failing the same
+ *   tool case for the same reason (a thinking budget spent before the call), which is
+ *   what parity means. It is here as the compiled thinking model, from the runtime's own
+ *   publisher.
+ *
+ * A build without the ExecuTorch runtime drops these three rows before they render — see
+ * the Discover view model — so the standard build's shortlist is unchanged.
  */
 val RECOMMENDED = listOf(
     "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
@@ -651,6 +696,11 @@ val RECOMMENDED = listOf(
     "LiquidAI/LFM2.5-8B-A1B-GGUF",
     "LiquidAI/LFM2.5-VL-3B-GGUF",
     "unsloth/Qwen3-1.7B-GGUF",
+    // The compiled rows, in the order the matrix argues them: the 7/7 generalist, the
+    // fastest decode measured on either phone, the thinking model at exact parity.
+    "larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",
+    "software-mansion/react-native-executorch-lfm-2.5",
+    "pytorch/SmolLM3-3B-INT8-INT4",
 )
 
 /**
@@ -808,6 +858,18 @@ enum class ParameterRange(val label: String, val min: String?, val max: String?)
     LARGE("8B to 16B", "8B", "16B"),
     HUGE("Over 16B", "16B", null),
 }
+
+/** Whether the size the publisher wrote in the name fits the query's ceiling, if both exist. */
+private fun HubModel.withinCeiling(query: HubQuery): Boolean {
+    val ceiling = query.maxParametersBillions ?: return true
+    val hint = parameterHint ?: return true
+    val number = hint.dropLast(1).toDoubleOrNull() ?: return true
+    val millions = hint.endsWith("M", ignoreCase = true)
+    val billions = if (millions) number / MILLIONS_PER_BILLION else number
+    return billions <= ceiling
+}
+
+private const val MILLIONS_PER_BILLION = 1000
 
 /** The `num_parameters` value for a band, or null when the band is everything. */
 internal fun ParameterRange.parameter(): String? = listOfNotNull(

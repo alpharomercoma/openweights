@@ -136,6 +136,7 @@
     <string name="watch_notification_progress">التحقق %1$d من %2$d · التالي</string>
     <string name="watch_notification_progress_last">التحقق %1$d من %2$d</string>
     <string name="watch_notification_ended">توقف تلقائيًا بعد %1$d عمليات تحقق</string>
+    <string name="watch_notification_failed">توقف: فشلت ثلاث عمليات تحقق متتالية. افتح التطبيق لرؤية آخر خطأ.</string>
     <string name="watch_duration_hm">%1$d س %2$d د</string>
     <string name="watch_duration_m">%1$d د</string>
     <string name="watch_duration_ms">%1$d د %2$02d ث</string>
@@ -146,7 +147,7 @@
     <string name="folder_lost">لا يمكن الوصول إلى هذا المجلد الآن. اختره مرة أخرى للمتابعة.</string>
     <string name="folder_readonly">قابل للقراءة، لكنه لا يقبل ملفات جديدة، لذا يظل الحفظ معطلًا.</string>
     <string name="folder_ready">يستطيع النموذج البحث فيه والقراءة منه وحفظ ملفات جديدة.</string>
-    <string name="proxy_hint">http://host:port أو socks5://host:port</string>
+    <string name="proxy_hint">http://user:pass@host:3128 أو socks5h://127.0.0.1:9150</string>
     <string name="goal_planning">جارٍ تخطيط الهدف</string>
     <string name="goal_working">جارٍ تنفيذ الهدف</string>
     <string name="goal_done">اكتمل الهدف</string>
@@ -184,6 +185,7 @@
     <string name="context_length_tokens">طول السياق: %1$d رمزًا</string>
     <string name="downloading_percent">جارٍ التنزيل %1$d%%</string>
     <string name="needs_newer_version">يلزم إصدار أحدث من OpenWeights: لا يمكن لهذا الإصدار تحميل نماذج %1$s.</string>
+    <string name="draft">مسودة</string>
     <string name="draft_model_not_a_model">نموذج مسودة للترميز التخميني، وليس نموذجًا يجيب بمفرده. يعمل فقط إلى جانب النموذج الكامل الذي يسرّعه.</string>
     <string name="header_read_failed">تعذرت قراءة ترويسة الملف: %1$s</string>
     <string name="fit_comfortable">يعمل براحة</string>

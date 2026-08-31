@@ -1,6 +1,6 @@
 {
-  "model": "react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w",
-  "engine": "ExecuTorchEngine",
+  "model": "LFM2.5-1.2B-Instruct-Q4_K_M",
+  "engine": "LlamaCppEngine",
   "params": "greedy topK=1 seed=7 maxTokens=768",
   "cases": [
     {
@@ -10,37 +10,37 @@
       "reasoning_chars": 0,
       "raw": "8",
       "calls": [],
-      "prompt_tokens": 37,
+      "prompt_tokens": 38,
       "cached_tokens": 0,
       "generated_tokens": 1,
-      "prefill_ms": 169,
-      "decode_ms": 15
+      "prefill_ms": 208,
+      "decode_ms": 28
     },
     {
       "id": "multi-step-change",
       "status": "fail",
-      "content": "100",
+      "content": "25",
       "reasoning_chars": 0,
-      "raw": "100",
+      "raw": "25",
       "calls": [],
-      "prompt_tokens": 46,
+      "prompt_tokens": 47,
       "cached_tokens": 0,
       "generated_tokens": 1,
-      "prefill_ms": 161,
-      "decode_ms": 15
+      "prefill_ms": 260,
+      "decode_ms": 29
     },
     {
       "id": "format-constraint",
-      "status": "fail",
-      "content": "The first three planets from the Sun are Mercury, Venus, and Mars. Here is the JSON array: [Mercury, Venus, Mars].",
+      "status": "pass",
+      "content": "[\"mercury\", \"venus\", \"earth\"]",
       "reasoning_chars": 0,
-      "raw": "The first three planets from the Sun are Mercury, Venus, and Mars. Here is the JSON array: [Mercury, Venus, Mars].",
+      "raw": "[\"mercury\", \"venus\", \"earth\"]",
       "calls": [],
-      "prompt_tokens": 31,
+      "prompt_tokens": 32,
       "cached_tokens": 0,
-      "generated_tokens": 30,
-      "prefill_ms": 114,
-      "decode_ms": 486
+      "generated_tokens": 12,
+      "prefill_ms": 180,
+      "decode_ms": 404
     },
     {
       "id": "extraction",
@@ -49,11 +49,11 @@
       "reasoning_chars": 0,
       "raw": "March 14",
       "calls": [],
-      "prompt_tokens": 90,
+      "prompt_tokens": 91,
       "cached_tokens": 0,
       "generated_tokens": 3,
-      "prefill_ms": 321,
-      "decode_ms": 56
+      "prefill_ms": 487,
+      "decode_ms": 103
     },
     {
       "id": "memory-across-turns",
@@ -63,10 +63,10 @@
       "raw": "Bagwis",
       "calls": [],
       "prompt_tokens": 23,
-      "cached_tokens": 68,
+      "cached_tokens": 79,
       "generated_tokens": 3,
-      "prefill_ms": 89,
-      "decode_ms": 67
+      "prefill_ms": 164,
+      "decode_ms": 86
     },
     {
       "id": "tool-call",
@@ -80,24 +80,24 @@
           "arguments": "{\"city\": \"Manila\"}"
         }
       ],
-      "prompt_tokens": 96,
+      "prompt_tokens": 97,
       "cached_tokens": 0,
       "generated_tokens": 13,
-      "prefill_ms": 333,
-      "decode_ms": 211
+      "prefill_ms": 539,
+      "decode_ms": 618
     },
     {
       "id": "tool-result",
       "status": "pass",
-      "content": "The current weather in Manila is **31\u00b0C** with **humid** conditions. Let me know if you need further details!",
+      "content": "The current weather in Manila is 31\u00b0C with humid conditions.",
       "reasoning_chars": 0,
-      "raw": "The current weather in Manila is **31\u00b0C** with **humid** conditions. Let me know if you need further details!",
+      "raw": "The current weather in Manila is 31\u00b0C with humid conditions.",
       "calls": [],
       "prompt_tokens": 26,
-      "cached_tokens": 109,
-      "generated_tokens": 26,
-      "prefill_ms": 102,
-      "decode_ms": 431
+      "cached_tokens": 110,
+      "generated_tokens": 13,
+      "prefill_ms": 162,
+      "decode_ms": 427
     }
   ]
 }

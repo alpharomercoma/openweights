@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.tools
 import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -69,7 +70,32 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
      */
     fun client(httpClient: OkHttpClient): OkHttpClient {
         val hop = proxy.asProxy() ?: return httpClient
-        return httpClient.newBuilder().proxy(hop).build()
+        val builder = httpClient.newBuilder().proxy(hop)
+        // Credentials, when the address carries them. HTTP proxies take them per request
+        // through the standard challenge; OkHttp has no per-client hook for SOCKS
+        // authentication, and a process-global java.net.Authenticator would apply to every
+        // connection this app makes, so for SOCKS the user:pass part is ignored rather
+        // than half-honoured. The placeholder shows credentials on the HTTP example only.
+        proxyCredentials()?.let { (user, pass) ->
+            builder.proxyAuthenticator { _, response ->
+                if (response.request.header("Proxy-Authorization") != null) {
+                    null // Refused once already; repeating the same answer would loop.
+                } else {
+                    response.request.newBuilder()
+                        .header("Proxy-Authorization", Credentials.basic(user, pass))
+                        .build()
+                }
+            }
+        }
+        return builder.build()
+    }
+
+    /** The user:pass in the proxy address, or null when it carries none. */
+    private fun proxyCredentials(): Pair<String, String>? {
+        val info = runCatching { java.net.URI(proxy).userInfo }.getOrNull() ?: return null
+        val user = info.substringBefore(':')
+        val pass = info.substringAfter(':', missingDelimiterValue = "")
+        return user.takeIf { it.isNotEmpty() }?.let { it to pass }
     }
 
     /**

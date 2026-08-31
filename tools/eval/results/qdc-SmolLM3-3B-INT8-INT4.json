@@ -1,0 +1,98 @@
+{
+  "model": "SmolLM3-3B-INT8-INT4",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "pass",
+      "content": "9",
+      "reasoning_chars": 831,
+      "raw": "<think>\nOkay, let me try to figure out this problem. The farmer has 17 sheep. The problem says \"All but 9 run away.\" Hmm, so I need to understand what that means. If all but 9 run away, that means the number of sheep that stayed is 9, right? Because if you subtract the ones that left, the remaining ones are the ones that didn't run away.\n\nWait, let me think again. The total number is 17. If all but 9 ran away, then the number that stayed is 9. Because if you take away the ones that ran, the ones that stayed are the ones that didn't run. So the farmer has 9 sheep left. Let me check with an example. Suppose there were 10 sheep, and all but 3 ran away. Then 3 would be left. So the same logic applies here. Total 17, all but 9 ran, so 9 remain. That seems straightforward. I don't think there's any trick here. The answer should be 9.\n</think>\n\n9",
+      "calls": [],
+      "prompt_tokens": 277,
+      "cached_tokens": 0,
+      "generated_tokens": 222,
+      "prefill_ms": 11496,
+      "decode_ms": 10419
+    },
+    {
+      "id": "multi-step-change",
+      "status": "pass",
+      "content": "Ana buys 7 pencils at 12 pesos each: $7 \\times 12 = 84$ pesos total. She pays with a 100-peso bill, so the change is $100 - 84 = 16$ pesos.\n\n\\boxed{16}",
+      "reasoning_chars": 1099,
+      "raw": "<think>\nOkay, let's see. Ana buys 7 pencils at 12 pesos each and pays with a 100-peso bill. I need to find out how much change she receives. Alright, first step is to calculate the total cost of the pencils. So, if each pencil is 12 pesos and she buys 7, I multiply 12 by 7. Let me do that. 12 times 7 is 84. So, the total cost is 84 pesos.\n\nNow, she pays with a 100-peso bill, so the change she should get is the difference between the bill amount and the total cost. That would be 100 minus 84. Let me subtract. 100 - 84 equals 16. So, Ana should receive 16 pesos as change. \n\nWait, let me double-check my calculations to make sure I didn't make a mistake. 7 pencils at 12 pesos each: 7 * 12. Let me break it down. 10 pencils would be 10 * 12 = 120, but she only bought 7, so I need to subtract 3 pencils. Each pencil is 12, so 3 * 12 = 36. So, 120 - 36 = 84. Yeah, that's the same as before. So total cost is indeed 84. Then 100 - 84 is 16. That seems right. \n\nI don't think there's any other fees or discounts mentioned here, so the change should just be 16 pesos. Okay, confident that the answer is 16.\n</think>\n\nAna buys 7 pencils at 12 pesos each: $7 \\times 12 = 84$ pesos total. She pays with a 100-peso bill, so the change is $100 - 84 = 16$ pesos.\n\n\\boxed{16}",
+      "calls": [],
+      "prompt_tokens": 283,
+      "cached_tokens": 0,
+      "generated_tokens": 382,
+      "prefill_ms": 11589,
+      "decode_ms": 19281
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "<think>\nOkay, let's see. The user wants a JSON array with the lowercase names of the first three planets from the Sun. Let me start by recalling the order of the planets. From the Sun, it's Mercury, Venus, Earth, Mars, then the asteroid belt, Jupiter, Saturn, Uranus, Neptune.\n\nSo the first three are Mercury, Venus, Earth. Now, I need to make sure the names are lowercase. Let me check each one. Mercury is lowercase 'm' (dcc). Venus is 'dcc' as well. Earth is 'dcc' too. Wait, no, Earth is spelled E-A-R-T-H, so lowercase would be 'dcc'. Got it.\n\nNow, the user wants a JSON array. So the structure should be something like [ \"dcc\", \"dcc\", \"dcc\" ]. But I need to confirm if there are any special cases or if the user expects any specific formatting. The problem says \"dcc\" is lowercase for each planet. Let me double-check each planet's name.\n\nMercury: lowercase 'dcc' \u2013 correct.\nVenus: lowercase 'dcc' \u2013 correct.\nEarth: lowercase 'dcc' \u2013 correct.\n\nSo the JSON array should be [ \"dcc\", \"dcc\", \"dcc\" ]. I should make sure there are no typos. Let me write it out properly. Also, the user specified to return the JSON array exactly, so I can't add any extra text or information. Just the JSON with those three entries.\n\nWait, the user mentioned \"dcc\" as the lowercase for each. Is there a reason they specified that? Maybe it's a typo or a code? But in this context, 'dcc' is likely the representation for each planet's lowercase name. For example, if each planet's first letter is capitalized, converting to lowercase would be 'dcc'. So 'dcc' stands for 'dcc^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K",
+      "reasoning_chars": 0,
+      "raw": "<think>\nOkay, let's see. The user wants a JSON array with the lowercase names of the first three planets from the Sun. Let me start by recalling the order of the planets. From the Sun, it's Mercury, Venus, Earth, Mars, then the asteroid belt, Jupiter, Saturn, Uranus, Neptune.\n\nSo the first three are Mercury, Venus, Earth. Now, I need to make sure the names are lowercase. Let me check each one. Mercury is lowercase 'm' (dcc). Venus is 'dcc' as well. Earth is 'dcc' too. Wait, no, Earth is spelled E-A-R-T-H, so lowercase would be 'dcc'. Got it.\n\nNow, the user wants a JSON array. So the structure should be something like [ \"dcc\", \"dcc\", \"dcc\" ]. But I need to confirm if there are any special cases or if the user expects any specific formatting. The problem says \"dcc\" is lowercase for each planet. Let me double-check each planet's name.\n\nMercury: lowercase 'dcc' \u2013 correct.\nVenus: lowercase 'dcc' \u2013 correct.\nEarth: lowercase 'dcc' \u2013 correct.\n\nSo the JSON array should be [ \"dcc\", \"dcc\", \"dcc\" ]. I should make sure there are no typos. Let me write it out properly. Also, the user specified to return the JSON array exactly, so I can't add any extra text or information. Just the JSON with those three entries.\n\nWait, the user mentioned \"dcc\" as the lowercase for each. Is there a reason they specified that? Maybe it's a typo or a code? But in this context, 'dcc' is likely the representation for each planet's lowercase name. For example, if each planet's first letter is capitalized, converting to lowercase would be 'dcc'. So 'dcc' stands for 'dcc^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K",
+      "calls": [],
+      "prompt_tokens": 270,
+      "cached_tokens": 0,
+      "generated_tokens": 414,
+      "prefill_ms": 11396,
+      "decode_ms": 21644
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 1702,
+      "raw": "<think>\nOkay, let me see. The problem is about the Barangay San Isidro council voting to change the date of their annual fiesta. They moved it from January 21 to March 14. The question is asking for the date when the fiesta will be held, and I need to provide just the date.\n\nFirst, I need to make sure I understand the information given. The original date was January 21, and they changed it to March 14. The vote was 6 to 1, so it seems like the majority agreed on the new date. The key point here is that the new date is explicitly mentioned as March 14. There's no indication of any further delays or additional changes. \n\nI should check if there's any trick or if I'm missing something. The problem states that they voted to move the fiesta to March 14, so that's the new official date. The question is straightforward: what is the new date? The answer is March 14. \n\nWait, sometimes in these problems, there might be a hidden step, like if the original date is January 21, maybe there's a leap year consideration or a specific local law that affects the date, but the problem doesn't mention anything like that. The information given is clear: they changed it to March 14. \n\nAnother thing to check is if the voting result affects the date. The vote was 6 to 1, so the new date is definitely March 14 as per the council's decision. There's no mention of a need for additional votes or a postponement. \n\nSo, putting it all together, the answer should be March 14. I don't see any conflicting information here. The problem is simple, just restating the new date after the vote. I think that's it. Let me just confirm once more: the original date was January 21, new date is March 14. The answer is March 14.\n</think>\n\nMarch 14",
+      "calls": [],
+      "prompt_tokens": 328,
+      "cached_tokens": 0,
+      "generated_tokens": 405,
+      "prefill_ms": 14444,
+      "decode_ms": 22201
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 666,
+      "raw": "<think>\nOkay, the user asked, \"What is my cat's name?\" and then provided an example where they said the cat is named Bagwis. Now, they're testing if I remember that.\n\nLooking back, I remember from the previous conversation that the user mentioned their cat is named Bagwis. So the correct answer here is to simply state the name without any additional information. I need to make sure I don't add anything else, just the name. Let me confirm again: the user's cat is indeed named Bagwis, as per their initial statement. Therefore, the answer should be straightforward, just the name. No need for any extra details or explanations. I'll just provide \"Bagwis\" as the response.\n</think>\n\nBagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 903,
+      "generated_tokens": 151,
+      "prefill_ms": 1477,
+      "decode_ms": 10165
+    },
+    {
+      "id": "tool-call",
+      "status": "fail",
+      "content": "<think>I need to call the 'get_weather' function with the city 'Manila' to retrieve its current weather. I'll create a JSON object with the function name 'get_weather' and the 'city' parameter set to 'Manila'. I'll then use the 'tools' tag to call the function@mail.xx^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K",
+      "reasoning_chars": 0,
+      "raw": "<think>I need to call the 'get_weather' function with the city 'Manila' to retrieve its current weather. I'll create a JSON object with the function name 'get_weather' and the 'city' parameter set to 'Manila'. I'll then use the 'tools' tag to call the function@mail.xx^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K^K",
+      "calls": [],
+      "prompt_tokens": 405,
+      "cached_tokens": 0,
+      "generated_tokens": 97,
+      "prefill_ms": 19130,
+      "decode_ms": 5274
+    },
+    {
+      "id": "tool-result",
+      "status": "fail",
+      "content": "<think>Based on the provided weather data, I can compile the response. I'll use the 'fdcqli.kr' domain for the API, as it is well-known for its weather service. I'll call the 'fdcqli.kr.xxx' API to retrieve the weather data for 'Manila', but I'll use the 'fdcqli.kr.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx",
+      "reasoning_chars": 0,
+      "raw": "<think>Based on the provided weather data, I can compile the response. I'll use the 'fdcqli.kr' domain for the API, as it is well-known for its weather service. I'll call the 'fdcqli.kr.xxx' API to retrieve the weather data for 'Manila', but I'll use the 'fdcqli.kr.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx.xxx",
+      "calls": [],
+      "prompt_tokens": 527,
+      "cached_tokens": 0,
+      "generated_tokens": 100,
+      "prefill_ms": 26005,
+      "decode_ms": 5816
+    }
+  ]
+}

@@ -45,8 +45,25 @@ internal data class SearchEntry(
         tags = tags,
         updatedAt = lastModified,
         pipelineTag = pipelineTag,
+        // A search result's runtime is overwritten by which search returned it; a repo
+        // fetched by id has no search to say so, and the tag is the same signal the
+        // ExecuTorch search itself filters on. Without this, a compiled repository on the
+        // recommended shortlist would wear a GGUF label and be handed to the wrong engine.
+        runtimes = if (EXECUTORCH_TAG in tags) {
+            setOf(HubRuntime.EXECUTORCH)
+        } else {
+            setOf(HubRuntime.LLAMA_CPP)
+        },
     )
 }
+
+/**
+ * Top level rather than a companion, and that is load-bearing: declaring any companion on
+ * a @Serializable class is where the serialization plugin then puts `serializer()`, and a
+ * *private* companion made every generated serializer access in this module throw
+ * IllegalAccessError at runtime while compiling clean.
+ */
+private const val EXECUTORCH_TAG = "executorch"
 
 @Serializable
 internal data class DetailEntry(

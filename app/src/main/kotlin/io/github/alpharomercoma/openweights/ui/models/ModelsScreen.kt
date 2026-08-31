@@ -69,6 +69,7 @@ import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 
@@ -131,6 +132,7 @@ fun ModelsScreen(
             Column(
                 modifier = Modifier.fillMaxSize().padding(padding)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                    .readableColumn()
                     .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,7 +149,8 @@ fun ModelsScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)),
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+                .readableColumn(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -279,7 +282,12 @@ private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit)
         Column(modifier = Modifier.weight(1f)) {
             Text(model.name, style = MaterialTheme.typography.titleSmall)
             val badge = stringResource(R.string.reads_attachments).takeIf { model.isMultimodal }
-            Metric(listOfNotNull(formatBytes(model.sizeBytes), badge).joinToString(" · "))
+            val runtime = stringResource(
+                if (model.isCompiled) R.string.runtime_executorch else R.string.runtime_gguf,
+            )
+            Metric(
+                listOfNotNull(formatBytes(model.sizeBytes), runtime, badge).joinToString(" · "),
+            )
             // Surface the projector gap rather than leaving the user to discover why the
             // attachment button never appears. One line, amber-toned via error container,
             // so it reads as a note rather than a failure.

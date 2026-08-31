@@ -182,7 +182,15 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
         val exhausted = failures >= Watch.MAX_CONSECUTIVE_FAILURES
         val counted = existing.copy(
             lastRunAt = if (outcome == WatchOutcome.SKIPPED) existing.lastRunAt else at,
-            lastSummary = summary.take(SUMMARY_CHARS),
+            // A skip's reason goes to the run history, not here: "Skipped at 12% battery"
+            // replacing what the last real check found would blank the one line on the
+            // screen worth reading, and the previous finding is also what the next check
+            // is asked to compare against.
+            lastSummary = if (outcome == WatchOutcome.SKIPPED) {
+                existing.lastSummary
+            } else {
+                summary.take(SUMMARY_CHARS)
+            },
             runs = if (outcome == WatchOutcome.SKIPPED) existing.runs else existing.runs + 1,
             consecutiveFailures = failures,
             // A skipped tick moves the deadline too. It is the attempt that resets the

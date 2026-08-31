@@ -82,7 +82,14 @@ class WatchRunner @Inject constructor(
         // or past the window it was given while the app was shut — ends here rather than
         // running one more check nobody asked for. The budget half of the same bound is
         // enforced where the checks are counted, in the record.
-        if (!watch.isActive || expire(watch, now)) return null
+        // The second clause: a tick ahead of its time is the fifteen-minute backstop
+        // arriving while the ticker is alive, and running it would be the double-check
+        // the backstop exists to prevent — budget spent early, a duplicate notification,
+        // a countdown rewritten under the screen. Recording nothing is deliberate;
+        // nothing happened. The slack absorbs timer jitter, so the tick the deadline
+        // belongs to is never the one refused.
+        val early = now < watch.dueAt - EARLY_TICK_SLACK_MS
+        if (!watch.isActive || expire(watch, now) || early) return null
 
         refusal()?.let { why ->
             // The recorded state is read back here for the same reason the checked path
@@ -92,20 +99,31 @@ class WatchRunner @Inject constructor(
             return WatchOutcome.SKIPPED.takeIf { after == null || after.isActive }
         }
 
-        val (outcome, summary) = check(watch, watchId)
+        val checked = check(watch, watchId)
         // The recorded state is read back rather than discarded, because recording the third
         // failure is what stops the watch, and the caller has to know at once. Thrown away,
         // the ticker slept one more full period before noticing, holding the foreground
         // notification up for a watch that had already given up.
-        val after = watches.record(watchId, now, outcome, summary)
-        // Only a check that actually ran is worth a person's attention. Skipped ticks are
-        // routine — busy engine, low battery, the ordinary cost of running unattended — and
-        // alerting on every one of those would be the thing that gets this feature muted.
-        if (outcome == WatchOutcome.CHECKED) alert(watch, summary, after ?: watch)
-        // Said once, when the last check of the budget has just run: a watch that stops
-        // itself and says nothing is indistinguishable from one that broke.
-        if (after != null && after.state == WatchState.EXPIRED) announceEnd(after)
-        return outcome.takeIf { after == null || after.isActive }
+        val after = watches.record(watchId, now, checked.outcome, checked.summary)
+        // Only a check that actually ran, and only when its answer is news. Skipped ticks
+        // are routine — busy engine, low battery, the ordinary cost of running unattended.
+        // And a completed check that found the same thing as the last one is the watch
+        // working, not the watch finding something: alerting on it anyway was what made
+        // "tell me if this changes" ping on every interval, which is the version of this
+        // feature that gets muted. See WatchVerdict for how "news" is decided.
+        if (checked.outcome == WatchOutcome.CHECKED && checked.changed) {
+            alert(watch, checked.summary, after ?: watch)
+        }
+        // Said once, when the watch has just ended itself: a watch that stops and says
+        // nothing is indistinguishable from one that broke. The budget running out and the
+        // third straight failure are both endings, and the failure is the one it is worse
+        // to be silent about — that watch stopped because it *could not do its job*.
+        when (after?.state) {
+            WatchState.EXPIRED -> announceEnd(after)
+            WatchState.FAILED -> announceFailure(after)
+            else -> Unit
+        }
+        return checked.outcome.takeIf { after == null || after.isActive }
     }
 
     /**
@@ -246,14 +264,16 @@ class WatchRunner @Inject constructor(
      * recording was scattered through the branches it was one early return away from a tick
      * that ran and left no trace, which for an unattended feature is the same as not running.
      */
-    private suspend fun check(watch: Watch, watchId: Long): Pair<WatchOutcome, String> {
+    private suspend fun check(watch: Watch, watchId: Long): Checked {
         // Deliberately not loading a model. A scheduled tick can arrive in a process that
         // started for this alone, and opening a couple of gigabytes of weights in the
         // background to answer a question nobody is waiting for is the kind of thing that
         // gets an app uninstalled. The next tick with the app open will run.
         val model = runtime.loadedModel
-            ?: return WatchOutcome.SKIPPED to
-                "No model was loaded, so this check waited for the next one."
+            ?: return Checked(
+                WatchOutcome.SKIPPED,
+                "No model was loaded, so this check waited for the next one.",
+            )
 
         val settings = runtime.settingsFor(model.description)
         val answer = runCatching {
@@ -279,15 +299,26 @@ class WatchRunner @Inject constructor(
             // catch, and stop a watch that works.
             if (failure is CancellationException) throw failure
             Log.w("OpenWeights", "watch $watchId failed", failure)
-            return WatchOutcome.FAILED to (failure.message ?: "The check did not finish.")
+            return Checked(
+                WatchOutcome.FAILED,
+                failure.message ?: "The check did not finish.",
+            )
         }
 
         // tryRun declined: something else owns the engine. See TurnRunner.tryRun.
         val text = answer.getOrNull()
-            ?: return WatchOutcome.SKIPPED to "The model was busy with something else."
+            ?: return Checked(WatchOutcome.SKIPPED, "The model was busy with something else.")
 
-        return WatchOutcome.CHECKED to text.trim().ifBlank { "Nothing new." }
+        val read = WatchVerdict.read(text, watch.lastSummary)
+        return Checked(WatchOutcome.CHECKED, read.summary, read.changed)
     }
+
+    /** What a tick's check produced: the row to record, and whether it is news. */
+    private data class Checked(
+        val outcome: WatchOutcome,
+        val summary: String,
+        val changed: Boolean = true,
+    )
 
     /**
      * Why this tick should not run, or null to go ahead.
@@ -322,24 +353,78 @@ class WatchRunner @Inject constructor(
             role = ChatRole.SYSTEM,
             parts = listOf(
                 MessagePart.Text(
-                    "You are running a scheduled check on the user's phone. Nobody is " +
-                        "watching, so do the check with the tools you have and answer in " +
-                        "one or two sentences. Say what you found. If nothing has changed, " +
-                        "say so plainly. The task below may still read as a request to you " +
-                        "rather than a question, if it is a reminder rather than something " +
-                        "to look up: it is due now, and delivering it is the check, not " +
-                        "something you need a tool for. Say it plainly rather than " +
-                        "explaining that you cannot set reminders — this schedule is " +
-                        "already the reminder.",
+                    buildString {
+                        append(
+                            "You are running a scheduled check on the user's phone. " +
+                                "Nobody is watching, so do the check with the tools you " +
+                                "have and answer in one or two sentences. Say what you " +
+                                "found. The task below may still read as a request to " +
+                                "you rather than a question, if it is a reminder rather " +
+                                "than something to look up: it is due now, and " +
+                                "delivering it is the check, not something you need a " +
+                                "tool for. Say it plainly rather than explaining that " +
+                                "you cannot set reminders: this schedule is already the " +
+                                "reminder.",
+                        )
+                        // The one piece of history a check is allowed: what the last one
+                        // found. Not the last twenty — a check that carried its own
+                        // conversation would drift into comparing itself to itself — but
+                        // without this one line the model cannot say whether anything
+                        // changed, and "did it change" is the question a watch exists
+                        // to answer.
+                        watch.lastSummary?.let {
+                            append(
+                                " The previous check found: \"$it\". After your answer, " +
+                                    "end with exactly one word on its own line: CHANGED " +
+                                    "if what you found differs from the previous check " +
+                                    "in a way the user would care about, UNCHANGED if " +
+                                    "it does not.",
+                            )
+                        }
+                    },
                 ),
             ),
         ),
         ChatMessage(role = ChatRole.USER, parts = listOf(MessagePart.Text(watch.task))),
     )
 
+    /**
+     * Says, once, that a watch gave up because its checks kept failing.
+     *
+     * Separate wording from [announceEnd], because "finished its run" and "could not do
+     * its job" are opposite news, and the second used to be silent: the third straight
+     * failure stopped the watch in the record and nothing told the person relying on it.
+     */
+    private fun announceFailure(watch: Watch) {
+        val granted = ContextCompat.checkSelfPermission(appContext, POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) return
+        val manager = appContext.getSystemService<NotificationManager>() ?: return
+        ensureAlertChannel(manager)
+        val text = appContext.getString(R.string.watch_notification_failed)
+        val notification = NotificationCompat.Builder(appContext, ALERT_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(watch.task.take(MAX_TITLE_CHARS))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(openApp())
+            .build()
+        runCatching { manager.notify("watch-end-${watch.id}".hashCode(), notification) }
+    }
+
     private companion object {
         /** The same floor a goal uses. Working unattended is what flattens a phone. */
         const val MIN_BATTERY_PERCENT = 15
+
+        /**
+         * How early a tick may run and still count as its deadline's tick.
+         *
+         * Generous against timer jitter and coarse alarms; a fifteen-minute backstop
+         * arriving for a five-minute watch is minutes early, not seconds, so the two are
+         * cleanly separable.
+         */
+        const val EARLY_TICK_SLACK_MS = 30_000L
 
         /** Separate from GenerationService's ongoing channel. See [alert]. */
         const val ALERT_CHANNEL = "watch-alert"

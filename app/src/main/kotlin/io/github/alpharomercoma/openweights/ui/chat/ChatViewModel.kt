@@ -69,6 +69,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.GoalBoard
 import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
+import io.github.alpharomercoma.openweights.core.tools.ToolEvidence
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.correlatedWebResearchSources
 import io.github.alpharomercoma.openweights.model.StagedDocument
@@ -221,6 +222,8 @@ data class ConversationSummary(
     val pinnedAt: Long? = null,
     /** When it was archived, or null: archived chats leave the list for their own section. */
     val archivedAt: Long? = null,
+    /** True when a half-written message is waiting in this chat's composer. */
+    val hasDraft: Boolean = false,
 ) {
     val isPinned: Boolean get() = pinnedAt != null
     val isArchived: Boolean get() = archivedAt != null
@@ -316,6 +319,12 @@ data class ChatUiState(
      */
     val archivedCount: Int = 0,
     val activeConversationId: Long? = null,
+    /**
+     * What was half-written in this conversation's composer when it was last left, or
+     * null when nothing was. Loaded when the conversation opens; the composer seeds its
+     * field from it once per conversation and then owns the text.
+     */
+    val composerDraft: String? = null,
     val preferences: ModelPreferences = ModelPreferences(),
     /** What the loaded model can read. All false without a projector. */
     val mediaSupport: MediaSupport = MediaSupport(),
@@ -650,6 +659,7 @@ class ChatViewModel @Inject constructor(
         set(value) {
             field = value
             _uiState.update { it.copy(activeConversationId = value) }
+            loadComposerDraft()
             // Remembered, and never forgotten. Android reclaims a process holding a model in
             // memory sooner than most, and coming back to a blank screen with the
             // conversation still in the database reads as having lost it. SavedStateHandle
@@ -667,6 +677,7 @@ class ChatViewModel @Inject constructor(
     private var restoring: Long? = savedState[LAST_CONVERSATION]
 
     init {
+        loadComposerDraft()
         viewModelScope.launch {
             archive.observeCount()
                 .catch { failure ->
@@ -697,6 +708,7 @@ class ChatViewModel @Inject constructor(
                                     updatedAt = it.updatedAt,
                                     pinnedAt = it.pinnedAt,
                                     archivedAt = it.archivedAt,
+                                    hasDraft = it.draft.isNotEmpty(),
                                 )
                             },
                         )
@@ -1043,6 +1055,8 @@ class ChatViewModel @Inject constructor(
                                 // conversation to record when it started; this is the first
                                 // moment one exists. See GoalBoard.bindConversation.
                                 goals.bindConversation(it)
+                                // The message this draft was keeping safe is a row now.
+                                saveDraft(0L, "")
                             }
                     addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
                 }
@@ -1807,7 +1821,20 @@ class ChatViewModel @Inject constructor(
         try {
             setMode(AgentMode.PLAN)
             offerAskOverride = if (brief.offersAskDuringPlan) null else false
-            if (!turn("${brief.plan}\n\n$task")) return
+            // What the plan will have to work with, said before the plan is asked for.
+            // The planning turn itself carries no tools, so without this the model plans
+            // blind and either invents steps nothing can run or asks about things a step
+            // could simply look up. Additive rather than a rewrite of the brief, which is
+            // the shape of prompt change this codebase has measured working.
+            val available = turns.executionToolNames()
+            val snapshot = if (available.isEmpty()) {
+                ""
+            } else {
+                "\n\nWhen the plan runs, these tools will be available: " +
+                    available.joinToString(", ") +
+                    ". Plan only steps they can carry out."
+            }
+            if (!turn("${brief.plan}$snapshot\n\n$task")) return
             // Falls back for a brief that has one: measured live, a small model asked to
             // plan a subject it does not recognise sometimes answers in prose instead of
             // proposing anything at all, tool or no tool. Research's own fallback plans
@@ -1952,9 +1979,18 @@ class ChatViewModel @Inject constructor(
         val allToolsFailed = !calledAdvance && lastTurnSteps.everyToolFailed()
 
         return when {
+            // Named by half, because the retry pass reads this sentence and a model that
+            // is told only "you did not research" repeats whichever half it already did:
+            // measured as the verification-spiral shape, search-fail-search-fail-halt.
+            // Saying which half is missing is the smallest steer that breaks the loop.
             brief.requiresWebEvidence && verifiedSources.isEmpty() ->
-                "This research step did not successfully search and read a source, so it " +
-                    "was not marked done."
+                if (lastTurnSteps.searchedSomething()) {
+                    "This step searched but never opened a result: fetch one of the " +
+                        "addresses the search returned, then answer from what it says."
+                } else {
+                    "This step did not get a successful search: search the web for it, " +
+                        "then open the best result before answering."
+                }
 
             skippedAhead ->
                 "This step closed more than the one it was given, so it was not marked done."
@@ -1969,6 +2005,10 @@ class ChatViewModel @Inject constructor(
             else -> null
         }
     }
+
+    /** A successful search happened this turn, whatever became of its results. */
+    private fun List<AgentStep>.searchedSomething(): Boolean = filterIsInstance<AgentStep.Ran>()
+        .any { it.successful && it.evidence is ToolEvidence.Search }
 
     private fun List<AgentStep>.calledAdvance(): Boolean =
         any { it is AgentStep.Ran && it.call.name == "advance" }
@@ -2122,6 +2162,35 @@ class ChatViewModel @Inject constructor(
         folding.fold(force = force, engineIsDecoding = isDecoding) { conversationId }
 
     /** Clears the conversation and the model's KV cache, keeping the model loaded. */
+    /**
+     * Persists what is sitting unsent in the composer, debounced by the caller.
+     *
+     * Keyed to the conversation on screen, with zero standing for the chat that does not
+     * exist yet, so a message typed before the first send survives the app closing the
+     * same way one typed into an old chat does. Failures are logged and dropped: a draft
+     * that could not be saved must not interrupt the typing it was copied from.
+     */
+    fun saveComposerDraft(text: String) {
+        val key = conversationId ?: 0L
+        viewModelScope.launch {
+            runCatching { writer.inOrder { saveDraft(key, text) } }
+                .onFailure { Log.w("OpenWeights", "draft not saved", it) }
+        }
+    }
+
+    private fun loadComposerDraft() {
+        val key = conversationId ?: 0L
+        viewModelScope.launch {
+            val stored = runCatching { writer.inOrder { draft(key) } }.getOrDefault("")
+            // Only if the screen still shows the conversation this was loaded for: the
+            // read is behind the write queue, and a fast switch could otherwise deliver
+            // one chat's draft into another's composer.
+            if ((conversationId ?: 0L) == key) {
+                _uiState.update { it.copy(composerDraft = stored.takeIf(String::isNotEmpty)) }
+            }
+        }
+    }
+
     fun newChat() {
         // A goal is driven by its own job, separate from generationJob, and reading the
         // board rather than the transcript to decide what to do next: stopping only the
@@ -3143,7 +3212,7 @@ private const val RESEARCH_STEP_TOOL_PROMPT: String =
         "question needed one. Search the web for it and read a real source before " +
         "answering. If the first search does not settle it, change the query and search " +
         "again rather than answering from what you already believe or saying you cannot " +
-        "know — one weak search is not evidence the answer is unavailable, only that the " +
+        "know: one weak search is not evidence the answer is unavailable, only that the " +
         "first query was."
 
 /**

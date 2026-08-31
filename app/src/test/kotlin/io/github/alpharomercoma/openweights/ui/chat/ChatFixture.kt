@@ -104,7 +104,7 @@ abstract class ChatFixture {
             .build()
 
         engine = FakeInferenceEngine()
-        chats = ChatRepository(database, Clock.System)
+        chats = ChatRepository(context, database, Clock.System)
         writer = FailableWriter(chats)
         filing = FailableFiling(database)
         // Registered but unreachable unless a test says the model supports tools, so the

@@ -65,7 +65,7 @@ class SearchMediaTool @Inject constructor(
         // The name is the signal a small model actually reads.
         description = "Show the user pictures or short video clips found on the web. " +
             "Returns thumbnails to display, not text to read. It answers no questions " +
-            "and returns no facts — for information of any kind, use web_search.",
+            "and returns no facts; for information of any kind, use web_search.",
         parametersJson = """
             {
               "type": "object",

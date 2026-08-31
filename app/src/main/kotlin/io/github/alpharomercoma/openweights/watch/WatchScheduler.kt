@@ -195,9 +195,17 @@ class WatchScheduler @Inject constructor(
                         val current = watches.byId(watch.id)
                         // Short-circuit order is the contract: a watch that is gone or
                         // paused must end the loop without ticking at all.
+                        // The tick is stamped with the deadline this loop just slept
+                        // toward when the wall clock has not reached it — the runner now
+                        // refuses early ticks so the backstop cannot double-run a fast
+                        // watch, and the ticker's own tick must never read as early to
+                        // its own deadline, whatever a coarse timer or a test clock says.
                         live = current != null &&
                             current.state == WatchState.ACTIVE &&
-                            tickOnce(watch.id)
+                            tickOnce(
+                                watch.id,
+                                maxOf(System.currentTimeMillis(), current.dueAt),
+                            )
                         // After the tick rather than before it: the counter has just moved
                         // and the next deadline is a period from now. Read back rather than
                         // computed here, because a tick that was skipped did not move
@@ -300,8 +308,8 @@ class WatchScheduler @Inject constructor(
      * notification and a foreground hold the watch no longer needs, kept for up to
      * fourteen more minutes for no reason other than not having looked yet.
      */
-    private suspend fun tickOnce(watchId: Long): Boolean = try {
-        runner.get().tick(watchId) != null
+    private suspend fun tickOnce(watchId: Long, now: Long): Boolean = try {
+        runner.get().tick(watchId, now) != null
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {

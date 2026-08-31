@@ -13,8 +13,8 @@
       "prompt_tokens": 38,
       "cached_tokens": 0,
       "generated_tokens": 768,
-      "prefill_ms": 105,
-      "decode_ms": 36625
+      "prefill_ms": 123,
+      "decode_ms": 41526
     },
     {
       "id": "multi-step-change",
@@ -26,8 +26,8 @@
       "prompt_tokens": 43,
       "cached_tokens": 3,
       "generated_tokens": 311,
-      "prefill_ms": 130,
-      "decode_ms": 14256
+      "prefill_ms": 200,
+      "decode_ms": 19012
     },
     {
       "id": "format-constraint",
@@ -39,8 +39,8 @@
       "prompt_tokens": 27,
       "cached_tokens": 3,
       "generated_tokens": 346,
-      "prefill_ms": 99,
-      "decode_ms": 16014
+      "prefill_ms": 157,
+      "decode_ms": 21285
     },
     {
       "id": "extraction",
@@ -52,8 +52,8 @@
       "prompt_tokens": 90,
       "cached_tokens": 3,
       "generated_tokens": 165,
-      "prefill_ms": 280,
-      "decode_ms": 7573
+      "prefill_ms": 333,
+      "decode_ms": 9883
     },
     {
       "id": "memory-across-turns",
@@ -65,8 +65,8 @@
       "prompt_tokens": 76,
       "cached_tokens": 17,
       "generated_tokens": 128,
-      "prefill_ms": 299,
-      "decode_ms": 5946
+      "prefill_ms": 352,
+      "decode_ms": 7518
     },
     {
       "id": "tool-call",
@@ -83,8 +83,8 @@
       "prompt_tokens": 166,
       "cached_tokens": 1,
       "generated_tokens": 135,
-      "prefill_ms": 512,
-      "decode_ms": 7008
+      "prefill_ms": 594,
+      "decode_ms": 9398
     },
     {
       "id": "tool-result",
@@ -96,8 +96,8 @@
       "prompt_tokens": 28,
       "cached_tokens": 302,
       "generated_tokens": 169,
-      "prefill_ms": 170,
-      "decode_ms": 8538
+      "prefill_ms": 207,
+      "decode_ms": 11245
     }
   ]
 }

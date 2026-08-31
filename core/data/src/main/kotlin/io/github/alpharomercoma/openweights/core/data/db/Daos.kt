@@ -60,6 +60,14 @@ interface ConversationDao {
     suspend fun setModel(id: Long, modelName: String?, at: Long)
 
     /**
+     * Deliberately does not touch [ConversationEntity.updatedAt]: typing into a composer
+     * is not activity worth reordering the drawer over, and a chat that leapt to the top
+     * because its field held two characters would be the drawer crying wolf.
+     */
+    @Query("UPDATE conversations SET draft = :draft WHERE id = :id")
+    suspend fun setDraft(id: Long, draft: String)
+
+    /**
      * Points the conversation at a summary, or forgets the one it had.
      *
      * The last of the whole-row upserts, gone for the reason above: a fold is slow, it

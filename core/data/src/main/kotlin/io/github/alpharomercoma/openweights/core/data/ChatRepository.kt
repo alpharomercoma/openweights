@@ -16,7 +16,11 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.room.withTransaction
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
@@ -28,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.OpenWeightsDatabase
 import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,9 +52,17 @@ data class ToolStepRecord(
     val millis: Long,
 )
 
-/** Reads and writes conversations, and records what each reply cost. */
+/**
+ * Reads and writes conversations, and records what each reply cost.
+ *
+ * One facade over the conversation tables, by design, whatever detekt counts: every caller
+ * goes through ChatWriter's queue, and splitting this class would put the queue's promise —
+ * nothing reaches the tables without ordering — behind two doors instead of one.
+ */
 @Singleton
+@Suppress("TooManyFunctions")
 class ChatRepository @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val database: OpenWeightsDatabase,
     private val clock: Clock,
 ) {
@@ -198,6 +211,30 @@ class ChatRepository @Inject constructor(
     }
 
     suspend fun deleteConversation(id: Long) = database.conversations().delete(id)
+
+    /**
+     * Keeps or clears what is half-written in a conversation's composer.
+     *
+     * Zero as the id means the chat that does not exist yet: a draft typed before the
+     * first send has no row to live on, and creating one for it would put an empty,
+     * titleless conversation in the drawer. That one draft lives in the preferences
+     * store instead, and there is exactly one of it, because there is exactly one
+     * "new chat" at a time.
+     */
+    suspend fun saveDraft(conversationId: Long, draft: String) {
+        if (conversationId > 0) {
+            database.conversations().setDraft(conversationId, draft)
+        } else {
+            context.settingsDataStore.edit { it[NEW_CHAT_DRAFT] = draft }
+        }
+    }
+
+    /** What [saveDraft] kept for this conversation, empty when nothing was. */
+    suspend fun draft(conversationId: Long): String = if (conversationId > 0) {
+        database.conversations().byId(conversationId)?.draft.orEmpty()
+    } else {
+        context.settingsDataStore.data.first()[NEW_CHAT_DRAFT].orEmpty()
+    }
 
     /**
      * Records which model a conversation is now running under.
@@ -409,3 +446,6 @@ internal fun String.asConversationTitle(): String {
         else -> cleaned.take(MAX_TITLE_LENGTH).substringBeforeLast(' ') + "…"
     }
 }
+
+/** The one draft with no conversation to live on: the message being written in a new chat. */
+private val NEW_CHAT_DRAFT = stringPreferencesKey("new_chat_draft")

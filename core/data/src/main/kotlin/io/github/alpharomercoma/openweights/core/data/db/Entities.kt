@@ -43,6 +43,18 @@ data class ConversationEntity(
      */
     val compactionHeadId: Long? = null,
     /**
+     * What is sitting half-written in this conversation's composer.
+     *
+     * A column rather than saved instance state, because the two die differently. Saveable
+     * state survives rotation and a background kill, and that is all it survives: closing
+     * the chat, opening another, or coming back tomorrow all arrive with an empty field
+     * where a message the user was in the middle of writing used to be. A draft is the one
+     * piece of the screen the user authored and cannot regenerate, so it lives with the
+     * conversation it belongs to. Empty means none; never null, because "no draft" and
+     * "an empty field" are the same fact here.
+     */
+    val draft: String = "",
+    /**
      * When this conversation was pinned, or null if it is not.
      *
      * A timestamp rather than a boolean, because a list of pinned chats has to be in some

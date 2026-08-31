@@ -151,6 +151,19 @@ class TurnRunner @Inject constructor(
     fun hasEnabledTools(): Boolean = tools.all.any { it.isUserFacing && switches.isEnabled(it) }
 
     /**
+     * The tools an execution turn would actually offer, by name, for a planner to read.
+     *
+     * The planning turn strips every user-facing tool, so without this the model plans
+     * blind: it cannot tell whether "search for it" is a step this phone can carry out,
+     * which is where unanswerable steps and premature questions come from. One line of
+     * names is the cheapest form of the environment the plan will run in — additive
+     * context, which this codebase has twice measured beating prompt rewrites.
+     */
+    fun executionToolNames(): List<String> = tools.all
+        .filter { it.isUserFacing && switches.isEnabled(it) && it.isAvailable }
+        .map { it.definition.name }
+
+    /**
      * Runs until the model stops asking for tools, or the budget runs out.
      *
      * @return the raw text of the last pass, which is what a cancellation should keep.

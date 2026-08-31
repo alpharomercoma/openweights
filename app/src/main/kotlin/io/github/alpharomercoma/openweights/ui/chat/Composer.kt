@@ -72,6 +72,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,11 +89,15 @@ import androidx.core.content.ContextCompat
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
+import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.model.StagedDocument
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 
 /**
  * Where you type.
@@ -109,10 +114,22 @@ import io.github.alpharomercoma.openweights.model.StagedDocument
 // comes and goes with state — and splitting it would scatter one visual container across
 // functions that can only be understood together.
 @Composable
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, FlowPreview::class)
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 fun Composer(
     conversationKey: Long?,
+    /**
+     * The draft persisted for this conversation, or null when none was. Seeded into the
+     * field once per conversation; after that the field owns the text and this is ignored,
+     * so typing is never overwritten by a stale read arriving late.
+     */
+    initialDraft: String? = null,
+    /**
+     * Where the text goes so it survives the screen. Called debounced as the user types
+     * and immediately with an empty string when a send clears the field, which is also
+     * what clears the stored draft.
+     */
+    onDraftChange: (String) -> Unit = {},
     enabled: Boolean,
     isGenerating: Boolean,
     /**
@@ -169,6 +186,30 @@ fun Composer(
         TextFieldState()
     }
     val draft = field.text.toString()
+
+    // Which conversation the persisted draft has already been offered to. Saveable so a
+    // rotation does not offer it again over text the user has since changed; keyed like
+    // the field, so switching chats re-arms it. The sentinel is a key no conversation has.
+    var seededFor by rememberSaveable(conversationKey) { mutableStateOf(UNSEEDED) }
+    LaunchedEffect(conversationKey, initialDraft) {
+        val key = conversationKey ?: 0L
+        if (seededFor != key && initialDraft != null) {
+            // Only into an empty field: a field with text in it was restored by the
+            // saveable state above or already being typed into, and both outrank a read
+            // from disk.
+            if (field.text.isEmpty()) field.setTextAndPlaceCursorAtEnd(initialDraft)
+            seededFor = key
+        }
+    }
+    // The persist side. Debounced so a sentence costs one write, not one per character;
+    // dropping the first emission keeps the value the field woke up with from being
+    // written straight back where it came from.
+    LaunchedEffect(conversationKey) {
+        snapshotFlow { field.text.toString() }
+            .drop(1)
+            .debounce(DRAFT_DEBOUNCE_MS)
+            .collect { onDraftChange(it) }
+    }
     var isFocused by remember { mutableStateOf(false) }
 
     // Held rather than captured, so the listener built once still calls whatever the current
@@ -283,7 +324,9 @@ fun Composer(
     // no longer on screen.
     DisposableEffect(Unit) { onDispose { if (isListening) onDictate {} } }
 
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(
+        modifier = modifier.readableColumn().padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
         if (commands != null) {
             SlashCommandPalette(
                 commands = commands,
@@ -768,8 +811,17 @@ private fun DictateButton(isListening: Boolean, enabled: Boolean, onDictate: () 
 /** Appends dictated words to whatever was already typed, with a space where one is due. */
 private fun String.appended(heard: String): String = if (isEmpty()) heard else "${trimEnd()} $heard"
 
-/** Six lines of draft before it scrolls: past that the composer eats the conversation. */
-private const val MAX_LINES = 6
+/**
+ * Eight lines of draft before it scrolls: past that the composer eats the conversation.
+ *
+ * Was six. This app's users paste prompts, not sentences — a multi-paragraph instruction
+ * is the normal case for a developer playground — and at six lines the window into a
+ * pasted prompt was small enough that checking what you were about to send meant
+ * scrolling inside the field. Eight is about a third of a phone screen with the keyboard
+ * up, which still leaves the last exchange visible above it; past that the field scrolls,
+ * so nothing is ever lost, only out of frame.
+ */
+private const val MAX_LINES = 8
 
 /** The painted circle. Sized for the bar, not for the thumb. */
 private const val SEND_SIZE = 36
@@ -803,3 +855,9 @@ private fun ComposerPreview() {
         }
     }
 }
+
+/** No conversation has this key, so a fresh composer always accepts its first seed. */
+private const val UNSEEDED = Long.MIN_VALUE
+
+/** One write per pause in typing, not one per character. */
+private const val DRAFT_DEBOUNCE_MS = 400L

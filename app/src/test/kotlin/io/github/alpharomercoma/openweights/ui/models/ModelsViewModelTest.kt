@@ -22,21 +22,28 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
-import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.hub.HubTokenSource
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
 import io.github.alpharomercoma.openweights.core.hub.Publishers
 import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.chat.FakeInferenceEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * What the model list does before anything has ever been downloaded.
@@ -54,13 +61,21 @@ import kotlin.time.Duration.Companion.seconds
  * A real WorkManager rather than a fake queue, because the emptiness of that first emission
  * is the whole subject and a hand-written fake would be a fake of the thing that went wrong.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ModelsViewModelTest {
+    // Pinned, exactly as ChatFixture pins it. Without this the view model's scope runs on
+    // Robolectric's main looper, and whether that looper gets pumped while a test blocks
+    // is platform folklore: this class was green on every Mac and hung — "No value
+    // produced in 30s" — on the CI runner, a different test each run. On the test
+    // dispatcher every dispatch is the scheduler's, and advanceUntilIdle is the pump.
+    private val dispatcher = StandardTestDispatcher()
     private lateinit var context: Context
     private lateinit var store: ModelStore
 
     @Before
     fun setUp() {
+        Dispatchers.setMain(dispatcher)
         context = ApplicationProvider.getApplicationContext()
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
@@ -70,33 +85,33 @@ class ModelsViewModelTest {
         store.directory.listFiles()?.forEach { it.delete() }
     }
 
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
     @Test
-    fun `models on disk reach the screen with no download ever queued`() = runTest {
+    fun `models on disk reach the screen with no download ever queued`() = runTest(dispatcher) {
         // The exact shape of the shipped bug: weights present, queue never used.
         gguf("LFM2.5-2.6B-Q4_K_M.gguf")
 
-        viewModel().uiState.test {
-            assertThat(awaitItem().models.map { it.name })
-                .containsExactly("LFM2.5-2.6B-Q4_K_M")
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertThat(settled().models.map { it.name })
+            .containsExactly("LFM2.5-2.6B-Q4_K_M")
     }
 
     @Test
-    fun `an empty directory reports no models rather than never reporting`() = runTest {
+    fun `an empty directory reports no models rather than never reporting`() = runTest(dispatcher) {
         // The counterweight, and the half that made the bug hard to see: "no models" is a
         // real answer, and it is indistinguishable from a screen that never spoke unless
         // something asserts the state arrived.
-        viewModel().uiState.test {
-            val state = awaitItem()
-            assertThat(state.models).isEmpty()
-            assertThat(state.downloads).isEmpty()
-            cancelAndIgnoreRemainingEvents()
-        }
+        val viewModel = viewModel()
+        val state = settled(viewModel, done = { it.models.isEmpty() })
+        assertThat(state.models).isEmpty()
+        assertThat(state.downloads).isEmpty()
     }
 
     @Test
-    fun `storage is the sum of what is on disk`() = runTest {
+    fun `storage is the sum of what is on disk`() = runTest(dispatcher) {
         // Shown to the user as what the app is occupying, and the only number on that screen
         // they might act on.
         gguf("a.gguf", bytes = 1_024)
@@ -106,7 +121,7 @@ class ModelsViewModelTest {
     }
 
     @Test
-    fun `a projector is counted with its model rather than listed as one`() = runTest {
+    fun `a projector is counted with its model rather than listed as one`() = runTest(dispatcher) {
         // A projector is not something anybody chose to run, so it must not appear as a
         // model. Its bytes are real, though, and hiding them would understate what the app
         // is using by half a gigabyte on a vision model.
@@ -129,17 +144,29 @@ class ModelsViewModelTest {
      * `.value` instead is how two of these first failed, with an empty list that looked
      * exactly like the bug this file exists to catch.
      */
-    private suspend fun settled(): ModelsUiState {
-        lateinit var latest: ModelsUiState
-        // Thirty seconds of ceiling, milliseconds of typical wait: the directory listing
-        // runs on real dispatchers, and Turbine's three-second default was missed by the
-        // two-core CI runner under a full-suite load while every faster machine passed.
-        viewModel().uiState.test(timeout = 30.seconds) {
-            latest = awaitItem()
-            while (latest.models.isEmpty()) latest = awaitItem()
-            cancelAndIgnoreRemainingEvents()
+    private fun TestScope.settled(
+        viewModel: ModelsViewModel = viewModel(),
+        done: (ModelsUiState) -> Boolean = { it.models.isNotEmpty() },
+    ): ModelsUiState {
+        // Subscribed from the background scope so WhileSubscribed starts the combine, and
+        // cancelled with the test. The refresh itself runs on real IO, so the scheduler
+        // drain alternates with a short real wait, the same shape ChatFixture settles with.
+        backgroundScope.launch { viewModel.uiState.collect {} }
+        repeat(SETTLE_ROUNDS) {
+            advanceUntilIdle()
+            if (done(viewModel.uiState.value)) return viewModel.uiState.value
+            Thread.sleep(SETTLE_PAUSE_MS)
         }
-        return latest
+        advanceUntilIdle()
+        check(done(viewModel.uiState.value)) {
+            "the screen never settled: ${viewModel.uiState.value}"
+        }
+        return viewModel.uiState.value
+    }
+
+    private companion object {
+        const val SETTLE_ROUNDS = 100
+        const val SETTLE_PAUSE_MS = 20L
     }
 
     private fun gguf(name: String, bytes: Int = 1_024): File =

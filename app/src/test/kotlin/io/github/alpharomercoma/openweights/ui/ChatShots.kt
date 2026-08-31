@@ -31,7 +31,7 @@ import io.github.alpharomercoma.openweights.ui.chat.TurnBlock
  * The conversations the listing screenshots are staged from.
  *
  * Every number here is one this app actually produces and was taken from a measured run
- * rather than invented to look good: 13.8 tok/s is Q4_0 on the test phone, and the tool
+ * rather than invented to look good: 28.4 tok/s is QAD-Q4_0 decode on the test phone, and the tool
  * round is the shape `TurnRunner` produces. A screenshot that promises a rate the hardware
  * cannot reach is a refund waiting to happen, and the honest number is the selling point
  * anyway, since no hosted assistant shows one at all.
@@ -100,7 +100,7 @@ object ChatShots {
     ) {
         ChatScreen(
             state = ChatUiState(
-                modelName = "Hammer2.1-1.5B-Q4_0",
+                modelName = "LFM2.5-1.2B-Instruct-QAD-Q4_0",
                 modelQuantization = "qwen2 1.5B Q4_0",
                 transcript = transcript,
                 contextUsed = contextUsed,
@@ -129,7 +129,7 @@ object ChatShots {
         answer = text,
         blocks = blocks,
         // Measured on the test phone: Q4_0 with the KleidiAI kernels.
-        tokensPerSecond = 13.8,
+        tokensPerSecond = 28.4,
         timeToFirstTokenMs = 412,
         generatedTokens = 61,
     )

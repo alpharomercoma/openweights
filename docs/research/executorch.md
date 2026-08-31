@@ -1,5 +1,9 @@
 # ExecuTorch as a second runtime
 
+> **Status 2026-09-01:** shipped, and grown past this plan — the bring-up target
+> was one model on XNNPACK; eight families now render and seven carry measured parity
+> rows. `executorch-families.md` is the living document; this one records the decision.
+
 Research date: **August 2026**. Companion to
 [`inference-engines.md`](inference-engines.md), which chose llama.cpp and reserved this
 slot, and [`mediatek-npu.md`](mediatek-npu.md), which measured what the accelerator behind

@@ -78,7 +78,7 @@ android {
         // no tool can make. A version code is a counter Play uses to order uploads and
         // nothing else, and the one requirement on it is that it never repeats, which is
         // exactly the kind of promise a person forgets and a machine does not.
-        versionName = "0.1.0"
+        versionName = "2.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

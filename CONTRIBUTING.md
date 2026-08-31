@@ -12,8 +12,9 @@ cd openweights
 ```
 
 You need JDK 21, the Android SDK with platform 37, NDK r29 or newer (older NDKs do not
-align native segments to 16 KB, which Google Play requires), and CMake 3.22+. The
-llama.cpp source is a pinned submodule: if you cloned without `--recurse-submodules`, run
+align native segments to 16 KB, which Google Play requires), and CMake 4.1.2. Four
+pinned submodules ride along — llama.cpp, the OpenCL headers and ICD loader, and QuickJS
+for the sandbox: if you cloned without `--recurse-submodules`, run
 `git submodule update --init --depth 1`.
 
 `docs/ARCHITECTURE.md` explains how the modules fit together;
@@ -47,8 +48,10 @@ A few things reviewers will look for:
   `docs/CONTEXT.md`.
 - **Comments explain constraints, not mechanics.** Say why something must be this way, not
   what the next line does.
-- **No telemetry, no accounts, no network calls to anywhere but Hugging Face.** This is a
-  hard product constraint, not a preference.
+- **No telemetry, no accounts, and every network egress named and switchable.** Model
+  traffic goes to Hugging Face; the assistant's own search, pictures and page-fetch
+  tools are the only other things that leave the device, each behind its own switch
+  under a heading that says so. This is a hard product constraint, not a preference.
 
 ## Reporting bugs
 

@@ -86,7 +86,7 @@ class PlayScreenshots {
     // reason to install this rather than a hosted assistant.
     @Test
     fun aToolRunAndTheAnswerItFed() =
-        shoot("02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
+        shoot("02-tools", until = "thunderstorms") { ChatShots.toolRound() }
 
     @Test
     fun aPlanYouCanTick() = shoot("03-plan", until = "Write the summary") {
@@ -95,7 +95,7 @@ class PlayScreenshots {
 
     @Test
     fun theHubRatherThanACatalogue() =
-        shoot("04-discover", until = "Hammer2.1") { ListingShots.discover() }
+        shoot("04-discover", until = "LFM2.5") { ListingShots.discover() }
 
     @Test
     fun everyToolWithAnOffSwitch() = shoot("05-tools", until = "Search the web") {
@@ -116,8 +116,7 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
-    fun sevenInchTools() =
-        shoot("7/02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
+    fun sevenInchTools() = shoot("7/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
@@ -125,7 +124,7 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = SEVEN_INCH)
-    fun sevenInchDiscover() = shoot("7/04-discover", until = "Hammer2.1") {
+    fun sevenInchDiscover() = shoot("7/04-discover", until = "LFM2.5") {
         ListingShots.discover()
     }
 
@@ -139,8 +138,7 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = TEN_INCH)
-    fun tenInchTools() =
-        shoot("10/02-tools", until = "thunderstorms", tap = SHOW_STEPS) { ChatShots.toolRound() }
+    fun tenInchTools() = shoot("10/02-tools", until = "thunderstorms") { ChatShots.toolRound() }
 
     @Test
     @Config(qualifiers = TEN_INCH)
@@ -148,7 +146,7 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = TEN_INCH)
-    fun tenInchDiscover() = shoot("10/04-discover", until = "Hammer2.1") {
+    fun tenInchDiscover() = shoot("10/04-discover", until = "LFM2.5") {
         ListingShots.discover()
     }
 
@@ -173,7 +171,7 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = PAPER)
-    fun paperDiscover() = shoot("light/03-discover", until = "Hammer2.1", dark = false) {
+    fun paperDiscover() = shoot("light/03-discover", until = "LFM2.5", dark = false) {
         ListingShots.discover()
     }
 
@@ -239,7 +237,6 @@ class PlayScreenshots {
         const val OUTPUT = "OPENWEIGHTS_SCREENSHOTS"
 
         /** The header a finished tool run folds behind. See `WorkBlock`. */
-        const val SHOW_STEPS = "Show the steps"
 
         /** Long enough for a markdown parse on a cold host JVM, short enough to fail fast. */
         const val WAIT_MS = 10_000L

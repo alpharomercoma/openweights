@@ -56,11 +56,11 @@ object ListingShots {
         state = DiscoverUiState(
             query = HubQuery(text = "gguf", sort = HubSort.TRENDING),
             results = listOf(
-                hub("MadeAgents/Hammer2.1-1.5b", downloads = 41_206, likes = 118),
-                hub("bartowski/Qwen2.5-1.5B-Instruct-GGUF", downloads = 289_431, likes = 74),
-                hub("unsloth/gemma-3-1b-it-GGUF", downloads = 156_884, likes = 203),
-                hub("Salesforce/Llama-xLAM-2-1b-fc-r-gguf", downloads = 12_907, likes = 46),
-                hub("LiquidAI/LFM2-1.2B-GGUF", downloads = 33_512, likes = 91),
+                hub("LiquidAI/LFM2.5-1.2B-Instruct-GGUF", downloads = 332_804, likes = 217),
+                hub("unsloth/Qwen3-1.7B-GGUF", downloads = 47_512, likes = 73),
+                hub("LiquidAI/LFM2.5-2.6B-GGUF", downloads = 885_760, likes = 316),
+                hub("LiquidAI/LFM2.5-8B-A1B-GGUF", downloads = 303_008, likes = 288),
+                hub("pytorch/SmolLM3-3B-INT8-INT4", downloads = 21_004, likes = 55),
             ),
             // What the phone can actually hold, which is what turns a list into advice.
             parameterCeilingBillions = 8,
@@ -190,8 +190,8 @@ object ListingShots {
                 )
             },
             perModel = listOf(
-                ModelUsage("Hammer2.1-1.5B-Q4_0", 120_400, 180, 13.8),
-                ModelUsage("Qwen2.5-1.5B-Q4_K_M", 22_480, 34, 11.2),
+                ModelUsage("LFM2.5-1.2B-Instruct-QAD-Q4_0", 120_400, 180, 42.7),
+                ModelUsage("Qwen3-1.7B-Q8_0", 22_480, 34, 24.3),
             ),
         ),
     )

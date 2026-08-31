@@ -722,3 +722,44 @@ The regression suite survives as `eval/date_placement_eval.py` + `eval/prompt_du
 (regenerate the dump with `PROMPT_DUMP=… ./gradlew :app:testStandardDebugUnitTest --tests
 '*PromptDumpTest*'` after any prompt-affecting change); ToolChoiceBenchmark now assembles
 the date exchange the way the app does.
+
+## The routing matrix: unknown entities, and what actually moved (2026-09-01)
+
+"Who is Alpha Romer Coma?" was answered with "I don't have enough information" by a
+model holding a working web_search. A 33-case × two-axis matrix (`eval/routing_matrix.py`:
+chit-chat, settled trivia, popular entities, unknown entities, live state, explicit
+search, multi-turn continuations including a completed tool round, and the date
+question; run at temp 0 over the full shipped catalogue on LFM2.5-1.2B QAD-Q4_0 and
+Q4_0, Qwen3-1.7B, and Llama-3.2-3B) established four things:
+
+- **Prompt wording, again, barely moves routing.** Extending the search-when-named
+  clause to people, organisations and places was free — never worse on any model,
+  occasionally +1 — and shipped on that basis, grounded in Mallen et al. 2022
+  (arXiv:2212.10511): parametric memory fails precisely on long-tail entities. But no
+  wording arm cured the lament. The mechanism that did is the knowledge-lament branch
+  of the denial repair — "I don't have enough information about X" now takes the same
+  single push the capability denial takes, landing on web_search. AbstentionBench
+  (arXiv:2506.09038) predicts exactly this split: crafted prompts "boost abstention in
+  practice" but do not resolve it.
+- **The date exchange is load-bearing beyond the date.** The "(For context: … Only
+  mention it if asked.)" wording shipped for greeting echoes broke the temp-0 date
+  question on every model (read_memory called for "what is today's date"), and removing
+  the exchange entirely cost trivia (6/6→4/6) and the multi-turn rows. The plain pair —
+  "Today is X." / "Understood, I have that." — answers the date 1/1 everywhere; the two
+  turns of ordinary conversation act as a worked example the routing leans on, which is
+  the few-shot effect the SLM function-calling literature reports (arXiv:2504.19277).
+- **Names still dominate.** search_files drew "Who is <person>?" calls; renamed
+  find_files, those went to web_search with nothing else changed — the search_media
+  finding, replayed.
+- **Pass-1 numbers undercount the app.** The matrix measures a single pass; the app's
+  repair loop converts the remaining weather/math/reminder denials and the knowledge
+  laments on their second pass. End-to-end on the SM8650 with the shipped QAD quant:
+  "Who is Alpha Romer Coma?" → searched on pass 1 → grounded biography in 4.6 s
+  (220 tok/s prefill, CH90%); "hi" 1.6 s with no call; the date answered without a
+  search in 1.0 s at CH98%. Quant matters: Q4_0 searches unknowns unprompted where
+  QAD-Q4_0 laments, so routing verdicts must name the quant they were measured on.
+
+Known and accepted: popular-entity questions ("What does Google do?") still draw an
+occasional search — a wasted call with a correct answer, the long-standing over-eager
+tail. Llama-3.2-3B produced wholesale zeros under this harness's OpenAI-shape calls —
+a harness artifact to resolve before its rows are read as routing truth.

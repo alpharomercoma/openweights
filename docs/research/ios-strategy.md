@@ -1,5 +1,9 @@
 # Bringing OpenWeights to iOS
 
+> **Status 2026-09-01:** underway. `core:common` is now a KMP module with
+> `iosArm64`/`iosSimulatorArm64` targets, `./gradlew verify` runs the simulator tests,
+> and `core/engine/src/main/cpp/apple/` holds a first static-lib build of the engine.
+
 Written 2026-08-10, revised the same day after an objective review found several claims in
 the first draft too confident. The question: is a separate native Swift app worth it, or
 should we move to React Native or Flutter so one codebase serves both?

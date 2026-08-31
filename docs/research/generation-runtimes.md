@@ -59,12 +59,13 @@ That is the same conclusion the chat path reached about NPU access and it has th
 consequence: the NPU is a later, device specific experiment, not a toggle. Start on CPU and
 OpenCL.
 
-## What is being built now
+## What was built, and then removed (status 2026-09-01)
 
-Not a runtime. `:core:generation` is pure Kotlin with no JNI: `ImageGenerator`,
-`SpeechSynthesizer`, a capability each runtime states rather than the interface assuming,
-and a `GenerationBundle` that carries the runtime, the quantization, the sizes and the
-target chip so the interface cannot claim a size or a voice the weights do not have.
+Nothing shipping. A `:core:generation` module — pure Kotlin contracts, `ImageGenerator`,
+`SpeechSynthesizer`, a `GenerationBundle` naming runtime, quantization, sizes and target
+chip — was drafted and then deleted along with its MNN candidate; no module of that name
+exists in `settings.gradle.kts` today. This section stays as the design that would be
+picked back up, not as a description of the tree.
 
 `InferenceEngine` stays text only. It speaks of a KV cache, a chat template, tools and
 tokens per second, none of which a diffusion model has, and the settings sheet has already

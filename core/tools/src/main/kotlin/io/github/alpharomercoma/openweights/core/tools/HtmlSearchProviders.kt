@@ -23,7 +23,8 @@ import org.jsoup.nodes.Element
 import java.net.URLDecoder
 
 /**
- * The three general engines besides DuckDuckGo, each scraped from its own results page.
+ * The general engines besides DuckDuckGo — Brave and Yahoo — each scraped from its own
+ * results page. Bing and Google are not here: both were measured refusing phones outright.
  *
  * Ported from what `ddgs` actually sends rather than from what its documentation says, which
  * matters because every one of these is a page meant for a browser and the difference

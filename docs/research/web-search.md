@@ -1,5 +1,11 @@
 # Where web search comes from
 
+> **Status 2026-09-01:** grown since written. DuckDuckGo is no longer the whole of
+> it: the app ships DuckDuckGo, Brave and Yahoo behind per-engine switches, an
+> optional search-only proxy, and an optional Context7 documentation source. Bing and
+> Google were measured unreachable from phones and removed (see the provider chain in
+> `core:tools` and the switches on the Tools screen).
+
 Written 2026-08-10, to answer one question that turned out to be three: can the app run
 SearXNG on the phone, would it help if it could, and what should the default be.
 

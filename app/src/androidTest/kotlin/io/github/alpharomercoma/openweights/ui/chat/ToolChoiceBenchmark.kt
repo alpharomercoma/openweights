@@ -343,6 +343,7 @@ class ToolChoiceBenchmark {
         val described =
             if (native) "" else "\n\n" + ToolPrompting.describe(tools, arm.format)
         val messages = listOf(ChatMessage.text(ChatRole.SYSTEM, system() + described)) +
+            dateExchange() +
             // The same fold TurnRunner does before it sends one, and for the same reason:
             // a template that would not take the definitions raises on the tool role, and a
             // prior written straight through would measure a defect the app no longer has.
@@ -433,9 +434,20 @@ class ToolChoiceBenchmark {
 
     private fun catalogue(): List<ToolDefinition> = registry().definitions
 
-    /** Assembled the way ChatViewModel assembles it, date included, or it is not the app. */
+    /** Assembled the way ChatViewModel assembles it, or it is not the app. The date is
+     * deliberately absent: it left the instructions so the warmed head stays byte-stable
+     * across midnight, and rides as [dateExchange] instead. */
     private fun system(): String =
-        "Today is ${LocalDate.now()}.\n\n$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
+        "$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
+
+    /** The acknowledged exchange ChatViewModel opens every conversation with. */
+    private fun dateExchange(): List<ChatMessage> = listOf(
+        ChatMessage.text(
+            ChatRole.USER,
+            "(For context: today is ${LocalDate.now()}. Only mention it if asked.)",
+        ),
+        ChatMessage.text(ChatRole.ASSISTANT, "Understood."),
+    )
 
     /**
      * Internal rather than private so [RawReplyProbe] can run the same models through the same

@@ -3552,7 +3552,8 @@ private fun recap(compaction: Compaction?): List<ChatMessage> {
 }
 
 /**
- * The day, carried by the conversation's first user turn rather than by the instructions.
+ * The day, carried by a small acknowledged exchange at the front of the conversation
+ * rather than by the instructions.
  *
  * The model still needs it: it cannot tell that "this year's final" is past its training
  * data if nobody says what year it is, and it answers from memory rather than look — on
@@ -3564,23 +3565,38 @@ private fun recap(compaction: Compaction?): List<ChatMessage> {
  * covers, so the head stays byte-stable for as long as the settings do, and a new day
  * costs the dozen tokens of a turn that was being read anyway.
  *
- * After a fold the first user turn is the recap, which is rebuilt from the root like
- * everything behind it; the date rides along. The day itself stays pinned per
- * conversation ([PromptDay]) so an open chat's bytes never shift at midnight.
+ * As its own acknowledged exchange, not prepended to the question. Prepended, the date
+ * reads as part of what the user wants and the model reaches for tools to serve it:
+ * measured at temp 0 over the shipped catalogue on LFM2.5-1.2B, "hi" and its kin drew
+ * tool calls on 8 of 12 chit-chat cases (hi → read_memory), against 4 of 12 with the
+ * date in the instructions and 3 of 12 with no date at all. The same acknowledged-turn
+ * device the fold recap uses scores 4 of 12 — the old level — and is the only placement
+ * measured that also answers "what is today's date?" without searching for it (the old
+ * in-system line failed even that). The conversation having already absorbed the fact
+ * is what keeps it from being treated as a request.
+ *
+ * The pair sits directly after the head, so it is rebuilt from the root like everything
+ * behind it and folds carry it naturally. The day itself stays pinned per conversation
+ * ([PromptDay]) so an open chat's bytes never shift at midnight.
  */
 private fun List<ChatMessage>.withConversationDay(): List<ChatMessage> {
     val at = indexOfFirst { it.role == ChatRole.USER }
     if (at < 0) return this
-    val first = this[at]
-    val question = first.text
-    val dated = if (question.isBlank()) {
-        "Today is ${PromptDay.pinned}."
-    } else {
-        "Today is ${PromptDay.pinned}.\n\n$question"
-    }
-    return toMutableList().apply {
-        this[at] = first.copy(parts = first.files + MessagePart.Text(dated))
-    }
+    return subList(0, at) +
+        listOf(
+            // Framed as context with a scope note, because the bare fact leaks: told
+            // plainly "Today is X.", the model recited the date back at greetings 8 of
+            // 30 times ("hello" → "Today is September 1, 2026. This is an important
+            // milestone…"). This wording measured 2/30 echoes and 2/30 tool calls over
+            // five seeds of six chit-chat cases at the shipped temperature, against
+            // 17/30 tool calls for prepending the date to the question.
+            ChatMessage.text(
+                ChatRole.USER,
+                "(For context: today is ${PromptDay.pinned}. Only mention it if asked.)",
+            ),
+            ChatMessage.text(ChatRole.ASSISTANT, "Understood."),
+        ) +
+        subList(at, size)
 }
 
 /**

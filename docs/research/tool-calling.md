@@ -694,3 +694,31 @@ measured, one inferred, and the inference written down where the next person wil
 - The context is cleared between benchmark cases. A run used to accumulate until the window
   filled, which is what `llama_decode returned 1` was: the sixth model died partway through
   and took its remaining arms with it.
+
+## Where the date line lives moves routing more than most description edits (2026-09-01)
+
+Moving `Today is …` out of the instructions (for KV byte-stability, see
+first-turn-latency.md) and prepending it to the first question made small models read the
+date as part of the request: at temp 0 over the shipped 14-tool catalogue, LFM2.5-1.2B
+called tools on 8/12 chit-chat cases ("hi" → read_memory) against 4/12 with the date in
+the system message and 3/12 with no date at all; at the shipped temperature over five
+seeds it was 17/30. The fix is the same device the fold recap uses — the fact as its own
+acknowledged exchange ahead of the first question — which returns routing to the no-date
+floor on LFM2.5 Q4_0/Q4_K_M and Qwen3-1.7B alike.
+
+Wording matters twice more, both measured at temp 0.8 × 5 seeds × 6 greetings:
+
+- **The acknowledgment steers routing.** "Understood, I have that." drew 1/30 tool calls;
+  "Noted." 5/30; "Got it." 6/30.
+- **A bare fact gets recited.** With `Today is X.` / `Understood, I have that.`, greetings
+  quoted the date back 8/30 times ("hello" → "Today is September 1, 2026. This is an
+  important milestone…"). The shipped wording — `(For context: today is X. Only mention
+  it if asked.)` / `Understood.` — measured 2/30 calls and 2/30 recitals, and still
+  answers "what is today's date?" without a search (verified on the Poco: 1.2s "hi" with
+  no call, then "Today's date is 2026-09-01"). The stronger "No need to mention it"
+  suppressed even legitimate date answers — scope notes must permit the asked-for case.
+
+The regression suite survives as `eval/date_placement_eval.py` + `eval/prompt_dump.json`
+(regenerate the dump with `PROMPT_DUMP=… ./gradlew :app:testStandardDebugUnitTest --tests
+'*PromptDumpTest*'` after any prompt-affecting change); ToolChoiceBenchmark now assembles
+the date exchange the way the app does.

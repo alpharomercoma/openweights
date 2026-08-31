@@ -66,10 +66,10 @@ class EngineMessagesTest {
         assertThat(system.text).contains("Do not search to double check")
         // The date deliberately stays OUT of the instructions — it is the one line that
         // changes daily, and in the head it invalidated the warm snapshot and disk store
-        // at every midnight. It rides on the first user turn instead.
-        assertThat(system.text).doesNotContain("Today is")
+        // at every midnight. It opens the conversation as its own acknowledged exchange.
+        assertThat(system.text).doesNotContain("today is")
         val firstUser = state.engineMessages().first { it.role == ChatRole.USER }
-        assertThat(firstUser.text).contains("Today is")
+        assertThat(firstUser.text).contains("today is")
     }
 
     /**
@@ -127,9 +127,10 @@ class EngineMessagesTest {
     fun `without compaction every turn is sent`() {
         val state = ChatUiState(transcript = transcript(4))
 
-        // Four turns, and the one instruction every conversation opens with: how long an
-        // answer should be. Tools are not in it, because this state has none.
-        assertThat(state.engineMessages()).hasSize(5)
+        // Four turns, the date exchange every conversation opens with, and the one
+        // instruction every conversation opens with: how long an answer should be. Tools
+        // are not in it, because this state has none.
+        assertThat(state.engineMessages()).hasSize(7)
     }
 
     @Test
@@ -158,12 +159,16 @@ class EngineMessagesTest {
         assertThat(system.text).contains("Do not search to double check")
         assertThat(system.text).doesNotContain("The user is porting a parser.")
         assertThat(system.text).doesNotContain("$")
-        // Post-fold the recap is the conversation's first user turn, so it also carries
-        // the date — the one line kept out of the instructions so the head stays
-        // byte-stable across midnight.
         val recap = messages.first { it.text.contains("Earlier in this conversation:") }
         assertThat(recap.text).contains("The user is porting a parser.")
-        assertThat(recap.text).contains("Today is")
+        // The date is its own acknowledged exchange ahead of the recap — kept out of the
+        // instructions so the head stays byte-stable across midnight, and kept out of
+        // the question so it is never read as something to act on.
+        val day = messages.indexOfFirst { it.text.contains("today is") }
+        assertThat(day).isAtLeast(0)
+        assertThat(day).isLessThan(messages.indexOf(recap))
+        assertThat(messages[day].role).isEqualTo(ChatRole.USER)
+        assertThat(messages[day + 1].role).isEqualTo(ChatRole.ASSISTANT)
     }
 
     @Test
@@ -177,10 +182,11 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // The instructions, the recap exchange that stands in for what was folded, and the
-        // two turns after the fold. The folded turns themselves appear nowhere.
-        assertThat(messages).hasSize(5)
-        assertThat(messages.drop(3).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        // The instructions, the date exchange, the recap exchange that stands in for what
+        // was folded, and the two turns after the fold. The folded turns themselves appear
+        // nowhere.
+        assertThat(messages).hasSize(7)
+        assertThat(messages.drop(5).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
         assertThat(messages.map { it.text }.none { it.contains("turn 0") }).isTrue()
     }
 
@@ -203,8 +209,9 @@ class EngineMessagesTest {
         assertThat(messages.first().role).isEqualTo(ChatRole.SYSTEM)
         assertThat(messages.first().text).contains("Answer from what you know")
         // The summary is a turn now, and the alternation it has to keep is the whole reason
-        // it is a user turn followed by an assistant one rather than a system turn of its own.
-        assertThat(messages[1].text).contains("summary")
+        // it is a user turn followed by an assistant one rather than a system turn of its
+        // own. It follows the date exchange, which opens every conversation.
+        assertThat(messages[3].text).contains("summary")
         assertAlternates(messages)
     }
 
@@ -412,7 +419,8 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        assertThat(messages.count { it.role == ChatRole.USER }).isEqualTo(1)
+        // Two user turns: the date exchange's, and the question carrying the notes.
+        assertThat(messages.count { it.role == ChatRole.USER }).isEqualTo(2)
         assertThat(messages.last().role).isEqualTo(ChatRole.USER)
         assertThat(messages.last().text).contains("Vaughan")
     }

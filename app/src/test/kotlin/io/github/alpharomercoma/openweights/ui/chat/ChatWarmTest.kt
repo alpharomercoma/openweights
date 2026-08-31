@@ -150,7 +150,7 @@ class ChatWarmTest : ChatFixture() {
             assertThat(branchWarm.messages.first().text).doesNotContain("Today is")
             assertThat(
                 branchWarm.messages.first { it.role == ChatRole.USER }.text,
-            ).contains("Today is $startDay.")
+            ).contains("today is $startDay.")
 
             // A fresh chat is a new start: its warm moves the pin and reads the new
             // head in the background, before anybody has typed.

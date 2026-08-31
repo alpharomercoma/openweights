@@ -29,6 +29,7 @@ import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
+import io.github.alpharomercoma.openweights.core.engine.WarmResult
 import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
 import io.github.alpharomercoma.openweights.core.tools.AgentDecision
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
@@ -144,10 +145,6 @@ class TurnRunner @Inject constructor(
      */
     fun toolNamed(name: String): Tool? = tools.find(name)
 
-    /** Whether the user has switched memory on, which decides if facts reach the prompt. */
-    fun remembers(): Boolean =
-        tools.all.any { it.definition.name == "remember" && switches.isEnabled(it) }
-
     fun hasEnabledTools(): Boolean = tools.all.any { it.isUserFacing && switches.isEnabled(it) }
 
     /**
@@ -178,8 +175,17 @@ class TurnRunner @Inject constructor(
         offerAsk: Boolean? = null,
         question: String = "",
         offerPlan: Boolean = true,
-    ): String = engineInUse.withLock {
-        turn(conversation, params, mode, withTools, notes, listener, offerAsk, question, offerPlan)
+    ): String {
+        // A warm holds the engine for as long as a cold prefill takes, and it exists to
+        // serve exactly the turn that is arriving now: interrupt it, keep what it read,
+        // and let the turn reuse that.
+        if (warming) engine.cancel()
+        return engineInUse.withLock {
+            turn(
+                conversation, params, mode, withTools, notes, listener,
+                offerAsk, question, offerPlan,
+            )
+        }
     }
 
     /**
@@ -201,7 +207,14 @@ class TurnRunner @Inject constructor(
         question: String = "",
         offerPlan: Boolean = true,
     ): String? {
-        if (!engineInUse.tryLock()) return null
+        if (warming) engine.cancel()
+        if (!engineInUse.tryLock()) {
+            // Busy with a real turn: skip, as documented above. Busy with a warm: the
+            // cancel above is already landing, so wait out the moment it takes to exit
+            // rather than recording a skip for work nobody was waiting on.
+            if (!warming) return null
+            engineInUse.lock()
+        }
         return try {
             turn(
                 conversation,
@@ -215,6 +228,102 @@ class TurnRunner @Inject constructor(
                 offerPlan,
             )
         } finally {
+            engineInUse.unlock()
+        }
+    }
+
+    /**
+     * The tools a turn in [mode] would offer, exactly as [turn] decides them.
+     *
+     * One function because two callers must agree to the byte: the turn that answers, and
+     * the warm that reads the same prefix in ahead of it. A selection that drifted between
+     * them is a warm that warmed a prompt nobody will ever send.
+     */
+    private fun selectTools(mode: AgentMode, offerPlan: Boolean, offerAsk: Boolean?): ToolRegistry {
+        asks.offered = offerAsk ?: (mode == AgentMode.PLAN)
+        // The switches only govern what the user was offered a switch for. Plan mode's own
+        // two tools are machinery, so they follow availability alone; a stale "off" left in
+        // the preferences by the screen that used to list them must not disable them now.
+        val offered = tools.all.filter { it.isAvailable }
+            // The plan belongs to the conversation the user is looking at, and the board
+            // holding it is one object for the whole process. Anything that is not that
+            // conversation must not be handed `advance`: a watch coming due mid-plan runs
+            // through this same loop, in AUTO, with no approval on the way, and was offered
+            // a tick for a step it knows nothing about. It also inherited the longer round
+            // budget, because ticking a plan is a chaining tool.
+            .filter { offerPlan || it.definition.name != AdvanceTool.NAME }
+        return tools.enabled(
+            offered
+                // Plan mode gets the machinery and nothing else.
+                //
+                // It used to be handed the whole catalogue alongside an instruction not to
+                // call any of it, and measured on five ambiguous requests it called one
+                // anyway two times in five on the 2.6B and four in five on the 1.2B: a mode
+                // that does not do what it says. It also rarely asked, which is the one
+                // thing plan mode is for.
+                //
+                // Writing the exception into the instruction was tried first and made it
+                // worse, 2 of 5 down to 1. Taking the tools out of the prompt fixed both at
+                // once: questions asked went to 4 of 5 and 2 of 5, and tools run went to
+                // none on either model. The wording then made no difference at all, which
+                // is the same result the web tools gave. A tool in the prompt is an
+                // invitation and an instruction not to accept it is weaker than not making
+                // it.
+                //
+                // The cost is one clarifying question on an unambiguous request in two,
+                // measured on the 2.6B. In the mode whose whole purpose is to think before
+                // acting, that is the right side to err on.
+                .filter { mode != AgentMode.PLAN || !it.isUserFacing }
+                .filter { !it.isUserFacing || switches.isEnabled(it) }
+                .map { it.definition.name }
+                .toSet(),
+        )
+    }
+
+    /** True while [warmFreshChat] holds the engine, so a turn knows to interrupt it. */
+    @Volatile
+    private var warming = false
+
+    /**
+     * Reads the head of a fresh conversation into the engine's cache, ahead of anybody
+     * asking anything.
+     *
+     * Composed by the same functions a real turn composes with — [selectTools], the same
+     * describing pass, the same registry — because the engine reuses this work by
+     * comparing rendered bytes, and any drift here is a warm that warmed nothing. Runs
+     * only when the engine is idle and yields to a turn the moment one arrives: [run]
+     * cancels a warm in progress rather than queueing behind it.
+     *
+     * @param system the fresh conversation's instructions, from the same builder the
+     * first real turn will use.
+     */
+    suspend fun warmFreshChat(
+        system: List<ChatMessage>,
+        withTools: Boolean,
+        params: SamplerParams,
+    ): WarmResult? {
+        if (!engineInUse.tryLock()) return null
+        warming = true
+        return try {
+            val active = selectTools(AgentMode.AUTO, offerPlan = true, offerAsk = null)
+            val native = engine.loadedModel?.supportsTools == true
+            val renderTools = withTools && native && ToolBudget(headroomTokens()).hasRoom
+            val messages = system.describing(active, needed = withTools && !native)
+            val result = engine.warm(
+                messages = messages,
+                tools = if (renderTools) active.definitions else emptyList(),
+                params = params,
+            )
+            result?.let {
+                Log.i(
+                    "OpenWeights",
+                    "warm prefilled=${it.warmedTokens} reused=${it.reusedTokens} " +
+                        "in ${it.prefillMs}ms snapshot=${it.snapshotBytes / BYTES_PER_KB}KB",
+                )
+            }
+            result
+        } finally {
+            warming = false
             engineInUse.unlock()
         }
     }
@@ -248,44 +357,7 @@ class TurnRunner @Inject constructor(
         // this tool exists for, and offering it anyway is what let a small model ask who
         // the subject was instead of researching it. Null everywhere else, which is every
         // other turn there is.
-        asks.offered = offerAsk ?: (mode == AgentMode.PLAN)
-        // The switches only govern what the user was offered a switch for. Plan mode's own
-        // two tools are machinery, so they follow availability alone; a stale "off" left in
-        // the preferences by the screen that used to list them must not disable them now.
-        val offered = tools.all.filter { it.isAvailable }
-            // The plan belongs to the conversation the user is looking at, and the board
-            // holding it is one object for the whole process. Anything that is not that
-            // conversation must not be handed `advance`: a watch coming due mid-plan runs
-            // through this same loop, in AUTO, with no approval on the way, and was offered
-            // a tick for a step it knows nothing about. It also inherited the longer round
-            // budget, because ticking a plan is a chaining tool.
-            .filter { offerPlan || it.definition.name != AdvanceTool.NAME }
-        val active = tools.enabled(
-            offered
-                // Plan mode gets the machinery and nothing else.
-                //
-                // It used to be handed the whole catalogue alongside an instruction not to
-                // call any of it, and measured on five ambiguous requests it called one
-                // anyway two times in five on the 2.6B and four in five on the 1.2B: a mode
-                // that does not do what it says. It also rarely asked, which is the one
-                // thing plan mode is for.
-                //
-                // Writing the exception into the instruction was tried first and made it
-                // worse, 2 of 5 down to 1. Taking the tools out of the prompt fixed both at
-                // once: questions asked went to 4 of 5 and 2 of 5, and tools run went to
-                // none on either model. The wording then made no difference at all, which
-                // is the same result the web tools gave. A tool in the prompt is an
-                // invitation and an instruction not to accept it is weaker than not making
-                // it.
-                //
-                // The cost is one clarifying question on an unambiguous request in two,
-                // measured on the 2.6B. In the mode whose whole purpose is to think before
-                // acting, that is the right side to err on.
-                .filter { mode != AgentMode.PLAN || !it.isUserFacing }
-                .filter { !it.isUserFacing || switches.isEnabled(it) }
-                .map { it.definition.name }
-                .toSet(),
-        )
+        val active = selectTools(mode, offerPlan, offerAsk)
 
         // Two rounds is search then answer, which is the whole shape of a turn that looks
         // something up. A turn that works with files is a different shape: find it, read it,
@@ -1073,6 +1145,8 @@ private const val ANNOUNCEMENT_CHARS = 160
  * tokens" and becomes a second copy of whatever was pasted.
  */
 private const val GROUNDING_MAX_CHARS = 400
+
+private const val BYTES_PER_KB = 1024L
 
 /** The steps of any decision, so the caller does not have to match on the type to show them. */
 private fun AgentDecision.steps(): List<AgentStep> = when (this) {

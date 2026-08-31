@@ -67,7 +67,6 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.GoalBoard
-import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolEvidence
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
@@ -420,14 +419,6 @@ data class ChatUiState(
      * clearly in the transcript what ran.
      */
     val mode: AgentMode = AgentMode.AUTO,
-    /**
-     * What earlier conversations left behind, already rendered, or null when memory is off
-     * or empty.
-     *
-     * Rendered upstream rather than read here so that [engineMessages] stays a function of
-     * its state and can be tested without a store behind it.
-     */
-    val memories: String? = null,
     /** A tool waiting for the user to allow it. Null when nothing is waiting. */
     val pendingApproval: ToolCall? = null,
 ) {
@@ -551,7 +542,6 @@ class ChatViewModel @Inject constructor(
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
     private val goals: GoalBoard,
-    private val memory: Memory,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -593,6 +583,16 @@ class ChatViewModel @Inject constructor(
     private val folding = Folding(compactor, writer, _uiState)
 
     private var generationJob: Job? = null
+
+    /**
+     * The background read of the fresh-conversation prefix, so nobody waits for it later.
+     *
+     * See [TurnRunner.warmFreshChat]. Fired after a load and when the prefix could have
+     * changed; a real turn interrupts it rather than queueing, so it never costs the user
+     * anything but battery the first answer was going to spend anyway.
+     */
+    private var warmJob: Job? = null
+
     private var thermalJob: Job? = null
     private var goalJob: Job? = null
 
@@ -919,6 +919,11 @@ class ChatViewModel @Inject constructor(
                 writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
             }
         }
+
+        // The context was just reset for the new weights, so the first answer's twenty
+        // seconds of instructions-and-tools prefill are all still ahead — spend them now,
+        // in the background, while the user is still reading the screen.
+        warmEngine()
     }
 
     private fun ChatUiState.afterLoad(
@@ -1416,15 +1421,9 @@ class ChatViewModel @Inject constructor(
         compactIfNeeded()
 
         // Read here rather than held: the user can switch a tool off in another tab
-        // between one question and the next, and the instruction has to follow. Memory
-        // is read in the same breath and for the same reason, and only when its own
-        // tool is on: switching it off has to stop the app remembering and stop it
-        // repeating what it already remembered.
+        // between one question and the next, and the instruction has to follow.
         _uiState.update {
-            it.copy(
-                toolsAvailable = turns.hasEnabledTools(),
-                memories = memory.asPrompt().takeIf { _ -> turns.remembers() },
-            )
+            it.copy(toolsAvailable = turns.hasEnabledTools())
         }
 
         val state = _uiState.value
@@ -2191,6 +2190,27 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /** Reads the fresh-chat prefix into the engine cache while nobody is waiting. */
+    private fun warmEngine() {
+        warmJob?.cancel()
+        warmJob = viewModelScope.launch {
+            if (loadedFile == null || _uiState.value.isLoadingModel) return@launch
+            // Refreshed exactly the way a turn refreshes it, because the instruction that
+            // says tools exist goes in or stays out of the prefix with this flag — and a
+            // warm rendered under yesterday's answer warms a prompt nobody will send.
+            _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
+            val state = _uiState.value
+            val head = state.prefixMessages()
+            if (head.isEmpty()) return@launch
+            // The same sampler shape a real turn would pass, because thinking flags reach
+            // the template and the template shapes the bytes being warmed.
+            val params = state.preferences.toSamplerParams().let {
+                if (state.toolsAvailable) it.copy(thinking = true) else it
+            }
+            turns.warmFreshChat(head, withTools = state.toolsAvailable, params = params)
+        }
+    }
+
     fun newChat() {
         // A goal is driven by its own job, separate from generationJob, and reading the
         // board rather than the transcript to decide what to do next: stopping only the
@@ -2215,7 +2235,13 @@ class ChatViewModel @Inject constructor(
             // the insert had no parent row to hang from. Nothing between here and the
             // reset reads the id, so moving it up only closes the window sooner.
             conversationId = null
-            runtime.resetContext()
+            // The cache is deliberately NOT reset here any more. Every conversation on this
+            // screen starts with the same instructions-and-tools prefix, and the engine
+            // aligns the cache itself: a transformer rolls the old conversation back to
+            // that shared prefix, and a hybrid, which cannot roll back, restores the warm
+            // snapshot taken at load. Resetting was a full first-turn re-read on every new
+            // chat — about twenty seconds of prefill on the 1.2B before a short question —
+            // for hygiene the alignment already guarantees byte-for-byte.
             // A research turn interrupted mid-plan can leave these set; unconsumed, the
             // new chat's first turn would silently inherit an override that belonged to
             // the conversation just left behind. See start().
@@ -2240,6 +2266,9 @@ class ChatViewModel @Inject constructor(
                     error = null,
                 )
             }
+            // Cheap when the cache already begins with the prefix, which is every new chat
+            // whose settings did not change; a real re-read only happens when they did.
+            warmEngine()
         }
     }
 
@@ -2482,7 +2511,14 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(preferences = preferences) }
             // The conversation is kept: only the weights move, and the transcript is text.
             // The cache does not survive, which is why the next reply re-reads it.
-            if (movedProcessor) loadedFile?.let { loadModel(it, keepConversation = true) }
+            if (movedProcessor) {
+                loadedFile?.let { loadModel(it, keepConversation = true) }
+            } else {
+                // The prefix may have changed with the settings — a new system prompt, a
+                // different answer length — so the warmed bytes are re-derived; the warm
+                // itself is a no-op when they did not.
+                warmEngine()
+            }
         }
     }
 
@@ -3250,15 +3286,14 @@ private const val MARKDOWN_STYLE: String =
         "for lists, and a table when you are comparing things across the same few fields."
 
 /**
- * What actually gets sent to the model: the compaction summary, if any, followed by the
- * turns that were not folded into it.
+ * The instructions every conversation on this screen starts with, as messages.
  *
- * @param toolPromptOverride Replaces [ModelPreferences.toolPrompt] for this one turn. The
- *   configured prompt is tuned for ordinary chat, where reaching for a tool the model
- *   probably does not need is the failure worth avoiding; a research step is the opposite
- *   case; see the override research steps pass.
+ * Split out of [engineMessages] because two callers must produce the same bytes: the turn
+ * that answers, and the warm pass that reads this prefix into the engine while nobody is
+ * waiting. The engine reuses the work by comparing rendered bytes, so this being one
+ * function is the guarantee, not a tidiness.
  */
-internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): List<ChatMessage> {
+internal fun ChatUiState.prefixMessages(toolPromptOverride: String? = null): List<ChatMessage> {
     val instructions = listOfNotNull(
         // A model cannot tell that "this year's final" is past its training data if nobody
         // tells it what year it is, and it will answer from memory rather than look. Eight
@@ -3268,11 +3303,6 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
-        // After the user's own instructions and before anything about tools, because it is
-        // background rather than an order. It is also the same tokens on every turn, so it
-        // sits in the stable part of the prompt where the KV cache keeps it and it is paid
-        // for once rather than per question. See Memory.
-        memories,
         // Plan mode says its piece whether or not any tool is switched on, because it is a
         // mode the user chose and it changes how the model is meant to answer. Gated on
         // tools being available, "/plan" with everything switched off sent no instruction
@@ -3284,10 +3314,23 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         ),
     ).joinToString("\n\n")
 
-    val system = instructions
+    return instructions
         .takeIf { it.isNotBlank() }
         ?.let { listOf(ChatMessage.text(ChatRole.SYSTEM, it)) }
         .orEmpty()
+}
+
+/**
+ * What actually gets sent to the model: the compaction summary, if any, followed by the
+ * turns that were not folded into it.
+ *
+ * @param toolPromptOverride Replaces [ModelPreferences.toolPrompt] for this one turn. The
+ *   configured prompt is tuned for ordinary chat, where reaching for a tool the model
+ *   probably does not need is the failure worth avoiding; a research step is the opposite
+ *   case; see the override research steps pass.
+ */
+internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): List<ChatMessage> {
+    val system = prefixMessages(toolPromptOverride)
 
     // The engine's own record of the conversation, where there is a current one. Replaying
     // it verbatim — decorated questions, tool rounds and all — is what lets the next prompt

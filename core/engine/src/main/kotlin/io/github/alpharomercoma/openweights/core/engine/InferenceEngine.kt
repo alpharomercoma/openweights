@@ -251,6 +251,17 @@ data class LoadedModelInfo(
  * Implementations hold a single model at a time and are not safe for concurrent
  * generation; [cancel] is the exception and may be called while [chat] is running.
  */
+/** What warming the conversation prefix did. See [InferenceEngine.warm]. */
+data class WarmResult(
+    /** Tokens freshly decoded into the cache by this warm. */
+    val warmedTokens: Int,
+    /** Tokens the cache already held, so nothing was done for them. */
+    val reusedTokens: Int,
+    val prefillMs: Long,
+    /** Size of the snapshot kept for models that refuse rollback, or 0. */
+    val snapshotBytes: Long,
+)
+
 interface InferenceEngine : AutoCloseable {
     /** The model currently loaded, or null. */
     val loadedModel: LoadedModelInfo?
@@ -286,6 +297,27 @@ interface InferenceEngine : AutoCloseable {
          */
         tools: List<ToolDefinition> = emptyList(),
     ): Flow<GenerationEvent>
+
+    /**
+     * Prefills the head a fresh conversation will start with, so the first question does
+     * not pay for it.
+     *
+     * [messages] is that head — normally one system message — and [tools] whatever the
+     * first turn would offer; both must be composed exactly as the first turn will compose
+     * them, because the engine reuses the work by comparing bytes, not intent. Runs on the
+     * same serialized path as [chat] and honours [cancel]; a cancelled warm keeps the
+     * progress it can and is not an error.
+     *
+     * Default is a quiet no-op: an engine that cannot warm — none is loaded, or the
+     * runtime has no such path — reports null rather than failing, because warming is an
+     * optimization and never an obligation.
+     */
+    suspend fun warm(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition> = emptyList(),
+        /** Only [SamplerParams.thinking] and [SamplerParams.reasoningEffort] shape the prefix. */
+        params: SamplerParams = SamplerParams(),
+    ): WarmResult? = null
 
     /** Stops the running generation. Safe to call from any thread. */
     fun cancel()

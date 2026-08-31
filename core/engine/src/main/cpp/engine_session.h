@@ -152,6 +152,17 @@ struct GenerationStats {
     bool thinking_prefilled   = false;
 };
 
+/** What warming the prompt prefix did, measured the same way generation is. */
+struct WarmStats {
+    /** Tokens freshly decoded into the cache by this warm. */
+    int32_t prompt_tokens  = 0;
+    /** Tokens the cache already held, byte-for-byte, so nothing was done for them. */
+    int32_t reused_tokens  = 0;
+    int64_t prefill_ms     = 0;
+    /** Size of the prefix snapshot kept for models that refuse rollback, or 0. */
+    int64_t snapshot_bytes = 0;
+};
+
 /**
  * A loaded model plus its context and KV cache.
  *
@@ -202,6 +213,33 @@ public:
         const TokenCallback & on_token,
         GenerationStats & stats,
         ParsedReply & reply,
+        std::string & error);
+
+    /**
+     * Reads the conversation's stable prefix into the KV cache before anybody asks anything.
+     *
+     * The first turn of every conversation begins with the same two thousand tokens of
+     * system message and tool definitions, and at phone prefill speeds that is most of the
+     * first answer's wait. Warming decodes that prefix while the app is idle — right after
+     * the model loads — so the first question pays for itself and nothing else.
+     *
+     * `messages` is the fresh conversation's head (normally just the system message) and is
+     * rendered *without* the generation prompt, so the rendered text is a byte prefix of
+     * what the first real turn will render. Cancellable like generation; a cancelled warm
+     * keeps every full batch it managed on models whose memory can be cut, and concedes the
+     * cache on those whose memory cannot.
+     *
+     * On models that refuse partial rollback (recurrent and hybrid families), the warmed
+     * prefix is also snapshotted, because those models otherwise pay a full re-read on
+     * every new conversation: the old conversation's cache cannot be rewound to the shared
+     * prefix, but it can be *replaced* by the snapshot. Transformers need no snapshot; for
+     * them rollback already keeps the prefix across conversations.
+     */
+    bool warm(
+        const std::vector<ChatMessage> & messages,
+        const std::vector<ToolDefinition> & tools,
+        const ReasoningConfig & reasoning,
+        WarmStats & stats,
         std::string & error);
 
     /** True when the loaded chat template understands being told whether to think. */
@@ -294,10 +332,33 @@ private:
         const std::vector<ToolDefinition> & tools,
         const ReasoningConfig & reasoning,
         std::string & out,
-        std::string & error);
+        std::string & error,
+        bool add_generation_prompt = true);
 
     /** Decodes `tokens[from..]`, reusing whatever prefix is already cached. */
     bool ingest_prompt(const std::vector<llama_token> & tokens, size_t from, std::string & error);
+
+    /**
+     * Brings the cache into agreement with the head of `tokens`, as cheaply as it can.
+     *
+     * Reuses the longest matching prefix; rolls the rest back where the memory allows it;
+     * where it refuses, restores the warm snapshot if `tokens` extends the snapshotted
+     * prefix; and starts cold otherwise. Returns the position ingestion should continue
+     * from. `need_logits` keeps one token back for generation, which a warm does not need.
+     */
+    size_t align_cache(const std::vector<llama_token> & tokens, bool need_logits);
+
+    /**
+     * Decodes `tokens[from..]` a batch at a time, committing progress after each batch.
+     *
+     * The warm path's ingest: a cancelled warm is not a failure, so every batch that
+     * finished stays counted in [cached_] and the next turn reuses it. On a model whose
+     * memory cannot drop the half-written batch, cancellation concedes the whole cache.
+     */
+    bool ingest_warm(const std::vector<llama_token> & tokens, size_t from, std::string & error);
+
+    /** Snapshots the cache as the warm prefix, on the families that cannot roll back. */
+    void maybe_snapshot();
 
     /**
      * Encodes a prompt containing media and evaluates it into the KV cache.
@@ -350,6 +411,18 @@ private:
      * so the next turn re-evaluates from the start instead.
      */
     bool cached_covers_context_ = true;
+
+    /**
+     * The tokens the warm snapshot covers, and the memory state that held exactly them.
+     *
+     * Only populated on models whose memory refuses partial rollback — recurrent and
+     * hybrid families — because they are the ones with no other way to keep the shared
+     * prefix across conversations. For everyone else the ordinary rollback path is free.
+     * Both live for the session and go with it; a re-warm with a different prefix
+     * replaces them.
+     */
+    std::vector<llama_token> prefix_tokens_;
+    std::vector<uint8_t> prefix_state_;
 
     std::atomic<bool> cancelled_{false};
 };

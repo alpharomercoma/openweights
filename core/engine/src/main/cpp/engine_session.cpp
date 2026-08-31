@@ -936,7 +936,8 @@ bool Session::render_prompt(
     const std::vector<ToolDefinition> & tools,
     const ReasoningConfig & reasoning,
     std::string & out,
-    std::string & error) {
+    std::string & error,
+    bool add_generation_prompt) {
     auto * templates = static_cast<common_chat_templates *>(chat_templates_);
     if (templates == nullptr) {
         error = "model has no chat template; it cannot be used for chat";
@@ -944,7 +945,10 @@ bool Session::render_prompt(
     }
 
     common_chat_templates_inputs inputs;
-    inputs.add_generation_prompt = true;
+    // False only for warming, which renders the head a future conversation will start
+    // with: the generation prompt opens an assistant turn, and a warmed prefix ending in
+    // one would stop matching the moment the real first turn renders a user turn there.
+    inputs.add_generation_prompt = add_generation_prompt;
     inputs.use_jinja = true;
     // Ask the template to keep thinking separable; the parser then hands it back as
     // reasoning_content instead of leaving tags in the answer.
@@ -1096,6 +1100,255 @@ bool Session::ingest_prompt(
     return true;
 }
 
+size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_logits) {
+    size_t reusable = 0;
+    while (cached_covers_context_ && reusable < cached_.size() && reusable < tokens.size() &&
+           cached_[reusable] == tokens[reusable]) {
+        ++reusable;
+    }
+    // Never reuse the entire prompt when logits are wanted: at least one token must be
+    // decoded to have something to sample from. A warm samples nothing, so it may.
+    if (need_logits && reusable == tokens.size() && reusable > 0) {
+        --reusable;
+    }
+
+    // Where the cache stopped matching, in tokens.
+    //
+    // Worth a line of log because the alternative is inferring it. A turn that re-reads
+    // the whole conversation can be a history that does not match what was generated, a
+    // template that renders a rebuilt turn a token differently, or anything volatile
+    // near the head of the prompt, and those want different fixes. The number says
+    // which: a divergence a few hundred tokens in is the tail of the conversation, one
+    // at twenty is the system message or the tool block.
+    if (reusable < cached_.size()) {
+        LOGI("kv: diverged at %zu of %zu cached, prompt %zu, re-reading %zu",
+             reusable, cached_.size(), tokens.size(), tokens.size() - reusable);
+    }
+
+    // The snapshot beats whatever the cache offers whenever the prompt carries the whole
+    // warmed prefix and the cache matches less of it. The empty cache is the common case:
+    // a fresh context after load, reset or an error holds nothing, no rollback is ever
+    // attempted, and without this check the snapshot sat unused while two thousand tokens
+    // were read again.
+    if (!prefix_state_.empty() && prefix_tokens_.size() > reusable) {
+        size_t on_prefix = 0;
+        while (on_prefix < prefix_tokens_.size() && on_prefix < tokens.size() &&
+               prefix_tokens_[on_prefix] == tokens[on_prefix]) {
+            ++on_prefix;
+        }
+        if (on_prefix == prefix_tokens_.size() && (on_prefix < tokens.size() || !need_logits)) {
+            reset();
+            const size_t applied = llama_state_seq_set_data(
+                ctx_, prefix_state_.data(), prefix_state_.size(), 0);
+            if (applied != 0) {
+                cached_ = prefix_tokens_;
+                n_past_ = static_cast<int32_t>(prefix_tokens_.size());
+                LOGI("kv: restored the warm prefix of %zu, reading %zu instead of %zu",
+                     prefix_tokens_.size(), tokens.size() - prefix_tokens_.size(),
+                     tokens.size());
+                return prefix_tokens_.size();
+            }
+            LOGI("kv: warm prefix restore failed, starting cold");
+            reset();
+            return 0;
+        }
+    }
+
+    // Compared against the cache position rather than the token count, because a
+    // previous turn with an attachment leaves positions filled that no token describes.
+    //
+    // The answer matters and used to be thrown away. A transformer's cache can be cut at
+    // any position, but a recurrent or hybrid one carries a running state rather than a
+    // row per token, so it can only roll back as far as it kept snapshots for, which by
+    // default is none. It says so by returning false, and the old code rewound n_past_
+    // anyway. Nothing was removed, and llama_batch_get_one leaves the positions unset, so
+    // the next batch was placed after the tail that was supposed to be gone: the model
+    // attended to text nobody could see, the cache grew on every turn, and thirty or so
+    // generations later llama_decode returned 1 with no slot left. That is the LFM2
+    // failure, and Granite-hybrid, Jamba and Nemotron-H reach it by the same route.
+    if (static_cast<int32_t>(reusable) < n_past_) {
+        const bool rolled_back = llama_memory_seq_rm(
+            llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
+        if (!rolled_back) {
+            // The families that refuse are the ones the warm snapshot exists for. A new
+            // conversation shares its first two thousand tokens with the snapshot, so if
+            // this prompt extends the snapshotted prefix, restoring it turns "re-read
+            // everything" into "re-read the question".
+            size_t on_prefix = 0;
+            while (on_prefix < prefix_tokens_.size() && on_prefix < tokens.size() &&
+                   prefix_tokens_[on_prefix] == tokens[on_prefix]) {
+                ++on_prefix;
+            }
+            const bool extends_prefix = !prefix_state_.empty() &&
+                on_prefix == prefix_tokens_.size() && on_prefix > 0 &&
+                (on_prefix < tokens.size() || !need_logits);
+            if (extends_prefix) {
+                reset();
+                const size_t applied = llama_state_seq_set_data(
+                    ctx_, prefix_state_.data(), prefix_state_.size(), 0);
+                if (applied != 0) {
+                    cached_ = prefix_tokens_;
+                    n_past_ = static_cast<int32_t>(prefix_tokens_.size());
+                    LOGI("kv: rollback refused; restored the warm prefix of %zu instead of "
+                         "re-reading all %zu",
+                         prefix_tokens_.size(), tokens.size());
+                    return prefix_tokens_.size();
+                }
+                LOGI("kv: warm prefix restore failed, re-reading all %zu", tokens.size());
+                reset();
+                return 0;
+            }
+            // Said out loud, because the divergence line above only names the
+            // candidate. Reading that line as what was reused sent a whole
+            // investigation the wrong way: on a hybrid model this branch turns
+            // "re-reading 674" into re-reading everything.
+            LOGI("kv: rollback to %zu refused (recurrent state), re-reading all %zu",
+                 reusable, tokens.size());
+            reset();
+            return 0;
+        }
+    }
+    cached_.resize(reusable);
+    n_past_ = static_cast<int32_t>(reusable);
+    return reusable;
+}
+
+bool Session::ingest_warm(
+    const std::vector<llama_token> & tokens,
+    size_t from,
+    std::string & error) {
+    const int32_t n_batch = static_cast<int32_t>(llama_n_batch(ctx_));
+
+    for (size_t offset = from; offset < tokens.size(); offset += n_batch) {
+        if (cancelled_.load(std::memory_order_relaxed)) {
+            error = "cancelled";
+            return false;
+        }
+        const int32_t chunk =
+            std::min<int32_t>(n_batch, static_cast<int32_t>(tokens.size() - offset));
+        llama_batch batch =
+            llama_batch_get_one(const_cast<llama_token *>(tokens.data() + offset), chunk);
+        const int ret = llama_decode(ctx_, batch);
+        if (ret != 0) {
+            // An aborted or failed batch may have written some of its cells. Committed
+            // progress stays only if the half-written tail can actually be removed; a
+            // memory that refuses gives the whole cache up rather than answering from
+            // positions nobody can account for.
+            if (!llama_memory_seq_rm(
+                    llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_), -1)) {
+                reset();
+            }
+            error = cancelled_.load(std::memory_order_relaxed)
+                ? "cancelled"
+                : "failed to decode prompt (llama_decode returned " + std::to_string(ret) + ")";
+            return false;
+        }
+        // Committed per batch, so a cancelled warm keeps what it finished: the next turn
+        // reuses the partial prefix instead of starting over.
+        cached_.insert(cached_.end(), tokens.begin() + offset, tokens.begin() + offset + chunk);
+        n_past_ += chunk;
+    }
+    return true;
+}
+
+void Session::maybe_snapshot() {
+    // Transformers can roll any conversation back to the shared prefix, so for them the
+    // snapshot would be memory spent on a problem they do not have.
+    if (!llama_model_is_hybrid(model_) && !llama_model_is_recurrent(model_)) return;
+    if (cached_.empty() || prefix_tokens_ == cached_) return;
+
+    const size_t size = llama_state_seq_get_size(ctx_, 0);
+    if (size == 0) {
+        LOGI("kv: warm snapshot unavailable for this model");
+        return;
+    }
+    std::vector<uint8_t> data(size);
+    const size_t written = llama_state_seq_get_data(ctx_, data.data(), data.size(), 0);
+    if (written == 0) {
+        LOGI("kv: warm snapshot failed");
+        return;
+    }
+    data.resize(written);
+    prefix_state_  = std::move(data);
+    prefix_tokens_ = cached_;
+    LOGI("kv: warm prefix snapshot of %zu tokens, %zu KB",
+         prefix_tokens_.size(), prefix_state_.size() / 1024);
+}
+
+bool Session::warm(
+    const std::vector<ChatMessage> & messages,
+    const std::vector<ToolDefinition> & tools,
+    const ReasoningConfig & reasoning,
+    WarmStats & stats,
+    std::string & error) {
+    cancelled_.store(false, std::memory_order_relaxed);
+
+    std::string prompt;
+    if (!render_prompt(messages, tools, reasoning, prompt, error,
+                       /*add_generation_prompt=*/false)) {
+        return false;
+    }
+
+    const llama_vocab * vocab = llama_model_get_vocab(model_);
+    const bool add_special = true;
+    const int32_t needed = -llama_tokenize(
+        vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+        nullptr, 0, add_special, true);
+    if (needed <= 0) {
+        error = "the chat template produced an empty prefix";
+        return false;
+    }
+    std::vector<llama_token> tokens(needed);
+    if (llama_tokenize(
+            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+            tokens.data(), static_cast<int32_t>(tokens.size()), add_special, true) < 0) {
+        error = "failed to tokenize the prefix";
+        return false;
+    }
+    if (static_cast<int32_t>(tokens.size()) >= static_cast<int32_t>(llama_n_ctx(ctx_))) {
+        error = "the prefix is longer than the context window";
+        return false;
+    }
+
+    const int64_t start = now_ms();
+
+    // Already warm: the cache starts with exactly these tokens. The snapshot is still
+    // captured when it is missing and the cache holds the prefix alone, which is the
+    // load-then-warm-twice case rather than the mid-conversation one.
+    if (cached_covers_context_ && tokens.size() <= cached_.size() &&
+        std::equal(tokens.begin(), tokens.end(), cached_.begin())) {
+        stats.reused_tokens = static_cast<int32_t>(tokens.size());
+        if (cached_.size() == tokens.size()) {
+            maybe_snapshot();
+        }
+        stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
+        return true;
+    }
+
+    const size_t from = align_cache(tokens, /*need_logits=*/false);
+    stats.reused_tokens = static_cast<int32_t>(from);
+
+    if (!ingest_warm(tokens, from, error)) {
+        // What the batches that finished added; zero when a refused rollback gave up the
+        // whole cache on the way out.
+        const int32_t kept = static_cast<int32_t>(cached_.size()) - stats.reused_tokens;
+        stats.prompt_tokens = kept > 0 ? kept : 0;
+        stats.prefill_ms    = now_ms() - start;
+        return false;
+    }
+
+    stats.prompt_tokens = static_cast<int32_t>(tokens.size() - from);
+    stats.prefill_ms    = now_ms() - start;
+    cached_ = tokens;
+    n_past_ = static_cast<int32_t>(tokens.size());
+    cached_covers_context_ = true;
+    maybe_snapshot();
+    stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
+    LOGI("kv: warmed %d tokens in %lld ms (%d reused)",
+         stats.prompt_tokens, static_cast<long long>(stats.prefill_ms), stats.reused_tokens);
+    return true;
+}
+
 StopReason Session::generate(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
@@ -1190,62 +1443,7 @@ StopReason Session::generate(
             return StopReason::CONTEXT_FULL;
         }
 
-        size_t reusable = 0;
-        while (cached_covers_context_ && reusable < cached_.size() &&
-               reusable < prompt_tokens.size() &&
-               cached_[reusable] == prompt_tokens[reusable]) {
-            ++reusable;
-        }
-        // Never reuse the entire prompt: at least one token must be decoded for logits.
-        if (reusable == prompt_tokens.size() && reusable > 0) {
-            --reusable;
-        }
-
-        // Where the cache stopped matching, in tokens.
-        //
-        // Worth a line of log because the alternative is inferring it. A turn that re-reads
-        // the whole conversation can be a history that does not match what was generated, a
-        // template that renders a rebuilt turn a token differently, or anything volatile
-        // near the head of the prompt, and those want different fixes. The number says
-        // which: a divergence a few hundred tokens in is the tail of the conversation, one
-        // at twenty is the system message or the tool block.
-        if (reusable < cached_.size()) {
-            LOGI("kv: diverged at %zu of %zu cached, prompt %zu, re-reading %zu",
-                 reusable, cached_.size(), prompt_tokens.size(),
-                 prompt_tokens.size() - reusable);
-
-        }
-        // Compared against the cache position rather than the token count, because a
-        // previous turn with an attachment leaves positions filled that no token describes.
-        //
-        // The answer matters and used to be thrown away. A transformer's cache can be cut at
-        // any position, but a recurrent or hybrid one carries a running state rather than a
-        // row per token, so it can only roll back as far as it kept snapshots for, which by
-        // default is none. It says so by returning false, and the old code rewound n_past_
-        // anyway. Nothing was removed, and llama_batch_get_one leaves the positions unset, so
-        // the next batch was placed after the tail that was supposed to be gone: the model
-        // attended to text nobody could see, the cache grew on every turn, and thirty or so
-        // generations later llama_decode returned 1 with no slot left. That is the LFM2
-        // failure, and Granite-hybrid, Jamba and Nemotron-H reach it by the same route.
-        //
-        // So a refusal means starting over. It costs a full prefill on those families and
-        // buys a session that stays correct.
-        if (static_cast<int32_t>(reusable) < n_past_) {
-            const bool rolled_back = llama_memory_seq_rm(
-                llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
-            if (!rolled_back) {
-                // Said out loud, because the divergence line above only names the
-                // candidate. Reading that line as what was reused sent a whole
-                // investigation the wrong way: on a hybrid model this branch turns
-                // "re-reading 674" into re-reading everything.
-                LOGI("kv: rollback to %zu refused (recurrent state), re-reading all %zu",
-                     reusable, prompt_tokens.size());
-                reset();
-                reusable = 0;
-            }
-        }
-        cached_.resize(reusable);
-        n_past_ = static_cast<int32_t>(reusable);
+        const size_t reusable = align_cache(prompt_tokens, /*need_logits=*/true);
 
         if (!ingest_prompt(prompt_tokens, reusable, error)) {
             // Whatever decoded before the stop is in the cache, and the bookkeeping above says

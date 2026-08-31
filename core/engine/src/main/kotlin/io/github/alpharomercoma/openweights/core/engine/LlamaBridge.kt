@@ -23,6 +23,7 @@ package io.github.alpharomercoma.openweights.core.engine
  * Native handles are raw pointers held as `Long`. Passing a stale handle is undefined
  * behaviour, so only [LlamaCppEngine] may touch them.
  */
+@Suppress("TooManyFunctions")
 internal class LlamaBridge {
     /** Receives each generated fragment. Returning false stops generation. */
     internal fun interface TokenSink {
@@ -64,6 +65,25 @@ internal class LlamaBridge {
     ): Long
 
     external fun nativeFreeModel(handle: Long)
+
+    /**
+     * Prefills the fresh-conversation prefix and, on models that refuse rollback, keeps a
+     * snapshot of it. Blocks like generation; cancellable via [nativeCancel].
+     *
+     * @return `[warmedTokens, reusedTokens, prefillMs, snapshotBytes]`; a cancelled warm
+     * returns what it managed rather than throwing.
+     */
+    @Suppress("LongParameterList")
+    external fun nativeWarm(
+        handle: Long,
+        roles: Array<String>,
+        contents: Array<String>,
+        toolNames: Array<String>,
+        toolDescriptions: Array<String>,
+        toolSchemas: Array<String>,
+        enableThinking: Boolean,
+        reasoningEffort: String?,
+    ): LongArray?
 
     external fun nativeResetContext(handle: Long)
 

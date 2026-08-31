@@ -92,6 +92,12 @@ class RoutingInferenceEngine(
         emitAll(engine.chat(messages, params, tools))
     }
 
+    override suspend fun warm(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        params: SamplerParams,
+    ): WarmResult? = active?.warm(messages, tools, params)
+
     override fun cancel() {
         active?.cancel()
     }

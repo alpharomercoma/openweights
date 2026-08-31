@@ -203,6 +203,37 @@ class LlamaCppEngine internal constructor(
         }
     }
 
+    override suspend fun warm(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        params: SamplerParams,
+    ): WarmResult? = withContext(engineThread) {
+        val activeHandle = handle.get()
+        if (activeHandle == 0L) return@withContext null
+        val stats = bridge.nativeWarm(
+            handle = activeHandle,
+            // Marshalled exactly as chat marshals them, because the engine reuses this
+            // work by comparing bytes: a role or a flag spelled differently here is a
+            // prefix that never matches and a warm that warmed nothing.
+            roles = messages.map { it.role.wireName }.toTypedArray(),
+            contents = messages.map { it.text }.toTypedArray(),
+            toolNames = tools.map { it.name }.toTypedArray(),
+            toolDescriptions = tools.map { it.description }.toTypedArray(),
+            toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
+            enableThinking = params.thinking,
+            reasoningEffort = params.reasoningEffort.wireName,
+        ) ?: return@withContext null
+        currentModel = currentModel?.copy(
+            contextUsed = (stats[0] + stats[1]).toInt(),
+        )
+        WarmResult(
+            warmedTokens = stats[0].toInt(),
+            reusedTokens = stats[1].toInt(),
+            prefillMs = stats[2],
+            snapshotBytes = stats[3],
+        )
+    }
+
     override suspend fun resetContext() {
         withContext(engineThread) {
             val activeHandle = handle.get()

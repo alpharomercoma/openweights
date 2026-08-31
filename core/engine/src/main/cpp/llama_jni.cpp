@@ -25,6 +25,7 @@ using openweights::ChatMessage;
 using openweights::GenerationStats;
 using openweights::ParsedReply;
 using openweights::ToolDefinition;
+using openweights::WarmStats;
 using openweights::SamplerConfig;
 using openweights::Session;
 using openweights::StopReason;
@@ -282,6 +283,78 @@ JNIEXPORT void JNICALL
 Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeFreeModel(
     JNIEnv * /*env*/, jobject /*thiz*/, jlong handle) {
     delete as_session(handle);
+}
+
+JNIEXPORT jlongArray JNICALL
+Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeWarm(
+    JNIEnv * env,
+    jobject /*thiz*/,
+    jlong handle,
+    jobjectArray roles,
+    jobjectArray contents,
+    jobjectArray tool_names,
+    jobjectArray tool_descriptions,
+    jobjectArray tool_schemas,
+    jboolean enable_thinking,
+    jstring reasoning_effort) try {
+    Session * session = as_session(handle);
+
+    const jsize message_count = env->GetArrayLength(roles);
+    std::vector<ChatMessage> messages;
+    messages.reserve(message_count);
+    for (jsize i = 0; i < message_count; ++i) {
+        auto role = static_cast<jstring>(env->GetObjectArrayElement(roles, i));
+        auto content = static_cast<jstring>(env->GetObjectArrayElement(contents, i));
+        messages.push_back({to_utf8(env, role), to_utf8(env, content), std::string(), {}});
+        env->DeleteLocalRef(role);
+        env->DeleteLocalRef(content);
+    }
+
+    const jsize tool_count = tool_names != nullptr ? env->GetArrayLength(tool_names) : 0;
+    std::vector<ToolDefinition> tools;
+    tools.reserve(tool_count);
+    for (jsize i = 0; i < tool_count; ++i) {
+        auto name = static_cast<jstring>(env->GetObjectArrayElement(tool_names, i));
+        auto description = static_cast<jstring>(env->GetObjectArrayElement(tool_descriptions, i));
+        auto schema = static_cast<jstring>(env->GetObjectArrayElement(tool_schemas, i));
+        tools.push_back({to_utf8(env, name), to_utf8(env, description), to_utf8(env, schema)});
+        env->DeleteLocalRef(name);
+        env->DeleteLocalRef(description);
+        env->DeleteLocalRef(schema);
+    }
+
+    openweights::ReasoningConfig thinking;
+    thinking.enabled = enable_thinking == JNI_TRUE;
+    thinking.effort =
+        reasoning_effort == nullptr ? std::string() : to_utf8(env, reasoning_effort);
+
+    WarmStats stats;
+    std::string error;
+    const bool ok = session->warm(messages, tools, thinking, stats, error);
+    // A cancelled warm is the user arriving, which is what warming is for; the batches it
+    // finished are kept and reported rather than raised.
+    if (!ok && error != "cancelled") {
+        throw_engine_exception(env, error.empty() ? std::string("warm failed") : error);
+        return nullptr;
+    }
+
+    jlongArray out = env->NewLongArray(4);
+    if (out == nullptr) return nullptr;
+    const jlong values[4] = {
+        static_cast<jlong>(stats.prompt_tokens),
+        static_cast<jlong>(stats.reused_tokens),
+        static_cast<jlong>(stats.prefill_ms),
+        static_cast<jlong>(stats.snapshot_bytes),
+    };
+    env->SetLongArrayRegion(out, 0, 4, values);
+    return out;
+}
+catch (const std::exception & failure) {
+    throw_engine_exception(env, std::string("nativeWarm failed: ") + failure.what());
+    return nullptr;
+} catch (...) {
+    throw_engine_exception(env, "nativeWarm failed for an unknown reason");
+    return nullptr;
 }
 
 JNIEXPORT void JNICALL

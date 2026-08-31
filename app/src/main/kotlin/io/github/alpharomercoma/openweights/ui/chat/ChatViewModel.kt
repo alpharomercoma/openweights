@@ -36,9 +36,11 @@ import io.github.alpharomercoma.openweights.core.common.model.AnswerLength
 import io.github.alpharomercoma.openweights.core.common.model.AssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
@@ -46,15 +48,15 @@ import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryTe
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.data.ArchivedConversations
+import io.github.alpharomercoma.openweights.core.data.ComputeTarget
 import io.github.alpharomercoma.openweights.core.data.ConversationFiling
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
-import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.data.ToolStepRecord
+import io.github.alpharomercoma.openweights.core.data.computeLayersFor
 import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
-import io.github.alpharomercoma.openweights.core.data.layersFor
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
@@ -340,6 +342,17 @@ data class ChatUiState(
     val toolsAvailable: Boolean = false,
     /** True when this device has a backend other than the CPU to offload layers to. */
     val hasGpu: Boolean = false,
+    /** Whether an accelerator is enumerated; see `ModelRuntime.hasNpu`. */
+    val hasNpu: Boolean = false,
+    /**
+     * The processor a compiled model was built for, or null for a GGUF.
+     *
+     * Non-null turns the two processor controls into a statement. A `.pte` holds delegate
+     * identifiers and loading resolves those exact ones, so where it runs was decided when
+     * somebody exported it and no setting here can move it. Saying so is better than
+     * hiding the section, which reads as the app having no opinion.
+     */
+    val compiledProcessor: ComputeTarget? = null,
     /**
      * How hot the device is, sampled while a reply is being written.
      *
@@ -438,13 +451,38 @@ data class ChatUiState(
         get() = listOfNotNull(
             // Not the quantization: it is already the tail of the model name directly
             // above, and repeating it wastes the only line that can say something new.
-            backend,
+            computeLine,
             contextSize.takeIf { it > 0 }?.let { "$it ctx" },
             // Only when it is not the default, which is the same rule the rest of this line
             // follows. A mode was choosable by typing and then invisible: nothing anywhere
             // said the app was in plan mode, so the only evidence was tools not running.
             mode.takeIf { it != ChatUiState().mode }?.label,
         ).joinToString(" · ")
+
+    /**
+     * Where the work runs, said the way the user chose it.
+     *
+     * One word while both halves are automatic or agree, which is every phone until the
+     * user opens the processor controls. Split into "reads X · writes Y" only when the
+     * halves genuinely differ, and a half left on Auto is reported as what it resolved
+     * to rather than as "auto", because the line answers what *is*, not what was asked.
+     * A compiled model's processor was decided at export, so it is stated flat.
+     */
+    private val computeLine: String?
+        get() {
+            compiledProcessor?.let { return it.name }
+            val reads = preferences.prefillTarget
+            val writes = preferences.decodeTarget
+            if (reads == ComputeTarget.AUTO && writes == ComputeTarget.AUTO) return backend
+            val fallback = backend ?: return null
+            val read = reads.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
+            val write = writes.takeIf { it != ComputeTarget.AUTO }?.name ?: fallback
+            // Compact on purpose: this line ellipsizes at small widths, and
+            // "reads GPU · writes…" hides exactly the half the split exists to say.
+            // Read → write, seven characters, never truncated; the settings sheet
+            // carries the full words.
+            return if (read == write) read else "$read→$write"
+        }
 
     /**
      * Whether the composer may start a turn.
@@ -788,9 +826,19 @@ class ChatViewModel @Inject constructor(
         contextLength: Int?,
     ): ModelLoadParams {
         val (prompted, generated) = writer.inOrder { turnShape(modelFile.nameWithoutExtension) }
-        val layers = Offload.fromName(preferences.offload)
-            .layersFor(runtime.hasGpu(), prompted, generated)
-        contextLength?.let { return ModelLoadParams(contextLength = it, gpuLayers = layers) }
+        // Resolved from the two halves together, because layers serve both. The prefill
+        // choice reaches the other knob — op_offload — inside toLoadParams.
+        val layers = computeLayersFor(
+            prefill = preferences.prefillTarget,
+            decode = preferences.decodeTarget,
+            hasGpu = runtime.hasGpu(),
+            promptTokens = prompted,
+            generatedTokens = generated,
+        )
+        contextLength?.let {
+            return preferences.toLoadParams(gpuLayers = layers, automatic = it)
+                .copy(contextLength = it)
+        }
         // Only computed when it will be used. Reading the header is cheap but it is still a
         // file read on the path a cold start always takes, and a user who has chosen a window
         // has already answered the question this asks.
@@ -873,6 +921,16 @@ class ChatViewModel @Inject constructor(
             backend = runtime.backendName(),
             offloadBuffers = info?.offloadBuffers.orEmpty(),
             hasGpu = runtime.hasGpu(),
+            hasNpu = runtime.hasNpu(),
+            compiledProcessor = modelFile.name
+                .takeIf { ModelFormat.of(it) == ModelFormat.PTE }
+                ?.let {
+                    when (CompiledBackend.of(it).processor) {
+                        CompiledBackend.Processor.CPU -> ComputeTarget.CPU
+                        CompiledBackend.Processor.GPU -> ComputeTarget.GPU
+                        CompiledBackend.Processor.NPU -> ComputeTarget.NPU
+                    }
+                },
             modelName = modelFile.nameWithoutExtension,
             // The filename's own quantization, not llama's verbose description:
             // "Q4_K_M" beside the compute device and context window reads as a
@@ -2342,7 +2400,15 @@ class ChatViewModel @Inject constructor(
     fun savePreferences(preferences: ModelPreferences) {
         val model = preferencesKey ?: return
         viewModelScope.launch {
-            val movedProcessor = _uiState.value.preferences.offload != preferences.offload
+            // Either half moving is a reload, because both reach the loader: the writing
+            // half decides which layers are resident and the reading half decides whether
+            // large batches may be offloaded, and neither is re-read on an existing context.
+            // Checking only one of them is how a control turns into a label — the setting
+            // sits in storage until the model happens to load again, which for most people
+            // is never, while the top bar goes on truthfully reporting the old answer.
+            val current = _uiState.value.preferences
+            val movedProcessor = current.prefillTarget != preferences.prefillTarget ||
+                current.decodeTarget != preferences.decodeTarget
             runtime.saveSettings(model, preferences)
             _uiState.update { it.copy(preferences = preferences) }
             // The conversation is kept: only the weights move, and the transcript is text.

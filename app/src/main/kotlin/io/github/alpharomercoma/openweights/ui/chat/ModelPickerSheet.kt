@@ -87,7 +87,10 @@ fun ModelPickerSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
+        // Fully expanded from the first frame, like the hyperparameter sheet: the list
+        // is the whole point of opening it, and the half state was one more pull before
+        // every model choice.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(
@@ -125,7 +128,14 @@ fun ModelPickerSheet(
             // sheet gave no sign there was anything below. Capping the list is what lets
             // the footer stay put, and the cap is high enough that the common case of two
             // or three models still shows every one without scrolling at all.
-            LazyColumn(modifier = Modifier.heightIn(max = LIST_MAX)) {
+            // Weighted rather than capped at a fixed height: with several downloads in
+            // flight, or landscape, or a large font, a fixed cap pushed the footer
+            // actions off the sheet with no way to reach them (codex UI review). The
+            // weight gives the list whatever the sheet has left after the footer, which
+            // is the property the cap was approximating.
+            LazyColumn(
+                modifier = Modifier.weight(1f, fill = false).heightIn(max = LIST_MAX),
+            ) {
                 // Grouped the same way Manage Models groups them, because they are the same
                 // list and a person who learns one order should not have to learn a second.
                 models.byPublisher().forEach { group ->

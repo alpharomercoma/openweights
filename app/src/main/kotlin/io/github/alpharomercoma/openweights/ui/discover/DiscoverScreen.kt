@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -66,6 +67,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -74,8 +76,10 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.formatBy
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -91,6 +95,7 @@ fun DiscoverScreen(
     onSearch: () -> Unit,
     onLoadMore: () -> Unit = {},
     onSortChange: (HubSort) -> Unit,
+    onRuntimeToggled: (HubRuntime, Boolean) -> Unit,
     onFiltersChange: (HubQuery) -> Unit,
     onPhoneSizedChange: (Boolean) -> Unit,
     onOfficialOnlyChange: (Boolean) -> Unit,
@@ -208,6 +213,8 @@ fun DiscoverScreen(
                 onOfficialOnlyChange = onOfficialOnlyChange,
                 onRecommendedOnlyChange = onRecommendedOnlyChange,
                 onOpenFilters = { filtersOpen = true },
+                onRuntimeToggled = onRuntimeToggled,
+                showRuntime = ExecuTorchSupport.AVAILABLE,
             )
 
             if (state.isSearching) {
@@ -416,20 +423,28 @@ private fun ModelDetail(
             }
         }
 
-        item {
-            Column {
-                // The slider is the point: KV cache scales with context, so the same file
-                // can be comfortable at 4k and impossible at 64k. Changing it re-runs the
-                // maths locally, with no further network use.
-                Caption(
-                    stringResource(R.string.context_length_tokens, state.contextLength),
-                )
-                StepSlider(
-                    value = state.contextLength.toFloat(),
-                    onValueChange = { onContextLengthChange(it.roundToInt()) },
-                    valueRange = CONTEXT_RANGE,
-                    steps = ModelLoadParams.CONTEXT_STEPS,
-                )
+        // The slider only moves the maths for GGUF files: their KV cache scales with
+        // context, so the same file can be comfortable at 4k and impossible at 64k. A
+        // compiled graph's window was fixed at export, so on a repository with nothing but
+        // compiled files the slider would be a control that changes nothing — say the fact
+        // instead of offering the dead control.
+        if (state.files.any { ModelFormat.of(it.file.fileName) == ModelFormat.GGUF }) {
+            item {
+                Column {
+                    Caption(
+                        stringResource(R.string.context_length_tokens, state.contextLength),
+                    )
+                    StepSlider(
+                        value = state.contextLength.toFloat(),
+                        onValueChange = { onContextLengthChange(it.roundToInt()) },
+                        valueRange = CONTEXT_RANGE,
+                        steps = ModelLoadParams.CONTEXT_STEPS,
+                    )
+                }
+            }
+        } else if (state.files.isNotEmpty()) {
+            item {
+                Caption(stringResource(R.string.context_fixed_at_export))
             }
         }
 
@@ -494,6 +509,7 @@ private fun DiscoverScreenPreview() {
             onPhoneSizedChange = {},
             onOfficialOnlyChange = {},
             onRecommendedOnlyChange = {},
+            onRuntimeToggled = { _, _ -> },
             onClearFilters = {},
             onOpenModel = {},
             onCloseModel = {},

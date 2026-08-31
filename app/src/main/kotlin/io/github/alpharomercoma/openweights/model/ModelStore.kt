@@ -18,7 +18,10 @@ package io.github.alpharomercoma.openweights.model
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,8 +52,13 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         directory.listFiles { file -> file.isDirectory }?.forEach { it.deleteRecursively() }
     }
 
-    /** Every GGUF currently on disk, newest first. Projectors are not models. */
-    fun availableModels(): List<File> = ggufFiles().filterNot { it.isProjector }
+    /**
+     * Every model currently on disk, newest first, whichever runtime reads it.
+     *
+     * Projectors are not models: they are half of one, and a user offered `mmproj-...gguf`
+     * as something to load would get a failure they could not act on.
+     */
+    fun availableModels(): List<File> = modelFiles().filterNot { it.isProjector }
 
     /**
      * The model to open with: the one last chosen, or any that is present.
@@ -145,6 +153,56 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
     fun projectorDestination(modelFileName: String): File =
         File(directory, GgufFileName.projectorNameFor(modelFileName))
 
+    /**
+     * Anything on disk a runtime *in this build* can open.
+     *
+     * The flavour is part of the question. A `.pte` sideloaded onto a standard build has
+     * nothing to run it, and listing it would offer the user a model that can only fail;
+     * it is left out of the list rather than shown and then refused.
+     */
+    private fun modelFiles(): List<File> =
+        directory.listFiles { file -> file.isFile && file.name.isRunnableHere() }
+            ?.sortedByDescending { it.lastModified() }
+            .orEmpty()
+
+    /**
+     * Whether this build can open a file of this name, right now.
+     *
+     * Two conditions, and the second is what keeps a part-finished install off the screen.
+     * A `.pte` is useless without the tokenizer it was exported against, and the two arrive
+     * as separate downloads, so a model listed the moment its weights land is a model the
+     * user can tap and be refused by. Listing it only once both files are present means the
+     * row appears exactly when it starts working, and a failed tokenizer download shows up
+     * as a model that never arrived rather than one that is broken.
+     */
+    private fun String.isRunnableHere(): Boolean = when (ModelFormat.of(this)) {
+        ModelFormat.GGUF -> true
+        ModelFormat.PTE -> ExecuTorchSupport.AVAILABLE && tokenizerFor(this).isFile
+        null -> false
+    }
+
+    /** Where the tokenizer for [modelFileName] belongs, whether or not it has arrived. */
+    fun tokenizerFor(modelFileName: String): File =
+        File(directory, ExecuTorchFileName.tokenizerNameFor(modelFileName))
+
+    /**
+     * Where a repository's compiled weights are saved.
+     *
+     * Named after the repository rather than after the file inside it, because every `.pte`
+     * repository on the Hub calls its weights `model.pte`. Three installs would collide on
+     * one name, and worse, the family a `.pte` belongs to can only be read off its name —
+     * it carries no metadata the way a GGUF does — so `model.pte` would leave the prompt
+     * template unchoosable. See `ExecuTorchFileName`.
+     */
+    fun compiledDestination(repoId: String, weightsPath: String = ""): File =
+        File(directory, ExecuTorchFileName.modelNameFor(repoId, weightsPath))
+
+    /**
+     * GGUFs only, for pairing a model with its projector.
+     *
+     * Deliberately narrower than [modelFiles]: a projector is always a GGUF, so widening
+     * this would only add files that can never match.
+     */
     private fun ggufFiles(): List<File> =
         directory.listFiles { file -> file.isFile && file.name.endsWith(GGUF_EXTENSION) }
             ?.sortedByDescending { it.lastModified() }

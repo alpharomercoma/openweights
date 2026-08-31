@@ -60,6 +60,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
@@ -164,6 +165,8 @@ fun ChatScreen(
     onUnloadModel: () -> Unit = {},
     modifier: Modifier = Modifier,
     onOpenConversation: (Long) -> Unit = {},
+    canvasActive: Boolean = false,
+    onOpenCanvas: () -> Unit = {},
     /** The drawer's chat search, which is its own flow rather than part of [state]. */
     chatSearch: ChatSearchState = ChatSearchState(),
     onSearchConversations: (String) -> Unit = {},
@@ -271,6 +274,8 @@ fun ChatScreen(
         },
     ) {
         ChatContent(
+            canvasActive = canvasActive,
+            onOpenCanvas = onOpenCanvas,
             state = state,
             listState = listState,
             followTail = followTail,
@@ -325,6 +330,8 @@ fun ChatScreen(
 @Composable
 @Suppress("LongParameterList")
 private fun ChatContent(
+    canvasActive: Boolean,
+    onOpenCanvas: () -> Unit,
     state: ChatUiState,
     listState: androidx.compose.foundation.lazy.LazyListState,
     followTail: io.github.alpharomercoma.openweights.core.designsystem.component.FollowTailState,
@@ -393,6 +400,8 @@ private fun ChatContent(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             ChatTopBar(
+                canvasActive = canvasActive,
+                onOpenCanvas = onOpenCanvas,
                 state = state,
                 hasScrolled = listState.canScrollBackward,
                 onOpenHistory = onOpenHistory,
@@ -817,6 +826,8 @@ private fun ChatSheets(
             supportsThinking = state.supportsThinking,
             outputModality = state.outputModality,
             hasGpu = state.hasGpu,
+            hasNpu = state.hasNpu,
+            compiledProcessor = state.compiledProcessor,
             offloadBuffers = state.offloadBuffers,
             loadedContext = state.contextSize,
             onSave = {
@@ -1323,6 +1334,8 @@ private fun ChatTopBar(
     onOpenModelPicker: () -> Unit,
     onResetMode: () -> Unit,
     goalRunning: Boolean,
+    canvasActive: Boolean = false,
+    onOpenCanvas: () -> Unit = {},
 ) {
     TopAppBar(
         // The name raises the picker rather than leaving for another screen: which
@@ -1345,6 +1358,17 @@ private fun ChatTopBar(
             }
         },
         actions = {
+            // The way back into the canvas. It opens itself when the model shows
+            // something, but Back dismisses it while the model keeps building, and
+            // without this the only road back was asking the model to show it again.
+            if (canvasActive) {
+                IconButton(onClick = onOpenCanvas) {
+                    Icon(
+                        Icons.Rounded.Language,
+                        contentDescription = stringResource(R.string.canvas_title),
+                    )
+                }
+            }
             if (state.modelName != null) {
                 // Starting a chat was only in the drawer, which is two taps and a
                 // slide for the thing people do most often between questions. Left of

@@ -33,12 +33,11 @@ data class ParsedToolCalls(val text: String, val calls: List<ToolCall>)
  */
 object ToolCallParser {
 
-    fun parse(raw: String): ParsedToolCalls {
-        parseLfmStyle(raw)?.let { return it }
-        parseTaggedJson(raw)?.let { return it }
-        parseTaggedXml(raw)?.let { return it }
-        return ParsedToolCalls(raw, emptyList())
-    }
+    fun parse(raw: String): ParsedToolCalls = parseLfmStyle(raw)
+        ?: parseTaggedJson(raw)
+        ?: parseTaggedXml(raw)
+        ?: parseBareJson(raw)
+        ?: ParsedToolCalls(raw, emptyList())
 
     /** `<|tool_call_start|>[name(arg='value', other=2)]<|tool_call_end|>`: LFM2. */
     private fun parseLfmStyle(raw: String): ParsedToolCalls? {
@@ -58,19 +57,53 @@ object ToolCallParser {
 
     /** `<tool_call>{"name": "...", "arguments": {...}}</tool_call>`: Hermes and friends. */
     private fun parseTaggedJson(raw: String): ParsedToolCalls? {
-        val start = raw.indexOf(JSON_START)
-        if (start < 0) return null
-        val end = raw.indexOf(JSON_END, start)
-        if (end < 0) return null
+        val calls = mutableListOf<ToolCall>()
+        val text = StringBuilder()
+        var cursor = 0
+        // Every envelope, not the first: a model asked for two things calls twice in one
+        // reply, and reading one of them ran half the errand (codex QA).
+        var start = raw.indexOf(JSON_START)
+        while (start >= 0) {
+            val end = raw.indexOf(JSON_END, start)
+            if (end < 0) break
+            val body = raw.substring(start + JSON_START.length, end).trim()
+            val name = body.jsonStringField("name")
+            if (name != null) {
+                val arguments = body.jsonObjectField("arguments") ?: "{}"
+                calls +=
+                    ToolCall(id = "$name-${calls.size}", name = name, argumentsJson = arguments)
+                text.append(raw, cursor, start)
+            } else {
+                text.append(raw, cursor, end + JSON_END.length)
+            }
+            cursor = end + JSON_END.length
+            start = raw.indexOf(JSON_START, cursor)
+        }
+        if (calls.isEmpty()) return null
+        text.append(raw, cursor, raw.length)
+        return ParsedToolCalls(text.toString().trim(), calls)
+    }
 
-        val body = raw.substring(start + JSON_START.length, end).trim()
+    /**
+     * `{"name": "web_search", "parameters": {...}}` with no wrapper at all: Llama 3.x.
+     *
+     * Llama emits a call as a bare JSON object and nothing else, so the only safe reading
+     * is the strictest one: the entire reply, trimmed, must be one object carrying a name
+     * and a `parameters` object. Anything looser would eat ordinary answers that happen
+     * to contain JSON, which is why prose around the object disqualifies it.
+     */
+    private fun parseBareJson(raw: String): ParsedToolCalls? {
+        // Llama 3.x opens a call with its own <|python_tag|> token, which reaches this
+        // parser as literal text. Measured on a phone: the call inside was perfect and
+        // the tag alone was what kept it from being read.
+        val body = raw.trim().removePrefix(PYTHON_TAG).trim()
+        if (!body.startsWith("{") || !body.endsWith("}")) return null
+
         val name = body.jsonStringField("name") ?: return null
-        val arguments = body.jsonObjectField("arguments") ?: "{}"
-
-        val text = (raw.take(start) + raw.substring(end + JSON_END.length)).trim()
+        val arguments = body.jsonObjectField("parameters") ?: return null
         return ParsedToolCalls(
-            text,
-            listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
+            text = "",
+            calls = listOf(ToolCall(id = name, name = name, argumentsJson = arguments)),
         )
     }
 
@@ -279,6 +312,8 @@ object ToolCallParser {
         }
         return null
     }
+
+    private const val PYTHON_TAG = "<|python_tag|>"
 
     private const val LFM_START = "<|tool_call_start|>"
     private const val LFM_END = "<|tool_call_end|>"

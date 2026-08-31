@@ -75,8 +75,9 @@ tasks.register("verify") {
     // container now: findByName here returns null for anything the Android plugin has not
     // created yet, which silently drops whole tiers from the run.
     dependsOn(
-        verifyTasks.map { name ->
-            subprojects.map { project -> project.tasks.matching { it.name == name } }
+        verifyTasks.map { pattern ->
+            val wanted = Regex(pattern)
+            subprojects.map { project -> project.tasks.matching { wanted.matches(it.name) } }
         },
     )
     // The root build script itself, which nothing above covers: those map over subprojects,
@@ -88,7 +89,21 @@ tasks.register("verify") {
     dependsOn(tasks.matching { it.name == "ktlintKotlinScriptCheck" })
 }
 
-/** The host-side tiers, in the order they fail fastest. */
+/**
+ * The host-side tiers, in the order they fail fastest.
+ *
+ * Regular expressions rather than names, because `:app` and `:core:engine` carry a product
+ * flavour and the Android plugin renames every variant task accordingly:
+ * `testDebugUnitTest` becomes `testStandardDebugUnitTest` and `testAcceleratedDebugUnitTest`.
+ * Matching by exact name would have quietly stopped running the app's unit tests, its lint
+ * and its instrumentation compile the moment the flavour was added — which is precisely the
+ * silent gap the comment above warns about, arriving through a different door.
+ *
+ * Both flavours are matched deliberately. The standard one exists to *not* carry ExecuTorch,
+ * so its source set is where an unused-runtime mistake would hide, and a variant that is
+ * never compiled is a claim rather than a fact. The extra cost is one more assemble; the
+ * native build is shared between them.
+ */
 val verifyTasks = listOf(
     "ktlintCheck",
     "detekt",
@@ -96,15 +111,15 @@ val verifyTasks = listOf(
     // was holding four errors, including composables reading the locale in a way that
     // ignores the user changing it. Run it on release, because that is the variant with
     // R8 and the manifest that reaches Play.
-    "lintRelease",
-    "assembleDebug",
+    "lint(Standard|Accelerated)?Release",
+    "assemble(Standard|Accelerated)?Debug",
     // Compiled here even though it cannot be run here. Nothing in this tier builds the
     // instrumentation sources, so they rotted quietly: a composable gained two parameters
     // and the screen test that calls it had not compiled since, which nobody found out
     // until the next person needed to run it. Compiling costs seconds and is the whole
     // difference between a device tier that works when reached for and one that does not.
-    "assembleDebugAndroidTest",
-    "testDebugUnitTest",
+    "assemble(Standard|Accelerated)?DebugAndroidTest",
+    "test(Standard|Accelerated)?DebugUnitTest",
     // The multiplatform tiers, and they are not decoration. A module that compiles for iOS
     // and is never run there is a claim rather than a fact, and `verify` wiring only the
     // Android task names meant the iOS simulator tests existed and nothing ran them: a

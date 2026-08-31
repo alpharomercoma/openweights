@@ -134,6 +134,20 @@ data class ModelLoadParams(
      * needing less memory in the first place.
      */
     val useMmap: Boolean = false,
+    /**
+     * Whether prompt reading may be handed to a GPU while generation stays where it is.
+     *
+     * The one mechanism that separates the two halves of a turn. A batch is only offloaded
+     * when it is large enough to repay the transfer, and generation is always a batch of
+     * one, so this reaches prefill and never decode — which is exactly the split worth
+     * making, since the GPU reads a prompt faster than the CPU and writes an answer slower.
+     *
+     * With [gpuLayers] at zero it is the whole of "prefill on the GPU, decode on the CPU".
+     * With every layer on the GPU both halves are already there and this changes nothing.
+     * On by default, matching llama.cpp, and only reached at all on a device that has a
+     * GPU backend to offload to.
+     */
+    val opOffload: Boolean = true,
 ) {
     init {
         require(contextLength > 0) { "contextLength must be > 0" }

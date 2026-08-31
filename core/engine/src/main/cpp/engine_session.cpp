@@ -503,6 +503,7 @@ Session * Session::load(
     int32_t n_threads_batch,
     int32_t n_gpu_layers,
     bool use_mmap,
+    bool op_offload,
     std::string & error) {
     init_backend();
 
@@ -530,6 +531,13 @@ Session * Session::load(
     ctx_params.n_threads       = n_threads;
     ctx_params.n_threads_batch = n_threads_batch;
     ctx_params.no_perf         = true;
+    // Whether large-batch operations may be handed to a GPU while the model itself stays
+    // where n_gpu_layers put it. This is the one knob that separates the two halves of a
+    // turn: the scheduler only offloads an operation when the batch is big enough to be
+    // worth the transfer, so prompt reading can run on the GPU while token-by-token
+    // generation, which is always batch one, stays on the CPU. Turning it off keeps
+    // everything local.
+    ctx_params.op_offload      = op_offload;
 
     // Allocated before the context so that every native handle has an owner from the
     // moment it exists: a throw between them would otherwise leak the model outright.

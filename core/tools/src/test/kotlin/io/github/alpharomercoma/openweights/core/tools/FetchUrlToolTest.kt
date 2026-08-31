@@ -16,12 +16,15 @@
 
 package io.github.alpharomercoma.openweights.core.tools
 
+import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * What the one tool that dials an address of the model's choosing may be talked into.
@@ -31,8 +34,15 @@ import org.junit.Test
  * incomplete defence on its own. Every address here is refused before any socket is opened,
  * so none of these tests touch the network.
  */
+@RunWith(RobolectricTestRunner::class)
 class FetchUrlToolTest {
-    private val tool = FetchUrlTool(OkHttpClient(), Reachability { true })
+    private val workspace = Workspace(
+        ApplicationProvider.getApplicationContext(),
+        WorkspaceGrant(ApplicationProvider.getApplicationContext()),
+    )
+
+    private val tool =
+        FetchUrlTool(OkHttpClient(), Reachability { true }, workspace, SessionArtifacts())
 
     private suspend fun fetch(url: String): String =
         tool.run(ToolCall(id = "1", name = "fetch_url", argumentsJson = """{"url":"$url"}"""))

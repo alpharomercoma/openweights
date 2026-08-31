@@ -89,3 +89,24 @@ Measure each backend from its **own** build directory. With
 `libggml-vulkan.so` alongside it, `-ngl 0` does not give a clean CPU reading —
 it still reports the Vulkan backend and returned 2.96 t/s decode, which is
 neither backend's real number.
+
+## `op_offload` is inert on OpenCL (2026-08-31)
+
+`llama_context_params.op_offload` asks the scheduler to ship large-batch ops
+(prefill) to a faster backend even when the weights are not resident there.
+Whether a backend actually accepts that traffic is up to its
+`ggml_backend_dev_offload_op` hook — and `ggml-opencl.cpp` leaves
+`.offload_op = NULL`, which the dispatcher treats as "never". Vulkan and CUDA
+implement the hook; OpenCL does not. Since OpenCL is the only GPU backend this
+app compiles in (Vulkan is off for the measured reasons above), setting
+`op_offload` currently changes nothing.
+
+Consequence for the prefill/decode processor selection: residency
+(`n_gpu_layers`) is the only working lever, and it serves both halves of the
+turn at once. So asking for the GPU on **either** half puts the weights on the
+GPU; a genuine split (prefill on GPU, decode weights on CPU) becomes possible
+only when a backend that implements `offload_op` is enabled. The flag stays
+wired end-to-end (`ModelLoadParams.opOffload` → `ctx_params.op_offload`) so it
+starts working the moment that happens. Found in codex QA, verified against
+`ggml-opencl.cpp` (`.offload_op = NULL`) and `ggml-backend.cpp`
+(`ggml_backend_dev_offload_op` returns `false` when the hook is null).

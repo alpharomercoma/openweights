@@ -16,8 +16,10 @@
 
 package io.github.alpharomercoma.openweights.core.hub
 
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName.GGUF_SUFFIX
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -43,7 +45,18 @@ data class HubModel(
     val updatedAt: String?,
     /** The Hub's task tag, absent on a good number of repositories. */
     val pipelineTag: String? = null,
+    /**
+     * Which runtimes this repository has weights for.
+     *
+     * Filled in from the search that found it rather than from the repository listing: the
+     * two runtimes are found through different Hub filters, so which search returned a
+     * result is already the answer, and a repository returned by both has both. Reading it
+     * any other way would cost a request per row.
+     */
+    val runtimes: Set<HubRuntime> = setOf(HubRuntime.LLAMA_CPP),
 ) {
+    /** True when this repository ships weights compiled ahead of time for ExecuTorch. */
+    val isCompiled: Boolean get() = HubRuntime.EXECUTORCH in runtimes
     val owner: String get() = id.substringBefore('/', missingDelimiterValue = "")
     val name: String get() = id.substringAfter('/')
 
@@ -137,6 +150,23 @@ data class HubModelDetail(
     val files: List<HubFile>,
     /** Multimodal projectors offered by this repository, smallest first. */
     val projectors: List<HubFile>,
+    /**
+     * Weights compiled ahead of time, for ExecuTorch. Empty for an ordinary GGUF repo.
+     *
+     * Almost always exactly one, and almost always called `model.pte`, which is why
+     * [ExecuTorchFileName] renames it on the way in.
+     */
+    val compiled: List<HubFile> = emptyList(),
+    /**
+     * The tokenizers this repository publishes, which a `.pte` cannot be run without.
+     *
+     * A GGUF carries its tokenizer inside it. A `.pte` does not, and says nothing about
+     * which one produced it, so a repository offering compiled weights and no tokenizer is
+     * one this app cannot install. A list rather than one file, because a repository that
+     * publishes several sizes of a family keeps a tokenizer beside each — see
+     * [tokenizerFor] for how a weights file finds its own.
+     */
+    val tokenizers: List<HubFile> = emptyList(),
     val license: String?,
     val architecture: String?,
     val parameterCount: Long?,
@@ -166,6 +196,53 @@ data class HubModelDetail(
 
     /** True when this repository ships a vision or audio encoder. */
     val isMultimodal: Boolean get() = projectors.isNotEmpty()
+
+    /** The runtime this repository's weights need, or null when it offers neither. */
+    val runtime: HubRuntime?
+        get() = when {
+            files.isNotEmpty() -> HubRuntime.LLAMA_CPP
+            compiled.isNotEmpty() -> HubRuntime.EXECUTORCH
+            else -> null
+        }
+
+    /**
+     * True when the compiled weights here can actually be installed.
+     *
+     * A `.pte` without a tokenizer beside it is a download that ends in a model that cannot
+     * open, so the offer is withheld rather than made and then broken.
+     */
+    val isInstallableCompiled: Boolean get() = compiled.isNotEmpty() && tokenizers.isNotEmpty()
+
+    /**
+     * The tokenizer that belongs to [weights]: the one in the nearest enclosing directory.
+     *
+     * A single-model repository keeps `tokenizer.json` at the root and that is the answer.
+     * A multi-size repository keeps one beside each size (`1_2b/tokenizer.json` for
+     * `1_2b/xnnpack/…pte`), and handing every size the root tokenizer would pair weights
+     * with a vocabulary they were not exported against — the model would load and then
+     * speak noise. Deepest matching directory wins; among equals, the JSON form.
+     */
+    fun tokenizerFor(weights: HubFile): HubFile? {
+        val candidates = tokenizers.filter { tokenizer ->
+            val directory = tokenizer.path.substringBeforeLast('/', "")
+            directory.isEmpty() || weights.path.startsWith("$directory/")
+        }
+        // Scoped tokenizers existing anywhere in the repository means sizes have their
+        // own vocabularies. A weights file in a folder with no tokenizer of its own must
+        // then fail closed rather than borrow the root one: the borrow loads fine and
+        // speaks noise (codex QA). The root file stays the answer only for weights at
+        // the root, or when it is all the repository has.
+        val scoped = tokenizers.any { '/' in it.path }
+        val best = candidates.maxWithOrNull(
+            compareBy(
+                { it.path.count { character -> character == '/' } },
+                { -ExecuTorchFileName.REMOTE_TOKENIZERS.indexOf(it.path.substringAfterLast('/')) },
+            ),
+        ) ?: return null
+        val bestIsRoot = '/' !in best.path
+        val weightsNested = '/' in weights.path
+        return best.takeUnless { scoped && bestIsRoot && weightsNested }
+    }
 
     /** The projector for the file the user is most likely to take: the first listed. */
     fun defaultProjector(): HubFile? = files.firstOrNull()?.let(::pairedProjector)
@@ -213,13 +290,72 @@ class HuggingFaceClient @Inject constructor(
      * while asking for more forever. The Hub paginates with an opaque cursor handed back in
      * a `Link` header, which is what this follows.
      */
+    /**
+     * One page across every runtime the query asks for.
+     *
+     * The Hub has no single filter for "weights this phone can run": the two runtimes are
+     * found through different parameters, so this is one request per runtime, run together
+     * and merged. Compiled models come first, which is where the user is most likely to be
+     * looking when they have asked for them at all and is also the smaller, curated set —
+     * burying a handful of them under a thousand GGUFs would be the same as not having them.
+     *
+     * A repository returned by both searches appears once, carrying both runtimes, which is
+     * what puts the ExecuTorch label on it.
+     */
     suspend fun searchPage(
         query: HubQuery,
         cursor: String? = null,
         limit: Int = DEFAULT_LIMIT,
+    ): HubSearchPage = coroutineScope {
+        val wanted = query.runtimes.ifEmpty { HubRuntime.entries.toSet() }
+        val pages = HubRuntime.entries
+            .filter { it in wanted }
+            .map { runtime ->
+                async { runtime to runCatching { runtimePage(query, runtime, cursor, limit) } }
+            }
+            .awaitAll()
+
+        // One runtime failing must not empty the screen: the other half is still an answer.
+        // Everything failing is a real failure and is raised, so the error banner still works.
+        val good = pages.mapNotNull { (runtime, result) ->
+            result.getOrNull()?.let { runtime to it }
+        }
+        if (good.isEmpty()) {
+            throw pages.first().second.exceptionOrNull() ?: HubException("Search failed")
+        }
+
+        val merged = LinkedHashMap<String, HubModel>()
+        good.forEach { (runtime, page) ->
+            page.models.forEach { model ->
+                val already = merged[model.id]
+                merged[model.id] = (already ?: model).copy(
+                    runtimes = (already?.runtimes ?: emptySet()) + runtime,
+                )
+            }
+        }
+
+        HubSearchPage(
+            models = merged.values.sortedByDescending { it.isCompiled },
+            // The llama.cpp half is the one worth paging: the compiled corner of the Hub is
+            // small enough to arrive whole. Paging on its cursor would also mean tracking
+            // two cursors that advance at different rates.
+            cursor = good.firstOrNull { it.first == HubRuntime.LLAMA_CPP }?.second?.cursor,
+        )
+    }
+
+    private suspend fun runtimePage(
+        query: HubQuery,
+        runtime: HubRuntime,
+        cursor: String?,
+        limit: Int,
     ): HubSearchPage {
         val url = apiUrl("models")
-            .addQueryParameter("apps", LLAMA_CPP)
+            .apply {
+                when (runtime) {
+                    HubRuntime.LLAMA_CPP -> addQueryParameter("apps", LLAMA_CPP)
+                    HubRuntime.EXECUTORCH -> addQueryParameter("filter", EXECUTORCH)
+                }
+            }
             .addQueryParameter("limit", limit.toString())
             .apply { cursor?.let { addQueryParameter("cursor", it) } }
             .addQueryParameter("sort", query.sort.parameter)
@@ -236,7 +372,8 @@ class HuggingFaceClient @Inject constructor(
             .build()
 
         val page = getPaged(url)
-        val models = json.decodeFromString<List<SearchEntry>>(page.body).map { it.toModel() }
+        val models = json.decodeFromString<List<SearchEntry>>(page.body)
+            .map { it.toModel().copy(runtimes = setOf(runtime)) }
         return HubSearchPage(models = models, cursor = page.nextCursor)
     }
 
@@ -265,8 +402,9 @@ class HuggingFaceClient @Inject constructor(
             .build()
         val payload = json.decodeFromString<DetailEntry>(get(url))
 
-        val gguf = payload.siblings.orEmpty()
-            .filter { it.rfilename.endsWith(GGUF_SUFFIX, ignoreCase = true) }
+        val siblings = payload.siblings.orEmpty()
+        fun filesEnding(vararg suffixes: String) = siblings
+            .filter { sibling -> suffixes.any { sibling.rfilename.endsWith(it, true) } }
             .map { sibling ->
                 HubFile(
                     path = sibling.rfilename,
@@ -274,6 +412,16 @@ class HuggingFaceClient @Inject constructor(
                     sha256 = sibling.lfs?.sha256,
                 )
             }
+
+        // A repository is one or the other in practice, and asking for both costs nothing:
+        // the answer is already in hand, and which one is populated is what says whether
+        // this repo needs llama.cpp or ExecuTorch.
+        val compiled = filesEnding(ModelFormat.PTE.suffix).sortedBy { it.sizeBytes }
+        val tokenizers = siblings
+            .filter { ExecuTorchFileName.isRemoteTokenizer(it.rfilename) }
+            .map { HubFile(it.rfilename, it.lfs?.size ?: it.size ?: 0L, it.lfs?.sha256) }
+
+        val gguf = filesEnding(GGUF_SUFFIX)
             .sortedBy { it.sizeBytes }
             // Bounded, because everything downstream is per file: the screen builds a row
             // for each, and the inspector launches a coroutine for each to read its header
@@ -287,6 +435,8 @@ class HuggingFaceClient @Inject constructor(
             model = payload.toModel(),
             files = gguf.filterNot { it.isProjector },
             projectors = gguf.filter { it.isProjector },
+            compiled = compiled.take(MAX_FILES_PER_REPO),
+            tokenizers = tokenizers,
             license = payload.cardData?.license,
             architecture = payload.gguf?.architecture,
             parameterCount = payload.gguf?.total,
@@ -395,6 +545,15 @@ class HuggingFaceClient @Inject constructor(
 
         /** The Hub's identifier for the local app this project is built on. */
         const val LLAMA_CPP = "llama.cpp"
+
+        /**
+         * The tag ExecuTorch repositories carry, used through `filter` rather than `apps`.
+         *
+         * The Hub computes `apps` for a handful of tools and ExecuTorch is not one of them,
+         * so the tag is what there is. `library=executorch` is not a substitute: the Hub
+         * accepts it and returns ordinary results, so it fails by looking like it worked.
+         */
+        const val EXECUTORCH = "executorch"
     }
 }
 
@@ -504,6 +663,24 @@ val RECOMMENDED = listOf(
  */
 data class Publisher(val avatarUrl: String? = null, val isOrganisation: Boolean = false)
 
+/**
+ * Which runtime a search is looking for models for.
+ *
+ * The Hub cannot answer "models this phone can run" — it answers "models packaged for this
+ * tool", and the two runtimes are packaged, tagged and searched differently. A GGUF repo is
+ * found through the `apps` filter the Hub computes for llama.cpp; an ExecuTorch repo is
+ * found through its `executorch` tag. Measured against the live Hub, `library=executorch`
+ * is accepted and silently ignored, returning ordinary GGUF repositories, which is exactly
+ * the kind of filter that looks like it works.
+ */
+enum class HubRuntime(val format: ModelFormat) {
+    /** Anything llama.cpp can read, which is most of the Hub. */
+    LLAMA_CPP(ModelFormat.GGUF),
+
+    /** Compiled ahead of time. A much smaller, curated corner of the Hub. */
+    EXECUTORCH(ModelFormat.PTE),
+}
+
 /** One page of Hub results, and the way back for the next one. */
 data class HubSearchPage(
     val models: List<HubModel>,
@@ -516,6 +693,18 @@ data class HubSearchPage(
 /** Everything the Discover screen can ask the Hub for. */
 data class HubQuery(
     val text: String = "",
+    /**
+     * Which runtimes to find models for. Both, unless the user says otherwise.
+     *
+     * A set rather than a choice, because these are not alternatives to pick between: a
+     * phone that can run both should be offered both, and the Hub is searched once per
+     * runtime and the results merged. Deliberately not counted in [activeCount] — it
+     * changes which corners of the Hub are searched rather than narrowing a result set.
+     *
+     * Empty is treated as "all of them" rather than "none", so unticking every box shows
+     * everything instead of an empty screen the user has to undo.
+     */
+    val runtimes: Set<HubRuntime> = HubRuntime.entries.toSet(),
     val sort: HubSort = HubSort.TRENDING,
     /** The task the model is published for. Null means any. */
     val task: HubTask? = null,

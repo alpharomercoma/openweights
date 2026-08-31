@@ -221,6 +221,8 @@ class WebSearchTool @Inject constructor(
 class FetchUrlTool @Inject constructor(
     httpClient: OkHttpClient,
     private val reachability: Reachability,
+    private val workspace: Workspace,
+    private val artifacts: SessionArtifacts,
 ) : Tool {
     /** Not described to the model when it cannot work. See [Reachability]. */
     override val isAvailable: Boolean get() = reachability.isOnline()
@@ -280,6 +282,10 @@ class FetchUrlTool @Inject constructor(
                 "url": {
                   "type": "string",
                   "description": "The full https address of the page to read"
+                },
+                "save_to": {
+                  "type": "string",
+                  "description": "Optional file path to save the page's text into the shared folder for scripts"
                 }
               },
               "required": ["url"]
@@ -327,7 +333,8 @@ class FetchUrlTool @Inject constructor(
                 )
 
             when (hop) {
-                is Hop.Read -> return@withContext readOutcome(hop.page, requested, next)
+                is Hop.Read ->
+                    return@withContext readOutcome(hop.page, requested, next, call)
                 is Hop.Moved -> {
                     if (++hops > MAX_HOPS) {
                         return@withContext ToolExecution.failure(
@@ -344,22 +351,45 @@ class FetchUrlTool @Inject constructor(
     }
 
     /** What a page that actually answered becomes, once its text has been looked at. */
-    private fun readOutcome(page: PageText, requested: String, finalUrl: HttpUrl): ToolExecution =
-        when {
-            !page.successful -> ToolExecution.failure(page.text)
-            // A page that answered and left nothing to read is almost always one that
-            // builds itself in the browser: the file holds a script and an empty div, and
-            // the words arrive later from somewhere this cannot follow. Returning the
-            // empty string said none of that, and a model handed nothing reports that the
-            // page does not mention the thing, which is a wrong answer rather than a
-            // missing one.
-            page.text.isBlank() -> ToolExecution.failure(
-                "That page has no readable text in it. It is probably built in " +
-                    "the browser, so there is nothing in the file to read. Try a " +
-                    "different source.",
-            )
-            else -> fetchedPageSuccess(page.text, requested, finalUrl.toString())
+    private suspend fun readOutcome(
+        page: PageText,
+        requested: String,
+        finalUrl: HttpUrl,
+        call: ToolCall,
+    ): ToolExecution = when {
+        !page.successful -> ToolExecution.failure(page.text)
+        // A page that answered and left nothing to read is almost always one that
+        // builds itself in the browser: the file holds a script and an empty div, and
+        // the words arrive later from somewhere this cannot follow. Returning the
+        // empty string said none of that, and a model handed nothing reports that the
+        // page does not mention the thing, which is a wrong answer rather than a
+        // missing one.
+        page.text.isBlank() -> ToolExecution.failure(
+            "That page has no readable text in it. It is probably built in " +
+                "the browser, so there is nothing in the file to read. Try a " +
+                "different source.",
+        )
+        else -> {
+            val saveTo = call.argument("save_to", "saveTo", "save")
+            if (saveTo != null && workspace.isReady && workspace.acceptsNewFiles) {
+                // Saved whole, summarised briefly: a page can be far larger than the
+                // context window, and the sandbox reading the file is how the model
+                // works through what the conversation could never hold.
+                val saved = workspace.put(saveTo, page.text, replace = true)
+                if (saved.successful) {
+                    artifacts.created(saveTo)
+                    ToolExecution(
+                        "Saved ${page.text.length} characters of $requested to " +
+                            "$saveTo. It starts:" + "\n" + page.text.take(SAVED_PREVIEW),
+                    )
+                } else {
+                    saved
+                }
+            } else {
+                fetchedPageSuccess(page.text, requested, finalUrl.toString())
+            }
         }
+    }
 
     /**
      * What is worth reading in a response, or why nothing is.
@@ -413,6 +443,8 @@ class FetchUrlTool @Inject constructor(
          * Five is what a browser allows for the same reason: a chain longer than that is a
          * loop or a tracker, and every hop is another address this tool has to be sure of.
          */
+        const val SAVED_PREVIEW = 500
+
         const val MAX_HOPS = 5
 
         /** About a thousand tokens: enough to answer from, small enough to leave room. */

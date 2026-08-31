@@ -166,4 +166,55 @@ class ToolCallParserTest {
 
         assertThat(ToolCallParser.parse(raw).calls).isEmpty()
     }
+
+    @Test
+    fun `llama's bare json object is a call`() {
+        val raw = """{"name": "web_search", "parameters": {"query": "Manila weather"}}"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.single().name).isEqualTo("web_search")
+        assertThat(parsed.calls.single().argumentsJson).contains("Manila weather")
+        assertThat(parsed.text).isEmpty()
+    }
+
+    @Test
+    fun `json inside an ordinary answer stays prose`() {
+        // The bare form has no markers, so only a reply that is nothing but the object
+        // can be read as a call; explaining JSON must not trigger one.
+        val raw = """Llama calls look like {"name": "f", "parameters": {}} in text."""
+
+        assertThat(ToolCallParser.parse(raw).calls).isEmpty()
+    }
+
+    @Test
+    fun `llama's python tag does not hide the call behind it`() {
+        // Verbatim from a Poco X8 Pro Max run: Llama-3.2-3B-Instruct wrote exactly this
+        // and the call inside was correct; only the tag kept it from being parsed.
+        val raw = """<|python_tag|>{"name": "get_weather", "parameters": {"city": "Manila"}}"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.single().name).isEqualTo("get_weather")
+        assertThat(parsed.calls.single().argumentsJson).contains("Manila")
+    }
+
+    @Test
+    fun `two envelopes in one reply are two calls`() {
+        val raw = """<tool_call>{"name": "web_search", "arguments": {"query": "a"}}</tool_call>
+<tool_call>{"name": "get_weather", "arguments": {"city": "Manila"}}</tool_call>"""
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.map { it.name })
+            .containsExactly("web_search", "get_weather")
+            .inOrder()
+    }
+
+    @Test
+    fun `a bare object without parameters stays prose`() {
+        val raw = """{"name": "Alice", "age": 30}"""
+
+        assertThat(ToolCallParser.parse(raw).calls).isEmpty()
+    }
 }

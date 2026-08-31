@@ -75,6 +75,21 @@ data class ModelPreferences(
      */
     val maxTokens: Int = DEFAULT_MAX_TOKENS,
     /**
+     * Where prompt reading runs. [ComputeTarget.AUTO] leaves it to the usage ledger.
+     *
+     * Separate from [decodeTarget] because the two halves are genuinely separable — see
+     * [ComputeTarget] — and because that is the half a GPU is good at.
+     */
+    val prefillTarget: ComputeTarget = ComputeTarget.AUTO,
+    /**
+     * Where answer writing runs. [ComputeTarget.AUTO] leaves it to the usage ledger.
+     *
+     * Note that asking for the CPU here while asking for the GPU above is the combination
+     * that is actually reachable, and the reverse is not: layers resident on the GPU serve
+     * both halves, so there is no way to write on the GPU while reading on the CPU.
+     */
+    val decodeTarget: ComputeTarget = ComputeTarget.AUTO,
+    /**
      * How much conversation the model keeps in mind, or [AUTOMATIC] to let the app decide.
      *
      * Zero rather than a number, so "never chosen" and "chose 4096" are distinguishable. The
@@ -143,11 +158,20 @@ data class ModelPreferences(
 
     /**
      * @param automatic what to use when the user has not chosen a window themselves.
+     * @param gpuLayers how many layers the caller resolved onto the GPU, which serves both
+     * halves of a turn. [ComputeTarget.AUTO] on either half is resolved before this.
      */
     fun toLoadParams(gpuLayers: Int = 0, automatic: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH) =
         ModelLoadParams(
             contextLength = if (contextLength == AUTOMATIC) automatic else contextLength,
             gpuLayers = gpuLayers,
+            // Prompt reading is offloaded unless the user pinned it to the CPU. This is the
+            // only knob that reaches one half of a turn without the other: a batch is
+            // offloaded only when it is big enough to repay the transfer, and generation is
+            // always a batch of one. With no layers on the GPU it *is* "read on the GPU,
+            // write on the CPU"; with every layer there both halves are already on it and
+            // the flag changes nothing.
+            opOffload = prefillTarget != ComputeTarget.CPU,
         )
 
     companion object {
@@ -536,6 +560,39 @@ class ModelPreferencesRepository @Inject constructor(
 }
 
 /**
+ * Where one half of a turn runs.
+ *
+ * Split from a single [Offload] choice because the two halves want opposite things: a GPU
+ * reads a prompt several times faster than the CPU and writes an answer slower, so the
+ * useful answer is often "prompt on the GPU, answer on the CPU" rather than one or the
+ * other for both.
+ *
+ * What makes that expressible is `op_offload`: the scheduler only hands an operation to a
+ * GPU when the batch is large enough to repay the transfer, and generation is always a
+ * batch of one. So prompt reading can be offloaded while generation stays local.
+ *
+ * [NPU] is here because the enum is the vocabulary the app uses to talk about processors,
+ * not because any runtime in this build can reach one. It is offered only where the engine
+ * enumerates an accelerator, which today it does on no device: llama.cpp has no MediaTek or
+ * Qualcomm backend compiled in, and an ExecuTorch model's processor is fixed when it is
+ * exported rather than chosen here. See `docs/research/mediatek-npu.md`.
+ */
+enum class ComputeTarget(val label: String) {
+    /** Let the app decide from what this model has actually been used for. */
+    AUTO("Auto"),
+
+    // Written out rather than title-cased from the name, which produced "Cpu" and "Gpu".
+    CPU("CPU"),
+    GPU("GPU"),
+    NPU("NPU"),
+    ;
+
+    companion object {
+        fun fromName(name: String): ComputeTarget = entries.firstOrNull { it.name == name } ?: AUTO
+    }
+}
+
+/**
  * Which processor a model's layers are loaded onto.
  *
  * A choice rather than a slider because splitting layers across both pays the transfer in
@@ -616,6 +673,51 @@ fun Offload.layersFor(hasGpu: Boolean, promptTokens: Long, generatedTokens: Long
                 promptTokens * CROSSOVER_DENOMINATOR > generatedTokens * CROSSOVER_NUMERATOR
             if (prefillHeavy) ALL_LAYERS else 0
         }
+    }
+}
+
+/**
+ * The layers a pair of per-half choices puts on the GPU.
+ *
+ * Layers are indivisible between the halves: weights resident on the GPU are used to read a
+ * prompt *and* to write an answer. llama.cpp has a second knob that would separate them —
+ * `op_offload`, which hands over only batches large enough to repay the transfer, and
+ * generation is always a batch of one — and [ModelPreferences.toLoadParams] sets it from
+ * the reading choice.
+ *
+ * **It does nothing on the GPU backend this app ships.** `ggml-opencl.cpp` leaves
+ * `.offload_op` null, and `ggml_backend_dev_offload_op` returns false for a backend that
+ * does not implement it, so with no layers resident the scheduler moves nothing and both
+ * halves run on the CPU. Vulkan, Metal, CUDA, SYCL and CANN all implement it; OpenCL is the
+ * one compiled in here, and Vulkan is switched off for measured reasons in
+ * `docs/research/gpu-backends.md`.
+ *
+ * So asking for the GPU on either half puts the weights there, because residency is the
+ * only mechanism that backend has. The flag stays wired and correct, and the moment a
+ * backend that implements it is enabled, "read on the GPU, write on the CPU" starts working
+ * without another change here. Until then the honest thing is to give the reading choice
+ * the effect it can have rather than the one it is named after — and the loaded-buffers
+ * line under the control reports where the weights actually went.
+ */
+fun computeLayersFor(
+    prefill: ComputeTarget,
+    decode: ComputeTarget,
+    hasGpu: Boolean,
+    promptTokens: Long,
+    generatedTokens: Long,
+): Int {
+    if (!hasGpu) return 0
+    return when {
+        // Either half asking for the GPU means the weights go there. Residency serves both,
+        // which is why this cannot honour one half without the other on this backend.
+        decode == ComputeTarget.GPU || prefill == ComputeTarget.GPU -> ALL_LAYERS
+
+        // Both pinned away from it: nothing resident, and op_offload off as well.
+        decode == ComputeTarget.CPU && prefill != ComputeTarget.AUTO -> 0
+
+        // Writing pinned to the CPU with reading left open: the measured heuristic decides,
+        // which is what the single control did.
+        else -> Offload.AUTO.layersFor(hasGpu, promptTokens, generatedTokens)
     }
 }
 

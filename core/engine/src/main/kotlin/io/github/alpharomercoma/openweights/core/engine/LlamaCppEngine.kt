@@ -100,6 +100,7 @@ class LlamaCppEngine internal constructor(
                     threadCount = params.threadCount ?: defaultThreadCount,
                     batchThreadCount = params.batchThreadCount ?: defaultBatchThreadCount,
                     gpuLayers = params.gpuLayers,
+                    opOffload = params.opOffload,
                     useMmap = params.useMmap,
                 )
                 val info = try {

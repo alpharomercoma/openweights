@@ -16,8 +16,10 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -73,19 +75,37 @@ class ParameterSheetTest {
     fun `a device with nothing but a CPU is not offered a processor`() {
         showSheet(hasGpu = false)
 
-        compose.onNodeWithText("Processor").assertDoesNotExist()
+        compose.onNodeWithText("Reading the prompt").assertDoesNotExist()
+        compose.onNodeWithText("Writing the answer").assertDoesNotExist()
     }
 
     @Test
-    fun `a device with a second backend is offered the choice`() {
+    fun `a device with a second backend is offered the choice for each half of a turn`() {
         showSheet(hasGpu = true)
 
-        // Behind Advanced, with the other four settings whose defaults are right. Still
+        // Two controls, because the halves want opposite things: a GPU reads a prompt
+        // faster and writes an answer slower, so "read on the GPU, write on the CPU" is a
+        // real answer and a single control could not express it.
+        //
+        // Behind Advanced, with the other settings whose defaults are right. Still
         // reachable, which is the difference between folding an interface up and cutting
         // things out of it.
-        compose.onNodeWithText("Processor").assertDoesNotExist()
+        compose.onNodeWithText("Reading the prompt").assertDoesNotExist()
         compose.onNodeWithText("Advanced").performScrollTo().performClick()
-        compose.onNodeWithText("Processor").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Reading the prompt").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Writing the answer").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `the NPU is not offered on a device that has none`() {
+        showSheet(hasGpu = true)
+        compose.onNodeWithText("Advanced").performScrollTo().performClick()
+        compose.onNodeWithText("Reading the prompt").performScrollTo().assertIsDisplayed()
+
+        // Offering it would be a button that changes nothing: llama.cpp has no vendor NPU
+        // backend compiled in, and a compiled model's processor is fixed when it is
+        // exported. It appears only where the engine enumerates an accelerator.
+        compose.onAllNodesWithText("NPU").assertCountEquals(0)
     }
 
     @Test

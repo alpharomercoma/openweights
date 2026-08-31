@@ -26,7 +26,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
-import io.github.alpharomercoma.openweights.core.data.Offload
+import io.github.alpharomercoma.openweights.core.data.ComputeTarget
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -512,12 +512,14 @@ class ChatViewModelTest : ChatFixture() {
         val before = viewModel.uiState.value.transcript.size
 
         viewModel.savePreferences(
-            viewModel.uiState.value.preferences.copy(offload = Offload.GPU.name),
+            viewModel.uiState.value.preferences.copy(decodeTarget = ComputeTarget.GPU),
         )
 
-        // Two loads, and the second one asks for the GPU. Saving alone used to be the whole
-        // of it: the setting sat in storage until the model happened to load again, which
-        // for most people is never, and the top bar went on truthfully reporting the CPU.
+        // Two loads, and the second one asks for the GPU. Writing on the GPU is what puts
+        // the weights there — layers serve both halves — so this is the choice that moves
+        // them. Saving alone used to be the whole of it: the setting sat in storage until
+        // the model happened to load again, which for most people is never, and the top bar
+        // went on truthfully reporting the CPU.
         assertThat(awaitLoads(count = 2)).hasSize(2)
         assertThat(engine.loadParams.last().gpuLayers).isGreaterThan(0)
         assertThat(engine.loadParams.first().gpuLayers).isEqualTo(0)

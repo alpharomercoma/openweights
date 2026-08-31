@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -40,6 +41,9 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -51,7 +55,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -63,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HubTask
 import io.github.alpharomercoma.openweights.core.hub.ParameterRange
@@ -88,6 +97,8 @@ fun DiscoverFilterBar(
     onOfficialOnlyChange: (Boolean) -> Unit,
     onRecommendedOnlyChange: (Boolean) -> Unit,
     onOpenFilters: () -> Unit,
+    onRuntimeToggled: (HubRuntime, Boolean) -> Unit,
+    showRuntime: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
@@ -239,6 +250,13 @@ fun DiscoverFilterBar(
                     border = chipBorder(selected = false),
                 )
             }
+
+            // Last in the row rather than first: a chip ahead of the sorts pushed
+            // "Downloads" off a phone screen, which the screen tests caught the first
+            // time this control was tried inside the row.
+            if (showRuntime) {
+                RuntimeChip(selected = query.runtimes, onToggle = onRuntimeToggled)
+            }
         }
 
         // The row is intentionally wider than a phone, but a raw scroll container reads as
@@ -268,6 +286,63 @@ fun DiscoverFilterBar(
                     imageVector = Icons.Rounded.ChevronRight,
                     contentDescription = stringResource(R.string.show_more_filters),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Which runtimes the Hub is being searched for: one chip, a menu of boxes behind it.
+ *
+ * Both are ticked to begin with, because a build carrying two runtimes can run models for
+ * either, and an empty selection means "all of them" rather than "nothing" — unticking
+ * every box shows everything instead of an empty screen the user has to undo. Only shown
+ * where there is a choice to make: a build without the ExecuTorch runtime gets no chip.
+ */
+@Composable
+private fun RuntimeChip(selected: Set<HubRuntime>, onToggle: (HubRuntime, Boolean) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    // An empty set searches every runtime, so the boxes render as all ticked.
+    val effective = selected.ifEmpty { HubRuntime.entries.toSet() }
+    val narrowed = effective.size < HubRuntime.entries.size
+    Box {
+        FilterChip(
+            selected = narrowed,
+            onClick = { open = true },
+            label = {
+                Text(
+                    text = stringResource(R.string.runtime),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            },
+            trailingIcon = {
+                Icon(
+                    imageVector = Icons.Rounded.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            colors = selectedChipColors(),
+            border = chipBorder(narrowed),
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            HubRuntime.entries.forEach { runtime ->
+                val on = runtime in effective
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(
+                                when (runtime) {
+                                    HubRuntime.LLAMA_CPP -> R.string.runtime_gguf
+                                    HubRuntime.EXECUTORCH -> R.string.runtime_executorch
+                                },
+                            ),
+                        )
+                    },
+                    leadingIcon = { Checkbox(checked = on, onCheckedChange = null) },
+                    onClick = { onToggle(runtime, !on) },
                 )
             }
         }

@@ -19,8 +19,12 @@ package io.github.alpharomercoma.openweights.ui.discover
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
+import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
 import io.github.alpharomercoma.openweights.core.data.UsageRepository
 import io.github.alpharomercoma.openweights.core.data.db.ModelDecodeSpeed
 import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
@@ -29,10 +33,12 @@ import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
 import io.github.alpharomercoma.openweights.core.device.ThroughputCalibration
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
+import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSearchPage
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.hub.HuggingFaceClient
@@ -172,11 +178,31 @@ class DiscoverViewModel @Inject constructor(
     fun onSortChange(sort: HubSort) = onQueryChange(_uiState.value.query.copy(sort = sort))
 
     /**
-     * Narrows the search to models this phone can hold, or widens it again.
+     * Ticks a runtime's box, or unticks it.
      *
-     * The one filter no other model browser can offer, because it is the only one that has
-     * to know what is in your hand.
+     * Both are on to begin with, because a build carrying two runtimes can run models for
+     * either and there is no reason to make the user ask. Unticking the last one leaves an
+     * empty set, which the search reads as "all of them" rather than "none": a filter row
+     * that can empty the screen is a filter row people have to undo.
      */
+    fun onRuntimeToggled(runtime: HubRuntime, enabled: Boolean) {
+        if (!ExecuTorchSupport.AVAILABLE) return
+        // An empty set means "all of them", so the boxes render as all ticked — start from
+        // that reading, or unticking one from the empty state would be a silent no-op.
+        val current = _uiState.value.query.runtimes.ifEmpty { HubRuntime.entries.toSet() }
+        val next = if (enabled) current + runtime else current - runtime
+        if (next == current) return
+        onQueryChange(
+            _uiState.value.query.copy(
+                runtimes = next,
+                // The shortlist is a handful of GGUF repositories fetched by name, so it
+                // says nothing about compiled models and would hide every one of them.
+                recommendedOnly = _uiState.value.query.recommendedOnly &&
+                    next == setOf(HubRuntime.LLAMA_CPP),
+            ),
+        )
+    }
+
     fun onPhoneSizedChange(enabled: Boolean) = onQueryChange(
         _uiState.value.query.copy(
             parameters = ParameterRange.ANY,
@@ -382,10 +408,50 @@ class DiscoverViewModel @Inject constructor(
             runCatching { client.detail(repoId) }
                 .onSuccess { detail ->
                     val downloaded = modelStore.availableModels().map { it.name }.toSet()
+
+                    // A repository offers one or the other. Compiled weights are listed
+                    // only when the tokenizer is there too, because a `.pte` without one
+                    // downloads fine and then cannot open, and only in a build that has a
+                    // runtime for them.
+                    // Only weights this build could actually open. A `.pte` compiled for a
+                    // delegate that is not linked fails to load outright — the runtime says
+                    // the backend is not registered and there is no fallback to the CPU —
+                    // so offering one means a gigabyte downloaded and then an error. The
+                    // backend is read from the name because a `.pte` carries no metadata
+                    // and the runtime has no API that reports what a file uses.
+                    val compiled = detail.compiled
+                        .takeIf { ExecuTorchSupport.AVAILABLE && detail.isInstallableCompiled }
+                        .orEmpty()
+                        .filter { ExecuTorchSupport.canRun(CompiledBackend.of(repoId + it.path)) }
+                        // No tokenizer in reach means a download that ends in a model
+                        // that cannot open, so the offer is withheld per file.
+                        .filter { detail.tokenizerFor(it) != null }
+                        // Only families this build can render: a `.pte` the prompt
+                        // side has no template for refuses to load, loudly, after a
+                        // gigabyte — so it is not offered in the first place.
+                        .filter {
+                            PromptTemplates.forModel(
+                                ExecuTorchFileName.modelNameFor(repoId, it.path),
+                            ) != null
+                        }
+
                     _uiState.update { state ->
                         state.copy(
                             detail = detail,
-                            files = detail.files.map { file ->
+                            // Compiled weights first. A repository publishes one of them,
+                            // occasionally two, against a long list of GGUF quantisations,
+                            // and the whole reason to open a repository that has one is
+                            // usually that it has one.
+                            files = compiled.map { file ->
+                                InspectedFile(
+                                    file = file,
+                                    // Named after the repository (and, in a multi-model
+                                    // repository, the file) once installed, so that is
+                                    // what says whether it is already here.
+                                    isDownloaded = ExecuTorchFileName
+                                        .modelNameFor(repoId, file.path) in downloaded,
+                                )
+                            } + detail.files.map { file ->
                                 InspectedFile(
                                     file = file,
                                     isDownloaded = file.path.substringAfterLast('/') in downloaded,
@@ -393,7 +459,18 @@ class DiscoverViewModel @Inject constructor(
                             },
                         )
                     }
+                    // Compiled weights are sized without a download. There is no header
+                    // to read — that is inspection's whole job and a `.pte` has none — but
+                    // memory and storage can still be answered, which is what decides
+                    // whether a gigabyte is worth spending.
+                    compiled.forEach { file ->
+                        updateFile(file.path) {
+                            it.copy(fit = estimateCompiled(file), isInspecting = false)
+                        }
+                    }
+
                     coroutineScope {
+                        // GGUF only, for the reason above.
                         detail.files.forEach { file -> launch { inspect(repoId, file) } }
                     }
                 }
@@ -467,6 +544,14 @@ class DiscoverViewModel @Inject constructor(
         }
     }
 
+    /** The fit for weights that carry no metadata, using only compiled measurements. */
+    private fun estimateCompiled(file: HubFile): FitReport = estimator.estimateCompiled(
+        device = profiler.profile(),
+        fileSizeBytes = file.sizeBytes,
+        calibration = compiledCalibration,
+        prefillCalibration = compiledPrefillCalibration,
+    )
+
     private fun estimate(metadata: GgufMetadata, file: HubFile, contextLength: Int): FitReport =
         estimator.estimate(
             device = profiler.profile(),
@@ -508,13 +593,33 @@ class DiscoverViewModel @Inject constructor(
     /** The prefill mirror of [calibration]. See [matchPrefillCalibration]. */
     private var prefillCalibration: ThroughputCalibration? = null
 
+    /**
+     * The same two, measured on compiled models only.
+     *
+     * Kept apart from [calibration] because the two runtimes are not comparable. The
+     * estimate extrapolates one measured (bytes, tokens a second) pair to another file
+     * size, which holds within a runtime and says nothing across one: predicting a `.pte`
+     * from a GGUF measurement would produce a confident number about software that was
+     * never run.
+     */
+    private var compiledCalibration: ThroughputCalibration? = null
+    private var compiledPrefillCalibration: ThroughputCalibration? = null
+
     private fun loadCalibration() {
         viewModelScope.launch {
             val decodeSpeeds = usageRepository.decodeSpeedByModel()
             val prefillSpeeds = usageRepository.prefillSpeedByModel()
-            val installed = modelStore.availableModels().associateBy { it.nameWithoutExtension }
-            calibration = matchCalibration(decodeSpeeds, installed)
-            prefillCalibration = matchPrefillCalibration(prefillSpeeds, installed)
+            val byFormat = modelStore.availableModels().groupBy { ModelFormat.of(it.name) }
+
+            val gguf = byFormat[ModelFormat.GGUF].orEmpty()
+                .associateBy { it.nameWithoutExtension }
+            calibration = matchCalibration(decodeSpeeds, gguf)
+            prefillCalibration = matchPrefillCalibration(prefillSpeeds, gguf)
+
+            val compiled = byFormat[ModelFormat.PTE].orEmpty()
+                .associateBy { it.nameWithoutExtension }
+            compiledCalibration = matchCalibration(decodeSpeeds, compiled)
+            compiledPrefillCalibration = matchPrefillCalibration(prefillSpeeds, compiled)
         }
     }
 

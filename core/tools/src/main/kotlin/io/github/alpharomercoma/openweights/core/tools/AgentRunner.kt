@@ -534,5 +534,11 @@ class AgentRunner(
          * every extra round re-reads a prompt that has grown.
          */
         const val CHAINED_MAX_ROUNDS = 4
+
+        /**
+         * The ceiling when a builder is on the table: enough rounds to scaffold, write
+         * several files, show the work, and then fix what showing it revealed.
+         */
+        const val BUILDER_MAX_ROUNDS = 8
     }
 }

@@ -282,6 +282,26 @@ class ModelsViewModel @Inject constructor(
         start(repoId, projector, modelStore.projectorDestination(modelFileName))
     }
 
+    /**
+     * Installs an ExecuTorch model: its compiled weights, and the tokenizer they need.
+     *
+     * Two downloads for one install, and both are renamed on the way in. The weights take
+     * the repository's name because every `.pte` repository calls the file `model.pte`, and
+     * the name is the only thing that says which family it is — a `.pte` carries no
+     * metadata to read, so `PromptTemplates` has nothing else to go on.
+     *
+     * The tokenizer goes first. Neither file is usable alone and the two land
+     * independently, so the small one is started first and `ModelStore` shows the model
+     * only once both are present. The row therefore appears when it starts working rather
+     * than when it starts downloading, and a tokenizer that fails looks like a model that
+     * never arrived rather than one that is quietly broken.
+     */
+    fun downloadCompiled(repoId: String, weights: HubFile, tokenizer: HubFile) {
+        val destination = modelStore.compiledDestination(repoId, weights.path)
+        start(repoId, tokenizer, modelStore.tokenizerFor(destination.name))
+        start(repoId, weights, destination)
+    }
+
     private fun start(repoId: String, file: HubFile, destination: File) {
         val key = destination.name
         // The one moment the app knows where a file came from. Once it has landed it is a
@@ -353,6 +373,9 @@ class ModelsViewModel @Inject constructor(
         }
         modelStore.forgetPublisher(model.file.name)
         model.file.sourceSidecar.delete()
+        // A compiled model's tokenizer is useless without it and invisible in the list,
+        // so leaving it behind would quietly keep megabytes with no way to reclaim them.
+        modelStore.tokenizerFor(model.file.name).delete()
         // The projector is useless without its model and is often the larger of the two,
         // so leaving it behind would quietly keep hundreds of megabytes.
         refresh()

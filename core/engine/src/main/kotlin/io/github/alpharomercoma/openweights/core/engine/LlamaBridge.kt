@@ -52,6 +52,15 @@ internal class LlamaBridge {
         batchThreadCount: Int,
         gpuLayers: Int,
         useMmap: Boolean,
+        /**
+         * Whether a large batch may be handed to a GPU even when the weights are not on it.
+         *
+         * The scheduler only offloads an operation when the batch is big enough to repay
+         * the transfer, and generation is always a batch of one — so this separates the two
+         * halves of a turn: prompt reading can run on the GPU while writing stays on the
+         * CPU. It is the only mechanism either runtime has for that split.
+         */
+        opOffload: Boolean,
     ): Long
 
     external fun nativeFreeModel(handle: Long)

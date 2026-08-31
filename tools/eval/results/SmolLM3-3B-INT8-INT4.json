@@ -1,0 +1,103 @@
+{
+  "model": "SmolLM3-3B-INT8-INT4",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "pass",
+      "content": "The farmer has 17 sheep. \"All but 9 run away,\" meaning the number of sheep that stayed is 9. Therefore, the number of sheep left is:\n\n\\boxed{9}",
+      "reasoning_chars": 1505,
+      "raw": "<think>\nOkay, let me try to figure this out. The problem says a farmer has 17 sheep. Then it mentions that \"all but 9 run away.\" I need to find out how many sheep are left.\n\nFirst, I should understand what \"all but 9\" means. If all the sheep except 9 run away, that means the number of sheep that ran away is 17 minus the number that stayed. But the wording says \"all but 9,\" which I think is another way of saying \"all except 9.\" So if all but 9 are gone, then 9 are left, right?\n\nWait, let me double-check that. The total number of sheep is 17. If all but 9 ran away, then the number that stayed is 9. Because \"all but 9\" would mean that the group that remained is the 9 that didn't run away. So the farmer is left with 9 sheep. \n\nBut maybe I should approach it step by step. Let's denote the number of sheep that ran away as R. The total number is 17. If all but 9 ran away, then the number that ran away (R) is equal to the total minus the ones that stayed. The ones that stayed are 9, so R = 17 - 9 = 8. Therefore, the farmer has 9 sheep left. \n\nHmm, that seems consistent. Another way to think about it is using the complement. The problem is asking how many are left, which is the complement of the ones that ran away. If all but 9 ran, then the ones that stayed are the 9 that weren't part of the \"all\". So the answer should be 9. \n\nI don't see any other interpretations here. The key is understanding that \"all but 9\" refers to the majority that left, leaving the minority of 9. So the final answer is 9.\n<\/think>\n\nThe farmer has 17 sheep. \"All but 9 run away,\" meaning the number of sheep that stayed is 9. Therefore, the number of sheep left is:\n\n\\boxed{9}",
+      "calls": [],
+      "prompt_tokens": 277,
+      "cached_tokens": 0,
+      "generated_tokens": 441,
+      "prefill_ms": 19911,
+      "decode_ms": 37879
+    },
+    {
+      "id": "multi-step-change",
+      "status": "pass",
+      "content": "16",
+      "reasoning_chars": 722,
+      "raw": "<think>\nOkay, let's see. Ana buys 7 pencils, each costing 12 pesos. First, I need to calculate the total cost of the pencils. So, 7 pencils times 12 pesos each. Let me do that multiplication. 7 times 12 is 84. So the total price is 84 pesos.\n\nNow, she pays with a 100-peso bill. To find out how much change she should get, I need to subtract the total cost from the amount she paid. That would be 100 pesos minus 84 pesos. Let me subtract those numbers. 100 minus 84 is 16. So Ana should receive 16 pesos in change. Wait, let me double-check my math to make sure I didn't make a mistake. 7 times 12 is indeed 84. Then 100 minus 84 is 16. Yeah, that seems right. I don't think I made any errors here. The answer should be 16 pesos.\n<\/think>\n\n16",
+      "calls": [],
+      "prompt_tokens": 283,
+      "cached_tokens": 0,
+      "generated_tokens": 204,
+      "prefill_ms": 20537,
+      "decode_ms": 16627
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "<think>\nOkay, let me see. The user is asking for a JSON array with the lowercase names of the first three planets from the Sun, and nothing else. Alright, let's start by recalling the order of the planets from the Sun.\n\nFirst is Mercury, then Venus, followed by Earth. After that comes Mars, then the asteroid belt, Jupiter, Saturn, Uranus, and Neptune. So the first three are Mercury, Venus, Earth. Now, I need to make sure I get their lowercase names. The JSON should be an array, and each element is the lowercase version of each planet's name.\n\nWait, the user specified \"dcc names of the first three planets from the Sun\". So I need to take each planet's name, convert to lowercase, and put them into an array. Let me check each one:\n\nMercury in lowercase is \"mercury\".\nVenus becomes \"venus\".\nEarth is \"earth\".\n\nSo the array should be [\"mercury\", \"venus\", \"earth\"]. Let me confirm that there's no other possible first three planets. Sometimes people might confuse Earth with Mars, but Earth is definitely the third. So that's correct.\n\nNow, the JSON should be an array containing these three strings. The user wants exactly the lowercase names, nothing else. So no extra text, just the array. I need to make sure the JSON is properly formatted with commas and brackets. Also, the user might be using this in some application, so correctness is key.\n\nLet me write it out as JSON. The correct syntax is [ \"dcc;!fdfijkl;;;kj;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;",
+      "reasoning_chars": 0,
+      "raw": "<think>\nOkay, let me see. The user is asking for a JSON array with the lowercase names of the first three planets from the Sun, and nothing else. Alright, let's start by recalling the order of the planets from the Sun.\n\nFirst is Mercury, then Venus, followed by Earth. After that comes Mars, then the asteroid belt, Jupiter, Saturn, Uranus, and Neptune. So the first three are Mercury, Venus, Earth. Now, I need to make sure I get their lowercase names. The JSON should be an array, and each element is the lowercase version of each planet's name.\n\nWait, the user specified \"dcc names of the first three planets from the Sun\". So I need to take each planet's name, convert to lowercase, and put them into an array. Let me check each one:\n\nMercury in lowercase is \"mercury\".\nVenus becomes \"venus\".\nEarth is \"earth\".\n\nSo the array should be [\"mercury\", \"venus\", \"earth\"]. Let me confirm that there's no other possible first three planets. Sometimes people might confuse Earth with Mars, but Earth is definitely the third. So that's correct.\n\nNow, the JSON should be an array containing these three strings. The user wants exactly the lowercase names, nothing else. So no extra text, just the array. I need to make sure the JSON is properly formatted with commas and brackets. Also, the user might be using this in some application, so correctness is key.\n\nLet me write it out as JSON. The correct syntax is [ \"dcc;!fdfijkl;;;kj;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;",
+      "calls": [],
+      "prompt_tokens": 270,
+      "cached_tokens": 0,
+      "generated_tokens": 355,
+      "prefill_ms": 19554,
+      "decode_ms": 29876
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 739,
+      "raw": "<think>\nOkay, let me see. The question is about the Barangay San Isidro council meeting on Tuesday, where they voted to move the annual fiesta from January 21 to March 14, and they released 45,000 pesos for repairs.\n\nThe task is to answer with just the date when the fiesta will be held. The key part here is the new date mentioned, which is March 14. I need to make sure I'm not mixing up the original date (January 21) or the release date (when they released the money). The question specifically asks for the date the fiesta will be held, so that's March 14. I should just put that as the answer without any extra information. Let me double-check the problem statement to confirm. Yep, the new date given is March 14. So the answer is March 14.\n<\/think>\n\nMarch 14",
+      "calls": [],
+      "prompt_tokens": 328,
+      "cached_tokens": 0,
+      "generated_tokens": 183,
+      "prefill_ms": 24094,
+      "decode_ms": 15073
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 743,
+      "raw": "<think>\nOkay, the user just asked, \"What is my cat's name?\" and I need to respond with only the name. But in my previous message, I mentioned they have a cat named Bagwis. Let me check the history again to be sure.\n\nWait, the user's first message was just \"My cat is named Bagwis. Remember that.\" and then I responded asking if they had a specific question. So the name Bagwis is definitely correct. The user now is testing if I can remember it, and they want the answer to be \"Bagwis\" without any extra text. I should just provide the name as requested. I need to make sure I don't add any extra information or context. Just the name. Alright, let me confirm once more that the name is Bagwis. Yes, that's correct. So the response should be \"Bagwis\".\n<\/think>\n\nBagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 526,
+      "generated_tokens": 182,
+      "prefill_ms": 1935,
+      "decode_ms": 16776
+    },
+    {
+      "id": "tool-call",
+      "status": "fail",
+      "content": "ichTextBox\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"fdc.get_weather\", \"description\": \"Get the current weather for a city.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\", \"description\": \"City name\"}}, \"required\": [\"city\"]}}}\n<\/tools>",
+      "reasoning_chars": 425,
+      "raw": "<think>I've determined that the user is requesting the current weather in Manila, so I should use the 'get_weather' function with the city 'Manila'. I will format the response as JSON with the 'get_weather' function name and the 'city' parameter. The response should be sent to the user as a JSON object wrapped in XML tags. I'll use the provided 'tools' XML tag to call the 'fdc.get_weather' function with the specified parameters.<\/think>\nichTextBox\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"fdc.get_weather\", \"description\": \"Get the current weather for a city.\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\", \"description\": \"City name\"}}, \"required\": [\"city\"]}}}\n<\/tools>\n<tool_call>\n{\"name\": \"fdc.get_weather\", \"arguments\": {\"city\": \"Manila\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "fdc.get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 405,
+      "cached_tokens": 0,
+      "generated_tokens": 192,
+      "prefill_ms": 30083,
+      "decode_ms": 17498
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "tslib\n{\"name\": \"fdc.get_weather\", \"arguments\": {\"city\": \"Manila}}\"\n tslib\n{\"result\": {\"temperature_c\": 31, \"condition\": \"humidddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddb",
+      "reasoning_chars": 809,
+      "raw": "<think>I've successfully retrieved the current weather conditions for Manila, including the temperature in Celsius (31°C) and the condition (humid). I've formatted the response as JSON within an XML tag, following the specified format for tool calls. I've provided the user with the most current weather information for Manila, including the temperature and condition. The response is clear, concise, and directly addresses the user's query. I've adhered to the user's request to use the 'fdc.get_weather' function with the 'fdc' as the client ID, ensuring the response is accurate, up-to-date, and formatted as instructed. I've provided the necessary details to help the user understand the current weather conditions, without any extra or unnecessary information. The response is ready to be presented to the user.<\/think>\n<\/think>\n tslib\n{\"name\": \"fdc.get_weather\", \"arguments\": {\"city\": \"Manila}}\"\n tslib\n{\"result\": {\"temperature_c\": 31, \"condition\": \"humidddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddbddb",
+      "calls": [],
+      "prompt_tokens": 24,
+      "cached_tokens": 597,
+      "generated_tokens": 234,
+      "prefill_ms": 2134,
+      "decode_ms": 22389
+    }
+  ]
+}

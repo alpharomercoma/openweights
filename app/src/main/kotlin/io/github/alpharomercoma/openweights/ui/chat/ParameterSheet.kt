@@ -65,8 +65,8 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.common.model.Tunable
+import io.github.alpharomercoma.openweights.core.data.ComputeTarget
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
-import io.github.alpharomercoma.openweights.core.data.Offload
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -92,6 +92,24 @@ fun ParameterSheet(
     preferences: ModelPreferences,
     supportsThinking: Boolean,
     hasGpu: Boolean,
+    /**
+     * Whether this device enumerates an accelerator the engine can reach.
+     *
+     * False on every build today and still asked, because the alternative is an NPU button
+     * that does nothing. llama.cpp has no vendor NPU backend compiled in, and a compiled
+     * ExecuTorch model's processor is decided when it is exported. See
+     * `docs/research/mediatek-npu.md` and `docs/research/executorch.md`.
+     */
+    hasNpu: Boolean = false,
+    /**
+     * The processor a compiled model was built for, or null for a GGUF.
+     *
+     * When set, the two controls below become one statement: a `.pte` holds delegate
+     * identifiers and loading resolves those exact ones, so where it runs was decided at
+     * export and nothing here can move it. Stated rather than hidden, because a missing
+     * section reads as the app having no answer.
+     */
+    compiledProcessor: ComputeTarget? = null,
     /**
      * What the loaded model emits, which decides what is worth showing.
      *
@@ -318,13 +336,60 @@ fun ParameterSheet(
                         steps = 0,
                     )
                 }
-                if (hasGpu) {
+                // Reading can go to an accelerator where one exists; writing cannot.
+                // A batch of one is too small to repay the transfer, which is the same
+                // reason op_offload never reaches decode.
+                val prefillTargets = listOfNotNull(
+                    ComputeTarget.AUTO,
+                    ComputeTarget.CPU,
+                    ComputeTarget.GPU,
+                    ComputeTarget.NPU.takeIf { hasNpu },
+                )
+                val decodeTargets = listOf(ComputeTarget.AUTO, ComputeTarget.CPU, ComputeTarget.GPU)
+
+                if (compiledProcessor != null) {
                     Setting(
                         label = stringResource(R.string.processor),
-                        explanation = "Which processor holds the layers. Changing this " +
-                            "reloads the model, which takes a few seconds. Your chat is " +
-                            "kept.",
-                        value = Offload.fromName(draft.offload).label.lowercase(),
+                        explanation = "This model was compiled ahead of time for one " +
+                            "processor. Running it somewhere else means a different " +
+                            "export, not a different setting.",
+                        value = compiledProcessor.label.lowercase(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.processor_fixed_at_export),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else if (hasGpu) {
+                    // Two halves, chosen separately, because they want opposite things: a
+                    // GPU reads a prompt several times faster than the CPU and writes an
+                    // answer slower. "Read on the GPU, write on the CPU" is a real setting
+                    // and often the right one.
+                    //
+                    // Only the reading half offers every processor. Layers resident on the
+                    // GPU serve both halves, so writing there implies reading there, and
+                    // the reverse — write on the GPU, read on the CPU — cannot be expressed
+                    // at all. Offering it would be a control that quietly does nothing.
+                    Setting(
+                        label = stringResource(R.string.prefill_processor),
+                        explanation = "Which processor reads your prompt. The GPU is " +
+                            "usually faster at this. Changing it reloads the model, which " +
+                            "takes a few seconds. Your chat is kept.",
+                        value = draft.prefillTarget.label.lowercase(),
+                    ) {
+                        TargetRow(
+                            targets = prefillTargets,
+                            selected = draft.prefillTarget,
+                            onSelect = { draft = draft.copy(prefillTarget = it) },
+                        )
+                    }
+
+                    Setting(
+                        label = stringResource(R.string.decode_processor),
+                        explanation = "Which processor writes the reply. The CPU is usually " +
+                            "faster at this, one token at a time.",
+                        value = draft.decodeTarget.label.lowercase(),
                         // What the request actually produced, under the request itself.
                         // Asking for the GPU and getting it are different things: a backend
                         // that fails to attach loads onto the CPU and reports the layer
@@ -335,20 +400,11 @@ fun ParameterSheet(
                             ?.joinToString(" · ") { (name, mib) -> "$name $mib MiB" }
                             ?.let { "loaded: $it" },
                     ) {
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            Offload.entries.forEachIndexed { index, choice ->
-                                SegmentedButton(
-                                    selected = Offload.fromName(draft.offload) == choice,
-                                    onClick = { draft = draft.copy(offload = choice.name) },
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = index,
-                                        count = Offload.entries.size,
-                                    ),
-                                ) {
-                                    Text(choice.label)
-                                }
-                            }
-                        }
+                        TargetRow(
+                            targets = decodeTargets,
+                            selected = draft.decodeTarget,
+                            onSelect = { draft = draft.copy(decodeTarget = it) },
+                        )
                     }
                 }
                 if (outputModality.accepts(Tunable.TOOL_PROMPT)) {
@@ -552,6 +608,7 @@ private fun ParameterSheetPreview() {
             preferences = ModelPreferences(),
             supportsThinking = true,
             hasGpu = true,
+            hasNpu = false,
             onSave = {},
             onReset = {},
             onDismiss = {},
@@ -596,4 +653,32 @@ private fun integralTop(bottom: Int, top: Int): Int {
     val intervals = ModelLoadParams.CONTEXT_STEPS + 1
     val span = (top - bottom) / intervals * intervals
     return if (span <= 0) top else bottom + span
+}
+
+/**
+ * The processors offered for one half of a turn.
+ *
+ * A row rather than a fixed set, because what a device can actually do differs: [NPU] is
+ * only ever offered where the engine enumerates an accelerator, which today no build does —
+ * llama.cpp has no vendor NPU backend compiled in, and a compiled ExecuTorch model's
+ * processor is fixed when it is exported rather than chosen here. Listing it regardless
+ * would be a control that changes nothing, which is worse than an absent one.
+ */
+@Composable
+private fun TargetRow(
+    targets: List<ComputeTarget>,
+    selected: ComputeTarget,
+    onSelect: (ComputeTarget) -> Unit,
+) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        targets.forEachIndexed { index, choice ->
+            SegmentedButton(
+                selected = selected == choice,
+                onClick = { onSelect(choice) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = targets.size),
+            ) {
+                Text(choice.label)
+            }
+        }
+    }
 }

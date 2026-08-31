@@ -106,6 +106,19 @@ class ModelRuntime @Inject constructor(
         engine.computeDevices().any { it.kind == ComputeDeviceKind.GPU }
     }.getOrDefault(false)
 
+    /**
+     * True when the engine enumerates an accelerator this device can actually run layers on.
+     *
+     * Asked of the loaded backends rather than of a table of chip names, so it is the truth
+     * for the hardware in the user's hand. It is false everywhere today: llama.cpp has no
+     * vendor NPU backend compiled in — there is no ggml MediaTek backend at all — and a
+     * compiled ExecuTorch model's processor is fixed when it is exported. It is still asked,
+     * because the alternative is offering an NPU button that changes nothing.
+     */
+    fun hasNpu(): Boolean = runCatching {
+        engine.computeDevices().any { it.kind == ComputeDeviceKind.ACCELERATOR }
+    }.getOrDefault(false)
+
     fun isThrottling(): Boolean = thermal.isThrottling()
 
     /** How hot the system says the device is, for the line that says so while working. */

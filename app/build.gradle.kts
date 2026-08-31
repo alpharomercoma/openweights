@@ -138,12 +138,38 @@ android {
         }
     }
 
+    /**
+     * Mirrors core:engine's dimension, which is where the second runtime actually lives.
+     * The accelerated variant carries ExecuTorch and can open a `.pte`; the standard one
+     * ships llama.cpp alone and never offers models it could not run.
+     */
+    flavorDimensions += "runtime"
+    productFlavors {
+        create("standard") { dimension = "runtime" }
+        create("accelerated") {
+            dimension = "runtime"
+            versionNameSuffix = "-accelerated"
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         // Play requires 16 KB-aligned uncompressed shared libraries.
         jniLibs.useLegacyPackaging = false
+
+        // Two copies of the C++ runtime arrive in the APK: ours, from the CMake builds in
+        // core:engine and core:sandbox, and a prebuilt one inside fbjni, which ExecuTorch
+        // depends on for its JNI. They are the same library from different NDKs, and the
+        // merger will not choose between them.
+        //
+        // Taking the first is what every project carrying fbjni does. It is safe because
+        // libc++_shared is backward compatible and both are recent, but it is a real
+        // decision rather than boilerplate: if ExecuTorch ever ships against an NDK newer
+        // than ours, the copy that wins could be older than the one its .so was linked
+        // against, and the symptom would be a link error at load rather than here.
+        jniLibs.pickFirsts += "**/libc++_shared.so"
     }
 }
 

@@ -112,6 +112,18 @@ a real folder, and the finished page loaded into a real WebView whose DOM is cou
   with a 4096-token window is pushed (`tools/executorch/export_qwen3.sh` with
   `+export.max_seq_length=4096` on the Linux build host), which is the recorded fix.
 
+## Cross-silicon: the same suite on a Snapdragon
+
+The identical test APK and models were run on a Qualcomm Device Cloud SM8650 (Snapdragon
+8 Gen 3, Adreno 750) over the QDC tunnel. Both engines ran clean, and — the strong
+result — **every model produced the identical case-for-case grade row it produced on the
+Dimensity 9400**: Gemma 3 ET `FFFPF`, LFM 2.5 ET `FFFPPPP`, Qwen3 Q8_0 `PPPPPPP`.
+Greedy decoding reproduces across vendors' silicon, which is what makes this suite a
+regression test rather than a survey. Decode is quicker there (LFM ~67 tok/s, Gemma ~46,
+Qwen3 Q8_0 ~21 on llama.cpp); reports are kept as `tools/eval/results/qdc-*.json`.
+ExecuTorch on XNNPACK is CPU-only on both chips, so this is an ISA/scheduler comparison,
+not a vendor-accelerator one.
+
 ## Answers the goal asked for explicitly
 
 - **Python in the sandbox: no.** The execution tool is QuickJS in an isolated process;

@@ -63,6 +63,31 @@ object CapabilityDenial {
     }
 
     /**
+     * Whether this reply claims missing *knowledge* about something the question names,
+     * with working search in the prompt.
+     *
+     * The other way a small model talks itself out of the tools it holds: "I don't have
+     * enough information about Alpha Romer Coma", said as the whole answer, by a model
+     * whose web_search was one call away. [denies] cannot see it — there is no capability
+     * noun in the sentence — but the failure is the same reflex and earns the same push.
+     * The evidence for pushing rather than accepting is Mallen et al. 2022
+     * (arXiv:2212.10511): parametric memory fails precisely on long-tail entities, and
+     * retrieval is the fix for exactly those, so a lament about an unrecognised name is
+     * the strongest possible signal that a search was warranted.
+     *
+     * Kept narrow on purpose. A clarification ("I don't know what you mean") is a real
+     * question to the user, not a lament, and "your ..." keeps its standing privacy
+     * guard. Judged on the first sentence like every other classification here.
+     */
+    fun lamentsUnknown(reply: String): Boolean {
+        val sentence = reply.head().substringBefore(". ")
+        return DENIAL.containsMatchIn(sentence) &&
+            KNOWLEDGE.containsMatchIn(sentence) &&
+            !CLARIFYING.containsMatchIn(sentence) &&
+            !REFUSAL.containsMatchIn(sentence)
+    }
+
+    /**
      * The tools the denial itself says are needed, best fit first, empty when the task is
      * something to write rather than to run.
      *
@@ -132,8 +157,26 @@ object CapabilityDenial {
      */
     private val LOOKUP_SHAPED = Regex(
         "latest|up.?to.?date|real.?time|current |meta data|in stock|price" +
-            "|identify|look up|find out|information about",
+            // "biograph": the mid-conversation lament for an unrecognised person names
+            // the genre, not the act of looking up — "a tool that can instantly provide
+            // a biography" — and without this it fell through to the prose-only push,
+            // which is a request to write the biography the model just said it lacks.
+            "|identify|look up|find out|information about|biograph",
     )
+
+    /**
+     * A lament's knowledge nouns. "information about|on" overlaps [LOOKUP_SHAPED] by
+     * design: once the gate opens, [fitting] classifies the same sentence and lands on
+     * web_search through the overlap, so the push names the right tool with no second
+     * classifier to keep in step.
+     */
+    private val KNOWLEDGE = Regex(
+        "enough information|information (about|on)|familiar with|details (about|on)" +
+            "|public information|record of|not aware of",
+    )
+
+    /** A model asking what was meant is conversing, not lamenting; never push against it. */
+    private val CLARIFYING = Regex("you mean|you're asking|you are asking|clarify")
 
     private val COMPUTE_SHAPED = Regex("calculat|arithmetic|comput|perform that")
 

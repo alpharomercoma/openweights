@@ -802,7 +802,15 @@ class TurnRunner @Inject constructor(
             // otherwise spends the allowance on the generic tool-preserving repair, which
             // is the exact wrong push for it. Call-shaped markup still wins — that is a
             // call that got the syntax wrong, not a claim about capability.
-            if (!pass.raw.containsToolMarkup() && CapabilityDenial.denies(pass.spoken())) {
+            // A knowledge lament ("I don't have enough information about …") is the same
+            // reflex with the capability noun missing, and takes the same one push: its
+            // sentence classifies lookup-shaped, so the retry names web_search.
+            if (!pass.raw.containsToolMarkup() &&
+                (
+                    CapabilityDenial.denies(pass.spoken()) ||
+                        CapabilityDenial.lamentsUnknown(pass.spoken())
+                    )
+            ) {
                 return denialRepair(pass)
             }
             if (!pass.raw.invitesRepair(active)) return false

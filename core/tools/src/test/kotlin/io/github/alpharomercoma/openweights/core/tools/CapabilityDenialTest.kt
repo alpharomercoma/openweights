@@ -140,6 +140,55 @@ class CapabilityDenialTest {
     }
 
     @Test
+    fun `the Alpha Romer Coma lament classifies as a lookup to push`() {
+        // The reply observed live, verbatim in shape: no capability noun, so denies()
+        // cannot see it, and the whole answer is a shrug a working web_search disproves.
+        val lament = "I don't have enough information about Alpha Romer Coma to answer."
+
+        assertThat(CapabilityDenial.denies(lament)).isFalse()
+        assertThat(CapabilityDenial.lamentsUnknown(lament)).isTrue()
+        assertThat(CapabilityDenial.fitting(lament, "Who is Alpha Romer Coma?"))
+            .containsExactly(WebSearchTool.NAME)
+    }
+
+    @Test
+    fun `not being familiar with a name is a lament too`() {
+        assertThat(
+            CapabilityDenial.lamentsUnknown(
+                "I'm not familiar with the Riverlight Festival, so I can't say much.",
+            ),
+        ).isTrue()
+    }
+
+    @Test
+    fun `asking what the user means is a conversation, not a lament`() {
+        assertThat(
+            CapabilityDenial.lamentsUnknown(
+                "I don't have enough information about what you mean by that - could " +
+                    "you clarify?",
+            ),
+        ).isFalse()
+    }
+
+    @Test
+    fun `a lament about the user's own things keeps its privacy guard`() {
+        assertThat(
+            CapabilityDenial.lamentsUnknown(
+                "I don't have information about your calendar or your location.",
+            ),
+        ).isFalse()
+    }
+
+    @Test
+    fun `an ordinary answer that mentions information is not a lament`() {
+        assertThat(
+            CapabilityDenial.lamentsUnknown(
+                "Here is the information about photosynthesis you asked for.",
+            ),
+        ).isFalse()
+    }
+
+    @Test
     fun `the retry line either names the tool or forbids mentioning any`() {
         assertThat(CapabilityDenial.retryRequest(WebSearchTool.NAME))
             .contains(WebSearchTool.NAME)

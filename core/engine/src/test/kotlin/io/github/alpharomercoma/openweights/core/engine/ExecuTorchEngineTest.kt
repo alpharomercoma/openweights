@@ -349,6 +349,110 @@ class ExecuTorchEngineTest {
     }
 
     /** A `.pte` with the tokenizer that was exported beside it. */
+    @Test
+    fun `a warm feeds the head in pieces and the first turn extends it`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_RULES)
+
+        val warm = engine.warm(listOf(head), params = NO_THINKING)
+
+        assertThat(warm).isNotNull()
+        assertThat(warm!!.warmedTokens).isGreaterThan(0)
+        // Long text goes in pieces, because a prefill call cannot be stopped and the
+        // piece is the interrupt latency.
+        assertThat(bridge.prefills.size).isGreaterThan(1)
+
+        bridge.reply = "Hello."
+        engine.chat(
+            listOf(head, ChatMessage.text(ChatRole.USER, "hi")),
+            NO_THINKING,
+        ).toList()
+        // The turn fed only what the warm had not: its own tail, never the rules again.
+        assertThat(bridge.prompts.last()).contains("hi")
+        assertThat(bridge.prompts.last()).doesNotContain("Rule 0:")
+    }
+
+    @Test
+    fun `a warm equal to what is held reads nothing`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_RULES)
+        engine.warm(listOf(head), params = NO_THINKING)
+        bridge.prefills.clear()
+        val resets = bridge.contextResets
+
+        val again = engine.warm(listOf(head), params = NO_THINKING)
+
+        assertThat(again).isNotNull()
+        assertThat(again!!.warmedTokens).isEqualTo(0)
+        assertThat(again.reusedTokens).isGreaterThan(0)
+        assertThat(bridge.prefills).isEmpty()
+        assertThat(bridge.contextResets).isEqualTo(resets)
+    }
+
+    @Test
+    fun `a warm shorter than the cache resets, because this runtime cannot roll back`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_RULES)
+        engine.warm(listOf(head), params = NO_THINKING)
+        bridge.reply = "Hello."
+        engine.chat(
+            listOf(head, ChatMessage.text(ChatRole.USER, "hi")),
+            NO_THINKING,
+        ).toList()
+        bridge.prefills.clear()
+        val resets = bridge.contextResets
+
+        val warm = engine.warm(listOf(head), params = NO_THINKING)
+
+        assertThat(warm).isNotNull()
+        assertThat(bridge.contextResets).isEqualTo(resets + 1)
+        assertThat(bridge.prefills.joinToString("")).contains("Rule 0:")
+    }
+
+    @Test
+    fun `a cancelled warm keeps its fed pieces and the next warm extends them`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_RULES)
+        bridge.onPrefill = { if (bridge.prefills.size == 1) engine.cancel() }
+
+        val interrupted = engine.warm(listOf(head), params = NO_THINKING)
+
+        assertThat(interrupted).isNotNull()
+        assertThat(bridge.prefills).hasSize(1)
+
+        bridge.onPrefill = null
+        val fedSoFar = bridge.prefills.single()
+        bridge.prefills.clear()
+        val resumed = engine.warm(listOf(head), params = NO_THINKING)
+
+        // Nothing fed twice: the second warm begins exactly where the first stopped.
+        assertThat(resumed).isNotNull()
+        assertThat(resumed!!.reusedTokens).isGreaterThan(0)
+        assertThat(bridge.prefills.joinToString("")).doesNotContain(fedSoFar.take(40))
+    }
+
+    @Test
+    fun `a failed prefill concedes the record rather than guessing`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_RULES)
+        bridge.failsDuringPrefill = "the runtime said no"
+        val resets = bridge.contextResets
+
+        val warm = engine.warm(listOf(head), params = NO_THINKING)
+
+        assertThat(warm).isNull()
+        assertThat(bridge.contextResets).isGreaterThan(resets)
+
+        // The next turn starts over from nothing, which is slow and correct.
+        bridge.failsDuringPrefill = null
+        bridge.reply = "Hello."
+        engine.chat(
+            listOf(head, ChatMessage.text(ChatRole.USER, "hi")),
+            NO_THINKING,
+        ).toList()
+        assertThat(bridge.prompts.last()).contains("Rule 0:")
+    }
+
     private fun installed(name: String): File {
         val model = folder.newFile(name)
         folder.newFile(model.nameWithoutExtension + ".tokenizer.json")
@@ -380,5 +484,15 @@ class ExecuTorchEngineTest {
 
         /** Reasoning off, so history renders the same way twice and the cache can hold. */
         val NO_THINKING = SamplerParams(thinking = false)
+
+        /** A head long enough to need several warm pieces. */
+        val LONG_RULES = buildString {
+            append("You are a careful assistant.\n")
+            repeat(60) { index ->
+                append("Rule ").append(index)
+                    .append(": prefer the shortest correct answer, cite nothing, and ")
+                    .append("keep lists to three items.\n")
+            }
+        }
     }
 }

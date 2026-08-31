@@ -210,9 +210,16 @@ the OpenClaw codebase). They agreed with each other and with this design:
 
 ## What this does not cover
 
-- **ExecuTorch.** The second runtime keeps its own prefix cache (27× reuse within its
-  rules) but has no warm/snapshot path; a new conversation there still pays its prefill.
-  The llama.cpp fleet — every GGUF — gets the full mechanism.
+- **ExecuTorch** now has the warm's first half (2026-08-31): the head is fed through the
+  runner's prefill-only entry — in pieces, since a prefill cannot be stopped mid-call, so
+  the piece is the interrupt latency — with the warm target computed as the common prefix
+  of the conversation rendered with and without a probe user turn (this runtime's
+  equivalent of rendering without the generation prompt). Judged by the runtime's own
+  accounting on the real runtime: the first question after a warm paid **14 prompt tokens
+  and 297 ms** against a cold control's **915 tokens and 13,963 ms**. What it still cannot
+  have: rollback (a cache longer than the target resets and refeeds, in the background),
+  snapshots, and the disk store — the runner serializes no state, so a cold start pays one
+  background head read. The llama.cpp fleet — every GGUF — keeps the full mechanism.
 - **Media turns.** An attachment still re-evaluates the conversation, and a
   conversation carrying media is skipped by the conversation warm; unchanged.
 - **A settings change mid-day** re-warms in the background (20 s of battery, once) —

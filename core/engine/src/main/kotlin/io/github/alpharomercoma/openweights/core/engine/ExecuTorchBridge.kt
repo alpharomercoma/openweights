@@ -80,6 +80,17 @@ interface ExecuTorchBridge {
     fun generate(prompt: String, maxNewTokens: Int, onToken: (String) -> Unit): ExecuTorchOutcome
 
     /**
+     * Feeds [prompt] into the cache without generating anything.
+     *
+     * The runtime appends at wherever its position already is, exactly as [generate]
+     * does, so what was fed here is text a later generate's prompt must begin with.
+     * Blocking, and — unlike generation — not stoppable mid-call: [stop] gates the token
+     * loop, and a prefill has no token loop. A caller that wants an interruptible warm
+     * feeds the text in pieces and checks between them.
+     */
+    fun prefill(prompt: String)
+
+    /**
      * Drops whatever the runtime is holding from previous generations.
      *
      * ExecuTorch does keep state between calls — `LlmModule` exposes both this and a

@@ -131,6 +131,18 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         return outcomeFrom(lastStats)
     }
 
+    override fun prefill(prompt: String) {
+        val running = module ?: throw LlamaException("No model loaded")
+        // The wrapper discards the native error code, so a refusal here is silent at
+        // this level; the engine's warm is verified behaviourally instead — a chat after
+        // a warm must extend it, and the runtime's own prompt count says whether it did.
+        runCatching { running.prefillPrompt(prompt) }.onFailure { cause ->
+            throw LlamaException(
+                "ExecuTorch could not prefill: ${cause.message ?: cause::class.java.simpleName}",
+            )
+        }
+    }
+
     override fun resetContext() {
         module?.resetContext()
     }

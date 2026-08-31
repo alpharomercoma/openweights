@@ -31,6 +31,15 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     /** Every prompt fed since construction, so a turn's *delta* can be asserted on. */
     val prompts: MutableList<String> = mutableListOf()
 
+    /** Every piece [prefill] fed, in order, so a warm's chunking can be asserted on. */
+    val prefills: MutableList<String> = mutableListOf()
+
+    /** Set to make [prefill] throw, as a runtime that cannot prefill would. */
+    var failsDuringPrefill: String? = null
+
+    /** Called after each [prefill] piece, so a test can cancel mid-warm. */
+    var onPrefill: ((String) -> Unit)? = null
+
     /** New tokens asked for, so the zero-means-no-limit case can be checked. */
     var lastMaxNewTokens: Int = -1
         private set
@@ -91,6 +100,12 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         reply.chunked(FRAGMENT).forEach(onToken)
         failsDuringGeneration?.let { throw LlamaException(it) }
         return outcome
+    }
+
+    override fun prefill(prompt: String) {
+        failsDuringPrefill?.let { throw LlamaException(it) }
+        prefills += prompt
+        onPrefill?.invoke(prompt)
     }
 
     override fun resetContext() {

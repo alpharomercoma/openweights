@@ -162,6 +162,44 @@ class ExecuTorchOnDeviceTest {
     }
 
     /**
+     * The head prefill: a fresh chat's system block read before anybody asks.
+     *
+     * Fed through the runner's prefill-only entry, in pieces, and judged by the
+     * runtime's own accounting rather than trust: the first question after a warm must
+     * report paying for its own words, not for the head. The control is the same
+     * question cold. This is also the test that would catch `prefillPrompt` failing
+     * silently — the Java wrapper discards its error code — because a head that never
+     * reached the cache leaves the turn's count at the cold figure.
+     */
+    @Test
+    fun warmHeadIsReusedByTheFirstTurn(): Unit = runBlocking {
+        engine.load(MODEL, PARAMS)
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_PROMPT)
+        val ask = ChatMessage.text(ChatRole.USER, "Acknowledge in one short sentence.")
+
+        val cold = turn(listOf(head, ask))
+        Log.i(TAG, "cold: prompt=${cold.stats.promptTokens} prefill=${cold.stats.prefillMs}ms")
+
+        engine.resetContext()
+
+        val warm = engine.warm(listOf(head), params = SamplerParams(maxTokens = 48))
+        assertThat(warm).isNotNull()
+        Log.i(TAG, "warm: fed=${warm!!.warmedTokens} pieces in ${warm.prefillMs}ms")
+        assertThat(warm.warmedTokens).isGreaterThan(0)
+
+        val after = turn(listOf(head, ask))
+        Log.i(
+            TAG,
+            "after warm: prompt=${after.stats.promptTokens} " +
+                "cached=${after.stats.cachedTokens} prefill=${after.stats.prefillMs}ms " +
+                "reply=${after.content}",
+        )
+        assertThat(after.stats.promptTokens).isLessThan(cold.stats.promptTokens / 4)
+        assertThat(after.content).isNotEmpty()
+        assertThat(after.content).doesNotContain("<|im_")
+    }
+
+    /**
      * One turn, with reasoning left on.
      *
      * Reasoning is deliberately on: Qwen3 disables it by closing an empty `<think>` block

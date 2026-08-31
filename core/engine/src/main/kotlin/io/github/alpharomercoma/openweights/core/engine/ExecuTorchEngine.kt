@@ -16,7 +16,9 @@
 
 package io.github.alpharomercoma.openweights.core.engine
 
+import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
+import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.PromptTemplate
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -88,6 +91,10 @@ class ExecuTorchEngine(
      * [GenerationStats.cachedTokens] means.
      */
     private var heldTokens: Int = 0
+
+    /** Set by [cancel]; read between warm pieces, which is where a warm can stop. */
+    @Volatile
+    private var warmStopped = false
 
     override val loadedModel: LoadedModelInfo? get() = info
 
@@ -259,7 +266,123 @@ class ExecuTorchEngine(
         )
     }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
-    override fun cancel() = bridge.stop()
+    override fun cancel() {
+        warmStopped = true
+        bridge.stop()
+    }
+
+    /**
+     * Reads [messages] into the runtime's cache, ahead of anybody asking anything.
+     *
+     * The llama runtime warms by prefilling and can abort mid-batch; this one warms on
+     * the runner's prefill-only entry, which cannot be stopped once called — [stop]
+     * gates the token loop, and a prefill has no token loop. So the text goes in pieces,
+     * cut at whitespace, and cancellation is checked between them: the piece is the
+     * interrupt latency. Everything fed stays useful when interrupted — the cache is
+     * append-only and the record grows piece by piece — so the turn that interrupted, or
+     * the next warm, extends whatever was already read. The pieces re-tokenize at their
+     * cut points, which is the same thing every turn boundary in this engine already
+     * does to the stream.
+     *
+     * The contract is "make the cache exactly this prompt": equal reads nothing, an
+     * extension feeds the difference, and anything else — including a cache *longer*
+     * than the target, which a forward-only runtime cannot serve — resets and refeeds.
+     * That last arm means a reopened or branched conversation re-reads in the
+     * background here where llama would roll back; slower, correct, and off the user's
+     * clock.
+     *
+     * [snapshot] and [store] have no meaning on this runtime: it cannot roll back, so
+     * there is nothing a snapshot could restore, and it cannot serialize state, so
+     * nothing outlives the process. A cold start pays one background head read.
+     */
+    override suspend fun warm(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        params: SamplerParams,
+        snapshot: Boolean,
+        store: String?,
+    ): WarmResult? = withContext(Dispatchers.IO) {
+        val rendering = template ?: return@withContext null
+        // The llama warm renders without the generation prompt so its text prefixes any
+        // future turn; these templates cannot be asked that, so it is computed instead:
+        // the common prefix of this conversation rendered as a prompt and the same
+        // conversation with one more user turn is the history text alone — everything up
+        // to where the assistant opener and the next turn diverge. A family that folds
+        // the system text into the first user turn diverges early and warms almost
+        // nothing, which is the correct no-op for it.
+        val full = rendering.render(messages, tools, params.thinking)
+        val probed = rendering.render(
+            messages + ChatMessage.text(ChatRole.USER, WARM_PROBE),
+            tools,
+            params.thinking,
+        )
+        val prompt = full.commonPrefixWith(probed)
+        if (prompt.isEmpty()) return@withContext null
+        if (prompt == fedText) {
+            return@withContext WarmResult(
+                warmedTokens = 0,
+                reusedTokens = heldTokens,
+                prefillMs = 0,
+                snapshotBytes = 0,
+            )
+        }
+
+        val extending = fedText.isNotEmpty() && prompt.startsWith(fedText)
+        val reused = if (extending) heldTokens else 0
+        var fresh = if (extending) {
+            prompt.substring(fedText.length)
+        } else {
+            bridge.resetContext()
+            fedText = ""
+            heldTokens = 0
+            prompt
+        }
+
+        warmStopped = false
+        val started = System.currentTimeMillis()
+        var warmed = 0
+        try {
+            while (fresh.isNotEmpty() && !warmStopped) {
+                val piece = warmPiece(fresh)
+                bridge.prefill(piece)
+                fedText += piece
+                val tokens = (piece.length / WARM_CHARS_PER_TOKEN).coerceAtLeast(1)
+                heldTokens += tokens
+                warmed += tokens
+                fresh = fresh.substring(piece.length)
+            }
+        } catch (failure: LlamaException) {
+            // The runtime's position no longer matches anything recorded; an extension
+            // record that might be wrong is worse than none. Same discipline as a
+            // failed generate. Logged rather than raised, because a warm is an
+            // optimization and its failure already costs exactly what it saves.
+            Log.w(TAG, "warm prefill failed; the next turn starts cold", failure)
+            fedText = ""
+            heldTokens = 0
+            runCatching { bridge.resetContext() }
+            return@withContext null
+        }
+        WarmResult(
+            warmedTokens = warmed,
+            reusedTokens = reused,
+            prefillMs = System.currentTimeMillis() - started,
+            snapshotBytes = 0,
+        )
+    }
+
+    /**
+     * The next piece to feed: at most [WARM_PIECE_CHARS], preferring to end at a line
+     * break, then at a space, so the cut re-tokenizes no more oddly than it must.
+     */
+    private fun warmPiece(text: String): String {
+        if (text.length <= WARM_PIECE_CHARS) return text
+        val window = text.substring(0, WARM_PIECE_CHARS)
+        val newline = window.lastIndexOf('\n')
+        if (newline > 0) return window.substring(0, newline + 1)
+        val space = window.lastIndexOf(' ')
+        if (space > 0) return window.substring(0, space + 1)
+        return window
+    }
 
     override suspend fun resetContext() {
         bridge.resetContext()
@@ -429,3 +552,14 @@ private class StreamedReply(private val template: PromptTemplate) {
         return text.substring(shown, finish).also { shown = finish }
     }
 }
+
+/** One warm piece: about two hundred tokens, which is the interrupt latency in text. */
+private const val WARM_PIECE_CHARS = 800
+
+/** The app-wide rough estimate; the runtime reports no token count for a prefill. */
+private const val WARM_CHARS_PER_TOKEN = 4
+
+/** Any user text: only the render's shape matters, never the probe's content. */
+private const val WARM_PROBE = "x"
+
+private const val TAG = "OpenWeights"

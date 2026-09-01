@@ -21,6 +21,9 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,6 +59,15 @@ enum class GrantState {
 @Singleton
 class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val context: Context) {
     private val store = context.getSharedPreferences("workspace", Context.MODE_PRIVATE)
+
+    private val revisions = MutableStateFlow(0)
+
+    /**
+     * Bumped when the folder is chosen or handed back, for the same listener as
+     * [ToolSwitches.changes]: the three file tools go in or out of the model's view with
+     * the grant, so granting reshapes the prompt head exactly the way a toggle does.
+     */
+    val changes: StateFlow<Int> = revisions.asStateFlow()
 
     /** The folder to work in, or null when there is not one this app may still use. */
     val folder: Uri?
@@ -95,6 +107,7 @@ class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val c
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         runCatching { context.contentResolver.takePersistableUriPermission(tree, flags) }
         store.edit { putString(KEY_TREE, tree.toString()) }
+        revisions.value += 1
     }
 
     /** Hands the folder back, both the record of it and the permission itself. */
@@ -104,6 +117,7 @@ class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val c
             runCatching { context.contentResolver.releasePersistableUriPermission(it, flags) }
         }
         store.edit { remove(KEY_TREE) }
+        revisions.value += 1
     }
 
     private fun stored(): Uri? = store.getString(KEY_TREE, null)?.let(Uri::parse)

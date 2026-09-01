@@ -19,6 +19,9 @@ package io.github.alpharomercoma.openweights.core.tools
 import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +38,18 @@ import javax.inject.Singleton
 class ToolSwitches @Inject constructor(@param:ApplicationContext context: Context) {
     private val store = context.getSharedPreferences("tool_switches", Context.MODE_PRIVATE)
 
+    private val revisions = MutableStateFlow(0)
+
+    /**
+     * Bumped on every [setEnabled], so whoever keeps the KV cache warm can hear about it.
+     *
+     * A toggle rewrites the tool block at the head of every future prompt, and the warm
+     * machinery compares bytes it is handed rather than watching preferences. Before this
+     * existed the recompute waited for the next send and ran in front of the user — the
+     * one place the whole warm design exists to keep it out of.
+     */
+    val changes: StateFlow<Int> = revisions.asStateFlow()
+
     fun isEnabled(name: String): Boolean = store.getBoolean(name, true)
 
     /**
@@ -45,7 +60,8 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
      * never opened the screen.
      */
     fun isEnabled(tool: Tool): Boolean {
-        val name = tool.definition.name
+        // A family of verbs over one decision shares one switch; see [Tool.switchName].
+        val name = tool.switchName
         if (store.contains(name)) return store.getBoolean(name, tool.defaultsOn)
         // A choice made under the tool's old name still stands. Without this, renaming a
         // tool silently turned it back on for anyone who had switched it off — or, for a
@@ -57,7 +73,10 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
         return tool.defaultsOn
     }
 
-    fun setEnabled(name: String, enabled: Boolean) = store.edit { putBoolean(name, enabled) }
+    fun setEnabled(name: String, enabled: Boolean) {
+        store.edit { putBoolean(name, enabled) }
+        revisions.value += 1
+    }
 
     /** The names that are on, for filtering the registry before a turn. */
     fun enabled(all: List<String>): Set<String> = all.filter(::isEnabled).toSet()

@@ -71,6 +71,8 @@ import io.github.alpharomercoma.openweights.core.tools.GoalBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.ToolEvidence
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
+import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
 import io.github.alpharomercoma.openweights.core.tools.correlatedWebResearchSources
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.runtime.GenerationService
@@ -85,6 +87,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -543,6 +547,9 @@ class ChatViewModel @Inject constructor(
     private val turns: TurnRunner,
     private val notifier: ReplyNotifier,
     private val goals: GoalBoard,
+    /** Only to hear toggles; the turn itself reads them through [turns]. */
+    private val toolSwitches: ToolSwitches,
+    private val workspaceGrant: WorkspaceGrant,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -679,6 +686,17 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadComposerDraft()
+        viewModelScope.launch {
+            // A tool toggled, or the folder granted or taken back, rewrites the tool block
+            // at the head of every future prompt — and for a hybrid model any head byte
+            // change is a full re-read, because rollback is refused. Heard here, that
+            // re-read runs now, in the background, while the user is still on the settings
+            // screen; unheard, it ran in front of them on their next send, which is the
+            // cold first turn this warm machinery exists to prevent. Each StateFlow replays
+            // its current value on collect, so the first emission of each is dropped.
+            merge(toolSwitches.changes.drop(1), workspaceGrant.changes.drop(1))
+                .collect { warmEngine() }
+        }
         viewModelScope.launch {
             archive.observeCount()
                 .catch { failure ->

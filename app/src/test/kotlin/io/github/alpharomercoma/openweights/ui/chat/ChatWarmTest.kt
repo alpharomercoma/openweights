@@ -262,4 +262,33 @@ class ChatWarmTest : ChatFixture() {
             assertThat(prompt.last().role).isEqualTo(ChatRole.USER)
             assertThat(prompt.last().text).contains("When was she born?")
         }
+
+    @Test
+    fun `toggling a tool re-warms the head in the background`() = runTest(dispatcher) {
+        loadModel()
+        settle()
+
+        engine.warmCalls.clear()
+        switches.setEnabled(StubTool.definition.name, false)
+        settle()
+
+        // A toggle rewrites the tool block at the head of every future prompt, and for a
+        // hybrid model any head change is a full re-read. Heard here, that read runs now,
+        // in the background; unheard, it ran in front of the user on their next send.
+        assertThat(engine.warmCalls.count { it.snapshot }).isEqualTo(1)
+    }
+
+    @Test
+    fun `granting or forgetting the folder re-warms the head too`() = runTest(dispatcher) {
+        loadModel()
+        settle()
+
+        engine.warmCalls.clear()
+        // The file tools describe themselves to the model only while a folder is shared,
+        // so the grant reshapes the prompt head exactly the way a toggle does.
+        grant.forget()
+        settle()
+
+        assertThat(engine.warmCalls.count { it.snapshot }).isEqualTo(1)
+    }
 }

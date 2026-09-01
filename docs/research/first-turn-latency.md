@@ -1,7 +1,7 @@
 # The first turn, and why it no longer costs twenty seconds
 
 Written 2026-08-31. The measurements are from the app's own usage ledger and engine logs on
-the Poco (MediaTek Dimensity 7300, `192.168.100.171`) and the Qualcomm Device Cloud SM8650
+the Poco (MediaTek MT6991 / Dimensity 9400, `192.168.100.171`) and the Qualcomm Device Cloud SM8650
 (`pineapple`), against real GGUF files.
 
 ## The bill, itemized
@@ -59,7 +59,7 @@ correctly a no-op):
 
 | device | model | path | fresh-chat cached | fresh-chat TTFT |
 |---|---|---|---|---|
-| Poco (Dimensity 7300) | LFM2.5-1.2B Q4_K_M | snapshot restore | 1018 of 1036 | **184 ms** |
+| Poco (Dimensity 9400) | LFM2.5-1.2B Q4_K_M | snapshot restore | 1018 of 1036 | **184 ms** |
 | Poco | Llama-3.2-3B Q4_K_M | rollback | 1044 | 453 ms |
 | Poco | Qwen3-1.7B Q8_0 | rollback | 1052 | 218 ms |
 | Poco | SmolLM3-3B Q4_K_M | rollback | 1054 | 455 ms |

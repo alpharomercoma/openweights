@@ -143,16 +143,7 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
      */
     fun replace(old: String, new: String): ToolExecution {
         val fact = new.trim().replace(WHITESPACE, " ")
-        if (fact.isEmpty()) {
-            return ToolExecution.rejected(
-                "The replacement was empty. To remove a memory, use forget_memory.",
-            )
-        }
-        if (fact.length > MAX_CHARS) {
-            return ToolExecution.rejected(
-                "Too long to remember. Keep it under $MAX_CHARS characters, one fact.",
-            )
-        }
+        unfit(fact)?.let { return it }
         val found = matching(old)
             ?: return ToolExecution.rejected(NO_MATCH)
         if (known.value.any { it !== found && it.text.equals(fact, ignoreCase = true) }) {
@@ -170,6 +161,17 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
         known.value = kept
         write(kept)
         return ToolExecution("Updated.")
+    }
+
+    /** Why [fact] cannot become a saved fact, or null when it can. */
+    private fun unfit(fact: String): ToolExecution? = when {
+        fact.isEmpty() -> ToolExecution.rejected(
+            "The replacement was empty. To remove a memory, use forget_memory.",
+        )
+        fact.length > MAX_CHARS -> ToolExecution.rejected(
+            "Too long to remember. Keep it under $MAX_CHARS characters, one fact.",
+        )
+        else -> null
     }
 
     /** Drops the one saved fact matching [text], or says why it could not. */

@@ -98,6 +98,13 @@ class SaveMemoryTool @Inject constructor(private val memory: Memory) : Tool {
     /** Its effect is every future prompt, so it asks in AUTO too. See [Tool.alwaysAsks]. */
     override val alwaysAsks: Boolean = true
 
+    /**
+     * True like its siblings', and load-bearing for retries: a successful durable write
+     * un-settles earlier refusals, so an update refused because a fact was absent becomes
+     * retryable the moment this saves it.
+     */
+    override val writesDurableData: Boolean = true
+
     override suspend fun run(call: ToolCall): String = execute(call).text
 
     override suspend fun execute(call: ToolCall): ToolExecution {

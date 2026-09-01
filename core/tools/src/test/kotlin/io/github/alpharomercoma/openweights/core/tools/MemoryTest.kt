@@ -179,4 +179,140 @@ class MemoryTest {
             assertThat(memory.facts.value).isEmpty()
         }
     }
+
+    @Test
+    fun `replacing a fact rewrites it in place rather than making it newest`() {
+        memory.remember("Prefers Kotlin", now = 1)
+        memory.remember("Lives in Manila", now = 2)
+
+        assertThat(memory.replace("Prefers Kotlin", "Prefers Rust").text).isEqualTo("Updated.")
+
+        // In place: a correction must not buy the fact a later eviction slot, or editing
+        // becomes a way to keep a fact alive past the budget.
+        assertThat(memory.facts.value.map { it.text })
+            .containsExactly("Prefers Rust", "Lives in Manila")
+            .inOrder()
+        assertThat(memory.facts.value.first().savedAt).isEqualTo(1)
+    }
+
+    @Test
+    fun `a unique fragment matches and an ambiguous one refuses to guess`() {
+        memory.remember("Prefers Kotlin")
+        memory.remember("Prefers answers without preamble")
+
+        // "Kotlin" names one fact; deleting on it is safe.
+        assertThat(memory.forgetMatching("kotlin").text).isEqualTo("Forgotten.")
+        // "Prefers" now names two facts, and deleting on an ambiguous name is how the
+        // wrong thing goes: it matches neither.
+        memory.remember("Prefers Rust")
+        val refused = memory.forgetMatching("Prefers")
+        assertThat(refused.successful).isFalse()
+        assertThat(memory.facts.value).hasSize(2)
+    }
+
+    @Test
+    fun `a rejection never quotes what is saved`() {
+        memory.remember("The user's name is Alpha")
+
+        val rejection = memory.forgetMatching("something never saved")
+
+        // Saving and reading are two switches on purpose: an error message that lists the
+        // facts would be the write half leaking the read half.
+        assertThat(rejection.successful).isFalse()
+        assertThat(rejection.text).doesNotContain("Alpha")
+        assertThat(rejection.text).contains("read_memory")
+    }
+
+    @Test
+    fun `an empty replacement is refused and points at forgetting`() {
+        memory.remember("Prefers Kotlin")
+
+        val refused = memory.replace("Prefers Kotlin", "  ")
+
+        assertThat(refused.successful).isFalse()
+        assertThat(refused.text).contains("forget_memory")
+        assertThat(memory.facts.value.map { it.text }).containsExactly("Prefers Kotlin")
+    }
+
+    @Test
+    fun `an edit that grows a fact pays the budget from the oldest, never from itself`() {
+        // The edited fact is deliberately the oldest, so a budget that evicts blindly from
+        // the front would evict the very fact the user just corrected.
+        memory.remember("short", now = 1)
+        repeat(6) { memory.remember("fact $it ".padEnd(160, 'x'), now = 2L + it) }
+
+        val grown = "grown ".padEnd(160, 'y')
+        assertThat(memory.replace("short", grown).text).isEqualTo("Updated.")
+
+        // Over budget by 120, so exactly one other fact — the next oldest — paid for it.
+        val texts = memory.facts.value.map { it.text }
+        assertThat(texts.first()).isEqualTo(grown)
+        assertThat(texts).hasSize(6)
+        assertThat(memory.facts.value.sumOf { it.text.length }).isAtMost(1_000)
+    }
+
+    @Test
+    fun `replacing with a fact already saved drops the old one instead of duplicating`() {
+        memory.remember("Prefers Kotlin")
+        memory.remember("Prefers Rust")
+
+        memory.replace("Prefers Kotlin", "prefers rust")
+
+        assertThat(memory.facts.value.map { it.text }).containsExactly("Prefers Rust")
+    }
+
+    @Test
+    fun `the update and forget tools ride the save switch`() {
+        val switches =
+            ToolSwitches(ApplicationProvider.getApplicationContext<android.app.Application>())
+        val update = UpdateMemoryTool(memory)
+        val forget = ForgetMemoryTool(memory)
+
+        // Off together: writing to the durable set is one decision, however many verbs.
+        assertThat(switches.isEnabled(update)).isFalse()
+        assertThat(switches.isEnabled(forget)).isFalse()
+
+        switches.setEnabled(SaveMemoryTool.NAME, true)
+        assertThat(switches.isEnabled(update)).isTrue()
+        assertThat(switches.isEnabled(forget)).isTrue()
+        // And reading stays its own decision.
+        assertThat(switches.isEnabled(ReadMemoryTool(memory))).isFalse()
+    }
+
+    @Test
+    fun `every verb that writes the durable set asks in every mode`() {
+        // The same standing threat, three doors: a page that talks the model into saving,
+        // rewriting or erasing a memory has edited every future conversation.
+        assertThat(SaveMemoryTool(memory).alwaysAsks).isTrue()
+        assertThat(UpdateMemoryTool(memory).alwaysAsks).isTrue()
+        assertThat(ForgetMemoryTool(memory).alwaysAsks).isTrue()
+        assertThat(ReadMemoryTool(memory).alwaysAsks).isFalse()
+    }
+
+    @Test
+    fun `the update tool rewrites and the forget tool deletes, end to end`() {
+        runBlocking {
+            memory.remember("Prefers Kotlin")
+            memory.remember("Lives in Manila")
+
+            val updated = UpdateMemoryTool(memory).run(
+                ToolCall(
+                    id = "1",
+                    name = UpdateMemoryTool.NAME,
+                    argumentsJson = """{"old":"Prefers Kotlin","new":"Prefers Rust"}""",
+                ),
+            )
+            assertThat(updated).isEqualTo("Updated.")
+
+            val forgotten = ForgetMemoryTool(memory).run(
+                ToolCall(
+                    id = "2",
+                    name = ForgetMemoryTool.NAME,
+                    argumentsJson = """{"fact":"Manila"}""",
+                ),
+            )
+            assertThat(forgotten).isEqualTo("Forgotten.")
+            assertThat(memory.facts.value.map { it.text }).containsExactly("Prefers Rust")
+        }
+    }
 }

@@ -117,6 +117,135 @@ class SaveMemoryTool @Inject constructor(private val memory: Memory) : Tool {
 }
 
 /**
+ * Rewrites one fact [SaveMemoryTool] kept, because facts stop being true.
+ *
+ * "Prefers Kotlin" becomes "prefers Rust", and without this verb the model's only move was
+ * save-the-new and hope the old one ages out — which it does not, for months, and the two
+ * then contradict each other at the head of every future prompt. A separate tool rather
+ * than an action parameter on save: single-purpose names are what a 1B model routes
+ * reliably, measured in `docs/research/tool-calling.md`.
+ *
+ * ### One switch for the writing family
+ *
+ * This and [ForgetMemoryTool] answer to [SaveMemoryTool]'s switch. May the model write to
+ * what the app keeps about you is one decision; splitting it three ways would mean three
+ * near-identical rows on the Tools screen and a combination — may save but not correct —
+ * that serves nobody. See [Tool.switchName].
+ *
+ * ### Asks every time, like its siblings
+ *
+ * The same standing threat [SaveMemoryTool] documents, from the other side: a page that
+ * talks the model into rewriting or erasing a memory has edited what every future
+ * conversation is told, and closing the chat does not undo it. Every verb that touches the
+ * durable set shows the user its exact arguments first.
+ */
+class UpdateMemoryTool @Inject constructor(private val memory: Memory) : Tool {
+    override val definition = ToolDefinition(
+        name = NAME,
+        description = "Rewrite one saved fact about the user that is outdated or wrong.",
+        parametersJson = """
+            {
+              "type": "object",
+              "properties": {
+                "old": {
+                  "type": "string",
+                  "description": "The saved fact to rewrite, as read_memory shows it"
+                },
+                "new": {
+                  "type": "string",
+                  "description": "One sentence, third person, that replaces it"
+                }
+              },
+              "required": ["old", "new"]
+            }
+        """.trimIndent(),
+    )
+
+    override val switchName: String get() = SaveMemoryTool.NAME
+
+    override val defaultsOn: Boolean = false
+
+    override val needsApproval: Boolean = true
+
+    /** Rewrites every future prompt, so it asks in AUTO too; see [SaveMemoryTool]. */
+    override val alwaysAsks: Boolean = true
+
+    override val writesDurableData: Boolean = true
+
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution {
+        val old = call.argument("old", "fact")
+            ?: return ToolExecution.rejected(
+                "No fact to rewrite was given. Call $NAME with old and new.",
+            )
+        val new = call.argument("new", "replacement")
+            ?: return ToolExecution.rejected(
+                "No replacement was given. Call $NAME with old and new.",
+            )
+        return memory.replace(old, new)
+    }
+
+    companion object {
+        const val NAME = "update_memory"
+    }
+}
+
+/**
+ * Drops one fact [SaveMemoryTool] kept.
+ *
+ * The user saying "forget that" is the whole use case, and it deserves a verb of its own:
+ * folded into [UpdateMemoryTool] as an empty replacement, a model that omits a parameter —
+ * which a 1B model does — would delete where it meant to edit. Deletion is the one
+ * write that cannot be corrected afterwards, so it is the one that must be impossible to
+ * reach by accident. Same switch, same always-ask as the rest of the writing family.
+ */
+class ForgetMemoryTool @Inject constructor(private val memory: Memory) : Tool {
+    override val definition = ToolDefinition(
+        name = NAME,
+        description = "Delete one saved fact about the user, when they ask to forget it " +
+            "or it no longer applies.",
+        parametersJson = """
+            {
+              "type": "object",
+              "properties": {
+                "fact": {
+                  "type": "string",
+                  "description": "The saved fact to delete, as read_memory shows it"
+                }
+              },
+              "required": ["fact"]
+            }
+        """.trimIndent(),
+    )
+
+    override val switchName: String get() = SaveMemoryTool.NAME
+
+    override val defaultsOn: Boolean = false
+
+    override val needsApproval: Boolean = true
+
+    /** Erases from every future prompt, which outlives the chat; asks in AUTO too. */
+    override val alwaysAsks: Boolean = true
+
+    override val writesDurableData: Boolean = true
+
+    override suspend fun run(call: ToolCall): String = execute(call).text
+
+    override suspend fun execute(call: ToolCall): ToolExecution {
+        val fact = call.argument("fact", "text", "memory")
+            ?: return ToolExecution.rejected(
+                "No fact was named. Call $NAME with the fact to delete.",
+            )
+        return memory.forgetMatching(fact)
+    }
+
+    companion object {
+        const val NAME = "forget_memory"
+    }
+}
+
+/**
  * Reads back what [SaveMemoryTool] kept.
  *
  * A tool rather than a block injected into every prompt, which is what this replaced. The

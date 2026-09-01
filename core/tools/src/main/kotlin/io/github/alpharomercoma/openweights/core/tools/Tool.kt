@@ -221,6 +221,18 @@ interface Tool {
     val isUserFacing: Boolean get() = true
 
     /**
+     * The switch this tool answers to, which is its own name for all but a family.
+     *
+     * Saving, updating and forgetting a memory are one decision about a person's data —
+     * may the model write to what the app keeps about you — split across three verbs
+     * because a 1B model routes single-purpose tools far better than an action parameter.
+     * Three rows saying nearly the same sentence would make the Tools screen worse at its
+     * one job, so the verbs share the switch of the tool that owns the decision, and the
+     * screen shows one row per switch owner rather than one per verb.
+     */
+    val switchName: String get() = definition.name
+
+    /**
      * Whether this tool is on for somebody who has never opened the Tools screen.
      *
      * True for everything that only reads what the turn already reaches: a search the user

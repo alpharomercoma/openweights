@@ -102,14 +102,22 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
      * every turn of every future conversation, against the 250 this was documented as
      * costing. Two limits that multiply need a third that does not.
      *
-     * The newest fact always survives: it is the one somebody just asked for.
+     * The newest fact always survives: it is the one somebody just asked for. A
+     * [protected] fact survives for the same reason from the other door — it is the one
+     * somebody just edited, and [replace] growing a fact must not evict the very fact it
+     * grew, however old it is.
      */
-    private fun List<Remembered>.withinBudget(): List<Remembered> {
+    private fun List<Remembered>.withinBudget(protected: Remembered? = null): List<Remembered> {
         var total = sumOf { it.text.length }
         if (total <= MAX_TOTAL_CHARS) return this
         val kept = toMutableList()
-        while (kept.size > 1 && total > MAX_TOTAL_CHARS) {
-            total -= kept.removeAt(0).text.length
+        var index = 0
+        while (kept.size > 1 && total > MAX_TOTAL_CHARS && index < kept.size) {
+            if (kept[index] === protected) {
+                index += 1
+                continue
+            }
+            total -= kept.removeAt(index).text.length
         }
         return kept
     }
@@ -118,6 +126,73 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
         val kept = known.value.filterNot { it.text.equals(text, ignoreCase = true) }
         known.value = kept
         write(kept)
+    }
+
+    /**
+     * Rewrites one saved fact in place, keeping its age.
+
+     * In place matters: [remember]-then-[forget] would make every correction the newest
+     * fact, and the budget evicts oldest-first, so a fact would buy its way to safety by
+     * being edited. The replacement passes the same gates a new fact does, because it is
+     * about to be one.
+     *
+     * Rejections here and in [forgetMatching] never quote what is saved. Saving and
+     * reading are two switches on purpose — what the app may keep, and what conversations
+     * get told — and an error message that lists the facts would be the write half leaking
+     * the read half.
+     */
+    fun replace(old: String, new: String): ToolExecution {
+        val fact = new.trim().replace(WHITESPACE, " ")
+        if (fact.isEmpty()) {
+            return ToolExecution.rejected(
+                "The replacement was empty. To remove a memory, use forget_memory.",
+            )
+        }
+        if (fact.length > MAX_CHARS) {
+            return ToolExecution.rejected(
+                "Too long to remember. Keep it under $MAX_CHARS characters, one fact.",
+            )
+        }
+        val found = matching(old)
+            ?: return ToolExecution.rejected(NO_MATCH)
+        if (known.value.any { it !== found && it.text.equals(fact, ignoreCase = true) }) {
+            // The replacement already stands as its own fact, so the corrected one is
+            // redundant rather than rewritten.
+            forget(found.text)
+            return ToolExecution("That is already remembered; the old version is forgotten.")
+        }
+        // The budget holds through edits too: a replacement longer than what it replaced
+        // pays the way a new fact pays, from the oldest — never from the edited fact.
+        val replaced = Remembered(fact, found.savedAt)
+        val kept = known.value
+            .map { if (it === found) replaced else it }
+            .withinBudget(protected = replaced)
+        known.value = kept
+        write(kept)
+        return ToolExecution("Updated.")
+    }
+
+    /** Drops the one saved fact matching [text], or says why it could not. */
+    fun forgetMatching(text: String): ToolExecution {
+        val found = matching(text)
+            ?: return ToolExecution.rejected(NO_MATCH)
+        forget(found.text)
+        return ToolExecution("Forgotten.")
+    }
+
+    /**
+     * The one fact [query] names, or null.
+     *
+     * Exact first, then a unique substring, because a small model quotes loosely: asked to
+     * forget "the fact about my name" it will pass a fragment, and demanding the byte-exact
+     * sentence back turns every edit into a read-then-retry round trip. A fragment matching
+     * two facts matches neither — deleting on an ambiguous name is how the wrong thing goes.
+     */
+    private fun matching(query: String): Remembered? {
+        val wanted = query.trim().replace(WHITESPACE, " ")
+        if (wanted.isEmpty()) return null
+        known.value.firstOrNull { it.text.equals(wanted, ignoreCase = true) }?.let { return it }
+        return known.value.filter { it.text.contains(wanted, ignoreCase = true) }.singleOrNull()
     }
 
     fun forgetAll() {
@@ -183,6 +258,14 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
         const val MAX_CHARS = 160
 
         private const val KEY = "facts"
+
+        /**
+         * Said without quoting the saved facts; see [replace] for why. The pointer to
+         * read_memory is honest even when that switch is off — the model then reports it
+         * cannot, which is the configuration the user chose.
+         */
+        private const val NO_MATCH = "No saved memory matches that. Call read_memory to " +
+            "see what is saved, then try again with the exact fact."
 
         /** Separates the timestamp from the text. Trimmed out of every fact on the way in. */
         private const val SEPARATOR = " "

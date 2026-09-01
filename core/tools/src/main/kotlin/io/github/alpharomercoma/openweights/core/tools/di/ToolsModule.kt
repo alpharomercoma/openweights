@@ -26,6 +26,7 @@ import io.github.alpharomercoma.openweights.core.tools.AndroidReachability
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.DeleteFileTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.ForgetMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.ReadMemoryTool
@@ -37,6 +38,7 @@ import io.github.alpharomercoma.openweights.core.tools.ShowDocumentTool
 import io.github.alpharomercoma.openweights.core.tools.ShowSlidesTool
 import io.github.alpharomercoma.openweights.core.tools.ShowWebsiteTool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
+import io.github.alpharomercoma.openweights.core.tools.UpdateMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.WatchTool
 import io.github.alpharomercoma.openweights.core.tools.Watches
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
@@ -81,15 +83,18 @@ object ToolsModule {
         advance: AdvanceTool,
         askUser: AskUserTool,
         watch: WatchTool,
-        // Last, and off unless asked for. They are the only pair that carries anything out
-        // of one conversation and into the next: one half writes, the other reads back.
+        // Last, and off unless asked for. They are the only family that carries anything
+        // out of one conversation and into the next: read comes back, and the three
+        // writing verbs — save, update, forget — all answer to save's switch.
         readMemory: ReadMemoryTool,
         saveMemory: SaveMemoryTool,
+        updateMemory: UpdateMemoryTool,
+        forgetMemory: ForgetMemoryTool,
     ): ToolRegistry = ToolRegistry(
         listOf(
             search, media, fetch, searchFiles, readFile, writeFile, deleteFile,
             showWebsite, showDocument, showSlides, runScript,
-            advance, askUser, watch, readMemory, saveMemory,
+            advance, askUser, watch, readMemory, saveMemory, updateMemory, forgetMemory,
         ),
     )
 

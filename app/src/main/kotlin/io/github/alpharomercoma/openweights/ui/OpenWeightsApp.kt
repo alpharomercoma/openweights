@@ -358,6 +358,9 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onForgetFolder = viewModel::forgetFolder,
                 onEngineEnabled = viewModel::setEngineEnabled,
                 onProxy = viewModel::setProxy,
+                onMemoryEdit = viewModel::updateMemory,
+                onMemoryDelete = viewModel::deleteMemory,
+                onMemoryClear = viewModel::clearMemories,
                 onBack = navController::popBackStack,
             )
         }

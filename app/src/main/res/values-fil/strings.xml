@@ -255,8 +255,16 @@
     <string name="prefill_processor">Pagbasa ng prompt</string>
     <string name="decode_processor">Pagsulat ng sagot</string>
     <string name="processor_fixed_at_export">Nakatakda noong na-export</string>
-    <string name="tool_save_memory_name">Mag-save ng mga alaala</string>
-    <string name="tool_save_memory_detail">Hinahayaan ang model na magtago ng isang maikling detalye tungkol sa iyo para sa mga susunod na chat. Laging nagtatanong muna.</string>
+    <string name="tool_save_memory_name">Mag-save at mag-edit ng mga alaala</string>
+    <string name="tool_save_memory_detail">Hinahayaan ang model na magtago, magtama, o magbura ng isang maikling detalye tungkol sa iyo para sa mga susunod na chat. Laging nagtatanong muna.</string>
+    <string name="memory_title">Mga alaala</string>
+    <string name="memory_status_none">Wala pang naka-save tungkol sa iyo.</string>
+    <string name="memory_status">%1$d ang naka-save. Nababasa ito ng bawat chat na may nakabukas na memory.</string>
+    <string name="memory_edit_title">I-edit ang alaala</string>
+    <string name="memory_length">%1$d sa %2$d na character</string>
+    <string name="memory_forget_all">Kalimutan lahat</string>
+    <string name="memory_edit">I-edit ang %1$s</string>
+    <string name="memory_delete">Burahin ang %1$s</string>
     <string name="tool_read_memory_name">Magbasa ng mga alaala</string>
     <string name="tool_read_memory_detail">Hinahayaan ang model na balikan ang mga detalyeng naitago nito tungkol sa iyo.</string>
 </resources>

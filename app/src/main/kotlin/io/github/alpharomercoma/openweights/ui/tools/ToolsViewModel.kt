@@ -20,10 +20,13 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.Memory
+import io.github.alpharomercoma.openweights.core.tools.Remembered
 import io.github.alpharomercoma.openweights.core.tools.SearchEngine
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
@@ -33,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** One row: what it does, what it costs, and whether it is on. */
@@ -61,6 +65,8 @@ data class ToolsUiState(
     /** Which engines search may use, in the order they are tried. */
     val engines: List<EngineSummary> = emptyList(),
     val proxy: String = "",
+    /** What the app has saved about the user, oldest first, for reading and pruning here. */
+    val memories: List<Remembered> = emptyList(),
 )
 
 /** One search engine, and whether the user has left it on. */
@@ -82,11 +88,29 @@ class ToolsViewModel @Inject constructor(
     private val switches: ToolSwitches,
     private val grant: WorkspaceGrant,
     private val search: SearchSettings,
+    private val memory: Memory,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val _uiState =
         MutableStateFlow(ToolsUiState(read(), workspace(), engines(), search.proxy))
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
+
+    init {
+        // Collected rather than snapshotted, because the other writer is the model: a fact
+        // saved mid-conversation should be on this screen when the user arrives to check.
+        viewModelScope.launch {
+            memory.facts.collect { facts -> _uiState.update { it.copy(memories = facts) } }
+        }
+    }
+
+    /** Rewrites one saved fact from the screen; the same gates the model's edit passes. */
+    fun updateMemory(old: String, new: String) {
+        memory.replace(old, new)
+    }
+
+    fun deleteMemory(text: String) = memory.forget(text)
+
+    fun clearMemories() = memory.forgetAll()
 
     fun setEngineEnabled(engine: SearchEngine, enabled: Boolean) {
         search.setEnabled(engine, enabled)
@@ -148,6 +172,10 @@ class ToolsViewModel @Inject constructor(
         // not because anybody grants them. A switch beside "Advance" did what it said and
         // quietly broke plan mode.
         .filter { it.isUserFacing }
+        // One row per switch, not per verb: updating and forgetting a memory ride the
+        // save switch, and three rows saying almost the same sentence would bury the
+        // rows that decide something. See Tool.switchName.
+        .filter { it.definition.name == it.switchName }
         .map { tool ->
             ToolSummary(
                 id = tool.definition.name,

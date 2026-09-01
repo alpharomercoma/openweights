@@ -23,14 +23,19 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
 import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
+import io.github.alpharomercoma.openweights.core.tools.ForgetMemoryTool
+import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
+import io.github.alpharomercoma.openweights.core.tools.ReadMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
+import io.github.alpharomercoma.openweights.core.tools.SaveMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
 import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
+import io.github.alpharomercoma.openweights.core.tools.UpdateMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
 import io.github.alpharomercoma.openweights.core.tools.Workspace
 import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
@@ -74,6 +79,10 @@ class ToolCatalogueTest {
             ReadFileTool(workspace),
             WriteFileTool(workspace, SessionArtifacts(), CanvasBoard()),
             RunScriptTool(Sandbox(context), workspace),
+            SaveMemoryTool(Memory(context)),
+            ReadMemoryTool(Memory(context)),
+            UpdateMemoryTool(Memory(context)),
+            ForgetMemoryTool(Memory(context)),
         )
     }
 
@@ -151,8 +160,10 @@ class ToolCatalogueTest {
         // spent before the user has said anything, and the number that grows quietly as tools
         // are added, so it is asserted rather than trusted.
         val everything = ToolPrompting.describe(definitions).length / CHARS_PER_TOKEN
+        // "Every install" means on by default as well as able to run: the memory tools are
+        // available the moment their switch is on, but no install ships with it on.
         val shipped = ToolPrompting
-            .describe(tools.filter { it.isAvailable }.map { it.definition })
+            .describe(tools.filter { it.isAvailable && it.defaultsOn }.map { it.definition })
             .length / CHARS_PER_TOKEN
 
         assertThat(shipped).isGreaterThan(0)
@@ -237,7 +248,15 @@ class ToolCatalogueTest {
          * feature the app is for — building things on the phone — and the choice-accuracy
          * cost is bounded by the same isAvailable gate: none of it is described until a
          * folder has been shared.
+         *
+         * 1024 became 1312 when the four memory tools joined this measurement — two of
+         * them new, update and forget, which completed the writing family. Most of the
+         * jump is the two that already shipped and had simply never been counted here.
+         * The configuration this measures is now triple opt-in: a shared folder, the
+         * memory writing switch, and the reading switch, all off until the user says
+         * otherwise, so no install pays it by accident — and the shipped number above is
+         * untouched.
          */
-        const val FULL_CEILING = 1024
+        const val FULL_CEILING = 1312
     }
 }

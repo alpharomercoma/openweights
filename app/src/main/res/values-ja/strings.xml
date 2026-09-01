@@ -251,8 +251,16 @@
     <string name="prefill_processor">プロンプトの読み込み</string>
     <string name="decode_processor">回答の生成</string>
     <string name="processor_fixed_at_export">エクスポート時に固定</string>
-    <string name="tool_save_memory_name">メモリーを保存</string>
-    <string name="tool_save_memory_detail">あなたに関する短い事実を今後のチャットのために保存できます。必ず事前に確認します。</string>
+    <string name="tool_save_memory_name">メモリーの保存と編集</string>
+    <string name="tool_save_memory_detail">あなたに関する短い事実を今後のチャットのために保存・修正・削除できます。必ず事前に確認します。</string>
+    <string name="memory_title">メモリー</string>
+    <string name="memory_status_none">まだ何も保存されていません。</string>
+    <string name="memory_status">%1$d件保存済み。メモリーが有効なチャットはこれらを読めます。</string>
+    <string name="memory_edit_title">メモリーを編集</string>
+    <string name="memory_length">%1$d／%2$d文字</string>
+    <string name="memory_forget_all">すべて忘れる</string>
+    <string name="memory_edit">%1$sを編集</string>
+    <string name="memory_delete">%1$sを削除</string>
     <string name="tool_read_memory_name">メモリーを読む</string>
     <string name="tool_read_memory_detail">保存されたあなたに関する事実をモデルが参照できます。</string>
 </resources>

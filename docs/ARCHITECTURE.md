@@ -10,7 +10,7 @@ surface, and no knowledge of the UI above it.
  ├── :core:hub Hugging Face client, GGUF parser, resumable downloader
  ├── :core:data Room, DataStore, token vault, usage ledger
  ├── :core:device device profiling, model fit estimation, thermal policy
- ├── :core:tools the agent loop, sixteen tools, the boards they report to
+ ├── :core:tools the agent loop, eighteen tools, the boards they report to
  ├── :core:sandbox QuickJS in an isolated process, for the script tool
  └── :core:common multiplatform domain models and compiled-model templates
 :baselineprofile records the startup profile the release APK carries
@@ -105,7 +105,7 @@ deliberately not built, against measurement (`docs/research/gpu-backends.md`).
 ## The agent
 
 `:core:tools` owns everything between "the model asked for a tool" and "the result went
-back in": sixteen tools, fourteen of them user-facing, three of which leave the device
+back in": eighteen tools, sixteen of them user-facing, three of which leave the device
 (`web_search`, `show_pictures`, `fetch_url`) and say so in the UI. `AgentRunner` decides
 one round — what was requested, what may run, what was skipped and why — and the turn
 loop in `:app` (`TurnRunner`) owns cancellation and the pass-to-pass conversation. Files
@@ -113,6 +113,13 @@ live behind a user-granted folder (`Workspace`), scripts run in a QuickJS interp
 an `isolatedProcess` service with no filesystem, no sockets and no libc to reach
 (`:core:sandbox`), and pages the assistant builds are served to a WebView by a
 loopback-only server that resolves every path through the workspace so `../` is inert.
+
+Memory is four verbs behind two switches: reading back is one decision, and the three
+writing verbs — save, update, forget — share the other, because "may the model write to
+what the app keeps about you" is one question however many tools answer it. Every writing
+verb shows its exact arguments and asks first in every mode, since its effect outlives the
+conversation, and the saved facts themselves are listed, editable and deletable on the
+Tools screen.
 
 The boards are how the model and the user share state without sharing a prompt: a plan
 the user ticks (`PlanBoard`), a goal that survives process death (`GoalBoard`), a canvas

@@ -39,7 +39,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -62,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -74,6 +78,8 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.readable
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.Memory
+import io.github.alpharomercoma.openweights.core.tools.Remembered
 import io.github.alpharomercoma.openweights.core.tools.SearchEngine
 
 /**
@@ -101,6 +107,9 @@ fun ToolsScreen(
     onForgetFolder: () -> Unit,
     onEngineEnabled: (SearchEngine, Boolean) -> Unit = { _, _ -> },
     onProxy: (String) -> Unit = {},
+    onMemoryEdit: (String, String) -> Unit = { _, _ -> },
+    onMemoryDelete: (String) -> Unit = {},
+    onMemoryClear: () -> Unit = {},
     /**
      * Pops back to the conversation, when this screen was pushed from it.
      *
@@ -183,6 +192,19 @@ fun ToolsScreen(
                 )
             }
 
+            // What the memory switches below actually govern: the facts themselves,
+            // readable and prunable here because a memory the user cannot inspect is not
+            // their memory. Shown even when the switches are off — turning memory off
+            // stops new writes and reads, it does not make what is already saved vanish.
+            item {
+                MemoryCard(
+                    memories = state.memories,
+                    onEdit = onMemoryEdit,
+                    onDelete = onMemoryDelete,
+                    onClear = onMemoryClear,
+                )
+            }
+
             if (onDevice.isNotEmpty()) {
                 item { GroupHeading(stringResource(R.string.on_this_device)) }
                 item { ToolGroup(tools = onDevice, onToggle = onToggle) }
@@ -209,6 +231,9 @@ fun ToolsScreen(
 
 /** Enough to read as waiting rather than as broken. */
 private const val DIMMED = 0.55f
+
+/** The edit dialog's field, for the on-device test that types into it. */
+internal const val MEMORY_EDIT_FIELD = "memory_edit_field"
 
 /** The label over a group. Quiet, because the rows under it are the content. */
 @Composable
@@ -429,6 +454,138 @@ private fun ToolsScreenPreview() {
             onForgetFolder = {},
         )
     }
+}
+
+/**
+ * The facts the app has saved about its user, each one editable and deletable in place.
+ *
+ * Collapsed to a count until opened, like the search card above it: most visits to this
+ * screen are about switches, and a list of personal facts should not be the first thing on
+ * screen when someone opens Tools with a colleague watching. Editing goes through the same
+ * [io.github.alpharomercoma.openweights.core.tools.Memory] gates the model's own edits
+ * pass, so a fact edited here still fits the length budget every future prompt pays.
+ */
+@Composable
+private fun MemoryCard(
+    memories: List<Remembered>,
+    onEdit: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.md))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable { open = !open }
+            .padding(14.dp),
+    ) {
+        Text(stringResource(R.string.memory_title), style = MaterialTheme.typography.titleSmall)
+        Text(
+            text = if (memories.isEmpty()) {
+                stringResource(R.string.memory_status_none)
+            } else {
+                stringResource(R.string.memory_status, memories.size)
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (!open) return@Column
+
+        memories.forEach { fact ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = fact.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { editing = fact.text }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = stringResource(R.string.memory_edit, fact.text),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                IconButton(onClick = { onDelete(fact.text) }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.memory_delete, fact.text),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+
+        if (memories.isNotEmpty()) {
+            TextButton(
+                onClick = onClear,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+            ) { Text(stringResource(R.string.memory_forget_all)) }
+        }
+    }
+
+    editing?.let { old ->
+        MemoryEditDialog(
+            original = old,
+            onSave = { new ->
+                onEdit(old, new)
+                editing = null
+            },
+            onDismiss = { editing = null },
+        )
+    }
+}
+
+@Composable
+internal fun MemoryEditDialog(original: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var typed by rememberSaveable(original) { mutableStateOf(original) }
+    // The same normalisation Memory.replace applies, so the button and the store agree:
+    // a Save that closes the dialog and saves nothing is a rejection nobody was shown.
+    val normalised = typed.trim().replace(Regex("\\s+"), " ")
+    val tooLong = normalised.length > Memory.MAX_CHARS
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.memory_edit_title)) },
+        text = {
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                modifier = Modifier.fillMaxWidth().testTag(MEMORY_EDIT_FIELD),
+                shape = RoundedCornerShape(Radius.sm),
+                isError = tooLong,
+                supportingText = {
+                    Text(
+                        stringResource(
+                            R.string.memory_length,
+                            normalised.length,
+                            Memory.MAX_CHARS,
+                        ),
+                    )
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(typed) },
+                enabled = normalised.isNotEmpty() && !tooLong,
+            ) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 /**

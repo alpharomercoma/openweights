@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.Remembered
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -118,6 +119,47 @@ class ToolsScreenTest {
         assert(forgotten) { "Remove must reach the view model" }
     }
 
+    @Test
+    fun `the memory card opens to the saved facts and delete reaches the view model`() {
+        var deleted: String? = null
+        showTools(
+            memories = listOf(Remembered("Prefers Kotlin", savedAt = 1)),
+            onMemoryDelete = { deleted = it },
+        )
+
+        // Collapsed to a count until opened: a list of personal facts should not be the
+        // first thing on screen when Tools is opened with someone watching.
+        assertCount(0, "Prefers Kotlin")
+        compose.onNodeWithText("Memories").performClick()
+        compose.onNodeWithText("Prefers Kotlin").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("Delete Prefers Kotlin").performClick()
+        assert(deleted == "Prefers Kotlin") { "delete must reach the view model, got $deleted" }
+    }
+
+    @Test
+    fun `each saved fact offers an edit affordance`() {
+        showTools(memories = listOf(Remembered("Prefers Kotlin", savedAt = 1)))
+
+        compose.onNodeWithText("Memories").performClick()
+
+        // This deliberately stops before the tap. A Material3 OutlinedTextField inside an
+        // AlertDialog cannot run under Robolectric — composing one loops in layout until
+        // the heap goes, the same environment limit ConversationRenameOnDeviceTest
+        // documents — so opening the dialog here would hang the suite. The dialog itself,
+        // typed into, is proved on a device in MemoryEditOnDeviceTest.
+        compose.onNodeWithContentDescription("Edit Prefers Kotlin").assertIsDisplayed()
+    }
+
+    @Test
+    fun `with nothing saved the card says so and offers no forget all`() {
+        showTools()
+
+        compose.onNodeWithText("Nothing is saved about you yet.").assertIsDisplayed()
+        compose.onNodeWithText("Memories").performClick()
+        assertCount(0, "Forget all")
+    }
+
     private fun assertCount(expected: Int, text: String) {
         val found = compose.onAllNodesWithText(text).fetchSemanticsNodes().size
         assert(found == expected) { "expected $expected rows saying \"$text\", found $found" }
@@ -128,8 +170,11 @@ class ToolsScreenTest {
 
     private fun showTools(
         workspace: WorkspaceSummary = WorkspaceSummary(null, GrantState.NONE),
+        memories: List<Remembered> = emptyList(),
         onToggle: (String, Boolean) -> Unit = { _, _ -> },
         onForgetFolder: () -> Unit = {},
+        onMemoryEdit: (String, String) -> Unit = { _, _ -> },
+        onMemoryDelete: (String) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -162,10 +207,13 @@ class ToolsScreenTest {
                             ),
                         ),
                         workspace = workspace,
+                        memories = memories,
                     ),
                     onToggle = onToggle,
                     onChooseFolder = {},
                     onForgetFolder = onForgetFolder,
+                    onMemoryEdit = onMemoryEdit,
+                    onMemoryDelete = onMemoryDelete,
                 )
             }
         }

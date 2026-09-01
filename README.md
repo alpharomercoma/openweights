@@ -116,7 +116,7 @@ Multi-module Gradle project; each module has one job.
 | `:core:hub` | Hugging Face client, GGUF header parser, resumable downloader |
 | `:core:data` | Room database, settings, encrypted token vault, usage ledger |
 | `:core:device` | Device profiling, model fit estimation, thermal policy |
-| `:core:tools` | The agent loop and the sixteen tools it may call |
+| `:core:tools` | The agent loop and the eighteen tools it may call |
 | `:core:sandbox` | QuickJS in an isolated process, for the script tool |
 | `:baselineprofile` | Records the startup profile the release APK carries |
 

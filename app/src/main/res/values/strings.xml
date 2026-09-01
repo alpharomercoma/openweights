@@ -301,8 +301,16 @@
     <string name="decode_processor">Writing the answer</string>
 
     <string name="processor_fixed_at_export">Fixed at export</string>
-    <string name="tool_save_memory_name">Save memories</string>
-    <string name="tool_save_memory_detail">Lets the model keep one short fact about you for future chats. Always asks first.</string>
+    <string name="tool_save_memory_name">Save and edit memories</string>
+    <string name="tool_save_memory_detail">Lets the model keep, correct or delete a short fact about you for future chats. Always asks first.</string>
+    <string name="memory_title">Memories</string>
+    <string name="memory_status_none">Nothing is saved about you yet.</string>
+    <string name="memory_status">%1$d saved. Every chat with memory on can read them.</string>
+    <string name="memory_edit_title">Edit memory</string>
+    <string name="memory_length">%1$d of %2$d characters</string>
+    <string name="memory_forget_all">Forget all</string>
+    <string name="memory_edit">Edit %1$s</string>
+    <string name="memory_delete">Delete %1$s</string>
     <string name="tool_read_memory_name">Read memories</string>
     <string name="tool_read_memory_detail">Lets the model look up the facts it has kept about you.</string>
 </resources>

@@ -268,8 +268,16 @@
     <string name="prefill_processor">Leer la petición</string>
     <string name="decode_processor">Escribir la respuesta</string>
     <string name="processor_fixed_at_export">Fijado al exportar</string>
-    <string name="tool_save_memory_name">Guardar recuerdos</string>
-    <string name="tool_save_memory_detail">Permite al modelo guardar un dato breve sobre ti para futuros chats. Siempre pregunta antes.</string>
+    <string name="tool_save_memory_name">Guardar y editar recuerdos</string>
+    <string name="tool_save_memory_detail">Permite al modelo guardar, corregir o borrar un dato breve sobre ti para futuros chats. Siempre pregunta antes.</string>
+    <string name="memory_title">Recuerdos</string>
+    <string name="memory_status_none">Aún no hay nada guardado sobre ti.</string>
+    <string name="memory_status">%1$d guardados. Cualquier chat con la memoria activada puede leerlos.</string>
+    <string name="memory_edit_title">Editar recuerdo</string>
+    <string name="memory_length">%1$d de %2$d caracteres</string>
+    <string name="memory_forget_all">Olvidar todo</string>
+    <string name="memory_edit">Editar %1$s</string>
+    <string name="memory_delete">Borrar %1$s</string>
     <string name="tool_read_memory_name">Leer recuerdos</string>
     <string name="tool_read_memory_detail">Permite al modelo consultar los datos que ha guardado sobre ti.</string>
 </resources>

@@ -257,8 +257,16 @@
     <string name="prefill_processor">قراءة الطلب</string>
     <string name="decode_processor">كتابة الإجابة</string>
     <string name="processor_fixed_at_export">مُحدَّد عند التصدير</string>
-    <string name="tool_save_memory_name">حفظ الذكريات</string>
-    <string name="tool_save_memory_detail">يتيح للنموذج حفظ معلومة قصيرة عنك للمحادثات القادمة. يطلب الإذن دائمًا أولًا.</string>
+    <string name="tool_save_memory_name">حفظ الذكريات وتعديلها</string>
+    <string name="tool_save_memory_detail">يتيح للنموذج حفظ معلومة قصيرة عنك أو تصحيحها أو حذفها للمحادثات القادمة. يطلب الإذن دائمًا أولًا.</string>
+    <string name="memory_title">الذكريات</string>
+    <string name="memory_status_none">لا يوجد شيء محفوظ عنك بعد.</string>
+    <string name="memory_status">%1$d محفوظة. يمكن لأي محادثة مفعّل فيها التذكر قراءتها.</string>
+    <string name="memory_edit_title">تعديل الذكرى</string>
+    <string name="memory_length">%1$d من %2$d حرفًا</string>
+    <string name="memory_forget_all">نسيان الكل</string>
+    <string name="memory_edit">تعديل %1$s</string>
+    <string name="memory_delete">حذف %1$s</string>
     <string name="tool_read_memory_name">قراءة الذكريات</string>
     <string name="tool_read_memory_detail">يتيح للنموذج الاطلاع على المعلومات التي حفظها عنك.</string>
 </resources>

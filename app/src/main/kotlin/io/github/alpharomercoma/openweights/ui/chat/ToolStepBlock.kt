@@ -231,6 +231,9 @@ private val VERBS = mapOf(
     "read_file" to "Read",
     "write_file" to "Saved",
     "run_script" to "Worked out",
+    "save_memory" to "Remembered",
+    "update_memory" to "Updated a saved memory:",
+    "forget_memory" to "Forgot the memory",
 )
 
 /** What it returned, shown only when asked for. */

@@ -22,6 +22,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +51,15 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
      */
     val changes: StateFlow<Int> = revisions.asStateFlow()
 
+    /**
+     * By name, for the settings screen writing back what its rows show. Every gate that
+     * decides what the model is offered asks the [Tool] overload instead: only the tool
+     * knows its default and which switch governs it, and a name-keyed lookup answering
+     * "true" for a tool that ships off — or for a verb that rides a sibling's switch —
+     * is how a default-off family would quietly come on. Two such lookups used to sit
+     * here for exactly that reason, called by nobody; an external review flagged the trap
+     * and they are gone.
+     */
     fun isEnabled(name: String): Boolean = store.getBoolean(name, true)
 
     /**
@@ -75,12 +85,6 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
 
     fun setEnabled(name: String, enabled: Boolean) {
         store.edit { putBoolean(name, enabled) }
-        revisions.value += 1
+        revisions.update { it + 1 }
     }
-
-    /** The names that are on, for filtering the registry before a turn. */
-    fun enabled(all: List<String>): Set<String> = all.filter(::isEnabled).toSet()
-
-    /** The same, asked of tools, so each one's own default is used. */
-    fun enabledAmong(all: List<Tool>): Set<Tool> = all.filter(::isEnabled).toSet()
 }

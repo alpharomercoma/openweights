@@ -24,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -107,7 +108,7 @@ class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val c
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         runCatching { context.contentResolver.takePersistableUriPermission(tree, flags) }
         store.edit { putString(KEY_TREE, tree.toString()) }
-        revisions.value += 1
+        revisions.update { it + 1 }
     }
 
     /** Hands the folder back, both the record of it and the permission itself. */
@@ -117,7 +118,7 @@ class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val c
             runCatching { context.contentResolver.releasePersistableUriPermission(it, flags) }
         }
         store.edit { remove(KEY_TREE) }
-        revisions.value += 1
+        revisions.update { it + 1 }
     }
 
     private fun stored(): Uri? = store.getString(KEY_TREE, null)?.let(Uri::parse)

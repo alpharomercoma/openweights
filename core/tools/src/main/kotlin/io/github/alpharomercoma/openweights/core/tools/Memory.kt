@@ -62,6 +62,17 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
     private val store = context.getSharedPreferences("memory", Context.MODE_PRIVATE)
     private val known = MutableStateFlow(read())
 
+    /**
+     * Every write is a read-modify-write over [known], and there are two writers now: the
+     * agent's coroutine running a memory tool, and the main thread behind the Tools
+     * screen's edit and delete. Unserialized, a delete landing between [replace]'s match
+     * and its final assignment is clobbered by the stale snapshot — the deleted fact
+     * comes back, and the caller was told "Updated." as it happened. Everything here is
+     * quick and nothing suspends, so a plain monitor is the whole fix; readers stay
+     * lock-free on the [StateFlow].
+     */
+    private val writes = Any()
+
     val facts: StateFlow<List<Remembered>> = known.asStateFlow()
 
     /**
@@ -81,16 +92,18 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
                 "Too long to remember. Keep it under $MAX_CHARS characters, one fact.",
             )
         }
-        if (known.value.any { it.text.equals(fact, ignoreCase = true) }) {
-            // The fact is in memory, which is what was asked for. Nothing failed here.
-            return ToolExecution("Already remembered.")
-        }
+        synchronized(writes) {
+            if (known.value.any { it.text.equals(fact, ignoreCase = true) }) {
+                // The fact is in memory, which is what was asked for. Nothing failed here.
+                return ToolExecution("Already remembered.")
+            }
 
-        // Oldest first, so the cap costs the least recent thing rather than refusing the
-        // most recent one. A memory that stops accepting is a memory nobody trusts.
-        val kept = (known.value + Remembered(fact, now)).takeLast(MAX_FACTS).withinBudget()
-        known.value = kept
-        write(kept)
+            // Oldest first, so the cap costs the least recent thing rather than refusing
+            // the most recent one. A memory that stops accepting is a memory nobody trusts.
+            val kept = (known.value + Remembered(fact, now)).takeLast(MAX_FACTS).withinBudget()
+            known.value = kept
+            write(kept)
+        }
         return ToolExecution("Remembered.")
     }
 
@@ -123,9 +136,11 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
     }
 
     fun forget(text: String) {
-        val kept = known.value.filterNot { it.text.equals(text, ignoreCase = true) }
-        known.value = kept
-        write(kept)
+        synchronized(writes) {
+            val kept = known.value.filterNot { it.text.equals(text, ignoreCase = true) }
+            known.value = kept
+            write(kept)
+        }
     }
 
     /**
@@ -144,22 +159,28 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
     fun replace(old: String, new: String): ToolExecution {
         val fact = new.trim().replace(WHITESPACE, " ")
         unfit(fact)?.let { return it }
-        val found = matching(old)
-            ?: return ToolExecution.rejected(NO_MATCH)
-        if (known.value.any { it !== found && it.text.equals(fact, ignoreCase = true) }) {
-            // The replacement already stands as its own fact, so the corrected one is
-            // redundant rather than rewritten.
-            forget(found.text)
-            return ToolExecution("That is already remembered; the old version is forgotten.")
+        synchronized(writes) {
+            val found = matching(old)
+                ?: return ToolExecution.rejected(NO_MATCH)
+            if (known.value.any { it !== found && it.text.equals(fact, ignoreCase = true) }) {
+                // The replacement already stands as its own fact, so the corrected one is
+                // redundant rather than rewritten. The monitor is reentrant, so calling
+                // through [forget] here stays a single atomic step.
+                forget(found.text)
+                return ToolExecution(
+                    "That is already remembered; the old version is forgotten.",
+                )
+            }
+            // The budget holds through edits too: a replacement longer than what it
+            // replaced pays the way a new fact pays, from the oldest — never from the
+            // edited fact.
+            val replaced = Remembered(fact, found.savedAt)
+            val kept = known.value
+                .map { if (it === found) replaced else it }
+                .withinBudget(protected = replaced)
+            known.value = kept
+            write(kept)
         }
-        // The budget holds through edits too: a replacement longer than what it replaced
-        // pays the way a new fact pays, from the oldest — never from the edited fact.
-        val replaced = Remembered(fact, found.savedAt)
-        val kept = known.value
-            .map { if (it === found) replaced else it }
-            .withinBudget(protected = replaced)
-        known.value = kept
-        write(kept)
         return ToolExecution("Updated.")
     }
 
@@ -176,9 +197,11 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
 
     /** Drops the one saved fact matching [text], or says why it could not. */
     fun forgetMatching(text: String): ToolExecution {
-        val found = matching(text)
-            ?: return ToolExecution.rejected(NO_MATCH)
-        forget(found.text)
+        synchronized(writes) {
+            val found = matching(text)
+                ?: return ToolExecution.rejected(NO_MATCH)
+            forget(found.text)
+        }
         return ToolExecution("Forgotten.")
     }
 
@@ -198,8 +221,10 @@ class Memory @Inject constructor(@param:ApplicationContext context: Context) {
     }
 
     fun forgetAll() {
-        known.value = emptyList()
-        write(emptyList())
+        synchronized(writes) {
+            known.value = emptyList()
+            write(emptyList())
+        }
     }
 
     /**

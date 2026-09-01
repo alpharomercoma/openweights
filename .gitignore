@@ -26,3 +26,4 @@ keystore.properties
 .playwright-mcp/
 build-mnn-host/
 build-mnn-host-cl/
+build-ios-sim/

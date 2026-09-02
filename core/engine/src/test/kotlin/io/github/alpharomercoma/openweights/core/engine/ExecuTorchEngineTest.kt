@@ -22,8 +22,11 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -302,6 +305,39 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `a warm waits for the turn that is running`() = runBlocking {
+        // One thing at a time on the runtime. The app overlaps a fold's summary turn with
+        // the warm queued behind the load; on this runtime two writers to the record and
+        // the runtime's position at once fed text into the cache twice.
+        bridge.reply = "one two three four five six seven eight nine ten"
+        engine.load(installed(MODEL), PARAMS)
+        val timeline = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val firstToken = java.util.concurrent.CountDownLatch(1)
+        bridge.beforeFragment = {
+            timeline += "token"
+            firstToken.countDown()
+            Thread.sleep(SLOW_FRAGMENT_MS)
+        }
+        bridge.onPrefill = { timeline += "prefill" }
+
+        val turn = async(Dispatchers.Default) {
+            engine.chat(listOf(user("Hi")), NO_THINKING).toList()
+        }
+        firstToken.await()
+        val warm = async(Dispatchers.Default) {
+            val head = ChatMessage.text(ChatRole.SYSTEM, "A".repeat(LONG_HEAD_CHARS))
+            engine.warm(listOf(head), emptyList(), NO_THINKING)
+        }
+        turn.await()
+        warm.await()
+
+        assertThat(timeline).isNotEmpty()
+        assertThat(timeline.contains("prefill")).isTrue()
+        // Every token before any prefill: the warm did not start until the turn was over.
+        assertThat(timeline.indexOf("prefill")).isEqualTo(timeline.lastIndexOf("token") + 1)
+    }
+
+    @Test
     fun `a reply cut for budget is reported as such, not as a finished turn`() = runTest {
         bridge.reply = "one two three four five six seven eight nine ten eleven twelve"
         engine.load(installed(MODEL), PARAMS)
@@ -502,6 +538,10 @@ class ExecuTorchEngineTest {
 
     private companion object {
         const val MODEL = "Qwen3-1.7B.pte"
+
+        /** Long enough per fragment for a warm to be waiting while the turn still runs. */
+        const val SLOW_FRAGMENT_MS = 20L
+        const val LONG_HEAD_CHARS = 4_000
         val PARAMS = ModelLoadParams(contextLength = 4096)
 
         /** One tool, so a turn that offers them renders a different system block. */

@@ -28,10 +28,13 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -96,11 +99,28 @@ class ExecuTorchEngine(
     @Volatile
     private var warmStopped = false
 
+    /**
+     * One thing at a time on the runtime, and on the record of what it holds.
+     *
+     * The llama.cpp engine has one native thread and everything queues behind it. This one
+     * had none: a turn, a warm and a reset could each run on whichever IO thread the
+     * caller was on, and the app does overlap them, a fold's summary turn against the warm
+     * queued behind the load. Two writers to [fedText] and the runtime's own position at
+     * once is text fed twice into the cache. So every entry that touches either takes this
+     * lock, held for the whole of a turn's stream; [cancel] does not, because its job is to
+     * end what holds it.
+     */
+    private val turns = Mutex()
+
     override val loadedModel: LoadedModelInfo? get() = info
 
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
+        turns.withLock { loadLocked(modelFile, params) }
+    }
+
+    private fun loadLocked(modelFile: File, params: ModelLoadParams) {
         val tokenizer = tokenizerFor(modelFile)
-            ?: throw LlamaException(
+            ?: refuse(
                 "${modelFile.name} has no tokenizer beside it. A .pte carries a compiled " +
                     "graph and nothing that says how to tokenize for it, so both files " +
                     "have to be installed together.",
@@ -109,12 +129,12 @@ class ExecuTorchEngine(
         // Refuse rather than guess. A wrong template does not fail: the model answers, a
         // little worse, and its tool calls stop parsing, which reads as a bad model.
         val rendering = PromptTemplates.forModel(modelFile.name)
-            ?: throw LlamaException(
+            ?: refuse(
                 "No prompt template for ${modelFile.name}. This build can render: " +
                     PromptTemplates.known.joinToString(", ") + ".",
             )
 
-        unload()
+        closeModel()
         contextSize = params.contextLength
         if (!bridge.load(
                 modelFile.absolutePath,
@@ -123,7 +143,7 @@ class ExecuTorchEngine(
                 contextSize,
             )
         ) {
-            throw LlamaException("ExecuTorch could not open ${modelFile.name}")
+            refuse("ExecuTorch could not open ${modelFile.name}")
         }
 
         // The window is fixed when the model is exported — the runtime reads its own
@@ -148,7 +168,13 @@ class ExecuTorchEngine(
         )
     }
 
-    override suspend fun unload() {
+    /** A load refused for a reason the caller can show. */
+    private fun refuse(message: String): Nothing = throw LlamaException(message)
+
+    override suspend fun unload() = turns.withLock { closeModel() }
+
+    /** Under [turns]: the callers that already hold it cannot take it twice. */
+    private fun closeModel() {
         bridge.close()
         fedText = ""
         heldTokens = 0
@@ -162,6 +188,15 @@ class ExecuTorchEngine(
         params: SamplerParams,
         tools: List<ToolDefinition>,
     ): Flow<GenerationEvent> = channelFlow {
+        turns.withLock { stream(messages, params, tools) }
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
+
+    /** One turn, from render to the completed event, with [turns] held throughout. */
+    private suspend fun ProducerScope<GenerationEvent>.stream(
+        messages: List<ChatMessage>,
+        params: SamplerParams,
+        tools: List<ToolDefinition>,
+    ) {
         val rendering = template ?: throw LlamaException("No model loaded")
         val prompt = rendering.render(messages, tools, params.thinking)
 
@@ -271,7 +306,7 @@ class ExecuTorchEngine(
                 toolCalls = parsed.calls,
             ),
         )
-    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
+    }
 
     override fun cancel() {
         warmStopped = true
@@ -348,6 +383,14 @@ class ExecuTorchEngine(
         params: SamplerParams,
         snapshot: Boolean,
         store: String?,
+    ): WarmResult? = turns.withLock {
+        warmLocked(messages, tools, params)
+    }
+
+    private suspend fun warmLocked(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        params: SamplerParams,
     ): WarmResult? = withContext(Dispatchers.IO) {
         val rendering = template ?: return@withContext null
         // The llama warm renders without the generation prompt so its text prefixes any
@@ -431,7 +474,7 @@ class ExecuTorchEngine(
         return window
     }
 
-    override suspend fun resetContext() {
+    override suspend fun resetContext() = turns.withLock {
         bridge.resetContext()
         fedText = ""
         heldTokens = 0

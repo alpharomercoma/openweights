@@ -54,7 +54,6 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.time.LocalDate
 
 /**
  * Whether a model reaches for a tool when it should, and only then.
@@ -337,18 +336,19 @@ class ToolChoiceBenchmark {
         arm: Arm,
         native: Boolean,
     ): Choice {
-        // The same split TurnRunner makes: a template that can carry the definitions gets
-        // them, and one that cannot gets them written into what it can carry.
         val tools = catalogue().let { if (arm.reversed) it.reversed() else it }
-        val described =
-            if (native) "" else "\n\n" + ToolPrompting.describe(tools, arm.format)
-        val messages = listOf(ChatMessage.text(ChatRole.SYSTEM, system() + described)) +
-            dateExchange() +
-            // The same fold TurnRunner does before it sends one, and for the same reason:
-            // a template that would not take the definitions raises on the tool role, and a
-            // prior written straight through would measure a defect the app no longer has.
-            case.prior.spelledOut(engine.loadedModel?.supportsToolResults == true) +
-            ChatMessage.text(ChatRole.USER, case.prompt)
+        // Assembled in the app's order: the head, the day where the app puts it — its own
+        // exchange ahead of the first question — the conversation, then what TurnRunner
+        // adds for this model. The same split it makes: a template that can carry the
+        // definitions gets them, and one that cannot gets them written into what it can
+        // carry, in the shape this arm asks for. And the same fold before anything is sent,
+        // for the same reason: a template that would not take the definitions raises on the
+        // tool role, and a prior written straight through would measure a defect the app no
+        // longer has.
+        val question = ChatMessage.text(ChatRole.USER, case.prompt)
+        val messages = (head() + PromptDay.exchange() + case.prior + question)
+            .describing(if (native) "" else ToolPrompting.describe(tools, arm.format))
+            .spelledOut(engine.loadedModel?.supportsToolResults == true)
         // Greedy and without a repeat penalty, because that is the sampler TurnRunner uses
         // while tools are on the table, and an arm sampled any other way is measuring
         // behaviour the app stopped having. `-e penalty 1.1` puts the old penalty back, so
@@ -454,16 +454,20 @@ class ToolChoiceBenchmark {
 
     private fun catalogue(): List<ToolDefinition> = registry().definitions
 
-    /** Assembled the way ChatViewModel assembles it, or it is not the app. The date is
-     * deliberately absent: it left the instructions so the warmed head stays byte-stable
-     * across midnight, and rides as [dateExchange] instead. */
-    private fun system(): String = "$ANSWER_STYLE\n\n${ModelPreferences.DEFAULT_TOOL_PROMPT}"
-
-    /** The acknowledged exchange ChatViewModel opens every conversation with. */
-    private fun dateExchange(): List<ChatMessage> = listOf(
-        ChatMessage.text(ChatRole.USER, "Today is ${LocalDate.now()}."),
-        ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
-    )
+    /**
+     * TurnRunner's `describing`, which it keeps private: the tools written into the system
+     * message, for a template that would drop them anywhere else. Its own takes the registry
+     * in the registry's order and the bare format; the arms here reverse the catalogue and
+     * ask for the tagged shape, so the text arrives already rendered.
+     */
+    private fun List<ChatMessage>.describing(described: String): List<ChatMessage> {
+        if (described.isEmpty()) return this
+        val index = indexOfFirst { it.role == ChatRole.SYSTEM }
+        if (index < 0) return listOf(ChatMessage.text(ChatRole.SYSTEM, described)) + this
+        return toMutableList().apply {
+            set(index, ChatMessage.text(ChatRole.SYSTEM, "${this[index].text}\n\n$described"))
+        }
+    }
 
     /**
      * Internal rather than private so [RawReplyProbe] can run the same models through the same
@@ -493,9 +497,19 @@ class ToolChoiceBenchmark {
 
         val SHIPPED: SamplerParams = ModelPreferences().toSamplerParams()
 
-        /** Copied from ChatViewModel, which keeps it private, and the first thing sent. */
-        const val ANSWER_STYLE =
-            "Answer from what you know, in a few sentences. Reply with the answer itself."
+        /**
+         * The head the app sends, built by the app.
+         *
+         * [prefixMessages] with the shipped preferences and tools switched on, which is the
+         * prefix every turn renders and every warm reads in. This file used to render a copy,
+         * and the copy measured a prompt the app had stopped sending: it lacked the Markdown
+         * line and the Auto-mode sentence, and opened with an answer-length wording the app
+         * no longer uses. The day is not in the head, on purpose — it rides ahead of the first
+         * question as [PromptDay.exchange], so the warmed bytes survive midnight — and a
+         * measurement that put it anywhere else was measuring a different cache.
+         */
+        fun head(): List<ChatMessage> =
+            ChatUiState(preferences = ModelPreferences(), toolsAvailable = true).prefixMessages()
 
         /**
          * Two arms, where there were four.

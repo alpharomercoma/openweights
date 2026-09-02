@@ -22,7 +22,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
-import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
@@ -46,7 +45,6 @@ import okhttp3.OkHttpClient
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.LocalDate
 
 /**
  * What each model actually wrote, as opposed to what anything here could read.
@@ -84,10 +82,9 @@ class RawReplyProbe {
                 Log.i(TAG, "PROBE model=$name native=$native")
                 for (prompt in PROMPTS) {
                     engine.resetContext()
-                    val messages = listOf(
-                        ChatMessage.text(ChatRole.SYSTEM, system()),
-                        ChatMessage.text(ChatRole.USER, prompt),
-                    )
+                    // The benchmark's head and its day, or the two are not measuring one thing.
+                    val messages = ToolChoiceBenchmark.head() + PromptDay.exchange() +
+                        ChatMessage.text(ChatRole.USER, prompt)
                     val completed = engine.chat(
                         messages,
                         ToolChoiceBenchmark.SHIPPED.copy(
@@ -131,10 +128,6 @@ class RawReplyProbe {
     }
 
     private fun catalogue() = registry().definitions
-
-    private fun system(): String =
-        "Today is ${LocalDate.now()}.\n\n${ToolChoiceBenchmark.ANSWER_STYLE}\n\n" +
-            ModelPreferences.DEFAULT_TOOL_PROMPT
 
     private companion object {
         const val TAG = "OpenWeightsRaw"

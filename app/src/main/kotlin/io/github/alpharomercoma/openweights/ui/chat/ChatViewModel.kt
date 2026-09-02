@@ -3215,6 +3215,28 @@ internal object PromptDay {
     fun pin(date: LocalDate) {
         pinned = date
     }
+
+    /**
+     * The day as the conversation carries it: the plain fact, plainly acknowledged.
+     *
+     * The 33-case routing matrix (eval/routing_matrix.py, temp 0, both LFM quants) retired
+     * two cleverer wordings: "(For context: … Only mention it if asked.)" broke the date
+     * question itself — 0/1 everywhere, read_memory called for "what is today's date" —
+     * and "(For context: …)" with this ack did the same. This pair answers the date 1/1 on
+     * every model measured and drew the fewest chit-chat tool calls of any ack at the
+     * shipped temperature (1/30). Known cost, accepted: greetings echo the date back ~8/30
+     * at 0.8 — cosmetics, priced against wrong answers. The exchange also cannot be
+     * dropped: with no exchange at all, QAD's trivia fell 6/6→4/6 and Q4_0 lost the
+     * multi-turn rows — two turns of ordinary conversation are a worked example the
+     * routing visibly leans on.
+     *
+     * A function of its own so the on-device routing benchmark sends these bytes rather
+     * than a copy of them; where they go in the prompt is [withConversationDay]'s to say.
+     */
+    fun exchange(): List<ChatMessage> = listOf(
+        ChatMessage.text(ChatRole.USER, "Today is $pinned."),
+        ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
+    )
 }
 
 /** Warm-state files kept for models other than the loaded one. */
@@ -3684,29 +3706,13 @@ private fun recap(compaction: Compaction?): List<ChatMessage> {
  *
  * The pair sits directly after the head, so it is rebuilt from the root like everything
  * behind it and folds carry it naturally. The day itself stays pinned per conversation
- * ([PromptDay]) so an open chat's bytes never shift at midnight.
+ * ([PromptDay]) so an open chat's bytes never shift at midnight. The wording, and what it
+ * was measured against, is [PromptDay.exchange]'s.
  */
 private fun List<ChatMessage>.withConversationDay(): List<ChatMessage> {
     val at = indexOfFirst { it.role == ChatRole.USER }
     if (at < 0) return this
-    return subList(0, at) +
-        listOf(
-            // The plain fact, plainly acknowledged. The 33-case routing matrix
-            // (eval/routing_matrix.py, temp 0, both LFM quants) retired two cleverer
-            // wordings: "(For context: … Only mention it if asked.)" broke the date
-            // question itself — 0/1 everywhere, read_memory called for "what is
-            // today's date" — and "(For context: …)" with this ack did the same. This
-            // pair answers the date 1/1 on every model measured and drew the fewest
-            // chit-chat tool calls of any ack at the shipped temperature (1/30).
-            // Known cost, accepted: greetings echo the date back ~8/30 at 0.8 —
-            // cosmetics, priced against wrong answers. The exchange also cannot be
-            // dropped: with no exchange at all, QAD's trivia fell 6/6→4/6 and Q4_0
-            // lost the multi-turn rows — two turns of ordinary conversation are a
-            // worked example the routing visibly leans on.
-            ChatMessage.text(ChatRole.USER, "Today is ${PromptDay.pinned}."),
-            ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
-        ) +
-        subList(at, size)
+    return subList(0, at) + PromptDay.exchange() + subList(at, size)
 }
 
 /**

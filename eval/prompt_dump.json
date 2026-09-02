@@ -4,7 +4,7 @@
   "tools": [
     {
       "name": "web_search",
-      "description": "Search the web, only for what you cannot already know: what changed, what is recent, or the present state of a named person, product or organisation. Returns text to read; to show pictures or clips instead, use show_pictures. Not for settled knowledge — definitions, translations, history, arithmetic — and never to double check what you already know. Answer those yourself.",
+      "description": "Search the web for what you cannot already know: what changed, what is recent, or the present state of a named person, product or organisation. Returns text; for pictures or clips use show_pictures. Not for settled knowledge (definitions, translations, history, arithmetic) and never to double check what you know: answer those yourself.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -20,7 +20,7 @@
     },
     {
       "name": "show_pictures",
-      "description": "Show the user pictures or short video clips found on the web. Returns thumbnails to display, not text to read. It answers no questions and returns no facts; for information of any kind, use web_search.",
+      "description": "Show pictures or short clips found on the web, as thumbnails to display rather than text to read. It answers no questions; for information of any kind use web_search.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -64,7 +64,7 @@
     },
     {
       "name": "find_files",
-      "description": "Find files in the folder the user shared. Match names with a pattern like *.md, and optionally give text to look for inside them. Not for reading a file whose path you have. If nothing was named to look for, ask rather than guess.",
+      "description": "Find files in the shared folder by a name pattern like *.md, optionally containing given text. Not for reading a file whose path you have. If nothing was named to look for, ask rather than guess.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -145,7 +145,7 @@
     },
     {
       "name": "show_website",
-      "description": "Show an HTML page you saved to the user, rendered live. Point it at the page's path, like site\/index.html. Its folder is served whole, so relative links to CSS, scripts and images in that folder work. Call it once after the first save; later saves update the page on screen by themselves.",
+      "description": "Show an HTML page you saved, rendered live. Point it at the page's path, like site\/index.html. Its folder is served whole, so relative links to CSS, scripts and images in it work, and nothing loads from the network: keep every script, style, font and image in the folder or inline. Call it once after the first save; later saves update the page by themselves.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -161,7 +161,7 @@
     },
     {
       "name": "show_document",
-      "description": "Show a Markdown document you saved to the user, laid out as real A4 pages. Point it at the file, like notes\/report.md. Call it once after the first save; later saves with replace update the pages live.",
+      "description": "Show a Markdown file you saved as A4 pages, like notes\/report.md. Call it once after the first save; later saves with replace update the pages live.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -177,7 +177,7 @@
     },
     {
       "name": "show_slides",
-      "description": "Show a Markdown file as a 16:9 slide deck the user swipes through. Separate slides with a line containing only ---. Call it once after the first save; later saves with replace update the deck live.",
+      "description": "Show a Markdown file as a 16:9 slide deck, slides separated by a line containing only ---. Call it once after the first save; later saves with replace update the deck live.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -193,7 +193,7 @@
     },
     {
       "name": "run_script",
-      "description": "Write a JavaScript program, run it in a sandbox, and use what it returns. For real computation: arithmetic, dates, regex, JSON, or going through a file too large to read whole. Give source, or path to a saved .js file. Modern JavaScript with await; no network; the only modules are require('fs') and require('path'), for files you named in files. The last expression is the answer.",
+      "description": "Run a JavaScript program in a sandbox and use what it returns. For real computation: arithmetic, dates, regex, JSON, or a file too large to read whole. Give source, or path to a saved .js file. Modern JavaScript with await; no network; require('fs') and require('path') only, for files you named in files. The last expression is the answer.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -217,7 +217,7 @@
     },
     {
       "name": "watch",
-      "description": "Check something again on a schedule, for a while. Use it when they ask to be told about a change, or to look again every so often. Not for anything you can answer now. It stops itself after 60 checks or 72 hours.",
+      "description": "Check something again on a schedule, for a while: when they ask to be told about a change, or to look again every so often. Not for anything you can answer now. Stops itself after 60 checks or 72 hours.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -246,7 +246,7 @@
     },
     {
       "name": "save_memory",
-      "description": "Save one short fact about the user for future conversations: a preference, a name, how they like answers written. Only for what stays true after this conversation ends, never for what was just said.",
+      "description": "Save one short fact about the user for future conversations: a preference, a name, how they like answers written. Only what stays true after this conversation, never what was just said.",
       "parameters": {
         "type": "object",
         "properties": {

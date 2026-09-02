@@ -9,7 +9,7 @@ still gets answered without a search.
 Setup:
   1. Export the app's real bytes (system message, first user turn, the 16-tool
      catalogue) — run once after any prompt-affecting change:
-       PROMPT_DUMP=eval/prompt_dump.json ./gradlew :app:testStandardDebugUnitTest \
+       PROMPT_DUMP=$PWD/eval/prompt_dump.json ./gradlew :app:testStandardDebugUnitTest \
            --tests '*PromptDumpTest*'
   2. llama-server -m <model.gguf> --jinja -c 8192 --port 8089
   3. python3 eval/date_placement_eval.py eval/prompt_dump.json

@@ -54,7 +54,6 @@ class PromptDumpTest {
         val state = ChatUiState(
             transcript = listOf(TranscriptEntry(id = 0, role = ChatRole.USER, text = "hi")),
             mode = AgentMode.AUTO,
-            supportsTools = true,
             toolsAvailable = true,
         )
         val messages = state.engineMessages()

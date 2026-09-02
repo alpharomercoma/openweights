@@ -20,7 +20,7 @@ intent. Where a row says "measured", the command is in the row.
 | Upload signing | Config reads from `keystore.properties` or environment | Never from the repository |
 | Cleartext traffic | Disabled | `usesCleartextTraffic="false"` |
 | Backup and device transfer | Everything excluded | `data_extraction_rules.xml` |
-| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-03 on the version code 458 bundles |
+| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-03 on the version code 467 bundles |
 
 ### The release build was run, not just built
 
@@ -429,7 +429,7 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   rather than folded into "the tools ask before they run."
 - **The upload key lives only on one machine.** `keystore.properties` and `upload.jks`
   exist in the working checkout that cuts releases and nowhere else; a fresh clone builds
-  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-03 carry
+  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-03, at version code 467, carry
   that key (`keytool -printcert -jarfile` on either shows the same SHA-256 as the
   keystore), and enrolling it in Play App Signing is still the first Console step.
 - **Two bundles, one application id.** The `standard` flavour is llama.cpp alone; the

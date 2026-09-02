@@ -56,11 +56,13 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
      * than in the interface so that the model's tool and the user's command cannot disagree
      * about the limit, and so a tool call cannot talk its way past it.
      */
-    suspend fun add(task: String, everyMinutes: Int, now: Long): Watch? {
+    suspend fun add(task: String, everyMinutes: Int, now: Long): Watch? = database.withTransaction {
         // The rows rather than a count of them: there are at most four, and one statement
-        // that answers both "how many" and "which ones" is one fewer to keep in step.
+        // that answers both "how many" and "which ones" is one fewer to keep in step. Counted
+        // and inserted in one transaction, the way record() already is, so two adds that
+        // land together cannot both see three and make five.
         if (database.watches().inState(WatchState.ACTIVE.name).size >= Watch.MAX_ACTIVE) {
-            return null
+            return@withTransaction null
         }
         val watch = Watch(
             task = task.trim(),
@@ -69,7 +71,7 @@ class WatchRepository @Inject constructor(private val database: OpenWeightsDatab
             nextRunAt = now + everyMinutes * MILLIS_PER_MINUTE,
         )
         val id = database.watches().insert(watch.asEntity())
-        return watch.copy(id = id)
+        watch.copy(id = id)
     }
 
     /**

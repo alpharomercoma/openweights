@@ -547,11 +547,20 @@ class ModelPreferencesRepository @Inject constructor(
         }
     }
 
-    /** Puts this model back to the defaults, shared settings included. */
+    /**
+     * Puts this model back to the defaults, shared settings included.
+     *
+     * The shared record is written as defaults rather than removed. An absent shared record
+     * is what [observe] takes to mean an install from before the shared set existed, and
+     * answers every model from its own full copy; removing it here resurrected each other
+     * model's last-saved temperature and system prompt, and the next save then wrote those
+     * back as the shared values. A default record keeps the migration branch for the one
+     * case it was written for.
+     */
     suspend fun reset(modelName: String) {
         context.settingsDataStore.edit { store ->
             store.remove(key(modelName))
-            store.remove(sharedKey())
+            store[sharedKey()] = json.encodeToString(ModelPreferences().copy(version = CURRENT))
         }
     }
 
@@ -737,8 +746,12 @@ fun computeLayersFor(
         // which is why this cannot honour one half without the other on this backend.
         decode == ComputeTarget.GPU || prefill == ComputeTarget.GPU -> ALL_LAYERS
 
-        // Both pinned away from it: nothing resident, and op_offload off as well.
-        decode == ComputeTarget.CPU && prefill != ComputeTarget.AUTO -> 0
+        // Reading pinned to the CPU: nothing resident, and op_offload off as well, whether
+        // writing is pinned there too or left open. Residency serves both halves, so weights
+        // put on the GPU for an open decode would read there as well, against the pin. This
+        // is the mirror of the case below and was missing: prefill CPU with decode AUTO
+        // fell through to the heuristic and put every layer on the GPU for a long prompt.
+        prefill == ComputeTarget.CPU -> 0
 
         // Writing pinned to the CPU with reading left open: the measured heuristic decides,
         // which is what the single control did.

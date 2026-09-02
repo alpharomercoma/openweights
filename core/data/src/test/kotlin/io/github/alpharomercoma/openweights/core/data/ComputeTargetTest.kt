@@ -78,6 +78,21 @@ class ComputeTargetTest {
     }
 
     @Test
+    fun `reading pinned to the CPU keeps the weights local even with writing left open`() {
+        val layers = computeLayersFor(
+            prefill = ComputeTarget.CPU,
+            decode = ComputeTarget.AUTO,
+            hasGpu = true,
+            promptTokens = 100_000,
+            generatedTokens = 1,
+        )
+
+        // The mirror of the case below. This one fell through to the heuristic, which put
+        // every layer on the GPU for a long prompt and read there against the pin.
+        assertThat(layers).isEqualTo(0)
+    }
+
+    @Test
     fun `both halves pinned to the CPU keep the weights and the batches local`() {
         val layers = computeLayersFor(
             prefill = ComputeTarget.CPU,

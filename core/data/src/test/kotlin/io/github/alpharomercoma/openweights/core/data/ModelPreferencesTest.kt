@@ -16,6 +16,8 @@
 
 package io.github.alpharomercoma.openweights.core.data
 
+import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -43,9 +45,15 @@ class ModelPreferencesTest {
      * without this a test that saves anything defines the shared settings for every test
      * after it. That is correct behaviour and a poor test fixture: it made the migration
      * test read another test's temperature.
+     *
+     * The whole store rather than a reset: a reset now writes the shared record as defaults,
+     * and the migration test needs the record absent, which is the one state a reset no
+     * longer produces.
      */
     @After
-    fun clearShared() = runTest { repository.reset("nothing-in-particular.gguf") }
+    fun clearShared() = runTest {
+        ApplicationProvider.getApplicationContext<Context>().settingsDataStore.edit { it.clear() }
+    }
 
     @Test
     fun `the window the app used to default to is read as never having been chosen`() = runTest {
@@ -61,6 +69,22 @@ class ModelPreferencesTest {
         repository.save("pinned.gguf", ModelPreferences(contextLength = 8_192))
 
         assertThat(repository.current("pinned.gguf").contextLength).isEqualTo(8_192)
+    }
+
+    @Test
+    fun `resetting one model does not bring back another model's old settings`() = runTest {
+        repository.save("first.gguf", ModelPreferences(temperature = 0.2f))
+        repository.save("second.gguf", ModelPreferences(temperature = 0.9f))
+
+        repository.reset("second.gguf")
+
+        // The shared record is the defaults now, for every model. Removing it instead read
+        // as an install from before the shared set, and each model answered from its own
+        // last-saved copy: first.gguf came back at 0.2 after a reset that said defaults.
+        assertThat(repository.current("first.gguf").temperature)
+            .isEqualTo(ModelPreferences().temperature)
+        assertThat(repository.current("second.gguf").temperature)
+            .isEqualTo(ModelPreferences().temperature)
     }
 
     @Test

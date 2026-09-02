@@ -208,6 +208,10 @@ class ChatRepository @Inject constructor(
             headId = conversation.compactionHeadId.takeUnless { clearCompaction },
             at = clock.nowMillis(),
         )
+        // An edit is saying something in the chat, the same as a new message is, and the
+        // other two writes here already treat it so. Without this an edited archived chat
+        // stayed archived.
+        touch(conversationId)
     }
 
     suspend fun deleteConversation(id: Long) = database.conversations().delete(id)

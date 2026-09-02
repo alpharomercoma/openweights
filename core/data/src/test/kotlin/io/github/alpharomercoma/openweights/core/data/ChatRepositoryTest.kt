@@ -359,6 +359,20 @@ class ChatRepositoryTest {
     }
 
     @Test
+    fun `editing a turn in an archived chat takes it back out of the archive too`() = runTest {
+        val id = repository.startConversation("Trip packing", modelName = "lfm")
+        repository.addMessage(id, ChatRole.USER.wireName, "pack the tent")
+        filing.setArchived(id, archived = true)
+        val first = repository.messages(id).first().id
+
+        repository.replaceFrom(id, first, "pack the tarp", emptyList(), clearCompaction = true)
+
+        // An edit is saying something in the chat, the same as a new message is. This
+        // write went through without the touch the other two make.
+        assertThat(repository.conversation(id)!!.archivedAt).isNull()
+    }
+
+    @Test
     fun `saying something in an archived chat takes it back out of the archive`() = runTest {
         val id = repository.startConversation("Trip packing", modelName = "lfm")
         filing.setPinned(id, pinned = true)

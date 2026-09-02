@@ -200,6 +200,68 @@ class ExecuTorchOnDeviceTest {
     }
 
     /**
+     * Stop, pressed while the runtime is mid-reply.
+     *
+     * The runtime clears its own stop flag when its token loop starts and reports every
+     * end as "end of turn", so a stop used to be either lost or reported as a finished
+     * reply. Cancelled from the collector after a few tokens: the runtime must halt within
+     * a handful more, and the engine must say it was cancelled.
+     */
+    @Test
+    fun aStopMidReplyHaltsTheRuntimeAndSaysSo(): Unit = runBlocking {
+        engine.load(MODEL, PARAMS)
+        var seen = 0
+        var cancelledAtMs = 0L
+        val events = mutableListOf<GenerationEvent>()
+
+        engine.chat(
+            listOf(ChatMessage.text(ChatRole.USER, "Tell me a long story about a lighthouse.")),
+            SamplerParams(maxTokens = 512, thinking = false),
+        ).collect { event ->
+            events += event
+            if (event is GenerationEvent.Token && ++seen == TOKENS_BEFORE_STOP) {
+                cancelledAtMs = System.currentTimeMillis()
+                engine.cancel()
+            }
+        }
+
+        val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+        val tokens = events.count { it is GenerationEvent.Token }
+        Log.i(TAG, "stopped after $tokens tokens, reason=${done.reason}")
+        assertThat(cancelledAtMs).isNotEqualTo(0L)
+        assertThat(done.reason).isEqualTo(StopReason.CANCELLED)
+        assertThat(tokens).isLessThan(TOKENS_BEFORE_STOP + STOP_SLACK)
+        assertThat(System.currentTimeMillis() - cancelledAtMs).isLessThan(STOP_WITHIN_MS)
+    }
+
+    /**
+     * A reply cut for budget says so, because a tool call inside it must not run.
+     *
+     * Reasoning is left on so the budget is certain to be hit: a `<think>` block is never
+     * eight tokens long. Measured with reasoning off, the model once answered this prompt
+     * in two tokens and ended the turn itself, which is a different case.
+     */
+    @Test
+    fun aReplyCutForBudgetIsReportedAsSuch(): Unit = runBlocking {
+        engine.load(MODEL, PARAMS)
+
+        val events = engine.chat(
+            listOf(ChatMessage.text(ChatRole.USER, "Count slowly from one to one hundred.")),
+            SamplerParams(maxTokens = BUDGET),
+        ).toList()
+
+        val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+        val streamed = events.filterIsInstance<GenerationEvent.Token>()
+        Log.i(
+            TAG,
+            "budget $BUDGET: ${streamed.size} tokens, reason=${done.reason}, " +
+                "text=${streamed.joinToString("") { it.text }.replace('\n', ' ')}",
+        )
+        assertThat(done.reason).isEqualTo(StopReason.MAX_TOKENS)
+        assertThat(streamed.size).isAtMost(BUDGET + STOP_SLACK)
+    }
+
+    /**
      * One turn, with reasoning left on.
      *
      * Reasoning is deliberately on: Qwen3 disables it by closing an empty `<think>` block
@@ -212,10 +274,12 @@ class ExecuTorchOnDeviceTest {
      * A reply cut short by a token budget never emits its end-of-turn marker, and without
      * that marker the engine cannot say which tokens the runtime actually committed, so it
      * gives up the cache rather than guess. Asking for 48 tokens here measured a ratio of
-     * 1.96 — worse than no cache at all — purely because nothing ever finished.
+     * 1.96 — worse than no cache at all — purely because nothing ever finished; and the
+     * 48 crept back in later, which on a Snapdragon 8 Gen 3 on 2026-09-02 measured the
+     * same thing again: turn two re-read all 971 tokens. So the budget is the default.
      */
     private suspend fun turn(messages: List<ChatMessage>): Turn {
-        val events = engine.chat(messages, SamplerParams(maxTokens = 48)).toList()
+        val events = engine.chat(messages, SamplerParams()).toList()
         return Turn(
             done = events.filterIsInstance<GenerationEvent.Completed>().single(),
             raw = events.filterIsInstance<GenerationEvent.Token>().joinToString("") { it.text },
@@ -238,6 +302,12 @@ class ExecuTorchOnDeviceTest {
                 "Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json",
         )
         val PARAMS = ModelLoadParams(contextLength = 2048)
+        const val TOKENS_BEFORE_STOP = 5
+        const val BUDGET = 8
+
+        /** The runtime is asked to stop from inside its own token callback: one or two more. */
+        const val STOP_SLACK = 4
+        const val STOP_WITHIN_MS = 5_000L
 
         /** Long enough that re-reading it is visibly different from not re-reading it. */
         val LONG_PROMPT = buildString {

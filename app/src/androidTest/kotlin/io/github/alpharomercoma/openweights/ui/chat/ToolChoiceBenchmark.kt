@@ -349,9 +349,16 @@ class ToolChoiceBenchmark {
             // prior written straight through would measure a defect the app no longer has.
             case.prior.spelledOut(engine.loadedModel?.supportsToolResults == true) +
             ChatMessage.text(ChatRole.USER, case.prompt)
-        // Greedy, because TurnRunner forces temperature zero while tools are on the table and
-        // an arm sampled any other way is measuring behaviour the app stopped having.
-        val params = SHIPPED.copy(maxTokens = BUDGET, seed = SEED, temperature = 0f)
+        // Greedy and without a repeat penalty, because that is the sampler TurnRunner uses
+        // while tools are on the table, and an arm sampled any other way is measuring
+        // behaviour the app stopped having. `-e penalty 1.1` puts the old penalty back, so
+        // the two can be measured against each other on one build and one phone.
+        val params = SHIPPED.copy(
+            maxTokens = BUDGET,
+            seed = SEED,
+            temperature = 0f,
+            repeatPenalty = penalty(),
+        )
         val offered = if (native) tools else emptyList()
         // Cleared before each case, so a case is not measured on the cache the previous one
         // left. It also keeps the window from filling over a run, which is what
@@ -399,6 +406,13 @@ class ToolChoiceBenchmark {
      * replaced it is a repair round, which cannot be scored from a single generation because
      * it spends a pass to get a real call.
      */
+    /**
+     * The repeat penalty for the deciding pass: none, as TurnRunner runs it, unless the
+     * run asks for another with `-e penalty 1.1`.
+     */
+    private fun penalty(): Float =
+        InstrumentationRegistry.getArguments().getString("penalty")?.toFloatOrNull() ?: 1f
+
     private fun read(completed: GenerationEvent.Completed): Choice {
         completed.toolCalls.firstOrNull()?.let { return Choice(it.name, Route.NATIVE) }
         ToolPrompting.parse(completed.content, registry())

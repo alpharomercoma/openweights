@@ -32,8 +32,13 @@ package io.github.alpharomercoma.openweights.watch
  * repeating itself rather than reporting.
  */
 internal object WatchVerdict {
-    /** The verdict line, wherever the reply put it on its last non-blank line. */
-    private val VERDICT = Regex("""\s*\*{0,2}(CHANGED|UNCHANGED)\*{0,2}[.!]?\s*$""")
+    /**
+     * The verdict line, wherever the reply put it on its last non-blank line.
+     *
+     * A line of its own, not merely the last word: "The price has not CHANGED." ends in
+     * the word and was read as a change, with the sentence cut off before it.
+     */
+    private val VERDICT = Regex("""(?:^|\n)\s*\*{0,2}(CHANGED|UNCHANGED)\*{0,2}[.!]?\s*$""")
 
     data class Read(val summary: String, val changed: Boolean)
 

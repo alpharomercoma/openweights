@@ -51,6 +51,19 @@ class WatchVerdictTest {
     }
 
     @Test
+    fun `the word at the end of a sentence is not the verdict`() {
+        val read = WatchVerdict.read(
+            "The price has not CHANGED.",
+            previous = "The price is 42 dollars.",
+        )
+
+        // Read as the verdict, the sentence lost its last word and the watch reported a
+        // change it had just said did not happen. The verdict is a line of its own.
+        assertThat(read.summary).isEqualTo("The price has not CHANGED.")
+        assertThat(read.changed).isTrue() // Different text and no verdict line: fails open.
+    }
+
+    @Test
     fun `a model that forgot the word fails open unless it repeated itself verbatim`() {
         val previous = "The price is 42 dollars."
 

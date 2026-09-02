@@ -254,7 +254,11 @@ class WatchScheduler @Inject constructor(
                 withTimeoutOrNull(WORK_INFO_TIMEOUT_MS) {
                     WorkManager.getInstance(appContext)
                         .getWorkInfosForUniqueWorkFlow(WatchWorker.workName(watchId))
-                        .first()
+                        // The enqueue this follows is asynchronous, so the flow's first
+                        // emission can be the empty list from before it landed; waiting for
+                        // a snapshot with the work in it is what makes this a read of the
+                        // schedule rather than of the moment before it.
+                        .first { it.isNotEmpty() }
                         .firstOrNull { it.state == WorkInfo.State.ENQUEUED }
                         ?.nextScheduleTimeMillis
                 }

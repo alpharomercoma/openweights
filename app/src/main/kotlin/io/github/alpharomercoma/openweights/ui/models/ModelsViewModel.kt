@@ -362,6 +362,13 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun delete(model: LocalModel) {
+        // Off the main thread, as the sweep in init already is and for the reason given
+        // there: unlinking gigabytes and re-listing the directory from a button's onClick
+        // held the frame for as long as the filesystem took.
+        viewModelScope.launch(Dispatchers.IO) { deleteNow(model) }
+    }
+
+    private fun deleteNow(model: LocalModel) {
         // A mapped model can survive an unlink on some filesystems but not all engines
         // tolerate the backing file disappearing while a generation is in flight, so the
         // loaded model is not deleted out from under the engine. Said out loud, with the

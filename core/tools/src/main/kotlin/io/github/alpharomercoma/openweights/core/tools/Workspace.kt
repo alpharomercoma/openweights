@@ -24,6 +24,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Reader
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,6 +52,14 @@ private fun mediaTypeFor(name: String): String {
     return android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
         ?: "application/octet-stream"
 }
+
+/**
+ * A name for the sibling new text is staged in before it replaces a file: hidden by the
+ * dot, unique by the suffix, and ending in a way that tells anyone who finds one after a
+ * crash what it is and which file it was for.
+ */
+private fun stagingNameFor(name: String): String =
+    ".$name.${UUID.randomUUID().toString().substringBefore('-')}.tmp"
 
 internal fun Reader.readAsMuchAs(buffer: CharArray): Int {
     var filled = 0
@@ -95,14 +104,20 @@ data class Entry(
     val mediaType: String,
 )
 
+/** A hidden sibling of a file being replaced, where the new text lands before the old goes. */
+private class Staged(val uri: Uri, val name: String)
+
+/** What creating a file came to: the name the folder gave it, and whether the text got in. */
+private class Landed(val served: String, val written: Boolean)
+
 /**
  * The folder the user shared, and the only way into it.
  *
  * Everything the file tools do goes through here, so there is one place that knows how a
  * name the model wrote becomes a document a provider will answer for. That translation is
- * the whole security boundary, and [workspaceSegments] is the half of it worth testing on a
- * host: this half cannot be, because it is questions put to a provider that only exists on
- * a device.
+ * the whole security boundary. [workspaceSegments] is the half of it that decides what a
+ * path may mean; this half is the questions put to the provider, and since the real ones
+ * exist only on a device, `WorkspaceReplaceTest` puts them to a small provider of its own.
  *
  * Children are listed with a single cursor query per directory rather than through
  * `DocumentFile`, which issues a query per child to populate each object it returns. On a
@@ -175,7 +190,11 @@ class Workspace @Inject constructor(
         withContext(Dispatchers.IO) {
             val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
             runCatching {
-                context.contentResolver.query(childrenUri, PROJECTION, null, null, null)
+                // The query-arguments form, which is the one the framework carries to a
+                // provider: the selection form is folded into it on every device, and a
+                // DocumentsProvider refuses the selection form when handed it directly,
+                // which is what a host test does.
+                context.contentResolver.query(childrenUri, PROJECTION, null, null)
                     ?.use { cursor -> cursor.entries(under) }
             }.getOrNull().orEmpty()
         }
@@ -225,7 +244,6 @@ class Workspace @Inject constructor(
             context.contentResolver.query(
                 uri,
                 arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
-                null,
                 null,
                 null,
             )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
@@ -296,13 +314,7 @@ class Workspace @Inject constructor(
             if (existing.isDirectory) {
                 return ToolExecution.rejected("$path is a folder, not a file.")
             }
-            val uri = uriFor(existing)
-                ?: return ToolExecution.failure("$path could not be opened for writing.")
-            return if (overwrite(uri, text)) {
-                ToolExecution("Replaced $path with ${text.length} characters.")
-            } else {
-                ToolExecution.failure("$path could not be written.")
-            }
+            return replace(existing, segments, text, path)
         }
         val parent = ensureFolders(segments.dropLast(1))
             ?: return ToolExecution.failure(
@@ -371,19 +383,22 @@ class Workspace @Inject constructor(
      * Deleting through the provider rather than any path arithmetic, for the same reason
      * [resolve] walks: the only ids in hand are ones the granted folder handed over.
      */
-    suspend fun delete(path: String): ToolExecution = withContext(Dispatchers.IO) {
+    suspend fun delete(path: String): ToolExecution {
         val entry = resolve(path)
-            ?: return@withContext ToolExecution.rejected("There is no $path to delete.")
+            ?: return ToolExecution.rejected("There is no $path to delete.")
         val uri = uriFor(entry)
-            ?: return@withContext ToolExecution.failure("$path could not be opened.")
-        val gone = runCatching {
-            DocumentsContract.deleteDocument(context.contentResolver, uri)
-        }.getOrDefault(false)
-        if (gone) {
+            ?: return ToolExecution.failure("$path could not be opened.")
+        return if (remove(uri)) {
             ToolExecution("Deleted $path.")
         } else {
             ToolExecution.failure("$path could not be deleted.")
         }
+    }
+
+    /** Asks the provider to delete a document, and says whether it did. */
+    private suspend fun remove(uri: Uri): Boolean = withContext(Dispatchers.IO) {
+        runCatching { DocumentsContract.deleteDocument(context.contentResolver, uri) }
+            .getOrDefault(false)
     }
 
     private suspend fun putInto(
@@ -392,58 +407,171 @@ class Workspace @Inject constructor(
         text: String,
         path: String,
     ): ToolExecution {
-        val uri = create(parent, name, mediaTypeFor(name))
+        val landed = land(parent, name, text)
             ?: return ToolExecution.failure(
                 "$path could not be created. The folder may not accept new files.",
             )
-        // The belt to the media type's braces: a provider that still decorated the name
-        // is asked to change it back. Verified rather than assumed, because the file the
-        // model just told the user about has to exist under the name it said - the canvas
-        // resolves that exact path, and a silently renamed file is a deck that never
-        // updates. A provider that refuses the rename keeps the decorated name, and the
-        // save says so instead of claiming a path that is not there.
-        val actual = displayNameOf(uri)
-        val served = if (actual != null && actual != name) {
-            rename(uri, name) ?: actual
-        } else {
-            name
-        }
-        if (served != name) {
-            return if (write(uri, text)) {
-                ToolExecution(
-                    "Saved ${text.length} characters, but the folder stored it as " +
-                        "\"$served\" rather than \"$name\". Use that name.",
-                )
-            } else {
-                ToolExecution.failure("$path was created but nothing could be written into it.")
-            }
-        }
-        return if (write(uri, text)) {
-            ToolExecution("Saved ${text.length} characters to $path.")
-        } else {
+        return when {
             // The worst outcome here, and the one worth naming: a file exists with the
             // right name and nothing in it. Reported as a failure so that a goal step
             // cannot count it as the work having been done.
-            ToolExecution.failure("$path was created but nothing could be written into it.")
+            !landed.written ->
+                ToolExecution.failure("$path was created but nothing could be written into it.")
+            landed.served != name ->
+                ToolExecution(
+                    "Saved ${text.length} characters, but the folder stored it as " +
+                        "\"${landed.served}\" rather than \"$name\". Use that name.",
+                )
+            else -> ToolExecution("Saved ${text.length} characters to $path.")
         }
     }
 
     /**
-     * Replaces a document's contents, truncating whatever was there.
+     * Creates a file under a name and writes the text into it, holding the provider to the
+     * name asked for.
      *
-     * Separate from [write] because the mode matters. A provider opening in its default
-     * mode is not obliged to truncate, so writing eight hundred characters over two
-     * thousand leaves the tail of the old file behind and reports success, which is the
-     * silent half-overwrite this class refuses to allow by accident. "wt" says truncate.
+     * The belt to the media type's braces: a provider that still decorated the name is
+     * asked to change it back. Verified rather than assumed, because the file the model is
+     * about to tell the user about has to exist under the name it says - the canvas
+     * resolves that exact path, and a silently renamed file is a deck that never updates.
+     * A provider that refuses the rename keeps the decorated name, which is handed back so
+     * the caller can say so instead of claiming a path that is not there.
      */
-    suspend fun overwrite(uri: Uri, text: String): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
-            context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
-                stream.writer().use { it.write(text) }
-                true
-            } ?: false
-        }.getOrDefault(false)
+    private suspend fun land(parent: Entry?, name: String, text: String): Landed? {
+        val uri = create(parent, name, mediaTypeFor(name)) ?: return null
+        val actual = displayNameOf(uri)
+        val served = if (actual != null && actual != name) rename(uri, name) ?: actual else name
+        return Landed(served, write(uri, text))
     }
+
+    /**
+     * Puts new contents under a name that already has some, without a moment at which the
+     * folder holds neither.
+     *
+     * This used to open the document and truncate it, the one thing this class did that
+     * could destroy work: a provider error or a process death between the truncate and the
+     * last byte left an empty file where the user's had been. Now the text goes whole into
+     * a hidden sibling first, and only once it is all there does the original give way,
+     * deleted and the sibling renamed into its name. The framework has no rename-over, so
+     * the swap is not atomic; what holds instead is that the full text is in the folder
+     * under some name at every step, and the worst a death can leave is a
+     * `.notes.md.3f9a2c1b.tmp` beside a missing `notes.md` rather than an empty one.
+     *
+     * Not every provider renames. One that refuses has the name created afresh, as a first
+     * save would, and the text written into it from memory; the sibling goes only once the
+     * text has landed under the right name. Every failure says what state the folder was
+     * left in, and the ones that leave the text only in the sibling say its name.
+     */
+    // Each return is a distinct step that can fail, with its own account of what is left.
+    @Suppress("ReturnCount")
+    private suspend fun replace(
+        existing: Entry,
+        segments: List<String>,
+        text: String,
+        path: String,
+    ): ToolExecution {
+        val original = uriFor(existing)
+            ?: return ToolExecution.failure("$path could not be opened for writing.")
+        val parentPath = segments.dropLast(1).joinToString("/")
+        val parent = if (parentPath.isEmpty()) {
+            null
+        } else {
+            resolve(parentPath) ?: return ToolExecution.failure(
+                "The folder holding $path could not be read, so it is unchanged.",
+            )
+        }
+        val staged = stage(parent, existing.name)
+            ?: return ToolExecution.failure(
+                "$path could not be replaced: the folder would not take a new file to " +
+                    "write into, so it is unchanged.",
+            )
+        if (!write(staged.uri, text)) {
+            return ToolExecution.failure(
+                discard(staged, "$path could not be written, so it is unchanged."),
+            )
+        }
+        if (!remove(original)) {
+            return ToolExecution.failure(
+                discard(
+                    staged,
+                    "$path could not be replaced: the old file would not delete, so it " +
+                        "is unchanged.",
+                ),
+            )
+        }
+        return swap(staged, parent, existing.name, text, path)
+    }
+
+    /**
+     * A hidden sibling for the new text to land in before the original is touched.
+     *
+     * Declared with the target's media type rather than the sibling's own, for a provider
+     * that records the type at creation and keeps it through a rename: the file the swap
+     * ends with should be the markdown it is, not a byte stream. A provider that fits
+     * names to types may decorate the sibling's for it, which costs nothing - it is
+     * addressed by uri and reported by whatever name it was actually given.
+     */
+    private suspend fun stage(parent: Entry?, name: String): Staged? {
+        val asked = stagingNameFor(name)
+        val uri = create(parent, asked, mediaTypeFor(name)) ?: return null
+        return Staged(uri, displayNameOf(uri) ?: asked)
+    }
+
+    /** Removes a staged sibling that will not be used, and says so if it could not be. */
+    private suspend fun discard(staged: Staged, why: String): String = if (remove(staged.uri)) {
+        why
+    } else {
+        "$why A file called \"${staged.name}\" was left beside it and could not be removed."
+    }
+
+    /**
+     * The step past which the original is gone and the text lives under the staged name.
+     *
+     * Rename is asked for first, because it is one operation and the bytes move with it.
+     * A provider without it has the name made afresh, the way [putInto] makes one, and the
+     * text written in again from memory; only then is the sibling let go of.
+     */
+    private suspend fun swap(
+        staged: Staged,
+        parent: Entry?,
+        name: String,
+        text: String,
+        path: String,
+    ): ToolExecution {
+        val renamed = rename(staged.uri, name)
+        if (renamed != null) return replaced(path, name, renamed, text.length)
+        val landed = land(parent, name, text)
+            ?: return ToolExecution.failure(
+                "$path was removed but could not be created again. Its new contents are " +
+                    "in \"${staged.name}\" beside where it was.",
+            )
+        if (!landed.written) {
+            return ToolExecution.failure(
+                "$path was created again but nothing could be written into it. Its new " +
+                    "contents are in \"${staged.name}\" beside it.",
+            )
+        }
+        val result = replaced(path, name, landed.served, text.length)
+        return if (remove(staged.uri)) {
+            result
+        } else {
+            ToolExecution(
+                "${result.text} A copy called \"${staged.name}\" was left beside it and " +
+                    "could not be removed.",
+            )
+        }
+    }
+
+    /** The sentence for a swap that landed, allowing for a provider that renamed as it went. */
+    private fun replaced(path: String, name: String, served: String, count: Int): ToolExecution =
+        if (served == name) {
+            ToolExecution("Replaced $path with $count characters.")
+        } else {
+            ToolExecution(
+                "Replaced $path with $count characters, but the folder stored the new file " +
+                    "as \"$served\" rather than \"$name\". Use that name.",
+            )
+        }
 
     /** Puts text into a document that was just created, and says whether all of it landed. */
     suspend fun write(uri: Uri, text: String): Boolean = withContext(Dispatchers.IO) {

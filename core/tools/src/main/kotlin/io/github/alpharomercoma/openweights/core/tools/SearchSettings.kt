@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.tools
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import okhttp3.Credentials
@@ -35,11 +36,15 @@ import javax.inject.Singleton
  *
  * DuckDuckGo needs neither a key nor an account and answers general questions, so it is
  * the default and nothing has to be configured for search to work on a fresh install.
- * This holds only what the user changes: an instance address and whether the encyclopedia
- * may answer, neither of which is a secret.
+ * This holds what the user changes: an instance address and whether the encyclopedia
+ * may answer, neither of which is a secret, and a proxy's credentials, which are, and
+ * which go to [secrets] rather than to the same plain file.
  */
 @Singleton
-class SearchSettings @Inject constructor(@param:ApplicationContext context: Context) {
+class SearchSettings @Inject constructor(
+    @param:ApplicationContext context: Context,
+    private val secrets: SecretSealer,
+) {
     private val store = context.getSharedPreferences("search_settings", Context.MODE_PRIVATE)
 
     /**
@@ -173,16 +178,90 @@ class SearchSettings @Inject constructor(@param:ApplicationContext context: Cont
      *
      * `http`, `https` and `socks5` are the schemes `ddgs` supports and the ones supported
      * here, for the same reason: they are what people actually have.
+     *
+     * Read and written as the one string the user typed, and kept as two. The address is a
+     * setting like the others in this file; the `user:pass` in front of it is a credential,
+     * and it lives sealed under [SecretSealer] rather than in the same plain file, where
+     * anything that can read the app's files could read it. A value saved before the two
+     * were separated is moved across the first time it is read.
      */
     var proxy: String
-        get() = store.getString(PROXY, "").orEmpty()
-        set(value) = store.edit { putString(PROXY, value.trim()) }
+        get() = migratedAddress().withCredentials(sealedCredentials())
+        set(value) = saveProxy(value.trim())
+
+    private fun saveProxy(typed: String) {
+        val (address, credentials) = typed.splitCredentials()
+        val sealed = credentials?.let(secrets::seal)
+        if (credentials != null && sealed == null) {
+            // Never in the clear. The address is kept and the credentials are not, and the
+            // field reads back without them, so what happened is on the screen.
+            Log.w(TAG, "proxy credentials could not be sealed and were not kept")
+        }
+        store.edit {
+            putString(PROXY, address)
+            if (sealed != null) putString(PROXY_CREDENTIALS, sealed) else remove(PROXY_CREDENTIALS)
+        }
+    }
+
+    /**
+     * The stored address, with a pre-split value's credentials moved to the sealed store.
+     *
+     * A value that cannot be sealed yet stays as it was and is used as it was, since
+     * dropping it would lose the setting to a Keystore that is merely slow to answer; the
+     * move is tried again on the next read.
+     */
+    private fun migratedAddress(): String {
+        val stored = store.getString(PROXY, "").orEmpty()
+        val (address, credentials) = stored.splitCredentials()
+        if (credentials == null) return stored
+        val sealed = secrets.seal(credentials)
+        if (sealed == null) {
+            Log.w(TAG, "proxy credentials saved before sealing could not be moved yet")
+            return stored
+        }
+        store.edit {
+            putString(PROXY, address)
+            putString(PROXY_CREDENTIALS, sealed)
+        }
+        return address
+    }
+
+    private fun sealedCredentials(): String? =
+        store.getString(PROXY_CREDENTIALS, null)?.let(secrets::open)
 
     private companion object {
+        const val TAG = "OpenWeights"
         const val DOCUMENTATION = "documentation"
         const val PROXY = "proxy"
+        const val PROXY_CREDENTIALS = "proxy_credentials"
     }
 }
+
+/**
+ * `scheme://user:pass@rest` as the address without its `user:pass`, and the `user:pass`.
+ *
+ * Null for the second when there is none. The scheme is optional so that an address typed
+ * without one still has its credentials kept out of the plain file, even though nothing
+ * will use it until it has one. Matched as text rather than parsed as a URI, so what is
+ * put back together on read is what was typed, character for character.
+ */
+private fun String.splitCredentials(): Pair<String, String?> {
+    val match = CREDENTIALED.matchEntire(this) ?: return this to null
+    val (scheme, credentials, rest) = match.destructured
+    return "$scheme$rest" to credentials
+}
+
+/** The inverse of [splitCredentials]: the address with [credentials] back in front of it. */
+private fun String.withCredentials(credentials: String?): String {
+    if (credentials == null) return this
+    val scheme = SCHEME.find(this)?.value.orEmpty()
+    return scheme + credentials + "@" + removePrefix(scheme)
+}
+
+private val SCHEME = Regex("""^[A-Za-z][A-Za-z0-9+.\-]*://""")
+
+/** Everything after the scheme up to the first `@`, as long as no `/`, `?` or `#` comes first. */
+private val CREDENTIALED = Regex("""^([A-Za-z][A-Za-z0-9+.\-]*://|)([^/?#@]*)@(.*)$""")
 
 /**
  * A general web engine the app can read.

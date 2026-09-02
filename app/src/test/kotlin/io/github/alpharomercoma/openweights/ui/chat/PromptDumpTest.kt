@@ -32,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.tools.SaveMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchMediaTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.SecretSealer
 import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.ShowDocumentTool
 import io.github.alpharomercoma.openweights.core.tools.ShowSlidesTool
@@ -66,7 +67,7 @@ class PromptDumpTest {
         val workspace = Workspace(context, WorkspaceGrant(context))
         val board = CanvasBoard()
         val artifacts = SessionArtifacts()
-        val settings = SearchSettings(context)
+        val settings = SearchSettings(context, SecretSealer.Unavailable)
         val online = Reachability { true }
         val memory = Memory(context)
 

@@ -32,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
 import io.github.alpharomercoma.openweights.core.tools.SaveMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.SecretSealer
 import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
@@ -73,7 +74,11 @@ class ToolCatalogueTest {
         listOf(
             // Online, because this test is about what the catalogue says rather than about
             // when it is offered.
-            WebSearchTool(client, SearchSettings(context), Reachability { true }),
+            WebSearchTool(
+                client,
+                SearchSettings(context, SecretSealer.Unavailable),
+                Reachability { true },
+            ),
             FetchUrlTool(client, Reachability { true }, workspace, SessionArtifacts()),
             SearchFilesTool(workspace),
             ReadFileTool(workspace),

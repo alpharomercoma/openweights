@@ -20,6 +20,7 @@ import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.alpharomercoma.openweights.core.tools.SearchSettings
+import io.github.alpharomercoma.openweights.core.tools.SecretSealer
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -41,7 +42,7 @@ class SearchEnginesOnDeviceTest {
     fun probeEveryEngine() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val client = OkHttpClient()
-        val providers = SearchSettings(context).providers(client)
+        val providers = SearchSettings(context, SecretSealer.Unavailable).providers(client)
 
         QUERIES.forEach { (query, expectedHost) ->
             providers.forEach { provider ->

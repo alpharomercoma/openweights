@@ -28,7 +28,8 @@ import org.robolectric.RobolectricTestRunner
  */
 @RunWith(RobolectricTestRunner::class)
 class SearchEngineTest {
-    private val settings = SearchSettings(ApplicationProvider.getApplicationContext())
+    private val settings =
+        SearchSettings(ApplicationProvider.getApplicationContext(), SecretSealer.Unavailable)
     private val client = OkHttpClient()
 
     @Test

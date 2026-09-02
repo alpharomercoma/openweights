@@ -25,7 +25,7 @@ import org.robolectric.RobolectricTestRunner
 /** What the canvas WebView lets through: its own server, and nothing off the phone. */
 @RunWith(RobolectricTestRunner::class)
 class CanvasEgressTest {
-    private fun stays(address: String): Boolean = Uri.parse(address).staysOnDevice()
+    private fun stays(address: String): Boolean = Uri.parse(address).staysOnDevice(PORT)
 
     @Test
     fun `the server and what a page already holds stay on the device`() {
@@ -34,6 +34,14 @@ class CanvasEgressTest {
         assertThat(stays("data:image/png;base64,iVBORw0KGgo=")).isTrue()
         assertThat(stays("blob:http://127.0.0.1:43122/uuid")).isTrue()
         assertThat(stays("about:blank")).isTrue()
+    }
+
+    @Test
+    fun `the loopback on any other port is somebody else's server`() {
+        // The page's policy keeps its own requests on its origin, but nothing in it covers
+        // a navigation, and the loopback has other listeners: a debug bridge, another app.
+        assertThat(stays("http://127.0.0.1:8080/")).isFalse()
+        assertThat(stays("http://127.0.0.1/")).isFalse()
     }
 
     @Test
@@ -49,3 +57,5 @@ class CanvasEgressTest {
         assertThat(stays("mailto:someone@example.com")).isFalse()
     }
 }
+
+private const val PORT = 43122

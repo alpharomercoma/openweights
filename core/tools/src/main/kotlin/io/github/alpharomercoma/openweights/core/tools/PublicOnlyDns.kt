@@ -64,6 +64,17 @@ internal fun String.ipLiteralOrNull(): InetAddress? {
     return runCatching { InetAddress.getByName(this) }.getOrNull()
 }
 
+/**
+ * True when this host is written as digits and names somewhere that is not the public
+ * internet: the phone itself, the LAN, link-local, carrier NAT.
+ *
+ * For callers outside this module that dial addresses taken from untrusted content and
+ * have only the resolver boundary: a literal never reaches a resolver, so this is the
+ * check that boundary cannot make for them. A name is never private here; that is the
+ * resolver's question.
+ */
+fun String.isPrivateLiteral(): Boolean = ipLiteralOrNull()?.isPublicAddress() == false
+
 /** True when this address is somewhere on the public internet. */
 internal fun InetAddress.isPublicAddress(): Boolean = !isAnyLocalAddress &&
     !isLoopbackAddress &&

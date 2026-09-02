@@ -65,6 +65,18 @@ class PublicOnlyDnsTest {
     }
 
     @Test
+    fun `a host written as digits is private when it names anything but the internet`() {
+        // The check for callers with only the resolver boundary, which never sees these.
+        assertThat("192.168.1.1".isPrivateLiteral()).isTrue()
+        assertThat("127.0.0.1".isPrivateLiteral()).isTrue()
+        assertThat("169.254.169.254".isPrivateLiteral()).isTrue()
+        assertThat("[::1]".isPrivateLiteral() || "::1".isPrivateLiteral()).isTrue()
+        assertThat("93.184.216.34".isPrivateLiteral()).isFalse()
+        // A name is the resolver's question, never a private literal.
+        assertThat("router.local".isPrivateLiteral()).isFalse()
+    }
+
+    @Test
     fun `a name that answers with both keeps only the public address`() {
         // The shape of a rebinding attempt: one address to pass a check, one to connect to.
         val dns = PublicOnlyDns(resolvingTo("192.168.0.5", "93.184.216.34"))

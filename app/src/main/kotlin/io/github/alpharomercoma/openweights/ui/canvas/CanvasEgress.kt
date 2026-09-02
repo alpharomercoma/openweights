@@ -29,10 +29,13 @@ import android.net.Uri
  * `blob:` URLs carry only what the page already has, and `about:blank` is the empty tab.
  *
  * Only the literal IPv4 loopback, because that is the only address the server binds and
- * the only one its URLs name; a name that happens to resolve here is somebody else's.
+ * the only one its URLs name; a name that happens to resolve here is somebody else's. And
+ * only the server's own [port]: the page's policy keeps its fetches and images to its own
+ * origin, but a navigation is not covered by it, and a page could otherwise send the
+ * WebView to whatever else is listening on the loopback.
  */
-internal fun Uri.staysOnDevice(): Boolean = when (scheme?.lowercase()) {
-    "http", "https" -> host == LOOPBACK
+internal fun Uri.staysOnDevice(port: Int): Boolean = when (scheme?.lowercase()) {
+    "http", "https" -> host == LOOPBACK && this.port == port
     "data", "blob", "about" -> true
     else -> false
 }

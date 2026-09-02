@@ -107,6 +107,23 @@ class ArchivedScreenTest {
     }
 
     @Test
+    fun `a row still on screen from the results can be renamed after leaving the live list`() {
+        // Unarchived under an open sheet, the row is gone from the live list and still in
+        // the frozen results. The sheet found it there; Rename and Delete did not.
+        val state = ArchiveUiState(
+            loaded = true,
+            query = "bag",
+            hasAnswer = true,
+            results = listOf(
+                ConversationMatch(1, "Trip packing", "lfm", NOW, "Take the small bag.", null, NOW),
+            ),
+        )
+
+        assertThat(state.conversationFor(1)?.title).isEqualTo("Trip packing")
+        assertThat(state.conversationFor(2)).isNull()
+    }
+
+    @Test
     fun `a search says nothing until it has an answer`() {
         // Saying "no archived chat mentions that" while the read is still running is a
         // wrong answer shown confidently, and it appeared on every first keystroke.

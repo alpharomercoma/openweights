@@ -65,4 +65,17 @@ class CanvasViewModel @Inject constructor(
         board.dismiss()
         server.stop()
     }
+
+    /**
+     * Leaving the screen stops the server, whatever the board still holds.
+     *
+     * The server's own contract is that a URL learned while the canvas was open answers
+     * nothing once it is closed, and until this the back arrow closed the screen without
+     * ever telling the server, so a tab opened from "open in browser" kept reading the
+     * folder for as long as the process lived. The canvas itself is kept: the next open
+     * asks for a port again and gets a fresh server under a fresh key.
+     */
+    override fun onCleared() {
+        server.stop()
+    }
 }

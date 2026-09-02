@@ -26,12 +26,14 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import dagger.hilt.android.HiltAndroidApp
 import io.github.alpharomercoma.openweights.core.tools.PublicOnlyDns
+import io.github.alpharomercoma.openweights.core.tools.isPrivateLiteral
 import io.github.alpharomercoma.openweights.watch.WatchScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -103,6 +105,17 @@ class OpenWeightsApplication :
                     OkHttpNetworkFetcherFactory(
                         callFactory = OkHttpClient.Builder()
                             .dns(PublicOnlyDns())
+                            // The resolver never sees a host written as digits, so a
+                            // page could name the router or the metadata address in an
+                            // image tag and have it dialled. fetch_url refuses the same
+                            // literals; this is the same refusal for pictures.
+                            .addInterceptor { chain ->
+                                val request = chain.request()
+                                if (request.url.host.isPrivateLiteral()) {
+                                    throw IOException("Refused an image from a private address")
+                                }
+                                chain.proceed(request)
+                            }
                             .followRedirects(false)
                             .followSslRedirects(false)
                             .build(),

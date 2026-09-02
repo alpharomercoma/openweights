@@ -60,6 +60,7 @@ import io.github.alpharomercoma.openweights.ui.chat.ConversationActionsSheet
 import io.github.alpharomercoma.openweights.ui.chat.ConversationRow
 import io.github.alpharomercoma.openweights.ui.chat.DeleteConversationDialog
 import io.github.alpharomercoma.openweights.ui.chat.RenameConversationDialog
+import io.github.alpharomercoma.openweights.ui.chat.ConversationSummary
 import io.github.alpharomercoma.openweights.ui.chat.asSummary
 import io.github.alpharomercoma.openweights.ui.chat.highlighting
 import java.time.Instant
@@ -141,8 +142,7 @@ fun ArchivedScreen(
     // search result is the fallback: the live list is the truth for a title that was just
     // changed, but a row can be in the results and, a moment after being unarchived, gone
     // from the live list while the sheet is still open on it.
-    val target = state.conversations.firstOrNull { it.id == menuFor }
-        ?: state.results.firstOrNull { it.id == menuFor }?.asSummary()
+    val target = state.conversationFor(menuFor)
 
     target?.takeIf { menuFor != null }?.let { conversation ->
         ConversationActionsSheet(
@@ -160,7 +160,7 @@ fun ArchivedScreen(
         )
     }
     renaming?.let { id ->
-        (state.conversations.firstOrNull { it.id == id })?.let { conversation ->
+        state.conversationFor(id)?.let { conversation ->
             RenameConversationDialog(
                 conversation = conversation,
                 onRename = {
@@ -172,7 +172,7 @@ fun ArchivedScreen(
         }
     }
     deleting?.let { id ->
-        (state.conversations.firstOrNull { it.id == id })?.let { conversation ->
+        state.conversationFor(id)?.let { conversation ->
             DeleteConversationDialog(
                 conversation = conversation,
                 onConfirm = {
@@ -360,3 +360,14 @@ private fun ArchiveSearchField(value: String, onValueChange: (String) -> Unit) {
         shape = RoundedCornerShape(Radius.md),
     )
 }
+
+/**
+ * The row [id] is on screen from, whichever list that is.
+ *
+ * The sheet, the rename dialog and the delete dialog all look it up, and the two dialogs
+ * looked only in the live list: a row unarchived under an open sheet is gone from there
+ * and still in the frozen results, and tapping Rename or Delete on it then did nothing.
+ */
+internal fun ArchiveUiState.conversationFor(id: Long?): ConversationSummary? =
+    conversations.firstOrNull { it.id == id }
+        ?: results.firstOrNull { it.id == id }?.asSummary()

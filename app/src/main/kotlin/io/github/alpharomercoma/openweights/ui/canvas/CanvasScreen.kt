@@ -183,6 +183,7 @@ private fun Site(
                 // so the main frame retries, briefly and a bounded number of times.
                 webViewClient = object : WebViewClient() {
                     private var retries = 0
+                    private val port = url.toUri().port
 
                     // The WebView's half of the server's policy: nothing off the phone,
                     // whether the page asks with a fetch, an image, a form or by leaving.
@@ -190,7 +191,7 @@ private fun Site(
                         view: WebView,
                         request: WebResourceRequest,
                     ): WebResourceResponse? {
-                        if (request.url.staysOnDevice()) return null
+                        if (request.url.staysOnDevice(port)) return null
                         Log.w("OpenWeights", "canvas refused a request to ${request.url.host}")
                         return WebResourceResponse(
                             "text/plain",
@@ -206,7 +207,7 @@ private fun Site(
                         view: WebView,
                         request: WebResourceRequest,
                     ): Boolean {
-                        if (request.url.staysOnDevice()) return false
+                        if (request.url.staysOnDevice(port)) return false
                         Log.w("OpenWeights", "canvas refused to leave for ${request.url.host}")
                         return true
                     }

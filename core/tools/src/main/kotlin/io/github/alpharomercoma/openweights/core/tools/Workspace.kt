@@ -23,7 +23,10 @@ import android.provider.DocumentsContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.io.Reader
+import java.io.SequenceInputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -92,6 +95,43 @@ internal fun Reader.skipAsMuchAs(count: Long): Long {
     }
     return skipped
 }
+
+/**
+ * What an ASCII skip left: how many characters went, and the stream to decode from.
+ *
+ * Bytes read past the last ASCII one are put back in front of [rest], so a decoder sees
+ * exactly the bytes it would have seen from that point.
+ */
+internal class AsciiSkip(val chars: Long, val rest: InputStream)
+
+/**
+ * Skips up to [count] characters without decoding them, for as long as they are ASCII.
+ *
+ * An ASCII byte is one character, so counting those needs no decoder. Anything else is
+ * left for one: a multi-byte sequence is one character or two, a malformed one is however
+ * many the decoder makes of it, and the offsets the model is paging by were counted by
+ * that decoder, so the two must agree to the character. For code, notes and logs the fast
+ * path is the whole way; for prose in another script it hands over at the first letter
+ * and costs nothing the decoding skip did not.
+ */
+internal fun InputStream.skipAscii(count: Long): AsciiSkip {
+    val chunk = ByteArray(SKIP_CHUNK_BYTES)
+    var skipped = 0L
+    while (skipped < count) {
+        val read = read(chunk, 0, minOf(chunk.size.toLong(), count - skipped).toInt())
+        if (read <= 0) break
+        var ascii = 0
+        while (ascii < read && chunk[ascii] >= 0) ascii++
+        skipped += ascii
+        if (ascii < read) {
+            val kept = ByteArrayInputStream(chunk.copyOfRange(ascii, read))
+            return AsciiSkip(skipped, SequenceInputStream(kept, this))
+        }
+    }
+    return AsciiSkip(skipped, this)
+}
+
+private const val SKIP_CHUNK_BYTES = 8 * 1024
 
 /** Something found in the shared folder, named the way the model was taught to name it. */
 data class Entry(
@@ -271,8 +311,14 @@ class Workspace @Inject constructor(
             val uri = uriFor(entry) ?: return@withContext null
             runCatching {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
-                    stream.reader().use { reader ->
-                        reader.skipAsMuchAs(skip.toLong())
+                    // The offset is in characters, and only ASCII maps onto bytes without
+                    // a decoder's say. So the skip runs over raw bytes for as long as they
+                    // are ASCII and hands the decoder what is left, which for most files
+                    // is nothing. Decoding the skipped part was how a large offset cost a
+                    // whole file's decode to read none of it.
+                    val ahead = stream.skipAscii(skip.toLong())
+                    ahead.rest.reader().use { reader ->
+                        reader.skipAsMuchAs(skip - ahead.chars)
                         val buffer = CharArray(take)
                         val read = reader.readAsMuchAs(buffer)
                         String(buffer, 0, read)

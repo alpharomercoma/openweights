@@ -167,8 +167,15 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
             ?: return ToolExecution.rejected(
                 "There is no file at $path in the shared folder. Use find_files first.",
             )
-        val skip = call.argument("offset", "start", "skip")?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        return window(entry, path, skip)
+        return when (val offset = ReadOffset.of(call.argument("offset", "start", "skip"), entry)) {
+            is ReadOffset.Skip -> window(entry, path, offset.chars)
+            is ReadOffset.PastEnd -> ToolExecution.rejected(nothingMore(path, offset.asked))
+            is ReadOffset.BeforeStart -> ToolExecution.rejected(
+                "An offset of ${offset.asked} is before the start of $path. Offsets count " +
+                    "characters from 0; call read_file again with offset 0 to read from " +
+                    "the start.",
+            )
+        }
     }
 
     // Guard clauses keep each incompatible file shape next to its user-facing explanation.
@@ -201,12 +208,14 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         val text = workspace.readText(entry, skip, WINDOW_CHARS + 1)
             ?: return ToolExecution.rejected("$path could not be read. It may not be text.")
         if (text.isEmpty()) {
-            return ToolExecution.rejected(
-                "$path has nothing more to read from character $skip.",
-            )
+            return ToolExecution.rejected(nothingMore(path, skip.toLong()))
         }
         return ToolExecution(text.take(WINDOW_CHARS) + rest(read = text.length, skip = skip))
     }
+
+    /** The one sentence for an offset at or past the end, wherever that was found out. */
+    private fun nothingMore(path: String, at: Long): String =
+        "$path has nothing more to read from character $at."
 
     /**
      * What to say when the window stopped before the file did.
@@ -221,6 +230,48 @@ class ReadFileTool @Inject constructor(private val workspace: Workspace) : Tool 
         return "\n\n[Cut here: this is $WINDOW_CHARS characters starting at $skip, and the " +
             "file goes on. To read the next part, call read_file again with the same path " +
             "and offset ${skip + WINDOW_CHARS}.]"
+    }
+}
+
+/**
+ * Where a read_file call asks to start, decided before the file is opened.
+ *
+ * The offset used to be coerced rather than judged. A negative one read from the start,
+ * and one too large for an [Int] parsed as no offset at all, so a model that asked for
+ * character ten billion got page one again and concluded the file was short. Nothing
+ * bounded it above either, and the skip decoded everything it skipped, so the same call
+ * cost a whole file's decode to return nothing.
+ *
+ * A character is never fewer bytes than one, so an offset beyond the file's byte count
+ * cannot land inside it and is answered without a read. A provider that reports no size
+ * gets the read it would have got anyway, and the same sentence at the end of it.
+ */
+internal sealed interface ReadOffset {
+    /** Characters to skip, inside the file as far as its reported size can tell. */
+    data class Skip(val chars: Int) : ReadOffset
+
+    /** A negative offset, which is not a place in any file. */
+    data class BeforeStart(val asked: String) : ReadOffset
+
+    /** An offset the file cannot reach, named as the model wrote it. */
+    data class PastEnd(val asked: Long) : ReadOffset
+
+    companion object {
+        /**
+         * [raw] as the model wrote it, or null for none. What does not parse as a whole
+         * number still reads from the start, as it always has.
+         */
+        fun of(raw: String?, entry: Entry): ReadOffset {
+            val written = raw ?: return Skip(0)
+            val asked = written.toLongOrNull() ?: return Skip(0)
+            // Zero is both "empty" and "unknown" in the contract, and neither can bound.
+            val known = entry.sizeBytes > 0
+            return when {
+                asked < 0 -> BeforeStart(written)
+                asked > Int.MAX_VALUE || (known && asked > entry.sizeBytes) -> PastEnd(asked)
+                else -> Skip(asked.toInt())
+            }
+        }
     }
 }
 

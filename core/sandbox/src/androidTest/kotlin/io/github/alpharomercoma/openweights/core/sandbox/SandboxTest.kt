@@ -76,6 +76,19 @@ class SandboxTest {
     }
 
     @Test
+    fun aScriptThatFailsWhileRunningIsNotRunAgain() = runBlocking {
+        // JSON.parse on bad input throws a SyntaxError of its own, and the retry ladder
+        // used to read that as the script not having parsed and run the program again on
+        // the next rung, in the same context. This one fails the first time and not the
+        // second, so a re-run would report success with 2 where the script failed with 1.
+        val result = sandbox.run(
+            "globalThis.n = (globalThis.n || 0) + 1; if (n === 1) JSON.parse('{bad'); n",
+        )
+        assertThat(result.failed).isTrue()
+        assertThat(result.output).contains("SyntaxError")
+    }
+
+    @Test
     fun aGenuinelyBrokenScriptStillHearsAboutItsOwnMistake() = runBlocking {
         // The other half of that rule. Reading it a second way must not mean reporting the
         // second reading's complaint, which is about code the model never wrote.

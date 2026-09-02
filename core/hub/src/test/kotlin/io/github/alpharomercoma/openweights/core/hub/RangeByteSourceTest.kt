@@ -80,6 +80,23 @@ class RangeByteSourceTest {
     }
 
     @Test
+    fun `a range served from the wrong place is refused rather than parsed`() = runTest {
+        // The right status with the wrong bytes: read as the header, these parse as a
+        // broken file, and the message would blame the model rather than the server.
+        server.enqueue(
+            MockResponse.Builder()
+                .code(HubHttp.PARTIAL_CONTENT)
+                .addHeader("Content-Range", "bytes 512-522/100000")
+                .body("elsewhere..")
+                .build(),
+        )
+
+        val failure = runCatching { source().read(offset = 0, length = 11) }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(HubException::class.java)
+    }
+
+    @Test
     fun `a range answered with far more than was asked for is cut to the ask`() = runTest {
         // The refusal above is not enough on its own. A 206 carrying a body of any size at
         // all was read whole, so a server had only to agree with the range header and then

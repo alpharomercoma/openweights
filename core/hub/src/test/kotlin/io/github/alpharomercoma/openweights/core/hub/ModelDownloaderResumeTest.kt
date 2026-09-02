@@ -303,6 +303,25 @@ class ModelDownloaderResumeTest {
     }
 
     @Test
+    fun `a 416 that does not say how long the file is does not finish the download`() {
+        val destination = File(folder.root, "weights.gguf")
+        val file = hubFile(size = 0L)
+        File(folder.root, "weights.gguf.part").writeBytes(whole.copyOf(whole.size / 2))
+        markPartial(destination, file = file)
+
+        // Unknown size and a 416 with no total: nothing here says the half on disk is the
+        // whole file, and it used to be verified and installed as one.
+        server.enqueue(MockResponse.Builder().code(416).build())
+
+        val failure = runCatching {
+            runBlocking { downloader.download("owner/repo", file, destination).toList() }
+        }.exceptionOrNull()
+
+        assertThat(failure).isNotNull()
+        assertThat(destination.exists()).isFalse()
+    }
+
+    @Test
     fun `a resume that receives 416 when already at end of file succeeds`() {
         val destination = File(folder.root, "weights.gguf")
         val file = hubFile(size = 0L)

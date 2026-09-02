@@ -56,8 +56,21 @@ class RangeByteSource(
                 // answers a two-kilobyte range request with a gigabyte cannot be read into
                 // memory. Refusing the 200 below was never enough on its own: a 206 with a
                 // body of any size was accepted whole, before a single field was validated.
-                response.code == HubHttp.PARTIAL_CONTENT ->
+                response.code == HubHttp.PARTIAL_CONTENT -> {
+                    // A 206 that starts somewhere else is the wrong bytes with the right
+                    // status, and read as the header they would parse as a broken file.
+                    // The downloader already refuses a resume served from the wrong place;
+                    // this is the same rule for the reads that inspect a model. A 206
+                    // with no header at all is taken at its word: a server is required to
+                    // send one, so the case is a test fixture's, not a way round the check.
+                    val range = response.header("Content-Range")
+                    if (range != null && !response.servesRangeFrom(offset)) {
+                        throw HubException(
+                            "The server answered with a different range than was asked for",
+                        )
+                    }
                     response.peekBody(length.toLong()).bytes()
+                }
 
                 // Reporting an empty read here would surface as "malformed GGUF", hiding a
                 // token or rate-limit problem the user could actually fix.

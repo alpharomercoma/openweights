@@ -296,10 +296,18 @@ class HuggingFaceClient @Inject constructor(
         limit: Int = DEFAULT_LIMIT,
     ): HubSearchPage = coroutineScope {
         val wanted = query.runtimes.ifEmpty { HubRuntime.entries.toSet() }
+        // A cursor names the runtime it came from, and a later page is asked of that
+        // runtime alone. The same opaque cursor used to go to both searches, so the
+        // compiled search received llama.cpp's cursor and answered nothing useful, and a
+        // search of the compiled corner alone could never turn a page at all, since the
+        // cursor handed back was always llama.cpp's and there was no llama.cpp page.
+        val paging = cursor?.let(PagingCursor::decode)
         val pages = HubRuntime.entries
-            .filter { it in wanted }
+            .filter { it in wanted && (paging == null || it == paging.runtime) }
             .map { runtime ->
-                async { runtime to runCatching { runtimePage(query, runtime, cursor, limit) } }
+                async {
+                    runtime to runCatching { runtimePage(query, runtime, paging?.cursor, limit) }
+                }
             }
             .awaitAll()
 
@@ -324,12 +332,18 @@ class HuggingFaceClient @Inject constructor(
 
         HubSearchPage(
             models = merged.values.sortedByDescending { it.isCompiled },
-            // The llama.cpp half is the one worth paging: the compiled corner of the Hub is
-            // small enough to arrive whole. Paging on its cursor would also mean tracking
-            // two cursors that advance at different rates.
-            cursor = good.firstOrNull { it.first == HubRuntime.LLAMA_CPP }?.second?.cursor,
+            // The llama.cpp half is the one worth paging when both were asked for: the
+            // compiled corner of the Hub is small enough to arrive whole on the first page.
+            // On its own, the compiled search pages on its own cursor.
+            cursor = pagedHalf(good)?.let { (runtime, page) ->
+                page.cursor?.let { PagingCursor(runtime, it).encode() }
+            },
         )
     }
+
+    private fun pagedHalf(good: List<Pair<HubRuntime, HubSearchPage>>) =
+        good.firstOrNull { it.first == HubRuntime.LLAMA_CPP }
+            ?: good.firstOrNull { it.first == HubRuntime.EXECUTORCH }
 
     private suspend fun runtimePage(
         query: HubQuery,
@@ -720,6 +734,29 @@ enum class HubRuntime(val format: ModelFormat) {
 }
 
 /** One page of Hub results, and the way back for the next one. */
+/**
+ * The Hub's cursor, tagged with the runtime whose search produced it.
+ *
+ * What [HuggingFaceClient.searchPage] hands out and takes back. Opaque to the caller, which
+ * only ever threads it through, and the tag is what lets the next page go to one search
+ * rather than to both.
+ */
+internal data class PagingCursor(val runtime: HubRuntime, val cursor: String) {
+    fun encode(): String = "${runtime.name}$SEPARATOR$cursor"
+
+    companion object {
+        private const val SEPARATOR = '|'
+
+        /** A cursor with no tag is read as llama.cpp's, which is what every cursor once was. */
+        fun decode(encoded: String): PagingCursor {
+            val name = encoded.substringBefore(SEPARATOR, missingDelimiterValue = "")
+            val runtime = HubRuntime.entries.firstOrNull { it.name == name }
+                ?: return PagingCursor(HubRuntime.LLAMA_CPP, encoded)
+            return PagingCursor(runtime, encoded.substringAfter(SEPARATOR))
+        }
+    }
+}
+
 data class HubSearchPage(
     val models: List<HubModel>,
     /** The Hub's opaque cursor for the page after this one, or null when there is none. */

@@ -211,7 +211,10 @@ class ModelDownloader @Inject constructor(
         val totalFromRange = header("Content-Range")
             ?.substringAfter("*/", "")
             ?.toLongOrNull()
-        return totalFromRange == null || alreadyHave >= totalFromRange
+        // A 416 that does not say how long the file is says nothing about whether this one
+        // is complete, and reading it as complete verified and installed a partial whenever
+        // the size was unknown as well.
+        return totalFromRange != null && alreadyHave >= totalFromRange
     }
 
     private suspend fun FlowCollector<DownloadProgress>.copyTo(
@@ -315,10 +318,6 @@ class ModelDownloader @Inject constructor(
     }
 
     /** True when the response's Content-Range actually begins at [offset]. */
-    private fun Response.servesRangeFrom(offset: Long): Boolean {
-        val header = header("Content-Range") ?: return false
-        return header.substringAfter("bytes ", "").substringBefore('-') == offset.toString()
-    }
 
     /**
      * Checks the finished file against the Hub's checksum.

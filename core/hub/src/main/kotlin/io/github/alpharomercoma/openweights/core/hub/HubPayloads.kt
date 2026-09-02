@@ -150,3 +150,9 @@ private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_TOO_MANY_REQUESTS = 429
+
+/** True when a partial response says, in its `Content-Range`, that it starts at [offset]. */
+fun Response.servesRangeFrom(offset: Long): Boolean {
+    val header = header("Content-Range") ?: return false
+    return header.substringAfter("bytes ", "").substringBefore('-') == offset.toString()
+}

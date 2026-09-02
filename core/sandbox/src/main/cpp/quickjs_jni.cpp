@@ -297,17 +297,29 @@ Java_io_github_alpharomercoma_openweights_core_sandbox_QuickJs_nativeRun(
     for (int rung = 0; rung < 4; rung++) {
         const int flags =
             JS_EVAL_TYPE_GLOBAL | (rung >= asyncFrom ? JS_EVAL_FLAG_ASYNC : 0);
-        value = JS_Eval(context, attempts[rung].c_str(), attempts[rung].size(), "<script>",
-                        flags);
+        // Compiled first and run only if that worked, so the two kinds of failure cannot
+        // be confused. They were told apart by searching the message for "SyntaxError",
+        // and a program that parsed, ran, printed, and then called JSON.parse on bad input
+        // failed with that very word: it was run again on the next rung, and again, with
+        // its output repeated each time. Whether the text parses is a question the
+        // compiler answers on its own, before anything has happened.
+        JSValue compiled = JS_Eval(context, attempts[rung].c_str(), attempts[rung].size(),
+                                   "<script>", flags | JS_EVAL_FLAG_COMPILE_ONLY);
+        if (JS_IsException(compiled)) {
+            lastFailure = failureOf(context);
+            continue;
+        }
+        run.output.clear();
+        value = JS_EvalFunction(context, compiled);
         value = settle(runtime, context, value, &failed);
         if (!failed) break;
 
+        // The program ran. Rewriting it would change what it did rather than whether it
+        // parsed, so this is the answer.
         lastFailure = failureOf(context);
         JS_FreeValue(context, value);
         value = JS_EXCEPTION;
-        // Anything that is not a syntax error means the program ran. Rewriting it would
-        // change what it did rather than whether it parsed, so this is the answer.
-        if (lastFailure.find("SyntaxError") == std::string::npos) break;
+        break;
     }
 
     // The failure the script actually hit, not the first rung's complaint about grammar.

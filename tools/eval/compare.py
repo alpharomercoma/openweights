@@ -116,7 +116,8 @@ def render(reports) -> str:
         "Exynos 2400 (Galaxy S24+), 8Elite the Snapdragon 8 Elite (Galaxy S25 Ultra), all "
         "three on Firebase Test Lab via "
         "`tools/eval/run_matrix_ftl.sh`. A grade that differs between two columns of "
-        "one engine is a cross-silicon divergence; each is quoted under its table.",
+        "one engine is a cross-silicon divergence; each is quoted under its table, and what "
+        "the five columns changed is in parity-five-socs.md.",
         "",
     ]
 

@@ -13,13 +13,16 @@ Qualcomm Device Cloud Snapdragon 8 Gen 3 on this date.
 two SoCs, rendered per device by `tools/eval/compare.py` (which previously let one
 phone's report silently overwrite the other's - fixed). The headline:
 
-- **Every llama.cpp grade is identical across the two SoCs.** Ten rows, case for
-  case, including the failures.
-- **ExecuTorch has exactly two cross-silicon divergences**: Qwen3-1.7B's
-  format-constraint case (pass on the Dimensity, fail on the Snapdragon) and
-  SmolLM3's tool-result case (same direction). Greedy decoding is deterministic per
-  binary, but XNNPACK's quantised kernels differ per microarchitecture, and a
-  knife-edge case can tip. llama.cpp's kernels evidently do not tip on these cases.
+- **Every llama.cpp grade is identical across the SoCs.** Ten rows, case for case,
+  including the failures — and still true on five SoCs as of 2026-09-03
+  ([parity-five-socs.md](parity-five-socs.md)).
+- **ExecuTorch has three cross-silicon divergences on five SoCs** (two when there were
+  two phones): on Qwen3-1.7B's format-constraint case and SmolLM3's tool-result case
+  the Snapdragon 8 Gen 3 alone fails where four SoCs pass, and on Llama 3.2's
+  tool-result case the 8 Elite and the Tensor G5 alone pass. Greedy decoding is
+  deterministic per binary, but XNNPACK's quantised kernels differ per
+  microarchitecture, and a knife-edge case can tip. llama.cpp's kernels evidently do
+  not tip on these cases.
 - Speeds: the Snapdragon 8 Gen 3 is faster on every ExecuTorch row (LFM2.5 1.2B
   decodes at 66.6 tok/s there against 36.6 on the Dimensity).
 

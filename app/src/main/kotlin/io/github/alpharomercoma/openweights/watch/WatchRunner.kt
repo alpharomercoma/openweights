@@ -171,6 +171,12 @@ class WatchRunner @Inject constructor(
      * Split out of [tick] to keep one exit per reason there, and because "is this over" and
      * "run this" are separate questions that happen to be asked in a row.
      */
+    /**
+     * Whether the watch still has checks ahead of it, for a scheduler deciding whether
+     * a tick that ran nothing means the watch is gone or merely not due yet.
+     */
+    suspend fun stillWanted(watchId: Long): Boolean = watches.byId(watchId)?.isActive == true
+
     private suspend fun expire(watch: Watch, now: Long): Boolean {
         if (!watch.isSpent(now)) return false
         watches.stop(watch.id, WatchState.EXPIRED)

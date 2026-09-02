@@ -666,7 +666,11 @@ class ChatViewModel @Inject constructor(
     private var conversationId: Long? = null
         set(value) {
             field = value
-            _uiState.update { it.copy(activeConversationId = value) }
+            // The draft goes with the conversation it was typed in. Left standing, the
+            // composer seeded it into whichever chat came next: the previous chat's
+            // half-written question appeared in a new chat, and a draft that had just
+            // been sent reappeared the moment its conversation gained an id.
+            _uiState.update { it.copy(activeConversationId = value, composerDraft = null) }
             loadComposerDraft()
             // Remembered, and never forgotten. Android reclaims a process holding a model in
             // memory sooner than most, and coming back to a blank screen with the
@@ -1042,6 +1046,8 @@ class ChatViewModel @Inject constructor(
         // conversation send the model the same thing it saw the first time.
         val text = document?.let { it.asPrompt() + typed }?.trim() ?: typed
 
+        pinDayForFreshChat()
+
         // isGenerating is claimed here, before any suspending work: two quick taps would
         // otherwise both pass canSend, create two conversations, and race the engine.
         _uiState.update { state ->
@@ -1155,7 +1161,11 @@ class ChatViewModel @Inject constructor(
             )
         }
 
-        viewModelScope.launch {
+        // Tracked as the generation job from its first line, the way send() tracks its
+        // own. It was not: Stop found nothing to cancel until generate() ran, and a chat
+        // reopened from the drawer meanwhile joined a finished job, queued behind this
+        // one's write, and then received the regenerated reply as its own.
+        val regenerate = viewModelScope.launch {
             // Storage has to lose the same replies the screen just lost. Without this the
             // conversation reopens with the discarded reply and the new one both in it.
             // Under the same lock as the writes, so the read cannot happen before the
@@ -1180,6 +1190,10 @@ class ChatViewModel @Inject constructor(
                     }
                 }
             }
+            // A cancellation is Stop, not a storage failure, and runCatching had been
+            // reading it as one: the job carried on deciding what to do inside a scope
+            // that was already dead.
+            discarded.exceptionOrNull()?.let { if (it is CancellationException) throw it }
             if (discarded.isFailure) {
                 // Refused rather than generated anyway. The reply on screen is already gone
                 // and the stored one is not, so answering would leave two of them in the
@@ -1196,6 +1210,12 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(toolNotes = notes) }
             }
             generate()
+        }
+        generationJob = regenerate
+        regenerate.invokeOnCompletion { cause ->
+            if (cause != null && generationJob === regenerate) {
+                _uiState.update { it.copy(isGenerating = false) }
+            }
         }
     }
 
@@ -2277,6 +2297,14 @@ class ChatViewModel @Inject constructor(
         warmJob?.cancel()
         warmJob = viewModelScope.launch {
             if (loadedFile == null || _uiState.value.isLoadingModel) return@launch
+            // Cancelling the job above does not reach the engine: the native read runs
+            // to its end whatever the coroutine's state, holding the engine the whole
+            // time, so the warm this launches found it busy and gave up — and the old
+            // warm then finished with the prompt it had, snapshot included. A tool toggle
+            // during the twenty-second load warm, a reopen on a store miss, a new chat
+            // right after load: each warmed nothing. So the running warm is interrupted
+            // first, the way a turn interrupts one, and this warm reads its own prompt.
+            turns.yieldWarms()
             // Refreshed exactly the way a turn refreshes it, because the instruction that
             // says tools exist goes in or stays out of the prefix with this flag — and a
             // warm rendered under yesterday's answer warms a prompt nobody will send.
@@ -2323,6 +2351,16 @@ class ChatViewModel @Inject constructor(
                 params = params,
             )
         }
+    }
+
+    /**
+     * The day a fresh conversation starts on is the day it keeps, so it is fixed at the
+     * first question as well as at the warm: a chat left empty across midnight had warmed
+     * yesterday and then sent yesterday for the whole of its life. The head warm never
+     * includes the date, so refreshing here invalidates nothing that was warmed.
+     */
+    private fun pinDayForFreshChat() {
+        if (_uiState.value.transcript.isEmpty()) PromptDay.refresh()
     }
 
     fun newChat() {

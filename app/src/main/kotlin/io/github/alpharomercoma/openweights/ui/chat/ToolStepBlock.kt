@@ -323,10 +323,17 @@ private fun MediaGrid(pictures: List<FoundPicture>, modifier: Modifier = Modifie
                         // This opened the thumbnail until a reviewer read the comment beside
                         // it and then read the code, which is the only reason a comment that
                         // describes the opposite of what happens ever gets caught.
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, picture.source.toUri()),
-                            )
+                        //
+                        // Only a web address. The source is whatever the search provider's
+                        // JSON said it was, and ACTION_VIEW launches whichever app claims
+                        // the scheme: a row carrying tel:, sms:, market: or another app's
+                        // own scheme would open that app on a tap meant for a web page.
+                        if (isWebAddress(picture.source)) {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, picture.source.toUri()),
+                                )
+                            }
                         }
                     },
             )
@@ -336,3 +343,13 @@ private fun MediaGrid(pictures: List<FoundPicture>, modifier: Modifier = Modifie
 
 /** Big enough to recognise a subject, small enough that eight fit a phone's width in two. */
 private val THUMBNAIL = 96.dp
+
+/**
+ * Whether [address] is something a browser opens, as opposed to something another app does.
+ *
+ * A prefix test rather than a parse, so it reads the same on the host and on the device and
+ * a malformed address fails closed.
+ */
+internal fun isWebAddress(address: String): Boolean =
+    address.startsWith("https://", ignoreCase = true) ||
+        address.startsWith("http://", ignoreCase = true)

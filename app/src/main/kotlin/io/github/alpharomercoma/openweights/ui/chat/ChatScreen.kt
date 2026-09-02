@@ -213,7 +213,9 @@ fun ChatScreen(
 
     // Hold the id, not the entry: streaming replaces entries on every token, and a
     // captured copy would have Copy putting a half-finished reply on the clipboard.
-    var actionsForId by remember { mutableStateOf<Long?>(null) }
+    // Keyed on the conversation: a reopened transcript numbers its entries from zero
+    // again, so an id held across a switch resolved to another conversation's turn.
+    var actionsForId by remember(state.activeConversationId) { mutableStateOf<Long?>(null) }
 
     // Back closes the drawer before it does anything else.
     //
@@ -386,7 +388,11 @@ private fun ChatContent(
 
     // Held by id rather than by entry, so a transcript that changes under it resolves to
     // nothing instead of to a stale copy of a turn that has since been dropped.
-    var editingId by remember { mutableStateOf<Long?>(null) }
+    // And keyed on the conversation, for the same reason as the actions sheet: an edit
+    // begun in one chat and finished after opening another from the drawer resolved to
+    // that chat's entry, filled the composer with it, and on Send truncated the wrong
+    // conversation after it.
+    var editingId by remember(state.activeConversationId) { mutableStateOf<Long?>(null) }
     val editing = editingId?.let { id -> state.transcript.firstOrNull { it.id == id } }
 
     var showParameters by remember { mutableStateOf(false) }

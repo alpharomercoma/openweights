@@ -46,7 +46,12 @@ class WatchWorker @AssistedInject constructor(
         val id = inputData.getLong(WATCH_ID, -1)
         if (id < 0) return Result.success()
 
-        if (scheduleIsOver { runner.tick(id) }) {
+        // A tick that ran nothing is either a watch that is over or a backstop arriving
+        // ahead of the deadline the in-process ticker is sleeping toward, and only the
+        // first may end the schedule. Read as one, a five-minute watch's fifteen-minute
+        // backstop unscheduled itself on its first early tick, and after the process died
+        // the watch was dead until the next launch.
+        if (scheduleIsOver { runner.tick(id) } && !runner.stillWanted(id)) {
             WorkManager.getInstance(applicationContext).cancelUniqueWork(workName(id))
         }
         return Result.success()

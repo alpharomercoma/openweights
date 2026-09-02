@@ -24,6 +24,8 @@ import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -159,6 +161,21 @@ class ToolStepBlockTest {
         compose.onNodeWithText("Searched", substring = true).performClick()
 
         compose.onNodeWithText("High tide is at four.", substring = true).assertExists()
+    }
+
+    @Test
+    fun `only a web address is handed to the system on a picture tap`() {
+        // The source of a picture is a field in a search provider's JSON, which is to say
+        // whatever the page said it was. ACTION_VIEW opens whichever app owns the scheme, so
+        // anything that is not a web page must not be launched from a tap on a thumbnail.
+        assertTrue(isWebAddress("https://example.com/page"))
+        assertTrue(isWebAddress("HTTP://example.com/page"))
+        assertFalse(isWebAddress("tel:+1234567890"))
+        assertFalse(isWebAddress("sms:+1234567890?body=hi"))
+        assertFalse(isWebAddress("market://details?id=x"))
+        assertFalse(isWebAddress("content://io.github.alpharomercoma.openweights.files/x"))
+        assertFalse(isWebAddress("javascript:alert(1)"))
+        assertFalse(isWebAddress(""))
     }
 
     private companion object {

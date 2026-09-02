@@ -46,6 +46,13 @@ subprojects {
                 "src/androidMain/kotlin",
                 "src/androidHostTest/kotlin",
                 "src/iosMain/kotlin",
+                // The flavour source sets, where the second runtime's JNI bridge lives.
+                // They went unanalysed for the same reason the multiplatform directories
+                // once did. The instrumentation sources are deliberately not listed: ktlint
+                // covers them, and detekt's complexity rules would fail the long on-device
+                // evals for being long, which is what an eval is.
+                "src/standard/kotlin",
+                "src/accelerated/kotlin",
             ).filter { it.exists() },
         )
     }
@@ -142,9 +149,15 @@ val verifyTasks = listOf(
 tasks.register("verifyOnDevice") {
     group = "verification"
     description = "Instrumented engine tests. Needs a connected device and model files."
+    // A regular expression for the same reason [verifyTasks] uses them: `:app` and
+    // `:core:engine` carry a product flavour, so their device tasks are
+    // `connectedStandardDebugAndroidTest` and `connectedAcceleratedDebugAndroidTest`. The
+    // exact name matched only the six modules that have no device tests, so from the day
+    // the flavour landed this ran nothing that needed a phone and reported green.
+    val deviceTask = Regex("connected(Standard|Accelerated)?DebugAndroidTest")
     dependsOn(
         subprojects.map { project ->
-            project.tasks.matching { it.name == "connectedDebugAndroidTest" }
+            project.tasks.matching { deviceTask.matches(it.name) }
         },
     )
 }

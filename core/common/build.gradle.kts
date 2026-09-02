@@ -30,7 +30,9 @@ kotlin {
     android {
         namespace = "io.github.alpharomercoma.openweights.core.common"
         compileSdk = 37
-        minSdk = 29
+        // The same floor as the convention plugin's BuildConfig.MIN_SDK, restated here
+        // because this multiplatform module cannot apply that plugin. Two places to bump.
+        minSdk = 31
 
         withHostTestBuilder {}
     }

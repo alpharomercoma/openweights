@@ -27,3 +27,6 @@ keystore.properties
 build-mnn-host/
 build-mnn-host-cl/
 build-ios-sim/
+
+# The Kotlin compiler's session directory, written by Gradle builds on the host.
+.kotlin/

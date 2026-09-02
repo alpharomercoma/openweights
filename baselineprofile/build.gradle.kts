@@ -31,6 +31,16 @@ android {
     // plugin makes that variant itself. Pointing at it here rather than at debug is what
     // stops the profile describing code R8 has since renamed.
     targetProjectPath = ":app"
+
+    // The app carries a runtime flavour, and a test module that names none cannot pick
+    // a variant of it: `generateBaselineProfile` failed to resolve `:app` at all from the
+    // day the flavour landed, so the shipped profile could no longer be regenerated. The
+    // standard flavour is the one that profiles the code both flavours share.
+    flavorDimensions += "runtime"
+    productFlavors {
+        create("standard") { dimension = "runtime" }
+        create("accelerated") { dimension = "runtime" }
+    }
 }
 
 baselineProfile {

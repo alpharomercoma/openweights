@@ -38,13 +38,19 @@ jobs:
       - name: Lint
         run: ./gradlew ktlintCheck detekt
 
+      # `test` reaches every Android module and none of the multiplatform ones: a KMP
+      # module has jvmTest and iosSimulatorArm64Test and no task called test, so
+      # :core:common's tiers had never run here. jvmTest is the half a Linux runner can do.
       - name: Unit tests
-        run: ./gradlew test
+        run: ./gradlew test jvmTest
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug
 
+      # Under the flavour directories since the runtime split; the old path matched
+      # nothing, and upload-artifact's default is to warn about that and pass.
       - uses: actions/upload-artifact@v4
         with:
           name: openweights-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/*/debug/*.apk
+          if-no-files-found: error

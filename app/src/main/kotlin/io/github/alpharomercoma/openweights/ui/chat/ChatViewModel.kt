@@ -3191,19 +3191,21 @@ private fun StagedDocument.asPrompt(): String = buildString {
  * and a fresh chat picks up the new day for free.
  */
 internal object PromptDay {
+    /**
+     * Where today comes from. A test swaps it, so that the process outliving midnight is
+     * something the test says has happened rather than something the wall clock might do
+     * between one of its assertions and the next.
+     */
+    @VisibleForTesting
+    var today: () -> LocalDate = { LocalDate.now() }
+
     @Volatile
-    var pinned: LocalDate = LocalDate.now()
+    var pinned: LocalDate = today()
         private set
 
     /** Moves the pin to today. Called at a fresh chat's warm; never mid-conversation. */
     fun refresh() {
-        pinned = LocalDate.now()
-    }
-
-    /** For tests only: makes "the process outlived midnight" a state a test can set up. */
-    @VisibleForTesting
-    fun pin(date: LocalDate) {
-        pinned = date
+        pinned = today()
     }
 
     /**

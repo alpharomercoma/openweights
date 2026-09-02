@@ -7,7 +7,7 @@ that need one, date recitals in greetings, and whether "what is today's date?"
 still gets answered without a search.
 
 Setup:
-  1. Export the app's real bytes (system message, first user turn, the 14-tool
+  1. Export the app's real bytes (system message, first user turn, the 16-tool
      catalogue) — run once after any prompt-affecting change:
        PROMPT_DUMP=eval/prompt_dump.json ./gradlew :app:testStandardDebugUnitTest \
            --tests '*PromptDumpTest*'

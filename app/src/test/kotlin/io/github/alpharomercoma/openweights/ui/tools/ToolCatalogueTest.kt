@@ -16,37 +16,18 @@
 
 package io.github.alpharomercoma.openweights.ui.tools
 
+import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
-import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
-import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
-import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
-import io.github.alpharomercoma.openweights.core.tools.ForgetMemoryTool
-import io.github.alpharomercoma.openweights.core.tools.Memory
-import io.github.alpharomercoma.openweights.core.tools.Reachability
-import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
-import io.github.alpharomercoma.openweights.core.tools.ReadMemoryTool
-import io.github.alpharomercoma.openweights.core.tools.RunScriptTool
-import io.github.alpharomercoma.openweights.core.tools.SaveMemoryTool
-import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
-import io.github.alpharomercoma.openweights.core.tools.SearchSettings
-import io.github.alpharomercoma.openweights.core.tools.SecretSealer
-import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
-import io.github.alpharomercoma.openweights.core.tools.UpdateMemoryTool
-import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
-import io.github.alpharomercoma.openweights.core.tools.Workspace
-import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
-import io.github.alpharomercoma.openweights.core.tools.WriteFileTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.OkHttpClient
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -62,36 +43,29 @@ import org.robolectric.RobolectricTestRunner
  * the reply and would then find two tools where the model named one.
  *
  * None of that shows up in a test of any single tool, because each of them is a property of
- * the set. So this is over the set the app really registers, built the way
- * [io.github.alpharomercoma.openweights.core.tools.di.ToolsModule] builds it.
+ * the set. So this is over the set the app really registers, built by
+ * [io.github.alpharomercoma.openweights.core.tools.di.ToolsModule] itself through
+ * [AppToolRegistry]. A list kept here by hand covered ten of the eighteen tools the app
+ * registers, and the eight it missed were exactly the ones added after it was written.
  */
 @RunWith(RobolectricTestRunner::class)
 class ToolCatalogueTest {
-    private val tools: List<Tool> = run {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val client = OkHttpClient()
-        val workspace = Workspace(context, WorkspaceGrant(context))
-        listOf(
-            // Online, because this test is about what the catalogue says rather than about
-            // when it is offered.
-            WebSearchTool(
-                client,
-                SearchSettings(context, SecretSealer.Unavailable),
-                Reachability { true },
-            ),
-            FetchUrlTool(client, Reachability { true }, workspace, SessionArtifacts()),
-            SearchFilesTool(workspace),
-            ReadFileTool(workspace),
-            WriteFileTool(workspace, SessionArtifacts(), CanvasBoard()),
-            RunScriptTool(Sandbox(context), workspace),
-            SaveMemoryTool(Memory(context)),
-            ReadMemoryTool(Memory(context)),
-            UpdateMemoryTool(Memory(context)),
-            ForgetMemoryTool(Memory(context)),
-        )
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /**
+     * Every tool the app registers, for the checks that are about each one's schema.
+     *
+     * With a folder shared, so that the file and canvas tools count as available in the
+     * measurement below; a schema is checked whether or not its tool is on offer. Lazy,
+     * because the grant is the app's real one and lives in its preferences: once taken it
+     * is visible to every registry built after it in the same test, and the measurement
+     * of what an install has before sharing anything has to be made before this exists.
+     */
+    private val tools: List<Tool> by lazy {
+        AppToolRegistry.build(context, sharedFolder = true).all
     }
 
-    private val definitions: List<ToolDefinition> = tools.map { it.definition }
+    private val definitions: List<ToolDefinition> by lazy { tools.map { it.definition } }
 
     @Test
     fun `every schema is json an object and has properties`() {
@@ -164,12 +138,19 @@ class ToolCatalogueTest {
         // in its system message on every pass of every turn. It is the share of the window
         // spent before the user has said anything, and the number that grows quietly as tools
         // are added, so it is asserted rather than trusted.
-        val everything = ToolPrompting.describe(definitions).length / CHARS_PER_TOKEN
-        // "Every install" means on by default as well as able to run: the memory tools are
-        // available the moment their switch is on, but no install ships with it on.
-        val shipped = ToolPrompting
-            .describe(tools.filter { it.isAvailable && it.defaultsOn }.map { it.definition })
-            .length / CHARS_PER_TOKEN
+        //
+        // "Every install" means on by default as well as able to run, with nothing shared
+        // yet: the memory tools are available the moment their switch is on, but no install
+        // ships with it on, and the file tools describe themselves only once a folder is.
+        // Measured first, before [tools] takes the grant; measured after, it would count
+        // the file tools too, and trip the ceiling by a thousand tokens rather than pass.
+        val shipped = tokens(
+            AppToolRegistry.build(context).all.filter { it.isAvailable && it.defaultsOn },
+        )
+        // The most a turn can be shown: auto mode, a folder shared, every switch on. The two
+        // plan-mode tools gate themselves behind boards nothing here has written to and are
+        // never described beside these, exactly as on the phone.
+        val everything = tokens(tools.filter { it.isAvailable })
 
         assertThat(shipped).isGreaterThan(0)
         assertWithMessage("the tools every install has cost about $shipped tokens")
@@ -177,6 +158,9 @@ class ToolCatalogueTest {
         assertWithMessage("the whole catalogue costs about $everything tokens")
             .that(everything).isLessThan(FULL_CEILING)
     }
+
+    private fun tokens(offered: List<Tool>): Int =
+        ToolPrompting.describe(offered.map { it.definition }).length / CHARS_PER_TOKEN
 
     private fun ToolDefinition.schema(): JsonObject =
         Json.parseToJsonElement(parametersJson).jsonObject
@@ -186,7 +170,7 @@ class ToolCatalogueTest {
         const val CHARS_PER_TOKEN = 4
 
         /**
-         * What the three tools every install has cost to describe, with room to edit.
+         * What the tools every install has cost to describe, with room to edit.
          *
          * Was 378 tokens for web_search, fetch_url and run_script, ceiling 448. Now about
          * 445, and the ceiling moved with it rather than the descriptions being shaved to
@@ -202,14 +186,20 @@ class ToolCatalogueTest {
          * already answered correctly.
          *
          * The property this ceiling exists for is unchanged: the margin absorbs a copy
-         * edit, and a fourth default tool, which costs 40 to 90 tokens, still trips it.
+         * edit, and another default tool, which costs 40 to 90 tokens, still trips it.
          *
          * 512 became 576 when fetch_url gained save_to: a page larger than the context
          * window can now land in a file for the sandbox to work through, which is the
          * capability that makes fetch-then-parse a loop instead of a dead end. About 25
          * tokens after trimming, paid consciously.
+         *
+         * 576 became 832 when the measurement moved onto the registry the app builds, and
+         * found two default tools the hand-kept list had never counted: show_pictures and
+         * watch had been on by default on every install for weeks, about three hundred
+         * tokens between them, without this number knowing. Measured at 775 the day it
+         * moved. The catalogue did not grow; the count caught up with it.
          */
-        const val DEFAULT_CEILING = 576
+        const val DEFAULT_CEILING = 832
 
         /**
          * And what all of them cost, once a folder has been shared: was 672 tokens, now
@@ -261,7 +251,15 @@ class ToolCatalogueTest {
          * memory writing switch, and the reading switch, all off until the user says
          * otherwise, so no install pays it by accident — and the shipped number above is
          * untouched.
+         *
+         * 1312 became 1984 when the measurement moved onto the registry itself. The
+         * hand-kept list this test used to describe had six tools the app was already
+         * offering with a folder shared — show_pictures, delete_file, show_website,
+         * show_document, show_slides and watch — and none of the entries above had been
+         * counting them, whatever their prose says. Measured at 1906 tokens the day it
+         * moved, which is the true size of the fullest prompt a turn can be shown, and
+         * the number this ceiling has claimed to bound all along.
          */
-        const val FULL_CEILING = 1312
+        const val FULL_CEILING = 1984
     }
 }

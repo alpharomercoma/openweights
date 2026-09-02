@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.time.LocalDate
 
 /**
  * The background warms that keep a rewritten prompt out of the user's wait.
@@ -121,42 +122,54 @@ class ChatWarmTest : ChatFixture() {
     @Test
     fun `a conversation keeps its day across midnight and a fresh chat picks up the new one`() =
         runTest(dispatcher) {
-            loadModel()
-            engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
-            val startDay = PromptDay.pinned
-            viewModel.send("Who is Ada Lovelace?")
-            settle(steps = FOLD_SETTLE_STEPS)
+            // The day is the test's rather than the wall clock's, so midnight is a line in
+            // this test and never a moment it happens to straddle: read live, a pin taken
+            // before the stroke was compared with a now() read after it, and the test was
+            // one that could only fail at 00:00.
+            val firstDay = LocalDate.of(2026, 9, 1)
+            val realToday = PromptDay.today
+            PromptDay.today = { firstDay }
+            try {
+                loadModel()
+                engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
+                viewModel.send("Who is Ada Lovelace?")
+                settle(steps = FOLD_SETTLE_STEPS)
+                assertThat(PromptDay.pinned).isEqualTo(firstDay)
 
-            // Midnight passes with the process alive and a conversation open. Rendered
-            // live, the date line diverged every prompt from the cache, and a hybrid
-            // model paid a full foreground re-read for the next "hi" — the measured
-            // incident this pins.
-            val yesterday = java.time.LocalDate.now().minusDays(1)
-            PromptDay.pin(yesterday)
+                // Midnight passes with the process alive and a conversation open. Rendered
+                // live, the date line diverged every prompt from the cache, and a hybrid
+                // model paid a full foreground re-read for the next "hi" — the measured
+                // incident this pins.
+                val secondDay = firstDay.plusDays(1)
+                PromptDay.today = { secondDay }
 
-            // A warm fired mid-conversation — a branch here — must not move the day:
-            // the conversation keeps the bytes its cache holds, which is the engine
-            // record replaying the first question exactly as it was sent, date and all.
-            engine.warmCalls.clear()
-            viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
-            settle(steps = FOLD_SETTLE_STEPS)
-            assertThat(PromptDay.pinned).isEqualTo(yesterday)
-            // The head must stay byte-identical across midnight — that is the point of
-            // moving the date out of it — while the conversation's first question keeps
-            // carrying the day it started with.
-            val branchWarm = engine.warmCalls.last { call ->
-                call.messages.any { it.role == ChatRole.USER }
+                // A warm fired mid-conversation — a branch here — must not move the day:
+                // the conversation keeps the bytes its cache holds, which is the engine
+                // record replaying the first question exactly as it was sent, date and all.
+                engine.warmCalls.clear()
+                viewModel.branchFrom(viewModel.uiState.value.transcript.last().id)
+                settle(steps = FOLD_SETTLE_STEPS)
+                assertThat(PromptDay.pinned).isEqualTo(firstDay)
+                // The head must stay byte-identical across midnight — that is the point of
+                // moving the date out of it — while the conversation's first question keeps
+                // carrying the day it started with.
+                val branchWarm = engine.warmCalls.last { call ->
+                    call.messages.any { it.role == ChatRole.USER }
+                }
+                assertThat(branchWarm.messages.first().text).doesNotContain("Today is")
+                assertThat(
+                    branchWarm.messages.first { it.role == ChatRole.USER }.text,
+                ).contains("Today is $firstDay.")
+
+                // A fresh chat is a new start: its warm moves the pin and reads the new
+                // head in the background, before anybody has typed.
+                viewModel.newChat()
+                settle(steps = FOLD_SETTLE_STEPS)
+                assertThat(PromptDay.pinned).isEqualTo(secondDay)
+            } finally {
+                PromptDay.today = realToday
+                PromptDay.refresh()
             }
-            assertThat(branchWarm.messages.first().text).doesNotContain("Today is")
-            assertThat(
-                branchWarm.messages.first { it.role == ChatRole.USER }.text,
-            ).contains("Today is $startDay.")
-
-            // A fresh chat is a new start: its warm moves the pin and reads the new
-            // head in the background, before anybody has typed.
-            viewModel.newChat()
-            settle(steps = FOLD_SETTLE_STEPS)
-            assertThat(PromptDay.pinned).isEqualTo(java.time.LocalDate.now())
         }
 
     @Test

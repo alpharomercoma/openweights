@@ -50,14 +50,21 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import java.io.File
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.nio.file.Files
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The chat screen, wired to a real database and a fake engine.
@@ -83,6 +90,9 @@ abstract class ChatFixture {
     protected lateinit var viewModel: ChatViewModel
     protected lateinit var chats: ChatRepository
 
+    /** Room's executor, wrapped so a settle can see a query or a write still in flight. */
+    private lateinit var databaseWork: TrackedExecutor
+
     /**
      * The board a goal reads its plan off, held so a test can be the model that proposed it.
      *
@@ -101,8 +111,15 @@ abstract class ChatFixture {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        databaseWork = TrackedExecutor(
+            Executors.newFixedThreadPool(DATABASE_THREADS) { Thread(it, "openweights-test-db") },
+        )
         database = Room.inMemoryDatabaseBuilder(context, OpenWeightsDatabase::class.java)
             .allowMainThreadQueries()
+            // Room's own default is a four-thread pool exactly like this one. The wrapper is
+            // the only difference, and it is how settle knows a write has not landed yet.
+            .setQueryExecutor(databaseWork)
+            .setTransactionExecutor(databaseWork)
             .build()
 
         engine = FakeInferenceEngine()
@@ -183,14 +200,14 @@ abstract class ChatFixture {
         // This is not the draining the comment above rejects. That was draining *instead of*
         // cancelling, which lets work meant to die run to completion against a fixture that
         // is already half gone. Draining *after* cancelling only gives work that is already
-        // dead somewhere to unwind, which it has to have.
-        repeat(TEARDOWN_STEPS) {
-            runCatching { dispatcher.scheduler.advanceUntilIdle() }
-            Thread.sleep(SETTLE_PAUSE_MS)
-        }
+        // dead somewhere to unwind, which it has to have. It used to get three fixed pauses
+        // for that; now it gets until nothing is running anywhere, which is the same thing
+        // asked rather than guessed.
+        runCatching { drainUntilQuiet(TEARDOWN_CEILING_MS) }
         runCatching { dispatcher.scheduler.advanceUntilIdle() }
 
         database.close()
+        databaseWork.shutdown()
         models.deleteRecursively()
         Dispatchers.resetMain()
     }
@@ -333,69 +350,182 @@ abstract class ChatFixture {
     }
 
     /**
-     * Runs the view model's work until the state stops changing.
+     * Runs the view model's work until there is none left anywhere it can be.
      *
      * advanceUntilIdle alone is not enough here. The view model reads preferences from
-     * DataStore, which runs on a real dispatcher, so a coroutine can be parked off the test
-     * scheduler with nothing left for the scheduler to run. Alternating a short real wait
-     * with a drain lets that work land and its continuation be picked up.
+     * DataStore and writes through Room, both on real dispatchers, so a coroutine can be
+     * parked off the test scheduler with nothing left for the scheduler to run, and come
+     * back a moment later with more. This used to alternate a drain with a fixed real wait,
+     * [steps] times, which was a guess at how long the round trips take: too few and a test
+     * failed on a slower machine, and the sixteen it took to be safe cost 320 ms on every
+     * call whether anything was running or not. Two hundred call sites made that over a
+     * minute of the suite spent asleep.
+     *
+     * Now it asks. Three places can hold work in flight — the pool that Dispatchers.IO and
+     * Default share, Room's executor, and the scheduler's own queue — and each one can say
+     * whether it does. The loop drains, looks at all three, and returns once they have been
+     * empty together on [QUIET_CHECKS] consecutive looks a millisecond apart, which is the
+     * margin for a worker that has been handed a task and not yet woken to run it. A
+     * ceiling still bounds it, sized by [steps] so that the callers that asked for the
+     * longest waits get the most patience, but none of it is spent unless something is
+     * genuinely still running.
      */
     protected fun TestScope.settle(steps: Int = SETTLE_STEPS) {
-        repeat(steps) {
-            advanceUntilIdle()
-            Thread.sleep(SETTLE_PAUSE_MS)
-        }
-        advanceUntilIdle()
+        drainUntilQuiet(ceilingMs = steps * STEP_CEILING_MS)
     }
 
     /**
-     * Runs the work until [condition] holds, instead of for a fixed number of alternations.
+     * Runs the work until [condition] holds, and fails if it never does.
      *
-     * For work whose length scales with its input rather than with the turn: staging a
-     * seven-file batch is seven sequential IO round trips, which fit inside [settle]'s
-     * grace on a fast laptop and did not on the two-core CI runner — five of seven staged,
-     * red on exactly one machine. Waiting on the state instead of the clock is the fix the
-     * fixed-step comment below was warning about. Exits the moment the condition is true,
-     * so the fast machine stays fast; the ceiling only prices the slow one.
+     * [settle] waits for everything to finish; this waits for one thing to become true,
+     * which is the tool for a state the work only passes through, and for a wait whose
+     * failure should say what it was waiting for rather than surface as whatever the next
+     * assertion happened to trip over. It arrived when staging a seven-file batch, seven
+     * sequential IO round trips, fit inside the old fixed-step grace on a fast laptop and
+     * not on the two-core CI runner: five of seven staged, red on exactly one machine.
+     * Exits the moment the condition is true, so the fast machine stays fast; the ceiling
+     * only prices the slow one.
      */
     protected fun TestScope.settleUntil(condition: () -> Boolean) {
-        repeat(CONDITION_STEPS) {
-            advanceUntilIdle()
+        val deadline = System.nanoTime() + CONDITION_CEILING_MS * NANOS_PER_MILLI
+        while (true) {
+            dispatcher.scheduler.advanceUntilIdle()
             if (condition()) return
-            Thread.sleep(SETTLE_PAUSE_MS)
+            if (System.nanoTime() >= deadline) break
+            Thread.sleep(POLL_MS)
         }
-        advanceUntilIdle()
+        dispatcher.scheduler.advanceUntilIdle()
         check(condition()) { "state never settled into the expected shape" }
+    }
+
+    /**
+     * Drains and re-drains until nothing is in flight anywhere, or [ceilingMs] passes.
+     *
+     * The order of the looks matters. The scheduler is drained first, then the pool and
+     * the database are looked at, and the scheduler's queue is asked last: a worker that
+     * finishes between the look and the question hands the scheduler its continuation,
+     * and asking afterwards is what makes that continuation count as work still to do.
+     * The one thing no order can see is a task handed to a parked worker that has not yet
+     * woken, which is why quiet has to hold on consecutive looks before it is believed.
+     */
+    private fun drainUntilQuiet(ceilingMs: Long) {
+        val deadline = System.nanoTime() + ceilingMs * NANOS_PER_MILLI
+        var quietLooks = 0
+        while (System.nanoTime() < deadline) {
+            dispatcher.scheduler.advanceUntilIdle()
+            val quiet = !CoroutinePool.isBusy() &&
+                databaseWork.isIdle &&
+                dispatcher.scheduler.hasNothingQueued()
+            quietLooks = if (quiet) quietLooks + 1 else 0
+            if (quietLooks >= QUIET_CHECKS) return
+            Thread.sleep(POLL_MS)
+        }
+    }
+
+    /** Whether the scheduler holds nothing at all, delayed or otherwise. */
+    private fun TestCoroutineScheduler.hasNothingQueued(): Boolean =
+        SCHEDULER_IS_IDLE.invoke(this) as Boolean
+
+    /**
+     * An executor that can say whether anything handed to it is still queued or running.
+     *
+     * Room runs its queries and transactions on whatever executor it is given and says
+     * nothing about them until the caller's continuation lands back on the scheduler. In
+     * between, this count is the only way a settle can see the write it is waiting for.
+     */
+    private class TrackedExecutor(private val pool: ExecutorService) : Executor {
+        private val inFlight = AtomicInteger()
+
+        val isIdle: Boolean get() = inFlight.get() == 0
+
+        override fun execute(command: Runnable) {
+            inFlight.incrementAndGet()
+            try {
+                pool.execute {
+                    try {
+                        command.run()
+                    } finally {
+                        inFlight.decrementAndGet()
+                    }
+                }
+            } catch (rejected: RejectedExecutionException) {
+                inFlight.decrementAndGet()
+                throw rejected
+            }
+        }
+
+        fun shutdown() {
+            pool.shutdown()
+        }
     }
 
     protected companion object {
         /**
-         * Enough passes for every piece of off-scheduler work in a turn to land.
+         * The default patience, in steps of [STEP_CEILING_MS].
          *
-         * Six covered a DataStore read and its continuation. A turn now also waits for the
-         * reply to be written before it reports itself finished, which is a database round
-         * trip on a real dispatcher and needs its own alternations; at six, a third turn in
-         * a row simply had not happened yet when the assertions ran. Ten is the floor
-         * measured here and this is above it, because the failure mode of too few is a test
-         * that passes on this machine and not on a slower one.
+         * Sixteen was the number of drain-and-sleep alternations a turn needed back when
+         * settle waited blind: six covered a DataStore read and its continuation, and the
+         * reply write a turn waits for before reporting itself finished took the rest. It
+         * stays as the unit the call sites are written in.
          */
         const val SETTLE_STEPS = 16
-        const val SETTLE_PAUSE_MS = 20L
+
+        /**
+         * The ceiling a settle gets per step, now that the steps are no longer waited out.
+         *
+         * The callers that asked for the most steps were the ones with the most work to
+         * wait for, so the same number sizes how long settle may keep looking. Half a
+         * second a step is twenty-five times what a step used to sleep, and none of it is
+         * spent unless something is still running.
+         */
+        const val STEP_CEILING_MS = 500L
+
+        /** How often settle looks, and the spacing of the looks that confirm quiet. */
+        const val POLL_MS = 1L
+
+        /**
+         * Consecutive quiet looks before settle believes it.
+         *
+         * A worker that has just been handed a task reads as parked until the OS wakes it,
+         * so one look can miss work a few microseconds from starting. Three looks a
+         * millisecond apart make that miss need a wake-up slower than two milliseconds.
+         */
+        const val QUIET_CHECKS = 3
 
         /** How many times to re-check the table before giving up and asserting on it. */
         const val AWAIT_STEPS = 20
 
         /** [settleUntil]'s ceiling: two seconds of real time, paid only when needed. */
-        const val CONDITION_STEPS = 100
+        const val CONDITION_CEILING_MS = 2_000L
 
         /**
-         * Passes given to work that has been cancelled and has to unwind.
+         * How long cancelled work gets to unwind before the database goes.
          *
-         * Small, because nothing here is being waited *for*: the work is already dead and
-         * this only gives it somewhere to notice. Three covers a suspension on a real
-         * dispatcher and its continuation, which is the shape the DataStore reads have.
+         * Nothing here is being waited *for*: the work is already dead and this only gives
+         * it somewhere to notice, so the usual case is three quiet looks and the ceiling is
+         * for the one that is not.
          */
-        const val TEARDOWN_STEPS = 3
+        const val TEARDOWN_CEILING_MS = 2_000L
+
+        /** Room's own default pool is this wide, and the fixture's stand-in matches it. */
+        const val DATABASE_THREADS = 4
+
+        const val NANOS_PER_MILLI = 1_000_000L
+
+        /**
+         * The scheduler's own answer to "is anything queued", which it keeps internal.
+         *
+         * `advanceUntilIdle` runs what is queued and returns, and a worker thread can queue
+         * the next thing a microsecond later with nothing public to say so. The internal
+         * check is one synchronized `isEmpty` over the event heap, resolved once here so
+         * that a coroutines upgrade which renames it fails on the first settle with this
+         * message, rather than as tests that quietly stop waiting.
+         */
+        private val SCHEDULER_IS_IDLE: Method = runCatching {
+            TestCoroutineScheduler::class.java.getMethod("isIdle\$kotlinx_coroutines_test")
+        }.getOrElse {
+            error("TestCoroutineScheduler no longer exposes isIdle; update ChatFixture.settle")
+        }
 
         /** A fold runs the model, resets the cache and writes, all before its turn starts. */
         const val FOLD_SETTLE_STEPS = 30
@@ -409,6 +539,43 @@ abstract class ChatFixture {
         /** Virtual milliseconds a held load takes, long enough to interleave a second. */
         const val LOAD_MS = 500L
     }
+}
+
+/**
+ * The pool Dispatchers.IO and Dispatchers.Default share, asked whether any worker is busy.
+ *
+ * Nothing public answers that. Each worker is a thread carrying a public state field, and
+ * two of its states mean "running a task": one for work that holds a CPU permit, one for
+ * work that is allowed to block, which is what DataStore's reads and the file copies are.
+ * Everything else — parked, dormant, terminated — is a worker with nothing to do.
+ */
+private object CoroutinePool {
+    private val worker: Class<*> = runCatching {
+        Class.forName("kotlinx.coroutines.scheduling.CoroutineScheduler\$Worker")
+    }.getOrElse { error("the coroutine scheduler's worker moved; update ChatFixture.settle") }
+
+    private val state: Field = worker.getField("state")
+
+    private val busy = setOf("CPU_ACQUIRED", "BLOCKING")
+
+    fun isBusy(): Boolean = liveThreads().any { thread ->
+        worker.isInstance(thread) && state.get(thread).toString() in busy
+    }
+
+    private fun liveThreads(): List<Thread> {
+        var root: ThreadGroup = Thread.currentThread().threadGroup
+        while (root.parent != null) root = root.parent
+        var threads = arrayOfNulls<Thread>(root.activeCount() + THREAD_SLACK)
+        var count = root.enumerate(threads, true)
+        while (count == threads.size) {
+            threads = arrayOfNulls(threads.size * 2)
+            count = root.enumerate(threads, true)
+        }
+        return threads.take(count).filterNotNull()
+    }
+
+    /** Room for threads started between the count and the enumeration. */
+    private const val THREAD_SLACK = 16
 }
 
 /**

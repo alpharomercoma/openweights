@@ -53,6 +53,24 @@ class CpuTopologyTest {
     }
 
     @Test
+    fun `keeps every core when the slow cluster is made of big cores`() {
+        // The Dimensity 9400: four A720s at 2.4 GHz under three X4s and an X925. By
+        // frequency the A720s are the slow cluster; by part they are big cores doing two
+        // thirds of an X4's work, and dropping them cost a quarter of the prompt speed.
+        val dimensity = List(4) { 2_400_000L } + List(3) { 3_300_000L } + listOf(3_730_000L)
+        val parts = List(4) { A720 } + List(3) { X4 } + listOf(X925)
+        assertThat(CpuTopology.performanceCores(dimensity, parts)).isEqualTo(8)
+    }
+
+    @Test
+    fun `drops the cores that are little by part, not by frequency`() {
+        // The Snapdragon 8 Gen 3 again, now with its parts: the two A520s go.
+        val frequencies = listOf(3_300_000L) + List(5) { 3_000_000L } + List(2) { 2_270_000L }
+        val parts = listOf(X4) + List(5) { A720 } + List(2) { A520 }
+        assertThat(CpuTopology.performanceCores(frequencies, parts)).isEqualTo(6)
+    }
+
+    @Test
     fun `keeps all but two when the fast cluster is a minority`() {
         // Two fast cores cannot carry two thirds of a chip's worth of work on their own,
         // so the other cluster keeps its place in the barrier. Not every core of it: on
@@ -90,6 +108,10 @@ class CpuTopologyTest {
 
         /** Two speeds, for the shapes where only the split matters. */
         const val SLOW = 1_800_000L
+        const val A520 = 0xd80
+        const val A720 = 0xd81
+        const val X4 = 0xd82
+        const val X925 = 0xd85
         const val FAST = 2_800_000L
     }
 

@@ -51,7 +51,7 @@ import java.io.File
  * | chip | clusters | picks |
  * | --- | --- | ---: |
  * | SM8650 | 1 + 5 + 2 | 6, and 6 is what measured fastest |
- * | Dimensity MT6991 | 8 at one speed | 8, which is what measured fastest there |
+ * | Dimensity MT6991 | 4 A720 + 3 X4 + 1 X925 | 8, which is what measured fastest there |
  * | Snapdragon 8 Elite | 2 + 6, both fast | 6: all but two, see [SPARE_CORES] |
  * | a 4 + 4 phone, the commonest Android shape | 4 + 4 | 4 |
  * | a 2 + 6 phone | 2 + 6 | 8 |
@@ -78,24 +78,60 @@ object CpuTopology {
      * rather than a guess: an unreadable `cpufreq` means no evidence that any core is
      * slower, and the old behaviour is what was measured on the phones that do read.
      */
-    fun performanceCores(): Int = performanceCores(maxFrequencies())
+    fun performanceCores(): Int = performanceCores(maxFrequencies(), cpuParts())
 
     /**
      * The same decision over readings already taken, which is what makes it testable
      * anywhere: a unit test host has no `/sys/devices/system/cpu` to describe a phone with.
+     *
+     * [parts] are the cores' part numbers from `/proc/cpuinfo`, and they decide what a
+     * slow cluster is. A frequency cannot: the Dimensity 9400 keeps four Cortex-A720s at
+     * 2.4 GHz beside four faster cores, and by frequency they look like the Snapdragon 8
+     * Gen 3's two A520s at 2.27, which are the cores the rule exists to drop. They are not
+     * the same core. An A520 is an in-order core that does about half an A720's work per
+     * step; an A720 at 2.4 GHz does two thirds of an X4's, and dropping four of them cost
+     * the Dimensity a quarter of its prompt speed (72 tok/s on four threads against 96 on
+     * eight, measured with Qwen3-1.7B Q8_0 on 2026-09-03). So a cluster is dropped when
+     * its cores are little by design, and only then; the frequency shape is the fallback
+     * for a kernel that will not say what its cores are.
      */
-    internal fun performanceCores(frequencies: List<Long>?): Int {
+    internal fun performanceCores(frequencies: List<Long>?, parts: List<Int>? = null): Int {
         if (frequencies == null || frequencies.size < MIN_CORES_TO_SPLIT) return allCores
+        val size = frequencies.size
 
+        val littles = parts?.takeIf { it.size == size }?.count { it in LITTLE_PARTS }
         val slowest = frequencies.min()
         val fastCount = frequencies.count { it > slowest }
-        // Nothing to drop when every core runs at one speed, and nothing worth dropping
-        // when what survives is a minority: see the note above this object for why the
-        // line falls at half rather than anywhere else.
-        if (fastCount == 0) return frequencies.size
-        if (fastCount * 2 < frequencies.size) return frequencies.size - SPARE_CORES
-        return fastCount
+        return when {
+            // Drop the little cores when at least half the chip is left without them;
+            // when they are the majority the fast cores cannot carry the chip's worth of
+            // work on their own, and the littles keep their place in the barrier.
+            littles != null && littles > 0 -> (size - littles).takeIf { it * 2 >= size } ?: size
+            // Nothing to drop when every core runs at one speed.
+            fastCount == 0 -> size
+            // When the fast cluster is a minority, hold two cores back: see [SPARE_CORES].
+            fastCount * 2 < size -> size - SPARE_CORES
+            // No little cores among them, and the fast ones at least half: every core is
+            // a big core and every core is worth a thread (the Dimensity 9400). Only a
+            // kernel that would not name its cores is left to the frequency shape.
+            littles == null -> fastCount
+            else -> size
+        }
     }
+
+    /**
+     * Every core's part number, in core order, or null if the kernel will not say.
+     *
+     * `/proc/cpuinfo` lists each online core with its implementer and part; a phone
+     * with a core offline at that moment reads short, and a short list is treated as no
+     * answer rather than matched against the wrong cores.
+     */
+    private fun cpuParts(): List<Int>? = runCatching {
+        File("/proc/cpuinfo").readLines()
+            .filter { it.startsWith("CPU part") }
+            .map { it.substringAfter(':').trim().removePrefix("0x").toInt(HEX) }
+            .takeIf { it.isNotEmpty() }
+    }.getOrNull()
 
     /**
      * Every core's ceiling in kHz, or null if any of them will not say.
@@ -147,4 +183,14 @@ object CpuTopology {
      * keeps every core, because the Dimensity 9400 measured fastest that way.
      */
     private const val SPARE_CORES = 2
+
+    private const val HEX = 16
+
+    /**
+     * Arm's in-order cores, the ones a prompt is better off without: Cortex-A53, A35,
+     * A55, A510 and A520. Everything else Arm ships in a phone is out of order and earns
+     * its thread; so does every Oryon core, which Qualcomm numbers its own way and which
+     * is handled by the frequency rule above.
+     */
+    private val LITTLE_PARTS = setOf(0xd03, 0xd04, 0xd05, 0xd46, 0xd80)
 }

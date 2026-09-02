@@ -71,6 +71,18 @@ and a 24-token one for decode, on the same three cloud phones, 2026-09-03:
 | Snapdragon 8 Elite | 163 | 318 | **345** | 92 |
 | Tensor G5 | 69 | **130** | 97 | 89 |
 | Exynos 2400 | 67 | **115** | 88 | 92 |
+| Dimensity 9400 (in hand) | 46 | 73 | 84 | **96** |
+
+**The Dimensity had been losing a quarter of its prompt speed since 23 August.** The
+thread rule of that day dropped a chip's slowest cluster, and described the Dimensity
+as eight cores at one speed. Its kernel says four at 2.4 GHz, three at 3.3 and one at
+3.73, so the rule handed it four threads, and four is the 73 in the table. The four
+slow cores are Cortex-A720s, big cores by design; by frequency alone they look like
+the Snapdragon 8 Gen 3's two A520s, which are the cores the rule exists to drop, and
+which do half the work per step where an A720 at 2.4 GHz does two thirds of an X4's.
+The rule now reads the part number from `/proc/cpuinfo` and drops a cluster only when
+its cores are in-order little cores; the frequency shape is the fallback for a kernel
+that will not say. The Dimensity is back to eight, measured.
 
 **The 8 Elite's prefill was a thread count, and the app's own.** With eight batch
 threads a 24-token prompt costs a fixed 3.5 seconds per call, whatever its length, and a

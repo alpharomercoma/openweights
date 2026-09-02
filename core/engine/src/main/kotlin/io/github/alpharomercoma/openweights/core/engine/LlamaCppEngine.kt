@@ -455,9 +455,10 @@ class LlamaCppEngine internal constructor(
             (Runtime.getRuntime().availableProcessors() / 2).coerceIn(MIN_THREADS, MAX_GEN_THREADS)
 
         /**
-         * Prompt processing is compute-bound and scales with cores, but only with cores of
-         * the same speed. On the MT6991, where all eight are, 8 threads gave 69.5 tok/s
-         * against 55.3 at 4. On an SM8650, where two of the eight are A520s, 8 threads gave
+         * Prompt processing is compute-bound and scales with cores, but only with cores
+         * that are big by design. On the MT6991, whose eight all are (four A720s under
+         * three X4s and an X925), 8 threads gave 69.5 tok/s against 55.3 at 4, and 96
+         * against 72 when remeasured on 2026-09-03. On an SM8650, where two of the eight are A520s, 8 threads gave
          * 105.2 t/s against 139.0 at 6: the barrier at the end of each operation waits for
          * the slowest thread, and a slice on a little core takes about twice as long.
          *

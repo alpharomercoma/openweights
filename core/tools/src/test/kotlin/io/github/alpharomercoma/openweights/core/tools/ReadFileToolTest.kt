@@ -17,8 +17,6 @@
 package io.github.alpharomercoma.openweights.core.tools
 
 import android.content.Context
-import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -27,9 +25,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
-import org.robolectric.fakes.RoboCursor
-import java.io.ByteArrayInputStream
 
 /**
  * What read_file does with the one number the model controls.
@@ -43,56 +38,27 @@ import java.io.ByteArrayInputStream
 @RunWith(RobolectricTestRunner::class)
 class ReadFileToolTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val tree: Uri = Uri.parse("content://openweights.test/tree/root")
-    private val workspace =
-        Workspace(context, WorkspaceGrant(context).also { it.remember(tree) })
+    private val provider = FakeDocumentsProvider.register()
+    private val workspace = Workspace(
+        context,
+        WorkspaceGrant(context).also { it.remember(FakeDocumentsProvider.TREE) },
+    )
     private val tool = ReadFileTool(workspace)
 
-    /** How many times the file was opened, which for some offsets should be never. */
-    private var opened = 0
-
-    /** The one row the folder listing answers with: id, type, name and reported size. */
-    private var listing: Array<Any?> = emptyArray()
+    /** How many times the file was opened to read, which for some offsets should be never. */
+    private val opened: Int get() = provider.opens.count { it == "notes.txt:r" }
 
     /**
-     * Puts one text file in the shared folder, sized as [reported]; null stands for a
-     * provider that does not say, which the contract allows.
+     * Puts one text file in the shared folder. [reported] false stands for a provider that
+     * does not say how big it is, which the contract allows.
      */
-    private fun share(text: String, reported: Long? = text.toByteArray().size.toLong()) {
-        listing = arrayOf("doc-1", "text/plain", "notes.txt", reported)
-        val bytes = text.toByteArray()
-        shadowOf(context.contentResolver).registerInputStreamSupplier(
-            DocumentsContract.buildDocumentUriUsingTree(tree, "doc-1"),
-        ) {
-            opened++
-            ByteArrayInputStream(bytes)
-        }
-    }
-
-    /** A cursor answers once and the walk closes it, so every call is given a new one. */
-    private fun listFolder() {
-        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
-            tree,
-            DocumentsContract.getTreeDocumentId(tree),
-        )
-        shadowOf(context.contentResolver).setCursor(
-            children,
-            RoboCursor().apply {
-                setColumnNames(
-                    listOf(
-                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                        DocumentsContract.Document.COLUMN_MIME_TYPE,
-                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                        DocumentsContract.Document.COLUMN_SIZE,
-                    ),
-                )
-                setResults(arrayOf(listing))
-            },
-        )
+    private suspend fun share(text: String, reported: Boolean = true) {
+        provider.reportsSize = reported
+        val put = workspace.put("notes.txt", text)
+        check(put.successful) { put.text }
     }
 
     private suspend fun read(offset: Any? = null): ToolExecution {
-        listFolder()
         val arguments = if (offset == null) {
             """{"path":"notes.txt"}"""
         } else {
@@ -169,7 +135,7 @@ class ReadFileToolTest {
 
     @Test
     fun `a size the provider does not report is found out by reading`() = runTest {
-        share("short", reported = null)
+        share("short", reported = false)
 
         assertThat(read(3).text).isEqualTo("rt")
         assertThat(read(50).text)

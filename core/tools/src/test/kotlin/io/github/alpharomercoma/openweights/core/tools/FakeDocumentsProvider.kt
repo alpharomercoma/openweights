@@ -43,6 +43,9 @@ class FakeDocumentsProvider : DocumentsProvider() {
 
     var renames = true
 
+    /** Whether the listing carries a size; the contract lets a provider leave it out. */
+    var reportsSize = true
+
     /** Every open as `name:mode`, so a test can say what was never opened for writing. */
     val opens = mutableListOf<String>()
 
@@ -117,7 +120,7 @@ class FakeDocumentsProvider : DocumentsProvider() {
             Document.COLUMN_DISPLAY_NAME to file.name,
             Document.COLUMN_MIME_TYPE to
                 if (file.isDirectory) Document.MIME_TYPE_DIR else "text/plain",
-            Document.COLUMN_SIZE to file.length(),
+            Document.COLUMN_SIZE to file.length().takeIf { reportsSize },
         )
         addRow(columnNames.map(row::get))
     }

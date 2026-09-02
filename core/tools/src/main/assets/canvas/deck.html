@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slides</title>
-<script src="/__ow__/asset/marked.min.js"></script>
+<script src="__OW_BASE__/__ow__/asset/marked.min.js"></script>
 <style>
   /* A real presentation surface: every slide is authored on a fixed 1280x720 stage —
      the 16:9 the projector expects — and the stage is scaled to whatever screen is
@@ -178,7 +178,7 @@
   }
 
   function refresh() {
-    fetch("/" + FILE.split("/").map(encodeURIComponent).join("/"))
+    fetch("__OW_BASE__/" + FILE.split("/").map(encodeURIComponent).join("/"))
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         if (text === lastText) return;

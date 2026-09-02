@@ -57,6 +57,26 @@ class CanvasBoardTest {
     }
 
     @Test
+    fun `a site owns its folder and a document owns only itself`() {
+        // What the server is allowed to hand a page. A site reads its own stylesheet and
+        // nothing above its folder; a document rendered by the bundled viewer needs the one
+        // file and must not be able to read the notes beside it.
+        val site = Canvas(CanvasKind.SITE, "site/index.html", "site")
+        assertThat(site.contains("site/style.css")).isTrue()
+        assertThat(site.contains("site/index.html")).isTrue()
+        assertThat(site.contains("notes/passwords.md")).isFalse()
+        assertThat(site.contains("site-notes/plan.md")).isFalse()
+
+        val document = Canvas(CanvasKind.DOCUMENT, "report.md", "")
+        assertThat(document.contains("report.md")).isTrue()
+        assertThat(document.contains("notes/passwords.md")).isFalse()
+
+        val deck = Canvas(CanvasKind.SLIDES, "talk/slides.md", "talk")
+        assertThat(deck.contains("talk/slides.md")).isTrue()
+        assertThat(deck.contains("talk/notes.md")).isFalse()
+    }
+
+    @Test
     fun `showing again is a new generation, editing is not`() {
         val board = CanvasBoard()
         board.show(CanvasKind.SITE, "site/index.html", "site")

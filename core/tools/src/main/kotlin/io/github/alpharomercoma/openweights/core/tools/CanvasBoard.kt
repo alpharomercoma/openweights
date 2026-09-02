@@ -44,7 +44,25 @@ data class Canvas(
      * step back to the conversation without the screen forcing itself over them again.
      */
     val generation: Int = 0,
-)
+) {
+    /**
+     * Whether [path] is part of what this canvas shows.
+     *
+     * One answer for two questions — does a write here repaint the screen, and may the
+     * server hand this file to the page — because a page reading a file it could not have
+     * repainted from is exactly the read the server exists to refuse.
+     *
+     * A site is its entry and everything under the folder it is served from, since that is
+     * where its own CSS and scripts live; a root of "" is a site at the top of the shared
+     * folder, which is the whole folder. A document or a deck is one Markdown file rendered
+     * by a viewer the APK supplies, so it is the entry and nothing else: the notes beside
+     * a report are not part of the report.
+     */
+    fun contains(path: String): Boolean = when (kind) {
+        CanvasKind.SITE -> root.isEmpty() || path == entry || path.startsWith("$root/")
+        CanvasKind.DOCUMENT, CanvasKind.SLIDES -> path == entry
+    }
+}
 
 /**
  * The one canvas on screen, owned here the way [AskBoard] owns the pending question.
@@ -71,10 +89,7 @@ class CanvasBoard @Inject constructor() {
     /** Called after every workspace write; a write under the root is a visible change. */
     fun changed(path: String) {
         val canvas = current.value ?: return
-        val inside = canvas.root.isEmpty() ||
-            path == canvas.entry ||
-            path.startsWith(canvas.root + "/")
-        if (inside) current.value = canvas.copy(revision = canvas.revision + 1)
+        if (canvas.contains(path)) current.value = canvas.copy(revision = canvas.revision + 1)
     }
 
     fun dismiss() {

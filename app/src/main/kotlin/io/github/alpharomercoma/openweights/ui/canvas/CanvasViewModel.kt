@@ -57,5 +57,12 @@ class CanvasViewModel @Inject constructor(
         CanvasKind.SLIDES -> server.viewerUrlFor("deck", canvas.entry)
     }
 
-    fun dismiss() = board.dismiss()
+    /**
+     * Closes the canvas and the server behind it. A URL that was open in a browser tab
+     * stops answering, which is the point: the folder is served while it is on screen.
+     */
+    fun dismiss() {
+        board.dismiss()
+        server.stop()
+    }
 }

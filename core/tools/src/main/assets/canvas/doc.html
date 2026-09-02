@@ -7,12 +7,12 @@
      viewer behaves. -->
 <meta name="viewport" content="width=860">
 <title>Document</title>
-<script src="/__ow__/asset/marked.min.js"></script>
+<script src="__OW_BASE__/__ow__/asset/marked.min.js"></script>
 <script>
   /* Paged.js would otherwise paginate the empty shell on load; content arrives by fetch. */
   window.PagedConfig = { auto: false };
 </script>
-<script src="/__ow__/asset/paged.polyfill.min.js"></script>
+<script src="__OW_BASE__/__ow__/asset/paged.polyfill.min.js"></script>
 <style>
   html { background: #d9dbe0; }
   body { margin: 0; }
@@ -74,7 +74,7 @@
     // Paged.js renders into a fresh container each time; the old one goes first.
     document.querySelectorAll(".pagedjs_pages").forEach(function (n) { n.remove(); });
     var paged = new Paged.Previewer();
-    paged.preview(markdownToHtml(text), ["/__ow__/asset/doc-paged.css"], document.body).then(function (flow) {
+    paged.preview(markdownToHtml(text), ["__OW_BASE__/__ow__/asset/doc-paged.css"], document.body).then(function (flow) {
       document.body.classList.remove("unpaged");
       window.__ow = {
         pages: flow.total,
@@ -100,7 +100,7 @@
 
   function refresh() {
     if (rendering) return;
-    fetch("/" + FILE.split("/").map(encodeURIComponent).join("/"))
+    fetch("__OW_BASE__/" + FILE.split("/").map(encodeURIComponent).join("/"))
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (text) {
         if (text === lastText) return;

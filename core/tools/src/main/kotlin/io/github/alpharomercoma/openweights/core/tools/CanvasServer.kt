@@ -30,6 +30,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,14 +45,37 @@ import javax.inject.Singleton
  * GET only, one request per connection, files resolved through [Workspace.resolve] — the
  * same walk every file tool uses, which is what makes `../` inert here: a path is either
  * a chain of names the granted folder handed over, or it is nothing.
+ *
+ * ### Loopback is not private
+ *
+ * Every app on the phone shares 127.0.0.1, and `INTERNET` is a permission nobody is asked
+ * about. A server that answered any `GET` therefore handed the folder the user shared with
+ * this app to every other app installed, for as long as the process lived, and a scan of
+ * the ephemeral port range finds it in seconds. So three things gate a request now, and
+ * each one closes a different door:
+ *
+ * - **The key.** Every URL carries a random 128-bit path segment minted when the server
+ *   starts, and a request without it is answered as if the file did not exist. Only what
+ *   this app hands out — the WebView's URL, the Open-in-browser link — knows it. A cookie
+ *   would not do: browsers scope cookies by host and not by port, so a key stored that way
+ *   would be sent to any other app's loopback server the user later opened.
+ * - **The host.** A browser resolving somebody else's name to 127.0.0.1 still sends that
+ *   name as `Host`, so a request for anything but this address and port is refused.
+ * - **The canvas.** Files are served only from under the folder the canvas is showing.
+ *   A page the model built reads its own CSS; it does not read the notes beside it.
+ *
+ * And the server stops with the canvas: [stop] closes the socket and the key is minted
+ * afresh next time, so a URL copied out of one session opens nothing in the next.
  */
 @Singleton
 class CanvasServer @Inject constructor(
     private val workspace: Workspace,
+    private val board: CanvasBoard,
     @param:ApplicationContext private val context: Context,
 ) {
 
     private var socket: ServerSocket? = null
+    private var key: String = newKey()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** The port the server listens on, starting it on first use. */
@@ -68,11 +92,29 @@ class CanvasServer @Inject constructor(
         return server.localPort
     }
 
+    /**
+     * Closes the socket and forgets the key.
+     *
+     * Called when the canvas is dismissed. The next [port] starts a fresh server under a
+     * fresh key, so nothing that learned the old URL — a browser tab, another app that
+     * read it off the screen — can read a file from it.
+     */
+    @Synchronized
+    fun stop() {
+        socket?.let { runCatching { it.close() } }
+        socket = null
+        key = newKey()
+    }
+
+    /** `http://127.0.0.1:port/key`, the prefix every URL this server answers begins with. */
+    @Synchronized
+    private fun base(): String = "http://127.0.0.1:${port()}/$key"
+
     fun urlFor(path: String): String {
         val encoded = path.split('/').joinToString("/") {
             URLEncoder.encode(it, "UTF-8").replace("+", "%20")
         }
-        return "http://127.0.0.1:${port()}/$encoded"
+        return "${base()}/$encoded"
     }
 
     /**
@@ -83,8 +125,7 @@ class CanvasServer @Inject constructor(
      * and the tab in Chrome are the same rendering, byte for byte.
      */
     fun viewerUrlFor(kind: String, path: String): String =
-        "http://127.0.0.1:${port()}/$VIEWER_PREFIX/$kind?file=" +
-            URLEncoder.encode(path, "UTF-8")
+        "${base()}/$VIEWER_PREFIX/$kind?file=" + URLEncoder.encode(path, "UTF-8")
 
     private fun accept(server: ServerSocket) {
         while (!server.isClosed) {
@@ -99,33 +140,49 @@ class CanvasServer @Inject constructor(
         client.soTimeout = READ_TIMEOUT_MS
         val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.ISO_8859_1))
         val request = runCatching { reader.readLine() }.getOrNull() ?: return
-        // Drain the headers; the answer does not depend on any of them.
+        // The headers are drained; the one that matters is read on the way past.
+        var host: String? = null
         var header = runCatching { reader.readLine() }.getOrNull()
         while (!header.isNullOrEmpty()) {
+            if (header.startsWith("host:", ignoreCase = true)) {
+                host = header.substringAfter(':').trim()
+            }
             header = runCatching { reader.readLine() }.getOrNull()
         }
-        val parts = request.split(' ')
         val out = client.getOutputStream()
-        if (parts.size < 2 || parts[0] != "GET") {
-            out.write(response("405 Method Not Allowed", "text/plain", "GET only".toByteArray()))
-            return
-        }
-        val path = URLDecoder.decode(parts[1].substringBefore('?'), "UTF-8").trimStart('/')
-        val query = parts[1].substringAfter('?', "")
-        val viewer = viewerResponse(path, query)
-        if (viewer != null) {
-            out.write(viewer)
-            out.flush()
-            return
-        }
-        val body = runBlocking { read(path) }
-        if (body == null) {
-            out.write(response("404 Not Found", "text/plain", "No such file: $path".toByteArray()))
-        } else {
-            out.write(response("200 OK", contentTypeFor(path), body))
-        }
+        out.write(answer(request.split(' '), host, client.localPort))
         out.flush()
     }
+
+    /** The whole reply to one request line, gates first. */
+    private fun answer(parts: List<String>, host: String?, port: Int): ByteArray {
+        if (parts.size < 2 || parts[0] != "GET") {
+            return response("405 Method Not Allowed", "text/plain", "GET only".toByteArray())
+        }
+        if (host != "127.0.0.1:$port") {
+            return response("400 Bad Request", "text/plain", "Wrong host".toByteArray())
+        }
+        val decoded = URLDecoder.decode(parts[1].substringBefore('?'), "UTF-8").trimStart('/')
+        // Answered exactly like a missing file, so a scan learns nothing from the reply
+        // about whether it guessed a key or a name.
+        val keyed = decoded.substringBefore('/') == currentKey() && decoded.contains('/')
+        if (!keyed) {
+            val body = "No such file: $decoded".toByteArray()
+            return response("404 Not Found", "text/plain", body)
+        }
+        return route(decoded.substringAfter('/', ""), parts[1].substringAfter('?', ""))
+    }
+
+    /** A viewer, or a file the canvas on screen owns. */
+    private fun route(path: String, query: String): ByteArray {
+        viewerResponse(path, query)?.let { return it }
+        val body = runBlocking { read(path) }
+            ?: return response("404 Not Found", "text/plain", "No such file: $path".toByteArray())
+        return response("200 OK", contentTypeFor(path), body)
+    }
+
+    @Synchronized
+    private fun currentKey(): String = key
 
     /**
      * The bundled viewers and their assets, or null when [path] is an ordinary file.
@@ -180,17 +237,28 @@ class CanvasServer @Inject constructor(
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
             .replace("<", "\\u003c")
-        return response(
-            "200 OK",
-            "text/html; charset=utf-8",
-            shell.replace("__OW_FILE__", escaped).toByteArray(),
-        )
+        // The shells reach their assets and the file by absolute path, and every absolute
+        // path on this server begins with the key.
+        val body = shell
+            .replace("__OW_FILE__", escaped)
+            .replace("__OW_BASE__", "/${currentKey()}")
+        return response("200 OK", "text/html; charset=utf-8", body.toByteArray())
     }
 
+    /**
+     * The file at [path], or null when there is none — or when it is not the canvas's to
+     * show. Nothing is served while no canvas is on screen.
+     */
     private suspend fun read(path: String): ByteArray? {
-        val entry = workspace.resolve(path.ifEmpty { "index.html" }) ?: return null
-        if (entry.isDirectory) return read(if (path.isEmpty()) "index.html" else "$path/index.html")
-        return workspace.readBytes(entry)
+        val canvas = board.showing.value ?: return null
+        val wanted = path.ifEmpty { "index.html" }
+        if (!canvas.contains(wanted)) return null
+        val entry = workspace.resolve(wanted) ?: return null
+        return if (entry.isDirectory) {
+            read(if (path.isEmpty()) "index.html" else "$path/index.html")
+        } else {
+            workspace.readBytes(entry)
+        }
     }
 
     private fun response(status: String, type: String, body: ByteArray): ByteArray {
@@ -223,5 +291,12 @@ class CanvasServer @Inject constructor(
         const val VIEWER_PREFIX = "__ow__"
         const val BACKLOG = 8
         const val READ_TIMEOUT_MS = 10_000
+        const val KEY_BYTES = 16
+
+        /** 128 random bits as hex: unguessable, and nothing a URL needs escaping for. */
+        fun newKey(): String {
+            val bytes = ByteArray(KEY_BYTES).also { SecureRandom().nextBytes(it) }
+            return bytes.joinToString("") { "%02x".format(it) }
+        }
     }
 }

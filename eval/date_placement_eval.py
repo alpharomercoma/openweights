@@ -22,7 +22,17 @@ no-date floor. The bare "Today is X." exchange then recited the date back at
 greetings 8/30 times; the shipped wording — "(For context: today is X. Only
 mention it if asked.)" / "Understood." — measured 2/30 calls, 2/30 recitals.
 """
-import json, sys, urllib.request
+import json, os, sys, urllib.request
+
+# The app's tool-pass sampler, stated in full: see routing_matrix.py for why, and for the
+# 2026-09-02 measurement behind the pass running with no repeat penalty.
+SAMPLER = {
+    "top_k": int(os.environ.get("TOP_K", 40)),
+    "top_p": float(os.environ.get("TOP_P", 0.95)),
+    "min_p": float(os.environ.get("MIN_P", 0.05)),
+    "repeat_penalty": float(os.environ.get("REPEAT_PENALTY", 1.0)),
+    "repeat_last_n": int(os.environ.get("REPEAT_LAST_N", 64)),
+}
 
 DUMP = sys.argv[1] if len(sys.argv) > 1 else "eval/prompt_dump.json"
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8089
@@ -70,8 +80,8 @@ CALL = [("What is the weather in Manila right now?", "web_search"),
 
 def ask(messages, temperature=0.0, seed=1):
     body = json.dumps({"model": "m", "messages": messages, "tools": TOOLS,
-                       "temperature": temperature, "top_p": 0.95,
-                       "max_tokens": 200, "seed": seed}).encode()
+                       "temperature": temperature, "max_tokens": 200, "seed": seed,
+                       **SAMPLER}).encode()
     req = urllib.request.Request(f"http://localhost:{PORT}/v1/chat/completions",
                                  body, {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=600) as r:

@@ -29,12 +29,32 @@ Usage:
   python3 eval/routing_matrix.py <dump.json> <model.gguf> <port> [modes] [arms] [nothink]
   modes: comma list of ifasked,plain,none   arms: comma list of current,entity,rule,both
   nothink: pass "nothink" for thinking models (Qwen3, SmolLM3)
+
+The sampler is the app's tool pass, stated in full rather than left to llama-server's
+defaults. TurnRunner.deciding() runs a pass that offers tools greedy with no repeat
+penalty; the rest are SamplerParams' defaults, which llama-server happens to share.
+Until 2026-09-02 the app applied its 1.1 penalty on that pass while every run of this
+file sent none, so the verdicts described a sampler the app did not ship. Measured that
+day at both values: LFM2.5-1.2B QAD-Q4_0 flipped one case (the date question, into a
+read_memory call at 1.1); Qwen3-1.7B Q8_0 moved two cases each way for the same total.
+The app now matches this file. Override any field to test an alternative, e.g.
+REPEAT_PENALTY=1.1.
 """
 import json
+import os
 import subprocess
 import sys
 import time
 import urllib.request
+
+SAMPLER = {
+    "temperature": 0,
+    "top_k": int(os.environ.get("TOP_K", 40)),
+    "top_p": float(os.environ.get("TOP_P", 0.95)),
+    "min_p": float(os.environ.get("MIN_P", 0.05)),
+    "repeat_penalty": float(os.environ.get("REPEAT_PENALTY", 1.0)),
+    "repeat_last_n": int(os.environ.get("REPEAT_LAST_N", 64)),
+}
 
 DUMP = sys.argv[1]
 MODEL = sys.argv[2]
@@ -175,9 +195,12 @@ LACKS = ("enough information", "not have information", "don't have information",
 
 
 def ask(messages, timeout=600):
+    # 400 is enough for a non-thinking pass. The app puts no cap on a tool pass and forces
+    # thinking on whenever tools are offered (ChatViewModel), so a thinking model replayed
+    # faithfully needs room to finish: MAX_TOKENS=2000 or so, and a slower run.
     payload = {
         "model": "m", "messages": messages, "tools": TOOLS,
-        "temperature": 0, "max_tokens": 400, "seed": 1,
+        "max_tokens": int(os.environ.get("MAX_TOKENS", 400)), "seed": 1, **SAMPLER,
     }
     if NOTHINK:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
@@ -247,7 +270,8 @@ try:
                     f"{calls or content[:70]!r}{lament}")
         summary = " ".join(
             f"{k}={v[0]}/{v[1]}" for k, v in sorted(tally.items()))
-        print(f"{name} mode={mode:7s} arm={arm:8s} sysTokens={tokens(system)} {summary}")
+        print(f"{name} mode={mode:7s} arm={arm:8s} rp={SAMPLER['repeat_penalty']} "
+              f"sysTokens={tokens(system)} {summary}")
         for r in rows:
             print(r)
         sys.stdout.flush()

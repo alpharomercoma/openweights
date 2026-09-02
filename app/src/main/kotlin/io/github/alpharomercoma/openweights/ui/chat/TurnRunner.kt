@@ -1086,9 +1086,19 @@ private fun List<ChatMessage>.describing(tools: ToolRegistry, needed: Boolean): 
  * What this does cost is a direct answer given while tools are available, which comes out
  * greedy: right for a question with one answer, flatter for a haiku. That is the trade, and
  * seventeen points of routing accuracy is worth it.
+ *
+ * And no repeat penalty, for the same reason. Greedy is an argmax, and the penalty divides
+ * the logit of every token seen in the last sixty-four by 1.1 before the argmax is taken:
+ * the entity the question named, the date the exchange ahead of it stated, the punctuation
+ * of the call being written. Measured on 2026-09-02 with the offline routing matrix, which
+ * had been run at llama.cpp's own default of 1.0 all along while the app shipped 1.1: on
+ * LFM2.5-1.2B the penalty flipped one of thirty-three cases, "what is today's date?" into a
+ * read_memory call, and on Qwen3-1.7B it moved two cases each way for the same total. So
+ * the routing pass runs at the sampler the routing was measured with, and the user's
+ * penalty applies where it was meant to, to prose.
  */
 private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
-    if (offerTools) copy(temperature = 0f) else this
+    if (offerTools) copy(temperature = 0f, repeatPenalty = 1f) else this
 
 /**
  * The same results, with the last one carrying word that the tools are finished.

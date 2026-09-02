@@ -761,6 +761,35 @@ class TurnRunnerTest {
         assertThat(engine.offered.single()).isEmpty()
     }
 
+    @Test
+    fun `a pass that may call a tool runs greedy with no repeat penalty`() = runBlocking<Unit> {
+        // Choosing among tools is an argmax, and the penalty divides every recently seen
+        // token's logit before the argmax is taken: the entity the question named, the
+        // date the exchange stated, the punctuation of the call. Measured on the routing
+        // matrix on 2026-09-02 at both values; every pass whose call could run uses the
+        // sampler the routing was measured with. The user's temperature and penalty stay
+        // theirs for the pass that can only write prose: the one past the round cap.
+        repeat(PLENTY) { round ->
+            val call = ToolCall(
+                id = "$round",
+                name = "web_search",
+                argumentsJson = """{"query":"x$round"}""",
+            )
+            engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
+        }
+
+        run(withTools = true)
+
+        val greedy = engine.paramsUsed.map { it.temperature == 0f && it.repeatPenalty == 1f }
+        assertThat(greedy.first()).isTrue()
+        assertThat(greedy.last()).isFalse()
+        // The greedy passes are a prefix: once the cap is spent no later pass may call.
+        assertThat(greedy).isEqualTo(greedy.sortedByDescending { it })
+        val prose = engine.paramsUsed.last()
+        assertThat(prose.temperature).isEqualTo(SamplerParams.DEFAULT_TEMPERATURE)
+        assertThat(prose.repeatPenalty).isEqualTo(SamplerParams.DEFAULT_REPEAT_PENALTY)
+    }
+
     /** Runs one turn and returns every step it reported. */
     private suspend fun run(
         withTools: Boolean,

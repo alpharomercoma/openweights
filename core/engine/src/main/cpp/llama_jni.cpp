@@ -704,6 +704,13 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     env->DeleteLocalRef(content);
     env->DeleteLocalRef(reasoning);
     env->DeleteLocalRef(calls);
+    // The sink may have thrown. With an exception pending, releasing references is the
+    // only JNI still allowed: the exception built below and the result array are both
+    // undefined, and CheckJNI aborts the process for either. Returning now hands the
+    // sink's own exception to Kotlin, which is what it threw it for.
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        return nullptr;
+    }
     if (reason == StopReason::ERROR) {
         throw_engine_exception(env, error);
         return nullptr;

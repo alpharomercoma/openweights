@@ -17,13 +17,26 @@
 package io.github.alpharomercoma.openweights.core.data
 
 import android.util.Base64
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
+import java.security.KeyStoreException
+import java.security.ProviderException
 import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 
 /**
  * The envelope the one credential this app holds is stored in.
@@ -35,12 +48,27 @@ import javax.crypto.KeyGenerator
  * and the part that can be quietly wrong, which is the layout, and the part that has to
  * hold when something has gone wrong, which is that an unreadable value reads as no token
  * rather than as a crash on the screen somebody opened to fix it.
+ *
+ * The second half stands in for the Keystore itself with a key source that throws, which
+ * is what a phone whose Keystore has stopped answering looks like from here, and checks
+ * that the vault stays shut rather than falling open.
  */
 @RunWith(RobolectricTestRunner::class)
 class TokenVaultTest {
+    @get:Rule
+    val folder = TemporaryFolder()
+
     private val cipher =
         TokenCipher(KeyGenerator.getInstance("AES").apply { init(256) }.generateKey())
     private val token = "hf_a_token_that_looks_real"
+
+    private fun freshKey(): SecretKey =
+        KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+
+    /** A store of this test's own, so what one vault writes another can read. */
+    private fun store(): DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+    ) { File(folder.root, "vault.preferences_pb") }
 
     @Test
     fun `a sealed token opens again`() {
@@ -112,5 +140,59 @@ class TokenVaultTest {
         val vault = TokenVault(ApplicationProvider.getApplicationContext())
 
         assertThat(runCatching { vault.store("   ") }.isFailure).isTrue()
+    }
+
+    @Test
+    fun `a token round trips through the store under a working key`() = runTest {
+        val store = store()
+        val key = freshKey()
+
+        assertThat(TokenVault(store) { key }.store(token)).isTrue()
+
+        assertThat(TokenVault(store) { key }.current()).isEqualTo(token)
+        // Sealed on disk, which is what the store exists for.
+        assertThat(store.data.first().asMap().values.map { it.toString() })
+            .doesNotContain(token)
+    }
+
+    @Test
+    fun `a key store that will not answer stores nothing and says so`() = runTest {
+        val store = store()
+        val vault = TokenVault(store) { throw KeyStoreException("the Keystore is not answering") }
+
+        assertThat(vault.store(token)).isFalse()
+
+        assertThat(vault.current()).isNull()
+        // And not in the clear either, which is the fallback this vault refuses to have.
+        assertThat(store.data.first().asMap()).isEmpty()
+    }
+
+    @Test
+    fun `a token sealed under a key the store no longer gives out reads as no token`() = runTest {
+        val store = store()
+        assertThat(TokenVault(store) { freshKey() }.store(token)).isTrue()
+        // A ProviderException is unchecked, which is how the Keystore reports most of its
+        // troubles, and the one that used to take the process down.
+        val locked = TokenVault(store) { throw ProviderException("the key blob is corrupt") }
+
+        assertThat(locked.current()).isNull()
+        assertThat(locked.seal("anything")).isNull()
+        assertThat(locked.open("anything")).isNull()
+    }
+
+    @Test
+    fun `the key is asked for again after a failure, not remembered as missing`() = runTest {
+        val store = store()
+        val key = freshKey()
+        var answering = false
+        val vault = TokenVault(store) {
+            if (answering) key else throw KeyStoreException("not yet")
+        }
+        assertThat(vault.store(token)).isFalse()
+
+        answering = true
+
+        assertThat(vault.store(token)).isTrue()
+        assertThat(vault.current()).isEqualTo(token)
     }
 }

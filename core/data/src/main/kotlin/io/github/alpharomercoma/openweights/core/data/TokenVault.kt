@@ -20,6 +20,9 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,29 +45,73 @@ import javax.inject.Singleton
  * is the modern replacement for `EncryptedSharedPreferences`, which Google deprecated:
  * DataStore does the storage, the Keystore does the cryptography, and neither pretends to
  * do the other's job.
+ *
+ * There is no plain fallback. A Keystore that will not answer — a key blob the OS update
+ * corrupted, a provider that crashes, a device policy that has locked keys away — used to
+ * take the process down at the first read. Now a read answers no token, with a line in the
+ * log, and a save says it did not happen so the screen can say so. Writing the token in
+ * the clear instead would keep the screen working by handing the credential to anything
+ * that can read the app's files, which is the wrong trade for the one secret the app holds.
  */
 @Singleton
-class TokenVault @Inject constructor(@ApplicationContext private val context: Context) {
-    /** The stored token, or null when none is set. */
-    val token: Flow<String?> = context.settingsDataStore.data.map { preferences ->
-        preferences[TOKEN_KEY]?.let(::decrypt)
+class TokenVault internal constructor(
+    private val store: DataStore<Preferences>,
+    keySource: () -> SecretKey,
+) {
+    @Inject
+    constructor(@ApplicationContext context: Context) :
+        this(context.settingsDataStore, ::keystoreKey)
+
+    /** The stored token, or null when none is set or none can be read. */
+    val token: Flow<String?> = store.data.map { preferences ->
+        preferences[TOKEN_KEY]?.let(::open)
     }
 
     suspend fun current(): String? = token.first()
 
-    suspend fun store(rawToken: String) {
+    /**
+     * Stores the token, and says whether it is now stored.
+     *
+     * False means the Keystore gave out no key, and nothing was written: not the token in
+     * the clear, and not an empty value over whatever was there. The caller is told rather
+     * than shown a saved state the next download would contradict.
+     */
+    suspend fun store(rawToken: String): Boolean {
         val trimmed = rawToken.trim()
         require(trimmed.isNotEmpty()) { "refusing to store an empty token" }
-        context.settingsDataStore.edit { it[TOKEN_KEY] = encrypt(trimmed) }
+        val sealed = seal(trimmed) ?: return false
+        store.edit { it[TOKEN_KEY] = sealed }
+        return true
     }
 
     suspend fun clear() {
-        context.settingsDataStore.edit { it.remove(TOKEN_KEY) }
+        store.edit { it.remove(TOKEN_KEY) }
     }
 
-    private fun encrypt(value: String): String = TokenCipher(key).seal(value)
+    /**
+     * [value] sealed under the vault's key as one storable string, or null when the
+     * Keystore is not answering. Offered beyond the token so the one key, and the one way
+     * of failing, serve every secret the app holds.
+     */
+    fun seal(value: String): String? = withKey("seal") { TokenCipher(it).seal(value) }
 
-    private fun decrypt(stored: String): String? = TokenCipher(key).open(stored)
+    /** What [stored] was sealed from, or null when it cannot be read or the key cannot be had. */
+    fun open(stored: String): String? = withKey("open") { TokenCipher(it).open(stored) }
+
+    /**
+     * Runs [block] with the key, or logs why it could not and answers null.
+     *
+     * Caught broadly on purpose. The Keystore reports its troubles as checked security
+     * exceptions, as `ProviderException` and as `IllegalStateException`, and every one of
+     * them means the same thing here: no key, so no answer. The class and message go to the
+     * log, which is where the person debugging that phone will look.
+     */
+    private inline fun <T> withKey(doing: String, block: (SecretKey) -> T?): T? = try {
+        block(key)
+    } catch (failure: Exception) {
+        Log.w(TAG, "the Keystore did not answer, so the vault cannot $doing", failure)
+        null
+    }
 
     /**
      * The key, fetched once and kept for the life of the process.
@@ -80,33 +127,36 @@ class TokenVault @Inject constructor(@ApplicationContext private val context: Co
      * failure is not cached, so a keystore that was briefly unavailable is tried again
      * rather than poisoning the vault for the life of the process.
      */
-    private val key: SecretKey by lazy { keystoreKey() }
-
-    private fun keystoreKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
-            return it.secretKey
-        }
-
-        return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).apply {
-            init(
-                KeyGenParameterSpec.Builder(
-                    KEY_ALIAS,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .build(),
-            )
-        }.generateKey()
-    }
+    private val key: SecretKey by lazy(keySource)
 
     private companion object {
-        const val KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "openweights.hf_token"
+        const val TAG = "OpenWeights"
         val TOKEN_KEY = stringPreferencesKey("hugging_face_token")
     }
 }
+
+/** The vault's AES key from the Android Keystore, generated under its alias on first use. */
+private fun keystoreKey(): SecretKey {
+    val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
+    (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
+        return it.secretKey
+    }
+
+    return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).apply {
+        init(
+            KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build(),
+        )
+    }.generateKey()
+}
+
+private const val KEYSTORE = "AndroidKeyStore"
+private const val KEY_ALIAS = "openweights.hf_token"
 
 /**
  * The envelope the token is stored in, separated from where its key comes from.

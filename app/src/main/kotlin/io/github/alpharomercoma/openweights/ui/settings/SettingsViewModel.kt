@@ -101,7 +101,16 @@ class SettingsViewModel @Inject constructor(
             // have the older one's failure delete the newer one's valid token.
             tokenMutex.withLock {
                 _uiState.update { it.copy(isCheckingToken = true, tokenStatus = null) }
-                vault.store(token)
+                if (!vault.store(token)) {
+                    // Nothing was written, in the clear or otherwise; see TokenVault.store.
+                    // Checking a token that was not kept would only report on the network.
+                    reportToken(
+                        hasToken = false,
+                        status = "Not saved: this device's key store is not answering, so " +
+                            "the token cannot be kept safely.",
+                    )
+                    return@withLock
+                }
 
                 runCatching { client.whoAmI() }
                     .onSuccess { account -> reportToken(true, "Signed in as $account") }

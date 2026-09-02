@@ -68,8 +68,11 @@ class RoutingInferenceEngine(
             ?: throw LlamaException("Not a model this app can run: ${modelFile.name}")
         val engine = engineFor(format)
 
-        // Free the other runtime's weights before allocating ours, not after.
+        // Free the other runtime's weights before allocating ours, not after. And forget
+        // the old format at once: a load that then fails must not leave the routing
+        // pointed at an engine that holds nothing.
         activeFormat?.takeIf { it != format }?.let { built[it]?.unload() }
+        activeFormat = null
 
         engine.load(modelFile, params, projectorFile)
         activeFormat = format

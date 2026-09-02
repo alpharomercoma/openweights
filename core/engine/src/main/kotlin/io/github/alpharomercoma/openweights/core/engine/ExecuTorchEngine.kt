@@ -198,6 +198,7 @@ class ExecuTorchEngine(
         tools: List<ToolDefinition>,
     ) {
         val rendering = template ?: throw LlamaException("No model loaded")
+        cancelRequested = false
         val prompt = rendering.render(messages, tools, params.thinking)
 
         // What the runtime already holds, and whether this turn extends it.
@@ -250,7 +251,11 @@ class ExecuTorchEngine(
         // trusted the old record would send the same suffix at an already-advanced position
         // and duplicate it.
         val discipline = StopDiscipline(budget)
-        cancelRequested = false
+        // Not cleared here. A Stop that landed while the prompt was being rendered or the
+        // context reset has already set it, and the runtime's own stop flag it also raised
+        // is wiped when the token loop starts; the flag is the only record left. The
+        // callback reads it on the first token and re-issues the stop. It is cleared at
+        // the start of the turn instead, before anything a Stop could be aimed at.
         val outcome = try {
             bridge.generate(fresh, budget) { fragment ->
                 if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
@@ -556,7 +561,9 @@ class ExecuTorchEngine(
 
     private fun String.withoutReasoning(): String {
         val close = lastIndexOf(THINK_CLOSE)
-        if (close < 0) return this
+        // A closer with no opener before it is text, not the end of a thinking block: a
+        // model describing the tag would otherwise lose everything it said up to there.
+        if (close < 0 || indexOf(THINK_OPEN) !in 0..<close) return this
         return substring(close + THINK_CLOSE.length).trim()
     }
 

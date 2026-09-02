@@ -119,8 +119,12 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         onPrefill?.invoke(prompt)
     }
 
+    /** Called from [resetContext], so a test can act between the prompt and the reply. */
+    var onResetContext: (() -> Unit)? = null
+
     override fun resetContext() {
         contextResets++
+        onResetContext?.invoke()
     }
 
     override fun stop() {

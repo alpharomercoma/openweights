@@ -126,6 +126,32 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `keeps a closer with no opener as text`() = runTest {
+        bridge.reply = "The block ends with </think> and nothing more."
+        engine.load(installed(MODEL), PARAMS)
+
+        val done = engine.chat(listOf(user("Which tag closes it?"))).completed()
+
+        assertThat(done.content).isEqualTo("The block ends with </think> and nothing more.")
+        assertThat(done.reasoning).isEmpty()
+    }
+
+    @Test
+    fun `honours a stop that lands before the runtime starts`() = runTest {
+        // Between rendering the prompt and asking for tokens there is a window, and a Stop
+        // in it used to be wiped by the flag reset that preceded generation. The runtime
+        // clears its own stop when its loop starts, so the flag was the only record.
+        bridge.reply = "One two three four five six seven eight nine ten."
+        bridge.onResetContext = { engine.cancel() }
+        engine.load(installed(MODEL), PARAMS)
+
+        val done = engine.chat(listOf(user("Count."))).completed()
+
+        assertThat(done.reason).isEqualTo(StopReason.CANCELLED)
+        assertThat(done.content.length).isLessThan(bridge.reply.length)
+    }
+
+    @Test
     fun `lifts a tool call out of the reply`() = runTest {
         bridge.reply = "<tool_call>\n{\"name\": \"web_search\", " +
             "\"arguments\": {\"query\": \"Manila weather\"}}\n</tool_call>"

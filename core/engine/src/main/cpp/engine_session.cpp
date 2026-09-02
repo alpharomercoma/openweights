@@ -2145,7 +2145,13 @@ StopReason Session::generate(
         int32_t accepted = 0;
         while (accepted < static_cast<int32_t>(draft.size())) {
             const llama_token verdict = llama_sampler_sample(sampler, ctx_, accepted);
-            if (verdict != draft[accepted]) {
+            // An end-of-generation verdict is handed on as the pending token rather than
+            // accepted, even when the draft guessed it. Accepting it would decode it and
+            // record it in `cached_`, where the plain path never puts one: the loop reads
+            // it next and stops before decoding. A stray end token in the record then
+            // diverges from the next turn's prompt at that position and costs a rollback,
+            // or the whole cache on a memory that cannot roll back.
+            if (verdict != draft[accepted] || llama_vocab_is_eog(vocab, verdict)) {
                 has_pending_token = true;
                 pending_token = verdict;
                 break;
@@ -2213,15 +2219,19 @@ StopReason Session::generate(
         const bool truncated = reason != StopReason::END_OF_TURN;
         const common_chat_msg parsed =
             common_chat_parse(safe_reply, truncated, parser_params);
-        for (const auto & call : parsed.tool_calls) {
-            reply.tool_calls.push_back({call.id, call.name, call.arguments});
+        // Tool calls are only handed up from a reply that finished. A truncated one may
+        // have been about to add arguments, and TurnRunner already ends such a turn
+        // without acting on whatever it parsed; withholding them here as well means no
+        // new caller has to rediscover that rule.
+        if (!truncated) {
+            for (const auto & call : parsed.tool_calls) {
+                reply.tool_calls.push_back({call.id, call.name, call.arguments});
+            }
         }
         // Only trust the cleaned text when the parser actually recognised something.
         // Otherwise it returns the input unchanged plus the generation prompt, which is
         // worse than the raw text the Kotlin parser can still handle.
-        // Tool calls are only acted on from a reply that finished. A truncated one may
-        // have been about to add arguments.
-        if (!reply.tool_calls.empty() && reason == StopReason::END_OF_TURN) {
+        if (!reply.tool_calls.empty()) {
             reply.content = parsed.content;
             reply.reasoning = parsed.reasoning_content;
             return_parsed_content = true;

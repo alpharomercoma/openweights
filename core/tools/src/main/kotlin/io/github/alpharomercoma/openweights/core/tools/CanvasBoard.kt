@@ -54,12 +54,14 @@ data class Canvas(
      *
      * A site is its entry and everything under the folder it is served from, since that is
      * where its own CSS and scripts live; a root of "" is a site at the top of the shared
-     * folder, which is the whole folder. A document or a deck is one Markdown file rendered
-     * by a viewer the APK supplies, so it is the entry and nothing else: the notes beside
-     * a report are not part of the report.
+     * folder, which is the whole folder. The folder itself counts too, so that asking for
+     * it by name is answered with its index page the way every other server answers. A
+     * document or a deck is one Markdown file rendered by a viewer the APK supplies, so it
+     * is the entry and nothing else: the notes beside a report are not part of the report.
      */
     fun contains(path: String): Boolean = when (kind) {
-        CanvasKind.SITE -> root.isEmpty() || path == entry || path.startsWith("$root/")
+        CanvasKind.SITE ->
+            root.isEmpty() || path == entry || path == root || path.startsWith("$root/")
         CanvasKind.DOCUMENT, CanvasKind.SLIDES -> path == entry
     }
 }

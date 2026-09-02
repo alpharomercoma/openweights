@@ -72,6 +72,23 @@ class PageFurnitureTest {
     }
 
     @Test
+    fun `a letter that grows when lowercased does not shift the cut`() {
+        // The scanner used to find tags in a lowercased copy and slice the original at the
+        // indices it found there. A capital I with a dot above lowercases to two characters,
+        // so on a Turkish page every index past one was off by one per letter. Enough of
+        // them and the cut lands past the script, which is kept whole, or past the end of
+        // the page, which throws.
+        val dotted = "\u0130".repeat(DOTTED_LETTERS)
+        val page = "<body><p>$dotted</p><SCRIPT>var secret = 1</SCRIPT><p>End</p></body>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains(dotted)
+        assertThat(read).contains("End")
+        assertThat(read).doesNotContain("secret")
+    }
+
+    @Test
     fun `the largest article wins, so an index page yields its biggest card`() {
         val page = """
             <body>
@@ -216,6 +233,9 @@ class PageFurnitureTest {
     }
 
     private companion object {
+        /** More than the script is long, so the drift cannot hide inside it. */
+        const val DOTTED_LETTERS = 40
+
         /**
          * Long enough to clear the threshold that separates a body from a teaser, and dull
          * enough that nothing in it can be mistaken for the furniture around it.

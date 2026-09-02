@@ -69,6 +69,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.GoalBoard
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
+import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
 import io.github.alpharomercoma.openweights.core.tools.ToolEvidence
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
@@ -542,6 +543,8 @@ class ChatViewModel @Inject constructor(
     /** Only to hear toggles; the turn itself reads them through [turns]. */
     private val toolSwitches: ToolSwitches,
     private val workspaceGrant: WorkspaceGrant,
+    /** Only to forget them on a switch; the file tools are what fill and read it. */
+    private val artifacts: SessionArtifacts,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -2399,7 +2402,7 @@ class ChatViewModel @Inject constructor(
             // left — which, when newChat is being run *by* a delete, no longer exists, so
             // the insert had no parent row to hang from. Nothing between here and the
             // reset reads the id, so moving it up only closes the window sooner.
-            conversationId = null
+            switchTo(null)
             // The cache is deliberately NOT reset here any more. Every conversation on this
             // screen starts with the same instructions-and-tools prefix, and the engine
             // aligns the cache itself: a transformer rolls the old conversation back to
@@ -2483,6 +2486,17 @@ class ChatViewModel @Inject constructor(
         }
         ?.takeIf { rows -> rows.first().modelName == _uiState.value.modelName }
 
+    /**
+     * Makes [id] the conversation on screen, and forgets what the model built in the last one.
+     *
+     * The files it made are the user's now: nobody in the new chat watched them being made,
+     * so replacing or deleting one asks again.
+     */
+    private fun switchTo(id: Long?) {
+        conversationId = id
+        artifacts.cleared()
+    }
+
     private suspend fun reopen(id: Long) {
         // Read before anything is disturbed. The row's existence does not depend on a reply
         // still being written, so this one read needs no queue, and taking it first means a
@@ -2531,7 +2545,7 @@ class ChatViewModel @Inject constructor(
             newChat()
             return
         }
-        conversationId = id
+        switchTo(id)
         nextEntryId = messages.size.toLong()
         // The board is one object for the whole app, so a plan left in it is on screen in
         // whatever chat is opened next and is pinned to the tail of that chat's prompt.

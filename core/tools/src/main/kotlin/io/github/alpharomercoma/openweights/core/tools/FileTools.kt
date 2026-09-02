@@ -343,7 +343,7 @@ class WriteFileTool @Inject constructor(
             call.flag("replace", "overwrite") &&
                 // Replacing a file this same session created is the agent's ordinary
                 // edit loop, not destruction: nothing of the user's is being lost.
-                call.argument("path", "file", "name")?.let { !artifacts.isOwn(it) } != false
+                call.shortArgument("path", "file", "name")?.let { !artifacts.isOwn(it) } != false
             )
 
     override suspend fun run(call: ToolCall): String = execute(call).text
@@ -352,7 +352,11 @@ class WriteFileTool @Inject constructor(
         workspace.refusal() ?: create(call)
 
     private suspend fun create(call: ToolCall): ToolExecution {
-        val path = call.argument("path", "file", "name")
+        // The salvaged reading, for the same reason the content gets one: a quote the
+        // model left unescaped in the content breaks the envelope around the path too, and
+        // refusing the call for want of a path it plainly gave was where the salvage of
+        // the content was never reached.
+        val path = call.shortArgument("path", "file", "name")
             ?: return ToolExecution.rejected(
                 "No path was given. Call write_file again with a path.",
             )

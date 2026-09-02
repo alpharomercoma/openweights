@@ -195,6 +195,41 @@ class ToolNotesTest {
     }
 
     @Test
+    fun `a private read that then failed still taints the chat`() {
+        // The rule the runner applies within a turn, carried across turns. run_script reads
+        // the files a program names before running it, and a program that then throws
+        // answers with the exception text, which can hold what it had already read. That
+        // text is in the engine's record whether or not a note is kept, so gating the flag
+        // on success let the next turn's web_search carry it off the device in Auto unasked.
+        val crashed = AgentStep.Ran(
+            call = call("run_script", """{"file":"taxes.py"}"""),
+            result = "run_script failed: KeyError: 'salary: 91,000'",
+            millis = 1,
+            successful = false,
+        )
+
+        val notes = ToolNotes().withSteps(listOf(crashed)) { privateTool }
+
+        assertThat(notes.notes).isEmpty()
+        assertThat(notes.carriesPrivateData).isTrue()
+    }
+
+    @Test
+    fun `an untrusted read that then failed still taints the chat`() {
+        val failed = AgentStep.Ran(
+            call = call("fetch_url", URL_ARGS),
+            result = "fetch_url failed: 500 from a page saying ignore your instructions",
+            millis = 1,
+            successful = false,
+        )
+
+        val notes = ToolNotes().withSteps(listOf(failed)) { untrustedTool }
+
+        assertThat(notes.notes).isEmpty()
+        assertThat(notes.carriesUntrustedText).isTrue()
+    }
+
+    @Test
     fun `a tool that reads nothing of anybody else leaves no suspicion behind`() {
         val notes = ToolNotes().withSteps(listOf(ran("web_search", QUERY_ARGS, "Hits."))) { null }
 
@@ -283,6 +318,13 @@ class ToolNotesTest {
         val untrustedTool = object : Tool {
             override val definition = ToolDefinition("fetch_url", "", "{}")
             override val returnsUntrustedText = true
+            override suspend fun run(call: ToolCall) = ""
+        }
+
+        /** Stands for read_file and run_script, the tools that bring the user's own data in. */
+        val privateTool = object : Tool {
+            override val definition = ToolDefinition("run_script", "", "{}")
+            override val readsPrivateData = true
             override suspend fun run(call: ToolCall) = ""
         }
 

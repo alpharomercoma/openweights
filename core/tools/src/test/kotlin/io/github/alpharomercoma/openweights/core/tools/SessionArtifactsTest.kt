@@ -39,6 +39,18 @@ class SessionArtifactsTest {
     }
 
     @Test
+    fun `what a chat made is the user's once the chat is left`() {
+        // The object is one for the whole process, and the chat is not: a file made in one
+        // conversation stayed silently replaceable in the next for as long as the app lived.
+        val artifacts = SessionArtifacts()
+        artifacts.created("site/index.html")
+
+        artifacts.cleared()
+
+        assertThat(artifacts.isOwn("site/index.html")).isFalse()
+    }
+
+    @Test
     fun `deleting a user's file asks, deleting the session's own does not`() {
         val artifacts = SessionArtifacts()
         artifacts.created("scratch/attempt.js")

@@ -19,6 +19,8 @@ package io.github.alpharomercoma.openweights.core.tools
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,7 +43,14 @@ import java.net.URL
 class CanvasServerTest {
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val board = CanvasBoard()
-    private val server = CanvasServer(Workspace(context, WorkspaceGrant(context)), board, context)
+    private val grant = WorkspaceGrant(context)
+    private val workspace = Workspace(context, grant)
+    private val server = CanvasServer(workspace, board, context)
+
+    init {
+        // Registered, not held: the tests that need the folder reach it through the grant.
+        FakeDocumentsProvider.register()
+    }
 
     private fun get(url: String): Pair<Int, String> {
         val connection = URL(url).openConnection() as HttpURLConnection
@@ -230,6 +239,22 @@ class CanvasServerTest {
         board.show(CanvasKind.SITE, "site/index.html", "site")
         val (outsideCode, _) = get(server.urlFor("notes/passwords.md"))
         assertThat(outsideCode).isEqualTo(404)
+    }
+
+    @Test
+    fun `a folder is answered by its index page, with or without the slash`() = runTest {
+        // Neither used to reach the index fallback: the trailing slash left an empty name
+        // the walk refuses, and the bare folder was neither the entry nor under "site/".
+        grant.remember(FakeDocumentsProvider.TREE)
+        check(workspace.put("site/index.html", "<h1>Home</h1>").successful)
+        board.show(CanvasKind.SITE, "site/index.html", "site")
+
+        listOf("site/", "site").forEach { path ->
+            val (headers, body) = fetch(server.urlFor(path))
+            assertWithMessage(path).that(body).isEqualTo("<h1>Home</h1>")
+            // As a page, not as a download: the type is the index file's, not the folder's.
+            assertWithMessage(path).that(headers["content-type"]).startsWith("text/html")
+        }
     }
 
     @Test

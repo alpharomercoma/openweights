@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.tools
 
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 /**
@@ -36,6 +37,37 @@ class WebSearchToolTest {
         assertThat(call("""{"search":"c"}""").argument("query", "q", "search")).isEqualTo("c")
         // Malformed JSON is common from small models and must not throw.
         assertThat(call("not json").argument("query")).isNull()
+    }
+
+    private fun provider(called: String, answer: List<SearchHit>?) = object : SearchProvider {
+        override val id = called
+        override val label = called
+        override val isConfigured = true
+        override suspend fun search(query: String, limit: Int): List<SearchHit>? = answer
+    }
+
+    @Test
+    fun `a provider that found nothing has answered, and the next one is not asked`() = runTest {
+        // Null means the provider could not answer; an empty list means it looked and there
+        // was nothing. The chain used to treat both as a failure, so a query with no hits
+        // fell through every provider and came back as "the device may be offline".
+        val empty = provider("empty", emptyList())
+        val never = provider("never", listOf(SearchHit("Hit", "text", "https://example.test")))
+
+        val answered = WebSearchTool.firstAnswer(listOf(empty, never), "nothing", 3)
+
+        assertThat(answered?.first).isSameInstanceAs(empty)
+        assertThat(answered?.second).isEmpty()
+    }
+
+    @Test
+    fun `a provider that could not answer is passed over`() = runTest {
+        val blocked = provider("blocked", null)
+        val next = provider("next", emptyList())
+
+        assertThat(WebSearchTool.firstAnswer(listOf(blocked, next), "q", 3)?.first)
+            .isSameInstanceAs(next)
+        assertThat(WebSearchTool.firstAnswer(listOf(blocked), "q", 3)).isNull()
     }
 
     @Test

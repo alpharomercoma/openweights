@@ -162,18 +162,18 @@ class WebSearchTool @Inject constructor(
         // Through the proxy when one is set, and only here: see SearchSettings.proxy for
         // why this is scoped to search rather than applied to every request the app makes.
         val providers = settings.providers(settings.client(httpClient.forTools()))
-        // Each in turn until one answers. A provider returns null when it could not answer
-        // rather than an empty list, so being rate limited moves on to the next one instead
-        // of telling the model the web has nothing on the subject.
-        val answered = providers.firstNotNullOfOrNull { provider ->
-            provider.search(query, MAX_RESULTS)?.takeIf { it.isNotEmpty() }?.let { provider to it }
-        }
-
-        val (provider, results) = answered
+        val (provider, results) = firstAnswer(providers, query, MAX_RESULTS)
             ?: return@withContext ToolExecution.failure(
                 "No search provider could answer. The device may be offline, or the search " +
                     "may be rate limited. Say so rather than guessing.",
             )
+
+        if (results.isEmpty()) {
+            return@withContext ToolExecution(
+                "No results for \"$query\" from ${provider.label}. The search worked and " +
+                    "nothing matched: try different words, or say that nothing was found.",
+            )
+        }
 
         // Framed as material, not as a menu. A small model handed three bare titles reads
         // them as options and asks which one to open, which is how "what is the Eiffel
@@ -184,6 +184,24 @@ class WebSearchTool @Inject constructor(
 
     internal companion object {
         const val NAME = "web_search"
+
+        /**
+         * Each provider in turn until one answers, with whatever it said.
+         *
+         * A provider returns null when it could not answer rather than an empty list, so
+         * being rate limited moves on to the next one instead of telling the model the web
+         * has nothing on the subject. An empty list is the other thing entirely: the
+         * provider looked and found nothing, and that is an answer. This used to skip it
+         * too, so a query with no hits fell through every provider and came back as "the
+         * device may be offline", which is a wrong report of a working search.
+         */
+        suspend fun firstAnswer(
+            providers: List<SearchProvider>,
+            query: String,
+            limit: Int,
+        ): Pair<SearchProvider, List<SearchHit>>? = providers.firstNotNullOfOrNull { provider ->
+            provider.search(query, limit)?.let { provider to it }
+        }
 
         /** Builds the model-facing result while keeping its source addresses structured. */
         fun webSearchSuccess(
@@ -432,7 +450,7 @@ class FetchUrlTool @Inject constructor(
         }
         // peekBody stops at the limit rather than after it: the bytes past it are never
         // buffered, so a page with no end cannot exhaust the heap.
-        return PageText(response.peekBody(MAX_BYTES.toLong()).string().readable())
+        return PageText(pageText(response.peekBody(MAX_BYTES.toLong()).string(), type))
     }
 
     /** One step of a fetch: either something to read, or somewhere else to look. */
@@ -482,6 +500,27 @@ class FetchUrlTool @Inject constructor(
 
         /** Content types worth handing to a language model. */
         val TEXTUAL = listOf("text/", "application/json", "application/xml", "application/xhtml")
+
+        /** Content types that are markup to be cleaned rather than text to be kept. */
+        val HTML = listOf("text/html", "application/xhtml")
+
+        /**
+         * The body as the model should see it: cleaned when it is HTML, and otherwise as it
+         * came.
+         *
+         * Every textual type used to go through the HTML cleaner, which cuts anything shaped
+         * like a tag, decodes entities and folds newlines into spaces. That is right for a
+         * page and wrong for everything else: a JSON body lost its `"a < b"` comparisons and
+         * its line breaks, and with `save_to` the file a script then opened was not the
+         * document the server sent. A type the server did not name is read as HTML, which
+         * is what an unlabelled response almost always is.
+         */
+        fun pageText(body: String, contentType: String?): String =
+            if (contentType == null || HTML.any { contentType.startsWith(it) }) {
+                body.readable()
+            } else {
+                body
+            }
     }
 }
 
@@ -610,21 +649,27 @@ internal fun String.withoutFurniture(): String = mainContent().withoutElements(F
  * first matching close, and bounds the work: when no close tag lies ahead of an open one,
  * that is remembered per name, so the text is searched to its end at most once per name.
  * An element that never closes is kept as it was, which is what the regex did too.
+ *
+ * Matched case-insensitively on the text itself rather than on a lowercased copy. The copy
+ * was how this started, and its indices were used to slice the original, which is only
+ * sound while the two are the same length. Kotlin's `lowercase()` does not promise that: a
+ * capital I with a dot above becomes two characters, so a Turkish page with one before its
+ * first `<script>` had every index past it off by one, and the slice either threw or kept
+ * the script and cut the prose.
  */
 private fun String.withoutElements(names: Set<String>): String {
-    val lower = lowercase()
     val out = StringBuilder(length)
     // Per name, the position from which a search for its close tag already came up empty.
     val noCloseFrom = HashMap<String, Int>()
     var from = 0
     var at = 0
     while (at < length) {
-        val open = lower.indexOf('<', at)
+        val open = indexOf('<', at)
         if (open < 0) break
-        val tag = lower.tagNameAt(open + 1)?.takeIf { it in names }
-        val openEnd = if (tag != null) lower.indexOf('>', open) else -1
+        val tag = tagNameAt(open + 1)?.takeIf { it in names }
+        val openEnd = if (tag != null) indexOf('>', open) else -1
         val close = if (tag != null && openEnd >= 0) {
-            lower.closeTagAfter(tag, openEnd + 1, noCloseFrom)
+            closeTagAfter(tag, openEnd + 1, noCloseFrom)
         } else {
             -1
         }
@@ -646,11 +691,12 @@ private fun String.withoutElements(names: Set<String>): String {
 /** The lowercase tag name starting at [start], or null when what follows is not a tag. */
 private fun String.tagNameAt(start: Int): String? {
     var end = start
-    while (end < length && this[end] in 'a'..'z') end++
+    while (end < length && (this[end] in 'a'..'z' || this[end] in 'A'..'Z')) end++
     if (end == start) return null
     // A name is whole only at a boundary: `<navigation>` is not `<nav>`.
     if (end < length && (this[end].isLetterOrDigit() || this[end] == '-')) return null
-    return substring(start, end)
+    // ASCII letters only, so lowercasing cannot change the length here.
+    return substring(start, end).lowercase()
 }
 
 /**
@@ -667,7 +713,7 @@ private fun String.closeTagAfter(
     if (known != null && known <= start) return -1
     var probe = start
     while (true) {
-        val found = indexOf("</$name", probe)
+        val found = indexOf("</$name", probe, ignoreCase = true)
         if (found < 0) {
             noCloseFrom[name] = start
             return -1

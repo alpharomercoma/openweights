@@ -103,10 +103,18 @@ class WorkspaceGrant @Inject constructor(@param:ApplicationContext private val c
      * with the activity, which is the thing that made attachments have to be copied into the
      * app in the first place. A workspace cannot be copied in: the point is that the files
      * stay where the user put them.
+     *
+     * Asked for as read and write together, then as read alone. The take is all or nothing:
+     * a provider that handed over a read-only folder refuses the pair outright rather than
+     * keeping the half it offered, and a refusal here used to persist nothing while the
+     * folder was still written down, so [state] answered [GrantState.LOST] forever for a
+     * folder the app could perfectly well read.
      */
     fun remember(tree: Uri) {
-        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        runCatching { context.contentResolver.takePersistableUriPermission(tree, flags) }
+        val read = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        val both = read or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        runCatching { context.contentResolver.takePersistableUriPermission(tree, both) }
+            .recoverCatching { context.contentResolver.takePersistableUriPermission(tree, read) }
         store.edit { putString(KEY_TREE, tree.toString()) }
         revisions.update { it + 1 }
     }

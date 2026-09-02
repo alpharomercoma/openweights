@@ -29,7 +29,12 @@ import javax.inject.Singleton
  * teaches the user to stop reading the question. So creations are remembered here, and
  * the asking rules wave through what the session made while still guarding what it found.
  *
- * In memory only, on purpose. After a restart everything on disk is the user's again.
+ * A session is one conversation on screen in one run of the process, and it ends at
+ * whichever comes first. In memory only, on purpose: after a restart everything on disk
+ * is the user's again. And [cleared] when the chat changes, because this object outlives
+ * the conversation it was filled in. Left standing, a file the model made in one chat
+ * stayed silently overwritable in the next one for as long as the process lived, though
+ * nobody in that chat had watched it being made.
  */
 @Singleton
 class SessionArtifacts @Inject constructor() {
@@ -42,4 +47,10 @@ class SessionArtifacts @Inject constructor() {
 
     @Synchronized
     fun isOwn(path: String): Boolean = path.lowercase() in created
+
+    /** Forgets everything: from here on every file on disk is the user's until made again. */
+    @Synchronized
+    fun cleared() {
+        created.clear()
+    }
 }

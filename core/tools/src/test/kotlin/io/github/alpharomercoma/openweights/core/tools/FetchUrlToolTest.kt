@@ -77,6 +77,26 @@ class FetchUrlToolTest {
     }
 
     @Test
+    fun `a json body is handed over exactly as it came`() {
+        // Every textual type went through the HTML cleaner, which cut anything shaped like a
+        // tag, decoded entities and folded newlines into spaces. A script reading the file
+        // save_to wrote then opened a document the server never sent.
+        val body = "{\n  \"check\": \"a < b && b > c\",\n  \"note\": \"x &amp; y\"\n}"
+
+        assertThat(FetchUrlTool.pageText(body, "application/json")).isEqualTo(body)
+        assertThat(FetchUrlTool.pageText(body, "text/plain")).isEqualTo(body)
+        assertThat(FetchUrlTool.pageText("<a>\n<b>", "application/xml")).isEqualTo("<a>\n<b>")
+    }
+
+    @Test
+    fun `an html body is still cleaned`() {
+        val body = "<html><body><script>var x = 1</script><p>Hello &amp;\nworld</p></body></html>"
+
+        assertThat(FetchUrlTool.pageText(body, "text/html")).isEqualTo("Hello & world")
+        assertThat(FetchUrlTool.pageText(body, null)).isEqualTo("Hello & world")
+    }
+
+    @Test
     fun `refused page is an unsuccessful typed execution with no evidence`() = runTest {
         val execution = tool.execute(
             ToolCall(

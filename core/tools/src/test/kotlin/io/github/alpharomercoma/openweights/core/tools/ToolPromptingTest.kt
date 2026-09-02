@@ -125,6 +125,20 @@ class ToolPromptingTest {
     }
 
     @Test
+    fun `a brace inside a string is not the end of the arguments`() {
+        // What run_script arrives as: a code value with braces, a regex and a comment in it.
+        // Counting every brace closed the object at the first `}` inside the string, and the
+        // tool was handed a fragment that parsed as nothing.
+        val code = "def f(d):\\n    # }\\n    return re.sub(r'\\\\}', '{', d.get(\\\"k\\\", '}'))"
+        val arguments = """{"code": "$code", "opts": {"n": 1}}"""
+        val reply = """{"tool": "read_file", "arguments": $arguments} done"""
+
+        val call = ToolPrompting.parse(reply, registry)
+
+        assertThat(call?.argumentsJson).isEqualTo(arguments)
+    }
+
+    @Test
     fun `a call cut off mid arguments is not dispatched with empty ones`() {
         // It used to come back as a call with no arguments, which spends a round on a tool
         // that can only answer "you gave me nothing" and then tells the model its own

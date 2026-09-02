@@ -78,22 +78,33 @@ data class ToolNotes(
      * A repeat of a call already here replaces it rather than joining it. The arguments are the
      * identity, so this is the same claim about the same call made later, and two copies of it
      * would push something else out.
+     *
+     * The two flags are set on having run at all, not on having succeeded, which is the rule
+     * [AgentRunner] applies within a turn and for the same reason: a failed call can still
+     * put the text in the window. `run_script` reads the files a program names before running
+     * it, and a program that then throws answers with the exception message, which can carry
+     * what it had already read. That message is in the engine's record whether or not a note
+     * is kept of it, so the flag that asks before anything leaves the device has to be set
+     * whether or not a note is kept. Gated on success, the taint ended with the turn while
+     * the text did not, and the next turn's web_search could carry it off in Auto unasked.
      */
     fun withSteps(steps: List<AgentStep>, source: (String) -> Tool?): ToolNotes {
+        val ran = steps.filterIsInstance<AgentStep.Ran>()
+        if (ran.isEmpty()) return this
+        val tools = ran.map { source(it.call.name) }
         // associateBy keeps the last on a collision, which is what a batch holding the same
         // call twice should leave behind: one note, the newer of the two.
-        val fresh = steps.filterIsInstance<AgentStep.Ran>()
-            .filter { it.successful }
-            .map { it.asNote(source(it.call.name)) }
+        val fresh = ran.zip(tools)
+            .filter { (step, _) -> step.successful }
+            .map { (step, tool) -> step.asNote(tool) }
             .associateBy { it.call }
             .values
             .toList()
-        if (fresh.isEmpty()) return this
         val replaced = fresh.map { it.call }.toSet()
         return ToolNotes(
             notes = (notes.filterNot { it.call in replaced } + fresh).trimmedToBudget(),
-            readUntrusted = readUntrusted || fresh.any { it.untrusted },
-            readPrivate = readPrivate || fresh.any { it.private },
+            readUntrusted = readUntrusted || tools.any { it?.returnsUntrustedText == true },
+            readPrivate = readPrivate || tools.any { it?.readsPrivateData == true },
         )
     }
 

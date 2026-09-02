@@ -44,7 +44,19 @@ import kotlinx.serialization.json.jsonObject
 internal fun ToolCall.textArgument(vararg names: String): String? =
     argument(*names) ?: names.firstNotNullOfOrNull { argumentsJson.scavenge(it) }
 
-/** Pulls one named value out of an envelope that is no longer valid JSON. */
+/**
+ * Reads a short argument out of a call whose long one may have broken the envelope.
+ *
+ * The path of a write is read with [argument], which parses the whole call, and the whole
+ * call is exactly what an unescaped quote in the content breaks. So the path was refused as
+ * missing before the content ever got its salvaged reading, and the model was told to call
+ * again with a path it had given. This tries the strict reading and, only when the envelope
+ * will not parse, takes the value between the key's opening quote and the next one. That
+ * is the wrong rule for a page of text, where the next quote is probably inside the text,
+ * and the right one for a name, which has none.
+ */
+internal fun ToolCall.shortArgument(vararg names: String): String? =
+    argument(*names) ?: names.firstNotNullOfOrNull { argumentsJson.scavengeShort(it) }
 
 /** A whole number argument, however the model chose to write it. */
 internal fun ToolCall.intArgument(vararg names: String): Int? =
@@ -74,21 +86,32 @@ internal fun ToolCall.flag(vararg names: String): Boolean =
             }
         } == true
 
+/** Pulls one named value out of an envelope that is no longer valid JSON. */
 private fun String.scavenge(name: String): String? {
+    val open = openingQuoteOf(name) ?: return null
+    // Everything up to the brace that closes the call, so the last quote found is the one
+    // that closes the value rather than one belonging to the text inside it.
+    val body = trimEnd().removeSuffix("}").trimEnd()
+    val close = body.lastIndexOf('"')
+    return if (close > open) body.substring(open + 1, close).unescaped() else null
+}
+
+/** The same for a value with no quotes of its own: it ends at the first one after it opens. */
+private fun String.scavengeShort(name: String): String? {
+    val open = openingQuoteOf(name) ?: return null
+    val close = indexOf('"', startIndex = open + 1)
+    return if (close > open) substring(open + 1, close).unescaped() else null
+}
+
+/** Where the quoted value of [name] begins, or null when the call has no such key. */
+private fun String.openingQuoteOf(name: String): Int? {
     val key = indexOf("\"$name\"")
     if (key < 0) return null
 
     val colon = indexOf(':', startIndex = key + name.length + QUOTES)
     if (colon < 0) return null
 
-    val open = indexOf('"', startIndex = colon + 1)
-    if (open < 0) return null
-
-    // Everything up to the brace that closes the call, so the last quote found is the one
-    // that closes the value rather than one belonging to the text inside it.
-    val body = trimEnd().removeSuffix("}").trimEnd()
-    val close = body.lastIndexOf('"')
-    return if (close > open) body.substring(open + 1, close).unescaped() else null
+    return indexOf('"', startIndex = colon + 1).takeIf { it >= 0 }
 }
 
 /**

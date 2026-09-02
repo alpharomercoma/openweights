@@ -206,6 +206,12 @@ object ToolPrompting {
      * tools already accept a mangled envelope, so this only has to find the right span. Depth
      * counting handles a nested object; a run-on that never closes returns nothing rather
      * than the rest of the reply.
+     *
+     * A brace inside a double-quoted string is a letter, not structure. Counting every
+     * brace was fine while arguments were queries and paths, and wrong the moment
+     * run_script arrived: a `code` value holding `}` in a string, a regex or a comment
+     * closed the object early, and the tool was handed a fragment that parsed as nothing.
+     * Escapes are honoured so an escaped quote does not end the string it sits in.
      */
     private fun String.argumentsAfter(marker: Int): String? {
         val key = keyAt(ARGUMENT_KEYS, from = marker)
@@ -214,14 +220,21 @@ object ToolPrompting {
         if (open < 0) return null
 
         var depth = 0
-        for (index in open until length) {
-            when (this[index]) {
-                '{' -> depth++
-                '}' -> {
+        var quoted = false
+        var index = open
+        while (index < length) {
+            val char = this[index]
+            when {
+                quoted && char == '\\' -> index++
+                char == '"' -> quoted = !quoted
+                quoted -> Unit
+                char == '{' -> depth++
+                char == '}' -> {
                     depth--
                     if (depth == 0) return substring(open, index + 1)
                 }
             }
+            index++
         }
         return null
     }

@@ -167,10 +167,15 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
         /**
          * The lite endpoint's markup, which is a table rather than a list of divs.
          *
-         * A row carries the link, and the snippet arrives in a later cell, so the two are
+         * A row carries the link, and the snippet arrives in the row after it, so the two are
          * matched in sequence rather than by one expression spanning both: the rows for
          * advertisements and for "no results" carry a link with no snippet after it, and a
          * single pattern that insisted on both would silently drop the first real result.
+         *
+         * Paired by position, not by index. Two lists zipped by index gave the advertisement
+         * the first organic result's snippet and shifted every later snippet onto the wrong
+         * result, so the model read one page's summary under another page's title. A link
+         * takes only a snippet that sits between it and the next link.
          */
         private val LITE_LINK = Regex(
             """<a[^>]*href="([^"]+)"[^>]*class=['"]result-link['"][^>]*>(.*?)</a>""",
@@ -186,9 +191,13 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
             val snippets = LITE_SNIPPET.findAll(page).toList()
             return links.take(limit).mapIndexed { index, match ->
                 val (href, title) = match.destructured
+                val before = links.getOrNull(index + 1)?.range?.first ?: page.length
+                val snippet = snippets.firstOrNull {
+                    it.range.first > match.range.last && it.range.first < before
+                }
                 SearchHit(
                     title = title.stripTags(),
-                    snippet = snippets.getOrNull(index)?.groupValues?.get(1)?.stripTags().orEmpty(),
+                    snippet = snippet?.groupValues?.get(1)?.stripTags().orEmpty(),
                     url = href.unwrapRedirect(),
                 )
             }.filter { it.url.startsWith("http") }

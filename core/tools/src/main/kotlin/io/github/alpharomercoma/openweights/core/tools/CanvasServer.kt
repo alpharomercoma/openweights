@@ -230,9 +230,11 @@ class CanvasServer @Inject constructor(
     /** A viewer, or a file the canvas on screen owns. */
     private fun route(path: String, query: String): ByteArray {
         viewerResponse(path, query)?.let { return it }
-        val body = runBlocking { read(path) }
+        val (served, body) = runBlocking { read(path) }
             ?: return response("404 Not Found", "text/plain", "No such file: $path".toByteArray())
-        val type = contentTypeFor(path)
+        // Typed by the file that answered, not by the name asked for: a folder answered by
+        // its index page would otherwise go out as a download rather than a page.
+        val type = contentTypeFor(served)
         val policy = if (type.startsWith("text/html")) PAGE_POLICY else null
         return response("200 OK", type, body, policy)
     }
@@ -310,18 +312,22 @@ class CanvasServer @Inject constructor(
     }
 
     /**
-     * The file at [path], or null when there is none — or when it is not the canvas's to
-     * show. Nothing is served while no canvas is on screen.
+     * The file at [path], named and read, or null when there is none — or when it is not
+     * the canvas's to show. Nothing is served while no canvas is on screen.
+     *
+     * A folder is answered by the index page inside it, asked for as `site/` or `site`
+     * alike. The trailing slash is dropped before the walk because the walk refuses an
+     * empty name, and a link to a folder is written with the slash more often than not.
      */
-    private suspend fun read(path: String): ByteArray? {
+    private suspend fun read(path: String): Pair<String, ByteArray>? {
         val canvas = board.showing.value ?: return null
-        val wanted = path.ifEmpty { "index.html" }
+        val wanted = path.trimEnd('/').ifEmpty { "index.html" }
         if (!canvas.contains(wanted)) return null
         val entry = workspace.resolve(wanted) ?: return null
         return if (entry.isDirectory) {
-            read(if (path.isEmpty()) "index.html" else "$path/index.html")
+            read("$wanted/index.html")
         } else {
-            workspace.readBytes(entry)
+            workspace.readBytes(entry)?.let { wanted to it }
         }
     }
 

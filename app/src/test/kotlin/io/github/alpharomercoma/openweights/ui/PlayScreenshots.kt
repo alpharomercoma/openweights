@@ -26,6 +26,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.ThemeMode
 import org.junit.Rule
@@ -59,6 +61,11 @@ import java.io.File
  *
  * One screen per test, because a compose rule takes one `setContent` and throws on the
  * second.
+ *
+ * Run under the accelerated flavour. `DiscoverScreen` only draws the runtime chips when
+ * `ExecuTorchSupport.AVAILABLE` is true, and the standard flavour's constant is false, so
+ * a standard render of the Hub is a render of one runtime and the listing would be
+ * showing the smaller of the two apps.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -97,8 +104,18 @@ class PlayScreenshots {
     fun theHubRatherThanACatalogue() =
         shoot("04-discover", until = "LFM2.5") { ListingShots.discover() }
 
+    // Both runtimes' files in one list, which is the fact the second runtime changed
+    // about the product and the one a listing can show in a single frame: a GGUF row and
+    // a compiled row, each saying which engine opens it.
     @Test
-    fun everyToolWithAnOffSwitch() = shoot("05-tools", until = "Search the web") {
+    fun bothRuntimesOnOnePhone() = shoot("05-models", until = "SmolLM3") {
+        ListingShots.models()
+    }
+
+    // Scrolled to the switches. The folder, search and memory cards sit above them now,
+    // and the caption on this frame is about the switches.
+    @Test
+    fun everyToolWithAnOffSwitch() = shoot("06-tools", until = "Search the web", scroll = true) {
         ListingShots.tools()
     }
 
@@ -129,6 +146,10 @@ class PlayScreenshots {
     }
 
     @Test
+    @Config(qualifiers = SEVEN_INCH)
+    fun sevenInchModels() = shoot("7/05-models", until = "SmolLM3") { ListingShots.models() }
+
+    @Test
     @Config(qualifiers = TEN_INCH)
     fun tenInchChat() = shoot(
         "10/01-chat",
@@ -150,6 +171,10 @@ class PlayScreenshots {
         ListingShots.discover()
     }
 
+    @Test
+    @Config(qualifiers = TEN_INCH)
+    fun tenInchModels() = shoot("10/05-models", until = "SmolLM3") { ListingShots.models() }
+
     // The paper palette, which no listing asks for and which nobody had ever looked at.
     //
     // Both themes are meant to be built properly rather than one being a tint of the other,
@@ -165,9 +190,10 @@ class PlayScreenshots {
 
     @Test
     @Config(qualifiers = PAPER)
-    fun paperTools() = shoot("light/02-tools", until = "Search the web", dark = false) {
-        ListingShots.tools()
-    }
+    fun paperTools() =
+        shoot("light/02-tools", until = "Search the web", dark = false, scroll = true) {
+            ListingShots.tools()
+        }
 
     @Test
     @Config(qualifiers = PAPER)
@@ -201,6 +227,8 @@ class PlayScreenshots {
         dark: Boolean = true,
         typing: String? = null,
         tap: String? = null,
+        /** Swipe the screen up until [until] is composed, for a row that starts below the fold. */
+        scroll: Boolean = false,
         content: @Composable () -> Unit,
     ) {
         val into = System.getenv(OUTPUT) ?: return
@@ -215,9 +243,14 @@ class PlayScreenshots {
         // Markdown is parsed off the composition and swapped in when it finishes, so a
         // capture taken at idle gets the empty slot it holds in the meantime. The first
         // attempt drew a reply with the telemetry row under it and no reply above it.
-        compose.waitUntil(timeoutMillis = WAIT_MS) {
-            compose.onAllNodesWithText(until, substring = true).fetchSemanticsNodes().isNotEmpty()
+        if (scroll) {
+            var swipes = 0
+            while (!composed(until) && swipes++ < MAX_SWIPES) {
+                compose.onRoot().performTouchInput { swipeUp() }
+                compose.waitForIdle()
+            }
         }
+        compose.waitUntil(timeoutMillis = WAIT_MS) { composed(until) }
 
         tap?.let { compose.onNodeWithContentDescription(it).performClick() }
         typing?.let { compose.onNodeWithContentDescription("Message").performTextInput(it) }
@@ -233,8 +266,14 @@ class PlayScreenshots {
         println("screenshot ${file.name}: ${bitmap.width}x${bitmap.height} ${file.length()} bytes")
     }
 
+    private fun composed(text: String) =
+        compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+
     private companion object {
         const val OUTPUT = "OPENWEIGHTS_SCREENSHOTS"
+
+        /** A lazy list composes only what is on screen, so a row below the fold takes a swipe or two. */
+        const val MAX_SWIPES = 6
 
         /** The header a finished tool run folds behind. See `WorkBlock`. */
 

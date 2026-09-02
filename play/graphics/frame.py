@@ -31,8 +31,9 @@ CAPTIONS = [
     ("01-chat", "Real numbers, in front of you", "Tokens per second and context fill, live"),
     ("02-tools", "An assistant that can act", "Search the web, read a page, use your files"),
     ("03-plan", "Ask it to plan first", "It proposes the steps. You tick them off."),
-    ("04-discover", "Browse the Hub, not a fixed catalogue", "Inspect fit and run supported GGUF models"),
-    ("05-tools", "Every tool has an off switch", "Grouped by whether using one leaves the phone"),
+    ("04-discover", "Browse the Hub, not a catalogue", "GGUF for llama.cpp, .pte for ExecuTorch"),
+    ("05-models", "Two runtimes, one phone", "Every model says which engine opens it"),
+    ("06-tools", "Every tool has an off switch", "Grouped by whether using one leaves the phone"),
 ]
 
 

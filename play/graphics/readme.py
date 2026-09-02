@@ -21,9 +21,9 @@ from PIL import Image, ImageDraw
 
 HERE = Path(__file__).parent
 
-# Four, not five: the fifth store screenshot is the Tools screen again at a different scroll
-# position, which says nothing new on a strip this size.
-SCREENS = ["01-chat", "04-discover", "02-tools", "03-plan"]
+# Four of the six: the Tools switches say nothing new at this size, and the plan gives
+# way to the Models screen, which is the one frame that shows both runtimes.
+SCREENS = ["01-chat", "04-discover", "05-models", "02-tools"]
 
 # The header logo, shipped at the size it is displayed at.
 #

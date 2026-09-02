@@ -141,14 +141,21 @@ Made, checked against the spec, and in `play/graphics`. How to regenerate any of
 
 | Asset | File | Spec |
 |---|---|---|
-| App icon | `icon-512.png` | 512 x 512, 32-bit with alpha, 54 KB |
+| App icon | `icon-512.png` | 512 x 512, 32-bit with alpha, 3 KB |
 | Feature graphic | `feature-graphic-1024x500.png` | 1024 x 500, 24-bit, no alpha |
-| Phone screenshots | `screenshots-phone/01..05` | five at 1080 x 1920, 24-bit, no alpha |
+| Phone screenshots | `screenshots-phone/01..06` | six at 1080 x 1920, 24-bit, no alpha |
+| 7-inch tablet | `screenshots-tablet-7/01..05` | five at 1200 x 2133 |
+| 10-inch tablet | `screenshots-tablet-10/01..05` | five at 1800 x 3200 |
 
 The screenshots are the one place the product explains itself, so they are captioned in that
-order: the telemetry, a tool round, a plan, the Hub, and the off switches. The first one
-shows tokens per second, because that number is the difference between this and every
-assistant that hides it.
+order: the telemetry, a tool round, a plan, the Hub across both runtimes, the Models screen
+with a GGUF and a compiled `.pte` side by side, and the off switches. The first one shows
+tokens per second, because that number is the difference between this and every assistant
+that hides it; the fifth exists because the second runtime is the largest thing that changed
+since the listing was first drafted and a single frame can show it.
+
+The feature graphic says the same thing in one image: the lockup, six model families the app
+has run on the test phone through both engines, and which file format each engine opens.
 
 They are rendered from the real composables by a Robolectric run rather than captured off a
 phone, which is worth knowing for two reasons. A capture from this test handset is

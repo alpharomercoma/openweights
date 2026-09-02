@@ -20,7 +20,7 @@ intent. Where a row says "measured", the command is in the row.
 | Upload signing | Config reads from `keystore.properties` or environment | Never from the repository |
 | Cleartext traffic | Disabled | `usesCleartextTraffic="false"` |
 | Backup and device transfer | Everything excluded | `data_extraction_rules.xml` |
-| Download size | **23.5 MB AAB**, no bundled model | Under the 200 MB cellular threshold with room to spare |
+| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-03 on the version code 458 bundles |
 
 ### The release build was run, not just built
 
@@ -394,7 +394,8 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
    produced by every release build; Play takes it from the same upload screen.
 2. Publish [privacy-policy.md](privacy-policy.md) at a public URL and paste it into the
    Console. GitHub Pages on this repository is enough.
-3. Make the feature graphic and the phone screenshots. Sizes are in the listing document.
+3. ~~Make the feature graphic and the phone screenshots.~~ Done, and regenerated on
+   2026-09-03 for the second runtime: `play/graphics/README.md` says how.
 4. Answer the content rating questionnaire.
 5. File the generative AI content declaration, and ask review the two open questions in it.
 6. Record both foreground service videos, download and generation, and submit both declarations.
@@ -426,9 +427,16 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   read something private (either tool). Neither condition is the ordinary case, so the
   ordinary search or fetch does not stop to ask, and the two that do are declared as such
   rather than folded into "the tools ask before they run."
-- **No upload key.** `keystore.properties` does not exist in this checkout, so
-  `bundleRelease` produces an unsigned AAB. Creating the key and enrolling in Play App
-  Signing is the first Console step and has deliberately not been done for you.
+- **The upload key lives only on one machine.** `keystore.properties` and `upload.jks`
+  exist in the working checkout that cuts releases and nowhere else; a fresh clone builds
+  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-03 carry
+  that key (`keytool -printcert -jarfile` on either shows the same SHA-256 as the
+  keystore), and enrolling it in Play App Signing is still the first Console step.
+- **Two bundles, one application id.** The `standard` flavour is llama.cpp alone; the
+  `accelerated` one adds ExecuTorch and is 3.3 MB larger. Play takes one bundle per
+  release, so the choice of which to upload is a product decision, not a build one. The
+  listing art is rendered from the accelerated flavour because it is the one whose Hub
+  screen shows both runtimes.
 - **A fast Watch restored on a background process start can run unprotected.**
   `OpenWeightsApplication.onCreate` calls `watches.sync()` on every process start
   (`OpenWeightsApplication.kt`), including one the system triggered in the background rather

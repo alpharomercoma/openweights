@@ -25,17 +25,27 @@ import io.github.alpharomercoma.openweights.core.engine.ComputeDevice
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubQuery
+import io.github.alpharomercoma.openweights.core.hub.HubRuntime
 import io.github.alpharomercoma.openweights.core.hub.HubSort
 import io.github.alpharomercoma.openweights.core.tools.GrantState
+import io.github.alpharomercoma.openweights.core.tools.Remembered
+import io.github.alpharomercoma.openweights.core.tools.SearchEngine
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverUiState
+import io.github.alpharomercoma.openweights.ui.models.ActiveDownload
+import io.github.alpharomercoma.openweights.ui.models.LocalModel
+import io.github.alpharomercoma.openweights.ui.models.ModelsScreen
+import io.github.alpharomercoma.openweights.ui.models.ModelsUiState
 import io.github.alpharomercoma.openweights.ui.settings.SettingsScreen
 import io.github.alpharomercoma.openweights.ui.settings.SettingsUiState
+import io.github.alpharomercoma.openweights.ui.tools.EngineSummary
 import io.github.alpharomercoma.openweights.ui.tools.ToolSummary
 import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsUiState
 import io.github.alpharomercoma.openweights.ui.tools.WorkspaceSummary
+import java.io.File
+import java.io.RandomAccessFile
 
 /**
  * The two screens outside the conversation that are worth a listing slot.
@@ -54,13 +64,18 @@ object ListingShots {
     @Composable
     fun discover() = DiscoverScreen(
         state = DiscoverUiState(
-            query = HubQuery(text = "gguf", sort = HubSort.TRENDING),
+            query = HubQuery(text = "", sort = HubSort.TRENDING),
+            // Both corners of the Hub in one list, which is what the search does now: the
+            // GGUF repositories llama.cpp reads and the compiled `.pte` ones ExecuTorch
+            // opens, each row saying which. The two `pytorch/` ids are the exports this
+            // project actually ran on the test phone, per docs/research/executorch.md.
             results = listOf(
                 hub("LiquidAI/LFM2.5-1.2B-Instruct-GGUF", downloads = 332_804, likes = 217),
                 hub("unsloth/Qwen3-1.7B-GGUF", downloads = 47_512, likes = 73),
+                hub("pytorch/Qwen3-1.7B-INT8-INT4", 9_318, likes = 21, compiled = true),
                 hub("LiquidAI/LFM2.5-2.6B-GGUF", downloads = 885_760, likes = 316),
+                hub("pytorch/SmolLM3-3B-INT8-INT4", 21_004, likes = 55, compiled = true),
                 hub("LiquidAI/LFM2.5-8B-A1B-GGUF", downloads = 303_008, likes = 288),
-                hub("pytorch/SmolLM3-3B-INT8-INT4", downloads = 21_004, likes = 55),
             ),
             // What the phone can actually hold, which is what turns a list into advice.
             parameterCeilingBillions = 8,
@@ -133,6 +148,20 @@ object ListingShots {
                 ),
             ),
             workspace = WorkspaceSummary(null, GrantState.NONE),
+            // The cards above the rows, with what a first run shows: every engine on, the
+            // default one not switchable off, and the two facts a person might have let
+            // it keep. Left empty, the search card is a heading over nothing.
+            engines = SearchEngine.entries.map { engine ->
+                EngineSummary(
+                    engine,
+                    enabled = true,
+                    canDisable = engine != SearchEngine.DUCKDUCKGO,
+                )
+            },
+            memories = listOf(
+                Remembered("Prefers answers in metric units.", savedAt = 1_787_000_000_000),
+                Remembered("Works on an Android app called OpenWeights.", 1_787_100_000_000),
+            ),
         ),
         onToggle = { _, _ -> },
         onChooseFolder = {},
@@ -196,15 +225,67 @@ object ListingShots {
         ),
     )
 
-    private fun hub(id: String, downloads: Int, likes: Int) = HubModel(
+    /**
+     * The Models screen, with both runtimes' files on the same phone.
+     *
+     * `LocalModel` reads its size off the file, so each entry is a sparse temporary file
+     * set to the length the real download has: no bytes are written, and the number on
+     * screen is the number the row would show for the genuine file. The two `.pte` files
+     * are named the way the app names them, after the repository rather than the remote
+     * `model.pte`, since a compiled model carries no metadata and its name is the only
+     * thing that says which family it is.
+     */
+    @Composable
+    fun models() = ModelsScreen(
+        state = ModelsUiState(
+            models = listOf(
+                local("LFM2.5-1.2B-Instruct-QAD-Q4_0.gguf", 731_811_840, "LiquidAI"),
+                local("LFM2.5-2.6B-Q4_K_M.gguf", 1_674_454_848, "LiquidAI"),
+                local("Qwen3-1.7B-Q8_0.gguf", 2_098_855_936, "unsloth"),
+                local("Qwen3-1.7B-INT8-INT4.pte", 1_842_069_504, "pytorch"),
+                local("SmolLM3-3B-INT8-INT4.pte", 3_138_412_544, "pytorch"),
+            ),
+            listed = true,
+            downloads = listOf(
+                ActiveDownload(
+                    repoId = "google/gemma-3-1b-it-qat-q4_0-gguf",
+                    path = "gemma-3-1b-it-q4_0.gguf",
+                    key = "gemma-3-1b-it-q4_0.gguf",
+                    bytesDone = 412_000_000,
+                    bytesTotal = 1_002_000_000,
+                ),
+            ),
+            storageUsedBytes = 9_485_604_672,
+        ),
+        onUse = {},
+        onDelete = {},
+        onCancelDownload = {},
+    )
+
+    private fun hub(id: String, downloads: Int, likes: Int, compiled: Boolean = false) = HubModel(
         id = id,
         downloads = downloads,
         likes = likes,
         isGated = false,
-        tags = listOf("gguf", "text-generation"),
+        tags = listOf(if (compiled) "executorch" else "gguf", "text-generation"),
         updatedAt = "2026-08-01T00:00:00.000Z",
         pipelineTag = "text-generation",
+        runtimes = setOf(if (compiled) HubRuntime.EXECUTORCH else HubRuntime.LLAMA_CPP),
     )
+
+    /** A sparse file of the real download's length, in a directory that dies with the JVM. */
+    private fun local(name: String, bytes: Long, publisher: String): LocalModel {
+        val file = File(staged, name)
+        if (!file.exists()) RandomAccessFile(file, "rw").use { it.setLength(bytes) }
+        return LocalModel(file = file, publisher = publisher)
+    }
+
+    private val staged: File by lazy {
+        File(System.getProperty("java.io.tmpdir"), "openweights-listing").apply {
+            mkdirs()
+            deleteOnExit()
+        }
+    }
 
     /** The same row `ToolsViewModel.read` builds, from the same table of labels. */
     private fun tool(

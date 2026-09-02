@@ -30,3 +30,7 @@ build-ios-sim/
 
 # The Kotlin compiler's session directory, written by Gradle builds on the host.
 .kotlin/
+
+# Built release bundles and their R8 maps, copied here for upload. Never committed:
+# a bundle is reproducible from the tag and a mapping file is 60 MB.
+/play/release/

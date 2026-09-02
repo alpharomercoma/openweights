@@ -283,6 +283,37 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `a stop mid-reply reaches the runtime and is reported as a cancellation`() = runTest {
+        // The runtime clears its own stop flag when the token loop starts, so a Stop that
+        // lands before the first token is erased; the engine re-issues it from inside the
+        // callback. And the runtime always says "end of turn", so the reason has to be
+        // decided here: a call parsed out of a stopped reply must not run.
+        bridge.reply = "Let me think about that for a moment and then <tool_call>"
+        engine.load(installed(MODEL), PARAMS)
+        var fragments = 0
+        bridge.beforeFragment = { if (++fragments == 2) engine.cancel() }
+
+        val events = engine.chat(listOf(user("Hi")), NO_THINKING).toList()
+
+        val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+        assertThat(done.reason).isEqualTo(StopReason.CANCELLED)
+        assertThat(bridge.stopped).isTrue()
+        assertThat(fragments).isLessThan(bridge.reply.length)
+    }
+
+    @Test
+    fun `a reply cut for budget is reported as such, not as a finished turn`() = runTest {
+        bridge.reply = "one two three four five six seven eight nine ten eleven twelve"
+        engine.load(installed(MODEL), PARAMS)
+
+        val events = engine.chat(listOf(user("Count")), NO_THINKING.copy(maxTokens = 3)).toList()
+
+        val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+        assertThat(done.reason).isEqualTo(StopReason.MAX_TOKENS)
+        assertThat(bridge.stopped).isTrue()
+    }
+
+    @Test
     fun `stops decoding at the end-of-turn marker`() = runTest {
         bridge.reply = "Tokyo.<|im_end|>and then some rambling"
         engine.load(installed(MODEL), PARAMS)

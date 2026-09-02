@@ -215,11 +215,18 @@ class ExecuTorchEngine(
         // trusted the old record would send the same suffix at an already-advanced position
         // and duplicate it.
         val discipline = StopDiscipline(budget)
+        cancelRequested = false
         val outcome = try {
             bridge.generate(fresh, budget) { fragment ->
                 if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
                 reply.accept(fragment)?.let { trySend(GenerationEvent.Token(it)) }
-                if (discipline.shouldStop(fragment, reply.endedCleanly)) bridge.stop()
+                // Asked on every token rather than once from cancel(), because the
+                // runtime clears its stop flag when the token loop starts: a Stop that
+                // lands during the prefill ahead of it is erased, and a collector that
+                // has gone away has nobody left to call cancel() at all. Left running,
+                // the loop holds the module's lock until the window fills, and the next
+                // turn or a model switch waits behind it.
+                if (stopNow(discipline, fragment, reply, isClosedForSend)) bridge.stop()
             }
         } catch (failure: Throwable) {
             fedText = ""
@@ -257,7 +264,7 @@ class ExecuTorchEngine(
         val parsed = ToolCallParser.parse(raw)
         send(
             GenerationEvent.Completed(
-                reason = outcome.reason,
+                reason = reasonFor(reply, discipline, outcome.reason),
                 stats = statsFor(outcome, started, firstTokenAt, reused, prompt),
                 content = parsed.text.withoutReasoning(),
                 reasoning = raw.reasoning(),
@@ -268,7 +275,47 @@ class ExecuTorchEngine(
 
     override fun cancel() {
         warmStopped = true
+        cancelRequested = true
         bridge.stop()
+    }
+
+    /**
+     * Set by [cancel] and read by the token callback, which re-issues the stop. The
+     * runtime's flag alone is not enough: see the callback in [chat].
+     */
+    @Volatile
+    private var cancelRequested = false
+
+    /**
+     * Whether this token is the one to stop on: the user asked, the collector has gone,
+     * or the discipline's own budget and rut rules say so. The first two are asked on
+     * every token because the runtime clears its stop flag when the loop starts.
+     */
+    private fun stopNow(
+        discipline: StopDiscipline,
+        fragment: String,
+        reply: StreamedReply,
+        collectorGone: Boolean,
+    ): Boolean = cancelRequested ||
+        collectorGone ||
+        discipline.shouldStop(fragment, reply.endedCleanly)
+
+    /**
+     * Why a generation ended, decided here because the runtime's own answer is always
+     * "end of turn": its callback reports statistics, not why the loop stopped, and the
+     * bridge can only pass that on. A pass cut for budget, caught in a rut, or stopped by
+     * the user therefore read as a finished one, so a tool call sitting in a truncated
+     * reply ran and the turn loop kept a stopped turn's history as if it were whole.
+     */
+    private fun reasonFor(
+        reply: StreamedReply,
+        discipline: StopDiscipline,
+        runtime: StopReason,
+    ): StopReason = when {
+        cancelRequested -> StopReason.CANCELLED
+        reply.endedCleanly -> StopReason.END_OF_TURN
+        discipline.cut -> StopReason.MAX_TOKENS
+        else -> runtime
     }
 
     /**
@@ -499,11 +546,17 @@ private class StopDiscipline(private val budget: Int) {
     private var lastFragment = ""
     private var repeats = 0
 
+    /** True once this cut the generation short: budget spent or a rut, not a clean end. */
+    var cut = false
+        private set
+
     fun shouldStop(fragment: String, endedCleanly: Boolean): Boolean {
         produced += 1
         repeats = if (fragment == lastFragment) repeats + 1 else 0
         lastFragment = fragment
-        return endedCleanly || produced >= budget || repeats >= MAX_TOKEN_RUT
+        if (endedCleanly) return true
+        if (produced >= budget || repeats >= MAX_TOKEN_RUT) cut = true
+        return cut
     }
 
     private companion object {

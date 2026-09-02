@@ -212,21 +212,33 @@ class LlamaCppEngine internal constructor(
     ): WarmResult? = withContext(engineThread) {
         val activeHandle = handle.get()
         if (activeHandle == 0L) return@withContext null
-        val stats = bridge.nativeWarm(
-            handle = activeHandle,
-            // Marshalled exactly as chat marshals them, because the engine reuses this
-            // work by comparing bytes: a role or a flag spelled differently here is a
-            // prefix that never matches and a warm that warmed nothing.
-            roles = messages.map { it.role.wireName }.toTypedArray(),
-            contents = messages.map { it.text }.toTypedArray(),
-            toolNames = tools.map { it.name }.toTypedArray(),
-            toolDescriptions = tools.map { it.description }.toTypedArray(),
-            toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
-            enableThinking = params.thinking,
-            reasoningEffort = params.reasoningEffort.wireName,
-            snapshot = snapshot,
-            storePath = store,
-        ) ?: return@withContext null
+        // A warm that fails is a warm that did not happen, which the contract above says
+        // is reported as null. The native side throws for everything but a cancellation -
+        // a prefix longer than the context window, a template that will not render a
+        // system message on its own, a decode refused under memory pressure - and every
+        // one of those is a condition the next turn handles for itself. Warming fires
+        // after every load from a launch nothing catches, so letting the throw through
+        // turned "the head does not fit a 1,024-token window" into a crash on each load.
+        val stats = try {
+            bridge.nativeWarm(
+                handle = activeHandle,
+                // Marshalled exactly as chat marshals them, because the engine reuses this
+                // work by comparing bytes: a role or a flag spelled differently here is a
+                // prefix that never matches and a warm that warmed nothing.
+                roles = messages.map { it.role.wireName }.toTypedArray(),
+                contents = messages.map { it.text }.toTypedArray(),
+                toolNames = tools.map { it.name }.toTypedArray(),
+                toolDescriptions = tools.map { it.description }.toTypedArray(),
+                toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
+                enableThinking = params.thinking,
+                reasoningEffort = params.reasoningEffort.wireName,
+                snapshot = snapshot,
+                storePath = store,
+            )
+        } catch (failure: LlamaException) {
+            Log.w("OpenWeights", "warm skipped: ${failure.message}")
+            null
+        } ?: return@withContext null
         currentModel = currentModel?.copy(
             contextUsed = (stats[0] + stats[1]).toInt(),
         )

@@ -313,6 +313,53 @@ size_t complete_utf8_prefix(const std::string & text) {
 }
 
 /**
+ * Whether the byte at the front of [text] can never begin a valid character, as opposed to
+ * beginning one that has not finished arriving.
+ *
+ * [complete_utf8_prefix] answers zero for both, and the streaming loop could only wait.
+ * For a character still arriving that is right; for a stray continuation byte or an
+ * overlong lead it is a stall: nothing behind it is ever emitted, the stored reply ends
+ * there, and the model goes on decoding into a cache the record no longer describes. A
+ * byte-fallback vocabulary produces exactly such bytes when sampling wanders, so the
+ * front byte is replaced with U+FFFD and the stream moves on, which is what every decoder
+ * that displays text does with ill-formed input.
+ */
+bool utf8_malformed_at_front(const std::string & text) {
+    if (text.empty()) return false;
+    const auto lead = static_cast<unsigned char>(text[0]);
+
+    size_t length = 0;
+    uint32_t code = 0;
+    if ((lead & 0x80) == 0x00) {
+        return false;
+    } else if ((lead & 0xE0) == 0xC0) {
+        length = 2;
+        code = lead & 0x1Fu;
+    } else if ((lead & 0xF0) == 0xE0) {
+        length = 3;
+        code = lead & 0x0Fu;
+    } else if ((lead & 0xF8) == 0xF0) {
+        length = 4;
+        code = lead & 0x07u;
+    } else {
+        return true;  // a continuation byte, or a lead no encoding uses
+    }
+
+    for (size_t offset = 1; offset < length && offset < text.size(); ++offset) {
+        const auto byte = static_cast<unsigned char>(text[offset]);
+        if ((byte & 0xC0) != 0x80) return true;  // the sequence broke before it finished
+        code = (code << 6) | (byte & 0x3Fu);
+    }
+    if (text.size() < length) return false;  // still arriving
+
+    const bool overlong = (length == 2 && code < 0x80) ||
+                          (length == 3 && code < 0x800) ||
+                          (length == 4 && code < 0x10000);
+    const bool surrogate = code >= 0xD800 && code <= 0xDFFF;
+    return overlong || surrogate || code > 0x10FFFF;
+}
+
+/**
  * The CPU backend variants built by GGML_CPU_ALL_VARIANTS, best instruction set first.
  * Each exports `ggml_backend_score()`, which inspects the running CPU and returns 0 when
  * the variant's instructions are unavailable.
@@ -1183,7 +1230,15 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
     if (static_cast<int32_t>(reusable) < n_past_) {
         const bool rolled_back = llama_memory_seq_rm(
             llama_get_memory(ctx_), 0, static_cast<llama_pos>(reusable), -1);
-        if (!rolled_back) {
+        // A sliding-window model answers yes to the removal and still cannot serve the
+        // prefix. Its local-attention layers keep only the last n_swa positions, and
+        // those cells are recycled as the conversation grows past them; roll back to a
+        // point older than the window and the cells the next token needs are gone, with
+        // no error to say so. llama.h says to ask the memory what it still holds, and
+        // llama-server does exactly this check before trusting a reuse: the smallest
+        // position left must reach back a window's width from the cut.
+        const bool window_intact = rolled_back && swa_window_reaches(reusable);
+        if (!window_intact) {
             // The families that refuse are the ones the warm snapshot exists for. A new
             // conversation shares its first two thousand tokens with the snapshot, so if
             // this prompt extends the snapshotted prefix, restoring it turns "re-read
@@ -1216,8 +1271,9 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
             // candidate. Reading that line as what was reused sent a whole
             // investigation the wrong way: on a hybrid model this branch turns
             // "re-reading 674" into re-reading everything.
-            LOGI("kv: rollback to %zu refused (recurrent state), re-reading all %zu",
-                 reusable, tokens.size());
+            LOGI("kv: rollback to %zu refused (%s), re-reading all %zu",
+                 reusable, rolled_back ? "sliding window passed it" : "recurrent state",
+                 tokens.size());
             reset();
             return 0;
         }
@@ -1225,6 +1281,23 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
     cached_.resize(reusable);
     n_past_ = static_cast<int32_t>(reusable);
     return reusable;
+}
+
+bool Session::keeps_no_full_history() const {
+    return llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_) ||
+           llama_model_n_swa(model_) > 0;
+}
+
+bool Session::swa_window_reaches(size_t position) const {
+    const int32_t n_swa = llama_model_n_swa(model_);
+    if (n_swa <= 0 || position == 0) return true;
+    // The iSWA memory reports the sliding cache's own minimum, which is the question:
+    // the full cache behind it holds everything and is not where the gap would be.
+    const llama_pos pos_min = llama_memory_seq_pos_min(llama_get_memory(ctx_), 0);
+    if (pos_min < 0) return false;  // nothing left in the window at all
+    const llama_pos needed_from =
+        std::max<llama_pos>(0, static_cast<llama_pos>(position) - n_swa);
+    return pos_min <= needed_from;
 }
 
 bool Session::ingest_warm(
@@ -1359,9 +1432,12 @@ void Session::probe_thinking_history() {
 }
 
 void Session::maybe_snapshot() {
-    // Transformers can roll any conversation back to the shared prefix, so for them the
-    // snapshot would be memory spent on a problem they do not have.
-    if (!llama_model_is_hybrid(model_) && !llama_model_is_recurrent(model_)) return;
+    // A full-attention transformer can roll any conversation back to the shared prefix,
+    // so for it the snapshot would be memory spent on a problem it does not have. The
+    // families that cannot are the recurrent and hybrid ones, whose state has no rows to
+    // cut, and the sliding-window ones, whose local layers have forgotten the head by
+    // the time a conversation is long enough to want a new chat.
+    if (!keeps_no_full_history()) return;
     if (cached_.empty() || prefix_tokens_ == cached_) return;
 
     const size_t size = llama_state_seq_get_size(ctx_, 0);
@@ -1430,8 +1506,7 @@ bool Session::warm(
         if (snapshot && cached_.size() == tokens.size()) {
             maybe_snapshot();
         }
-        const bool stateful =
-            llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_);
+        const bool stateful = keeps_no_full_history();
         const bool snapshot_missing = snapshot && stateful &&
             (prefix_state_.empty() || prefix_tokens_ != tokens);
         if (!snapshot_missing) {
@@ -1565,7 +1640,7 @@ bool Session::restore_warm_file(const char * path, const std::vector<llama_token
     cached_ = tokens;
     n_past_ = static_cast<int32_t>(tokens.size());
     cached_covers_context_ = true;
-    if (llama_model_is_hybrid(model_) || llama_model_is_recurrent(model_)) {
+    if (keeps_no_full_history()) {
         // The RAM snapshot armed from the same bytes, with no compute: everything the
         // restore machinery does for a new chat works from the first second.
         prefix_tokens_ = tokens;
@@ -1803,7 +1878,13 @@ StopReason Session::generate(
         raw_reply += piece;
 
         pending += piece;
-        const size_t complete = complete_utf8_prefix(pending);
+        size_t complete = complete_utf8_prefix(pending);
+        // A byte that can never begin a character would otherwise sit at the front of
+        // `pending` for the rest of the reply, with everything behind it unemitted.
+        while (complete == 0 && utf8_malformed_at_front(pending)) {
+            pending.replace(0, 1, "\xEF\xBF\xBD");
+            complete = complete_utf8_prefix(pending);
+        }
         if (complete > 0) {
             const std::string emit = pending.substr(0, complete);
             pending.erase(0, complete);

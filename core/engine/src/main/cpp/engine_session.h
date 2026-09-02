@@ -33,6 +33,9 @@ namespace openweights {
  */
 size_t complete_utf8_prefix(const std::string & text);
 
+/** True when the first byte of [text] is ill-formed rather than merely incomplete. */
+bool utf8_malformed_at_front(const std::string & text);
+
 /** One message in a conversation, as handed to the chat template. */
 struct ChatMessage {
     std::string role;
@@ -413,6 +416,21 @@ private:
 
     /** Snapshots the cache as the warm prefix, on the families that cannot roll back. */
     void maybe_snapshot();
+
+    /**
+     * Whether this model's memory can be rolled back to any earlier position.
+     *
+     * False for recurrent and hybrid families, whose state has no rows to cut, and for
+     * sliding-window ones, whose local-attention cells are recycled past the window. Both
+     * want the warm-prefix snapshot, and both re-read a prefix a transformer would rewind to.
+     */
+    bool keeps_no_full_history() const;
+
+    /**
+     * Whether the sliding-window cache still holds the n_swa positions before [position],
+     * which the next token there will attend to. Always true without a sliding window.
+     */
+    bool swa_window_reaches(size_t position) const;
 
     /**
      * Encodes a prompt containing media and evaluates it into the KV cache.

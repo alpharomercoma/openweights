@@ -75,6 +75,12 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
 
         // The config form rather than generate(prompt, seqLen, ...), because only this
         // one separates "how long may the whole thing be" from "how much may be added".
+        //
+        // Stated for the record rather than relied on: in 1.4.0 the wrapper's generate
+        // reads seqLen, echo, temperature and the BOS/EOS counts out of this config and
+        // never maxNewTokens (the AAR's bytecode), so the runtime resolves its allowance
+        // from the window and this value changes nothing. The budget that holds is the
+        // engine's StopDiscipline, which counts callbacks and stops the loop itself.
         val config = LlmGenerationConfig.create()
             .maxNewTokens(maxNewTokens)
             // seqLen is deliberately not set. Setting both makes the runtime resolve the
@@ -133,9 +139,10 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
 
     override fun prefill(prompt: String) {
         val running = module ?: throw LlamaException("No model loaded")
-        // The wrapper discards the native error code, so a refusal here is silent at
-        // this level; the engine's warm is verified behaviourally instead — a chat after
-        // a warm must extend it, and the runtime's own prompt count says whether it did.
+        // In 1.4.0 the wrapper throws on a nonzero native code ("Prefill failed"), which
+        // is caught and translated below. Earlier releases discarded the code, so the
+        // engine's warm is also verified behaviourally — a chat after a warm must extend
+        // it, and the runtime's own prompt count says whether it did.
         runCatching { running.prefillPrompt(prompt) }.onFailure { cause ->
             throw LlamaException(
                 "ExecuTorch could not prefill: ${cause.message ?: cause::class.java.simpleName}",

@@ -77,6 +77,12 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
                 withTimeoutOrNull(millis + GRACE_MILLIS) {
                     val runner = connection.awaitBinder()
                     val result = CompletableDeferred<String>()
+                    // A process that dies mid-script never calls back. Without this the
+                    // wait ran to the outer clock, three seconds past the script's own
+                    // deadline, for an answer that had stopped being possible.
+                    connection.onDeath = {
+                        result.completeExceptionally(IllegalStateException("sandbox died"))
+                    }
                     runner.run(
                         source,
                         inputsJson,
@@ -112,6 +118,10 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
          */
         private val connected = CompletableDeferred<IScriptRunner>()
 
+        /** Told when the process goes away after the binder was handed over. */
+        @Volatile
+        var onDeath: (() -> Unit)? = null
+
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             if (service == null) {
                 connected.completeExceptionally(IllegalStateException("sandbox returned no binder"))
@@ -126,9 +136,12 @@ class Sandbox @Inject constructor(@param:ApplicationContext private val context:
 
         override fun onBindingDied(name: ComponentName?) {
             connected.completeExceptionally(IllegalStateException("sandbox binding died"))
+            onDeath?.invoke()
         }
 
-        override fun onServiceDisconnected(name: ComponentName?) = Unit
+        override fun onServiceDisconnected(name: ComponentName?) {
+            onDeath?.invoke()
+        }
 
         suspend fun awaitBinder(): IScriptRunner = connected.await()
     }

@@ -75,6 +75,9 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     /** Set to make [generate] throw partway, as a runtime error would. */
     var failsDuringGeneration: String? = null
 
+    /** Called before each fragment is delivered, so a test can act mid-reply. */
+    var beforeFragment: ((String) -> Unit)? = null
+
     override fun load(
         modelPath: String,
         tokenizerPath: String,
@@ -97,7 +100,15 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         prompts += prompt
         lastMaxNewTokens = maxNewTokens
         // Fragment by fragment, because the engine must not assume one callback per reply.
-        reply.chunked(FRAGMENT).forEach(onToken)
+        // The real runtime keeps calling back until its own loop ends; a stop is only a
+        // flag it reads on the way round, which is what stopping after the fragment
+        // that asked reproduces.
+        stopped = false
+        for (fragment in reply.chunked(FRAGMENT)) {
+            beforeFragment?.invoke(fragment)
+            onToken(fragment)
+            if (stopped) break
+        }
         failsDuringGeneration?.let { throw LlamaException(it) }
         return outcome
     }

@@ -99,7 +99,7 @@ class SearchMediaTool @Inject constructor(
             MediaResultKind.IMAGE
         }
 
-        val provider = DuckDuckGoMediaProvider(settings.client(httpClient))
+        val provider = DuckDuckGoMediaProvider(settings.client(httpClient.forTools()))
         val hits = provider.search(query, kind, LIMIT)
             ?: return@withContext "The search did not answer, which usually means it is " +
                 "rate limiting rather than that there is nothing. Try again, or search " +

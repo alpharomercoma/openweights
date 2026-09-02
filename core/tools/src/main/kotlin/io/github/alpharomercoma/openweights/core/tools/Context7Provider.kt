@@ -69,7 +69,7 @@ class Context7Provider(private val httpClient: OkHttpClient) : SearchProvider {
                     .header("User-Agent", SEARCH_USER_AGENT)
                     .header("Accept", "application/json")
                     .build()
-                httpClient.newCall(request).execute().use { response ->
+                httpClient.newCall(request).await().use { response ->
                     if (response.isSuccessful) response.body.string() else null
                 }
             }.getOrNull() ?: return@withContext null

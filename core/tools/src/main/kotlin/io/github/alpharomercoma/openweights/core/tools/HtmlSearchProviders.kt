@@ -58,7 +58,7 @@ internal abstract class HtmlSearchProvider(private val client: OkHttpClient) : S
 
     override suspend fun search(query: String, limit: Int): List<SearchHit>? {
         val page = runCatching {
-            client.newCall(request(query)).execute().use { response ->
+            client.newCall(request(query)).await().use { response ->
                 if (!response.isSuccessful) null else response.peekBody(MAX_PAGE_BYTES).string()
             }
         }.getOrNull() ?: return null

@@ -73,7 +73,7 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
         }
         val url = "$endpoint?l=us-en&o=json&q=${query.encoded()}&vqd=$token&p=-1"
         val body = runCatching {
-            client.newCall(get(url).build()).execute().use { response ->
+            client.newCall(get(url).build()).await().use { response ->
                 if (!response.isSuccessful) {
                     Log.i(TAG, "media search: endpoint answered ${response.code}")
                     null
@@ -144,9 +144,9 @@ class DuckDuckGoMediaProvider(private val client: OkHttpClient) {
     }
 
     /** The per-query token the endpoints refuse to answer without. */
-    private fun vqd(query: String): String? {
+    private suspend fun vqd(query: String): String? {
         val page = runCatching {
-            client.newCall(get("$HOME/?q=${query.encoded()}").build()).execute().use { response ->
+            client.newCall(get("$HOME/?q=${query.encoded()}").build()).await().use { response ->
                 if (!response.isSuccessful) {
                     Log.i(TAG, "media search: token page answered ${response.code}")
                     null

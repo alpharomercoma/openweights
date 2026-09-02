@@ -94,7 +94,7 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
                 .header("User-Agent", SEARCH_USER_AGENT)
                 .header("Accept", "text/html")
                 .build()
-            client.newCall(probe).execute().close()
+            client.newCall(probe).await().close()
         }
 
         val form = FormBody.Builder().add("q", query).build()
@@ -107,7 +107,7 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
             .build()
 
         val page = runCatching {
-            client.newCall(request).execute().use { response ->
+            client.newCall(request).await().use { response ->
                 // Bounded, because the size of this page is decided by a server we do not
                 // run. peekBody stops at the limit rather than after it, so a response that
                 // never ends cannot take the heap with it. A results page is tens of
@@ -130,7 +130,7 @@ class DuckDuckGoProvider(httpClient: OkHttpClient) : SearchProvider {
         // so one markup change no longer takes search down. It does not help when
         // DuckDuckGo itself is rate limiting, and nothing here pretends otherwise.
         val lite = runCatching {
-            client.newCall(liteRequest(query)).execute().use { response ->
+            client.newCall(liteRequest(query)).await().use { response ->
                 if (response.code != HTTP_OK) null else response.peekBody(MAX_PAGE_BYTES).string()
             }
         }.getOrNull() ?: return null

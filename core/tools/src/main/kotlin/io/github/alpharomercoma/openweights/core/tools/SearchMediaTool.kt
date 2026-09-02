@@ -63,9 +63,9 @@ class SearchMediaTool @Inject constructor(
         // "search" in the name outweighed every wording; named show_pictures with this
         // description, zero of eight misrouted and six of six visual requests arrived.
         // The name is the signal a small model actually reads.
-        description = "Show the user pictures or short video clips found on the web. " +
-            "Returns thumbnails to display, not text to read. It answers no questions " +
-            "and returns no facts; for information of any kind, use web_search.",
+        description = "Show pictures or short clips found on the web, as thumbnails to " +
+            "display rather than text to read. It answers no questions; for " +
+            "information of any kind use web_search.",
         parametersJson = """
             {
               "type": "object",

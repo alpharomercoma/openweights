@@ -62,12 +62,11 @@ class RunScriptTool @Inject constructor(
         // has read runs in Node. QuickJS in an isolated process has no module loader, no
         // file system and no sockets, and nothing in the description said so. Naming the
         // absences is the same negative-scope lever the rest of these descriptions use.
-        description = "Write a JavaScript program, run it in a sandbox, and use what it " +
-            "returns. For real computation: arithmetic, dates, regex, JSON, or going " +
-            "through a file too large to read whole. Give source, or path to a saved " +
-            ".js file. Modern JavaScript with await; no network; the only modules are " +
-            "require('fs') and require('path'), for files you named in files. " +
-            "The last expression is the answer.",
+        description = "Run a JavaScript program in a sandbox and use what it returns. " +
+            "For real computation: arithmetic, dates, regex, JSON, or a file too large " +
+            "to read whole. Give source, or path to a saved .js file. Modern JavaScript " +
+            "with await; no network; require('fs') and require('path') only, for files " +
+            "you named in files. The last expression is the answer.",
         parametersJson = """
             {
               "type": "object",

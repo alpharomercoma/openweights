@@ -56,8 +56,8 @@ class SaveMemoryTool @Inject constructor(private val memory: Memory) : Tool {
     override val definition = ToolDefinition(
         name = NAME,
         description = "Save one short fact about the user for future conversations: a " +
-            "preference, a name, how they like answers written. Only for what stays true " +
-            "after this conversation ends, never for what was just said.",
+            "preference, a name, how they like answers written. Only what stays true " +
+            "after this conversation, never what was just said.",
         parametersJson = """
             {
               "type": "object",

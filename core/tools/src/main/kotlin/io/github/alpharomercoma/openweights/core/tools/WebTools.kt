@@ -114,12 +114,11 @@ class WebSearchTool @Inject constructor(
         // four more all called this tool, and the model's own reasoning showed it deciding
         // to "verify with a web search" a fact it had already stated correctly. The list
         // is now exhaustive, and the double check is named as the thing not to do.
-        description = "Search the web, only for what you cannot already know: what " +
-            "changed, what is recent, or the present state of a named person, product or " +
-            "organisation. Returns text to read; to show pictures or clips instead, " +
-            "use ${SearchMediaTool.NAME}. Not for settled knowledge — definitions, " +
-            "translations, history, arithmetic — and never to double check what you " +
-            "already know. Answer those yourself.",
+        description = "Search the web for what you cannot already know: what changed, " +
+            "what is recent, or the present state of a named person, product or " +
+            "organisation. Returns text; for pictures or clips use ${SearchMediaTool.NAME}. " +
+            "Not for settled knowledge (definitions, translations, history, arithmetic) " +
+            "and never to double check what you know: answer those yourself.",
         parametersJson = """
             {
               "type": "object",

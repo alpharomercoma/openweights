@@ -48,10 +48,10 @@ class WatchTool(private val watches: Watches) : Tool {
     // outweighs every instruction around it — so the intent is kept and the example is not.
     override val definition = ToolDefinition(
         name = NAME,
-        description = "Check something again on a schedule, for a while. " +
-            "Use it when they ask to be told about a change, or to look again every so " +
-            "often. Not for anything you can answer now. It stops itself after " +
-            "${Watch.MAX_RUNS} checks or ${Watch.MAX_LIFETIME_HOURS} hours.",
+        description = "Check something again on a schedule, for a while: when they ask " +
+            "to be told about a change, or to look again every so often. Not for " +
+            "anything you can answer now. Stops itself after ${Watch.MAX_RUNS} checks " +
+            "or ${Watch.MAX_LIFETIME_HOURS} hours.",
         parametersJson = """
             {
               "type": "object",

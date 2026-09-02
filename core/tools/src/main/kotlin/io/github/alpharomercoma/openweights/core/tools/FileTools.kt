@@ -43,10 +43,9 @@ class SearchFilesTool @Inject constructor(private val workspace: Workspace) : To
         // The "not for" half is load-bearing and was measured twice. Removing it to save
         // tokens put "read that file for me" back to calling this tool with a guessed
         // pattern instead of asking which file, so it went back in.
-        description = "Find files in the folder the user shared. Match names with a " +
-            "pattern like *.md, and optionally give text to look for inside them. Not for " +
-            "reading a file whose path you have. If nothing was named to look for, ask " +
-            "rather than guess.",
+        description = "Find files in the shared folder by a name pattern like *.md, " +
+            "optionally containing given text. Not for reading a file whose path you " +
+            "have. If nothing was named to look for, ask rather than guess.",
         parametersJson = """
             {
               "type": "object",

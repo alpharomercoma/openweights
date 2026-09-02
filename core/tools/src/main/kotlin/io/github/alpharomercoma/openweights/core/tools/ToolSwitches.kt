@@ -52,17 +52,6 @@ class ToolSwitches @Inject constructor(@param:ApplicationContext context: Contex
     val changes: StateFlow<Int> = revisions.asStateFlow()
 
     /**
-     * By name, for the settings screen writing back what its rows show. Every gate that
-     * decides what the model is offered asks the [Tool] overload instead: only the tool
-     * knows its default and which switch governs it, and a name-keyed lookup answering
-     * "true" for a tool that ships off — or for a verb that rides a sibling's switch —
-     * is how a default-off family would quietly come on. Two such lookups used to sit
-     * here for exactly that reason, called by nobody; an external review flagged the trap
-     * and they are gone.
-     */
-    fun isEnabled(name: String): Boolean = store.getBoolean(name, true)
-
-    /**
      * The same question asked of a tool, which is the only way to honour [Tool.defaultsOn].
      *
      * Taking a name alone cannot: the default has to come from somewhere, this used to

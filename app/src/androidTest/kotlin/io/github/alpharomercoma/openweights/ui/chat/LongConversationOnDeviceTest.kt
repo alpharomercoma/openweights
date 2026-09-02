@@ -113,7 +113,6 @@ class LongConversationOnDeviceTest {
         )
 
         var state = ChatUiState(
-            supportsTools = engine.loadedModel?.supportsTools == true,
             toolsAvailable = useTools,
             contextSize = context,
         )

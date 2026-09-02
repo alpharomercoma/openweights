@@ -37,7 +37,6 @@ class ResearchEvidenceTest {
             ),
         )
 
-        assertThat(steps.hasWebResearchEvidence()).isTrue()
         assertThat(steps.correlatedWebResearchSources()).containsExactly(final)
     }
 
@@ -45,7 +44,7 @@ class ResearchEvidenceTest {
     fun `search alone is not evidence that a source was read`() {
         val steps = listOf(ran("web_search", evidence = ToolEvidence.Search(setOf(source))))
 
-        assertThat(steps.hasWebResearchEvidence()).isFalse()
+        assertThat(steps.correlatedWebResearchSources()).isEmpty()
     }
 
     @Test
@@ -61,7 +60,7 @@ class ResearchEvidenceTest {
             ),
         )
 
-        assertThat(steps.hasWebResearchEvidence()).isFalse()
+        assertThat(steps.correlatedWebResearchSources()).isEmpty()
     }
 
     @Test
@@ -75,7 +74,7 @@ class ResearchEvidenceTest {
             ),
         )
 
-        assertThat(steps.hasWebResearchEvidence()).isFalse()
+        assertThat(steps.correlatedWebResearchSources()).isEmpty()
     }
 
     @Test
@@ -85,7 +84,7 @@ class ResearchEvidenceTest {
             ran("fetch_url", result = "The sourced article."),
         )
 
-        assertThat(steps.hasWebResearchEvidence()).isFalse()
+        assertThat(steps.correlatedWebResearchSources()).isEmpty()
     }
 
     private fun ran(

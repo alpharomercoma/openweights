@@ -99,7 +99,6 @@ enum class Tunable {
     TEMPERATURE,
     TOP_K,
     TOP_P,
-    MIN_P,
     REPEAT_PENALTY,
     SEED,
     MAX_TOKENS,

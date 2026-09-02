@@ -121,9 +121,6 @@ data class Watch(
      */
     val expiresAt: Long get() = createdAt + MAX_LIFETIME_HOURS * MILLIS_PER_HOUR
 
-    /** How many checks are left in the budget, never negative. */
-    val runsLeft: Int get() = (MAX_RUNS - runs).coerceAtLeast(0)
-
     /** True once this watch has spent its budget or outlived its window. */
     fun isSpent(now: Long): Boolean = runs >= MAX_RUNS || now >= expiresAt
 

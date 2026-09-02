@@ -297,9 +297,6 @@ public:
      */
     void set_threads(int32_t n_threads, int32_t n_threads_batch);
 
-    /** True when a multimodal projector was loaded alongside the model. */
-    bool is_multimodal() const { return mtmd_ != nullptr; }
-
     MediaSupport media_support() const;
 
     /**

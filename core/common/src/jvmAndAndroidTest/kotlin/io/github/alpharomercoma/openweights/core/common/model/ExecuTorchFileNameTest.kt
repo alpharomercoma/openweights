@@ -80,7 +80,6 @@ class ExecuTorchFileNameTest {
         val tokenizer = ExecuTorchFileName.tokenizerNameFor(model)
 
         assertThat(tokenizer).isEqualTo("Qwen3-1.7B-ExecuTorch-XNNPACK.tokenizer.json")
-        assertThat(ExecuTorchFileName.isTokenizer(tokenizer)).isTrue()
         // A tokenizer is not itself something to load.
         assertThat(ModelFormat.of(tokenizer)).isNull()
     }

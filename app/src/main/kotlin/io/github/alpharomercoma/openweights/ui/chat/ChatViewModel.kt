@@ -337,14 +337,6 @@ data class ChatUiState(
     /** True when this model's chat template understands being told whether to think. */
     val supportsThinking: Boolean = false,
     /**
-     * True when this model's chat template renders tool definitions.
-     *
-     * A template that does not drops them silently, so the model is told it has tools it
-     * has no way to call and answers "I should use the search tool" forever. Asked of the
-     * template at load, not guessed from the name.
-     */
-    val supportsTools: Boolean = false,
-    /**
      * True when this model's chat template does something with the effort setting.
      *
      * Measured at load by rendering the template twice, so the control appears only where
@@ -852,7 +844,6 @@ class ChatViewModel @Inject constructor(
                 mediaSupport = MediaSupport(),
                 outputModality = OutputModality.TEXT,
                 supportsThinking = false,
-                supportsTools = false,
                 supportsReasoningEffort = false,
             )
         }
@@ -3143,7 +3134,7 @@ class ChatViewModel @Inject constructor(
 /**
  * Everything the loaded model turned out to be able to do, folded on in one place.
  *
- * Five fields interrogating the same nullable, which read as five null checks in the middle
+ * Four fields interrogating the same nullable, which read as four null checks in the middle
  * of a function whose subject is opening a file. Kept top level rather than made a method so
  * that answering "what can this model do" does not enlarge the view model.
  */
@@ -3157,7 +3148,6 @@ private fun ChatUiState.withCapabilities(
     // Two hurdles, and a model has to clear both. The template must render differently when
     // told not to think, and the weights must not have been caught ignoring that already.
     supportsThinking = info?.supportsThinking == true && !ignoresThinkingSwitch,
-    supportsTools = info?.supportsTools == true,
     supportsReasoningEffort = info?.supportsReasoningEffort == true,
 )
 

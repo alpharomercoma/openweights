@@ -105,18 +105,6 @@ data class HubFile(
     val sha256: String?,
 ) {
     /**
-     * The quantization, read from the filename.
-     *
-     * GGUF stores it as `general.file_type`, but llama.cpp writes that key *after* the
-     * tokenizer, and reading past the tokenizer costs megabytes. Every GGUF published on
-     * the Hub carries the quantization in its name, which is also where people look.
-     */
-    val quantizationLabel: String
-        get() = fileName
-            .removeSuffix(GGUF_SUFFIX)
-            .substringAfterLast('-')
-
-    /**
      * The last segment of the repository path, and never a way out of a directory.
      *
      * `substringAfterLast('/')` strips directories, which handles `../../x` by leaving `x`.

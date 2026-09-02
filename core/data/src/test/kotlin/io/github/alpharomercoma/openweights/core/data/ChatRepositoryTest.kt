@@ -289,7 +289,7 @@ class ChatRepositoryTest {
         repository.saveCompaction(id, "First pass.", throughIndex = 3, modelName = "model-a")
         repository.saveCompaction(id, "Second pass.", throughIndex = 7, modelName = "model-b")
 
-        val history = repository.compactionHistory(id)
+        val history = database.compactions().forConversation(id)
         assertThat(history.map { it.version }).containsExactly(1, 2).inOrder()
         assertThat(history.map { it.summary })
             .containsExactly("First pass.", "Second pass.").inOrder()
@@ -309,7 +309,7 @@ class ChatRepositoryTest {
 
         repository.deleteConversation(id)
 
-        assertThat(repository.compactionHistory(id)).isEmpty()
+        assertThat(database.compactions().forConversation(id)).isEmpty()
     }
 
     @Test

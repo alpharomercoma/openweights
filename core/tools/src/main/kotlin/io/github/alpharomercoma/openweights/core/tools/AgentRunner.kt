@@ -81,10 +81,6 @@ fun Iterable<AgentStep>.correlatedWebResearchSources(): Set<String> {
         .toSet()
 }
 
-/** Whether [correlatedWebResearchSources] found at least one source the turn actually read. */
-fun Iterable<AgentStep>.hasWebResearchEvidence(): Boolean =
-    correlatedWebResearchSources().isNotEmpty()
-
 /** The call a step belongs to, whatever became of it. */
 internal fun AgentStep.callId(): String = when (this) {
     is AgentStep.Requested -> call.id

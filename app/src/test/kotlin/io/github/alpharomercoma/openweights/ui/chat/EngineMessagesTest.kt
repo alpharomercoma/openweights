@@ -33,7 +33,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(1),
             mode = AgentMode.AUTO,
-            supportsTools = false,
         )
 
         val system = state.engineMessages().single { it.role == ChatRole.SYSTEM }
@@ -51,7 +50,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(1),
             mode = AgentMode.AUTO,
-            supportsTools = true,
             toolsAvailable = true,
         )
 
@@ -82,7 +80,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(1),
             mode = AgentMode.AUTO,
-            supportsTools = true,
             toolsAvailable = true,
         )
 
@@ -98,7 +95,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(1),
             mode = AgentMode.AUTO,
-            supportsTools = true,
             toolsAvailable = true,
         )
 
@@ -112,7 +108,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(1),
             mode = AgentMode.AUTO,
-            supportsTools = true,
             toolsAvailable = false,
         )
 
@@ -144,7 +139,6 @@ class EngineMessagesTest {
                 foldedThroughIndex = 3,
                 foldedEntryCount = 4,
             ),
-            supportsTools = true,
             toolsAvailable = true,
         )
 
@@ -176,7 +170,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(6),
             compaction = Compaction("summary", foldedThroughIndex = 3, foldedEntryCount = 4),
-            supportsTools = true,
             toolsAvailable = true,
         )
 
@@ -195,7 +188,6 @@ class EngineMessagesTest {
         val state = ChatUiState(
             transcript = transcript(6),
             compaction = Compaction("summary", foldedThroughIndex = 3, foldedEntryCount = 4),
-            supportsTools = true,
             toolsAvailable = true,
         )
 

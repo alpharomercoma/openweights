@@ -82,9 +82,6 @@ data class TaskPlan(val steps: List<TaskStep>) {
 
         /** A step is a line, not a paragraph: long ones are trimmed rather than dropped. */
         const val MAX_STEP_CHARS = 60
-
-        /** What the whole block may cost, since it is read on every pass from here on. */
-        const val MAX_BLOCK_TOKENS = 100
     }
 }
 

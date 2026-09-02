@@ -101,7 +101,7 @@ class TaskPlanTest {
         assertThat(block.lines().first { it.contains("read it") }).doesNotContain("x")
         // Small enough to send on every pass: four characters to a token puts this well
         // under a hundred, against the several hundred a model rewriting the list would cost.
-        assertThat(block.length / CHARS_PER_TOKEN).isLessThan(TaskPlan.MAX_BLOCK_TOKENS)
+        assertThat(block.length / CHARS_PER_TOKEN).isLessThan(100)
     }
 
     @Test

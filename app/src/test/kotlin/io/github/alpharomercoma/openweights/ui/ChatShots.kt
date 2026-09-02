@@ -105,7 +105,6 @@ object ChatShots {
                 transcript = transcript,
                 contextUsed = contextUsed,
                 contextSize = 4096,
-                supportsTools = true,
                 toolsAvailable = toolsAvailable,
             ),
             onSend = { true },

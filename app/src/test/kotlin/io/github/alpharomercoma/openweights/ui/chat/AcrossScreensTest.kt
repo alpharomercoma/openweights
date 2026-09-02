@@ -137,7 +137,6 @@ class AcrossScreensTest {
                         ),
                         contextUsed = 1_640,
                         contextSize = 4096,
-                        supportsTools = true,
                         toolsAvailable = true,
                     ),
                     onSend = { true },

@@ -32,7 +32,6 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
 
     // Written from the runtime's callback rather than returned by it, so they are held
     // here for the duration of one blocking generate rather than passed through.
-    private var window: Int = 0
     private var lastStats: String? = null
     private var lastError: String? = null
 
@@ -42,7 +41,6 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         temperature: Float,
         contextLength: Int,
     ): Boolean {
-        window = contextLength
         close()
         // Anything can come back from here: a missing native library throws
         // UnsatisfiedLinkError rather than an exception, and a .pte built for another

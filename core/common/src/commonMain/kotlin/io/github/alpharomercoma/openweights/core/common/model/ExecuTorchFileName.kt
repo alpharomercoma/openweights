@@ -79,10 +79,6 @@ object ExecuTorchFileName {
     fun tokenizerNameFor(modelFileName: String): String =
         modelFileName.substringBeforeLast('.') + TOKENIZER_SUFFIX
 
-    /** True for a tokenizer this app saved, which is not itself a model. */
-    fun isTokenizer(fileName: String): Boolean =
-        fileName.endsWith(TOKENIZER_SUFFIX, ignoreCase = true)
-
     /** True for a file in a repository that is the tokenizer we need. */
     fun isRemoteTokenizer(path: String): Boolean = path.substringAfterLast('/') in REMOTE_TOKENIZERS
 

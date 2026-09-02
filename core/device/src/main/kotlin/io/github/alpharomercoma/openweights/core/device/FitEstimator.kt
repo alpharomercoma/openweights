@@ -52,9 +52,7 @@ data class FitReport(
     val estimatedDecodeTokensPerSecond: Double?,
     val maxContextLength: Int,
     val estimatedPrefillTokensPerSecond: Double? = null,
-) {
-    val headroomBytes: Long get() = usableMemoryBytes - requiredMemoryBytes
-}
+)
 
 /**
  * Decides whether a model runs on this device, and how fast.

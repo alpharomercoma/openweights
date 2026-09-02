@@ -92,7 +92,6 @@ class HarnessSmokeTest {
             transcript = listOf(
                 TranscriptEntry(id = 1, role = ChatRole.USER, text = "What is 2 + 2?"),
             ),
-            supportsTools = engine.loadedModel?.supportsTools == true,
         )
 
         val passes = mutableListOf<GenerationEvent.Completed>()

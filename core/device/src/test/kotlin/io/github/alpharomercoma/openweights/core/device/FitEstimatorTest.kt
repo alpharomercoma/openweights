@@ -59,7 +59,6 @@ class FitEstimatorTest {
         )
 
         assertThat(report.verdict).isEqualTo(FitVerdict.COMFORTABLE)
-        assertThat(report.headroomBytes).isGreaterThan(0)
     }
 
     @Test

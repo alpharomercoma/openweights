@@ -286,16 +286,6 @@ class ChatRepository @Inject constructor(
     }
 
     /**
-     * Every summary a conversation has had, oldest first.
-     *
-     * Nothing reads this yet beyond its test. It is here because an append-only log whose
-     * history cannot be got at is just a slower way of overwriting, and because the first
-     * thing anyone will want when a summary turns out to be wrong is the one before it.
-     */
-    suspend fun compactionHistory(conversationId: Long): List<CompactionEntity> =
-        database.compactions().forConversation(conversationId)
-
-    /**
      * Records one reply in the lifetime ledger.
      *
      * Written separately from the message so the totals survive deleting the chat: the

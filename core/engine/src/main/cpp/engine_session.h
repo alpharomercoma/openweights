@@ -385,8 +385,9 @@ private:
      * phone: the fresh-chat read costs tens of seconds once, and every later startup of
      * the same model, same settings and same day arms itself from disk in the time a
      * 26 MB read takes. A stale or foreign file — new day, changed settings, replaced
-     * weights, another llama version — fails the token compare or llama's own state
-     * validation, is deleted, and the caller computes as if it never existed.
+     * weights, another llama.cpp build — fails the build stamp in its header, the token
+     * compare or llama's own state validation, is deleted, and the caller computes as if
+     * it never existed.
      */
     bool restore_warm_file(const char * path, const std::vector<llama_token> & tokens);
 

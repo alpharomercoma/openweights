@@ -31,6 +31,7 @@
 #include <utility>
 #include <vector>
 
+#include "build-info.h"
 #include "chat.h"
 #include "common.h"
 #include "ngram-map.h"
@@ -81,11 +82,38 @@ static bool ends_with(const std::string & text, const std::string & suffix) {
 namespace openweights {
 namespace {
 
-/** The warm-state file format; bumped whenever the layout changes. */
-constexpr uint32_t kWarmFileVersion = 1;
+/**
+ * The warm-state file format; bumped whenever the layout changes.
+ *
+ * Version 2 put the llama.cpp build stamp after the version word; a version 1 file is
+ * refused on its number, before anything after it is read.
+ */
+constexpr uint32_t kWarmFileVersion = 2;
 
 /** A state larger than this is not worth the disk or the write; compute instead. */
 constexpr uint64_t kWarmFileMaxBytes = 512ull * 1024 * 1024;
+
+/** A stamp is "b<number>-<commit>", a dozen characters; a longer one was not written here. */
+constexpr uint32_t kWarmFileMaxStampBytes = 64;
+
+/**
+ * The llama.cpp build that wrote a warm file, or is about to read one.
+ *
+ * The state blob is `llama_state_seq_get_data`'s bytes exactly as it produced them, and
+ * that layout is llama's to change between builds. `llama_state_seq_set_data` checks the
+ * cell count, the layer count and each tensor's type and size, which catches another
+ * model or context; a field it was not written to expect is read as one it was. The
+ * submodule commit is baked into `llama-common` at configure time, so a file written by
+ * any other build of this app is refused on its header, before llama sees a byte of it.
+ *
+ * A build configured without git stamps `b0-unknown`. That still refuses every file a
+ * stamped build wrote; it only cannot tell two unstamped builds apart, which is the
+ * position every file was in before the stamp.
+ */
+const std::string & warm_file_stamp() {
+    static const std::string stamp = llama_build_info();
+    return stamp;
+}
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -1620,11 +1648,28 @@ bool Session::read_warm_file(
 
     char magic[4];
     uint32_t version = 0;
-    uint32_t count = 0;
-    uint64_t state_size = 0;
+    uint32_t stamp_size = 0;
     bool header_ok =
         fread(magic, 1, 4, file) == 4 && memcmp(magic, "OWWM", 4) == 0 &&
         fread(&version, sizeof(version), 1, file) == 1 && version == kWarmFileVersion &&
+        fread(&stamp_size, sizeof(stamp_size), 1, file) == 1 &&
+        stamp_size > 0 && stamp_size <= kWarmFileMaxStampBytes;
+
+    if (header_ok) {
+        std::string stamp(stamp_size, '\0');
+        header_ok = fread(&stamp[0], 1, stamp_size, file) == stamp_size;
+        if (header_ok && stamp != warm_file_stamp()) {
+            // Another build's bytes: skipped whole, as if there were no file. Deleted
+            // below with every other mismatch, since that build is not coming back.
+            LOGI("kv: warm file is from llama build %s, this is %s; starting cold",
+                 stamp.c_str(), warm_file_stamp().c_str());
+            header_ok = false;
+        }
+    }
+
+    uint32_t count = 0;
+    uint64_t state_size = 0;
+    header_ok = header_ok &&
         fread(&count, sizeof(count), 1, file) == 1 &&
         count == tokens.size() && count > 0 &&
         fread(&state_size, sizeof(state_size), 1, file) == 1 &&
@@ -1696,15 +1741,22 @@ void Session::save_warm_file(const char * path, const std::vector<llama_token> &
         if (llama_state_seq_get_data(ctx_, state.data(), size, 0) != size) return;
     }
 
+    // A stamp the reader would refuse is a file not worth writing.
+    const std::string & stamp = warm_file_stamp();
+    if (stamp.empty() || stamp.size() > kWarmFileMaxStampBytes) return;
+
     const std::string tmp = std::string(path) + ".tmp";
     FILE * file = fopen(tmp.c_str(), "wb");
     if (file == nullptr) return;
     const uint32_t version = kWarmFileVersion;
+    const uint32_t stamp_size = static_cast<uint32_t>(stamp.size());
     const uint32_t count = static_cast<uint32_t>(tokens.size());
     const uint64_t state_size = static_cast<uint64_t>(state.size());
     const bool ok =
         fwrite("OWWM", 1, 4, file) == 4 &&
         fwrite(&version, sizeof(version), 1, file) == 1 &&
+        fwrite(&stamp_size, sizeof(stamp_size), 1, file) == 1 &&
+        fwrite(stamp.data(), 1, stamp.size(), file) == stamp.size() &&
         fwrite(&count, sizeof(count), 1, file) == 1 &&
         fwrite(&state_size, sizeof(state_size), 1, file) == 1 &&
         fwrite(tokens.data(), sizeof(llama_token), tokens.size(), file) == tokens.size() &&

@@ -64,6 +64,16 @@ class ChatViewModelTest : ChatFixture() {
     }
 
     @Test
+    fun `a file still being copied in blocks sending but not typing`() {
+        // The paperclip's copy is not instant, and Send during it passed: the question
+        // went without the file, which then rode along with whatever was asked next.
+        val state = ChatUiState(modelName = "model-a", isAttaching = true)
+
+        assertThat(state.canType).isTrue()
+        assertThat(state.canSend).isFalse()
+    }
+
+    @Test
     fun `nothing types into a composer with no model at all`() {
         val state = ChatUiState(modelName = null, isLoadingModel = false)
 

@@ -45,6 +45,7 @@ import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -282,8 +283,17 @@ abstract class ChatFixture {
          */
         var unreadable = false
 
+        /**
+         * Set to park every write from here on until it is completed, as a slow disk would.
+         *
+         * For a test about what the screen says while a write is still in flight; the
+         * fixture's settle otherwise runs every write to its end before anything can look.
+         */
+        var held: CompletableDeferred<Unit>? = null
+
         override suspend fun <T> inOrder(work: suspend ChatRepository.() -> T): T {
             if (broken) error("the disk would not take it")
+            held?.await()
             return super.inOrder(work)
         }
 

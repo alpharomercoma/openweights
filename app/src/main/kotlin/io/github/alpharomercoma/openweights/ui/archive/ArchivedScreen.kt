@@ -58,9 +58,9 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.ui.chat.ConversationActions
 import io.github.alpharomercoma.openweights.ui.chat.ConversationActionsSheet
 import io.github.alpharomercoma.openweights.ui.chat.ConversationRow
+import io.github.alpharomercoma.openweights.ui.chat.ConversationSummary
 import io.github.alpharomercoma.openweights.ui.chat.DeleteConversationDialog
 import io.github.alpharomercoma.openweights.ui.chat.RenameConversationDialog
-import io.github.alpharomercoma.openweights.ui.chat.ConversationSummary
 import io.github.alpharomercoma.openweights.ui.chat.asSummary
 import io.github.alpharomercoma.openweights.ui.chat.highlighting
 import java.time.Instant

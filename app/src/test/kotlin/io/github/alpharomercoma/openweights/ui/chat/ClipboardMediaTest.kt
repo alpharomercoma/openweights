@@ -18,7 +18,11 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentProvider
+import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
+import android.net.Uri
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
@@ -26,6 +30,7 @@ import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 
 /**
@@ -77,6 +82,7 @@ class ClipboardMediaTest {
 
     @Test
     fun `reading returns the copied files`() {
+        Robolectric.setupContentProvider(PictureProvider::class.java, "pictures")
         val uri = "content://pictures/7".toUri()
         clipboard.setPrimaryClip(ClipData.newUri(context.contentResolver, "photo", uri))
 
@@ -84,9 +90,84 @@ class ClipboardMediaTest {
     }
 
     @Test
+    fun `a copied file nobody can name the type of is not attached`() {
+        // Accepting it was the old answer, on the grounds that the copy would sort it out;
+        // the copy then refused it with a sentence about the model, for a file the model
+        // was never shown. Nothing here can say what the file is, so nothing can say this
+        // model reads it.
+        val uri = "content://nowhere/7".toUri()
+        // Raw, because newUri asks the resolver for the type up front, which is the very
+        // call this is about.
+        clipboard.setPrimaryClip(ClipData.newRawUri("photo", uri))
+
+        assertThat(ClipboardMedia.read(context, vision)).isEmpty()
+    }
+
+    @Test
+    fun `a provider that refuses to say what it holds does not take the sheet down`() {
+        Robolectric.setupContentProvider(RefusingProvider::class.java, "guarded")
+        val uri = "content://guarded/7".toUri()
+        clipboard.setPrimaryClip(ClipData.newRawUri("photo", uri))
+
+        assertThat(ClipboardMedia.read(context, vision)).isEmpty()
+    }
+
+    @Test
+    fun `a copied file of a kind this model cannot read is not attached`() {
+        Robolectric.setupContentProvider(PictureProvider::class.java, "pictures")
+        val uri = "content://pictures/7".toUri()
+        clipboard.setPrimaryClip(ClipData.newUri(context.contentResolver, "photo", uri))
+
+        assertThat(ClipboardMedia.read(context, MediaSupport(audio = true))).isEmpty()
+    }
+
+    @Test
     fun `reading plain text returns nothing to attach`() {
         clipboard.setPrimaryClip(ClipData.newPlainText("note", "some words"))
 
         assertThat(ClipboardMedia.read(context, vision)).isEmpty()
+    }
+
+    /** A provider that knows every one of its files is a picture. */
+    class PictureProvider : ContentProvider() {
+        override fun onCreate(): Boolean = true
+        override fun getType(uri: Uri): String = "image/png"
+        override fun query(
+            uri: Uri,
+            projection: Array<String>?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+            sortOrder: String?,
+        ): Cursor? = null
+        override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+        override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?): Int = 0
+        override fun update(
+            uri: Uri,
+            values: ContentValues?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+        ): Int = 0
+    }
+
+    /** A provider that throws for a URI it never meant to share, as real ones do. */
+    class RefusingProvider : ContentProvider() {
+        override fun onCreate(): Boolean = true
+        override fun getType(uri: Uri): String =
+            throw SecurityException("Permission Denial: reading $uri")
+        override fun query(
+            uri: Uri,
+            projection: Array<String>?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+            sortOrder: String?,
+        ): Cursor? = null
+        override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+        override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?): Int = 0
+        override fun update(
+            uri: Uri,
+            values: ContentValues?,
+            selection: String?,
+            selectionArgs: Array<String>?,
+        ): Int = 0
     }
 }

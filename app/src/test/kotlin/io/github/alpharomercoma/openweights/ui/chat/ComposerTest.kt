@@ -222,6 +222,128 @@ class ComposerTest {
     }
 
     @Test
+    fun `send waits for a file that is still being copied in`() {
+        // Attach was disabled during the copy and Send was not, so a question typed while
+        // a picture came in could be sent without it, and the picture landed on the next.
+        var sent: String? = null
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                Composer(
+                    conversationKey = null,
+                    enabled = true,
+                    isGenerating = false,
+                    staged = emptyList<MessagePart.File>(),
+                    document = null as StagedDocument?,
+                    onRemoveDocument = {},
+                    isAttaching = true,
+                    canDictate = false,
+                    isListening = false,
+                    heard = "",
+                    onAttach = {},
+                    onRemoveStaged = {},
+                    onDictate = {},
+                    onSend = {
+                        sent = it
+                        true
+                    },
+                    onStop = {},
+                    onCommand = {},
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("Message").performTextInput("What is this?")
+        compose.onNodeWithContentDescription("Send message").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Send message").performClick()
+
+        assert(sent == null) { "nothing may be sent while the attachment is still copying" }
+    }
+
+    @Test
+    fun `leaving the screen mid-dictation stops the microphone`() {
+        // The effect that stops dictation on the way out ran once and kept the first
+        // frame's isListening, which is false on every screen anybody has opened, so
+        // leaving while listening checked a stale false and left the microphone on.
+        var stops = 0
+        val listening = mutableStateOf(false)
+        val shown = mutableStateOf(true)
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                if (shown.value) {
+                    Composer(
+                        conversationKey = null,
+                        enabled = true,
+                        isGenerating = false,
+                        staged = emptyList<MessagePart.File>(),
+                        document = null as StagedDocument?,
+                        onRemoveDocument = {},
+                        isAttaching = false,
+                        canDictate = true,
+                        isListening = listening.value,
+                        heard = "",
+                        onAttach = {},
+                        onRemoveStaged = {},
+                        onDictate = { stops++ },
+                        onSend = { true },
+                        onStop = {},
+                        onCommand = {},
+                    )
+                }
+            }
+        }
+
+        listening.value = true
+        compose.waitForIdle()
+        shown.value = false
+        compose.waitForIdle()
+
+        assert(stops == 1) { "leaving while listening must stop dictation, got $stops stops" }
+    }
+
+    @Test
+    fun `a sent message is cleared from the stored draft at once`() {
+        // Clearing the field only queued the empty draft behind the typing debounce, so
+        // leaving within that pause kept the sent question as the stored draft and the
+        // next open of the chat put an answered message back in the box. Time is held
+        // still here so the debounce cannot be what delivers the empty string.
+        val drafts = mutableListOf<String>()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            OpenWeightsTheme(dynamicColor = false) {
+                Composer(
+                    conversationKey = null,
+                    onDraftChange = { drafts += it },
+                    enabled = true,
+                    isGenerating = false,
+                    staged = emptyList<MessagePart.File>(),
+                    document = null as StagedDocument?,
+                    onRemoveDocument = {},
+                    isAttaching = false,
+                    canDictate = false,
+                    isListening = false,
+                    heard = "",
+                    onAttach = {},
+                    onRemoveStaged = {},
+                    onDictate = {},
+                    onSend = { true },
+                    onStop = {},
+                    onCommand = {},
+                )
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+
+        compose.onNodeWithContentDescription("Message").performTextInput("hello")
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithContentDescription("Send message").performClick()
+        compose.mainClock.advanceTimeByFrame()
+
+        assert(drafts.lastOrNull() == "") {
+            "the stored draft must be cleared the moment the message is sent, saw $drafts"
+        }
+    }
+
+    @Test
     fun `editing a message that looks like a failed command resends on the first press`() {
         var sent: String? = null
         show(editing = "/tmp is full", onSend = {

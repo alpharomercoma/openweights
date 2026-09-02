@@ -145,6 +145,16 @@ data class TranscriptEntry(
      * nothing to match.
      */
     val history: String? = null,
+    /**
+     * The row this entry is stored as, or null when it is not stored at all.
+     *
+     * Null is a fact rather than a default. A question whose write failed stays on screen
+     * and is answered anyway, so the transcript can run one entry ahead of the table, and
+     * an edit that addressed rows by position then rewrote somebody else's question. The
+     * id is set when the write lands and read back when the conversation is reopened, and
+     * an entry without one cannot be edited in storage, only refused.
+     */
+    val storedId: Long? = null,
 ) {
     /**
      * An assistant turn that was opened and never written to.
@@ -183,6 +193,8 @@ private data class OpenedTurn(
 private data class Edit(
     /** Where in the transcript the rewritten question sits. */
     val at: Int,
+    /** The row being rewritten, or null for a question storage never took. */
+    val storedId: Long?,
     val text: String,
     /** Kept with the new wording: editing a question does not detach what came with it. */
     val attachments: List<MessagePart.File>,
@@ -494,13 +506,18 @@ data class ChatUiState(
      * out is a turn that re-reads the whole conversation because the cache holds the summary
      * prompt, answered from a history the screen has already replaced. Nothing crashes and
      * nothing is right.
+     *
+     * [isAttaching] for a smaller version of the same race. The copy a paperclip starts is
+     * not instant, and Send during it passed: the question went without the file, which
+     * then sat staged and rode along with whatever was asked next.
      */
     val canSend: Boolean get() =
         modelName != null &&
             outputModality == OutputModality.TEXT &&
             !isGenerating &&
             !isLoadingModel &&
-            !isCompacting
+            !isCompacting &&
+            !isAttaching
 
     /**
      * Whether the composer may be typed into, staged with a file, or dictated to.
@@ -1057,10 +1074,10 @@ class ChatViewModel @Inject constructor(
 
         // isGenerating is claimed here, before any suspending work: two quick taps would
         // otherwise both pass canSend, create two conversations, and race the engine.
+        val asked = entry(ChatRole.USER, text).copy(attachments = staged)
         _uiState.update { state ->
             state.copy(
-                transcript = state.transcript +
-                    entry(ChatRole.USER, text).copy(attachments = staged),
+                transcript = state.transcript + asked,
                 isGenerating = true,
                 staged = emptyList(),
                 stagedDocument = null,
@@ -1095,7 +1112,10 @@ class ChatViewModel @Inject constructor(
                                 // The message this draft was keeping safe is a row now.
                                 saveDraft(0L, "")
                             }
-                    addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+                    val row = addMessage(id, ChatRole.USER.wireName, text, attachments = staged)
+                    // Only once the row exists. An entry that never gets this is one an
+                    // edit refuses rather than guesses at; see [TranscriptEntry.storedId].
+                    _uiState.update { it.stored(asked.id, row) }
                 }
             }
             generate()
@@ -1213,9 +1233,18 @@ class ChatViewModel @Inject constructor(
             if (discarded.isFailure) {
                 // Refused rather than generated anyway. The reply on screen is already gone
                 // and the stored one is not, so answering would leave two of them in the
-                // conversation and the user reading a history they never had.
+                // conversation and the user reading a history they never had. The replies
+                // go back too, the way a failed edit puts its turns back: storage still
+                // holds them, and a screen that had lost them showed a question with no
+                // answer that came back on the next reopen.
                 Log.w("OpenWeights", "a reply could not be discarded", discarded.exceptionOrNull())
-                _uiState.update { it.copy(isGenerating = false, error = STORAGE_FAILED) }
+                _uiState.update {
+                    it.copy(
+                        transcript = state.transcript,
+                        isGenerating = false,
+                        error = STORAGE_FAILED,
+                    )
+                }
                 return@launch
             }
             // The notes the discarded reply's tool calls added are discarded with it, before
@@ -1254,14 +1283,22 @@ class ChatViewModel @Inject constructor(
         _uiState.update { edit.applied(it) }
 
         val editJob = viewModelScope.launch {
-            if (!rewriteStoredTurn(edit)) {
+            val rewritten = rewriteStoredTurn(edit)
+            if (rewritten == null) {
                 _uiState.update { edit.rolledBack(it) }
                 return@launch
             }
             _uiState.update { current ->
                 current.copy(
                     transcript = edit.kept +
-                        entry(ChatRole.USER, edit.text).copy(attachments = edit.attachments),
+                        entry(ChatRole.USER, edit.text).copy(
+                            attachments = edit.attachments,
+                            storedId = rewritten.storedId,
+                        ),
+                    // The notes the dropped turns' tool calls added go with them, as they
+                    // do on regenerate. Left in place, a page the user had edited away
+                    // kept grounding every prompt after it.
+                    toolNotes = rewritten.notes,
                     isGenerating = true,
                 )
             }
@@ -1307,6 +1344,7 @@ class ChatViewModel @Inject constructor(
         val invalidatesCompaction = state.compaction?.foldedThroughIndex?.let { at <= it } == true
         return Edit(
             at = at,
+            storedId = state.transcript[at].storedId,
             text = edited,
             attachments = state.transcript[at].attachments,
             abandoned = state.transcript.drop(at + 1).flatMap { it.attachments },
@@ -1319,33 +1357,51 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Puts the rewritten turn in storage, and says whether it got there.
+     * Puts the rewritten turn in storage, and says what the conversation is now.
      *
-     * Reported rather than thrown, because the screen has already been changed and the two
+     * Null rather than thrown, because the screen has already been changed and the two
      * have to agree: a transcript that shows the edit while storage still holds the original
      * is a conversation that changes back the next time it is opened.
+     *
+     * The row is addressed by the id the entry was stored under, never by its position.
+     * Position was how it used to be found, and the transcript and the table only line up
+     * while every write has landed: a question whose write failed is answered anyway, and
+     * from then on the transcript is one entry ahead of the rows, so an edit by position
+     * rewrote the question after the one that was tapped. An entry with no stored id is
+     * refused instead, with the same sentence the failed write already showed.
      */
-    private suspend fun rewriteStoredTurn(edit: Edit): Boolean {
-        val written = writeOrNull {
+    private suspend fun rewriteStoredTurn(edit: Edit): Rewritten? {
+        val storedId = edit.storedId ?: return null
+        return writeOrNull {
             writer.inOrder {
                 conversationId?.let { id ->
-                    // By position rather than by id: the transcript's ids are the app's
-                    // and the stored rows have their own, and the two only line up
-                    // while nothing has been dropped from either.
-                    messages(id).getOrNull(edit.at)?.let { message ->
-                        replaceFrom(
-                            conversationId = id,
-                            messageId = message.id,
-                            text = edit.text,
-                            attachments = edit.attachments,
-                            clearCompaction = edit.invalidatesCompaction,
-                        )
-                    }
+                    replaceFrom(
+                        conversationId = id,
+                        messageId = storedId,
+                        text = edit.text,
+                        attachments = edit.attachments,
+                        clearCompaction = edit.invalidatesCompaction,
+                    )
+                    // Read back after the write, the way regenerate does, so the cascade
+                    // has already taken the dropped turns' steps and the fold sees only
+                    // what survived. The rewritten question is the last row.
+                    val stored = messages(id)
+                    Rewritten(
+                        storedId = stored.lastOrNull()?.id,
+                        notes = restoredToolNotes(
+                            stored,
+                            toolSteps(id),
+                            edit.before.compaction?.foldedThroughIndex
+                                ?.takeUnless { edit.invalidatesCompaction },
+                        ),
+                    )
                 }
             }
         }
-        return written != null
     }
+
+    /** What an edit left in storage: the new row, and the notes the surviving turns add up to. */
+    private class Rewritten(val storedId: Long?, val notes: ToolNotes)
 
     /**
      * Carries this conversation up to a point into a new one, and opens it there.
@@ -1487,9 +1543,10 @@ class ChatViewModel @Inject constructor(
         compactIfNeeded()
 
         // Read here rather than held: the user can switch a tool off in another tab
-        // between one question and the next, and the instruction has to follow.
+        // between one question and the next, and the instruction has to follow. Asked
+        // for the mode the turn will run in, because plan mode's tools follow no switch.
         _uiState.update {
-            it.copy(toolsAvailable = turns.hasEnabledTools())
+            it.copy(toolsAvailable = turns.hasEnabledTools(it.mode))
         }
 
         val state = _uiState.value
@@ -3119,6 +3176,17 @@ class ChatViewModel @Inject constructor(
     private fun entry(role: ChatRole, text: String) =
         TranscriptEntry(id = nextEntryId++, role = role, text = text)
 
+    /**
+     * The state with one entry told which row it was stored as.
+     *
+     * By the entry's own id rather than by position or by "the last one": the write is
+     * awaited behind a queue, and a reply can have been opened under the question by
+     * the time it lands.
+     */
+    private fun ChatUiState.stored(entryId: Long, row: Long): ChatUiState = copy(
+        transcript = transcript.map { if (it.id == entryId) it.copy(storedId = row) else it },
+    )
+
     private fun updateLastEntry(transform: (TranscriptEntry) -> TranscriptEntry) {
         _uiState.update { state ->
             val transcript = state.transcript
@@ -3806,6 +3874,7 @@ private fun ChatUiState.refusalReason(): String? = when {
     // Reached only if the composer let a tap through anyway. The Send button is disabled
     // for the same condition, so this is the belt to that pair of braces.
     isCompacting -> "Making room by summarising earlier turns. This takes a few seconds."
+    isAttaching -> "The attachment is still being copied in. Send once it appears."
     else -> null
 }
 
@@ -3870,6 +3939,7 @@ private fun List<MessageEntity>.toTranscript(
                 index == foldedThrough + 1
         },
         blocks = stepsByMessage[message.id].orEmpty().map { TurnBlock.Step(it.toAgentStep()) },
+        storedId = message.id,
     )
 }
 

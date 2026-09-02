@@ -269,20 +269,29 @@ fun Composer(
         draft.isNotBlank() || staged.isNotEmpty() || document != null
     }
 
+    // Told at once, not left to the debounce above. Clearing the field only queued the
+    // empty draft behind the pause, so leaving within it kept the sent question as the
+    // stored draft, and the next open of the chat put a message already answered back in
+    // the box. The doc on [onDraftChange] promised this and nothing kept the promise.
+    fun clearSent() {
+        field.clearText()
+        onDraftChange("")
+    }
+
     fun trySend() {
         // Resending, unconditionally. The reopened text goes straight to onSend, which is
         // `submit()` and already puts editing ahead of command parsing; gating it here too
         // meant an edit that happened to read like a failed command ("/tmp is full") needed
         // Send pressed twice, once to clear a warning `submit` was never going to raise.
         if (editing != null) {
-            if (onSend(draft)) field.clearText()
+            if (onSend(draft)) clearSent()
             return
         }
         val command = pendingCommand
         if (command != null) {
             if (draft.isBlank()) return
             if (onSend("${command.trigger} ${draft.trim()}")) {
-                field.clearText()
+                clearSent()
                 pendingCommandName = null
                 unknownAttempt = null
             }
@@ -296,7 +305,7 @@ fun Composer(
             return
         }
         if (onSend(draft)) {
-            field.clearText()
+            clearSent()
             unknownAttempt = null
         }
     }
@@ -322,7 +331,14 @@ fun Composer(
     // Dictation lives in an application-scoped object, so leaving this screen while it is
     // listening would hold the microphone and deliver a transcript into a composer that is
     // no longer on screen.
-    DisposableEffect(Unit) { onDispose { if (isListening) onDictate {} } }
+    //
+    // Held the same way the paste receiver holds its callbacks. The effect runs once, and
+    // the lambda it keeps closed over the first frame's `isListening`, which is false on
+    // every screen anybody has ever opened: leaving mid-dictation checked that stale false
+    // and left the microphone on.
+    val currentListening by rememberUpdatedState(isListening)
+    val currentDictate by rememberUpdatedState(onDictate)
+    DisposableEffect(Unit) { onDispose { if (currentListening) currentDictate {} } }
 
     Column(
         modifier = modifier.readableColumn().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -660,12 +676,15 @@ private fun ComposerActions(
         SendButton(
             isGenerating = isGenerating,
             // The one control that still waits on the model itself: everything else in this
-            // bar works on a loading model, but there is nothing to send it to yet.
-            enabled = isGenerating || (enabled && !isLoadingModel && hasSomethingToSend),
+            // bar works on a loading model, but there is nothing to send it to yet. Nor
+            // while a file is still being copied in: sent then, the question went without
+            // it and the file rode along with the next one.
+            enabled = isGenerating ||
+                (enabled && !isLoadingModel && !isAttaching && hasSomethingToSend),
             onClick = {
                 if (isGenerating) {
                     onStop()
-                } else if (hasSomethingToSend) {
+                } else if (hasSomethingToSend && !isAttaching) {
                     onSend()
                 }
             },

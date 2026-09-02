@@ -79,11 +79,12 @@ fun WorkBlock(
 ) {
     if (blocks.isEmpty()) return
 
-    // Keyed to the number of blocks rather than the list, so a tap survives the next step
-    // arriving mid-run. Keying it to the list itself would reset the override on every
-    // frame that added a chip, which is exactly while somebody is most likely to have
-    // tapped.
-    var override by rememberSaveable(blocks.size) { mutableStateOf<Boolean?>(null) }
+    // No key at all, so a tap survives the next step arriving mid-run. It was keyed to the
+    // number of blocks, which was meant to be the stable choice against keying on the list
+    // itself and was not: every step that lands changes the count, so the override was
+    // reset on exactly the frames somebody was most likely to have tapped through. The
+    // one reset this state needs is below, when the turn stops being the newest.
+    var override by rememberSaveable { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(isLatest) { if (!isLatest) override = null }
     val open = isStreaming || isLatest
     val expanded = override ?: open

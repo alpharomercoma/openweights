@@ -145,6 +145,32 @@ class TurnBudgetTest {
         assertThat(engine.prompts.last().joinToString { it.text }).doesNotContain("Read the notes")
     }
 
+    @Test
+    fun `a chaining call on a full window earns no round`() = runBlocking {
+        // Two reasons a pass may not call: the round cap, and no room for what comes
+        // back. Asking for a chaining tool earns past the first, and it earned past the
+        // second too: named on a window with two hundred tokens free, the write ran and
+        // its result went in on top of a context with no room for it.
+        val recorder = RecordingTool("write_file")
+        val writer = object : Tool by recorder {
+            override val chains: Boolean = true
+        }
+        engine.scripted += ScriptedPass(
+            "Saving.",
+            toolCalls = listOf(
+                ToolCall(id = "w", name = "write_file", argumentsJson = """{"path":"a.md"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Answering from what I have.")
+        engine.contextUsed = CONTEXT - NEARLY_FULL_HEADROOM
+
+        run(beside = listOf(writer))
+
+        assertThat(recorder.calls).isEmpty()
+        // Withdrawn rather than run: the model was told there was no round and answered.
+        assertThat(engine.prompts).hasSize(2)
+    }
+
     private suspend fun run(beside: List<Tool> = emptyList()) {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
         TurnRunner(
@@ -235,5 +261,8 @@ class TurnBudgetTest {
 
         /** More passes than any budget allows, so the budget is what stops the turn. */
         const val PLENTY = 8
+
+        /** Tokens free at the point the budget stops thinking a tool is worth it. */
+        const val NEARLY_FULL_HEADROOM = 200
     }
 }

@@ -65,6 +65,12 @@ class ChatSearch(private val writer: ChatWriter, private val scope: CoroutineSco
     private var job: Job? = null
 
     /**
+     * Conversations deleted while this drawer has been open, so a read still in flight
+     * cannot put one back. See [forget].
+     */
+    private val forgotten = mutableSetOf<Long>()
+
+    /**
      * Searches for [text], after a pause, and puts what it finds on screen.
      *
      * The text lands immediately so the field never lags the finger; only the read waits.
@@ -97,8 +103,11 @@ class ChatSearch(private val writer: ChatWriter, private val scope: CoroutineSco
             // Matched against the exact text this read was for, not merely against "something
             // is still typed". A slow answer for "ai" must not land under "llm", which it did
             // whenever the second search was launched before the first returned.
+            // And against what has been deleted since, for the same reason as forget:
+            // a read that began before the delete answers with the row still in it.
+            val kept = found.filterNot { it.id in forgotten }
             _state.update {
-                if (it.query != text) it else it.copy(results = found, hasAnswer = true)
+                if (it.query != text) it else it.copy(results = kept, hasAnswer = true)
             }
         }
     }
@@ -113,8 +122,17 @@ class ChatSearch(private val writer: ChatWriter, private val scope: CoroutineSco
      * the delete it was meant to reflect, because deleting the open conversation waits for a
      * running turn to unwind first, and a re-read that got there before the delete did put
      * the row straight back.
+     *
+     * The id is remembered as well as filtered out, because the list on screen is not the
+     * only list there can be: a read launched by the keystroke before the delete is still
+     * running, and its answer, landing after this, held the deleted row again. Cancelling
+     * that read was the other option and leaves the query unanswered for good — the drawer
+     * saying "No chat mentions that" about a search it never finished — so the answer is
+     * let through and the row is taken out of it. A deleted id never returns, so the set
+     * only ever holds what was deleted while the screen was up.
      */
     fun forget(id: Long) {
+        forgotten += id
         _state.update { it.copy(results = it.results.filterNot { row -> row.id == id }) }
     }
 

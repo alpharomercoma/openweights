@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.util.Log
+import io.github.alpharomercoma.openweights.core.common.context.Compaction
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,8 +63,43 @@ internal class Folding(
 
         val startedIn = conversationId()
 
+        // Held until the fold is applied, not only while the summary is written. The flag
+        // used to drop the moment the model finished, and the write and the state update
+        // that follow both suspend: a turn settles with the composer already free before
+        // it folds, so in that window Send passed, a second turn opened against the old
+        // prompt, and the fold then rewrote the transcript underneath it.
         state.update { it.copy(isCompacting = true) }
-        val compaction = try {
+        try {
+            val compaction = summarise(current, engineIsDecoding)
+                ?.takeIf { startedIn == conversationId() }
+                ?: return false
+
+            // Without this a folded chat reopens with no summary and re-sends the whole
+            // transcript, which walks straight back into the context wall it just escaped.
+            startedIn?.let { id ->
+                writer.inOrder {
+                    saveCompaction(
+                        conversationId = id,
+                        summary = compaction.summary,
+                        throughIndex = compaction.foldedThroughIndex,
+                        // Recorded with the summary, because a summary is only as good as
+                        // what wrote it and a conversation can change model halfway.
+                        modelName = state.value.modelName,
+                    )
+                }
+            }
+            state.update { it.applying(compaction) }
+            return true
+        } finally {
+            // In a finally: a model that fails mid-summary would otherwise leave "folding
+            // earlier turns" on screen forever, and block every later fold.
+            state.update { it.copy(isCompacting = false) }
+        }
+    }
+
+    /** The summary, or null with the reason on screen when the model could not write one. */
+    private suspend fun summarise(current: ChatUiState, engineIsDecoding: Boolean): Compaction? =
+        try {
             compactor.compact(current, engineIsDecoding = engineIsDecoding)
         } catch (cancellation: CancellationException) {
             throw cancellation
@@ -75,56 +111,34 @@ internal class Folding(
             // attempted, so a failure to fold is worth saying and nothing more.
             state.update { it.copy(error = failure.userMessage()) }
             null
-        } finally {
-            // In a finally: a model that fails mid-summary would otherwise leave "folding
-            // earlier turns" on screen forever, and block every later fold.
-            state.update { it.copy(isCompacting = false) }
         }
 
-        if (compaction == null || startedIn != conversationId()) return false
-
-        // Without this a folded chat reopens with no summary and re-sends the whole
-        // transcript, which walks straight back into the context wall it just escaped.
-        startedIn?.let { id ->
-            writer.inOrder {
-                saveCompaction(
-                    conversationId = id,
-                    summary = compaction.summary,
-                    throughIndex = compaction.foldedThroughIndex,
-                    // Recorded with the summary, because a summary is only as good as what
-                    // wrote it and a conversation can change model halfway.
-                    modelName = state.value.modelName,
-                )
-            }
-        }
-
-        state.update { current ->
-            val folded = current.copy(
-                compaction = compaction,
-                // The record described a prompt this fold just rewrote from the root. A
-                // record captured by a turn *after* the fold contains the recap and is a
-                // valid extension again; clearing here is what lets its presence later
-                // mean "captured post-fold" without a marker.
-                engineHistory = null,
-                // The pages the old turns fetched are out of the window with them; the
-                // suspicion they earned goes too, except where a note still carries one.
-                toolNotes = current.toolNotes.folded(),
-                transcript = current.transcript.mapIndexed { index, entry ->
-                    if (index == compaction.foldedThroughIndex + 1) {
-                        entry.copy(compactionNote = COMPACTION_NOTE)
-                    } else {
-                        entry
-                    }
-                },
-            )
-            // Not zero, which is what the cache holds and not what the next turn will. Folding
-            // frees most of the window and never all of it: the summary and the turns kept
-            // verbatim are sent again every turn. Reporting zero told everything that sizes
-            // itself against the window that the whole of it was free, and the next attachment
-            // was measured against a window that was not there.
-            folded.copy(contextUsed = folded.estimatedPromptTokens())
-        }
-        return true
+    /** The screen with [compaction] folded into it. */
+    private fun ChatUiState.applying(compaction: Compaction): ChatUiState {
+        val folded = copy(
+            compaction = compaction,
+            // The record described a prompt this fold just rewrote from the root. A
+            // record captured by a turn *after* the fold contains the recap and is a
+            // valid extension again; clearing here is what lets its presence later
+            // mean "captured post-fold" without a marker.
+            engineHistory = null,
+            // The pages the old turns fetched are out of the window with them; the
+            // suspicion they earned goes too, except where a note still carries one.
+            toolNotes = toolNotes.folded(),
+            transcript = transcript.mapIndexed { index, entry ->
+                if (index == compaction.foldedThroughIndex + 1) {
+                    entry.copy(compactionNote = COMPACTION_NOTE)
+                } else {
+                    entry
+                }
+            },
+        )
+        // Not zero, which is what the cache holds and not what the next turn will. Folding
+        // frees most of the window and never all of it: the summary and the turns kept
+        // verbatim are sent again every turn. Reporting zero told everything that sizes
+        // itself against the window that the whole of it was free, and the next attachment
+        // was measured against a window that was not there.
+        return folded.copy(contextUsed = folded.estimatedPromptTokens())
     }
 
     /**

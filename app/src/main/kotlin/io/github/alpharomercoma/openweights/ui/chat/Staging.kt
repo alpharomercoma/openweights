@@ -51,8 +51,11 @@ sealed interface Staged {
  * this model can read the kind of file at all, how much of a document fits in what is left
  * of the window, and what to say when the answer is no. The view model keeps ownership of
  * the screen and applies whatever this returns.
+ *
+ * Open, like [ChatWriter], for one reason: a test needs a provider that refuses the read,
+ * and the real store swallows every refusal into null before it gets here.
  */
-class Staging @Inject constructor(
+open class Staging @Inject constructor(
     private val attachments: AttachmentStore,
     @param:ApplicationContext private val context: Context,
 ) {
@@ -93,7 +96,7 @@ class Staging @Inject constructor(
      * document that overruns the context does not produce a worse answer, it produces a
      * failed decode.
      */
-    suspend fun document(uri: Uri, budgetChars: Int): Staged =
+    open suspend fun document(uri: Uri, budgetChars: Int): Staged =
         attachments.readDocument(uri, budgetChars)
             ?.let(Staged::Document)
             ?: Staged.Refused(context.getString(R.string.document_unreadable))

@@ -165,6 +165,16 @@ internal class Attaching(
             state.update { it.copy(isAttaching = true) }
             val staged = try {
                 staging.document(uri, documentBudget(state.value))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (@Suppress("TooGenericExceptionCaught") failure: Exception) {
+                // The same answer [safelyStage] gives a picked file. A provider that
+                // refuses the read throws rather than returning null, and with nothing
+                // catching it here the exception left the view model's scope and took
+                // the process with it: a refused permission on a document is a sentence
+                // for the user, not a crash.
+                android.util.Log.w("Attaching", "Provider refused document", failure)
+                Staged.Refused(unreadableMessage)
             } finally {
                 state.update { it.copy(isAttaching = false) }
             }

@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentRunner
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
+import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.CapabilityDenial
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
@@ -148,15 +149,26 @@ class TurnRunner @Inject constructor(
     fun toolNamed(name: String): Tool? = tools.find(name)
 
     /**
-     * Whether a turn would offer the model anything.
+     * Whether a turn in [mode] would offer the model anything.
      *
      * Availability counts, not only the switch. Offline, every search tool is switched on
      * and none of them can run, and the head that reported them present forced thinking
      * on for a question the model could only answer from memory; a tool that would be
      * kept out of the prompt is not one the prompt should be shaped around.
+     *
+     * Plan mode is answered the way [selectTools] offers it: its two tools are machinery,
+     * not something the user was given a switch for, so they count whatever the switches
+     * say. Counted only the user-facing ones, every switch off made this false, the turn
+     * ran with no tools at all, and the mode lost `ask_user` and `advance` without a word.
+     * `ask_user` is offered by the mode itself — [selectTools] sets that as it runs — so
+     * it is counted as present rather than asked whether it is yet.
      */
-    fun hasEnabledTools(): Boolean =
-        tools.all.any { it.isUserFacing && it.isAvailable && switches.isEnabled(it) }
+    fun hasEnabledTools(mode: AgentMode = AgentMode.AUTO): Boolean = when (mode) {
+        AgentMode.PLAN -> tools.all.any {
+            !it.isUserFacing && (it.definition.name == AskUserTool.NAME || it.isAvailable)
+        }
+        else -> tools.all.any { it.isUserFacing && it.isAvailable && switches.isEnabled(it) }
+    }
 
     /**
      * The tools an execution turn would actually offer, by name, for a planner to read.
@@ -730,10 +742,15 @@ class TurnRunner @Inject constructor(
          * Whether these calls include the kind of step the longer budget was written for.
          *
          * Only true while the budget is still the short one, so a turn cannot keep buying
-         * rounds by naming a file tool: the ceiling is the ceiling.
+         * rounds by naming a file tool: the ceiling is the ceiling. And only while there is
+         * room for what the round returns: the round cap is one of two reasons [mayCall]
+         * says no, and earning past it must not earn past the other. Without the check a
+         * write named on a full window ran, and its result went in on top of a context
+         * that had no room for it.
          */
-        private fun wantsToChain(calls: List<ToolCall>): Boolean =
-            maxRounds < ceiling && calls.any { active.find(it.name)?.chains == true }
+        private fun wantsToChain(calls: List<ToolCall>): Boolean = maxRounds < ceiling &&
+            ToolBudget(headroomTokens()).hasRoom &&
+            calls.any { active.find(it.name)?.chains == true }
 
         /** A pass whose calls can still run: run them, or spend the one repair. */
         private suspend fun advance(

@@ -73,8 +73,15 @@ object ClipboardMedia {
         return (0 until clip.itemCount)
             .mapNotNull { clip.getItemAt(it).uri }
             .filter { uri ->
-                val type = context.contentResolver.getType(uri)
-                type == null || support.acceptsMimeType(type)
+                // Asking a provider what it holds is a call into another app, and one that
+                // is gone or that never meant to share this URI throws rather than
+                // answering; the paste receiver already guards the same call. A type that
+                // cannot be resolved is refused, not waved through: nothing here can say
+                // what the file is, so nothing can say this model reads it, and an
+                // unreadable file staged anyway was refused again after the copy with a
+                // sentence about the model rather than the clipboard.
+                val type = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+                support.acceptsMimeType(type)
             }
     }
 }

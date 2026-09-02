@@ -114,7 +114,7 @@ class AskBoard @Inject constructor() {
 @Singleton
 class AskUserTool @Inject constructor(private val board: AskBoard) : Tool {
     override val definition = ToolDefinition(
-        name = "ask_user",
+        name = NAME,
         description = "Ask the user a question when the request could mean more than one " +
             "thing, or when a detail a tool needs was never given. Suggest up to four " +
             "options. Not for a request no tool can carry out: say plainly that you cannot.",
@@ -172,6 +172,11 @@ class AskUserTool @Inject constructor(private val board: AskBoard) : Tool {
             ),
         )
         return answer.ifBlank { "The user did not answer. Choose for them and say what you chose." }
+    }
+
+    companion object {
+        /** Named once, because the turn loop counts it as present by name; see TurnRunner. */
+        const val NAME = "ask_user"
     }
 }
 

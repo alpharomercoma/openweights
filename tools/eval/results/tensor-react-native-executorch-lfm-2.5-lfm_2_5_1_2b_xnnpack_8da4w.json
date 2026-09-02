@@ -1,0 +1,103 @@
+{
+  "model": "react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8",
+      "reasoning_chars": 0,
+      "raw": "8",
+      "calls": [],
+      "prompt_tokens": 37,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 466,
+      "decode_ms": 46
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "100",
+      "reasoning_chars": 0,
+      "raw": "100",
+      "calls": [],
+      "prompt_tokens": 46,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 164,
+      "decode_ms": 26
+    },
+    {
+      "id": "format-constraint",
+      "status": "fail",
+      "content": "The first three planets in the Sun are the Sun, Mercury, and Venus. Their names in lowercase form are: Sun, Mercury, Venus.",
+      "reasoning_chars": 0,
+      "raw": "The first three planets in the Sun are the Sun, Mercury, and Venus. Their names in lowercase form are: Sun, Mercury, Venus.",
+      "calls": [],
+      "prompt_tokens": 31,
+      "cached_tokens": 0,
+      "generated_tokens": 30,
+      "prefill_ms": 114,
+      "decode_ms": 855
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 90,
+      "cached_tokens": 0,
+      "generated_tokens": 3,
+      "prefill_ms": 288,
+      "decode_ms": 89
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 32,
+      "generated_tokens": 3,
+      "prefill_ms": 83,
+      "decode_ms": 89
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<|tool_call_start|>[get_weather(city=\"Manila\")]<|tool_call_end|>",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 96,
+      "cached_tokens": 0,
+      "generated_tokens": 13,
+      "prefill_ms": 281,
+      "decode_ms": 389
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "The current weather in Manila is **31°C** with **humid** conditions. Let me know if you need further details!",
+      "reasoning_chars": 0,
+      "raw": "The current weather in Manila is **31°C** with **humid** conditions. Let me know if you need further details!",
+      "calls": [],
+      "prompt_tokens": 26,
+      "cached_tokens": 109,
+      "generated_tokens": 26,
+      "prefill_ms": 100,
+      "decode_ms": 809
+    }
+  ]
+}

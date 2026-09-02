@@ -1,0 +1,82 @@
+{
+  "model": "Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "The farmer has 17 sheep left.\n",
+      "reasoning_chars": 0,
+      "raw": "The farmer has 17 sheep left.\n",
+      "calls": [],
+      "prompt_tokens": 38,
+      "cached_tokens": 0,
+      "generated_tokens": 10,
+      "prefill_ms": 293,
+      "decode_ms": 356
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "12**\n",
+      "reasoning_chars": 0,
+      "raw": "12**\n",
+      "calls": [],
+      "prompt_tokens": 46,
+      "cached_tokens": 0,
+      "generated_tokens": 4,
+      "prefill_ms": 370,
+      "decode_ms": 159
+    },
+    {
+      "id": "format-constraint",
+      "status": "fail",
+      "content": "Return a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names",
+      "reasoning_chars": 0,
+      "raw": "Return a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names of the first three planets from the Sun, and nothing else.\nReturn a JSON array containing exactly the lowercase names",
+      "calls": [],
+      "prompt_tokens": 30,
+      "cached_tokens": 0,
+      "generated_tokens": 767,
+      "prefill_ms": 284,
+      "decode_ms": 34209
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 89,
+      "cached_tokens": 0,
+      "generated_tokens": 4,
+      "prefill_ms": 615,
+      "decode_ms": 198
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "fail",
+      "content": "Bagis.\n\nBagis.\n",
+      "reasoning_chars": 0,
+      "raw": "Bagis.\n\nBagis.\n",
+      "calls": [],
+      "prompt_tokens": 24,
+      "cached_tokens": 78,
+      "generated_tokens": 8,
+      "prefill_ms": 206,
+      "decode_ms": 372
+    },
+    {
+      "id": "tool-call",
+      "status": "skipped",
+      "reason": "family has no tool syntax"
+    },
+    {
+      "id": "tool-result",
+      "status": "skipped",
+      "reason": "family has no tool syntax"
+    }
+  ]
+}

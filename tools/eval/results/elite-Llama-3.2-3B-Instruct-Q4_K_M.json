@@ -1,0 +1,108 @@
+{
+  "model": "Llama-3.2-3B-Instruct-Q4_K_M",
+  "engine": "LlamaCppEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8",
+      "reasoning_chars": 0,
+      "raw": "8",
+      "calls": [],
+      "prompt_tokens": 64,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 3706,
+      "decode_ms": 51
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "76",
+      "reasoning_chars": 0,
+      "raw": "76",
+      "calls": [],
+      "prompt_tokens": 40,
+      "cached_tokens": 30,
+      "generated_tokens": 1,
+      "prefill_ms": 3556,
+      "decode_ms": 57
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "Here is a Python function that returns the desired JSON array:\n\n```python\nimport json\n\ndef get_planet_names():\n    \"\"\"\n    Returns a JSON array containing exactly the lowercase names of the first three planets from the Sun.\n    \n    :return: A JSON string representing an array of planet names.\n    \"\"\"\n\n    # List of the first three planets in our solar system\n    planets = ['mercury', 'venus', 'earth']\n\n    # Convert the list to a JSON array and return it as a string\n    return json.dumps(planets)\n\n# Example usage:\nprint(get_planet_names())\n```\n\nWhen you run this code, it will output:\n\n```json\n[\"mercury\",\"venus\",\"earth\"]\n```\n\nThis function uses Python's built-in `json` module to convert the list of planet names into a JSON array. The `dumps()` method is used to serialize the data into a JSON string.",
+      "reasoning_chars": 0,
+      "raw": "Here is a Python function that returns the desired JSON array:\n\n```python\nimport json\n\ndef get_planet_names():\n    \"\"\"\n    Returns a JSON array containing exactly the lowercase names of the first three planets from the Sun.\n    \n    :return: A JSON string representing an array of planet names.\n    \"\"\"\n\n    # List of the first three planets in our solar system\n    planets = ['mercury', 'venus', 'earth']\n\n    # Convert the list to a JSON array and return it as a string\n    return json.dumps(planets)\n\n# Example usage:\nprint(get_planet_names())\n```\n\nWhen you run this code, it will output:\n\n```json\n[\"mercury\",\"venus\",\"earth\"]\n```\n\nThis function uses Python's built-in `json` module to convert the list of planet names into a JSON array. The `dumps()` method is used to serialize the data into a JSON string.",
+      "calls": [],
+      "prompt_tokens": 27,
+      "cached_tokens": 30,
+      "generated_tokens": 188,
+      "prefill_ms": 3322,
+      "decode_ms": 11421
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 85,
+      "cached_tokens": 30,
+      "generated_tokens": 3,
+      "prefill_ms": 4445,
+      "decode_ms": 212
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 76,
+      "generated_tokens": 2,
+      "prefill_ms": 3396,
+      "decode_ms": 98
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<|python_tag|>{\"name\": \"get_weather\", \"parameters\": {\"city\": \"Manila\"}}",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 189,
+      "cached_tokens": 5,
+      "generated_tokens": 18,
+      "prefill_ms": 5280,
+      "decode_ms": 989
+    },
+    {
+      "id": "tool-result",
+      "status": "fail",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<|python_tag|>{\"name\": \"get_weather\", \"parameters\": {\"city\": \"Manila\"}}",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 27,
+      "cached_tokens": 212,
+      "generated_tokens": 18,
+      "prefill_ms": 3471,
+      "decode_ms": 983
+    }
+  ]
+}

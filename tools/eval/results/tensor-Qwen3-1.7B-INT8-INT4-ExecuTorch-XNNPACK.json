@@ -1,0 +1,103 @@
+{
+  "model": "Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "pass",
+      "content": "<think>\nOkay, let's see. The problem is: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left?\n\nHmm, so the farmer starts with 17 sheep. Then, all but 9 run away. Wait, \"all but 9\" – so that means 9 sheep ran away, and the rest stayed? But the question is how many sheep the farmer has left.\n\nSo if all but 9 ran away, that would mean 9 stayed, right? Because \"all but 9\" is the remaining ones. So if all except 9 ran away, then the farmer has 9 left. But wait, let me make sure.\n\nLet me think again. The farmer has 17 sheep. Then, all but 9 run away. So \"all but 9\" – that's a bit tricky. If you say \"all but X,\" that usually means X is the number that's left. So if all but 9 ran away, then 9 are left. So the answer would be 9?\n\nBut wait, maybe I need to check the wording again. The problem says \"All but 9 run away.\" So \"all but 9\" – so the farmer has 17 sheep. All but 9 ran away. So how many are left?\n\nSo if all but 9 ran away, that means 9 are left. So the answer is 9?\n\nBut maybe the question is trying to trick me? Like, maybe \"all but 9\" means that 9 ran away, so 17 - 9 = 8? But that would be if 9 ran away, but the wording is \"all but 9 run away.\" So if all but 9 ran away, then the farmer has 9 left. Because \"all\" ran away, but 9 were left. Wait, but how does that translate?\n\nLet me think of it this way. If all but 9 ran away, that is, the farmer's sheep are such that all except 9 ran away. So that would mean that 9 are left. So the answer is 9. But maybe the problem is in the wording. Sometimes these riddles are tricky.\n\nAnother way: If all but 9 ran away, then how many are left? So if you have 17 sheep. All but 9 ran away. So \"all but 9\" is the number that stayed. So 17 - 9 = 8? Wait, but that's if 9 ran away. But the problem says \"all but 9 run away.\" So if all ran away, but 9 stayed. That would be 9 left. But maybe the problem is phrased as \"all but 9 ran away,\" so the farmer has 9 left.\n\nBut maybe the problem is in the translation. Let me think in English. If you say \"all but 9 ran away,\" that could be interpreted as \"all of them ran away, but 9 did not.\" So the farmer's sheep are 17. All but 9 ran away. So 9 are left. Therefore, the answer is 9.\n\nBut wait, maybe the problem is a play on words. Like, if you say \"all but 9 run away,\" maybe it's phrased as \"all but 9\" meaning that 9 are left. So the answer is 9.\n\nAlternatively, if the farmer has 17 sheep, and all but 9 ran away, so the number of sheep left would be 9. So the answer is 9.\n\nBut maybe the problem is a trick question. Like, if all but 9 ran",
+      "reasoning_chars": 0,
+      "raw": "<think>\nOkay, let's see. The problem is: A farmer has 17 sheep. All but 9 run away. How many sheep does the farmer have left?\n\nHmm, so the farmer starts with 17 sheep. Then, all but 9 run away. Wait, \"all but 9\" – so that means 9 sheep ran away, and the rest stayed? But the question is how many sheep the farmer has left.\n\nSo if all but 9 ran away, that would mean 9 stayed, right? Because \"all but 9\" is the remaining ones. So if all except 9 ran away, then the farmer has 9 left. But wait, let me make sure.\n\nLet me think again. The farmer has 17 sheep. Then, all but 9 run away. So \"all but 9\" – that's a bit tricky. If you say \"all but X,\" that usually means X is the number that's left. So if all but 9 ran away, then 9 are left. So the answer would be 9?\n\nBut wait, maybe I need to check the wording again. The problem says \"All but 9 run away.\" So \"all but 9\" – so the farmer has 17 sheep. All but 9 ran away. So how many are left?\n\nSo if all but 9 ran away, that means 9 are left. So the answer is 9?\n\nBut maybe the question is trying to trick me? Like, maybe \"all but 9\" means that 9 ran away, so 17 - 9 = 8? But that would be if 9 ran away, but the wording is \"all but 9 run away.\" So if all but 9 ran away, then the farmer has 9 left. Because \"all\" ran away, but 9 were left. Wait, but how does that translate?\n\nLet me think of it this way. If all but 9 ran away, that is, the farmer's sheep are such that all except 9 ran away. So that would mean that 9 are left. So the answer is 9. But maybe the problem is in the wording. Sometimes these riddles are tricky.\n\nAnother way: If all but 9 ran away, then how many are left? So if you have 17 sheep. All but 9 ran away. So \"all but 9\" is the number that stayed. So 17 - 9 = 8? Wait, but that's if 9 ran away. But the problem says \"all but 9 run away.\" So if all ran away, but 9 stayed. That would be 9 left. But maybe the problem is phrased as \"all but 9 ran away,\" so the farmer has 9 left.\n\nBut maybe the problem is in the translation. Let me think in English. If you say \"all but 9 ran away,\" that could be interpreted as \"all of them ran away, but 9 did not.\" So the farmer's sheep are 17. All but 9 ran away. So 9 are left. Therefore, the answer is 9.\n\nBut wait, maybe the problem is a play on words. Like, if you say \"all but 9 run away,\" maybe it's phrased as \"all but 9\" meaning that 9 are left. So the answer is 9.\n\nAlternatively, if the farmer has 17 sheep, and all but 9 ran away, so the number of sheep left would be 9. So the answer is 9.\n\nBut maybe the problem is a trick question. Like, if all but 9 ran",
+      "calls": [],
+      "prompt_tokens": 38,
+      "cached_tokens": 0,
+      "generated_tokens": 767,
+      "prefill_ms": 671,
+      "decode_ms": 46409
+    },
+    {
+      "id": "multi-step-change",
+      "status": "pass",
+      "content": "Ana buys 7 pencils at 12 pesos each, so the total cost is $7 \\times 12 = 84$ pesos. She pays with a 100-peso bill, so the change she receives is $100 - 84 = 16$ pesos.\n\n**Answer:** 16",
+      "reasoning_chars": 1368,
+      "raw": "<think>\nOkay, let's see. Ana buys 7 pencils at 12 pesos each, right? So first, I need to figure out the total cost of the pencils. She pays with a 100-peso bill, and the question is asking how many pesos of change she receives. \n\nAlright, so each pencil is 12 pesos. She buys 7 of them. To find the total cost, I should multiply the number of pencils by the price per pencil. That would be 7 times 12. Let me do that calculation. 7 times 12... Well, 7 times 10 is 70, and 7 times 2 is 14, so 70 plus 14 is 84. So the total cost is 84 pesos.\n\nNow, she gives a 100-peso bill. So the change she receives would be the 100 pesos minus the total cost. That is 100 minus 84. Let me subtract that. 100 minus 80 is 20, and then minus 4 more is 16. So the change is 16 pesos.\n\nWait, but the question says \"how many pesos of change does she receive?\" So the answer should be 16? Let me check again. 7 pencils at 12 each. 7 times 12. Let me do 7*12 another way. 12*7. 10*7=70, 2*7=14, so 70+14=84. Correct. 100-84=16. Yes, that's right. So the answer is 16. \n\nBut wait, just to make sure I didn't misread the problem. The question says \"how many pesos of change does she receive?\" So if she pays with a 100, then the change is 100 minus the total price. Which is 16. So 16 is the answer. \n\nI think that's correct. No steps missed, and the arithmetic checks out. So yeah, 16 is the answer.\n<\/think>\n\nAna buys 7 pencils at 12 pesos each, so the total cost is $7 \\times 12 = 84$ pesos. She pays with a 100-peso bill, so the change she receives is $100 - 84 = 16$ pesos.\n\n**Answer:** 16",
+      "calls": [],
+      "prompt_tokens": 46,
+      "cached_tokens": 0,
+      "generated_tokens": 534,
+      "prefill_ms": 497,
+      "decode_ms": 30851
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "[\"mercury\", \"venus\", \"earth\"]",
+      "reasoning_chars": 2409,
+      "raw": "<think>\nOkay, the user wants a JSON array with the lowercase names of the first three planets from the Sun. Let me think about this step by step.\n\nFirst, I need to recall the order of the planets from the Sun. The planets are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. But the question says \"the first three planets from the Sun.\" Wait, the order from the Sun is Mercury, Venus, Earth, Mars, etc. So the first three are Mercury, Venus, Earth.\n\nBut wait, sometimes people might refer to the planets in order of their distance from the Sun, but the question says \"the first three planets from the Sun,\" which probably means the first three in the order starting from the Sun. So Mercury, Venus, Earth.\n\nNow, the user wants these names in lowercase. Let me check each planet's name. Mercury is \"mercury\", lowercase. Venus is \"venus\". Earth is \"earth\". So the array would be [\"mercury\", \"venus\", \"earth\"].\n\nBut wait, the user said \"the first three planets from the Sun.\" Is there a different order? For example, sometimes people might list the planets in order of their distance, but the question says \"from the Sun,\" which probably refers to the order they orbit the Sun. So Mercury, Venus, Earth, Mars, etc.\n\nSo the JSON array would be a JSON array containing those three names in lowercase. So the JSON would be:\n\n[\"mercury\", \"venus\", \"earth\"]\n\nI need to make sure there are no other planets included. The question says exactly the first three, so no more. Also, the JSON should be valid. So the array is in the correct order, lowercase, and in JSON format.\n\nSo the final answer is a JSON array with those three names. I should present it as a JSON array, with commas and brackets correctly placed. No quotes needed since it's a JSON array, but the user might expect the JSON array as a string. Wait, the user says \"return a JSON array\", so the answer should be in JSON format. So the correct answer is the array as a JSON array.\n\nSo the final answer is:\n\n[\"mercury\", \"venus\", \"earth\"]\n\nI need to make sure that the JSON is correctly formatted. Since the user said \"return a JSON array\", and the assistant's answer should be in the box as a JSON array. So the answer would be the JSON array as written. No need for quotes around the array, since it's a JSON array. The elements are strings, so they are in double quotes. The array is in square brackets. So the correct JSON array is as I wrote.\n<\/think>\n\n[\"mercury\", \"venus\", \"earth\"]",
+      "calls": [],
+      "prompt_tokens": 30,
+      "cached_tokens": 0,
+      "generated_tokens": 570,
+      "prefill_ms": 247,
+      "decode_ms": 33275
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 930,
+      "raw": "<think>\nOkay, let's see. The question is about the Barangay San Isidro council meeting and deciding when to hold the fiesta. The key information given is that they voted 6 to 1 to move the annual fiesta from January 21 to March 14. The question is asking on what date the fiesta will be held, and they want the answer just with the date.\n\nSo, the original date was January 21. They decided to move it to March 14. The answer should be March 14. But wait, I need to make sure there's no trick here. The question says \"after reviewing the typhoon damage,\" but the vote to move the fiesta is mentioned. The treasurer was asked to release money for repairs before the new date. But the question is about the date of the fiesta, not the repairs. So the answer is March 14.\n\nI don't think there's any confusion here. The original date was January 21, and they moved it to March 14. So the answer is March 14. Just need to write that in the box.\n<\/think>\n\nMarch 14",
+      "calls": [],
+      "prompt_tokens": 93,
+      "cached_tokens": 0,
+      "generated_tokens": 243,
+      "prefill_ms": 679,
+      "decode_ms": 13587
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 312,
+      "raw": "<think>\nOkay, the user asked, \"What is my cat's name? Answer with just the name.\" They mentioned their cat is named Bagwis. I need to respond with just the name. Since the user already provided the name, the answer is straightforward. Just state \"Bagwis\" clearly. No need for extra info. Keep it simple and to the point.\n<\/think>\n\nBagwis",
+      "calls": [],
+      "prompt_tokens": 314,
+      "cached_tokens": 0,
+      "generated_tokens": 79,
+      "prefill_ms": 1768,
+      "decode_ms": 4611
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 357,
+      "raw": "<think>\nOkay, the user is asking for the current weather in Manila. I need to use the get_weather function. The function requires the city parameter, which is Manila. So I'll call get_weather with city set to Manila. Let me make sure there are no other parameters needed. The function only asks for the city, so that's all. I'll structure the tool call accordingly.\n<\/think>\n\n<tool_call>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"Manila\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 167,
+      "cached_tokens": 0,
+      "generated_tokens": 101,
+      "prefill_ms": 985,
+      "decode_ms": 5648
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "The current weather in Manila is 31°C with humid conditions. Let me know if you need further details!",
+      "reasoning_chars": 336,
+      "raw": "<think>\nOkay, the user asked for the current weather in Manila. I used the get_weather function and received a response with temperature 31°C and condition \"humid\". Now, I need to present this information clearly. Let me check if the data makes sense. 31°C is hot, and humid conditions match the response. I'll summarize this in a friendly way.\n<\/think>\n\nThe current weather in Manila is 31°C with humid conditions. Let me know if you need further details!",
+      "calls": [],
+      "prompt_tokens": 28,
+      "cached_tokens": 268,
+      "generated_tokens": 102,
+      "prefill_ms": 231,
+      "decode_ms": 6032
+    }
+  ]
+}

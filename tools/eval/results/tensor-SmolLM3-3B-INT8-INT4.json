@@ -1,0 +1,98 @@
+{
+  "model": "SmolLM3-3B-INT8-INT4",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "pass",
+      "content": "9",
+      "reasoning_chars": 928,
+      "raw": "<think>\nOkay, let me try to figure this out. The problem says a farmer has 17 sheep. Then it mentions, \"All but 9 run away.\" Hmm, I need to understand what that means.\n\nSo, if all but 9 sheep run away, that means the ones that didn't run away are the 9 that stayed. Therefore, the number of sheep left would be 9. Let me check that again. If the farmer originally had 17 sheep, and all but 9 ran away, that implies that 17 - (number that ran away) = number that stayed. The problem states that the number that stayed is 9. So the number that ran away is 17 - 9 = 8. Therefore, the farmer is left with 9 sheep. \n\nWait, let me make sure I didn't mix up the numbers. The phrase \"All but 9 run away\" can be interpreted as \"All except 9 run away,\" meaning the remaining sheep are the 9 that didn't run. So yes, the farmer is left with 9 sheep. I think that's correct. I don't see any trick or play on words here. The answer should just be 9.\n<\/think>\n\n9",
+      "calls": [],
+      "prompt_tokens": 277,
+      "cached_tokens": 0,
+      "generated_tokens": 253,
+      "prefill_ms": 23600,
+      "decode_ms": 22720
+    },
+    {
+      "id": "multi-step-change",
+      "status": "pass",
+      "content": "Ana buys 7 pencils at 12 pesos each, totaling \\(7 \\times 12 = 84\\) pesos. She pays with a 100-peso bill, so the change is \\(100 - 84 = 16\\) pesos.\n\n\\boxed{16}",
+      "reasoning_chars": 1056,
+      "raw": "<think>\nOkay, let me figure this out step by step. So Ana buys 7 pencils, each costing 12 pesos. First, I need to calculate the total cost of the pencils. To do that, I multiply the number of pencils by the price per pencil. That would be 7 times 12. Let me compute that. 7 times 10 is 70, and 7 times 2 is 14, so adding those together gives 70 + 14 = 84 pesos. So the total cost of the pencils is 84 pesos.\n\nNow, Ana pays with a 100-peso bill. To find out how much change she should receive, I need to subtract the total cost of the pencils from the amount she paid. That means 100 pesos minus 84 pesos. Let me do that subtraction: 100 - 84. Hmm, 100 minus 80 is 20, and then I need to subtract the remaining 4, so 20 - 4 = 16. Therefore, Ana should receive 16 pesos as change.\n\nWait, let me double-check my calculations to make sure I didn't make a mistake. The total number of pencils is indeed 7, each at 12 pesos. Multiplying those gives 84, correct. Then subtracting from 100: 100 - 84. Yes, that's 16. I think that's right. So the change should be 16 pesos.\n<\/think>\n\nAna buys 7 pencils at 12 pesos each, totaling \\(7 \\times 12 = 84\\) pesos. She pays with a 100-peso bill, so the change is \\(100 - 84 = 16\\) pesos.\n\n\\boxed{16}",
+      "calls": [],
+      "prompt_tokens": 283,
+      "cached_tokens": 0,
+      "generated_tokens": 352,
+      "prefill_ms": 23109,
+      "decode_ms": 31912
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "<think>\nOkay, let me tackle this problem. The user wants me to return a JSON array with the lowercase names of the first three planets from the Sun, nothing else. Let me start by recalling the order of the planets from the Sun: Mercury, Venus, Earth, Mars, Jupiter, Saturn, etc. So the first three are Mercury, Venus, Earth.\n\nNow, I need to make sure the names are in lowercase. Let me check each one. Mercury is already lowercase, Venus too, Earth as well. So converting them to lowercase doesn't change them here. But just to be safe, I'll confirm each spelling. Mercury, Venus, Earth. All are lowercase in their standard names, so that's good.\n\nNext, I need to present this as a JSON array. The JSON structure should be an array with three elements. The syntax is [fafdabfd...], each element separated by a comma, and the entire array in square brackets. So the JSON would be [\"mercury\", \"venus\", \"earth\"].\n\nWait, the user specified \"dccimulator;!fdf&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r",
+      "reasoning_chars": 0,
+      "raw": "<think>\nOkay, let me tackle this problem. The user wants me to return a JSON array with the lowercase names of the first three planets from the Sun, nothing else. Let me start by recalling the order of the planets from the Sun: Mercury, Venus, Earth, Mars, Jupiter, Saturn, etc. So the first three are Mercury, Venus, Earth.\n\nNow, I need to make sure the names are in lowercase. Let me check each one. Mercury is already lowercase, Venus too, Earth as well. So converting them to lowercase doesn't change them here. But just to be safe, I'll confirm each spelling. Mercury, Venus, Earth. All are lowercase in their standard names, so that's good.\n\nNext, I need to present this as a JSON array. The JSON structure should be an array with three elements. The syntax is [fafdabfd...], each element separated by a comma, and the entire array in square brackets. So the JSON would be [\"mercury\", \"venus\", \"earth\"].\n\nWait, the user specified \"dccimulator;!fdf&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r&r",
+      "calls": [],
+      "prompt_tokens": 270,
+      "cached_tokens": 0,
+      "generated_tokens": 253,
+      "prefill_ms": 22323,
+      "decode_ms": 22605
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 1088,
+      "raw": "<think>\nOkay, let me look at this problem. The Barangay San Isidro council met on Tuesday and made a decision to move the annual fiesta from January 21 to March 14. They also allocated 45,000 pesos for repairs before the new date. The question is asking for the date the fiesta will be held, and the answer should just be the date.\n\nFirst, I need to confirm if there are any other factors that might affect the date, like holidays or local traditions. But the problem states that the new date is March 14, so unless there's conflicting information, that should be the answer. The initial date was January 21, but they changed it to March 14. The allocation of funds is just additional context, not affecting the date. \n\nI should also check if there's any ambiguity in the months. For example, is March 14 after January 21? Yes, because January has 31 days, so January 21 is around the middle of the month, and March 14 is much later. So the new date is March 14. The problem doesn't mention any other dates or conflicting information, so I can safely say that the fiesta will be held on March 14.\n<\/think>\n\nMarch 14",
+      "calls": [],
+      "prompt_tokens": 328,
+      "cached_tokens": 0,
+      "generated_tokens": 258,
+      "prefill_ms": 27237,
+      "decode_ms": 23360
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 898,
+      "raw": "<think>\nOkay, the user's query is straightforward. They asked, \"What is my cat's name?\" and then specified that I should answer with just the name. From the previous conversation, I know that the user mentioned their cat is named Bagwis. So the task here is to provide the name without any additional information or context. I need to make sure I don't add anything extra and just output the name as requested.\n\nI should check if there's any nuance I might be missing. The user might be testing if I can follow instructions precisely, or maybe they want to confirm the name in a different way. Either way, the correct response is to state the name exactly as provided. Since the user wants only the name, I need to be concise and avoid any additional text. So the answer should be \"Bagwis\" without any surrounding text or explanations. I'll make sure the response is clean and meets the user's requirement.\n<\/think>\n\nBagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 511,
+      "generated_tokens": 195,
+      "prefill_ms": 2068,
+      "decode_ms": 18465
+    },
+    {
+      "id": "tool-call",
+      "status": "fail",
+      "content": "<think>To fetch the current weather for Manila, I will call the 'get_weather' function with the 'city' parameter set to 'Manila'. This will trigger the appropriate weather data retrievalddfijklnemonickdijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijkl",
+      "reasoning_chars": 0,
+      "raw": "<think>To fetch the current weather for Manila, I will call the 'get_weather' function with the 'city' parameter set to 'Manila'. This will trigger the appropriate weather data retrievalddfijklnemonickdijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijklijkl",
+      "calls": [],
+      "prompt_tokens": 405,
+      "cached_tokens": 0,
+      "generated_tokens": 74,
+      "prefill_ms": 33715,
+      "decode_ms": 6845
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "<think>The current weather in Manila is humid, with a temperature of 31°C. I've successfully fetched this information by calling the 'get_weather' function with the city parameter set to 'Manila'. The response includes the current temperature in Celsius (31°C) and the weather condition (\"humid&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%",
+      "reasoning_chars": 0,
+      "raw": "<think>The current weather in Manila is humid, with a temperature of 31°C. I've successfully fetched this information by calling the 'get_weather' function with the city parameter set to 'Manila'. The response includes the current temperature in Celsius (31°C) and the weather condition (\"humid&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%dffdsa&rarr;%",
+      "calls": [],
+      "prompt_tokens": 507,
+      "cached_tokens": 0,
+      "generated_tokens": 767,
+      "prefill_ms": 47030,
+      "decode_ms": 80411
+    }
+  ]
+}

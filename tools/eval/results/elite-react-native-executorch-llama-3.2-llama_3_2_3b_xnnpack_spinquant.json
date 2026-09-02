@@ -1,0 +1,103 @@
+{
+  "model": "react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8",
+      "reasoning_chars": 0,
+      "raw": "8",
+      "calls": [],
+      "prompt_tokens": 63,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 1099,
+      "decode_ms": 65
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "4",
+      "reasoning_chars": 0,
+      "raw": "4",
+      "calls": [],
+      "prompt_tokens": 69,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 1151,
+      "decode_ms": 64
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "```json\n[\n  \"mercury\",\n  \"venus\",\n  \"earth\"\n]\n```\n\nThis is a simple JSON array containing the lowercase names of the first three planets from the Sun.",
+      "reasoning_chars": 0,
+      "raw": "```json\n[\n  \"mercury\",\n  \"venus\",\n  \"earth\"\n]\n```\n\nThis is a simple JSON array containing the lowercase names of the first three planets from the Sun.",
+      "calls": [],
+      "prompt_tokens": 56,
+      "cached_tokens": 0,
+      "generated_tokens": 40,
+      "prefill_ms": 870,
+      "decode_ms": 2319
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 114,
+      "cached_tokens": 0,
+      "generated_tokens": 3,
+      "prefill_ms": 1579,
+      "decode_ms": 196
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 82,
+      "generated_tokens": 2,
+      "prefill_ms": 363,
+      "decode_ms": 126
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "{\"name\": \"get_weather\", \"parameters\": {\"city\": \"Manila\"}}",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 193,
+      "cached_tokens": 0,
+      "generated_tokens": 17,
+      "prefill_ms": 2813,
+      "decode_ms": 1445
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "This is a response from the get_weather function, indicating that the current weather in Manila is 31 degrees Celsius with a humid condition.",
+      "reasoning_chars": 0,
+      "raw": "This is a response from the get_weather function, indicating that the current weather in Manila is 31 degrees Celsius with a humid condition.",
+      "calls": [],
+      "prompt_tokens": 27,
+      "cached_tokens": 210,
+      "generated_tokens": 27,
+      "prefill_ms": 503,
+      "decode_ms": 2050
+    }
+  ]
+}

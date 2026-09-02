@@ -1,0 +1,103 @@
+{
+  "model": "LFM2.5-1.2B-Instruct-Q4_K_M",
+  "engine": "LlamaCppEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8",
+      "reasoning_chars": 0,
+      "raw": "8",
+      "calls": [],
+      "prompt_tokens": 38,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 2358,
+      "decode_ms": 32
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "25",
+      "reasoning_chars": 0,
+      "raw": "25",
+      "calls": [],
+      "prompt_tokens": 47,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 1945,
+      "decode_ms": 18
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "[\"mercury\", \"venus\", \"earth\"]",
+      "reasoning_chars": 0,
+      "raw": "[\"mercury\", \"venus\", \"earth\"]",
+      "calls": [],
+      "prompt_tokens": 32,
+      "cached_tokens": 0,
+      "generated_tokens": 12,
+      "prefill_ms": 2059,
+      "decode_ms": 204
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 91,
+      "cached_tokens": 0,
+      "generated_tokens": 3,
+      "prefill_ms": 2163,
+      "decode_ms": 53
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 79,
+      "generated_tokens": 3,
+      "prefill_ms": 2044,
+      "decode_ms": 80
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<|tool_call_start|>[get_weather(city=\"Manila\")]<|tool_call_end|>",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 97,
+      "cached_tokens": 0,
+      "generated_tokens": 13,
+      "prefill_ms": 2254,
+      "decode_ms": 375
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "The current weather in Manila is 31°C with humid conditions.",
+      "reasoning_chars": 0,
+      "raw": "The current weather in Manila is 31°C with humid conditions.",
+      "calls": [],
+      "prompt_tokens": 26,
+      "cached_tokens": 110,
+      "generated_tokens": 13,
+      "prefill_ms": 1879,
+      "decode_ms": 230
+    }
+  ]
+}

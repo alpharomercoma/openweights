@@ -49,11 +49,9 @@ run_class io.github.alpharomercoma.openweights.core.engine.eval.ExecuTorchParity
 run_class io.github.alpharomercoma.openweights.core.engine.eval.LlamaCppParityEval llamacpp
 
 echo "== pulling reports"
-for f in $($ADB shell run-as "$PKG" ls files/eval-results 2>/dev/null); do
-  f=$(echo "$f" | tr -d '\r')
-  $ADB shell run-as "$PKG" cat "files/eval-results/$f" > "$OUT/$f"
-  echo "   $OUT/$f"
-done
+# From the test package's external files directory, which needs no run-as: a cloud device
+# that blocks run-as could not hand the reports back before, and had to be read by other means.
+$ADB pull "/sdcard/Android/data/$PKG/files/eval-results/." "$OUT/" | tail -1
 
 echo "== rendering comparison"
 python3 "$HERE/compare.py" "$OUT" --out "$ROOT/docs/research/backend-parity.md"

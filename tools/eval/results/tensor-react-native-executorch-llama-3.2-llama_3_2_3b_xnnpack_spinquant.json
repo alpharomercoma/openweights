@@ -1,0 +1,103 @@
+{
+  "model": "react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 maxTokens=768",
+  "cases": [
+    {
+      "id": "trap-arithmetic",
+      "status": "fail",
+      "content": "8",
+      "reasoning_chars": 0,
+      "raw": "8",
+      "calls": [],
+      "prompt_tokens": 63,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 1129,
+      "decode_ms": 83
+    },
+    {
+      "id": "multi-step-change",
+      "status": "fail",
+      "content": "4",
+      "reasoning_chars": 0,
+      "raw": "4",
+      "calls": [],
+      "prompt_tokens": 69,
+      "cached_tokens": 0,
+      "generated_tokens": 1,
+      "prefill_ms": 685,
+      "decode_ms": 88
+    },
+    {
+      "id": "format-constraint",
+      "status": "pass",
+      "content": "```json\n[\n  \"mercury\",\n  \"venus\",\n  \"earth\"\n]\n```\n\nNote: This is a JSON array containing strings, which represents the lowercase names of the first three planets from the Sun.",
+      "reasoning_chars": 0,
+      "raw": "```json\n[\n  \"mercury\",\n  \"venus\",\n  \"earth\"\n]\n```\n\nNote: This is a JSON array containing strings, which represents the lowercase names of the first three planets from the Sun.",
+      "calls": [],
+      "prompt_tokens": 56,
+      "cached_tokens": 0,
+      "generated_tokens": 45,
+      "prefill_ms": 649,
+      "decode_ms": 4138
+    },
+    {
+      "id": "extraction",
+      "status": "pass",
+      "content": "March 14",
+      "reasoning_chars": 0,
+      "raw": "March 14",
+      "calls": [],
+      "prompt_tokens": 114,
+      "cached_tokens": 0,
+      "generated_tokens": 3,
+      "prefill_ms": 1118,
+      "decode_ms": 316
+    },
+    {
+      "id": "memory-across-turns",
+      "status": "pass",
+      "content": "Bagwis",
+      "reasoning_chars": 0,
+      "raw": "Bagwis",
+      "calls": [],
+      "prompt_tokens": 23,
+      "cached_tokens": 85,
+      "generated_tokens": 2,
+      "prefill_ms": 278,
+      "decode_ms": 160
+    },
+    {
+      "id": "tool-call",
+      "status": "pass",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "{\"name\": \"get_weather\", \"parameters\": {\"city\": \"Manila\"}}",
+      "calls": [
+        {
+          "name": "get_weather",
+          "arguments": "{\"city\": \"Manila\"}"
+        }
+      ],
+      "prompt_tokens": 193,
+      "cached_tokens": 0,
+      "generated_tokens": 17,
+      "prefill_ms": 1904,
+      "decode_ms": 1715
+    },
+    {
+      "id": "tool-result",
+      "status": "pass",
+      "content": "This is a response from the tool, assuming it returns the current weather in Manila as temperature_c = 31 and condition = \"humid\". \n\nPlease note that the actual response from the tool might be different as the tool's response is not provided in the question.",
+      "reasoning_chars": 0,
+      "raw": "This is a response from the tool, assuming it returns the current weather in Manila as temperature_c = 31 and condition = \"humid\". \n\nPlease note that the actual response from the tool might be different as the tool's response is not provided in the question.",
+      "calls": [],
+      "prompt_tokens": 27,
+      "cached_tokens": 210,
+      "generated_tokens": 54,
+      "prefill_ms": 350,
+      "decode_ms": 5405
+    }
+  ]
+}

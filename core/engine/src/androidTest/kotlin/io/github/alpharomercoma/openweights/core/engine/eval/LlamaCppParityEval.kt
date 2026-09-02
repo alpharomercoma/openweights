@@ -47,8 +47,12 @@ class LlamaCppParityEval {
         val models = EVAL_DIR.listFiles { file -> file.extension == "gguf" }.orEmpty()
         assumeTrue("no .gguf files in $EVAL_DIR", models.isNotEmpty())
 
+        // The app's external files directory rather than its private one. Both are the
+        // test package's own, but only this one can be read without run-as: a cloud device
+        // that blocks run-as (Qualcomm's did) or pulls a directory by path after the run
+        // (Firebase Test Lab) can bring the reports home from here and not from filesDir.
         val resultsDir = InstrumentationRegistry.getInstrumentation()
-            .targetContext.filesDir.resolve("eval-results")
+            .targetContext.getExternalFilesDir(null)!!.resolve("eval-results")
 
         models.sortedBy { it.name }.forEach { model ->
             Log.i(TAG, "evaluating ${model.name}")

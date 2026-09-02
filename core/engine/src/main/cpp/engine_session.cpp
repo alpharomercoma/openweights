@@ -2157,9 +2157,19 @@ StopReason Session::generate(
             has_pending_token = true;
             pending_token = llama_sampler_sample(sampler, ctx_, accepted);
         }
-        if (accepted < static_cast<int32_t>(draft.size())) {
-            llama_memory_seq_rm(
-                llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_ + 1 + accepted), -1);
+        if (accepted < static_cast<int32_t>(draft.size()) &&
+            !llama_memory_seq_rm(
+                llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_ + 1 + accepted), -1)) {
+            // A memory that cannot drop the tail keeps tokens the model rejected, and no
+            // position after them can be trusted. Speculation is only switched on for
+            // memories that can, so this is the honest ending rather than an expected one:
+            // the cache goes, the queued tokens with it, and the turn says why.
+            reset();
+            chosen.clear();
+            has_pending_token = false;
+            error  = "the cache could not drop a rejected draft";
+            reason = StopReason::ERROR;
+            break;
         }
         n_past_ += 1 + accepted;
         cached_.push_back(token);

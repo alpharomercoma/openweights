@@ -106,6 +106,13 @@ struct SamplerConfig {
     int32_t repeat_last_n = 64;
     uint32_t seed          = LLAMA_DEFAULT_SEED;
     int32_t max_tokens    = 0;  // 0 = until EOG or context is full
+    /**
+     * Thinking tokens before the block is closed for the model: -1 for no cap. At the
+     * cap the template's own end-of-thinking tag is written into the reply and decoded,
+     * and the model answers from what it has. Nothing happens on a model or a turn that
+     * never opened a block.
+     */
+    int32_t reasoning_budget = -1;
 };
 
 /** How a generation ended. */
@@ -128,6 +135,9 @@ struct ParsedReply {
 struct GenerationStats {
     int32_t prompt_tokens     = 0;
     int32_t generated_tokens  = 0;
+    /** Tokens proposed by the n-gram drafter, and how many of them the model agreed with. */
+    int32_t draft_tokens      = 0;
+    int32_t accepted_tokens   = 0;
     int64_t prefill_ms        = 0;
     int64_t decode_ms         = 0;
     int64_t time_to_first_token_ms = 0;
@@ -202,6 +212,8 @@ public:
         int32_t n_gpu_layers,
         bool use_mmap,
         bool op_offload,
+        bool kv_quantized,
+        bool speculate,
         std::string & error);
 
     /**
@@ -458,6 +470,9 @@ private:
     std::string last_generation_prompt_;
     /** Set when the rendered prompt ends with the template's own thinking open tag. */
     bool thinking_prefilled_ = false;
+    /** The template's thinking tags, kept from the last render for the reasoning budget. */
+    std::string thinking_start_tag_;
+    std::string thinking_end_tag_;
 
     GrammarSpec last_grammar_;
 
@@ -483,6 +498,20 @@ private:
      * so the next turn re-evaluates from the start instead.
      */
     bool cached_covers_context_ = true;
+
+    /**
+     * Draft-free speculation: propose the next few tokens from n-grams already in the
+     * context and let the model verify them in one batch.
+     *
+     * Costs nothing where the context has no match, because then there is no draft and
+     * the step is the single decode it always was. Where the model is copying (a page
+     * being rebuilt, a quote, a file being edited back) a draft of four is verified for
+     * the price of about 1.7 single steps, so it pays above 0.68 accepted and yields up
+     * to 3x at full acceptance, per the batch costs measured on the MT6991. Only on
+     * models whose cache can drop a rejected tail: a hybrid or recurrent model cannot,
+     * and keeps the single path. Off unless the load asks for it.
+     */
+    bool speculate_ = false;
 
     /**
      * The tokens the warm snapshot covers, and the memory state that held exactly them.

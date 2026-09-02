@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.engine
 
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -97,7 +98,7 @@ class ContextLengthBenchmark {
 
         for (model in models) {
             LlamaCppEngine().use { engine ->
-                engine.load(model, ModelLoadParams(contextLength = WIDE, gpuLayers = 0))
+                engine.load(model, params(WIDE))
                 engine.turn("Say hello.", WARM_UP_TOKENS)
 
                 for (fill in FILLS) {
@@ -136,7 +137,7 @@ class ContextLengthBenchmark {
     fun separatesContextFromHeat() = runBlocking {
         assumeTrue("model.gguf not pushed", modelFile.exists())
         LlamaCppEngine().use { engine ->
-            engine.load(modelFile, ModelLoadParams(contextLength = WIDE, gpuLayers = 0))
+            engine.load(modelFile, params(WIDE))
             engine.turn("Say hello.", WARM_UP_TOKENS)
 
             report(engine, "empty, first", fill = 0)
@@ -173,7 +174,7 @@ class ContextLengthBenchmark {
         LlamaCppEngine().use { engine ->
             val before = residentMiB()
             val startedAt = System.currentTimeMillis()
-            engine.load(modelFile, ModelLoadParams(contextLength = context, gpuLayers = 0))
+            engine.load(modelFile, params(context))
             val loadMs = System.currentTimeMillis() - startedAt
             val loaded = residentMiB()
 
@@ -186,7 +187,8 @@ class ContextLengthBenchmark {
 
             Log.i(
                 TAG,
-                "ctx=%d load=%dms rss=%d MiB (+%d for the window) %.1f pp/s %.1f tg/s".format(
+                "kv=%s ctx=%d load=%dms rss=%d MiB (+%d for the window) %.1f pp/s %.1f tg/s".format(
+                    if (kvQuantized) "q8_0" else "f16",
                     context,
                     loadMs,
                     loaded,
@@ -198,6 +200,17 @@ class ContextLengthBenchmark {
             assertThat(stats.generatedTokens).isGreaterThan(0)
         }
     }
+
+    /**
+     * The KV cache at eight bits when the run asks for it with `-e kv q8`, so the same
+     * benchmark measures both settings on one phone: the decode-against-context curve is
+     * where a smaller cache should show, and the load line is where its memory does.
+     */
+    private val kvQuantized: Boolean =
+        InstrumentationRegistry.getArguments().getString("kv") == "q8"
+
+    private fun params(context: Int) =
+        ModelLoadParams(contextLength = context, gpuLayers = 0, kvCacheQuantized = kvQuantized)
 
     private suspend fun InferenceEngine.turn(prompt: String, maxTokens: Int): GenerationStats =
         chat(

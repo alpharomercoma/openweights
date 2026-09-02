@@ -62,6 +62,8 @@ PORT = int(sys.argv[3]) if len(sys.argv) > 3 else 8090
 MODES = (sys.argv[4] if len(sys.argv) > 4 else "ifasked,plain,none").split(",")
 ARM_KEYS = (sys.argv[5] if len(sys.argv) > 5 else "current,entity,both").split(",")
 NOTHINK = len(sys.argv) > 6 and sys.argv[6] == "nothink"
+# REASONING_BUDGET=32 caps the thinking block at 32 tokens; unset or -1 leaves it open.
+REASONING_BUDGET = int(os.environ.get("REASONING_BUDGET", -1))
 
 d = json.load(open(DUMP))
 SYSTEM = d["system"]
@@ -204,14 +206,29 @@ def ask(messages, timeout=600):
     }
     if NOTHINK:
         payload["chat_template_kwargs"] = {"enable_thinking": False}
+    # A cap on the thinking block, llama-server's own: after this many reasoning tokens
+    # the server injects the end-of-thinking tag and the model answers from what it has.
+    # -1 is no cap, which is what the app ships; 0 closes the block at once, which is not
+    # the same as NOTHINK because the block is still opened. Measured 2026-09-02, see
+    # docs/research/qa-sweep-2026-09-02.md, "A reasoning cap on the tool pass".
+    if REASONING_BUDGET >= 0:
+        payload["reasoning_budget_tokens"] = REASONING_BUDGET
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
         f"http://localhost:{PORT}/v1/chat/completions", body,
         {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        m = json.load(r)["choices"][0]["message"]
+        reply = json.load(r)
+    m = reply["choices"][0]["message"]
+    # What the answer cost, thinking included: the budget question is accuracy against
+    # tokens, and a verdict without the second number is half a verdict.
+    SPENT["completion_tokens"] += (reply.get("usage") or {}).get("completion_tokens", 0)
     calls = [c["function"]["name"] for c in (m.get("tool_calls") or [])]
     return calls, (m.get("content") or "").strip()
+
+
+# Completion tokens spent on the current arm, reset per arm and printed with its score.
+SPENT = {"completion_tokens": 0}
 
 
 def tokens(text):
@@ -241,6 +258,8 @@ try:
         system = SYSTEM.replace(CURRENT, tool_prompt)
         tally = {}
         rows = []
+        SPENT["completion_tokens"] = 0
+        arm_started = time.time()
         for c in CASES:
             if mode == "none" and c["class"] == "date":
                 continue
@@ -271,6 +290,8 @@ try:
         summary = " ".join(
             f"{k}={v[0]}/{v[1]}" for k, v in sorted(tally.items()))
         print(f"{name} mode={mode:7s} arm={arm:8s} rp={SAMPLER['repeat_penalty']} "
+              f"budget={REASONING_BUDGET} gen={SPENT['completion_tokens']} "
+              f"s={time.time() - arm_started:.0f} "
               f"sysTokens={tokens(system)} {summary}")
         for r in rows:
             print(r)

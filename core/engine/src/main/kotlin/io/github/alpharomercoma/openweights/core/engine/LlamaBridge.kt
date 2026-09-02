@@ -62,6 +62,10 @@ internal class LlamaBridge {
          * CPU. It is the only mechanism either runtime has for that split.
          */
         opOffload: Boolean,
+        /** K and V at eight bits with flash attention, or the f16 default. See [ModelLoadParams]. */
+        kvCacheQuantized: Boolean,
+        /** Draft-free n-gram speculation on the decode loop. See [ModelLoadParams]. */
+        speculation: Boolean,
     ): Long
 
     external fun nativeFreeModel(handle: Long)
@@ -157,6 +161,8 @@ internal class LlamaBridge {
         repeatLastN: Int,
         seed: Int,
         maxTokens: Int,
+        /** Thinking tokens before the engine closes the block itself; -1 for no cap. */
+        reasoningBudget: Int,
         toolNames: Array<String>,
         toolDescriptions: Array<String>,
         toolSchemas: Array<String>,

@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <mutex>
 #include <regex>
 #include <string>
@@ -32,6 +33,7 @@
 
 #include "chat.h"
 #include "common.h"
+#include "ngram-map.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 
@@ -55,6 +57,22 @@ constexpr size_t MAX_ATTACHMENT_BYTES = 64u * 1024u * 1024u;
 
 /** No legitimate tokenizer piece is remotely this large; malformed vocabularies stop here. */
 constexpr size_t MAX_TOKEN_PIECE_BYTES = 1024u * 1024u;
+
+/**
+ * The n-gram the drafter looks for in the context, and the most it proposes on a match.
+ *
+ * Twelve is llama.cpp's own default for the simple drafter: long enough that a match is
+ * the model copying rather than a coincidence. Four is the break-even from the batch
+ * costs measured on the MT6991, where verifying four costs 1.68 single steps and eight
+ * costs 3.09, so a longer draft pays only at an acceptance rate this drafter rarely has.
+ */
+constexpr uint16_t SPEC_NGRAM_SIZE = 12;
+constexpr uint16_t SPEC_DRAFT_MAX  = 4;
+
+static bool ends_with(const std::string & text, const std::string & suffix) {
+    return !suffix.empty() && text.size() >= suffix.size() &&
+           text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
 
 #define LOG_TAG "OpenWeights"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -558,6 +576,8 @@ Session * Session::load(
     int32_t n_gpu_layers,
     bool use_mmap,
     bool op_offload,
+    bool kv_quantized,
+    bool speculate,
     std::string & error) {
     init_backend();
 
@@ -592,6 +612,18 @@ Session * Session::load(
     // generation, which is always batch one, stays on the CPU. Turning it off keeps
     // everything local.
     ctx_params.op_offload      = op_offload;
+    // The KV cache at eight bits, K and V both, which halves the bytes attention reads
+    // back on every generated token. Decode is affine in context, so at a wide window
+    // this is on the order of a tenth of the per-token time; whether it is worth its
+    // cost in accuracy is a measurement per model, not an assumption, which is why it is
+    // a knob and off by default. Q8_0 only: a four-bit K collapses (llama.cpp #23470).
+    // Flash attention is asked for outright rather than left to the backend's judgement,
+    // because a quantized V cache needs it and "auto" is allowed to say no.
+    if (kv_quantized) {
+        ctx_params.type_k          = GGML_TYPE_Q8_0;
+        ctx_params.type_v          = GGML_TYPE_Q8_0;
+        ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    }
 
     // Allocated before the context so that every native handle has an owner from the
     // moment it exists: a throw between them would otherwise leak the model outright.
@@ -602,6 +634,7 @@ Session * Session::load(
         return nullptr;
     }
     session->model_ = model;
+    session->speculate_ = speculate;
 
     clear_last_error();
     llama_context * ctx = llama_init_from_model(model, ctx_params);
@@ -1072,6 +1105,9 @@ bool Session::render_prompt(
                               out.compare(out.size() - params.thinking_start_tag.size(),
                                           params.thinking_start_tag.size(),
                                           params.thinking_start_tag) == 0;
+        thinking_start_tag_ = params.thinking_start_tag;
+        thinking_end_tag_ = params.thinking_end_tags.empty() ? std::string()
+                                                             : params.thinking_end_tags.front();
 
         if (!reasoning.enabled && !params.thinking_start_tag.empty() &&
             !params.thinking_end_tags.empty()) {
@@ -1829,6 +1865,29 @@ StopReason Session::generate(
     // remaining bytes are still to come.
     std::string pending;
     bool return_parsed_content = false;
+
+    // Draft-free speculation, see speculate_ in the header. The drafter reads the cache
+    // record as the history, so it needs the record to be whole, and a rejected tail is
+    // dropped with a partial rollback, which a hybrid or recurrent memory refuses.
+    const bool speculating = speculate_ && cached_covers_context_ && !keeps_no_full_history();
+    const common_ngram_simple_config spec_config{SPEC_NGRAM_SIZE, SPEC_DRAFT_MAX};
+    llama_batch spec_batch = speculating ? llama_batch_init(SPEC_DRAFT_MAX + 1, 0, 1) : llama_batch{};
+    std::vector<llama_token> draft;
+    // Tokens the model has already chosen and the cache already holds, waiting to be
+    // emitted in order: a verified draft yields several per step.
+    std::deque<llama_token> chosen;
+    // The one token chosen but not yet in the cache: the correction after a rejected
+    // draft, or the token after a fully accepted one. It is committed by the next step.
+    bool has_pending_token = false;
+    llama_token pending_token = 0;
+
+    // The reasoning budget, see SamplerConfig. The block is open from the start when the
+    // template pre-filled the opening tag and nothing closed it in the prompt; otherwise
+    // it opens when the model writes the tag itself.
+    const bool budgeted = sampler_config.reasoning_budget >= 0 && !thinking_end_tag_.empty();
+    bool in_thinking = budgeted && thinking_prefilled_ &&
+        !ends_with(last_generation_prompt_, thinking_end_tag_);
+    int32_t thinking_tokens = 0;
     while (true) {
         if (cancelled_.load(std::memory_order_relaxed)) {
             reason = StopReason::CANCELLED;
@@ -1843,7 +1902,66 @@ StopReason Session::generate(
             break;
         }
 
-        const llama_token token = llama_sampler_sample(sampler, ctx_, -1);
+        if (in_thinking && thinking_tokens >= sampler_config.reasoning_budget) {
+            // Thought enough. Whatever was chosen past this point was more thinking:
+            // the queued accepted tokens leave the cache, the pending one was never in it.
+            if (!chosen.empty()) {
+                const int32_t unread = static_cast<int32_t>(chosen.size());
+                n_past_ -= unread;
+                cached_.resize(cached_.size() - static_cast<size_t>(unread));
+                if (!llama_memory_seq_rm(
+                        llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_), -1)) {
+                    reset();
+                }
+                chosen.clear();
+            }
+            has_pending_token = false;
+            const std::string close = thinking_end_tag_ + "\n";
+            std::vector<llama_token> close_tokens = common_tokenize(vocab, close, false, true);
+            if (close_tokens.empty() || n_past_ + static_cast<int32_t>(close_tokens.size()) >= n_ctx) {
+                reason = StopReason::CONTEXT_FULL;
+                break;
+            }
+            llama_batch close_batch =
+                llama_batch_get_one(close_tokens.data(), static_cast<int32_t>(close_tokens.size()));
+            if (llama_decode(ctx_, close_batch) != 0) {
+                error = "failed to close the thinking block";
+                reason = StopReason::ERROR;
+                break;
+            }
+            for (const llama_token closing : close_tokens) {
+                llama_sampler_accept(sampler, closing);
+            }
+            n_past_ += static_cast<int32_t>(close_tokens.size());
+            if (cached_covers_context_) {
+                cached_.insert(cached_.end(), close_tokens.begin(), close_tokens.end());
+            }
+            // Into the reply as text the parser and the screen both see, so the block
+            // reads as closed everywhere and the next turn's history matches the cache.
+            raw_reply += close;
+            safe_reply += close;
+            in_thinking = false;
+            LOGI("reasoning: closed the block at the budget of %d", sampler_config.reasoning_budget);
+            if (!on_token(close.c_str())) {
+                reason = StopReason::CANCELLED;
+                break;
+            }
+        }
+
+        llama_token token;
+        // Whether `token` is already in the cache (an accepted draft token) or still has
+        // to be decoded into it (everything else).
+        bool already_committed = false;
+        if (!chosen.empty()) {
+            token = chosen.front();
+            chosen.pop_front();
+            already_committed = true;
+        } else if (has_pending_token) {
+            token = pending_token;
+            has_pending_token = false;
+        } else {
+            token = llama_sampler_sample(sampler, ctx_, -1);
+        }
         if (llama_vocab_is_eog(vocab, token)) {
             reason = StopReason::END_OF_TURN;
             break;
@@ -1876,6 +1994,17 @@ StopReason Session::generate(
 
         const std::string piece(piece_buffer.data(), piece_len);
         raw_reply += piece;
+        if (budgeted) {
+            if (in_thinking) {
+                ++thinking_tokens;
+                if (ends_with(raw_reply, thinking_end_tag_)) {
+                    in_thinking = false;
+                }
+            } else if (!thinking_start_tag_.empty() && ends_with(raw_reply, thinking_start_tag_)) {
+                in_thinking = true;
+                thinking_tokens = 0;
+            }
+        }
 
         pending += piece;
         size_t complete = complete_utf8_prefix(pending);
@@ -1895,8 +2024,38 @@ StopReason Session::generate(
             }
         }
 
+        if (already_committed) {
+            continue;
+        }
+
+        // The draft: what the context says usually follows `token`, if it says anything.
+        // Bounded by the window, because every drafted token takes a cell to verify.
+        draft.clear();
+        if (speculating) {
+            draft = common_ngram_simple_draft(spec_config, cached_, token);
+            const size_t room = static_cast<size_t>(std::max<int32_t>(0, n_ctx - n_past_ - 1));
+            if (draft.size() > std::min<size_t>(room, SPEC_DRAFT_MAX)) {
+                draft.resize(std::min<size_t>(room, SPEC_DRAFT_MAX));
+            }
+        }
+
         llama_token committed = token;
-        llama_batch batch = llama_batch_get_one(&committed, 1);
+        llama_batch batch;
+        if (draft.empty()) {
+            batch = llama_batch_get_one(&committed, 1);
+        } else {
+            spec_batch.n_tokens = static_cast<int32_t>(1 + draft.size());
+            for (int32_t i = 0; i < spec_batch.n_tokens; ++i) {
+                spec_batch.token[i]     = i == 0 ? committed : draft[i - 1];
+                spec_batch.pos[i]       = static_cast<llama_pos>(n_past_ + i);
+                spec_batch.n_seq_id[i]  = 1;
+                spec_batch.seq_id[i][0] = 0;
+                // Every position's logits, because every drafted token is judged by the
+                // distribution the model computed after the one before it.
+                spec_batch.logits[i]    = 1;
+            }
+            batch = spec_batch;
+        }
         const int ret = llama_decode(ctx_, batch);
         if (ret != 0) {
             // See ingest_prompt: an aborted graph is Stop landing mid-batch, and the
@@ -1917,11 +2076,61 @@ StopReason Session::generate(
             reason = StopReason::ERROR;
             break;
         }
-        ++n_past_;
-        // Recorded only once the decode succeeded, so the cache stays an accurate record
-        // of what the KV cache actually holds.
-        if (cached_covers_context_) {
-            cached_.push_back(token);
+        if (draft.empty()) {
+            ++n_past_;
+            // Recorded only once the decode succeeded, so the cache stays an accurate
+            // record of what the KV cache actually holds.
+            if (cached_covers_context_) {
+                cached_.push_back(token);
+            }
+            continue;
+        }
+
+        // Verification: sample after every batch position in turn and accept a drafted
+        // token while the model would have chosen it too. The first disagreement is the
+        // model's own choice for that position, and everything drafted past it is dropped
+        // from the cache, which the transformer memory does exactly.
+        int32_t accepted = 0;
+        while (accepted < static_cast<int32_t>(draft.size())) {
+            const llama_token verdict = llama_sampler_sample(sampler, ctx_, accepted);
+            if (verdict != draft[accepted]) {
+                has_pending_token = true;
+                pending_token = verdict;
+                break;
+            }
+            chosen.push_back(verdict);
+            ++accepted;
+        }
+        if (accepted == static_cast<int32_t>(draft.size())) {
+            has_pending_token = true;
+            pending_token = llama_sampler_sample(sampler, ctx_, accepted);
+        }
+        if (accepted < static_cast<int32_t>(draft.size())) {
+            llama_memory_seq_rm(
+                llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_ + 1 + accepted), -1);
+        }
+        n_past_ += 1 + accepted;
+        cached_.push_back(token);
+        cached_.insert(cached_.end(), draft.begin(), draft.begin() + accepted);
+        stats.draft_tokens    += static_cast<int32_t>(draft.size());
+        stats.accepted_tokens += accepted;
+    }
+
+    // Accepted tokens the loop never emitted are in the cache and not in the reply, and
+    // the record has to say what the cache holds: they go.
+    if (!chosen.empty()) {
+        const int32_t unread = static_cast<int32_t>(chosen.size());
+        n_past_ -= unread;
+        cached_.resize(cached_.size() - static_cast<size_t>(unread));
+        if (!llama_memory_seq_rm(llama_get_memory(ctx_), 0, static_cast<llama_pos>(n_past_), -1)) {
+            reset();
+        }
+    }
+    if (speculating) {
+        llama_batch_free(spec_batch);
+        if (stats.draft_tokens > 0) {
+            LOGI("spec: drafted=%d accepted=%d generated=%d",
+                 stats.draft_tokens, stats.accepted_tokens, stats.generated_tokens);
         }
     }
 

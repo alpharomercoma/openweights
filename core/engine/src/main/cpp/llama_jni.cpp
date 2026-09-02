@@ -253,13 +253,16 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     jint batch_thread_count,
     jint gpu_layers,
     jboolean use_mmap,
-    jboolean op_offload) try {
+    jboolean op_offload,
+    jboolean kv_quantized,
+    jboolean speculate) try {
     std::string error;
     Session * session = Session::load(
         to_utf8(env, model_path),
         mmproj_path == nullptr ? std::string() : to_utf8(env, mmproj_path),
         context_length, thread_count, batch_thread_count,
-        gpu_layers, use_mmap == JNI_TRUE, op_offload == JNI_TRUE, error);
+        gpu_layers, use_mmap == JNI_TRUE, op_offload == JNI_TRUE,
+        kv_quantized == JNI_TRUE, speculate == JNI_TRUE, error);
     if (session == nullptr) {
         throw_engine_exception(env, error);
         return 0;
@@ -570,6 +573,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jint repeat_last_n,
     jint seed,
     jint max_tokens,
+    jint reasoning_budget,
     jobjectArray tool_names,
     jobjectArray tool_descriptions,
     jobjectArray tool_schemas,
@@ -633,6 +637,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     sampler.repeat_last_n  = repeat_last_n;
     sampler.seed           = static_cast<uint32_t>(seed);
     sampler.max_tokens     = max_tokens;
+    sampler.reasoning_budget = reasoning_budget;
 
     jclass sink_class = env->GetObjectClass(token_sink);
     jmethodID on_token = env->GetMethodID(sink_class, "onToken", "(Ljava/lang/String;)Z");

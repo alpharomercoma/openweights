@@ -102,6 +102,8 @@ class LlamaCppEngine internal constructor(
                     gpuLayers = params.gpuLayers,
                     opOffload = params.opOffload,
                     useMmap = params.useMmap,
+                    kvCacheQuantized = params.kvCacheQuantized,
+                    speculation = params.speculation,
                 )
                 val info = try {
                     readModelInfo(newHandle, modelFile.absolutePath)
@@ -161,6 +163,7 @@ class LlamaCppEngine internal constructor(
             repeatLastN = params.repeatLastN,
             seed = params.seed ?: Random.nextInt(),
             maxTokens = params.maxTokens,
+            reasoningBudget = params.reasoningBudget,
             toolNames = tools.map { it.name }.toTypedArray(),
             toolDescriptions = tools.map { it.description }.toTypedArray(),
             toolSchemas = tools.map { it.parametersJson }.toTypedArray(),

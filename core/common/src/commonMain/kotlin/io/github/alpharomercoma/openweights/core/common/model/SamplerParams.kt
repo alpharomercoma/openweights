@@ -37,6 +37,17 @@ data class SamplerParams(
     val seed: Int? = null,
     /** 0 means "generate until the model stops or the context fills". */
     val maxTokens: Int = 0,
+    /**
+     * The most tokens a thinking block may run to before the engine closes it.
+     *
+     * [NO_REASONING_BUDGET] leaves the block to the model. At the cap the engine writes
+     * the template's own end-of-thinking tag into the reply and the model answers from
+     * what it has, which is llama-server's `reasoning_budget_tokens` done on the phone.
+     * Measured on the routing matrix with Qwen3-1.7B on 2026-09-02: 128 keeps the
+     * unrestricted 31 of 33 while 64 drops to 29 and 32 to 27, so the tool pass uses 128
+     * and prose keeps the block open. llama.cpp only; the ExecuTorch engine ignores it.
+     */
+    val reasoningBudget: Int = NO_REASONING_BUDGET,
 ) {
     init {
         require(temperature >= 0f) { "temperature must be >= 0" }
@@ -53,6 +64,7 @@ data class SamplerParams(
         const val DEFAULT_MIN_P = 0.05f
         const val DEFAULT_REPEAT_PENALTY = 1.1f
         const val DEFAULT_REPEAT_LAST_N = 64
+        const val NO_REASONING_BUDGET = -1
     }
 }
 
@@ -148,6 +160,32 @@ data class ModelLoadParams(
      * GPU backend to offload to.
      */
     val opOffload: Boolean = true,
+    /**
+     * The KV cache at eight bits, K and V both, with flash attention.
+     *
+     * Decode is affine in context: on the MT6991 it costs 3.42 microseconds per generated
+     * token per token of context, which is the bytes of cache that attention reads back.
+     * Q8_0 halves those bytes, so at a wide window it is worth on the order of a tenth of
+     * the per-token time; what it costs is a little accuracy, and how much is a property of
+     * the model. Gemma is known to be sensitive to it, and a four-bit K collapses outright
+     * (llama.cpp discussion #23470), which is why this is a single switch to Q8_0 and not
+     * a choice of types. Off until it has been measured on the phone against the models
+     * this app recommends: `ContextLengthBenchmark` with `-e kv q8` is the measurement.
+     */
+    val kvCacheQuantized: Boolean = false,
+    /**
+     * Draft-free speculation on the llama.cpp decode loop.
+     *
+     * The next few tokens are proposed from n-grams already in the context and verified
+     * by the model in one batch, so a span it is copying (a page being rebuilt, a quote,
+     * a file written back with one change) decodes several tokens for the price of about
+     * 1.7 single steps. Where the context has no match there is no draft and no cost.
+     * Transformers only: a hybrid or recurrent cache cannot drop a rejected tail, and the
+     * engine keeps the single path on those whatever this says. Off until measured on
+     * the phone: `SpeculationBenchmark` is the measurement, and the go rule is in
+     * docs/research/qa-sweep-2026-09-02.md.
+     */
+    val speculation: Boolean = false,
 ) {
     init {
         require(contextLength > 0) { "contextLength must be > 0" }

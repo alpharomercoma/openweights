@@ -324,10 +324,19 @@ class WriteFileTool @Inject constructor(
         // own files keep the flag: overwriting what the session did not create destroys
         // content nothing here can put back, and stays behind both the flag and the
         // approval above.
-        val replace = call.flag("replace", "overwrite") || artifacts.isOwn(path)
+        val own = artifacts.isOwn(path)
+        val replace = call.flag("replace", "overwrite") || own
+        // Whether the write is going over a file the user had. Asked before the write,
+        // because afterwards there is a file either way.
+        val existed = !own && replace && workspace.resolve(path) != null
         val written = workspace.put(path, content, replace = replace)
         if (written.successful) {
-            artifacts.created(path)
+            // Only a file this made becomes the session's to edit freely. An approved
+            // overwrite of the user's file does not make the file the model's: the next
+            // rewrite, and a delete, ask again — the approval was for one replacement,
+            // and this same process may hold a later conversation the user is not
+            // watching so closely.
+            if (!existed) artifacts.created(path)
             // The canvas is watching: a save under what it shows repaints the screen.
             canvas.changed(path)
         }

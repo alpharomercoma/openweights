@@ -162,7 +162,7 @@ class WebSearchTool @Inject constructor(
 
         // Through the proxy when one is set, and only here: see SearchSettings.proxy for
         // why this is scoped to search rather than applied to every request the app makes.
-        val providers = settings.providers(settings.client(httpClient))
+        val providers = settings.providers(settings.client(httpClient.forTools()))
         // Each in turn until one answers. A provider returns null when it could not answer
         // rather than an empty list, so being rate limited moves on to the next one instead
         // of telling the model the web has nothing on the subject.
@@ -251,7 +251,7 @@ class FetchUrlTool @Inject constructor(
      * resolver. It is only this tool that needs it: every other request in the app goes to
      * an address the app chose, and this is the one the model chooses. See [PublicOnlyDns].
      */
-    private val httpClient: OkHttpClient = httpClient.newBuilder()
+    private val httpClient: OkHttpClient = httpClient.forTools().newBuilder()
         .dns(PublicOnlyDns())
         // Followed by hand in [run] rather than by OkHttp, and this is a security boundary
         // rather than a preference. The address checks below run on the address the user
@@ -340,7 +340,7 @@ class FetchUrlTool @Inject constructor(
                 .build()
 
             val hop = runCatching {
-                httpClient.newCall(request).execute().use { response ->
+                httpClient.newCall(request).await().use { response ->
                     redirectTarget(response, next)?.let { return@use Hop.Moved(it) }
                     Hop.Read(textOf(response))
                 }
@@ -392,7 +392,12 @@ class FetchUrlTool @Inject constructor(
                 // Saved whole, summarised briefly: a page can be far larger than the
                 // context window, and the sandbox reading the file is how the model
                 // works through what the conversation could never hold.
-                val saved = workspace.put(saveTo, page.text, replace = true)
+                //
+                // Into a new file, or over one this session made. This replaced whatever
+                // sat at the path, which made a fetch the user approved for its address
+                // — or ran unasked, being the first call of a turn — a way to put a web
+                // page over their notes; write_file asks before that and this did not.
+                val saved = workspace.put(saveTo, page.text, replace = artifacts.isOwn(saveTo))
                 if (saved.successful) {
                     artifacts.created(saveTo)
                     ToolExecution(
@@ -591,7 +596,89 @@ private fun String.readable(): String = withoutFurniture().stripTags()
  * cannot run off a device, while everything interesting here is string work that can be tested
  * on its own.
  */
-internal fun String.withoutFurniture(): String = mainContent().replace(FURNITURE, " ")
+internal fun String.withoutFurniture(): String = mainContent().withoutElements(FURNITURE_TAGS)
+
+/**
+ * The text with every `<tag ...>...</tag>` whose name is in [names] cut out, in one pass.
+ *
+ * This was a regex, `<(script|style|...)[^>]*>.*?</\1>`, and it was quadratic on a page whose
+ * furniture never closes: each unclosed `<script>` sent the lazy `.*?` to the end of the input
+ * before giving up, so a 512 KB page of them cost three minutes of a laptop core, with no
+ * suspension point for Stop to land on and the engine held for the whole of it. A page does
+ * not have to be hostile to do this, only broken, and the cleaner runs on every page fetched.
+ *
+ * Scanning forward once keeps the same answer, an element removed from its open tag to the
+ * first matching close, and bounds the work: when no close tag lies ahead of an open one,
+ * that is remembered per name, so the text is searched to its end at most once per name.
+ * An element that never closes is kept as it was, which is what the regex did too.
+ */
+private fun String.withoutElements(names: Set<String>): String {
+    val lower = lowercase()
+    val out = StringBuilder(length)
+    // Per name, the position from which a search for its close tag already came up empty.
+    val noCloseFrom = HashMap<String, Int>()
+    var from = 0
+    var at = 0
+    while (at < length) {
+        val open = lower.indexOf('<', at)
+        if (open < 0) break
+        val tag = lower.tagNameAt(open + 1)?.takeIf { it in names }
+        val openEnd = if (tag != null) lower.indexOf('>', open) else -1
+        val close = if (tag != null && openEnd >= 0) {
+            lower.closeTagAfter(tag, openEnd + 1, noCloseFrom)
+        } else {
+            -1
+        }
+        at = when {
+            tag == null -> open + 1
+            openEnd < 0 -> length // an open tag that never ends: the rest is kept as it is
+            close < 0 -> openEnd + 1
+            else -> {
+                out.append(this, from, open).append(' ')
+                from = close
+                close
+            }
+        }
+    }
+    out.append(this, from, length)
+    return out.toString()
+}
+
+/** The lowercase tag name starting at [start], or null when what follows is not a tag. */
+private fun String.tagNameAt(start: Int): String? {
+    var end = start
+    while (end < length && this[end] in 'a'..'z') end++
+    if (end == start) return null
+    // A name is whole only at a boundary: `<navigation>` is not `<nav>`.
+    if (end < length && (this[end].isLetterOrDigit() || this[end] == '-')) return null
+    return substring(start, end)
+}
+
+/**
+ * The index just past the first `</name>` at or after [start], or -1 when there is none —
+ * remembering in [noCloseFrom] that nothing lies ahead, so the next open tag of the same
+ * name is answered without another search.
+ */
+private fun String.closeTagAfter(
+    name: String,
+    start: Int,
+    noCloseFrom: MutableMap<String, Int>,
+): Int {
+    val known = noCloseFrom[name]
+    if (known != null && known <= start) return -1
+    var probe = start
+    while (true) {
+        val found = indexOf("</$name", probe)
+        if (found < 0) {
+            noCloseFrom[name] = start
+            return -1
+        }
+        var end = found + name.length + 2
+        while (end < length && this[end].isWhitespace()) end++
+        if (end < length && this[end] == '>') return end + 1
+        probe = found + 1
+    }
+}
 
 /**
  * The part of the page somebody came to read, when the page says which part that is.
@@ -670,9 +757,9 @@ private fun String.textLength(): Int = replace(TAGS, " ").replace(RUNS_OF_SPACE,
  * and this cannot be allowed to remove content: too little is a longer read, too much is a
  * confident wrong answer.
  */
-private val FURNITURE = Regex(
-    "(?is)<(script|style|nav|header|footer|aside|form|noscript|iframe|svg|template|dialog)" +
-        """[^>]*>.*?</\1>""",
+private val FURNITURE_TAGS = setOf(
+    "script", "style", "nav", "header", "footer", "aside", "form", "noscript", "iframe",
+    "svg", "template", "dialog",
 )
 
 /**

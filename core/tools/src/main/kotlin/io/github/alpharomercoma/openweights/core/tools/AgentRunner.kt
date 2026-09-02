@@ -404,7 +404,14 @@ class AgentRunner(
         }
         return AgentStep.Ran(
             call = call,
-            result = execution.text,
+            // A stranger's text is combed for control-token spellings before it becomes a
+            // message: see [withoutControlTokens]. The tools that return the app's own
+            // words, or the user's, are left exact.
+            result = if (tool.returnsUntrustedText) {
+                execution.text.withoutControlTokens()
+            } else {
+                execution.text
+            },
             millis = now() - startedAt,
             successful = execution.successful,
             evidence = execution.evidence,

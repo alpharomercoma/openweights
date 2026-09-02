@@ -161,6 +161,50 @@ class PageFurnitureTest {
     }
 
     @Test
+    fun `a page of furniture that never closes is cleaned in bounded time`() {
+        // The cleaner was a lazy regex, and a page full of unclosed script tags sent it to
+        // the end of the input once per tag: a quarter megabyte took the better part of a
+        // minute on a laptop core, minutes on a phone, with Stop unable to interrupt it and
+        // the engine held for the duration. A page only has to be broken to do this.
+        val page = buildString {
+            append("<body><div>$PROSE</div>")
+            repeat(8_000) { append("<script src=\"/a$it.js\"><div>filler text here</div>") }
+            append("</body>")
+        }
+        check(page.length > 250_000)
+
+        val started = System.nanoTime()
+        val read = page.withoutFurniture()
+        val millis = (System.nanoTime() - started) / 1_000_000
+
+        assertThat(read).contains("Ada Lovelace")
+        assertThat(millis).isLessThan(3_000)
+    }
+
+    @Test
+    fun `furniture is matched by whole name, whatever its case`() {
+        val page = "<body><SCRIPT>var x = 1</SCRIPT><navigation>Keep me</navigation>" +
+            "<nav>Menu</nav><div>$PROSE</div></body>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).doesNotContain("var x")
+        assertThat(read).doesNotContain("Menu")
+        assertThat(read).contains("Keep me")
+        assertThat(read).contains("Ada Lovelace")
+    }
+
+    @Test
+    fun `an unclosed script keeps what follows, and a closed one after it still goes`() {
+        val page = "<body><script>never closed<div>$PROSE</div><style>.a{}</style></body>"
+
+        val read = page.withoutFurniture()
+
+        assertThat(read).contains("Ada Lovelace")
+        assertThat(read).doesNotContain(".a{}")
+    }
+
+    @Test
     fun `an article whose tag is never closed does not swallow the page`() {
         // Failing safe: depth never returns to zero, nothing is emitted, and the fuller text
         // is what comes back.

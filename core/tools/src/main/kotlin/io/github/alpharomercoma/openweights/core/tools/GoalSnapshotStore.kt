@@ -48,9 +48,20 @@ internal data class GoalSnapshot(val goal: Goal, val steering: List<String>)
  * or queries, and replacing its one value atomically is the operation SharedPreferences already
  * provides. The JSON carries its own version so an incompatible future shape is discarded rather
  * than guessed at.
+ *
+ * Written with `apply`, not `commit`. A board change runs on the thread that makes it, and
+ * every one of them arrives on the main thread: start, steer and stop from the screen, and each
+ * step's record from the goal loop, which the view model runs. `commit` there was a synchronous
+ * write to flash with the screen waiting on it, at every step boundary. `apply` puts the value
+ * in the process-wide cache before it returns, so every read in this process sees it at once and
+ * in the order it was written, and hands the disk write to the framework's own queue — which the
+ * framework drains before an activity pauses or stops, so the boundary is on disk before the
+ * process can be put away. What that gives up is a crash landing inside the write's own moment,
+ * and a record short of the truth is the case the board was built for: a restored goal is
+ * always halted for a person to look at, never resumed, so a lost last step costs a glance and
+ * not a repeated change.
  */
 @Singleton
-@Suppress("ApplySharedPref") // A recovery boundary must be on disk before the call returns.
 class GoalSnapshotStore private constructor(private val preferences: SharedPreferences?) {
     @Inject
     constructor(@ApplicationContext context: Context) : this(
@@ -77,9 +88,7 @@ class GoalSnapshotStore private constructor(private val preferences: SharedPrefe
         val isValid = encoded.length <= MAX_SNAPSHOT_CHARS &&
             runCatching { decode(encoded) }.isSuccess
         if (isValid) {
-            val saved = runCatching { store.edit().putString(KEY, encoded).commit() }
-                .getOrDefault(false)
-            if (!saved) store.removeSnapshot()
+            store.edit().putString(KEY, encoded).apply()
         } else {
             // Never leave an older valid goal behind when the new value cannot be saved.
             // Resurrecting that older goal after a restart is worse than having no recovery.
@@ -92,7 +101,7 @@ class GoalSnapshotStore private constructor(private val preferences: SharedPrefe
     }
 
     private fun SharedPreferences.removeSnapshot() {
-        runCatching { edit().remove(KEY).commit() }
+        edit().remove(KEY).apply()
     }
 
     private fun encode(snapshot: GoalSnapshot): String = buildJsonObject {

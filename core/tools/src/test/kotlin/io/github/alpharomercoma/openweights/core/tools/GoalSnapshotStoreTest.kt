@@ -28,6 +28,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class GoalSnapshotStoreTest {
@@ -147,6 +148,33 @@ class GoalSnapshotStoreTest {
         val restored = GoalBoard(GoalSnapshotStore(context))
         assertThat(restored.goal.value?.task).isEqualTo("Do the work")
         assertThat(restored.steering.value).hasSize(16)
+    }
+
+    @Test
+    fun `a snapshot reaches the disk behind the call, not only the cache`() {
+        // Every read in this process is answered from the cache, so the tests above would
+        // pass against a store that never wrote anything down. The file is what a restart
+        // reads, and the write is queued rather than waited for, so it is given a moment.
+        val file = File(context.dataDir, "shared_prefs/${GoalSnapshotStore.PREFERENCES}.xml")
+        GoalBoard(store).start("Survive the restart")
+
+        settleUntil { onDisk(file).contains("Survive the restart") }
+        assertThat(onDisk(file)).contains("Survive the restart")
+
+        store.clear()
+
+        settleUntil { !onDisk(file).contains(GoalSnapshotStore.KEY) }
+        assertThat(onDisk(file)).doesNotContain(GoalSnapshotStore.KEY)
+    }
+
+    private fun onDisk(file: File): String = if (file.exists()) file.readText() else ""
+
+    /** Waits, up to a few seconds, for a queued write to land; the assertion follows. */
+    private fun settleUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!condition() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
     }
 
     @Test

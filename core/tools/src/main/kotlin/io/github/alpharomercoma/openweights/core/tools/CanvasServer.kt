@@ -66,6 +66,19 @@ import javax.inject.Singleton
  *
  * And the server stops with the canvas: [stop] closes the socket and the key is minted
  * afresh next time, so a URL copied out of one session opens nothing in the next.
+ *
+ * ### Nothing leaves the phone
+ *
+ * The gates above decide who may read the folder. A page the model built could still
+ * send it somewhere: a `fetch` to any host, a form posted anywhere, an image whose URL
+ * carries the file. Every HTML response therefore carries a Content-Security-Policy, which
+ * both the in-app WebView and a real browser enforce: a built page may run its own
+ * scripts and load from its own folder, and may connect to nothing but this server. The
+ * viewer shells go further, because the Markdown they render is a file the model wrote
+ * and Markdown carries raw HTML: their policy runs only scripts marked with a nonce minted
+ * per response, so a `<script>` or an `onerror=` inside a document is inert. The cost is
+ * that a built site cannot pull fonts, images or scripts from a CDN, and the site tool
+ * says so to the model.
  */
 @Singleton
 class CanvasServer @Inject constructor(
@@ -178,7 +191,9 @@ class CanvasServer @Inject constructor(
         viewerResponse(path, query)?.let { return it }
         val body = runBlocking { read(path) }
             ?: return response("404 Not Found", "text/plain", "No such file: $path".toByteArray())
-        return response("200 OK", contentTypeFor(path), body)
+        val type = contentTypeFor(path)
+        val policy = if (type.startsWith("text/html")) PAGE_POLICY else null
+        return response("200 OK", type, body, policy)
     }
 
     @Synchronized
@@ -238,11 +253,19 @@ class CanvasServer @Inject constructor(
             .replace("\"", "\\\"")
             .replace("<", "\\u003c")
         // The shells reach their assets and the file by absolute path, and every absolute
-        // path on this server begins with the key.
+        // path on this server begins with the key. Their own scripts carry the nonce the
+        // policy names; nothing the rendered Markdown brings in does.
+        val nonce = newNonce()
         val body = shell
             .replace("__OW_FILE__", escaped)
             .replace("__OW_BASE__", "/${currentKey()}")
-        return response("200 OK", "text/html; charset=utf-8", body.toByteArray())
+            .replace("__OW_NONCE__", nonce)
+        return response(
+            "200 OK",
+            "text/html; charset=utf-8",
+            body.toByteArray(),
+            viewerPolicy(nonce),
+        )
     }
 
     /**
@@ -261,14 +284,29 @@ class CanvasServer @Inject constructor(
         }
     }
 
-    private fun response(status: String, type: String, body: ByteArray): ByteArray {
+    private fun response(
+        status: String,
+        type: String,
+        body: ByteArray,
+        policy: String? = null,
+    ): ByteArray {
         val head = "HTTP/1.1 $status\r\n" +
             "Content-Type: $type\r\n" +
             "Content-Length: ${body.size}\r\n" +
             // The canvas reloads on every write; yesterday's page must not outlive it.
             "Cache-Control: no-store\r\n" +
+            // A file is what its extension says, never what a browser guesses it might be.
+            "X-Content-Type-Options: nosniff\r\n" +
+            policyHeaders(policy) +
             "Connection: close\r\n\r\n"
         return head.toByteArray(Charsets.ISO_8859_1) + body
+    }
+
+    /** The policy an HTML response carries, and no referrer with it; nothing for the rest. */
+    private fun policyHeaders(policy: String?): String = if (policy == null) {
+        ""
+    } else {
+        "Content-Security-Policy: $policy\r\nReferrer-Policy: no-referrer\r\n"
     }
 
     private fun contentTypeFor(path: String): String = when (path.substringAfterLast('.', "")) {
@@ -287,16 +325,37 @@ class CanvasServer @Inject constructor(
         else -> "application/octet-stream"
     }
 
-    private companion object {
+    internal companion object {
         const val VIEWER_PREFIX = "__ow__"
         const val BACKLOG = 8
         const val READ_TIMEOUT_MS = 10_000
         const val KEY_BYTES = 16
+
+        /**
+         * What a page the model built may reach: its own folder and this server, nothing
+         * off the phone. Inline scripts and eval stay allowed, because scripts are the
+         * point of previewing a site and a built page is one file more often than not.
+         */
+        const val PAGE_POLICY = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+            "connect-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'"
+
+        /**
+         * What a viewer shell may do: run its own scripts and nothing the document brings.
+         * Styles stay inline because the paginator writes them; scripts need the nonce.
+         */
+        fun viewerPolicy(nonce: String): String =
+            "default-src 'self'; script-src 'self' 'nonce-$nonce'; " +
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+                "font-src 'self' data:; connect-src 'self'; form-action 'none'; " +
+                "frame-src 'none'; object-src 'none'; base-uri 'none'"
 
         /** 128 random bits as hex: unguessable, and nothing a URL needs escaping for. */
         fun newKey(): String {
             val bytes = ByteArray(KEY_BYTES).also { SecureRandom().nextBytes(it) }
             return bytes.joinToString("") { "%02x".format(it) }
         }
+
+        /** A nonce for one response: the same shape as the key, minted as often. */
+        fun newNonce(): String = newKey()
     }
 }

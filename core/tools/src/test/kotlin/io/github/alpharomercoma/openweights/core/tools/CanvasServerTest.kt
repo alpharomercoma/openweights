@@ -66,6 +66,22 @@ class CanvasServerTest {
         }
     }
 
+    /** One response: its headers, lower-cased names and joined values, and its body. */
+    private fun fetch(url: String): Pair<Map<String, String>, String> {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        val code = connection.responseCode
+        val headers = connection.headerFields
+            .filterKeys { it != null }
+            .map { (name, values) -> name.lowercase() to values.joinToString(", ") }
+            .toMap()
+        val body = (if (code < 400) connection.inputStream else connection.errorStream)
+            ?.readBytes()?.toString(Charsets.UTF_8).orEmpty()
+        connection.disconnect()
+        return headers to body
+    }
+
+    private fun headersOf(url: String): Map<String, String> = fetch(url).first
+
     /** The key in this server's URLs: the first path segment. */
     private fun key(): String = URL(server.viewerUrlFor("doc", "x")).path.split('/')[1]
 
@@ -96,6 +112,42 @@ class CanvasServerTest {
         assertThat(body).contains("\"/$key/__ow__/asset/marked.min.js\"")
         assertThat(body).contains("fetch(\"/$key/\"")
         assertThat(body).doesNotContain("__OW_BASE__")
+    }
+
+    @Test
+    fun `a viewer runs only the scripts it was born with`() {
+        // Markdown carries raw HTML, and the file is the model's. The policy names a nonce
+        // minted for this response, the shell's own scripts carry it, and a <script> or an
+        // onerror= inside the document has none.
+        val url = server.viewerUrlFor("doc", "notes/report.md")
+        val (headers, body) = fetch(url)
+        val policy = headers.getValue("content-security-policy")
+        val nonce = Regex("'nonce-([0-9a-f]{32})'").find(policy)?.groupValues?.get(1)
+        assertThat(nonce).isNotNull()
+        // The whole script directive: the nonce, and no 'unsafe-inline' beside it.
+        assertThat(policy).contains("script-src 'self' 'nonce-$nonce';")
+        assertThat(policy).contains("connect-src 'self'")
+        assertThat(policy).contains("form-action 'none'")
+        assertThat(body).contains("<script nonce=\"$nonce\">")
+        assertThat(body).doesNotContain("__OW_NONCE__")
+        // A new one every time: a nonce that could be predicted is not one.
+        assertThat(headersOf(url).getValue("content-security-policy")).doesNotContain(nonce!!)
+    }
+
+    @Test
+    fun `a page the model built may reach nothing off the phone`() {
+        // The policy every HTML file is served under. Scripts and eval stay, because a
+        // site is what it runs; where it may connect, post and load from is this server.
+        val policy = CanvasServer.PAGE_POLICY
+        assertThat(policy).contains("default-src 'self'")
+        assertThat(policy).contains("connect-src 'self'")
+        assertThat(policy).contains("form-action 'self'")
+        assertThat(policy).doesNotContain("*")
+        assertThat(policy).doesNotContain("http")
+        // And assets are what their name says, not what a browser sniffs them to be.
+        val headers = headersOf(viewer("/__ow__/asset/marked.min.js"))
+        assertThat(headers["x-content-type-options"]).isEqualTo("nosniff")
+        assertThat(headers).doesNotContainKey("content-security-policy")
     }
 
     @Test

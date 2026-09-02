@@ -18,8 +18,10 @@ package io.github.alpharomercoma.openweights.ui.canvas
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -50,6 +52,7 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.tools.CanvasKind
+import java.io.ByteArrayInputStream
 
 /**
  * Where the model's work appears: a site rendered live, or a document as a real page.
@@ -181,6 +184,33 @@ private fun Site(
                 webViewClient = object : WebViewClient() {
                     private var retries = 0
 
+                    // The WebView's half of the server's policy: nothing off the phone,
+                    // whether the page asks with a fetch, an image, a form or by leaving.
+                    override fun shouldInterceptRequest(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): WebResourceResponse? {
+                        if (request.url.staysOnDevice()) return null
+                        Log.w("OpenWeights", "canvas refused a request to ${request.url.host}")
+                        return WebResourceResponse(
+                            "text/plain",
+                            "utf-8",
+                            HTTP_FORBIDDEN,
+                            "Blocked",
+                            emptyMap(),
+                            ByteArrayInputStream(ByteArray(0)),
+                        )
+                    }
+
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): Boolean {
+                        if (request.url.staysOnDevice()) return false
+                        Log.w("OpenWeights", "canvas refused to leave for ${request.url.host}")
+                        return true
+                    }
+
                     override fun onReceivedError(
                         view: WebView,
                         request: WebResourceRequest,
@@ -210,3 +240,4 @@ private fun Site(
 
 private const val MAX_LOAD_RETRIES = 4
 private const val RETRY_DELAY_MS = 600L
+private const val HTTP_FORBIDDEN = 403

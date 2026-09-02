@@ -36,10 +36,11 @@ class ShowWebsiteTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_website",
-        description = "Show an HTML page you saved to the user, rendered live. Point it " +
-            "at the page's path, like site/index.html. Its folder is served whole, so " +
-            "relative links to CSS, scripts and images in that folder work. Call it once " +
-            "after the first save; later saves update the page on screen by themselves.",
+        description = "Show an HTML page you saved, rendered live. Point it at the " +
+            "page's path, like site/index.html. Its folder is served whole, so relative " +
+            "links to CSS, scripts and images in it work, and nothing loads from the " +
+            "network: keep every script, style, font and image in the folder or inline. " +
+            "Call it once after the first save; later saves update the page by themselves.",
         parametersJson = """
             {
               "type": "object",
@@ -103,9 +104,9 @@ class ShowDocumentTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_document",
-        description = "Show a Markdown document you saved to the user, laid out as real " +
-            "A4 pages. Point it at the file, like notes/report.md. Call it once after " +
-            "the first save; later saves with replace update the pages live.",
+        description = "Show a Markdown file you saved as A4 pages, like notes/report.md. " +
+            "Call it once after the first save; later saves with replace update the " +
+            "pages live.",
         parametersJson = """
             {
               "type": "object",
@@ -161,9 +162,9 @@ class ShowSlidesTool @Inject constructor(
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_slides",
-        description = "Show a Markdown file as a 16:9 slide deck the user swipes " +
-            "through. Separate slides with a line containing only ---. Call it once " +
-            "after the first save; later saves with replace update the deck live.",
+        description = "Show a Markdown file as a 16:9 slide deck, slides separated by a " +
+            "line containing only ---. Call it once after the first save; later saves " +
+            "with replace update the deck live.",
         parametersJson = """
             {
               "type": "object",

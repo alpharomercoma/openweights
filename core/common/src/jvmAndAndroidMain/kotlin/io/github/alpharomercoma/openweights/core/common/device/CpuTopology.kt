@@ -52,6 +52,7 @@ import java.io.File
  * | --- | --- | ---: |
  * | SM8650 | 1 + 5 + 2 | 6, and 6 is what measured fastest |
  * | Dimensity MT6991 | 8 at one speed | 8, which is what measured fastest there |
+ * | Snapdragon 8 Elite | 2 + 6, both fast | 6: all but two, see [SPARE_CORES] |
  * | a 4 + 4 phone, the commonest Android shape | 4 + 4 | 4 |
  * | a 2 + 6 phone | 2 + 6 | 8 |
  *
@@ -91,7 +92,8 @@ object CpuTopology {
         // Nothing to drop when every core runs at one speed, and nothing worth dropping
         // when what survives is a minority: see the note above this object for why the
         // line falls at half rather than anywhere else.
-        if (fastCount * 2 < frequencies.size) return frequencies.size
+        if (fastCount == 0) return frequencies.size
+        if (fastCount * 2 < frequencies.size) return frequencies.size - SPARE_CORES
         return fastCount
     }
 
@@ -125,4 +127,24 @@ object CpuTopology {
 
     /** Below this a phone has no clusters worth the name, and every core is needed. */
     private const val MIN_CORES_TO_SPLIT = 4
+
+    /**
+     * Held back on a chip whose fast cluster is a minority, measured on a Snapdragon 8 Elite
+     * (two Oryon cores at 4.47 GHz, six at 3.53) with Qwen3-1.7B Q8_0 on 2026-09-03:
+     *
+     * | threads | prefill |
+     * | ---: | ---: |
+     * | 4 | 318 t/s |
+     * | **6** | **345 t/s** |
+     * | 8 | 92 t/s |
+     *
+     * Every core had been the answer here, on the grounds that the six are not slow. They
+     * are not: with all eight busy the step waits on whichever thread the scheduler put
+     * behind the caller, and a short prompt paid a fixed three and a half seconds for it,
+     * every call, whatever its length. The parity matrix read that as a phone that prefills
+     * at 10 tokens a second. Two spare cores is where the cost went away; one was not
+     * measured, so the number is the measured one. A chip whose cores all run at one speed
+     * keeps every core, because the Dimensity 9400 measured fastest that way.
+     */
+    private const val SPARE_CORES = 2
 }

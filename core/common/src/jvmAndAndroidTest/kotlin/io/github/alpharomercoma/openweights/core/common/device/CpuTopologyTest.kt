@@ -53,11 +53,13 @@ class CpuTopologyTest {
     }
 
     @Test
-    fun `keeps every core when the fast cluster is a minority`() {
+    fun `keeps all but two when the fast cluster is a minority`() {
         // Two fast cores cannot carry two thirds of a chip's worth of work on their own,
-        // so here the little cores are worth their place in the barrier.
+        // so the other cluster keeps its place in the barrier. Not every core of it: on
+        // the Snapdragon 8 Elite, which is this shape, all eight prefilled at a quarter of
+        // what six did and a short prompt paid three and a half seconds per call for it.
         val twoBigSixLittle = List(6) { SLOW } + List(2) { FAST }
-        assertThat(CpuTopology.performanceCores(twoBigSixLittle)).isEqualTo(8)
+        assertThat(CpuTopology.performanceCores(twoBigSixLittle)).isEqualTo(6)
     }
 
     @Test

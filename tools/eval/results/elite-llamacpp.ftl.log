@@ -9,25 +9,25 @@ Uploading [gs://openweights-eval-models/Llama-3.2-3B-Instruct-Q4_K_M.gguf] to Fi
 Uploading [gs://openweights-eval-models/Qwen3-1.7B-Q8_0.gguf] to Firebase Test Lab...
 Uploading [gs://openweights-eval-models/SmolLM3-Q4_K_M.gguf] to Firebase Test Lab...
 Uploading [gs://openweights-eval-models/gemma-3-1b-it-Q4_K_M.gguf] to Firebase Test Lab...
-Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-045336-pa3q-llamacpp/]
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-054500-pa3q-llamacpp/]
 
-Test [matrix-64kk0fxgem87a] has been created in the Google Cloud.
+Test [matrix-2rsmjkch7qfxa] has been created in the Google Cloud.
 Creating individual test executions...
-..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................done.
+...............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................done.
 Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
 
-Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/8820061796034392911 ].
-04:58:40 Test is Pending
-04:59:54 Starting attempt 1.
-04:59:54 Test is Running
-05:14:05 Done. Test time = 501 (secs)
-05:14:05 Starting results processing. Attempt: 1
-05:14:17 Completed results processing. Time taken = 5 (secs)
-05:14:17 Test is Finished
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/6963777385163391778 ].
+05:49:17 Test is Pending
+05:50:08 Starting attempt 1.
+05:50:08 Test is Running
+06:01:55 Done. Test time = 432 (secs)
+06:01:55 Starting results processing. Attempt: 1
+06:02:08 Completed results processing. Time taken = 5 (secs)
+06:02:08 Test is Finished
 
 Instrumentation testing complete.
 
-More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/8820061796034392911 ].
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/6963777385163391778 ].
 ┌─────────┬─────────────────────┬─────────────────────┐
 │ OUTCOME │   TEST_AXIS_VALUE   │     TEST_DETAILS    │
 ├─────────┼─────────────────────┼─────────────────────┤

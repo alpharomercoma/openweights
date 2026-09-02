@@ -35,30 +35,72 @@ ExecuTorch device, but the Tensor G5 answers "Whiskers" where the other four say
 "Bagis", and each phone's failing answer to the format case is a different sentence.
 Greedy makes a run reproducible on a phone; it says nothing about the phone next to it.
 
-## Speed, and two things not yet explained
+## Speed, and two things that were not explained until the probe ran
 
 Median prefill / decode, tokens per second, Qwen3-1.7B:
 
 | Engine | D9400 | 8 Gen 3 | 8 Elite | Tensor G5 | Exynos 2400 |
 |---|---|---|---|---|---|
 | ExecuTorch | 134 / 19.5 | 134 / 28.8 | 123 / 23.0 | 121 / 17.1 | 93 / 12.2 |
-| llama.cpp | 116 / 19.8 | 216 / 16.3 | **12** / 26.5 | 119 / 9.9 | 115 / 9.8 |
+| llama.cpp | 116 / 19.8 | 216 / 16.3 | **12** / 26.5, then 236 / 24.8 | 119 / 9.9 | 115 / 9.8 |
 
-Two numbers in that table are questions rather than results, and they are recorded
-here so nobody quotes them as measurements of the silicon:
+Two numbers in that table were questions rather than results when it was first written,
+and the thread sweep below answered one of them the same day; both are kept so nobody
+quotes the first reading as a measurement of the silicon:
 
 - **The 8 Elite's llama.cpp prefill collapsed to 10 to 16 tok/s on every model** while
   its decode was the fastest of the five. Its logcat shows it loaded
   `libggml-cpu-android_armv8.6_1.so` (score 23) where the Tensor and the Exynos loaded
-  the armv9.0 variant (score 55), which fits Oryon cores having no SVE, but a variant
-  choice does not explain a prefill this slow on its own. The next step is a run with
-  the variant forced and the thread count logged.
+  the armv9.0 variant (score 55), which fits Oryon cores having no SVE, but the variant
+  was not the cause: it was the batch thread count, answered below.
 - **Tensor G5 and Exynos 2400 decode at half their ExecuTorch rate on llama.cpp**, 10
   tok/s against 17 and 12. Thread placement across their small cores is the first thing
   to look at; the Dimensity and the Snapdragons do not show it.
 
 The ExecuTorch prefill advantage held on the new phones for the families it held on
 before, and the ExecuTorch decode lead is real on all five.
+
+### What the thread sweep found
+
+`SpeedProbe` (`tools/eval/run_matrix_ftl.sh <device> 36 <prefix> probe`) loads
+Qwen3-1.7B Q8_0 and moves one thread count at a time, a 406-token prompt for prefill
+and a 24-token one for decode, on the same three cloud phones, 2026-09-03:
+
+| Prefill, tok/s | 2 threads | 4 | 6 | 8 |
+|---|---|---|---|---|
+| Snapdragon 8 Elite | 163 | 318 | **345** | 92 |
+| Tensor G5 | 69 | **130** | 97 | 89 |
+| Exynos 2400 | 67 | **115** | 88 | 92 |
+
+**The 8 Elite's prefill was a thread count, and the app's own.** With eight batch
+threads a 24-token prompt costs a fixed 3.5 seconds per call, whatever its length, and a
+406-token one runs at 92 tok/s; with six the same phone prefills at 345 tok/s, the
+fastest of the five. The rule in `CpuTopology` had answered "every core" for a chip
+whose fast cluster is a minority, on the SM8650 evidence that the little cores are
+worth their place in the barrier; the Elite's six other cores are not little, and with
+all eight busy the step waits on whichever thread the scheduler put behind the caller.
+The rule now holds two cores back on that shape (`SPARE_CORES`), which is what the
+measurement supports and no more: one spare was not measured, and the two-plus-six
+budget chips get the same answer unmeasured. The Elite's llama.cpp column was rerun
+with the fix: median prefill went from 12 to 236 tok/s on Qwen3 Q8_0 and from 6 to 16
+up to 43 to 111 on the four Q4_K_M models, every grade unchanged, and the class took
+432 seconds against 501. That column in [backend-parity.md](backend-parity.md) is
+the rerun.
+
+**The Tensor G5 and Exynos 2400 decode rate is not a thread count.** Decode falls off a
+cliff with more threads on both (Tensor: 5.2 tok/s at two threads, 0.5 at eight;
+Exynos: 9.1 and 2.1), but the app's default of half the cores decodes no differently
+from two threads, so the halved rate against ExecuTorch has another cause. Both chips
+report 128-bit SVE with KleidiAI engaged, the path on which llama.cpp's SVE kernels
+are known to trail plain NEON, and the next probe is the armv8.6 variant forced on
+them. Their prefill also peaks at four threads where the rule gives six, a 25 to 30
+percent gap that stands against the SM8650's measured six; a rule that drops two
+clusters would fix these two and break that one, so it stays a recorded number rather
+than a change.
+
+**Racked phones throttle within a minute.** On the Tensor the last short-prompt runs
+decoded at half the first ones, forty seconds apart. A cloud number is a number under
+that condition.
 
 ## How the cloud runs work
 

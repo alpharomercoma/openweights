@@ -34,7 +34,9 @@ APK="$ROOT/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-ac
 case "$ENGINE" in
   executorch) CLASS=ExecuTorchParityEval; PATTERN='\.pte$|\.tokenizer\.json$' ;;
   llamacpp)   CLASS=LlamaCppParityEval;   PATTERN='\.gguf$' ;;
-  *) echo "engine must be executorch or llamacpp" >&2; exit 2 ;;
+  # The thread sweep, on the one GGUF it needs. See SpeedProbe.kt.
+  probe)      CLASS=SpeedProbe;           PATTERN='Qwen3-1.7B-Q8_0\.gguf$' ;;
+  *) echo "engine must be executorch, llamacpp or probe" >&2; exit 2 ;;
 esac
 
 echo "== building the accelerated test APK (both engines live in it)"

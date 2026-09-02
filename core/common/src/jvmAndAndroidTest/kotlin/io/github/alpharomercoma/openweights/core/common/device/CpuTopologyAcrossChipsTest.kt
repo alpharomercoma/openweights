@@ -43,22 +43,26 @@ class CpuTopologyAcrossChipsTest {
         val chips = listOf(
             // Qualcomm
             Chip("Snapdragon 8 Gen 3", cores(1 to 3_300_000, 5 to 3_000_000, 2 to 2_270_000), 6),
-            Chip("Snapdragon 8 Elite", cores(2 to 4_320_000, 6 to 3_530_000), 8),
+            Chip("Snapdragon 8 Elite", cores(2 to 4_320_000, 6 to 3_530_000), 6),
             Chip("Snapdragon 7 Gen 3", cores(1 to 2_630_000, 3 to 2_400_000, 4 to 1_800_000), 4),
-            Chip("Snapdragon 695", cores(2 to 2_200_000, 6 to 1_700_000), 8),
+            Chip("Snapdragon 695", cores(2 to 2_200_000, 6 to 1_700_000), 6),
             // MediaTek
             Chip("Dimensity 9400 (MT6991)", cores(8 to 3_620_000), 8),
             Chip("Dimensity 9300", cores(4 to 3_250_000, 4 to 2_000_000), 4),
             Chip("Dimensity 8300", cores(1 to 3_350_000, 3 to 3_200_000, 4 to 2_200_000), 4),
-            Chip("Helio G99", cores(2 to 2_200_000, 6 to 2_000_000), 8),
+            Chip("Helio G99", cores(2 to 2_200_000, 6 to 2_000_000), 6),
             // Google
             Chip("Tensor G4", cores(1 to 3_100_000, 3 to 2_600_000, 4 to 1_950_000), 4),
             Chip("Tensor G3", cores(1 to 2_910_000, 4 to 2_370_000, 4 to 1_700_000), 5),
             // Samsung and others
             Chip("Exynos 2400", cores(1 to 3_200_000, 5 to 2_900_000, 4 to 1_950_000), 6),
-            Chip("Unisoc T612", cores(2 to 1_820_000, 6 to 1_800_000), 8),
+            Chip("Unisoc T612", cores(2 to 1_820_000, 6 to 1_800_000), 6),
         )
 
+        // The two-plus-six shapes pick six, all but two, on the strength of one measurement:
+        // the Snapdragon 8 Elite, where all eight prefilled at a quarter of what six did.
+        // The budget chips of that shape are given the same answer unmeasured, which is the
+        // one place this table is a guess rather than a reading.
         chips.forEach { chip ->
             val picked = CpuTopology.performanceCores(chip.cores)
 
@@ -91,8 +95,9 @@ class CpuTopologyAcrossChipsTest {
     @Test
     fun `a lone fast core never strands the phone on one thread`() {
         // 1 + 7 is the shape where naively taking the fast cluster would leave one thread
-        // doing everything, which is slower than the whole chip by a long way.
+        // doing everything, which is slower than the whole chip by a long way. All but
+        // two rather than all, for the reason in [CpuTopology.SPARE_CORES].
         assertThat(CpuTopology.performanceCores(cores(1 to 3_000_000, 7 to 1_800_000)))
-            .isEqualTo(8)
+            .isEqualTo(6)
     }
 }

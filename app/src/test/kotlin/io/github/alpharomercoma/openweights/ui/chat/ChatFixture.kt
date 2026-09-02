@@ -283,10 +283,19 @@ abstract class ChatFixture {
         /** A singleton reused across every test in the JVM, so each test resets this itself. */
         var fails = false
 
+        /** What it hands back; a test that needs a page-sized result sets it, and resets it. */
+        var answer: String = DEFAULT_ANSWER
+
+        /** Runs as the call lands; a test that needs the world to change mid-turn sets it. */
+        var onRun: (() -> Unit)? = null
+
         override suspend fun run(call: ToolCall): String {
             if (fails) error("the tool would not run")
-            return "Ada Lovelace, 1815 to 1852."
+            onRun?.invoke()
+            return answer
         }
+
+        const val DEFAULT_ANSWER = "Ada Lovelace, 1815 to 1852."
     }
 
     /**

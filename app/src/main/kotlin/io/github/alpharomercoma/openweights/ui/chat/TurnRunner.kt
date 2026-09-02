@@ -147,7 +147,16 @@ class TurnRunner @Inject constructor(
      */
     fun toolNamed(name: String): Tool? = tools.find(name)
 
-    fun hasEnabledTools(): Boolean = tools.all.any { it.isUserFacing && switches.isEnabled(it) }
+    /**
+     * Whether a turn would offer the model anything.
+     *
+     * Availability counts, not only the switch. Offline, every search tool is switched on
+     * and none of them can run, and the head that reported them present forced thinking
+     * on for a question the model could only answer from memory; a tool that would be
+     * kept out of the prompt is not one the prompt should be shaped around.
+     */
+    fun hasEnabledTools(): Boolean =
+        tools.all.any { it.isUserFacing && it.isAvailable && switches.isEnabled(it) }
 
     /**
      * The tools an execution turn would actually offer, by name, for a planner to read.
@@ -1096,9 +1105,21 @@ private fun List<ChatMessage>.describing(tools: ToolRegistry, needed: Boolean): 
  * read_memory call, and on Qwen3-1.7B it moved two cases each way for the same total. So
  * the routing pass runs at the sampler the routing was measured with, and the user's
  * penalty applies where it was meant to, to prose.
+ *
+ * And a cap on the thinking, because a thought on the phone is twenty to fifty seconds
+ * and the decision does not need all of it. Measured on the same matrix with Qwen3-1.7B
+ * on 2026-09-02: no cap 31 of 33, a cap of 128 tokens 31 of 33 with two different
+ * misses, 64 tokens 29, 32 tokens 27. So the block is closed at 128 on the pass that may
+ * call, and the prose pass thinks as long as it likes.
  */
-private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams =
-    if (offerTools) copy(temperature = 0f, repeatPenalty = 1f) else this
+private fun SamplerParams.deciding(offerTools: Boolean): SamplerParams = if (offerTools) {
+    copy(temperature = 0f, repeatPenalty = 1f, reasoningBudget = TOOL_PASS_REASONING_BUDGET)
+} else {
+    this
+}
+
+/** Thinking tokens on a pass that may call a tool. See [deciding]. */
+internal const val TOOL_PASS_REASONING_BUDGET = 128
 
 /**
  * The same results, with the last one carrying word that the tools are finished.

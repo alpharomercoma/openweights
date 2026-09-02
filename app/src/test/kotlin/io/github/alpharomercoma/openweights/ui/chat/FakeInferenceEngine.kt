@@ -101,6 +101,13 @@ class FakeInferenceEngine : InferenceEngine {
      */
     var contextUsed = 8
 
+    /**
+     * When true, [contextUsed] follows each prompt's length at four characters a token, the
+     * way the real engine's reading follows what it was sent. A fixed reading is what most
+     * tests want; a test about what a prompt's size decides needs the reading to move with it.
+     */
+    var countsPrompt = false
+
     var cancelCount = 0
         private set
 
@@ -206,6 +213,7 @@ class FakeInferenceEngine : InferenceEngine {
         prompts += messages
         offered += tools
         paramsUsed += params
+        if (countsPrompt) contextUsed = messages.sumOf { it.text.length } / CHARS_PER_TOKEN
         if (failChat) return flow { throw LlamaException("the turn did not finish") }
         if (!hold) {
             val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)

@@ -785,9 +785,30 @@ class TurnRunnerTest {
         assertThat(greedy.last()).isFalse()
         // The greedy passes are a prefix: once the cap is spent no later pass may call.
         assertThat(greedy).isEqualTo(greedy.sortedByDescending { it })
+        // And they think to a budget; the prose pass thinks as long as it likes.
+        assertThat(engine.paramsUsed.first().reasoningBudget).isEqualTo(TOOL_PASS_REASONING_BUDGET)
         val prose = engine.paramsUsed.last()
         assertThat(prose.temperature).isEqualTo(SamplerParams.DEFAULT_TEMPERATURE)
         assertThat(prose.repeatPenalty).isEqualTo(SamplerParams.DEFAULT_REPEAT_PENALTY)
+        assertThat(prose.reasoningBudget).isEqualTo(SamplerParams.NO_REASONING_BUDGET)
+    }
+
+    @Test
+    fun `a tool that cannot run right now is not an offer`() {
+        // Offline, every search tool is switched on and none can run; the head that
+        // counted them present forced thinking on for a question answered from memory.
+        val unavailable = object : Tool by search {
+            override val isAvailable: Boolean get() = false
+        }
+        val runner = TurnRunner(
+            engine = engine,
+            tools = ToolRegistry(listOf(unavailable)),
+            switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
+            plans = PlanBoard(),
+            asks = AskBoard(),
+        )
+
+        assertThat(runner.hasEnabledTools()).isFalse()
     }
 
     /** Runs one turn and returns every step it reported. */

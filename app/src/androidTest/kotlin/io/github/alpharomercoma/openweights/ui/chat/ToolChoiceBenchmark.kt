@@ -358,6 +358,7 @@ class ToolChoiceBenchmark {
             seed = SEED,
             temperature = 0f,
             repeatPenalty = penalty(),
+            reasoningBudget = reasoningBudget(),
         )
         val offered = if (native) tools else emptyList()
         // Cleared before each case, so a case is not measured on the cache the previous one
@@ -412,6 +413,11 @@ class ToolChoiceBenchmark {
      */
     private fun penalty(): Float =
         InstrumentationRegistry.getArguments().getString("penalty")?.toFloatOrNull() ?: 1f
+
+    /** The thinking cap of the deciding pass, as TurnRunner sets it; `-e budget -1` lifts it. */
+    private fun reasoningBudget(): Int =
+        InstrumentationRegistry.getArguments().getString("budget")?.toIntOrNull()
+            ?: TOOL_PASS_REASONING_BUDGET
 
     private fun read(completed: GenerationEvent.Completed): Choice {
         completed.toolCalls.firstOrNull()?.let { return Choice(it.name, Route.NATIVE) }

@@ -747,8 +747,19 @@ class ChatViewModel @Inject constructor(
     val hasModel: Boolean
         get() = _uiState.value.modelName != null || _uiState.value.isLoadingModel
 
+    /**
+     * Set by [unloadModel] and cleared by a load the user asked for.
+     *
+     * The chat tab loads the default model whenever it finds none loaded, which is right
+     * on a cold start and wrong after the user unloaded it: leaving the tab and coming back
+     * brought the model straight back into memory. An unload is a choice, kept until the
+     * next one.
+     */
+    private var unloadedByUser = false
+
     /** Loads the model last chosen, or whichever is on disk if there is no choice yet. */
     fun loadDefaultModel() {
+        if (unloadedByUser) return
         runtime.preferredModel()?.let(::loadModel)
     }
 
@@ -761,6 +772,7 @@ class ChatViewModel @Inject constructor(
      * does not, and is rebuilt from that text on the next reply.
      */
     fun loadModel(modelFile: File, contextLength: Int? = null, keepConversation: Boolean = false) {
+        unloadedByUser = false
         // A generation in flight writes into the transcript, so it has to finish before the
         // model under it is replaced, not merely be asked to stop.
         stop()
@@ -782,6 +794,7 @@ class ChatViewModel @Inject constructor(
 
     /** Explicitly releases the loaded model while keeping its files available to reload. */
     fun unloadModel() {
+        unloadedByUser = true
         stop()
         val request = ++loadRequest
         viewModelScope.launch {
@@ -1135,9 +1148,14 @@ class ChatViewModel @Inject constructor(
     private fun restoredToolNotes(
         messages: List<MessageEntity>,
         stepsByMessage: Map<Long, List<ToolStepEntity>>,
-    ): ToolNotes = messages.fold(ToolNotes()) { notes, message ->
+        foldedThrough: Int?,
+    ): ToolNotes = messages.foldIndexed(ToolNotes()) { index, notes, message ->
+        // The fold is replayed where it happened: the suspicion earned before it went
+        // with the pages the fold rewrote, exactly as it does live.
+        val afterFold = foldedThrough != null && index == foldedThrough + 1
+        val current = if (afterFold) notes.folded() else notes
         val steps = stepsByMessage[message.id].orEmpty().map { it.toAgentStep() }
-        if (steps.isEmpty()) notes else notes.withSteps(steps, turns::toolNamed)
+        if (steps.isEmpty()) current else current.withSteps(steps, turns::toolNamed)
     }
 
     /**
@@ -1186,7 +1204,11 @@ class ChatViewModel @Inject constructor(
                         // What the notes are now that the discarded replies' steps are gone.
                         // Read back after the delete, so the cascade has already taken the
                         // dead steps with it and the fold sees only what survived.
-                        restoredToolNotes(stored.take(firstDiscarded), toolSteps(id))
+                        restoredToolNotes(
+                            stored.take(firstDiscarded),
+                            toolSteps(id),
+                            state.compaction?.foldedThroughIndex,
+                        )
                     }
                 }
             }
@@ -2560,7 +2582,9 @@ class ChatViewModel @Inject constructor(
         // current tool registry rather than stored, so a tool a build no longer ships answers
         // null here and the note reads as neither rather than the reopen failing over a
         // conversation from an older version.
-        val restoredNotes = restoredToolNotes(messages, stepsByMessage)
+        val foldedThrough = conversation.compactionThroughIndex
+            .takeIf { conversation.compactionSummary != null }
+        val restoredNotes = restoredToolNotes(messages, stepsByMessage, foldedThrough)
 
         _uiState.update { state ->
             val reopened = state.copy(
@@ -2797,8 +2821,12 @@ class ChatViewModel @Inject constructor(
 
     /** Stops the running generation, keeping whatever has been produced so far. */
     fun stop() {
+        // Only what this screen is running. The runtime is shared with the watches and the
+        // goal, and a reopen or a delete with no turn in flight used to cancel whichever of
+        // those had the engine at that moment, truncating a reply nobody had asked to stop.
+        val job = generationJob?.takeIf { it.isActive } ?: return
         runtime.cancel()
-        generationJob?.cancel()
+        job.cancel()
     }
 
     /**
@@ -2844,7 +2872,12 @@ class ChatViewModel @Inject constructor(
             preferencesKey?.let(runtime::rememberIgnoresThinkingSwitch)
             _uiState.update { it.copy(supportsThinking = false) }
         }
-        val canonical = canonicalText(reasoning, answer)
+        // A turn whose last pass was only a call that could not run has no answer in it,
+        // and a blank reply is never written down; the steps under it were, on screen, the
+        // whole reply, and they vanished with the row on reopen. Said in a sentence, so
+        // what the user watched is what the conversation keeps.
+        val settled = answer.ifBlank { unansweredNote(streamed?.blocks.orEmpty()) }
+        val canonical = canonicalText(reasoning, settled)
 
         updateLastEntry {
             it.copy(
@@ -2887,6 +2920,24 @@ class ChatViewModel @Inject constructor(
             )
         }
         return canonical
+    }
+
+    /**
+     * What a turn that produced steps and no answer says for itself.
+     *
+     * Empty when there were no steps either, which is the blank turn the callers already
+     * refuse to write.
+     */
+    private fun unansweredNote(blocks: List<TurnBlock>): String {
+        val last = blocks.lastOrNull { it is TurnBlock.Step } as? TurnBlock.Step ?: return ""
+        return when (val step = last.step) {
+            is AgentStep.Ran ->
+                "The turn ended after ${step.call.name} returned, with no answer written."
+            is AgentStep.Skipped ->
+                "The turn ended on a call to ${step.call.name} that did not run."
+            is AgentStep.Requested ->
+                "The turn ended on a call to ${step.call.name} that did not run."
+        }
     }
 
     /**

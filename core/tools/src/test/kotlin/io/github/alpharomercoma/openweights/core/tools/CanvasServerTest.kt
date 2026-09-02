@@ -233,6 +233,44 @@ class CanvasServerTest {
     }
 
     @Test
+    fun `connections beyond the bound wait in the backlog rather than being served`() {
+        // Each client connects and sends nothing, which parks the worker that accepted it in
+        // the request read: the one state connections can pile up in. Ten of them against a
+        // bound of four, and the six that wait sit within the backlog of eight, so the kernel
+        // completes every connect and nothing here rests on a retried SYN.
+        val port = server.port()
+        val clients = List(CanvasServer.CONNECTIONS + 6) {
+            Socket("127.0.0.1", port).apply { soTimeout = 10_000 }
+        }
+        try {
+            settleUntil { server.serving.get() == CanvasServer.CONNECTIONS }
+            assertThat(server.serving.get()).isEqualTo(CanvasServer.CONNECTIONS)
+            // Then everyone asks at once, and everyone is answered: the backlog drains through
+            // the same four workers and never through more of them.
+            val request = "GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:$port\r\n\r\n"
+            clients.forEach {
+                it.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
+            }
+            clients.forEach { client ->
+                val status =
+                    client.getInputStream().bufferedReader(Charsets.ISO_8859_1).readLine()
+                assertThat(status).isEqualTo("HTTP/1.1 404 Not Found")
+            }
+            assertThat(server.peakServing.get()).isEqualTo(CanvasServer.CONNECTIONS)
+        } finally {
+            clients.forEach { runCatching { it.close() } }
+        }
+    }
+
+    /** Waits, up to a few seconds, for [condition] to come true; the assertion follows. */
+    private fun settleUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!condition() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+    }
+
+    @Test
     fun `stopping closes the socket and mints a new key`() {
         val before = server.viewerUrlFor("doc", "x")
         val keyBefore = key()

@@ -31,6 +31,7 @@ import java.net.Socket
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.SecureRandom
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,7 +45,8 @@ import javax.inject.Singleton
  *
  * GET only, one request per connection, files resolved through [Workspace.resolve] — the
  * same walk every file tool uses, which is what makes `../` inert here: a path is either
- * a chain of names the granted folder handed over, or it is nothing.
+ * a chain of names the granted folder handed over, or it is nothing. And a few connections
+ * at a time, the rest waiting in the socket's backlog; [scope] says how many and why.
  *
  * ### Loopback is not private
  *
@@ -89,7 +91,32 @@ class CanvasServer @Inject constructor(
 
     private var socket: ServerSocket? = null
     private var key: String = newKey()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * The threads that answer requests, and there are [CONNECTIONS] of them.
+     *
+     * A view of the IO pool with a ceiling of its own, rather than the pool itself. A request
+     * holds its thread from accept to the last byte written — for as long as the read timeout
+     * allows, when a client connects and says nothing — and on the shared pool that was a
+     * thread per connection, for as many connections as anything on the phone cared to open.
+     * Four is plenty for an audience of one WebView, which fetches a page and a handful of
+     * assets; a fifth connection waits in the socket's backlog, where it costs nothing, until
+     * a worker is free to accept it. And a view of IO is elastic: these threads are on top of
+     * the pool's own limit, so an open canvas takes nothing from the rest of the app, where
+     * the old accept loop held one of its sixty-four for the life of the server.
+     */
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO.limitedParallelism(CONNECTIONS),
+    )
+
+    /**
+     * Connections inside [serve] right now, and the most there have been at once.
+     *
+     * Read only by a test. The ceiling above is a claim about concurrency, and a claim is
+     * checked by counting.
+     */
+    internal val serving = AtomicInteger()
+    internal val peakServing = AtomicInteger()
 
     /** The port the server listens on, starting it on first use. */
     @Synchronized
@@ -101,7 +128,10 @@ class CanvasServer @Inject constructor(
         // server listened perfectly well on an address nobody was dialling.
         val server = ServerSocket(0, BACKLOG, InetAddress.getByName("127.0.0.1"))
         socket = server
-        scope.launch { accept(server) }
+        // One accept loop per worker. A worker accepts a connection, answers it, and only
+        // then accepts the next, so nothing is spawned per connection and the queue is the
+        // socket's backlog: however many clients connect, this many are ever being served.
+        repeat(CONNECTIONS) { scope.launch { accept(server) } }
         return server.localPort
     }
 
@@ -140,31 +170,42 @@ class CanvasServer @Inject constructor(
     fun viewerUrlFor(kind: String, path: String): String =
         "${base()}/$VIEWER_PREFIX/$kind?file=" + URLEncoder.encode(path, "UTF-8")
 
+    /**
+     * One worker's whole life: accept a connection, answer it, accept the next.
+     *
+     * Several workers block in `accept` on the one socket and the kernel hands each new
+     * connection to one of them; closing the socket wakes them all, and they leave.
+     */
     private fun accept(server: ServerSocket) {
         while (!server.isClosed) {
-            val client = runCatching { server.accept() }.getOrNull()
-            if (client != null) {
-                scope.launch { client.use { serve(it) } }
-            }
+            val client = runCatching { server.accept() }.getOrNull() ?: continue
+            client.use { serve(it) }
         }
     }
 
     private fun serve(client: Socket) {
-        client.soTimeout = READ_TIMEOUT_MS
-        val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.ISO_8859_1))
-        val request = runCatching { reader.readLine() }.getOrNull() ?: return
-        // The headers are drained; the one that matters is read on the way past.
-        var host: String? = null
-        var header = runCatching { reader.readLine() }.getOrNull()
-        while (!header.isNullOrEmpty()) {
-            if (header.startsWith("host:", ignoreCase = true)) {
-                host = header.substringAfter(':').trim()
+        val now = serving.incrementAndGet()
+        peakServing.updateAndGet { most -> maxOf(most, now) }
+        try {
+            client.soTimeout = READ_TIMEOUT_MS
+            val reader =
+                BufferedReader(InputStreamReader(client.getInputStream(), Charsets.ISO_8859_1))
+            val request = runCatching { reader.readLine() }.getOrNull() ?: return
+            // The headers are drained; the one that matters is read on the way past.
+            var host: String? = null
+            var header = runCatching { reader.readLine() }.getOrNull()
+            while (!header.isNullOrEmpty()) {
+                if (header.startsWith("host:", ignoreCase = true)) {
+                    host = header.substringAfter(':').trim()
+                }
+                header = runCatching { reader.readLine() }.getOrNull()
             }
-            header = runCatching { reader.readLine() }.getOrNull()
+            val out = client.getOutputStream()
+            out.write(answer(request.split(' '), host, client.localPort))
+            out.flush()
+        } finally {
+            serving.decrementAndGet()
         }
-        val out = client.getOutputStream()
-        out.write(answer(request.split(' '), host, client.localPort))
-        out.flush()
     }
 
     /** The whole reply to one request line, gates first. */
@@ -326,10 +367,12 @@ class CanvasServer @Inject constructor(
     }
 
     internal companion object {
-        const val VIEWER_PREFIX = "__ow__"
-        const val BACKLOG = 8
-        const val READ_TIMEOUT_MS = 10_000
-        const val KEY_BYTES = 16
+        /** Connections served at once; the rest wait in the backlog. See [scope]. */
+        internal const val CONNECTIONS = 4
+        private const val VIEWER_PREFIX = "__ow__"
+        private const val BACKLOG = 8
+        private const val READ_TIMEOUT_MS = 10_000
+        private const val KEY_BYTES = 16
 
         /**
          * What a page the model built may reach: its own folder and this server, nothing
@@ -350,7 +393,7 @@ class CanvasServer @Inject constructor(
                 "frame-src 'none'; object-src 'none'; base-uri 'none'"
 
         /** 128 random bits as hex: unguessable, and nothing a URL needs escaping for. */
-        fun newKey(): String {
+        private fun newKey(): String {
             val bytes = ByteArray(KEY_BYTES).also { SecureRandom().nextBytes(it) }
             return bytes.joinToString("") { "%02x".format(it) }
         }

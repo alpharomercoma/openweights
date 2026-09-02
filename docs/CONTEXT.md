@@ -502,6 +502,13 @@ there. With no model installed the app opens on "Pick a model to begin", which h
 composer at all, so four `ChatFlowTest` cases fail hunting a "Message" field that the
 screen is right not to be showing.
 
+The same screen appears when the model is there and the folder is not the app's. On a
+Qualcomm Device Cloud reservation where `adb shell` is root (the SM8650 one on
+2026-09-02 was), that `mkdir` makes a folder owned by root that the app cannot list, and
+every composer test fails exactly as if nothing were installed. `ls -la` on the app's own
+`files/` shows its uid on the folders it made itself; give the models folder the same
+owner, `chown -R u0_aNNN:ext_data_rw`, and the model appears.
+
 The same recipe runs `:app`'s instrumentation. Four classes there need a device, and each
 asks a different question:
 

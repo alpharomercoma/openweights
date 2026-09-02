@@ -52,7 +52,23 @@ data class ToolNote(
  * It is not a cache and nothing reads from it but the prompt. A tool asked for again runs
  * again, because a page can change and the user is entitled to the current one.
  */
-data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
+data class ToolNotes(
+    val notes: List<ToolNote> = emptyList(),
+    /**
+     * Whether a stranger's text has entered the prompt since the last fold, whatever the
+     * budget has trimmed since.
+     *
+     * The notes are a budget, and a budget forgets: a page fetched three calls ago drops
+     * out of them, and with it went the flag that asks before anything leaves the device.
+     * The engine's record does not forget; it replays that page verbatim into every prompt
+     * until a fold rewrites the conversation. So the suspicion is kept here, apart from the
+     * notes, for exactly as long as the text is: set when a tool that returns untrusted
+     * text runs, cleared by [folded].
+     */
+    val readUntrusted: Boolean = false,
+    /** The same for the user's own data. See [readUntrusted]. */
+    val readPrivate: Boolean = false,
+) {
     /**
      * The record with this turn's tools added, oldest dropped to stay inside the budget.
      *
@@ -74,8 +90,22 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
             .toList()
         if (fresh.isEmpty()) return this
         val replaced = fresh.map { it.call }.toSet()
-        return ToolNotes((notes.filterNot { it.call in replaced } + fresh).trimmedToBudget())
+        return ToolNotes(
+            notes = (notes.filterNot { it.call in replaced } + fresh).trimmedToBudget(),
+            readUntrusted = readUntrusted || fresh.any { it.untrusted },
+            readPrivate = readPrivate || fresh.any { it.private },
+        )
     }
+
+    /**
+     * The record after a fold.
+     *
+     * The fold rewrote the prompt from the root: what the model reads of the old turns is
+     * now its own summary, and the verbatim page that justified the suspicion is gone from
+     * the window. The notes themselves stay, and any that still carry a stranger's text
+     * still count; only the memory of text the notes no longer hold is released.
+     */
+    fun folded(): ToolNotes = copy(readUntrusted = false, readPrivate = false)
 
     /**
      * The notes as the model reads them, or null when there is nothing to say.
@@ -140,10 +170,10 @@ data class ToolNotes(val notes: List<ToolNote> = emptyList()) {
      * what makes that false: the text is in the window again, in the question, so the turn it
      * is handed to has to start suspicious or the guard is one the notes walked around.
      */
-    val carriesUntrustedText: Boolean get() = notes.any { it.untrusted }
+    val carriesUntrustedText: Boolean get() = readUntrusted || notes.any { it.untrusted }
 
     /** And the same for the user's own text. See [carriesUntrustedText]. */
-    val carriesPrivateData: Boolean get() = notes.any { it.private }
+    val carriesPrivateData: Boolean get() = readPrivate || notes.any { it.private }
 
     companion object {
         /**

@@ -191,6 +191,23 @@ class GgufHeaderParserTest {
     }
 
     @Test
+    fun `a header claiming millions of entries is refused before any are read`() = runTest {
+        // The count is a stranger's 64-bit number. Unbounded, it kept the parser fetching
+        // 128 KB windows of a multi-gigabyte file for as long as the file lasted, on the
+        // user's mobile data, from a repository they only opened to look at.
+        val header = GgufBuilder()
+            .string("general.architecture", "llama")
+            .uint32("llama.block_count", 32)
+            .declaringEntries(1_400_000)
+            .build()
+
+        val failure = runCatching { GgufHeaderParser(header.asSource()).parse() }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(GgufParseException::class.java)
+        assertThat(failure).hasMessageThat().contains("entries")
+    }
+
+    @Test
     fun `a header claiming two billion blocks is refused rather than allocated`() = runTest {
         // block_count comes from the remote file and nothing bounded it. One number in a
         // header the app inspects before downloading anything was enough to make it build a

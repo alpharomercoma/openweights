@@ -97,16 +97,23 @@ class GgufHeaderParser(
 
     /** Validates the magic and version, and returns the metadata entry count. */
     private suspend fun WindowedReader.readFileHeader(): Long {
-        if (!readBytes(MAGIC.size).contentEquals(MAGIC)) {
-            throw GgufParseException("not a GGUF file")
-        }
+        if (!readBytes(MAGIC.size).contentEquals(MAGIC)) refuse("not a GGUF file")
         val version = readUInt32()
-        if (version !in SUPPORTED_VERSIONS) {
-            throw GgufParseException("unsupported GGUF version $version")
-        }
+        if (version !in SUPPORTED_VERSIONS) refuse("unsupported GGUF version $version")
         readUInt64() // tensor count, not needed for fit estimation
-        return readUInt64()
+        val keyValueCount = readUInt64()
+        // A real header has a few dozen entries before the tokenizer. The count is a
+        // stranger's 64-bit number, and without a ceiling on it a crafted file keeps the
+        // parse fetching windows of a multi-gigabyte download and growing the map for as
+        // long as the file lasts, on the user's mobile data, from a repository they only
+        // opened to look at.
+        if (keyValueCount > MAX_KEY_VALUES) {
+            refuse("GGUF header declares $keyValueCount metadata entries")
+        }
+        return keyValueCount
     }
+
+    private fun refuse(message: String): Nothing = throw GgufParseException(message)
 
     private fun Map<String, Any>.int(key: String): Int? = when (val value = this[key]) {
         is Int -> value
@@ -153,6 +160,13 @@ class GgufHeaderParser(
             byteArrayOf('G'.code.toByte(), 'G'.code.toByte(), 'U'.code.toByte(), 'F'.code.toByte())
         val SUPPORTED_VERSIONS = 1..3
         const val DEFAULT_WINDOW_BYTES = 128 * 1024
+
+        /**
+         * More metadata entries than any real file carries before its tokenizer. A 2.6 B
+         * model writes about thirty; a header claiming thousands is asking to be read for
+         * as long as the download lasts.
+         */
+        const val MAX_KEY_VALUES = 4_096L
         const val TOKENIZER_PREFIX = "tokenizer."
         const val KEY_ARCHITECTURE = "general.architecture"
         const val KEY_FILE_TYPE = "general.file_type"

@@ -37,6 +37,9 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
      */
     private var retainedStringBytes = 0L
 
+    /** Bytes requested from the source so far; see [ensure]. */
+    private var fetchedBytes = 0L
+
     /**
      * How many arrays are open above the one being read.
      *
@@ -54,6 +57,15 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
         if (withinBuffer) return
 
         val request = maxOf(length, windowBytes)
+        // What the parse has pulled over the network so far. Every other ceiling here
+        // bounds one value; this one bounds the whole read, because a header that keeps
+        // every value small and simply never ends would stream the file's remaining
+        // gigabytes through 128 KB windows, on the user's mobile data, from a repository
+        // they only opened to look at.
+        fetchedBytes += request
+        if (fetchedBytes > MAX_FETCH_BYTES) {
+            throw GgufParseException("GGUF header runs past $MAX_FETCH_BYTES bytes")
+        }
         buffer = source.read(position, request)
         bufferStart = position
         if (buffer.size < length) {
@@ -179,6 +191,12 @@ internal class WindowedReader(private val source: ByteWindowSource, private val 
     }
 
     private companion object {
+        /**
+         * The most a header parse may pull from the source. The tokenizer, where the
+         * megabytes are, is never reached; what is read before it is kilobytes.
+         */
+        const val MAX_FETCH_BYTES = 16L * 1024 * 1024
+
         const val BYTE_MASK = 0xFFL
         const val UINT32_BYTES = 4
         const val UINT64_BYTES = 8

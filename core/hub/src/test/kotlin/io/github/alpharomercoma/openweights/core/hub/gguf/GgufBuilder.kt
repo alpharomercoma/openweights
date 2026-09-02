@@ -86,11 +86,17 @@ internal class GgufBuilder {
         }
     }
 
+    /** The entry count the header claims, when a test wants it to lie. */
+    private var declaredEntries: Long? = null
+
+    /** A header whose count says [count] whatever it actually holds. */
+    fun declaringEntries(count: Long) = apply { declaredEntries = count }
+
     fun build(): ByteArray = ByteArrayOutputStream().apply {
         write("GGUF".toByteArray())
         writeUInt32(GGUF_VERSION)
         writeUInt64(0) // tensor count
-        writeUInt64(entries.size.toLong())
+        writeUInt64(declaredEntries ?: entries.size.toLong())
         entries.forEach { write(it) }
     }.toByteArray()
 

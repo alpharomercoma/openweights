@@ -37,3 +37,5 @@ build-ios-sim/
 
 # Test Lab logcats for the benchmark matrices run to 25 MB each; the reports and runner logs are what the repo keeps
 tools/eval/results/*bench*.logcat
+/play/videos/
+play/graphics/__pycache__/

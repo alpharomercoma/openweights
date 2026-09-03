@@ -90,8 +90,15 @@ gcloud firebase test android run --quiet --type instrumentation \
 RESULTS=$(grep -o 'storage/browser/[^]]*' "$LOG" | head -1 | sed 's|storage/browser/|gs://|')
 echo "== pulling reports from $RESULTS"
 TMP=$(mktemp -d)
-gcloud storage cp -r "${RESULTS}*/artifacts/sdcard/Android/data/$PKG/files/eval-results/*.json" "$TMP/" 2>/dev/null \
-  || gcloud storage cp -r "${RESULTS}" "$TMP/" >/dev/null 2>&1
+# The artifacts can land in the bucket a little after gcloud returns; a pull that finds
+# nothing is retried for a few minutes before the whole run directory is copied.
+tries=0
+until gcloud storage cp -r "${RESULTS}*/artifacts/sdcard/Android/data/$PKG/files/eval-results/*.json" "$TMP/" >/dev/null 2>&1 \
+      && [ -n "$(find "$TMP" -name '*.json' | grep -v 'instrumentation\|benchmarks.json')" ]; do
+  tries=$((tries + 1))
+  if [ "$tries" -ge 8 ]; then gcloud storage cp -r "${RESULTS}" "$TMP/" >/dev/null 2>&1; break; fi
+  sleep 30
+done
 # Two matrices created in the same second once shared a results directory and the
 # second failed validation, hence the pid in the name above; and the pushed prompts
 # file comes back with the artifacts, so it is not a report.

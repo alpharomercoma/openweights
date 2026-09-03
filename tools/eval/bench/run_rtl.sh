@@ -15,6 +15,8 @@ EVAL=/data/local/tmp/openweights/eval; HERE=$(cd "$(dirname "$0")" && pwd); OUT=
 APK=$HERE/../../../core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk
 $ADB shell mkdir -p $EVAL
 $ADB push "$HERE/benchmarks.json" $EVAL/benchmarks.json | tail -1
+$ADB push "$APK" /data/local/tmp/owtest.apk | tail -1
+$ADB shell pm install -r -t --user 0 /data/local/tmp/owtest.apk
 
 push() { name=$(basename "$1"); size=$($ADB shell stat -c %s $EVAL/$name 2>/dev/null || echo 0); local_size=$(stat -f %z "$1")
   [ "$size" = "$local_size" ] && { echo "have $name"; return; }

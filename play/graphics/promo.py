@@ -56,7 +56,7 @@ CARD_Y = 96
 EYEBROW_Y = CARD_Y + CARD_H + 56           # 848
 RULE_Y = EYEBROW_Y + 40                    # 888
 HEAD_Y = RULE_Y + 34                       # 922
-SUB_Y = RULE_Y + 48
+SUB_Y = RULE_Y + 44
 MARGIN = CARD_X
 FPS = 30
 # Measured on a render rather than assumed: the headline's ink ends 58 px below HEAD_Y, so
@@ -143,7 +143,12 @@ def plate(eyebrow: str, headline: str, sub: str, rect, out: Path,
     # Two families, not three. Geist Mono for the eyebrow because the app sets its own
     # telemetry in it; Schibsted for headline and subhead, separated by weight rather than
     # by a third face, which in a three-line block read as a ransom note.
-    sub_font = weighted(DISPLAY, 27, 400)
+    # 32, not 27. Simulated at 390 px, the width a full-bleed listing video gets on a
+    # phone, a 27 px subhead lands at about 5.5 px and is decorative rather than readable.
+    # It cannot be made readable at that size by any type choice: only the 50 px headline
+    # survives the reduction. 32 with shorter strings is the honest improvement, and the
+    # subhead's real audience is the viewer who taps to full screen.
+    sub_font = weighted(DISPLAY, 32, 400)
 
     tracked(draw, (x, EYEBROW_Y), eyebrow.upper(), eyebrow_font, LIME, 3.0)
 
@@ -153,8 +158,11 @@ def plate(eyebrow: str, headline: str, sub: str, rect, out: Path,
         cursor = x + draw.textlength(shown, font=head_font) + 6
         draw.rectangle([cursor, HEAD_Y + 12, cursor + 20, HEAD_Y + 58], fill=LIME)
 
-    draw.text((x + w - draw.textlength(sub, font=sub_font), SUB_Y),
-              sub, font=sub_font, fill=DIM_ON_INK)
+    sub_w = draw.textlength(sub, font=sub_font)
+    head_w = draw.textlength(headline, font=head_font)
+    if head_w + 60 + sub_w > w:  # they share one line; a collision must fail loudly
+        raise ValueError(f"caption overflows the card: {headline!r} + {sub!r}")
+    draw.text((x + w - sub_w, SUB_Y), sub, font=sub_font, fill=DIM_ON_INK)
     image.save(out)
     return out
 

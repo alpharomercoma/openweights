@@ -53,14 +53,14 @@ SHOTS = [
     # the words "It answers on-device". Check the tail of a shot, not only its head.
     dict(src="fs-specialuse-generation.mp4", at=6.6, length=4.0, crop=(40, 262, 1200, 538),
          eyebrow="on device", head="It answers on-device",
-         sub="No sign-in. The model file is on this phone."),
+         sub="No sign-in. The model is on this phone."),
 
     # Held, and cut to end at 2250, above the composer: the chat box has no business in a
     # shot whose whole subject is the telemetry line.
     dict(src="fs-specialuse-generation.mp4", at=46.6, length=3.4, hold=True,
          crop=(0, 1676, FULL_W, FULL_H),
          eyebrow="live telemetry", head="It shows its own speed",
-         sub="Speed and context, printed while it answers."),
+         sub="Speed and context, as it answers."),
 
     # Two files, each card centred on its own measured edges: the bands are 513 px tall with
     # 33 px gaps, so a 574 px window leaves about 30 px above and below and slices nothing.
@@ -69,7 +69,7 @@ SHOTS = [
     dict(src="shot-fit.mp4", at=2.4, length=3.0, hold=True,
          crop=(0, 1272, FULL_W, FULL_H),
          eyebrow="before download", head="It says if it fits",
-         sub="What each file needs, and how fast it will run."),
+         sub="What it needs, and how fast it runs."),
     # The other verdict, from the 8B page, and deliberately a different screen: two cards
     # from the same list that both say "Runs comfortably" differ so little that the cut
     # between them barely registers, and a caption changing over an apparently unchanged
@@ -81,7 +81,7 @@ SHOTS = [
     dict(src="fs-datasync-download.mp4", at=1.2, length=3.2, hold=True,
          crop=(40, 1203, 1200, 538),
          eyebrow="and when it will not", head="It says when it is tight",
-         sub="4.80 GB asking for 5.29, and it tells you first."),
+         sub="4.80 GB asking for 5.29, said upfront."),
 
     # Motion, and the only other shot that has any: the byte counter climbs and the bar
     # grows while the layout underneath stays perfectly still, which is the one kind of
@@ -89,7 +89,7 @@ SHOTS = [
     # publisher row below the card creeps into a 1280-wide window.
     dict(src="fs-datasync-download.mp4", at=5.0, length=3.6, crop=(50, 368, 1180, 529),
          eyebrow="from hugging face", head="Then it downloads it",
-         sub="Straight from Hugging Face, with a cancel that stops it."),
+         sub="Progress in the app. Cancel anytime."),
 
     # The tools. The first view is the screen's own explainer card, centred on its measured
     # edges: it says the file tools stay off until a folder is shared, which is both the
@@ -107,11 +107,11 @@ SHOTS = [
     dict(src="shot-tools3.mp4", at=0.4, length=3.2, hold=True,
          crop=(0, 380, FULL_W, FULL_H),
          eyebrow="your files", head="No folder is shared by default",
-         sub="The file tools stay off until you pick one."),
+         sub="They stay off until you pick one."),
     dict(src="shot-tools3.mp4", at=7.0, length=3.4, hold=True,
          crop=(0, 1412, FULL_W, FULL_H),
          eyebrow="your call", head="You control what goes online",
-         sub="Every tool says which side of the phone it works on."),
+         sub="Each tool says which side it works on."),
 ]
 
 

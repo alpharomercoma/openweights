@@ -20,7 +20,7 @@ intent. Where a row says "measured", the command is in the row.
 | Upload signing | Config reads from `keystore.properties` or environment | Never from the repository |
 | Cleartext traffic | Disabled | `usesCleartextTraffic="false"` |
 | Backup and device transfer | Everything excluded | `data_extraction_rules.xml` |
-| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-03 on the version code 467 bundles |
+| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-04 on the version code 485 bundles |
 
 ### The release build was run, not just built
 
@@ -398,7 +398,22 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
    2026-09-03 for the second runtime: `play/graphics/README.md` says how.
 4. Answer the content rating questionnaire.
 5. File the generative AI content declaration, and ask review the two open questions in it.
-6. Record both foreground service videos, download and generation, and submit both declarations.
+6. ~~Record both foreground service videos~~ Recorded 2026-09-04 on the Dimensity 9400
+   (POCO X8 Pro, Android 16), version code 467, which is byte-identical to 485 in every
+   service, notification and UI file. They are in `play/videos/`, gitignored like the
+   bundles, and still have to be uploaded to YouTube or Drive because the Console takes a
+   link rather than a file.
+   - `fs-datasync-download.mp4`, 50 s: a 4.51 GB model started from Discover, the in-app
+     progress, the home screen with the app gone, then the notification counting 370, 462,
+     555 and 694 MB of 4.51 GB while the app is off screen, then Cancel and the
+     notification gone.
+   - `fs-specialuse-generation.mp4`, 68 s: a reply started in the app, the home screen,
+     the notification reading "Answering / Running on this device", the turn finishing
+     while the app is off screen ("Your answer is ready"), and the complete reply on
+     return at 114 to 30 tok/s in 15.9 s.
+   Submit both declarations. On the data sync form tick **Network processing** only: the
+   task is fetching a model file the user chose, which is neither a backup nor a restore
+   nor local processing.
 7. Internal testing track, then read the pre-launch report. It runs the app on real
    devices and is the cheapest way to find a crash on hardware we do not own.
 8. Decide the launch countries and whether an age rating gate is needed.
@@ -429,7 +444,7 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   rather than folded into "the tools ask before they run."
 - **The upload key lives only on one machine.** `keystore.properties` and `upload.jks`
   exist in the working checkout that cuts releases and nowhere else; a fresh clone builds
-  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-03, at version code 467, carry
+  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-04, at version code 485, carry
   that key (`keytool -printcert -jarfile` on either shows the same SHA-256 as the
   keystore), and enrolling it in Play App Signing is still the first Console step.
 - **Two bundles, one application id.** The `standard` flavour is llama.cpp alone; the

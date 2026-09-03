@@ -80,7 +80,7 @@ gcloud firebase test android run --quiet --type instrumentation \
   --device "model=$MODEL,version=$VERSION,locale=en,orientation=portrait" \
   --test-targets "class io.github.alpharomercoma.openweights.core.engine.eval.$CLASS" \
   --timeout 45m ${ENV_VARS:+--environment-variables "$ENV_VARS"} \
-  --results-bucket "$BUCKET" --results-dir "runs/$(date +%Y%m%d-%H%M%S)-$MODEL-$ENGINE" \
+  --results-bucket "$BUCKET" --results-dir "runs/$(date +%Y%m%d-%H%M%S)-$$-$MODEL-$ENGINE${BENCH_MODEL:+-$BENCH_MODEL}" \
   --other-files "$FILES" \
   --directories-to-pull "/sdcard/Android/data/$PKG/files/eval-results" \
   --results-history-name "openweights-parity-$MODEL" 2>&1 | tee "$LOG" | grep -E "Test is|OUTCOME|Passed|Failed|error|ERROR" || true
@@ -92,7 +92,10 @@ echo "== pulling reports from $RESULTS"
 TMP=$(mktemp -d)
 gcloud storage cp -r "${RESULTS}*/artifacts/sdcard/Android/data/$PKG/files/eval-results/*.json" "$TMP/" 2>/dev/null \
   || gcloud storage cp -r "${RESULTS}" "$TMP/" >/dev/null 2>&1
-for f in $(find "$TMP" -name '*.json' | grep -v instrumentation); do
+# Two matrices created in the same second once shared a results directory and the
+# second failed validation, hence the pid in the name above; and the pushed prompts
+# file comes back with the artifacts, so it is not a report.
+for f in $(find "$TMP" -name '*.json' | grep -v 'instrumentation\|benchmarks.json'); do
   cp "$f" "$OUT/$PREFIX$(basename "$f")"
   echo "   $OUT/$PREFIX$(basename "$f")"
 done

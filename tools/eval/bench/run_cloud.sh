@@ -47,9 +47,15 @@ echo "== building the test APK once"
 xargs -P "$PAR" -L 1 sh -c '
   dev=$0; ver=$1; prefix=$2; engine=$3; fam=$4; sets=$5
   echo "-> $prefix $engine $fam [$sets] $(date +%H:%M)"
-  SKIP_BUILD=1 BENCH_MODEL=$fam BENCH_SETS=$sets '"$ROOT"'/tools/eval/run_matrix_ftl.sh "$dev" "$ver" "$prefix" "$engine" >/dev/null 2>&1 \
-    && echo "ok $prefix $engine $fam [$sets] $(date +%H:%M)" \
-    || echo "FAILED $prefix $engine $fam [$sets] $(date +%H:%M)"
+  suffix=$(echo "$sets" | tr , "\n" | sort | paste -sd+ -)
+  SKIP_BUILD=1 BENCH_MODEL=$fam BENCH_SETS=$sets '"$ROOT"'/tools/eval/run_matrix_ftl.sh "$dev" "$ver" "$prefix" "$engine" >/dev/null 2>&1 || true
+  # The report on disk is the only success there is; gcloud exits 0 on a matrix that
+  # failed validation.
+  if ls '"$OUT"'/"$prefix"*"$fam"*".bench-$suffix.json" >/dev/null 2>&1; then
+    echo "ok $prefix $engine $fam [$sets] $(date +%H:%M)"
+  else
+    echo "FAILED $prefix $engine $fam [$sets] $(date +%H:%M)"
+  fi
 ' < "$JOBS"
 rm -f "$JOBS"
 echo "== all matrices returned $(date +%H:%M)"

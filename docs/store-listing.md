@@ -158,6 +158,13 @@ it stays in that art's colour family and imports the same mark; and **ads must b
 which is why it carries no music. A Content ID claim can force ads onto a video, and that
 would put the listing out of policy, so silence is a compliance decision before a taste one.
 
+**The silence is deliberate, and so is the track.** The file carries a silent AAC stream at
+about -91 dB of encoder noise, which is below the 16-bit floor and inaudible. Stripping it
+would not change what anyone hears; it would only produce a container with no audio stream,
+which is what a strict transcoder or player refuses. Music is out on the policy above.
+Foley is out because there is nothing to sound: the shots are held frames and arriving text,
+with no taps or transitions, so clicks would be invented events.
+
 **The ground is not the feature graphic's flat ink, on purpose.** The cover art sits on
 `#052B42`, but the app's own dark surface is a neutral near-black (`OpenWeightsColors.Canvas`,
 `#0D0E10`). Real capture laid on flat navy read as a sticker on a billboard, so the field is
@@ -212,6 +219,12 @@ line by line; the download shot rides the byte counter climbing while its layout
 perfectly still, which is the one kind of motion a fixed crop can hold. Everything else is
 held, with the cut between two views carrying the change. Measured on the finished file, the
 longest motionless stretch is 3.0 s and there is a cut about every three seconds.
+
+**The copy says what a person would say.** "Then it downloads it", not "fetches", which is
+developer language and could even be read as cloud inference. "No folder is shared by
+default" rather than "nothing is shared", because the screen is about the workspace folder
+specifically and the broader claim would outrun it. "You control what goes online" rather
+than "local and networked, split", which was accurate and inert.
 
 **The evidence is paired.** "It says if it fits" over a file that runs comfortably, then
 "It says when it is tight" over the 4.80 GB file that wants 5.29 GB, which is the same model

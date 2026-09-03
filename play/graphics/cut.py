@@ -88,8 +88,8 @@ SHOTS = [
     # movement a fixed crop can hold. 1180 x 529 rather than the full width because the
     # publisher row below the card creeps into a 1280-wide window.
     dict(src="fs-datasync-download.mp4", at=5.0, length=3.6, crop=(50, 368, 1180, 529),
-         eyebrow="from hugging face", head="Then it fetches it",
-         sub="Progress inside the app, and a cancel that stops it."),
+         eyebrow="from hugging face", head="Then it downloads it",
+         sub="Straight from Hugging Face, with a cancel that stops it."),
 
     # The tools. The first view is the screen's own explainer card, centred on its measured
     # edges: it says the file tools stay off until a folder is shared, which is both the
@@ -106,12 +106,12 @@ SHOTS = [
     # what a list does; what the top edge cuts is a mistake.
     dict(src="shot-tools3.mp4", at=0.4, length=3.2, hold=True,
          crop=(0, 380, FULL_W, FULL_H),
-         eyebrow="nothing by default", head="Nothing is shared by default",
-         sub="The file tools stay off until you pick a folder."),
+         eyebrow="your files", head="No folder is shared by default",
+         sub="The file tools stay off until you pick one."),
     dict(src="shot-tools3.mp4", at=7.0, length=3.4, hold=True,
          crop=(0, 1412, FULL_W, FULL_H),
-         eyebrow="your call", head="Local and networked, split",
-         sub="Each one says which side of the phone it works on."),
+         eyebrow="your call", head="You control what goes online",
+         sub="Every tool says which side of the phone it works on."),
 ]
 
 

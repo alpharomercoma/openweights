@@ -270,8 +270,18 @@ def still(plate_png: Path, length: float, out: Path) -> Path:
 
 
 def _silence(video: Path) -> Path:
-    """Mux a silent AAC track. Play mutes the video anyway, but a file with no audio stream
-    at all is the kind of thing a strict player or transcoder refuses."""
+    """Mux a silent AAC track, deliberately, at about -91 dB of encoder noise around true
+    digital silence: inaudible, below the 16-bit floor.
+
+    The decision was made rather than inherited. Play autoplays this muted, so on the
+    surface that matters there is no audio either way, and stripping the track would not
+    change what a viewer hears: silence is silence, with or without a stream. What it would
+    change is the container, and one with no audio stream is what a strict transcoder or
+    player refuses. Music is out on policy, not taste: a Content ID claim can force ads onto
+    a video, and Play requires ads off, so a claimed track could put the listing out of
+    compliance. Foley is out because there is nothing to sound: the shots are held frames
+    and arriving text, with no taps or transitions, so clicks would be invented events, the
+    audio equivalent of staging footage."""
     tmp = video.with_name(video.stem + "-a.mp4")
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", str(video),

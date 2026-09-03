@@ -1,0 +1,37 @@
+/Users/alpha/mobile-inference/tools/eval/bench/benchmarks.json: 1 file pushed, 0 skipped. 18.9 MB/s (78631 bytes in 0.004s)
+push react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.pte 17:56
+adb: error: failed to read copy response: EOF
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.pte: 1 file pushed, 0 skipped. 4.3 MB/s (2553367552 bytes in 563.194s)
+adb: error: failed to read copy response: EOF
+push react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.tokenizer.json 18:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== ExecuTorchBenchmarkEval llama-3.2 18:06
+adb: device 'localhost:58244' not found
+push Llama-3.2-3B-Instruct-Q4_K_M.gguf 18:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== LlamaCppBenchmarkEval Llama-3.2 18:06
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+push Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.pte 18:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+push Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json 18:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== ExecuTorchBenchmarkEval Gemma3 18:06
+adb: device 'localhost:58244' not found
+push gemma-3-1b-it-Q4_K_M.gguf 18:07
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== LlamaCppBenchmarkEval gemma-3 18:07
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+push SmolLM3-3B-INT8-INT4.pte 18:07
+adb: error: failed to get feature set: device 'localhost:58244' not found
+push SmolLM3-3B-INT8-INT4.tokenizer.json 18:07
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== ExecuTorchBenchmarkEval SmolLM3-3B 18:07
+adb: device 'localhost:58244' not found
+push SmolLM3-Q4_K_M.gguf 18:07
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== LlamaCppBenchmarkEval SmolLM3-Q4 18:07
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+== done 18:08

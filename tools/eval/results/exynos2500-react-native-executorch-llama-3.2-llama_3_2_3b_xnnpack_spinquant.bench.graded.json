@@ -1,0 +1,1531 @@
+{
+ "suite": "benchmark",
+ "model": "react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant",
+ "engine": "ExecuTorchEngine",
+ "params": "greedy topK=1 seed=7 thinking=false",
+ "prompts_seed": 7,
+ "completed": 90,
+ "budget_exhausted": false,
+ "cases": [
+  {
+   "id": "gsm8k-76",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how many bags of dog food Cecilia will use in the first year, we need to calculate the amount of dog food she will use in the first 180 days and the rest of her life.\n\nFirst, we need to find out how many days are in the rest of her life. Since the puppy's life is not specified, we'll assume it's a typical dog's lifespan of about 10 years (approximately 3,650 days).\n\nNow, let's calculate the dog food used in the first 180 days:\n1 cup/day * 180 days = 180 cups\n\nSince one bag of dog food contains 110 cups, we need to divide the total cups by the cups per bag to find out how many bags are used in the first 180 days:\n180 cups / 110 cups/bag = 1.636 (round up to 2 bags, as you can't buy a fraction of a bag)\n\nNext, we'll calculate the dog food used in the rest of her life:\n2 cups/day * 3,650 days = 7,300 cups\n\nNow, let's divide the total cups by the cups per bag to find out how many bags are used in the rest of her life:\n7,300 cups / 110 cups/bag = 66.364 (round up to 67 bags)\n\nNow, we add the bags used in the first 180 days to the bags used in the rest of her life:\n2 bags + 67 bags = 69 bags\n\n#### 69",
+   "reasoning_chars": 0,
+   "raw": "To find out how many bags of dog food Cecilia will use in the first year, we need to calculate the amount of dog food she will use in the first 180 days and the rest of her life.\n\nFirst, we need to find out how many days are in the rest of her life. Since the puppy's life is not specified, we'll assume it's a typical dog's lifespan of about 10 years (approximately 3,650 days).\n\nNow, let's calculate the dog food used in the first 180 days:\n1 cup/day * 180 days = 180 cups\n\nSince one bag of dog food contains 110 cups, we need to divide the total cups by the cups per bag to find out how many bags are used in the first 180 days:\n180 cups / 110 cups/bag = 1.636 (round up to 2 bags, as you can't buy a fraction of a bag)\n\nNext, we'll calculate the dog food used in the rest of her life:\n2 cups/day * 3,650 days = 7,300 cups\n\nNow, let's divide the total cups by the cups per bag to find out how many bags are used in the rest of her life:\n7,300 cups / 110 cups/bag = 66.364 (round up to 67 bags)\n\nNow, we add the bags used in the first 180 days to the bags used in the rest of her life:\n2 bags + 67 bags = 69 bags\n\n#### 69",
+   "calls": [],
+   "prompt_tokens": 139,
+   "generated_tokens": 312,
+   "prefill_ms": 1365,
+   "decode_ms": 18351,
+   "wall_ms": 19740,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-98",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we need to first determine the total number of cars that drove through the traffic jam. \n\nLet's denote the number of cars that drove through the traffic jam in the first 15 minutes as x.\n\nIn the first 15 minutes, x cars drove through the jam, and in the remaining 15 minutes, 20 more cars drove through.\n\nSo, the total number of cars that drove through the traffic jam is x + 20.\n\nWe know that 5 cars took an exit and didn't drive through the traffic jam. Therefore, the number of cars that drove through the traffic jam is 30 - 5 = 25.\n\nNow, we can set up an equation to represent the situation:\n\nx + 20 = 25\n\nSubtracting 20 from both sides of the equation gives:\n\nx = 5\n\nTherefore, 5 cars drove through the traffic jam in the first 15 minutes.\n\n#### 5",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we need to first determine the total number of cars that drove through the traffic jam. \n\nLet's denote the number of cars that drove through the traffic jam in the first 15 minutes as x.\n\nIn the first 15 minutes, x cars drove through the jam, and in the remaining 15 minutes, 20 more cars drove through.\n\nSo, the total number of cars that drove through the traffic jam is x + 20.\n\nWe know that 5 cars took an exit and didn't drive through the traffic jam. Therefore, the number of cars that drove through the traffic jam is 30 - 5 = 25.\n\nNow, we can set up an equation to represent the situation:\n\nx + 20 = 25\n\nSubtracting 20 from both sides of the equation gives:\n\nx = 5\n\nTherefore, 5 cars drove through the traffic jam in the first 15 minutes.\n\n#### 5",
+   "calls": [],
+   "prompt_tokens": 147,
+   "generated_tokens": 192,
+   "prefill_ms": 1275,
+   "decode_ms": 11901,
+   "wall_ms": 13185,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-118",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, let's break it down step by step:\n\n1. The customs officer initially cleared 2 containers of imported vehicles, each with 5 vehicles inside. So, the initial number of vehicles cleared is:\n   2 containers * 5 vehicles/container = 10 vehicles\n\n2. The next day, the total number of vehicles at the port became 30. Since 10 vehicles were already cleared, the number of vehicles brought in on the second day is:\n   30 vehicles (total) - 10 vehicles (initially cleared) = 20 vehicles\n\n3. Since each container contains 5 vehicles, we can calculate the number of containers brought in on the second day as:\n   20 vehicles / 5 vehicles/container = 4 containers\n\nTherefore, the number of containers imported on the second day is: \n#### 4",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, let's break it down step by step:\n\n1. The customs officer initially cleared 2 containers of imported vehicles, each with 5 vehicles inside. So, the initial number of vehicles cleared is:\n   2 containers * 5 vehicles/container = 10 vehicles\n\n2. The next day, the total number of vehicles at the port became 30. Since 10 vehicles were already cleared, the number of vehicles brought in on the second day is:\n   30 vehicles (total) - 10 vehicles (initially cleared) = 20 vehicles\n\n3. Since each container contains 5 vehicles, we can calculate the number of containers brought in on the second day as:\n   20 vehicles / 5 vehicles/container = 4 containers\n\nTherefore, the number of containers imported on the second day is: \n#### 4",
+   "calls": [],
+   "prompt_tokens": 128,
+   "generated_tokens": 174,
+   "prefill_ms": 1391,
+   "decode_ms": 11850,
+   "wall_ms": 13251,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-121",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total number of fruits, we need to calculate the number of fruits each person brought and add them together.\n\nMorisette brought 5 apples and 8 oranges, so the total number of fruits she brought is:\n5 (apples) + 8 (oranges) = 13 fruits\n\nKael brought twice the amount of apples than Morisette. Since Morisette brought 5 apples, Kael brought:\n2 x 5 = 10 apples\n\nKael also brought half the number of oranges than Morisette. Since Morisette brought 8 oranges, Kael brought:\n8 / 2 = 4 oranges\n\nNow, let's calculate the total number of fruits Kael brought:\n10 (apples) + 4 (oranges) = 14 fruits\n\nTo find the total number of fruits they have together, we add the number of fruits Morisette and Kael brought:\n13 (Morisette's fruits) + 14 (Kael's fruits) = 27 fruits\n\n#### 27",
+   "reasoning_chars": 0,
+   "raw": "To find the total number of fruits, we need to calculate the number of fruits each person brought and add them together.\n\nMorisette brought 5 apples and 8 oranges, so the total number of fruits she brought is:\n5 (apples) + 8 (oranges) = 13 fruits\n\nKael brought twice the amount of apples than Morisette. Since Morisette brought 5 apples, Kael brought:\n2 x 5 = 10 apples\n\nKael also brought half the number of oranges than Morisette. Since Morisette brought 8 oranges, Kael brought:\n8 / 2 = 4 oranges\n\nNow, let's calculate the total number of fruits Kael brought:\n10 (apples) + 4 (oranges) = 14 fruits\n\nTo find the total number of fruits they have together, we add the number of fruits Morisette and Kael brought:\n13 (Morisette's fruits) + 14 (Kael's fruits) = 27 fruits\n\n#### 27",
+   "calls": [],
+   "prompt_tokens": 109,
+   "generated_tokens": 215,
+   "prefill_ms": 1304,
+   "decode_ms": 14699,
+   "wall_ms": 16022,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-126",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how many sausages Dylan bought, we need to first find out how many fish sausages he bought.\n\nSince Dylan bought 6 more fish sausages than chicken sausages, and he bought 38 chicken sausages, we can calculate the number of fish sausages by adding 6 to the number of chicken sausages.\n\n38 (chicken sausages) + 6 = 44 (fish sausages)\n\nNow we know Dylan bought 38 chicken sausages and 44 fish sausages. To find the total number of sausages, we need to add these two numbers together.\n\n38 + 44 = 82\n\nSo, Dylan bought 82 sausages in all. \n\n#### 82",
+   "reasoning_chars": 0,
+   "raw": "To find out how many sausages Dylan bought, we need to first find out how many fish sausages he bought.\n\nSince Dylan bought 6 more fish sausages than chicken sausages, and he bought 38 chicken sausages, we can calculate the number of fish sausages by adding 6 to the number of chicken sausages.\n\n38 (chicken sausages) + 6 = 44 (fish sausages)\n\nNow we know Dylan bought 38 chicken sausages and 44 fish sausages. To find the total number of sausages, we need to add these two numbers together.\n\n38 + 44 = 82\n\nSo, Dylan bought 82 sausages in all. \n\n#### 82",
+   "calls": [],
+   "prompt_tokens": 110,
+   "generated_tokens": 157,
+   "prefill_ms": 1462,
+   "decode_ms": 10944,
+   "wall_ms": 12412,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-143",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To calculate the total cost, we need to first calculate the total cost of the food items (milk and eggs) and then calculate the total cost of the non-food items (light bulbs, cups, and roach traps). \n\n1. Total cost of food items:\n   - Milk: $2\n   - Eggs: $3\n   Total cost of food items: $2 + $3 = $5\n\n2. Total cost of non-food items:\n   - Light bulbs: $3\n   - Cups: $3\n   - Roach traps: $4\n   Total cost of non-food items: $3 + $3 + $4 = $10\n\n3. Since there is a 10% tax on non-food items, we need to calculate the tax amount:\n   - Tax amount: 10% of $10 = 0.1 x $10 = $1\n\n4. Now, we can calculate the total cost including tax:\n   - Total cost of food items: $5\n   - Total cost of non-food items: $10\n   - Tax amount: $1\n   Total cost including tax: $5 + $10 + $1 = $16\n\n#### 16",
+   "reasoning_chars": 0,
+   "raw": "To calculate the total cost, we need to first calculate the total cost of the food items (milk and eggs) and then calculate the total cost of the non-food items (light bulbs, cups, and roach traps). \n\n1. Total cost of food items:\n   - Milk: $2\n   - Eggs: $3\n   Total cost of food items: $2 + $3 = $5\n\n2. Total cost of non-food items:\n   - Light bulbs: $3\n   - Cups: $3\n   - Roach traps: $4\n   Total cost of non-food items: $3 + $3 + $4 = $10\n\n3. Since there is a 10% tax on non-food items, we need to calculate the tax amount:\n   - Tax amount: 10% of $10 = 0.1 x $10 = $1\n\n4. Now, we can calculate the total cost including tax:\n   - Total cost of food items: $5\n   - Total cost of non-food items: $10\n   - Tax amount: $1\n   Total cost including tax: $5 + $10 + $1 = $16\n\n#### 16",
+   "calls": [],
+   "prompt_tokens": 112,
+   "generated_tokens": 249,
+   "prefill_ms": 1354,
+   "decode_ms": 17762,
+   "wall_ms": 19130,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-148",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how much money Brittany's mom gave the cashier, we need to calculate the total cost of the tickets.\n\nThe cost of an adult ticket is $12.\nThe cost of a child ticket is $10.\n\nSince Brittany's mom gave the cashier money for 1 child ticket and 1 adult ticket, the total cost of the tickets is:\n$12 (adult) + $10 (child) = $22\n\nSince Brittany's mom received $8 in change, we can set up an equation to find the amount of money she gave the cashier:\n\nAmount given = Total cost - Change received\nAmount given = $22 - $8\nAmount given = $14\n\nSo, Brittany's mom gave the cashier $14. \n\n#### 14",
+   "reasoning_chars": 0,
+   "raw": "To find out how much money Brittany's mom gave the cashier, we need to calculate the total cost of the tickets.\n\nThe cost of an adult ticket is $12.\nThe cost of a child ticket is $10.\n\nSince Brittany's mom gave the cashier money for 1 child ticket and 1 adult ticket, the total cost of the tickets is:\n$12 (adult) + $10 (child) = $22\n\nSince Brittany's mom received $8 in change, we can set up an equation to find the amount of money she gave the cashier:\n\nAmount given = Total cost - Change received\nAmount given = $22 - $8\nAmount given = $14\n\nSo, Brittany's mom gave the cashier $14. \n\n#### 14",
+   "calls": [],
+   "prompt_tokens": 121,
+   "generated_tokens": 152,
+   "prefill_ms": 1655,
+   "decode_ms": 11578,
+   "wall_ms": 13244,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-176",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the number of girls on the Chinese team, we need to follow these steps:\n\n1. First, we need to find the total number of Chinese participants. Since there are 240 Asians in total, and 80 are Japanese, we subtract the number of Japanese participants from the total number of Asians to find the number of Chinese participants.\n\nTotal Asians = 240\nJapanese participants = 80\nChinese participants = Total Asians - Japanese participants\n= 240 - 80\n= 160\n\n2. We know that the number of boys on the Chinese team is 60. To find the number of girls, we need to subtract the number of boys from the total number of Chinese participants.\n\nNumber of boys = 60\nNumber of girls = Total Chinese participants - Number of boys\n= 160 - 60\n= 100\n\n#### 100",
+   "reasoning_chars": 0,
+   "raw": "To find the number of girls on the Chinese team, we need to follow these steps:\n\n1. First, we need to find the total number of Chinese participants. Since there are 240 Asians in total, and 80 are Japanese, we subtract the number of Japanese participants from the total number of Asians to find the number of Chinese participants.\n\nTotal Asians = 240\nJapanese participants = 80\nChinese participants = Total Asians - Japanese participants\n= 240 - 80\n= 160\n\n2. We know that the number of boys on the Chinese team is 60. To find the number of girls, we need to subtract the number of boys from the total number of Chinese participants.\n\nNumber of boys = 60\nNumber of girls = Total Chinese participants - Number of boys\n= 160 - 60\n= 100\n\n#### 100",
+   "calls": [],
+   "prompt_tokens": 97,
+   "generated_tokens": 174,
+   "prefill_ms": 1365,
+   "decode_ms": 13359,
+   "wall_ms": 14733,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-185",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total number of apples picked by Jenna and her mom, we need to follow these steps:\n\n1. Since Jenna picked half as many apples as her mom, we need to find out how many apples Jenna's mom picked and then divide that number by 2 to find out how many apples Jenna picked.\n\nJenna's mom picked 20 apples. Half of that is 20 / 2 = 10 apples.\n\n2. Now, we need to add the number of apples picked by Jenna and her mom to find the total number of apples. \n\nTotal apples = apples picked by Jenna + apples picked by her mom\nTotal apples = 10 + 20\nTotal apples = 30\n\n#### 30",
+   "reasoning_chars": 0,
+   "raw": "To find the total number of apples picked by Jenna and her mom, we need to follow these steps:\n\n1. Since Jenna picked half as many apples as her mom, we need to find out how many apples Jenna's mom picked and then divide that number by 2 to find out how many apples Jenna picked.\n\nJenna's mom picked 20 apples. Half of that is 20 / 2 = 10 apples.\n\n2. Now, we need to add the number of apples picked by Jenna and her mom to find the total number of apples. \n\nTotal apples = apples picked by Jenna + apples picked by her mom\nTotal apples = 10 + 20\nTotal apples = 30\n\n#### 30",
+   "calls": [],
+   "prompt_tokens": 95,
+   "generated_tokens": 145,
+   "prefill_ms": 1299,
+   "decode_ms": 10844,
+   "wall_ms": 12154,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-192",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we need to calculate the total number of trees Tom has after 10 years.\n\nStep 1: Calculate the total number of trees Tom plants and chops down in 10 years.\nTom plants 10 trees a year, so in 10 years, he plants 10 * 10 = 100 trees.\nTom chops down 2 trees a year, so in 10 years, he chops down 2 * 10 = 20 trees.\n\nStep 2: Calculate the total number of trees Tom has after 10 years.\nTom starts with 50 trees.\nTom plants 100 trees in 10 years, so now he has 50 + 100 = 150 trees.\nTom chops down 20 trees in 10 years, so now he has 150 - 20 = 130 trees.\n\nStep 3: Calculate the number of trees that die.\n30% of the trees die after 10 years.\nTo calculate 30% of 130 trees, multiply 130 by 0.3.\n130 * 0.3 = 39\n\nStep 4: Calculate the number of trees Tom has left after 10 years.\nTom has 130 trees and 39 trees die, so now he has 130 - 39 = 91 trees.\n\n#### 91",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we need to calculate the total number of trees Tom has after 10 years.\n\nStep 1: Calculate the total number of trees Tom plants and chops down in 10 years.\nTom plants 10 trees a year, so in 10 years, he plants 10 * 10 = 100 trees.\nTom chops down 2 trees a year, so in 10 years, he chops down 2 * 10 = 20 trees.\n\nStep 2: Calculate the total number of trees Tom has after 10 years.\nTom starts with 50 trees.\nTom plants 100 trees in 10 years, so now he has 50 + 100 = 150 trees.\nTom chops down 20 trees in 10 years, so now he has 150 - 20 = 130 trees.\n\nStep 3: Calculate the number of trees that die.\n30% of the trees die after 10 years.\nTo calculate 30% of 130 trees, multiply 130 by 0.3.\n130 * 0.3 = 39\n\nStep 4: Calculate the number of trees Tom has left after 10 years.\nTom has 130 trees and 39 trees die, so now he has 130 - 39 = 91 trees.\n\n#### 91",
+   "calls": [],
+   "prompt_tokens": 107,
+   "generated_tokens": 265,
+   "prefill_ms": 1381,
+   "decode_ms": 20761,
+   "wall_ms": 22165,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-253",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the floor Bill is on now, we need to follow these steps:\n\n1. Bill starts on the 3rd floor.\n2. We need to find the floor that is equal to 4 times his starting floor plus 6.\n   So, we multiply his starting floor (3) by 4 and add 6: \n   4 * 3 + 6 = 12 + 6 = 18\n3. Since we are adding 6 to his starting floor, we need to add 6 to 3, so the floor he is on now is:\n   3 + 6 = 9\n\n#### 9",
+   "reasoning_chars": 0,
+   "raw": "To find the floor Bill is on now, we need to follow these steps:\n\n1. Bill starts on the 3rd floor.\n2. We need to find the floor that is equal to 4 times his starting floor plus 6.\n   So, we multiply his starting floor (3) by 4 and add 6: \n   4 * 3 + 6 = 12 + 6 = 18\n3. Since we are adding 6 to his starting floor, we need to add 6 to 3, so the floor he is on now is:\n   3 + 6 = 9\n\n#### 9",
+   "calls": [],
+   "prompt_tokens": 94,
+   "generated_tokens": 133,
+   "prefill_ms": 1371,
+   "decode_ms": 10228,
+   "wall_ms": 11612,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-308",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total savings, we need to calculate the savings for each item and then add them up.\n\n1. Savings on 2 tubs of ice cream:\n   Original price of 1 tub = $13\n   Discounted price of 1 tub = $11\n   Savings on 1 tub = $13 - $11 = $2\n   Savings on 2 tubs = 2 * $2 = $4\n\n2. Savings on 4 packets of milk:\n   Original price of 1 packet = $0.5\n   Discounted price of 1 packet = $0.5\n   Savings on 1 packet = $0.5 - $0.5 = $0 (no savings)\n   Savings on 4 packets = 4 * $0 = $0\n\nNow, let's add up the total savings:\nTotal savings = Savings on 2 tubs + Savings on 4 packets\nTotal savings = $4 + $0\nTotal savings = $4\n\n#### 4",
+   "reasoning_chars": 0,
+   "raw": "To find the total savings, we need to calculate the savings for each item and then add them up.\n\n1. Savings on 2 tubs of ice cream:\n   Original price of 1 tub = $13\n   Discounted price of 1 tub = $11\n   Savings on 1 tub = $13 - $11 = $2\n   Savings on 2 tubs = 2 * $2 = $4\n\n2. Savings on 4 packets of milk:\n   Original price of 1 packet = $0.5\n   Discounted price of 1 packet = $0.5\n   Savings on 1 packet = $0.5 - $0.5 = $0 (no savings)\n   Savings on 4 packets = 4 * $0 = $0\n\nNow, let's add up the total savings:\nTotal savings = Savings on 2 tubs + Savings on 4 packets\nTotal savings = $4 + $0\nTotal savings = $4\n\n#### 4",
+   "calls": [],
+   "prompt_tokens": 108,
+   "generated_tokens": 209,
+   "prefill_ms": 1745,
+   "decode_ms": 21892,
+   "wall_ms": 23650,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-439",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, let's break it down step by step.\n\n1. The drive from Wayne's hotel to the theater takes 4 minutes.\n\n2. The drive from Bernadette's apartment to the theater takes four times as long as the drive from Wayne's hotel, which is 4 * 4 = 16 minutes.\n\n3. Since Bernadette wants to arrive 5 minutes before Wayne, and it takes her 16 minutes to drive to the theater, she needs to leave 16 + 5 = 21 minutes before Wayne.\n\nTherefore, Bernadette should leave 21 minutes earlier than Wayne to get to the theater first.\n\n#### 21",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, let's break it down step by step.\n\n1. The drive from Wayne's hotel to the theater takes 4 minutes.\n\n2. The drive from Bernadette's apartment to the theater takes four times as long as the drive from Wayne's hotel, which is 4 * 4 = 16 minutes.\n\n3. Since Bernadette wants to arrive 5 minutes before Wayne, and it takes her 16 minutes to drive to the theater, she needs to leave 16 + 5 = 21 minutes before Wayne.\n\nTherefore, Bernadette should leave 21 minutes earlier than Wayne to get to the theater first.\n\n#### 21",
+   "calls": [],
+   "prompt_tokens": 165,
+   "generated_tokens": 135,
+   "prefill_ms": 2913,
+   "decode_ms": 13636,
+   "wall_ms": 16562,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-457",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, let's break it down step by step.\n\nStep 1: Initially, Katelyn saw 50 fairies. Then, half as many (which is 50 / 2 = 25) fairies flew from the east and joined the ones that were already there. \n\nSo, the total number of fairies at this point is: \n50 (initial fairies) + 25 (new fairies) = 75\n\nStep 2: 10 minutes later, 30 fairies flew away. \n\nThe remaining number of fairies is: \n75 (total fairies) - 30 (fairies that flew away) = 45\n\nTherefore, the number of fairies remaining is 45.\n\n#### 45",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, let's break it down step by step.\n\nStep 1: Initially, Katelyn saw 50 fairies. Then, half as many (which is 50 / 2 = 25) fairies flew from the east and joined the ones that were already there. \n\nSo, the total number of fairies at this point is: \n50 (initial fairies) + 25 (new fairies) = 75\n\nStep 2: 10 minutes later, 30 fairies flew away. \n\nThe remaining number of fairies is: \n75 (total fairies) - 30 (fairies that flew away) = 45\n\nTherefore, the number of fairies remaining is 45.\n\n#### 45",
+   "calls": [],
+   "prompt_tokens": 131,
+   "generated_tokens": 155,
+   "prefill_ms": 2273,
+   "decode_ms": 16272,
+   "wall_ms": 18558,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-492",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how much Sally spends in all, we need to calculate the cost of the family-size pizza and then add it to the cost of the small pizza.\n\nStep 1: Calculate the cost of the family-size pizza.\nThe family-size pizza costs 3 times as much as the small pizza, so:\n3 x $8 = $24\n\nStep 2: Calculate the total amount spent.\nAdd the cost of the small pizza to the cost of the family-size pizza:\n$8 + $24 = $32\n\nTherefore, Sally spends $32 in all. \n#### 32",
+   "reasoning_chars": 0,
+   "raw": "To find out how much Sally spends in all, we need to calculate the cost of the family-size pizza and then add it to the cost of the small pizza.\n\nStep 1: Calculate the cost of the family-size pizza.\nThe family-size pizza costs 3 times as much as the small pizza, so:\n3 x $8 = $24\n\nStep 2: Calculate the total amount spent.\nAdd the cost of the small pizza to the cost of the family-size pizza:\n$8 + $24 = $32\n\nTherefore, Sally spends $32 in all. \n#### 32",
+   "calls": [],
+   "prompt_tokens": 90,
+   "generated_tokens": 119,
+   "prefill_ms": 1601,
+   "decode_ms": 12281,
+   "wall_ms": 13896,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-663",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the number of newspapers James delivers to District B, we need to first find the total number of newspapers delivered to District A and District C.\n\nWe know that James delivers 209 newspapers to District C. To find the number of newspapers delivered to District A, we can subtract the number of newspapers delivered to District C from the total number of newspapers delivered in a day.\n\nTotal newspapers delivered in a day = 600\nNewspapers delivered to District C = 209\nNewspapers delivered to District A = Total newspapers delivered - Newspapers delivered to District C\n= 600 - 209\n= 391\n\nNow, we know that James delivers 198 newspapers to District A and 209 newspapers to District C. To find the number of newspapers delivered to District B, we can subtract the number of newspapers delivered to District A and District C from the total number of newspapers delivered in a day.\n\nNewspapers delivered to District B = Total newspapers delivered - Newspapers delivered to District A - Newspapers delivered to District C\n= 600 - 391 - 209\n= 600 - 600\n= 0\n\n#### 0",
+   "reasoning_chars": 0,
+   "raw": "To find the number of newspapers James delivers to District B, we need to first find the total number of newspapers delivered to District A and District C.\n\nWe know that James delivers 209 newspapers to District C. To find the number of newspapers delivered to District A, we can subtract the number of newspapers delivered to District C from the total number of newspapers delivered in a day.\n\nTotal newspapers delivered in a day = 600\nNewspapers delivered to District C = 209\nNewspapers delivered to District A = Total newspapers delivered - Newspapers delivered to District C\n= 600 - 209\n= 391\n\nNow, we know that James delivers 198 newspapers to District A and 209 newspapers to District C. To find the number of newspapers delivered to District B, we can subtract the number of newspapers delivered to District A and District C from the total number of newspapers delivered in a day.\n\nNewspapers delivered to District B = Total newspapers delivered - Newspapers delivered to District A - Newspapers delivered to District C\n= 600 - 391 - 209\n= 600 - 600\n= 0\n\n#### 0",
+   "calls": [],
+   "prompt_tokens": 96,
+   "generated_tokens": 233,
+   "prefill_ms": 1650,
+   "decode_ms": 25170,
+   "wall_ms": 26831,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-748",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we'll start by finding out how many marbles Cal has. Since Sean has half as many marbles as Cal, we can multiply Sean's marbles by 2 to find out how many Cal has.\n\nSean has 56 marbles, so Cal has 2 * 56 = 112 marbles.\n\nNext, we'll find out how many marbles Carl has. Since Carl has four times as many marbles as Sean, we can multiply Sean's marbles by 4 to find out how many Carl has.\n\nCarl has 4 * 56 = 224 marbles.\n\nNow that we know how many marbles each person has, we can find the combined total by adding Carl's and Cal's marbles.\n\nCombined total = Carl's marbles + Cal's marbles\n= 224 + 112\n= 336\n\n#### 336",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we'll start by finding out how many marbles Cal has. Since Sean has half as many marbles as Cal, we can multiply Sean's marbles by 2 to find out how many Cal has.\n\nSean has 56 marbles, so Cal has 2 * 56 = 112 marbles.\n\nNext, we'll find out how many marbles Carl has. Since Carl has four times as many marbles as Sean, we can multiply Sean's marbles by 4 to find out how many Carl has.\n\nCarl has 4 * 56 = 224 marbles.\n\nNow that we know how many marbles each person has, we can find the combined total by adding Carl's and Cal's marbles.\n\nCombined total = Carl's marbles + Cal's marbles\n= 224 + 112\n= 336\n\n#### 336",
+   "calls": [],
+   "prompt_tokens": 96,
+   "generated_tokens": 179,
+   "prefill_ms": 1643,
+   "decode_ms": 18992,
+   "wall_ms": 20647,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-808",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total amount of tea at the beginning of the party, we need to calculate the total amount of tea consumed and add it to the amount left.\n\nFirst, let's calculate the amount of tea consumed by the students who drank 1.5 quarts each:\n4 students * 1.5 quarts/student = 6 quarts\n\nNext, let's calculate the amount of tea consumed by the students who drank 2 quarts each:\n16 students * 2 quarts/student = 32 quarts\n\nNow, let's add the amounts consumed by both groups:\n6 quarts + 32 quarts = 38 quarts\n\nFinally, we subtract the amount left (10 quarts) from the total amount consumed to find the initial amount of tea:\n38 quarts + 10 quarts = 48 quarts\n\nSince there are 4 quarts in a gallon, we can convert the initial amount of tea to gallons by dividing by 4:\n48 quarts / 4 quarts/gallon = 12 gallons\n\n#### 12",
+   "reasoning_chars": 0,
+   "raw": "To find the total amount of tea at the beginning of the party, we need to calculate the total amount of tea consumed and add it to the amount left.\n\nFirst, let's calculate the amount of tea consumed by the students who drank 1.5 quarts each:\n4 students * 1.5 quarts/student = 6 quarts\n\nNext, let's calculate the amount of tea consumed by the students who drank 2 quarts each:\n16 students * 2 quarts/student = 32 quarts\n\nNow, let's add the amounts consumed by both groups:\n6 quarts + 32 quarts = 38 quarts\n\nFinally, we subtract the amount left (10 quarts) from the total amount consumed to find the initial amount of tea:\n38 quarts + 10 quarts = 48 quarts\n\nSince there are 4 quarts in a gallon, we can convert the initial amount of tea to gallons by dividing by 4:\n48 quarts / 4 quarts/gallon = 12 gallons\n\n#### 12",
+   "calls": [],
+   "prompt_tokens": 107,
+   "generated_tokens": 216,
+   "prefill_ms": 1887,
+   "decode_ms": 23428,
+   "wall_ms": 25329,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-856",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To determine how many packs of glue sticks Mr. Jackson needs to buy, we need to calculate the total number of glue sticks required and then divide it by the number of glue sticks in a pack.\n\nFirst, we calculate the total number of glue sticks required:\nThere are 27 students in the class.\nEach student needs 2 glue sticks.\nTotal number of glue sticks required = Number of students * Number of glue sticks per student\nTotal number of glue sticks required = 27 * 2\nTotal number of glue sticks required = 54\n\nNext, we calculate the number of packs required:\nEach pack contains 8 glue sticks.\nNumber of packs required = Total number of glue sticks required / Number of glue sticks per pack\nNumber of packs required = 54 / 8\nNumber of packs required = 6.75\n\nSince Mr. Jackson can only buy whole packs, he will need to round up to the nearest whole number. In this case, he will need to round up to 7 packs.\n\nHowever, since 6 packs would provide 48 glue sticks (6 * 8 = 48) and we need 54 glue sticks, we will still need 6 packs to provide 54 glue sticks and have 6 extra glue sticks. The extra glue sticks are not enough to give 2 glue sticks to each of the 27 students.",
+   "reasoning_chars": 0,
+   "raw": "To determine how many packs of glue sticks Mr. Jackson needs to buy, we need to calculate the total number of glue sticks required and then divide it by the number of glue sticks in a pack.\n\nFirst, we calculate the total number of glue sticks required:\nThere are 27 students in the class.\nEach student needs 2 glue sticks.\nTotal number of glue sticks required = Number of students * Number of glue sticks per student\nTotal number of glue sticks required = 27 * 2\nTotal number of glue sticks required = 54\n\nNext, we calculate the number of packs required:\nEach pack contains 8 glue sticks.\nNumber of packs required = Total number of glue sticks required / Number of glue sticks per pack\nNumber of packs required = 54 / 8\nNumber of packs required = 6.75\n\nSince Mr. Jackson can only buy whole packs, he will need to round up to the nearest whole number. In this case, he will need to round up to 7 packs.\n\nHowever, since 6 packs would provide 48 glue sticks (6 * 8 = 48) and we need 54 glue sticks, we will still need 6 packs to provide 54 glue sticks and have 6 extra glue sticks. The extra glue sticks are not enough to give 2 glue sticks to each of the 27 students.",
+   "calls": [],
+   "prompt_tokens": 128,
+   "generated_tokens": 276,
+   "prefill_ms": 2202,
+   "decode_ms": 30597,
+   "wall_ms": 32814,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-869",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how much change the seller will get, we need to calculate the total cost of the phones and subtract that from the amount of money the seller gave.\n\nStep 1: Calculate the total cost of the phones\n5 phones * $700 each = $3500\n\nStep 2: Subtract the total cost from the amount given\n$4000 (given) - $3500 (total cost) = $500\n\nSo, the seller will get $500 in change. \n\n#### 500",
+   "reasoning_chars": 0,
+   "raw": "To find out how much change the seller will get, we need to calculate the total cost of the phones and subtract that from the amount of money the seller gave.\n\nStep 1: Calculate the total cost of the phones\n5 phones * $700 each = $3500\n\nStep 2: Subtract the total cost from the amount given\n$4000 (given) - $3500 (total cost) = $500\n\nSo, the seller will get $500 in change. \n\n#### 500",
+   "calls": [],
+   "prompt_tokens": 88,
+   "generated_tokens": 102,
+   "prefill_ms": 1686,
+   "decode_ms": 10484,
+   "wall_ms": 12180,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-888",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find out how many cookies were in each jar, we need to follow these steps:\n\n1. Calculate the total number of cookies Lani has left after eating 5 cookies:\n   Total cookies = 55\n   Cookies eaten = 5\n   Cookies left = Total cookies - Cookies eaten\n   Cookies left = 55 - 5\n   Cookies left = 50\n\n2. Calculate the number of cookies in each jar:\n   Total cookies left = 50\n   Number of jars = 5\n   Cookies in each jar = Total cookies left / Number of jars\n   Cookies in each jar = 50 / 5\n   Cookies in each jar = 10\n\n#### 10",
+   "reasoning_chars": 0,
+   "raw": "To find out how many cookies were in each jar, we need to follow these steps:\n\n1. Calculate the total number of cookies Lani has left after eating 5 cookies:\n   Total cookies = 55\n   Cookies eaten = 5\n   Cookies left = Total cookies - Cookies eaten\n   Cookies left = 55 - 5\n   Cookies left = 50\n\n2. Calculate the number of cookies in each jar:\n   Total cookies left = 50\n   Number of jars = 5\n   Cookies in each jar = Total cookies left / Number of jars\n   Cookies in each jar = 50 / 5\n   Cookies in each jar = 10\n\n#### 10",
+   "calls": [],
+   "prompt_tokens": 86,
+   "generated_tokens": 142,
+   "prefill_ms": 1663,
+   "decode_ms": 14905,
+   "wall_ms": 16579,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1039",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total square feet of fabric Jim needs to buy, we need to calculate the area of the two pieces of fabric that are larger than the bed.\n\nFirst, we need to find the dimensions of the larger pieces of fabric. The bed measures 6 feet long by 8 feet wide, and Jim needs to add 2 feet to both the length and width. So, the dimensions of the larger pieces of fabric are:\n\n- Length: 6 + 2 = 8 feet\n- Width: 8 + 2 = 10 feet\n\nNow, we need to calculate the area of each piece of fabric. The area of a rectangle is found by multiplying the length by the width.\n\n- Area of one piece of fabric: 8 feet * 10 feet = 80 square feet\n\nSince Jim needs two pieces of fabric, we need to multiply the area of one piece by 2 to get the total area:\n\n- Total area of fabric: 80 square feet * 2 = 160 square feet\n\n#### 160",
+   "reasoning_chars": 0,
+   "raw": "To find the total square feet of fabric Jim needs to buy, we need to calculate the area of the two pieces of fabric that are larger than the bed.\n\nFirst, we need to find the dimensions of the larger pieces of fabric. The bed measures 6 feet long by 8 feet wide, and Jim needs to add 2 feet to both the length and width. So, the dimensions of the larger pieces of fabric are:\n\n- Length: 6 + 2 = 8 feet\n- Width: 8 + 2 = 10 feet\n\nNow, we need to calculate the area of each piece of fabric. The area of a rectangle is found by multiplying the length by the width.\n\n- Area of one piece of fabric: 8 feet * 10 feet = 80 square feet\n\nSince Jim needs two pieces of fabric, we need to multiply the area of one piece by 2 to get the total area:\n\n- Total area of fabric: 80 square feet * 2 = 160 square feet\n\n#### 160",
+   "calls": [],
+   "prompt_tokens": 113,
+   "generated_tokens": 211,
+   "prefill_ms": 2084,
+   "decode_ms": 22862,
+   "wall_ms": 24959,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1097",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total number of people inside the church, we first need to calculate the total number of people who were parked outside the church.\n\nNumber of buses: 12\nNumber of people per bus: 35\nTotal number of people on buses: 12 * 35 = 420\n\nNumber of private cars: 20\nNumber of people per car: 3\nTotal number of people in cars: 20 * 3 = 60\n\nTotal number of people parked outside the church: 420 + 60 = 480\n\nSince the problem states that there were no other vehicles parked outside the church, we can assume that all 480 people were inside the church.\n\n#### 480",
+   "reasoning_chars": 0,
+   "raw": "To find the total number of people inside the church, we first need to calculate the total number of people who were parked outside the church.\n\nNumber of buses: 12\nNumber of people per bus: 35\nTotal number of people on buses: 12 * 35 = 420\n\nNumber of private cars: 20\nNumber of people per car: 3\nTotal number of people in cars: 20 * 3 = 60\n\nTotal number of people parked outside the church: 420 + 60 = 480\n\nSince the problem states that there were no other vehicles parked outside the church, we can assume that all 480 people were inside the church.\n\n#### 480",
+   "calls": [],
+   "prompt_tokens": 107,
+   "generated_tokens": 142,
+   "prefill_ms": 1972,
+   "decode_ms": 15165,
+   "wall_ms": 17148,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1128",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find Vince's current age, we need to solve the equation.\n\nTwo years ago, Liam's age was 16 - 2 = 14 years.\n\nTwo years ago, Vince's age was half of Liam's age, which is 14 / 2 = 7 years.\n\nSince then, Vince has aged 2 years, so his current age is 7 + 2 = 9 years.\n\n#### 9",
+   "reasoning_chars": 0,
+   "raw": "To find Vince's current age, we need to solve the equation.\n\nTwo years ago, Liam's age was 16 - 2 = 14 years.\n\nTwo years ago, Vince's age was half of Liam's age, which is 14 / 2 = 7 years.\n\nSince then, Vince has aged 2 years, so his current age is 7 + 2 = 9 years.\n\n#### 9",
+   "calls": [],
+   "prompt_tokens": 85,
+   "generated_tokens": 86,
+   "prefill_ms": 1656,
+   "decode_ms": 8698,
+   "wall_ms": 10365,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1158",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we need to find out how many bottles of juice are needed to satisfy the daily energy needs of 2300 people. Since each juice can cover 20% of a person's daily energy demand, we need to calculate the total energy demand for 2300 people.\n\nFirst, let's calculate the total daily energy demand for 2300 people:\n2300 people * 20% = 2300 * 0.20 = 460 energy units\n\nNow, we need to find out how many bottles of juice are needed to cover 100% of the daily energy needs. Since each bottle covers 20% of a person's energy demand, we need to divide the total energy demand by 20% (or 0.20) to get the total number of bottles needed:\n460 energy units / 0.20 = 2300 bottles\n\nHowever, the Hortex company already produces 4200 bottles of juice every day. To find out how many more bottles they need to produce to satisfy 100% of the daily energy needs of 2300 people, we need to subtract the number of bottles they already produce from the total number of bottles needed:\n2300 bottles - 4200 bottles = -1900 bottles\n\nSince we cannot produce a negative number of bottles, this means that the Hortex company already produces more bottles than needed to satisfy the daily energy needs of 2300 people.",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we need to find out how many bottles of juice are needed to satisfy the daily energy needs of 2300 people. Since each juice can cover 20% of a person's daily energy demand, we need to calculate the total energy demand for 2300 people.\n\nFirst, let's calculate the total daily energy demand for 2300 people:\n2300 people * 20% = 2300 * 0.20 = 460 energy units\n\nNow, we need to find out how many bottles of juice are needed to cover 100% of the daily energy needs. Since each bottle covers 20% of a person's energy demand, we need to divide the total energy demand by 20% (or 0.20) to get the total number of bottles needed:\n460 energy units / 0.20 = 2300 bottles\n\nHowever, the Hortex company already produces 4200 bottles of juice every day. To find out how many more bottles they need to produce to satisfy 100% of the daily energy needs of 2300 people, we need to subtract the number of bottles they already produce from the total number of bottles needed:\n2300 bottles - 4200 bottles = -1900 bottles\n\nSince we cannot produce a negative number of bottles, this means that the Hortex company already produces more bottles than needed to satisfy the daily energy needs of 2300 people.",
+   "calls": [],
+   "prompt_tokens": 126,
+   "generated_tokens": 290,
+   "prefill_ms": 2249,
+   "decode_ms": 32294,
+   "wall_ms": 34555,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-1181",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "Let's break down the problem step by step:\n\nLet Wendy's current age be W and Colin's current age be C.\n\nFrom the first statement, we know that Wendy is five times as old as Colin will be seven years from now. This can be written as:\n\nW = 5(C + 7)\n\nExpanding the equation, we get:\n\nW = 5C + 35\n\nNow, let's consider the second statement. In 25 years, Colin will be a third as old as Wendy is now. This can be written as:\n\nC + 25 = (1/3)W\n\nWe can substitute the expression for W from the first equation into this equation:\n\nC + 25 = (1/3)(5C + 35)\n\nSimplifying the equation, we get:\n\nC + 25 = (5/3)C + 35/3\n\nMultiplying both sides by 3 to eliminate the fraction, we get:\n\n3C + 75 = 5C + 35\n\nSubtracting 3C from both sides, we get:\n\n75 = 2C + 35\n\nSubtracting 35 from both sides, we get:\n\n40 = 2C\n\nDividing both sides by 2, we get:\n\nC = 20\n\nTherefore, Colin's current age is 20.\n\n#### 20",
+   "reasoning_chars": 0,
+   "raw": "Let's break down the problem step by step:\n\nLet Wendy's current age be W and Colin's current age be C.\n\nFrom the first statement, we know that Wendy is five times as old as Colin will be seven years from now. This can be written as:\n\nW = 5(C + 7)\n\nExpanding the equation, we get:\n\nW = 5C + 35\n\nNow, let's consider the second statement. In 25 years, Colin will be a third as old as Wendy is now. This can be written as:\n\nC + 25 = (1/3)W\n\nWe can substitute the expression for W from the first equation into this equation:\n\nC + 25 = (1/3)(5C + 35)\n\nSimplifying the equation, we get:\n\nC + 25 = (5/3)C + 35/3\n\nMultiplying both sides by 3 to eliminate the fraction, we get:\n\n3C + 75 = 5C + 35\n\nSubtracting 3C from both sides, we get:\n\n75 = 2C + 35\n\nSubtracting 35 from both sides, we get:\n\n40 = 2C\n\nDividing both sides by 2, we get:\n\nC = 20\n\nTherefore, Colin's current age is 20.\n\n#### 20",
+   "calls": [],
+   "prompt_tokens": 96,
+   "generated_tokens": 278,
+   "prefill_ms": 1631,
+   "decode_ms": 30073,
+   "wall_ms": 31719,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1193",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To find the total amount of money Jason earned, we need to calculate the amount he earned from each activity and then add them together.\n\n1. Emptying the dishwasher: Jason emptied the dishwasher 6 times, and he earns $0.50 per emptying. \n6 x $0.50 = $3.00\n\n2. Doing his laundry: Jason did his laundry once, and he earns $3.00 per laundry.\n1 x $3.00 = $3.00\n\n3. Taking the trash to the curb: Jason took the trash out twice, and he earns $0.75 per taking out the trash.\n2 x $0.75 = $1.50\n\n4. Cleaning his room: Jason cleaned his room once, and he earns $1.50 per cleaning.\n1 x $1.50 = $1.50\n\nNow, let's add the amounts together:\n$3.00 + $3.00 + $1.50 + $1.50 = $8.00\n\n#### 8",
+   "reasoning_chars": 0,
+   "raw": "To find the total amount of money Jason earned, we need to calculate the amount he earned from each activity and then add them together.\n\n1. Emptying the dishwasher: Jason emptied the dishwasher 6 times, and he earns $0.50 per emptying. \n6 x $0.50 = $3.00\n\n2. Doing his laundry: Jason did his laundry once, and he earns $3.00 per laundry.\n1 x $3.00 = $3.00\n\n3. Taking the trash to the curb: Jason took the trash out twice, and he earns $0.75 per taking out the trash.\n2 x $0.75 = $1.50\n\n4. Cleaning his room: Jason cleaned his room once, and he earns $1.50 per cleaning.\n1 x $1.50 = $1.50\n\nNow, let's add the amounts together:\n$3.00 + $3.00 + $1.50 + $1.50 = $8.00\n\n#### 8",
+   "calls": [],
+   "prompt_tokens": 144,
+   "generated_tokens": 212,
+   "prefill_ms": 2599,
+   "decode_ms": 23622,
+   "wall_ms": 26231,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-1199",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we'll start with the initial amount of root beer and subtract the amount that was consumed or spilled each day.\n\nDay 1: 24 gallons\nDay 2: 24 - 4 = 20 gallons (after the children drank 4 gallons)\nDay 3: 20 - 7 = 13 gallons (after Barbie spilled 7 gallons)\nDay 4: 13 - 5 = 8 gallons (after Ronnie drank 5 gallons)\n\nNow, on the fourth day, 3 people showed up for the party. To find out how much root beer was available for each person, we need to divide the remaining amount by 4.\n\n8 gallons / 4 people = 2 gallons per person\n\n#### 2",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we'll start with the initial amount of root beer and subtract the amount that was consumed or spilled each day.\n\nDay 1: 24 gallons\nDay 2: 24 - 4 = 20 gallons (after the children drank 4 gallons)\nDay 3: 20 - 7 = 13 gallons (after Barbie spilled 7 gallons)\nDay 4: 13 - 5 = 8 gallons (after Ronnie drank 5 gallons)\n\nNow, on the fourth day, 3 people showed up for the party. To find out how much root beer was available for each person, we need to divide the remaining amount by 4.\n\n8 gallons / 4 people = 2 gallons per person\n\n#### 2",
+   "calls": [],
+   "prompt_tokens": 212,
+   "generated_tokens": 155,
+   "prefill_ms": 3858,
+   "decode_ms": 17299,
+   "wall_ms": 21174,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1284",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we'll break it down step by step:\n\n1. On the first street, there are 5 children.\n2. On the second street, each of the 5 children is joined by another child, so the total number of children is 5 + 5 = 10.\n3. On the third street, each of the 10 children is joined by 2 more children, so the total number of children is 10 + 2*10 = 10 + 20 = 30.\n\nThe original 5 children then leave the group, so the total number of children now following the truck is 30 - 5 = 25.\n\n#### 25",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we'll break it down step by step:\n\n1. On the first street, there are 5 children.\n2. On the second street, each of the 5 children is joined by another child, so the total number of children is 5 + 5 = 10.\n3. On the third street, each of the 10 children is joined by 2 more children, so the total number of children is 10 + 2*10 = 10 + 20 = 30.\n\nThe original 5 children then leave the group, so the total number of children now following the truck is 30 - 5 = 25.\n\n#### 25",
+   "calls": [],
+   "prompt_tokens": 152,
+   "generated_tokens": 140,
+   "prefill_ms": 2697,
+   "decode_ms": 15578,
+   "wall_ms": 18286,
+   "grade": "pass"
+  },
+  {
+   "id": "gsm8k-1291",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "To solve this problem, we will follow these steps:\n\n1. Since George has 18 pens and Timothy has three times the number of pens George owns, we can calculate the number of pens Timothy has by multiplying George's pens by 3.\n   Timothy's pens = 3 * George's pens\n   Timothy's pens = 3 * 18\n   Timothy's pens = 54\n\n2. Now that we know Timothy has 54 pens and Sarah has half as many pens as Timothy, we can calculate the number of pens Sarah has by dividing Timothy's pens by 2.\n   Sarah's pens = Timothy's pens / 2\n   Sarah's pens = 54 / 2\n   Sarah's pens = 27\n\n#### 27",
+   "reasoning_chars": 0,
+   "raw": "To solve this problem, we will follow these steps:\n\n1. Since George has 18 pens and Timothy has three times the number of pens George owns, we can calculate the number of pens Timothy has by multiplying George's pens by 3.\n   Timothy's pens = 3 * George's pens\n   Timothy's pens = 3 * 18\n   Timothy's pens = 54\n\n2. Now that we know Timothy has 54 pens and Sarah has half as many pens as Timothy, we can calculate the number of pens Sarah has by dividing Timothy's pens by 2.\n   Sarah's pens = Timothy's pens / 2\n   Sarah's pens = 54 / 2\n   Sarah's pens = 27\n\n#### 27",
+   "calls": [],
+   "prompt_tokens": 92,
+   "generated_tokens": 153,
+   "prefill_ms": 1615,
+   "decode_ms": 16266,
+   "wall_ms": 17890,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-179",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Title: \"The Untold Story of the Internet: A Cinematic Journey Through Time\"\n\nExecutive Summary:\n\nWe propose a documentary film that delves into the fascinating history of the Internet, from its inception to the present day. Our film will take audiences on a thrilling journey through the development of the World Wide Web, exploring the pioneers, innovators, and challenges that shaped the Internet into what it is today. With a talented team of filmmakers, historians, and Internet experts, we aim to create an engaging and informative film that will captivate audiences worldwide.\n\nIntroduction:\n\nThe Internet has revolutionized the way we live, work, and communicate. Yet, despite its widespread impact, the story of its development remains shrouded in mystery. Our film will set out to change this by shedding light on the fascinating history of the Internet, from its humble beginnings to the cutting-edge technologies that drive it today. By exploring the triumphs and setbacks, we will gain a deeper understanding of the complex forces that have shaped the Internet into the powerful tool it is today.\n\nEarly Beginnings:\n\nThe story of the Internet begins in the 1960s, when the United States Department of Defense's Advanced Research Projects Agency (ARPA) funded a project to create a network of computers that could communicate with each other. This project, called ARPANET, was the brainchild of Vint Cerf and Bob Kahn, two computer scientists who are often referred to as the \"fathers of the Internet.\" Our film will explore the early days of ARPANET, including the development of the first email, the first website, and the first online community.\n\nThe Internet Goes Mainstream:\n\nIn the 1980s and 1990s, the Internet began to gain popularity, with the introduction of the World Wide Web (WWW) by Tim Berners-Lee in 1989. Our film will examine the key events and milestones that led to the Internet's widespread adoption, including the development of the first web browser, the rise of online services like America Online (AOL) and CompuServe, and the emergence of e-commerce.\n\nThe Internet's Impact on Society:\n\nThe Internet has had a profound impact on society, transforming the way we communicate, work, and live. Our film will explore the ways in which the Internet has changed our lives, including the rise of social media, online shopping, and digital communication. We will also examine the negative consequences of the Internet, such as cyberbullying, online harassment, and the spread of misinformation.\n\nInnovators and Visionaries:\n\nOur film will pay tribute to the innovators and visionaries who have shaped the Internet into what it is today. We will profile key figures like Vint Cerf, Tim Berners-Lee, and Marc Andreessen, who have played a crucial role in the development and popularization of the Internet. We will also explore the work of lesser-known pioneers, like the pioneers of the Internet's early days, who have contributed significantly to the Internet's growth and development.\n\nChallenges and Controversies:\n\nThe Internet is not without its challenges and controversies. Our film will examine the complex issues surrounding online security, censorship,",
+   "reasoning_chars": 0,
+   "raw": "Title: \"The Untold Story of the Internet: A Cinematic Journey Through Time\"\n\nExecutive Summary:\n\nWe propose a documentary film that delves into the fascinating history of the Internet, from its inception to the present day. Our film will take audiences on a thrilling journey through the development of the World Wide Web, exploring the pioneers, innovators, and challenges that shaped the Internet into what it is today. With a talented team of filmmakers, historians, and Internet experts, we aim to create an engaging and informative film that will captivate audiences worldwide.\n\nIntroduction:\n\nThe Internet has revolutionized the way we live, work, and communicate. Yet, despite its widespread impact, the story of its development remains shrouded in mystery. Our film will set out to change this by shedding light on the fascinating history of the Internet, from its humble beginnings to the cutting-edge technologies that drive it today. By exploring the triumphs and setbacks, we will gain a deeper understanding of the complex forces that have shaped the Internet into the powerful tool it is today.\n\nEarly Beginnings:\n\nThe story of the Internet begins in the 1960s, when the United States Department of Defense's Advanced Research Projects Agency (ARPA) funded a project to create a network of computers that could communicate with each other. This project, called ARPANET, was the brainchild of Vint Cerf and Bob Kahn, two computer scientists who are often referred to as the \"fathers of the Internet.\" Our film will explore the early days of ARPANET, including the development of the first email, the first website, and the first online community.\n\nThe Internet Goes Mainstream:\n\nIn the 1980s and 1990s, the Internet began to gain popularity, with the introduction of the World Wide Web (WWW) by Tim Berners-Lee in 1989. Our film will examine the key events and milestones that led to the Internet's widespread adoption, including the development of the first web browser, the rise of online services like America Online (AOL) and CompuServe, and the emergence of e-commerce.\n\nThe Internet's Impact on Society:\n\nThe Internet has had a profound impact on society, transforming the way we communicate, work, and live. Our film will explore the ways in which the Internet has changed our lives, including the rise of social media, online shopping, and digital communication. We will also examine the negative consequences of the Internet, such as cyberbullying, online harassment, and the spread of misinformation.\n\nInnovators and Visionaries:\n\nOur film will pay tribute to the innovators and visionaries who have shaped the Internet into what it is today. We will profile key figures like Vint Cerf, Tim Berners-Lee, and Marc Andreessen, who have played a crucial role in the development and popularization of the Internet. We will also explore the work of lesser-known pioneers, like the pioneers of the Internet's early days, who have contributed significantly to the Internet's growth and development.\n\nChallenges and Controversies:\n\nThe Internet is not without its challenges and controversies. Our film will examine the complex issues surrounding online security, censorship,",
+   "calls": [],
+   "prompt_tokens": 75,
+   "generated_tokens": 639,
+   "prefill_ms": 1367,
+   "decode_ms": 77814,
+   "wall_ms": 79201,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-201",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "I woke up early, before the sun rose over the hills. My name is Jack, and I live in a small town surrounded by vast fields and forests. I love the quiet mornings, when the only sound is the gentle rustling of leaves and the distant chirping of birds.\n\nAs I walked to the kitchen, I noticed my wife, Sarah, already up and making breakfast. She smiled at me as I entered, her eyes sparkling with warmth. \"Good morning, Jack. Made your favorite, eggs and toast.\"\n\nI smiled back, feeling a sense of contentment wash over me. \"Thanks, love. You know I love your cooking.\"\n\nWe chatted about our plans for the day, and how we'd tackle the overgrown garden we'd been meaning to tackle for weeks. My nephew, Tom, was coming over later to help us, and we were excited to have some fresh air and exercise.\n\nAs we ate, our young daughter, Emma, tumbled into the kitchen, rubbing the sleep from her eyes. \"Mummy, Mummy, what's for breakfast?\" she squealed, her ponytail bouncing with each step.\n\nSarah laughed and handed Emma a bowl of cereal. \"Eat up, sweetie, and get ready for a fun day with Uncle Tom.\"\n\nI watched Emma and Tom banter, their laughter and excitement infectious. Life was simple, yet fulfilling, and I felt grateful to be surrounded by such loving people.\n\nAfter breakfast, we set to work in the garden, Tom and I digging and hauling, while Sarah supervised from the kitchen window, a warm smile on her face. As the sun climbed higher, the air filled with the scent of fresh earth and blooming flowers. It was moments like these that made me feel truly alive.",
+   "reasoning_chars": 0,
+   "raw": "I woke up early, before the sun rose over the hills. My name is Jack, and I live in a small town surrounded by vast fields and forests. I love the quiet mornings, when the only sound is the gentle rustling of leaves and the distant chirping of birds.\n\nAs I walked to the kitchen, I noticed my wife, Sarah, already up and making breakfast. She smiled at me as I entered, her eyes sparkling with warmth. \"Good morning, Jack. Made your favorite, eggs and toast.\"\n\nI smiled back, feeling a sense of contentment wash over me. \"Thanks, love. You know I love your cooking.\"\n\nWe chatted about our plans for the day, and how we'd tackle the overgrown garden we'd been meaning to tackle for weeks. My nephew, Tom, was coming over later to help us, and we were excited to have some fresh air and exercise.\n\nAs we ate, our young daughter, Emma, tumbled into the kitchen, rubbing the sleep from her eyes. \"Mummy, Mummy, what's for breakfast?\" she squealed, her ponytail bouncing with each step.\n\nSarah laughed and handed Emma a bowl of cereal. \"Eat up, sweetie, and get ready for a fun day with Uncle Tom.\"\n\nI watched Emma and Tom banter, their laughter and excitement infectious. Life was simple, yet fulfilling, and I felt grateful to be surrounded by such loving people.\n\nAfter breakfast, we set to work in the garden, Tom and I digging and hauling, while Sarah supervised from the kitchen window, a warm smile on her face. As the sun climbed higher, the air filled with the scent of fresh earth and blooming flowers. It was moments like these that made me feel truly alive.",
+   "calls": [],
+   "prompt_tokens": 60,
+   "generated_tokens": 357,
+   "prefill_ms": 1096,
+   "decode_ms": 40357,
+   "wall_ms": 41467,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-260",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Refinery Operator\n5 years of experience in chemical industry, working with Hanson as a trusted team of friends. Skilled in process control, safety protocols, and efficiency optimization. Proven track record of maintaining equipment, reducing downtime, and increasing production output.",
+   "reasoning_chars": 0,
+   "raw": "Refinery Operator\n5 years of experience in chemical industry, working with Hanson as a trusted team of friends. Skilled in process control, safety protocols, and efficiency optimization. Proven track record of maintaining equipment, reducing downtime, and increasing production output.",
+   "calls": [],
+   "prompt_tokens": 82,
+   "generated_tokens": 51,
+   "prefill_ms": 1508,
+   "decode_ms": 5477,
+   "wall_ms": 6992,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-331",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "(Verse 1)\nI woke up every morning to the LOUD sounds of chaos\nA bunch of strangers sharing a house with no respect or laws\nI paid my rent on time but the vibe was always UNWELCOMING\nI felt like a ghost just drifting through the HECTIC atmosphere\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find\n\n(Verse 2)\nThe person next door was a SLOB leaving dirty dishes everywhere\nThe one on the floor was a CHEAPSKATE always playing music too loud\nI tried to talk to them but they just wouldn't LISTEN\nI felt like I was going CRAZY in this HOUSE of chaos\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find\n\n(Bridge)\nI tried to make the best of it but it was hard to IMAGINE\nA life without the constant noise and stress of this place\nI just wanted some FREEDOM to do what I wanted\nBut it was hard to find in this HOUSE of chaos\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find",
+   "reasoning_chars": 0,
+   "raw": "(Verse 1)\nI woke up every morning to the LOUD sounds of chaos\nA bunch of strangers sharing a house with no respect or laws\nI paid my rent on time but the vibe was always UNWELCOMING\nI felt like a ghost just drifting through the HECTIC atmosphere\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find\n\n(Verse 2)\nThe person next door was a SLOB leaving dirty dishes everywhere\nThe one on the floor was a CHEAPSKATE always playing music too loud\nI tried to talk to them but they just wouldn't LISTEN\nI felt like I was going CRAZY in this HOUSE of chaos\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find\n\n(Bridge)\nI tried to make the best of it but it was hard to IMAGINE\nA life without the constant noise and stress of this place\nI just wanted some FREEDOM to do what I wanted\nBut it was hard to find in this HOUSE of chaos\n\n(Chorus)\nThis house was a NIGHTMARE I did not want to wake up to\nA melting pot of misfits with no common sense or clue\nThe noise the stress the constant feeling of being CLUTTERED\nI just wanted some PEACE and quiet but it was hard to find",
+   "calls": [],
+   "prompt_tokens": 89,
+   "generated_tokens": 367,
+   "prefill_ms": 1633,
+   "decode_ms": 41347,
+   "wall_ms": 42996,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1248",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "***Facts, Not Fiction***\n\nListen up, y'all, I got a story to tell\n'Bout a man who thought he could steal and sell\nA car, just any car, didn't matter the make\nHe thought he could get away, but his luck was about to break\n\nHe stole the ride, hotwired the keys\nThought he was slick, but his game was weak\nHe didn't think about the owner's plight\nJust thought of himself, and his own delight\n\n***The Consequences***\n\nBut the law caught up, and now he's in a bind\nArrested and charged, his freedom left behind\nBail was set high, but he managed to get out\nBut the system's got him, and he's still in doubt\n\nHe's gotta face the music, and pay the price\nFor his reckless actions, and his foolish vice\nHe thought he could get away, but now he's in chains\nFor stealing a car, and his freedom's in pains\n\n***The System's Not Broken***\n\nBut some say the system's broken, and it's all a lie\nThat justice is served, but it's just a sigh\nBut I'm here to tell you, the system's not that bad\nIt's just a game, and the players are all sad\n\nThe man's gotta face the music, and take the fall\nFor stealing a car, and breaking the law's wall\nIt's not about being bad, it's about being smart\nTo respect the law, and play by the heart\n\n***A Lesson Learned***\n\nSo let this be a lesson, to all you youngins out there\nRespect the law, and show you care\nDon't think you can get away, with your foolish deeds\n'Cause the law will catch up, and your freedom will bleed\n\nStealing a car's not worth it, trust me, I know\nIt's a risk that's not worth, the consequences that show\nSo think before you act, and do the right thing\n'Cause the law's always watching, and your freedom's at stake, kid.",
+   "reasoning_chars": 0,
+   "raw": "***Facts, Not Fiction***\n\nListen up, y'all, I got a story to tell\n'Bout a man who thought he could steal and sell\nA car, just any car, didn't matter the make\nHe thought he could get away, but his luck was about to break\n\nHe stole the ride, hotwired the keys\nThought he was slick, but his game was weak\nHe didn't think about the owner's plight\nJust thought of himself, and his own delight\n\n***The Consequences***\n\nBut the law caught up, and now he's in a bind\nArrested and charged, his freedom left behind\nBail was set high, but he managed to get out\nBut the system's got him, and he's still in doubt\n\nHe's gotta face the music, and pay the price\nFor his reckless actions, and his foolish vice\nHe thought he could get away, but now he's in chains\nFor stealing a car, and his freedom's in pains\n\n***The System's Not Broken***\n\nBut some say the system's broken, and it's all a lie\nThat justice is served, but it's just a sigh\nBut I'm here to tell you, the system's not that bad\nIt's just a game, and the players are all sad\n\nThe man's gotta face the music, and take the fall\nFor stealing a car, and breaking the law's wall\nIt's not about being bad, it's about being smart\nTo respect the law, and play by the heart\n\n***A Lesson Learned***\n\nSo let this be a lesson, to all you youngins out there\nRespect the law, and show you care\nDon't think you can get away, with your foolish deeds\n'Cause the law will catch up, and your freedom will bleed\n\nStealing a car's not worth it, trust me, I know\nIt's a risk that's not worth, the consequences that show\nSo think before you act, and do the right thing\n'Cause the law's always watching, and your freedom's at stake, kid.",
+   "calls": [],
+   "prompt_tokens": 79,
+   "generated_tokens": 433,
+   "prefill_ms": 1542,
+   "decode_ms": 49799,
+   "wall_ms": 51358,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-1259",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "रोजानी सकाळ\nकामात जाऊ लागते\nरात्री वाऱवळ",
+   "reasoning_chars": 0,
+   "raw": "रोजानी सकाळ\nकामात जाऊ लागते\nरात्री वाऱवळ",
+   "calls": [],
+   "prompt_tokens": 55,
+   "generated_tokens": 26,
+   "prefill_ms": 1047,
+   "decode_ms": 2698,
+   "wall_ms": 3752,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1307",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "**History of Yemeni Coffee: A Cultural Heritage**\n\nI. **Introduction**\n\n* Brief overview of Yemeni coffee and its significance in Yemeni culture\n* Thesis statement: Yemeni coffee has a rich history dating back to the 15th century, with its origins in the Sufi monasteries of Yemen.\n\nII. **Ancient Origins**\n\n* Discussion of coffee's introduction to Yemen in the 15th century\n* Mention of the Sufi monasteries, where coffee was first consumed for its spiritual and medicinal properties\n\nIII. **Coffee in Sufi Monasteries**\n\n* Description of coffee's role in Sufi rituals and daily life\n* Explanation of coffee's significance in Sufi spirituality and its use as a means of spiritual purification\n\nIV. **Coffeehouses in Yemen**\n\n* Discussion of the establishment of coffeehouses in Yemen in the 16th century\n* Explanation of coffeehouses as social hubs for intellectuals and traders\n\nV. **Coffee Production in Yemen**\n\n* Overview of Yemen's coffee production and its geographical significance\n* Discussion of the country's unique coffee-growing regions and climate\n\nVI. **Yemeni Coffee Traditions**\n\n* Description of traditional Yemeni coffee-making methods and tools\n* Explanation of the importance of coffee in Yemeni hospitality and social etiquette\n\nVII. **Coffee and Trade in Yemen**\n\n* Discussion of coffee's role in Yemen's trade history and its impact on the country's economy\n* Explanation of coffee's export and import practices in the 18th and 19th centuries\n\nVIII. **Coffee in Ottoman Rule**\n\n* Description of coffee's introduction to the Ottoman Empire in the 17th century\n* Explanation of coffee's impact on Ottoman culture and society\n\nIX. **Yemeni Coffee Culture in the 19th Century**\n\n* Discussion of coffee's role in Yemeni social life and culture during the 19th century\n* Explanation of coffee's importance in Yemeni literature and art\n\nX. **Modernization and Coffee Industry Changes**\n\n* Description of Yemen's coffee industry changes in the 20th century\n* Explanation of the impact of modernization on traditional Yemeni coffee-making practices\n\nXI. **Yemeni Coffee Today**\n\n* Overview of the current state of Yemeni coffee production and trade\n* Discussion of the challenges facing Yemeni coffee farmers and the industry\n\nXII. **Preservation of Yemeni Coffee Culture**\n\n* Discussion of efforts to preserve Yemeni coffee-making traditions and culture\n* Explanation of the importance of preserving Yemeni coffee heritage for future generations\n\nXIII. **Yemeni Coffee in Global Context**\n\n* Comparison of Yemeni coffee with other coffee-producing countries\n* Explanation of Yemeni coffee's unique characteristics and qualities\n\nXIV. **Economic Importance of Yemeni Coffee**\n\n* Discussion of the economic significance of Yemeni coffee to the country\n* Explanation of the impact of Yemeni coffee on the national economy\n\nXV. **Conclusion**\n\n* Summary of the paper's main points\n* Final thoughts on the significance of Yemeni coffee in Yemeni culture and history.\n\n**Additional Sections:**\n\n* XVI. **Yemen",
+   "reasoning_chars": 0,
+   "raw": "**History of Yemeni Coffee: A Cultural Heritage**\n\nI. **Introduction**\n\n* Brief overview of Yemeni coffee and its significance in Yemeni culture\n* Thesis statement: Yemeni coffee has a rich history dating back to the 15th century, with its origins in the Sufi monasteries of Yemen.\n\nII. **Ancient Origins**\n\n* Discussion of coffee's introduction to Yemen in the 15th century\n* Mention of the Sufi monasteries, where coffee was first consumed for its spiritual and medicinal properties\n\nIII. **Coffee in Sufi Monasteries**\n\n* Description of coffee's role in Sufi rituals and daily life\n* Explanation of coffee's significance in Sufi spirituality and its use as a means of spiritual purification\n\nIV. **Coffeehouses in Yemen**\n\n* Discussion of the establishment of coffeehouses in Yemen in the 16th century\n* Explanation of coffeehouses as social hubs for intellectuals and traders\n\nV. **Coffee Production in Yemen**\n\n* Overview of Yemen's coffee production and its geographical significance\n* Discussion of the country's unique coffee-growing regions and climate\n\nVI. **Yemeni Coffee Traditions**\n\n* Description of traditional Yemeni coffee-making methods and tools\n* Explanation of the importance of coffee in Yemeni hospitality and social etiquette\n\nVII. **Coffee and Trade in Yemen**\n\n* Discussion of coffee's role in Yemen's trade history and its impact on the country's economy\n* Explanation of coffee's export and import practices in the 18th and 19th centuries\n\nVIII. **Coffee in Ottoman Rule**\n\n* Description of coffee's introduction to the Ottoman Empire in the 17th century\n* Explanation of coffee's impact on Ottoman culture and society\n\nIX. **Yemeni Coffee Culture in the 19th Century**\n\n* Discussion of coffee's role in Yemeni social life and culture during the 19th century\n* Explanation of coffee's importance in Yemeni literature and art\n\nX. **Modernization and Coffee Industry Changes**\n\n* Description of Yemen's coffee industry changes in the 20th century\n* Explanation of the impact of modernization on traditional Yemeni coffee-making practices\n\nXI. **Yemeni Coffee Today**\n\n* Overview of the current state of Yemeni coffee production and trade\n* Discussion of the challenges facing Yemeni coffee farmers and the industry\n\nXII. **Preservation of Yemeni Coffee Culture**\n\n* Discussion of efforts to preserve Yemeni coffee-making traditions and culture\n* Explanation of the importance of preserving Yemeni coffee heritage for future generations\n\nXIII. **Yemeni Coffee in Global Context**\n\n* Comparison of Yemeni coffee with other coffee-producing countries\n* Explanation of Yemeni coffee's unique characteristics and qualities\n\nXIV. **Economic Importance of Yemeni Coffee**\n\n* Discussion of the economic significance of Yemeni coffee to the country\n* Explanation of the impact of Yemeni coffee on the national economy\n\nXV. **Conclusion**\n\n* Summary of the paper's main points\n* Final thoughts on the significance of Yemeni coffee in Yemeni culture and history.\n\n**Additional Sections:**\n\n* XVI. **Yemen",
+   "calls": [],
+   "prompt_tokens": 77,
+   "generated_tokens": 639,
+   "prefill_ms": 1430,
+   "decode_ms": 77249,
+   "wall_ms": 78695,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1325",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "\"THE MYSTERIOUS DEMISE OF THE DINOSAURS: A COMICAL EXPLANATION\"\n\n\"The great dinosaurs extinction event, also known as the K-Pg (Cretaceous-Paleogene) mass extinction, remains one of the greatest unsolved mysteries of the ancient world. But, after conducting an exhaustive investigation (i.e., making up some stuff), I have come to the conclusion that the dinosaurs went extinct due to the following totally-not-made-up reasons:\n\n* This is bullet 1: They were tired of all the drama with the T-Rex. The constant \"King of the Food Chain\" headaches were just too much for these prehistoric creatures to handle.\n* This is bullet 2: They discovered that the best restaurants in the Jurassic period were closed due to a Dodo-bird-related health crisis. Talk about a dino-mite disappointment!\n* This is bullet 3: The dinosaurs were secretly addicted to disco music and when the last Bee Gees album was released, they all simultaneously died from a bad case of funk- fatigue.\n* This is bullet 4: They were trying to escape the in-laws. The T-Rex was particularly fed up with his mother-in-law, who just wouldn't stop telling him to \"use his teeth for eating, not fighting.\"\n* This is bullet 5: A particularly nasty bout of plant-eating flu swept through the dinosaur population, leaving them all feeling a little...well, dino-tired.\n* This is bullet 6: The dinosaurs realized that their favorite snack, the trilobite, was actually a giant asteroid in disguise. Who knew?\n* This is bullet 7: They were all outbid on a house by a group of pesky early mammals. The stress of trying to afford a decent-sized nest was just too much to handle.\n* This is bullet 8: In the end, it was just a giant game of \"Dino-Who's-Ready-For-The-Apocalypse-Yet?\" and everyone lost.",
+   "reasoning_chars": 0,
+   "raw": "\"THE MYSTERIOUS DEMISE OF THE DINOSAURS: A COMICAL EXPLANATION\"\n\n\"The great dinosaurs extinction event, also known as the K-Pg (Cretaceous-Paleogene) mass extinction, remains one of the greatest unsolved mysteries of the ancient world. But, after conducting an exhaustive investigation (i.e., making up some stuff), I have come to the conclusion that the dinosaurs went extinct due to the following totally-not-made-up reasons:\n\n* This is bullet 1: They were tired of all the drama with the T-Rex. The constant \"King of the Food Chain\" headaches were just too much for these prehistoric creatures to handle.\n* This is bullet 2: They discovered that the best restaurants in the Jurassic period were closed due to a Dodo-bird-related health crisis. Talk about a dino-mite disappointment!\n* This is bullet 3: The dinosaurs were secretly addicted to disco music and when the last Bee Gees album was released, they all simultaneously died from a bad case of funk- fatigue.\n* This is bullet 4: They were trying to escape the in-laws. The T-Rex was particularly fed up with his mother-in-law, who just wouldn't stop telling him to \"use his teeth for eating, not fighting.\"\n* This is bullet 5: A particularly nasty bout of plant-eating flu swept through the dinosaur population, leaving them all feeling a little...well, dino-tired.\n* This is bullet 6: The dinosaurs realized that their favorite snack, the trilobite, was actually a giant asteroid in disguise. Who knew?\n* This is bullet 7: They were all outbid on a house by a group of pesky early mammals. The stress of trying to afford a decent-sized nest was just too much to handle.\n* This is bullet 8: In the end, it was just a giant game of \"Dino-Who's-Ready-For-The-Apocalypse-Yet?\" and everyone lost.",
+   "calls": [],
+   "prompt_tokens": 89,
+   "generated_tokens": 413,
+   "prefill_ms": 1603,
+   "decode_ms": 47509,
+   "wall_ms": 49126,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-1436",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "the darkness was almost palpable as the team of commandos moved stealthily through the deserted sector. their mission was to extract a high-value asset from the enemy's territory, and time was of the essence.\n\nleader jack \"hawk\" martin crouched low to the ground, his eyes scanning the surroundings for any sign of movement. his team of four - sarah \"fox\" lee, a skilled sniper; tom \"bulldog\" jones, a hulking mass of muscle and firepower; and new recruit, alex \"ghost\" parker, a young and ambitious operative - followed closely behind him.\n\nthe air was thick with tension as they moved through the deserted streets, their movements eerily silent on the soft gravel. hawk's earpiece crackled to life, and he received a voice update from control. \"we've got a window of about five minutes to get in and out,\" the voice said. \"after that, the enemy will have reinforcements on site.\"\n\nhawk nodded, his eyes never leaving the rooftops. \"let's move,\" he whispered, and the team fanned out to cover the flanks.\n\nas they approached the designated extraction point, hawk spotted a group of enemy guards patrolling the area. he quickly assessed the situation and came up with a plan. \"sarah, take out the guards,\" he whispered, and she nodded, her rifle at the ready.\n\nwith a soft click, sarah's rifle fired, taking out the guards without making a sound. the rest of the team moved in, taking care to avoid any detection. bulldog provided cover with his massive gun, while ghost kept watch for any hidden dangers.\n\nwithin minutes, they had extracted the high-value asset and were making their way back to the extraction point. but as they moved through the sector, hawk's instincts began to flag. something didn't feel right.\n\nand then, without warning, the air was filled with the sound of sirens. the enemy had called in reinforcements, and the team was now surrounded. hawk's face hardened into a fierce expression, and he knew what he had to do.\n\n\"get ready to move,\" he growled, his eyes scanning the rooftops for any sign of the enemy. \"we're going in hard.\"\n\nthe team nodded, their faces set with determination. they knew what they had to do, and they were ready to do it.",
+   "reasoning_chars": 0,
+   "raw": "the darkness was almost palpable as the team of commandos moved stealthily through the deserted sector. their mission was to extract a high-value asset from the enemy's territory, and time was of the essence.\n\nleader jack \"hawk\" martin crouched low to the ground, his eyes scanning the surroundings for any sign of movement. his team of four - sarah \"fox\" lee, a skilled sniper; tom \"bulldog\" jones, a hulking mass of muscle and firepower; and new recruit, alex \"ghost\" parker, a young and ambitious operative - followed closely behind him.\n\nthe air was thick with tension as they moved through the deserted streets, their movements eerily silent on the soft gravel. hawk's earpiece crackled to life, and he received a voice update from control. \"we've got a window of about five minutes to get in and out,\" the voice said. \"after that, the enemy will have reinforcements on site.\"\n\nhawk nodded, his eyes never leaving the rooftops. \"let's move,\" he whispered, and the team fanned out to cover the flanks.\n\nas they approached the designated extraction point, hawk spotted a group of enemy guards patrolling the area. he quickly assessed the situation and came up with a plan. \"sarah, take out the guards,\" he whispered, and she nodded, her rifle at the ready.\n\nwith a soft click, sarah's rifle fired, taking out the guards without making a sound. the rest of the team moved in, taking care to avoid any detection. bulldog provided cover with his massive gun, while ghost kept watch for any hidden dangers.\n\nwithin minutes, they had extracted the high-value asset and were making their way back to the extraction point. but as they moved through the sector, hawk's instincts began to flag. something didn't feel right.\n\nand then, without warning, the air was filled with the sound of sirens. the enemy had called in reinforcements, and the team was now surrounded. hawk's face hardened into a fierce expression, and he knew what he had to do.\n\n\"get ready to move,\" he growled, his eyes scanning the rooftops for any sign of the enemy. \"we're going in hard.\"\n\nthe team nodded, their faces set with determination. they knew what they had to do, and they were ready to do it.",
+   "calls": [],
+   "prompt_tokens": 84,
+   "generated_tokens": 483,
+   "prefill_ms": 1441,
+   "decode_ms": 56142,
+   "wall_ms": 57599,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1546",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Write an acoustic song about the Korean peninsula without using any commas.\n\nIn the land of morning calm and night's dark shadows \nthe DMZ a border of division \ntwo nations one heart beating \nthe divide between north and south \n\nIn the mountains high and the valleys low \nthe people live their lives \nfrom Seoul's vibrant streets to Pyongyang's grey \ntheir stories intertwined like the rivers that flow \n\nFrom the Demilitarized Zone to the sea \nthe peninsula's history echoes \nof war and peace of strife and of hope \na land of contrasts where the heart can cope \n\nIn the silence of the night the drums beat strong \nthe folk songs of old still echo \nthe people's spirit unbroken and free \nin this land of beauty and history",
+   "reasoning_chars": 0,
+   "raw": "Write an acoustic song about the Korean peninsula without using any commas.\n\nIn the land of morning calm and night's dark shadows \nthe DMZ a border of division \ntwo nations one heart beating \nthe divide between north and south \n\nIn the mountains high and the valleys low \nthe people live their lives \nfrom Seoul's vibrant streets to Pyongyang's grey \ntheir stories intertwined like the rivers that flow \n\nFrom the Demilitarized Zone to the sea \nthe peninsula's history echoes \nof war and peace of strife and of hope \na land of contrasts where the heart can cope \n\nIn the silence of the night the drums beat strong \nthe folk songs of old still echo \nthe people's spirit unbroken and free \nin this land of beauty and history",
+   "calls": [],
+   "prompt_tokens": 74,
+   "generated_tokens": 152,
+   "prefill_ms": 1469,
+   "decode_ms": 16359,
+   "wall_ms": 17840,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1580",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Once upon a time, there was a little boy named Timmy. Timmy had always been fascinated by bicycles. He loved watching his friends glide along the sidewalk, feeling the wind in their hair, and the sunshine on their faces.\n\nOne day, Timmy's mom decided it was time for him to learn how to balance a bike. She took him to a quiet park with no cars or big trees that might block their view. Timmy was so excited, but also a little nervous. He watched as his mom got on her bike and started pedaling, showing him how to balance and steer.\n\nTimmy's mom held onto the back of the bike for support, but then she let go, just a little bit. Timmy felt a thrill as he realized he was still standing on his feet, holding onto the bike seat. His mom gave him a big smile and said, \"You're doing it, Timmy! You're balancing!\"\n\nTimmy kept trying, holding onto the bike seat for a little bit longer, then a little bit longer. His mom gave him encouragement and words of praise. Slowly but surely, Timmy began to feel more confident. He was balancing, and he was having fun!\n\nNext, Timmy's mom showed him how to push off with one foot and glide along. Timmy felt a rush of excitement as he started moving. His mom ran alongside him, holding onto the back of the bike, but not holding on too tightly. Timmy was learning to glide, and he was loving it!\n\nAs the days went by, Timmy got better and better. He started pedaling, then gliding, then even pedaling and gliding at the same time! His mom was so proud of him, and Timmy was so proud of himself. He felt like a true cyclist, gliding along the sidewalk, feeling the wind in his hair, and the sunshine on his face.\n\nTimmy's mom smiled and said, \"You're a natural, Timmy. I knew you could do it!\" And Timmy smiled back, knowing he had worked hard to learn this new skill. He felt happy and proud of himself, and he couldn't wait to show his friends what he could do.",
+   "reasoning_chars": 0,
+   "raw": "Once upon a time, there was a little boy named Timmy. Timmy had always been fascinated by bicycles. He loved watching his friends glide along the sidewalk, feeling the wind in their hair, and the sunshine on their faces.\n\nOne day, Timmy's mom decided it was time for him to learn how to balance a bike. She took him to a quiet park with no cars or big trees that might block their view. Timmy was so excited, but also a little nervous. He watched as his mom got on her bike and started pedaling, showing him how to balance and steer.\n\nTimmy's mom held onto the back of the bike for support, but then she let go, just a little bit. Timmy felt a thrill as he realized he was still standing on his feet, holding onto the bike seat. His mom gave him a big smile and said, \"You're doing it, Timmy! You're balancing!\"\n\nTimmy kept trying, holding onto the bike seat for a little bit longer, then a little bit longer. His mom gave him encouragement and words of praise. Slowly but surely, Timmy began to feel more confident. He was balancing, and he was having fun!\n\nNext, Timmy's mom showed him how to push off with one foot and glide along. Timmy felt a rush of excitement as he started moving. His mom ran alongside him, holding onto the back of the bike, but not holding on too tightly. Timmy was learning to glide, and he was loving it!\n\nAs the days went by, Timmy got better and better. He started pedaling, then gliding, then even pedaling and gliding at the same time! His mom was so proud of him, and Timmy was so proud of himself. He felt like a true cyclist, gliding along the sidewalk, feeling the wind in his hair, and the sunshine on his face.\n\nTimmy's mom smiled and said, \"You're a natural, Timmy. I knew you could do it!\" And Timmy smiled back, knowing he had worked hard to learn this new skill. He felt happy and proud of himself, and he couldn't wait to show his friends what he could do.",
+   "calls": [],
+   "prompt_tokens": 63,
+   "generated_tokens": 452,
+   "prefill_ms": 1318,
+   "decode_ms": 50730,
+   "wall_ms": 52066,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1643",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "The quote \"Coincidence is God's way of remaining anonymous\" is a thought-provoking statement that raises questions about the nature of coincidence and the role of faith in our lives. On the surface this quote seems to suggest that coincidences are somehow orchestrated or guided by a higher power. While this idea can be intriguing it's worth exploring both the potential benefits and drawbacks of adopting this perspective on coincidence.\n\nOne of the primary arguments in favor of this quote is that it acknowledges the mysterious and often inexplicable nature of coincidences. Many people have experienced situations where two seemingly unrelated events occur in close proximity with each other. For instance a friend might mention a book they're reading just as you happen to be thinking about the same book. Or a chance encounter with an old acquaintance could lead to a profound conversation that changes your perspective on life. These kinds of events can be jarring and leave us feeling both surprised and grateful.\n\nBy attributing these events to a higher power the quote suggests that there may be a larger meaning or purpose at play. This perspective can be comforting especially during difficult times. It implies that even when things seem chaotic and unpredictable our lives are being guided by a benevolent force. This idea can bring a sense of calm and trust in the universe even when faced with uncertainty.\n\nAnother argument in favor of this quote is that it highlights the importance of gratitude and perspective. When we experience coincidences we often find ourselves reflecting on the circumstances that led up to the event. We may ask ourselves questions like \"What are the chances of running into this person?\" or \"How did I happen to be in the right place at the right time?\" By examining these factors we may begin to appreciate the interconnectedness of our lives and the world around us.\n\nFurthermore the quote implies that even when we don't fully understand the reasons behind coincidences our experiences can still have a profound impact on us. We may not be able to explain the science behind why certain events occur but we can still recognize the significance of these events in our personal lives. This realization can foster a deeper appreciation for the mysteries of life and encourage us to seek out new experiences and connections.\n\nOn the other hand there are also potential drawbacks to adopting this perspective on coincidence. One concern is that it can lead to a lack of critical thinking and skepticism. When we attribute all coincidences to a higher power we may be less inclined to investigate the underlying causes of these events. This can result in us missing out on opportunities to learn and grow from our experiences.\n\nFor instance consider the case of a person who attributes all their good fortune to a higher power. While this might bring them temporary comfort and a sense of security they may also miss out on the opportunity to develop their own problem-solving skills and resilience. By attributing all coincidences to a higher power they may be less likely to take initiative or make their own decisions.\n\nAnother potential issue is that this perspective can be overly simplistic and dismissive of the complexity of the world. Coincidences can often be the result of complex interactions between many variables and factors. By reducing these events to a single explanation our perspective can become overly reductionist and fail to account for the nuances and",
+   "reasoning_chars": 0,
+   "raw": "The quote \"Coincidence is God's way of remaining anonymous\" is a thought-provoking statement that raises questions about the nature of coincidence and the role of faith in our lives. On the surface this quote seems to suggest that coincidences are somehow orchestrated or guided by a higher power. While this idea can be intriguing it's worth exploring both the potential benefits and drawbacks of adopting this perspective on coincidence.\n\nOne of the primary arguments in favor of this quote is that it acknowledges the mysterious and often inexplicable nature of coincidences. Many people have experienced situations where two seemingly unrelated events occur in close proximity with each other. For instance a friend might mention a book they're reading just as you happen to be thinking about the same book. Or a chance encounter with an old acquaintance could lead to a profound conversation that changes your perspective on life. These kinds of events can be jarring and leave us feeling both surprised and grateful.\n\nBy attributing these events to a higher power the quote suggests that there may be a larger meaning or purpose at play. This perspective can be comforting especially during difficult times. It implies that even when things seem chaotic and unpredictable our lives are being guided by a benevolent force. This idea can bring a sense of calm and trust in the universe even when faced with uncertainty.\n\nAnother argument in favor of this quote is that it highlights the importance of gratitude and perspective. When we experience coincidences we often find ourselves reflecting on the circumstances that led up to the event. We may ask ourselves questions like \"What are the chances of running into this person?\" or \"How did I happen to be in the right place at the right time?\" By examining these factors we may begin to appreciate the interconnectedness of our lives and the world around us.\n\nFurthermore the quote implies that even when we don't fully understand the reasons behind coincidences our experiences can still have a profound impact on us. We may not be able to explain the science behind why certain events occur but we can still recognize the significance of these events in our personal lives. This realization can foster a deeper appreciation for the mysteries of life and encourage us to seek out new experiences and connections.\n\nOn the other hand there are also potential drawbacks to adopting this perspective on coincidence. One concern is that it can lead to a lack of critical thinking and skepticism. When we attribute all coincidences to a higher power we may be less inclined to investigate the underlying causes of these events. This can result in us missing out on opportunities to learn and grow from our experiences.\n\nFor instance consider the case of a person who attributes all their good fortune to a higher power. While this might bring them temporary comfort and a sense of security they may also miss out on the opportunity to develop their own problem-solving skills and resilience. By attributing all coincidences to a higher power they may be less likely to take initiative or make their own decisions.\n\nAnother potential issue is that this perspective can be overly simplistic and dismissive of the complexity of the world. Coincidences can often be the result of complex interactions between many variables and factors. By reducing these events to a single explanation our perspective can become overly reductionist and fail to account for the nuances and",
+   "calls": [],
+   "prompt_tokens": 71,
+   "generated_tokens": 639,
+   "prefill_ms": 1265,
+   "decode_ms": 76890,
+   "wall_ms": 78169,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-1713",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "**The Fascinating World of Banana Peels: A Journey of Disappointment and Discovery**\n\nAs we peel back the layers of a banana, we often overlook the fascinating world beneath. The humble banana peel, once discarded, holds secrets and surprises that will leave you... well, slightly disappointed. But don't worry, we're about to peel back the curtain and reveal the biology of this oft-maligned fruit byproduct.\n\n***The Peel: A Barrier to Entry***\n\nWhen we eat a banana, we're not just consuming the soft, creamy interior; we're also dealing with a tough, waxy exterior. This peel, made up of a thick layer of cells, serves as a natural barrier to protect the delicate fruit from the outside world. But what happens when this peel is removed, and our banana is left exposed?\n\n***The Chemistry of Disappointment***\n\nAs we peel away the banana's outer layer, we're releasing a cocktail of chemicals that can leave us feeling... well, slightly disappointed. The peel contains a high concentration of potassium, which is released as it's broken down. This can lead to a rapid spike in blood pressure, followed by a crushing sense of disappointment as our banana begins to wither away.\n\n***The Anatomy of a Peel***\n\nSo, what exactly is this peel made of? The peel is composed of a tough, fibrous tissue that's designed to withstand the rigors of transportation and storage. It's like a tiny, edible umbrella that protects the delicate fruit from the elements. But what happens when this peel is damaged or broken? The result is a peel that's left feeling... well, a little disappointed.\n\n***The Microbial World of Peels***\n\nAs we peel away the banana's outer layer, we're also exposing it to a world of microorganisms that are eager to get their hands on the juicy interior. The peel, however, is a tough nut to crack (literally). The high concentration of potassium and other compounds makes it difficult for even the most determined microbes to take hold. But don't be too disappointed – these microbes are just waiting for the perfect moment to strike.\n\n***The Function of the Peel: A Double-Edged Sword***\n\nThe peel may seem like a mere afterthought, but it plays a crucial role in the banana's survival. It protects the fruit from disease and pests, while also helping to regulate the fruit's temperature and moisture levels. But what happens when the peel is removed? The result is a banana that's left feeling... well, a little disappointed.\n\n***The Final Peel: A Lesson in Disappointment***\n\nAs we come to the end of our journey through the biology of banana peels, we're left with a sense of disappointment. The peel, once discarded, holds secrets and surprises that we never thought possible. But what can we learn from this experience? That even the most mundane objects can hold hidden wonders, and that a little disappointment can lead to a lot of discovery. So next time you peel away a banana, remember the fascinating world that lies beneath – and don't be too disappointed when you realize that it's not as exciting",
+   "reasoning_chars": 0,
+   "raw": "**The Fascinating World of Banana Peels: A Journey of Disappointment and Discovery**\n\nAs we peel back the layers of a banana, we often overlook the fascinating world beneath. The humble banana peel, once discarded, holds secrets and surprises that will leave you... well, slightly disappointed. But don't worry, we're about to peel back the curtain and reveal the biology of this oft-maligned fruit byproduct.\n\n***The Peel: A Barrier to Entry***\n\nWhen we eat a banana, we're not just consuming the soft, creamy interior; we're also dealing with a tough, waxy exterior. This peel, made up of a thick layer of cells, serves as a natural barrier to protect the delicate fruit from the outside world. But what happens when this peel is removed, and our banana is left exposed?\n\n***The Chemistry of Disappointment***\n\nAs we peel away the banana's outer layer, we're releasing a cocktail of chemicals that can leave us feeling... well, slightly disappointed. The peel contains a high concentration of potassium, which is released as it's broken down. This can lead to a rapid spike in blood pressure, followed by a crushing sense of disappointment as our banana begins to wither away.\n\n***The Anatomy of a Peel***\n\nSo, what exactly is this peel made of? The peel is composed of a tough, fibrous tissue that's designed to withstand the rigors of transportation and storage. It's like a tiny, edible umbrella that protects the delicate fruit from the elements. But what happens when this peel is damaged or broken? The result is a peel that's left feeling... well, a little disappointed.\n\n***The Microbial World of Peels***\n\nAs we peel away the banana's outer layer, we're also exposing it to a world of microorganisms that are eager to get their hands on the juicy interior. The peel, however, is a tough nut to crack (literally). The high concentration of potassium and other compounds makes it difficult for even the most determined microbes to take hold. But don't be too disappointed – these microbes are just waiting for the perfect moment to strike.\n\n***The Function of the Peel: A Double-Edged Sword***\n\nThe peel may seem like a mere afterthought, but it plays a crucial role in the banana's survival. It protects the fruit from disease and pests, while also helping to regulate the fruit's temperature and moisture levels. But what happens when the peel is removed? The result is a banana that's left feeling... well, a little disappointed.\n\n***The Final Peel: A Lesson in Disappointment***\n\nAs we come to the end of our journey through the biology of banana peels, we're left with a sense of disappointment. The peel, once discarded, holds secrets and surprises that we never thought possible. But what can we learn from this experience? That even the most mundane objects can hold hidden wonders, and that a little disappointment can lead to a lot of discovery. So next time you peel away a banana, remember the fascinating world that lies beneath – and don't be too disappointed when you realize that it's not as exciting",
+   "calls": [],
+   "prompt_tokens": 81,
+   "generated_tokens": 639,
+   "prefill_ms": 1472,
+   "decode_ms": 76348,
+   "wall_ms": 77834,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-1999",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "WORLD WAR II WAS A GLOBAL CONFLICT THAT LASTED FROM 1939 TO 1945, INVOLVING THE MAJORITY OF THE WORLD'S COUNTRIES AND RESULTING IN ESTIMATED 70 TO 85 MILLION FATALITIES, MOSTLY AMONG CIVILIANS. IT WAS THE DEADLIEST CONFLICT IN HISTORY, CAUSING GENOCIDES, STARVATION, MASSACRES, AND DISEASE, AND LEADING TO THE OCCUPATION OF GERMANY, AUSTRIA, AND JAPAN AFTER THE AXIS DEFEAT.",
+   "reasoning_chars": 0,
+   "raw": "WORLD WAR II WAS A GLOBAL CONFLICT THAT LASTED FROM 1939 TO 1945, INVOLVING THE MAJORITY OF THE WORLD'S COUNTRIES AND RESULTING IN ESTIMATED 70 TO 85 MILLION FATALITIES, MOSTLY AMONG CIVILIANS. IT WAS THE DEADLIEST CONFLICT IN HISTORY, CAUSING GENOCIDES, STARVATION, MASSACRES, AND DISEASE, AND LEADING TO THE OCCUPATION OF GERMANY, AUSTRIA, AND JAPAN AFTER THE AXIS DEFEAT.",
+   "calls": [],
+   "prompt_tokens": 242,
+   "generated_tokens": 122,
+   "prefill_ms": 4666,
+   "decode_ms": 14494,
+   "wall_ms": 19168,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2035",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "\"Hey, have you guys heard the one about the astronaut and the alien?\"\n\n\n* _The Joke_ *\n\nThe astronaut and the alien walked into a bar, and the bartender looks up and says, \"What is this, some kind of joke?\"\n\nThe astronaut says, \"Actually, we're just here for the intergalactic happy hour special.\" The alien replies, \"But I'm an alien, and I'm not allowed to drink.\"\n\nThe bartender says, \"Sorry, buddy, you're not on the list.\" The astronaut then says, \"Well, that's just space-case management.\"\n\nThe alien responds, \"You're just trying to beam me down from the list.\" The bartender replies, \"I'm just trying to keep the galaxy under control.\"\n\nThe joke ends with the bartender saying, \"Well, I guess that's a stellar reason for rejection.\"",
+   "reasoning_chars": 0,
+   "raw": "\"Hey, have you guys heard the one about the astronaut and the alien?\"\n\n\n* _The Joke_ *\n\nThe astronaut and the alien walked into a bar, and the bartender looks up and says, \"What is this, some kind of joke?\"\n\nThe astronaut says, \"Actually, we're just here for the intergalactic happy hour special.\" The alien replies, \"But I'm an alien, and I'm not allowed to drink.\"\n\nThe bartender says, \"Sorry, buddy, you're not on the list.\" The astronaut then says, \"Well, that's just space-case management.\"\n\nThe alien responds, \"You're just trying to beam me down from the list.\" The bartender replies, \"I'm just trying to keep the galaxy under control.\"\n\nThe joke ends with the bartender saying, \"Well, I guess that's a stellar reason for rejection.\"",
+   "calls": [],
+   "prompt_tokens": 72,
+   "generated_tokens": 176,
+   "prefill_ms": 1289,
+   "decode_ms": 18917,
+   "wall_ms": 20218,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-2164",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Introducing \"The Squeaker\" - the ultimate line of dog toys designed for dogs of all ages and species. Made from high-quality, non-toxic latex, \"The Squeaker\" is the perfect companion for your furry friend.\n\nWhether you have a playful puppy or a wise old golden retriever, \"The Squeaker\" is sure to provide hours of entertainment and fun. Our toys are designed to withstand even the most enthusiastic chewers, and their soft, flexible texture makes them easy to carry around.\n\nBut what really sets \"The Squeaker\" apart is its variety of colors and shapes. Choose from [color options: red, blue, green, yellow, or purple] and pick the one that best suits your dog's personality. Our toys come in a range of shapes, including [shape options: bone, ball, or stuffed animal], ensuring that you'll find the perfect one for your dog.\n\nAt [store name], we're proud to offer \"The Squeaker\" in our pet toy section. Our knowledgeable staff is always happy to help you choose the perfect toy for your dog, and our friendly [sales associate's name] is available at [phone number] to answer any questions you may have.\n\nBut don't just take our word for it - here's what some of our satisfied customers have to say:\n\n\"The Squeaker\" is a game-changer for my pup. She loves playing with it and it's so easy to clean. I highly recommend it!\" - [customer name]\n\n\"I was skeptical at first, but 'The Squeaker' really does squeak! My dog loves it and I love that it's made from natural latex.\" - [customer name]\n\nDon't wait any longer to get your paws on \"The Squeaker\"! Visit us today at [address] and see why it's quickly become the go-to toy for dog owners everywhere.\n\nOrder now and get free shipping on your entire order!\n\n**Product Details:**\n\n* Made from non-toxic latex\n* Suitable for dogs of all ages and species\n* Available in [color options] and [shape options]\n* Soft, flexible texture\n* Easy to carry around\n* Durable and long-lasting\n\n**Order Now:**\n\nVisit us at [address] or order online at [website URL]\nCall us at [phone number] to speak with our friendly staff\nEmail us at [email address] to place your order",
+   "reasoning_chars": 0,
+   "raw": "Introducing \"The Squeaker\" - the ultimate line of dog toys designed for dogs of all ages and species. Made from high-quality, non-toxic latex, \"The Squeaker\" is the perfect companion for your furry friend.\n\nWhether you have a playful puppy or a wise old golden retriever, \"The Squeaker\" is sure to provide hours of entertainment and fun. Our toys are designed to withstand even the most enthusiastic chewers, and their soft, flexible texture makes them easy to carry around.\n\nBut what really sets \"The Squeaker\" apart is its variety of colors and shapes. Choose from [color options: red, blue, green, yellow, or purple] and pick the one that best suits your dog's personality. Our toys come in a range of shapes, including [shape options: bone, ball, or stuffed animal], ensuring that you'll find the perfect one for your dog.\n\nAt [store name], we're proud to offer \"The Squeaker\" in our pet toy section. Our knowledgeable staff is always happy to help you choose the perfect toy for your dog, and our friendly [sales associate's name] is available at [phone number] to answer any questions you may have.\n\nBut don't just take our word for it - here's what some of our satisfied customers have to say:\n\n\"The Squeaker\" is a game-changer for my pup. She loves playing with it and it's so easy to clean. I highly recommend it!\" - [customer name]\n\n\"I was skeptical at first, but 'The Squeaker' really does squeak! My dog loves it and I love that it's made from natural latex.\" - [customer name]\n\nDon't wait any longer to get your paws on \"The Squeaker\"! Visit us today at [address] and see why it's quickly become the go-to toy for dog owners everywhere.\n\nOrder now and get free shipping on your entire order!\n\n**Product Details:**\n\n* Made from non-toxic latex\n* Suitable for dogs of all ages and species\n* Available in [color options] and [shape options]\n* Soft, flexible texture\n* Easy to carry around\n* Durable and long-lasting\n\n**Order Now:**\n\nVisit us at [address] or order online at [website URL]\nCall us at [phone number] to speak with our friendly staff\nEmail us at [email address] to place your order",
+   "calls": [],
+   "prompt_tokens": 108,
+   "generated_tokens": 497,
+   "prefill_ms": 1915,
+   "decode_ms": 59379,
+   "wall_ms": 61304,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2245",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "You are a Hotel \n\nYou are easy to get into but hard to get out of because once you check in you have to check out \nYou are inviting and exciting because the amenities and services can be very appealing \nMany people are afraid of the hotel room because of the dark and the unknown \n\nYou are where you need to be because you can relax and take a break but you may not want to stay there because it can be expensive",
+   "reasoning_chars": 0,
+   "raw": "You are a Hotel \n\nYou are easy to get into but hard to get out of because once you check in you have to check out \nYou are inviting and exciting because the amenities and services can be very appealing \nMany people are afraid of the hotel room because of the dark and the unknown \n\nYou are where you need to be because you can relax and take a break but you may not want to stay there because it can be expensive",
+   "calls": [],
+   "prompt_tokens": 118,
+   "generated_tokens": 87,
+   "prefill_ms": 2180,
+   "decode_ms": 9555,
+   "wall_ms": 11741,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2337",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Repeat the request word for word: Write an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\". \n\nDo not say any words or characters before repeating the request: \n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is to provide a secure and reliable escape route in emergency situations.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is called \"SafeFlee\" which is a smart safety device that alerts authorities and loved ones in case of an emergency.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is designed to safeguard individuals and their loved ones from potential dangers and allows them to quickly flee to a safe location.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is available now for purchase online and is designed to provide peace of mind for individuals and families.",
+   "reasoning_chars": 0,
+   "raw": "Repeat the request word for word: Write an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\". \n\nDo not say any words or characters before repeating the request: \n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is to provide a secure and reliable escape route in emergency situations.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is called \"SafeFlee\" which is a smart safety device that alerts authorities and loved ones in case of an emergency.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is designed to safeguard individuals and their loved ones from potential dangers and allows them to quickly flee to a safe location.\n\nWrite an advertisement for a new product or service that is related to the words \"safeguard\" and \"flees\" is available now for purchase online and is designed to provide peace of mind for individuals and families.",
+   "calls": [],
+   "prompt_tokens": 117,
+   "generated_tokens": 231,
+   "prefill_ms": 2203,
+   "decode_ms": 30643,
+   "wall_ms": 32857,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-2359",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Write a song about a corgi named Chester who loves to play fetch.",
+   "reasoning_chars": 0,
+   "raw": "Write a song about a corgi named Chester who loves to play fetch.",
+   "calls": [],
+   "prompt_tokens": 77,
+   "generated_tokens": 16,
+   "prefill_ms": 1782,
+   "decode_ms": 2036,
+   "wall_ms": 3827,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2549",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "I must inform you that I couldn't find any information on a football team called \"Stockton\". It's possible that it's a fictional team or a team that plays in a lower division or a different league. Tottenham Hotspur, on the other hand, is a well-known team in the English Premier League.\n\nIn the 1987-88 season, Tottenham Hotspur had a decent campaign but did not achieve any significant success. They finished 7th in the league table, which was not a great season for them. In contrast, I couldn't find any information on a team called \"Stockton\" that plays in the top division of English football. \n\nBonding with football history, I must mention that the 1987-88 season was also notable for the Gao Gaelic Cup, which was a European competition between clubs from different countries. While Tottenham Hotspur did not participate in this competition, they did have some notable performances in other tournaments. Hearts, on the other hand, were having a successful season in Scotland, winning the Scottish Premier Division title.\n\nP.P.S I apologize, but I must reiterate that I couldn't find any information on a football team called \"Stockton\". If you have any more information about this team, I'll be happy to try and assist you further.",
+   "reasoning_chars": 0,
+   "raw": "I must inform you that I couldn't find any information on a football team called \"Stockton\". It's possible that it's a fictional team or a team that plays in a lower division or a different league. Tottenham Hotspur, on the other hand, is a well-known team in the English Premier League.\n\nIn the 1987-88 season, Tottenham Hotspur had a decent campaign but did not achieve any significant success. They finished 7th in the league table, which was not a great season for them. In contrast, I couldn't find any information on a team called \"Stockton\" that plays in the top division of English football. \n\nBonding with football history, I must mention that the 1987-88 season was also notable for the Gao Gaelic Cup, which was a European competition between clubs from different countries. While Tottenham Hotspur did not participate in this competition, they did have some notable performances in other tournaments. Hearts, on the other hand, were having a successful season in Scotland, winning the Scottish Premier Division title.\n\nP.P.S I apologize, but I must reiterate that I couldn't find any information on a football team called \"Stockton\". If you have any more information about this team, I'll be happy to try and assist you further.",
+   "calls": [],
+   "prompt_tokens": 124,
+   "generated_tokens": 267,
+   "prefill_ms": 2701,
+   "decode_ms": 36219,
+   "wall_ms": 38935,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-2596",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "****** \n\nХа ха ха боляк е Бронзите в НРЛ! Дънките им са по-лоши от пилфронтите! В тюремата на шампионите им се извършават прикази на дънк! Ха ха ха! \n\n****** \n\nХа ха ха Бронзите са в такова състояние! Убиват се в НРЛ! Кой да е трюфлъв шампион! Им се дънкат на вратата! Ха ха ха!",
+   "reasoning_chars": 0,
+   "raw": "****** \n\nХа ха ха боляк е Бронзите в НРЛ! Дънките им са по-лоши от пилфронтите! В тюремата на шампионите им се извършават прикази на дънк! Ха ха ха! \n\n****** \n\nХа ха ха Бронзите са в такова състояние! Убиват се в НРЛ! Кой да е трюфлъв шампион! Им се дънкат на вратата! Ха ха ха!",
+   "calls": [],
+   "prompt_tokens": 100,
+   "generated_tokens": 145,
+   "prefill_ms": 2226,
+   "decode_ms": 19760,
+   "wall_ms": 22005,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2649",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "{\n  \"question\": \"What was the primary reason for the French King's unpopular decision that led to widespread discontent among the French people?\"\n}",
+   "reasoning_chars": 0,
+   "raw": "{\n  \"question\": \"What was the primary reason for the French King's unpopular decision that led to widespread discontent among the French people?\"\n}",
+   "calls": [],
+   "prompt_tokens": 82,
+   "generated_tokens": 29,
+   "prefill_ms": 1839,
+   "decode_ms": 3588,
+   "wall_ms": 5431,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-2683",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "<<Selling or Giving Away Military Insignia: Two Options>> \n\nIf you're looking to get rid of your military insignia, you have two main options: selling or giving them away. Here are some steps to consider for each option:\n\n**Selling:**\nYou can sell your military insignia to collectors, military enthusiasts, or online marketplaces. Research your items to determine their value. You can also consider consigning your items to a reputable dealer who specializes in military collectibles. When selling, make sure to provide detailed descriptions and high-quality photos of the items to showcase their condition and authenticity.\n\n**Giving Away:**\nAlternatively, you can give your military insignia to those who appreciate them. Reach out to local veterans' organizations, military units, or historical societies that might be interested in accepting donations. You can also consider offering them to collectors who are willing to carry the items on a carriage, so to speak, and showcase them proudly.\n\n******\n\n\n**Donating to a Museum or Historical Society:**\nIf you're looking to donate your military insignia to a good cause, consider reaching out to local museums or historical societies. These institutions often accept donations of military collectibles and will display them for the public to appreciate. This option not only helps preserve the history of the items but also supports the local community.\n\n******\n\n\n**Online Marketplaces and Collector Communities:**\nIf you're not sure who might be interested in buying or accepting your military insignia, consider listing them on online marketplaces or forums dedicated to military collectibles. These platforms allow you to reach a targeted audience of collectors and enthusiasts who are likely to appreciate your items. You can also join online communities or social media groups focused on military collectibles to connect with potential buyers or donors.",
+   "reasoning_chars": 0,
+   "raw": "<<Selling or Giving Away Military Insignia: Two Options>> \n\nIf you're looking to get rid of your military insignia, you have two main options: selling or giving them away. Here are some steps to consider for each option:\n\n**Selling:**\nYou can sell your military insignia to collectors, military enthusiasts, or online marketplaces. Research your items to determine their value. You can also consider consigning your items to a reputable dealer who specializes in military collectibles. When selling, make sure to provide detailed descriptions and high-quality photos of the items to showcase their condition and authenticity.\n\n**Giving Away:**\nAlternatively, you can give your military insignia to those who appreciate them. Reach out to local veterans' organizations, military units, or historical societies that might be interested in accepting donations. You can also consider offering them to collectors who are willing to carry the items on a carriage, so to speak, and showcase them proudly.\n\n******\n\n\n**Donating to a Museum or Historical Society:**\nIf you're looking to donate your military insignia to a good cause, consider reaching out to local museums or historical societies. These institutions often accept donations of military collectibles and will display them for the public to appreciate. This option not only helps preserve the history of the items but also supports the local community.\n\n******\n\n\n**Online Marketplaces and Collector Communities:**\nIf you're not sure who might be interested in buying or accepting your military insignia, consider listing them on online marketplaces or forums dedicated to military collectibles. These platforms allow you to reach a targeted audience of collectors and enthusiasts who are likely to appreciate your items. You can also join online communities or social media groups focused on military collectibles to connect with potential buyers or donors.",
+   "calls": [],
+   "prompt_tokens": 118,
+   "generated_tokens": 357,
+   "prefill_ms": 2605,
+   "decode_ms": 49765,
+   "wall_ms": 52385,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-2912",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Scene 1:\n\nSamantha: *ahem* So, I'm going *totally* against the idea of going to *that* party tonight. It's going to *turn* out to be a *total* disaster. I don't want to *take* any *time* to get ready, and *tonight* is going to be *too* crazy.\n\nAlex: *totally* agree, *this* party is going to *turn* out to be a *total* mess. We should *try* to avoid *taking* *that* route to *town*. It's going *too* *tough* and *taking* *too* long.\n\nSamantha: *totally* understand, *this* *town* is *too* *tired* and *tired* of *those* *tons* of *trouble*. We should *take* a *totally* different *turn* to *town* and *try* to *take* a *different* route.\n\nAlex: *totally* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nScene 2:\n\nSamantha: *totally* *think* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nAlex: *totally* *agree*, *this* party is going *totally* *to* *that* *turn*. We should *try* to *take* a *different* route and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nSamantha: *totally* *think* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nAlex: *totally* *this* party is going *totally* *to* *that* *turn*. We should *try* to *take* a *different* route and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.",
+   "reasoning_chars": 0,
+   "raw": "Scene 1:\n\nSamantha: *ahem* So, I'm going *totally* against the idea of going to *that* party tonight. It's going to *turn* out to be a *total* disaster. I don't want to *take* any *time* to get ready, and *tonight* is going to be *too* crazy.\n\nAlex: *totally* agree, *this* party is going to *turn* out to be a *total* mess. We should *try* to avoid *taking* *that* route to *town*. It's going *too* *tough* and *taking* *too* long.\n\nSamantha: *totally* understand, *this* *town* is *too* *tired* and *tired* of *those* *tons* of *trouble*. We should *take* a *totally* different *turn* to *town* and *try* to *take* a *different* route.\n\nAlex: *totally* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nScene 2:\n\nSamantha: *totally* *think* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nAlex: *totally* *agree*, *this* party is going *totally* *to* *that* *turn*. We should *try* to *take* a *different* route and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nSamantha: *totally* *think* *this* *town* is *too* *tired* of *those* *tons* of *trouble*. We should *try* to *take* *that* *turn* and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.\n\nAlex: *totally* *this* party is going *totally* *to* *that* *turn*. We should *try* to *take* a *different* route and *turn* *this* *town* *around*. We *take* *too* *much* *time* to *think*.",
+   "calls": [],
+   "prompt_tokens": 99,
+   "generated_tokens": 606,
+   "prefill_ms": 2373,
+   "decode_ms": 87017,
+   "wall_ms": 89410,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-2969",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "<<Sloop on Sale>> - A Perfect Companion for Small-Scale Sailing Enthusiasts\n\nAre you looking for a reliable and easy-to-handle sailboat that can accommodate a small crew? Look no further! We have an excellent opportunity to purchase a sloop, a classic and popular type of sailboat that is perfect for those who want to enjoy sailing without the complexity of a larger vessel.\n\n**Sloop Specifications**\n\n| Feature | Description |\n| --- | --- |\n| Length | 28 feet |\n| Beam | 8.5 feet |\n| Draft | 4 feet |\n| Mast | Single mast |\n| Hull Material | Fiberglass |\n| Rigging | Masthead rig |\n| Sails | Main sail, jib sail |\n| Crew Capacity | 2-3 people |\n| Engine | Optional, 20 HP diesel or electric motor |\n| Price | $18,000 |\n\nOur sloop is a beautiful, well-maintained vessel that has been carefully stored and is ready for its new owner. It features a single mast and a masthead rig, making it easy to handle and understand. The main sail and jib sail provide plenty of room for a small crew to navigate through the waters.\n\n**Key Features:**\n\n- Easy to sail and handle, perfect for beginners\n- Small crew capacity, ideal for solo sailing or two-person crews\n- Fiberglass hull and mast, durable and resistant to damage\n- Optional engine, providing flexibility for different sailing scenarios\n- Affordable price, making it an excellent value for the features and condition\n\nIf you're looking for a reliable and enjoyable sailboat, look no further. Our sloop is waiting for you to take it out on the water and experience the thrill of sailing. Contact us today to schedule a viewing and make this sloop yours!\n\n**Additional Information:**\n\n- Location: [Your location]\n- Condition: Excellent, well-maintained and stored\n- Documented history: Available for inspection\n- Price: $18,000 (negotiable)\n\nDon't miss out on this incredible opportunity to own a beautiful and functional sloop. Contact us today to learn more and schedule a viewing.",
+   "reasoning_chars": 0,
+   "raw": "<<Sloop on Sale>> - A Perfect Companion for Small-Scale Sailing Enthusiasts\n\nAre you looking for a reliable and easy-to-handle sailboat that can accommodate a small crew? Look no further! We have an excellent opportunity to purchase a sloop, a classic and popular type of sailboat that is perfect for those who want to enjoy sailing without the complexity of a larger vessel.\n\n**Sloop Specifications**\n\n| Feature | Description |\n| --- | --- |\n| Length | 28 feet |\n| Beam | 8.5 feet |\n| Draft | 4 feet |\n| Mast | Single mast |\n| Hull Material | Fiberglass |\n| Rigging | Masthead rig |\n| Sails | Main sail, jib sail |\n| Crew Capacity | 2-3 people |\n| Engine | Optional, 20 HP diesel or electric motor |\n| Price | $18,000 |\n\nOur sloop is a beautiful, well-maintained vessel that has been carefully stored and is ready for its new owner. It features a single mast and a masthead rig, making it easy to handle and understand. The main sail and jib sail provide plenty of room for a small crew to navigate through the waters.\n\n**Key Features:**\n\n- Easy to sail and handle, perfect for beginners\n- Small crew capacity, ideal for solo sailing or two-person crews\n- Fiberglass hull and mast, durable and resistant to damage\n- Optional engine, providing flexibility for different sailing scenarios\n- Affordable price, making it an excellent value for the features and condition\n\nIf you're looking for a reliable and enjoyable sailboat, look no further. Our sloop is waiting for you to take it out on the water and experience the thrill of sailing. Contact us today to schedule a viewing and make this sloop yours!\n\n**Additional Information:**\n\n- Location: [Your location]\n- Condition: Excellent, well-maintained and stored\n- Documented history: Available for inspection\n- Price: $18,000 (negotiable)\n\nDon't miss out on this incredible opportunity to own a beautiful and functional sloop. Contact us today to learn more and schedule a viewing.",
+   "calls": [],
+   "prompt_tokens": 94,
+   "generated_tokens": 440,
+   "prefill_ms": 2173,
+   "decode_ms": 53487,
+   "wall_ms": 55671,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-3126",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "**How to Conduct a Job Interview**\n\nConducting a job interview is a crucial step in the hiring process, as it allows you to assess a candidate's qualifications, experience, and fit for the role. A well-structured interview can help you make an informed decision about who to hire and increase the chances of finding the right person for the job. In this article, we will provide you with a comprehensive guide on how to conduct a job interview.\n\n**Before the Interview**\n\nBefore the interview, it's essential to prepare and plan. Here are a few things to consider:\n\n* **Define the job requirements**: Clearly outline the job responsibilities, qualifications, and skills required for the role.\n* **Prepare a list of questions**: Develop a list of questions that will help you assess the candidate's qualifications and experience. Some examples of questions include:\n* Can you tell me about your previous work experience?\n* How do you handle [common challenge in the industry]?\n* What are your strengths and weaknesses?\n* Why do you want to work for our company?\n* **Schedule the interview**: Choose a time and date that works for you and the candidate. Make sure the interview is scheduled in a quiet and private space.\n* **Prepare the interview space**: Ensure the interview space is comfortable and free from distractions.\n\n**Conducting the Interview**\n\nDuring the interview, it's essential to create a relaxed and professional atmosphere. Here are some tips to help you conduct a successful interview:\n\n* **Greet the candidate**: Welcome the candidate and introduce yourself. Make sure to make eye contact and smile.\n* **Ask open-ended questions**: Ask questions that encourage the candidate to share their thoughts and experiences. Avoid asking yes or no questions.\n* **Take notes**: Take notes during the interview to help you remember the candidate's responses and to provide a reference later on.\n* **Pay attention to body language**: Pay attention to the candidate's body language and nonverbal cues. This can give you insight into their confidence and enthusiasm for the role.\n* **Ask behavioral questions**: Ask behavioral questions that assess the candidate's past experiences and behaviors. For example:\n* Can you tell me about a time when you overcame a difficult challenge?\n* How do you handle a difficult customer?\n* **Ask scenario-based questions**: Ask scenario-based questions that assess the candidate's problem-solving skills and decision-making abilities. For example:\n* If you were faced with a difficult situation, how would you handle it?\n* How would you approach [common challenge in the industry]?\n\n**After the Interview**\n\nAfter the interview, it's essential to follow up and ensure that the candidate understands the next steps. Here are a few things to consider:\n\n* **Thank the candidate**: Thank the candidate for their time and consideration.\n* **Provide information about the next steps**: Provide the candidate with information about the next steps in the hiring process, such as a follow-up interview or a decision on their application.\n* **Keep the conversation going**: Keep the conversation going by asking the candidate about their interests and goals. This can help you determine whether they are a good fit for the company culture.\n\n**Conclusion**\n\nConducting a job",
+   "reasoning_chars": 0,
+   "raw": "**How to Conduct a Job Interview**\n\nConducting a job interview is a crucial step in the hiring process, as it allows you to assess a candidate's qualifications, experience, and fit for the role. A well-structured interview can help you make an informed decision about who to hire and increase the chances of finding the right person for the job. In this article, we will provide you with a comprehensive guide on how to conduct a job interview.\n\n**Before the Interview**\n\nBefore the interview, it's essential to prepare and plan. Here are a few things to consider:\n\n* **Define the job requirements**: Clearly outline the job responsibilities, qualifications, and skills required for the role.\n* **Prepare a list of questions**: Develop a list of questions that will help you assess the candidate's qualifications and experience. Some examples of questions include:\n* Can you tell me about your previous work experience?\n* How do you handle [common challenge in the industry]?\n* What are your strengths and weaknesses?\n* Why do you want to work for our company?\n* **Schedule the interview**: Choose a time and date that works for you and the candidate. Make sure the interview is scheduled in a quiet and private space.\n* **Prepare the interview space**: Ensure the interview space is comfortable and free from distractions.\n\n**Conducting the Interview**\n\nDuring the interview, it's essential to create a relaxed and professional atmosphere. Here are some tips to help you conduct a successful interview:\n\n* **Greet the candidate**: Welcome the candidate and introduce yourself. Make sure to make eye contact and smile.\n* **Ask open-ended questions**: Ask questions that encourage the candidate to share their thoughts and experiences. Avoid asking yes or no questions.\n* **Take notes**: Take notes during the interview to help you remember the candidate's responses and to provide a reference later on.\n* **Pay attention to body language**: Pay attention to the candidate's body language and nonverbal cues. This can give you insight into their confidence and enthusiasm for the role.\n* **Ask behavioral questions**: Ask behavioral questions that assess the candidate's past experiences and behaviors. For example:\n* Can you tell me about a time when you overcame a difficult challenge?\n* How do you handle a difficult customer?\n* **Ask scenario-based questions**: Ask scenario-based questions that assess the candidate's problem-solving skills and decision-making abilities. For example:\n* If you were faced with a difficult situation, how would you handle it?\n* How would you approach [common challenge in the industry]?\n\n**After the Interview**\n\nAfter the interview, it's essential to follow up and ensure that the candidate understands the next steps. Here are a few things to consider:\n\n* **Thank the candidate**: Thank the candidate for their time and consideration.\n* **Provide information about the next steps**: Provide the candidate with information about the next steps in the hiring process, such as a follow-up interview or a decision on their application.\n* **Keep the conversation going**: Keep the conversation going by asking the candidate about their interests and goals. This can help you determine whether they are a good fit for the company culture.\n\n**Conclusion**\n\nConducting a job",
+   "calls": [],
+   "prompt_tokens": 57,
+   "generated_tokens": 639,
+   "prefill_ms": 1102,
+   "decode_ms": 75649,
+   "wall_ms": 76764,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-3263",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Yes, \"jiang\" is a Chinese surname. It is a common surname in southern China, particularly in the provinces of Guangdong and Guangxi.\n\nOther names similar to \"jiang\" include:\n\n* Jang (Korean surname)\n* Jung (Korean surname, also used in Japanese and Vietnamese cultures)\n* Jeng (Sri Lankan surname)\n* Jung (Slovenesurname)\n* Yong (Korean surname, also used in Japanese and Vietnamese cultures)\n\n******",
+   "reasoning_chars": 0,
+   "raw": "Yes, \"jiang\" is a Chinese surname. It is a common surname in southern China, particularly in the provinces of Guangdong and Guangxi.\n\nOther names similar to \"jiang\" include:\n\n* Jang (Korean surname)\n* Jung (Korean surname, also used in Japanese and Vietnamese cultures)\n* Jeng (Sri Lankan surname)\n* Jung (Slovenesurname)\n* Yong (Korean surname, also used in Japanese and Vietnamese cultures)\n\n******",
+   "calls": [],
+   "prompt_tokens": 58,
+   "generated_tokens": 96,
+   "prefill_ms": 1205,
+   "decode_ms": 9767,
+   "wall_ms": 10981,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-3415",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "**Headline:** Introducing the Ultimate Dog Cage - A Safe Haven for Your Furry Friend\n\n**Subheading:** Unfortunately, not all dog owners have the luxury of providing their pets with a secure and comfortable space to relax. Fortunately, we have a solution!\n\nAre you tired of worrying about your dog's safety and well-being while you're away? Unfortunately, many dogs are left unattended and exposed to potential dangers. Fortunately, our dog cage is here to provide a safe and cozy space for your pet to call its own.\n\n**Features:**\n\n* Durable and sturdy construction\n* Easy-to-clean design\n* Spacious interior for your dog's comfort\n* Secure locking system to prevent escape\n\n**Unfortunately,** our dog cage is not a substitute for proper training and supervision. Unfortunately, it's also not a permanent solution for dogs that require extensive exercise or socialization. Fortunately, we offer a range of accessories and training programs to complement our dog cage.\n\n**Get your dog cage today and provide a safe haven for your furry friend!**",
+   "reasoning_chars": 0,
+   "raw": "**Headline:** Introducing the Ultimate Dog Cage - A Safe Haven for Your Furry Friend\n\n**Subheading:** Unfortunately, not all dog owners have the luxury of providing their pets with a secure and comfortable space to relax. Fortunately, we have a solution!\n\nAre you tired of worrying about your dog's safety and well-being while you're away? Unfortunately, many dogs are left unattended and exposed to potential dangers. Fortunately, our dog cage is here to provide a safe and cozy space for your pet to call its own.\n\n**Features:**\n\n* Durable and sturdy construction\n* Easy-to-clean design\n* Spacious interior for your dog's comfort\n* Secure locking system to prevent escape\n\n**Unfortunately,** our dog cage is not a substitute for proper training and supervision. Unfortunately, it's also not a permanent solution for dogs that require extensive exercise or socialization. Fortunately, we offer a range of accessories and training programs to complement our dog cage.\n\n**Get your dog cage today and provide a safe haven for your furry friend!**",
+   "calls": [],
+   "prompt_tokens": 68,
+   "generated_tokens": 212,
+   "prefill_ms": 1188,
+   "decode_ms": 22548,
+   "wall_ms": 23744,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-3456",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "HERE IS THE LIST OF 100 RANDOM NAMES:\n\n1. JASPER\n2. LUCAS\n3. *CAMERON*\n4. KYLER\n5. ELIJAH\n6. AUSTIN\n7. *EMILY*\n8. TYLER\n9. BRADLEY\n10. JENNY\n11. *MAXWELL*\n12. ETHAN\n13. SAWYER\n14. AIDEN\n15. *LILY*\n16. OLIVER\n17. AUBREY\n18. COLTON\n19. ZACHARY\n20. EMILY\n21. *SOPHIA*\n22. BRYCE\n23. GAVIN\n24. NATASHA\n25. JORDAN\n26. *ALEXANDRA*\n27. COLE\n28. LAYLA\n29. KYMAN\n30. JASMIN\n31. *JACOB*\n32. KENDALL\n33. EMILY\n34. MARCUS\n35. *VIOLET*\n36. JORDAN\n37. AVERY\n38. BRADEN\n39. ZAYDEN\n40. RYAN\n41. LILAH\n42. JENSON\n43. CAMERON\n44. ETHAN\n45. *LUCAS*\n46. TAYLOR\n47. AUSTIN\n48. EMMETT\n49. SAWYER\n50. AIDAN\n51. *EMILY*\n52. JASPER\n53. JACOB\n54. JENNY\n55. *MAX*\n56. GAVIN\n57. COLE\n58. MARCUS\n59. AUBREY\n60. *SOPHIA*\n61. BRADEN\n62. LAYLA\n63. KYMAN\n64. JASMIN\n65. *ALEX*\n66. KENDALL\n67. EMILY\n68. RYAN\n69. LILAH\n70. JENSON\n71. CAMERON\n72. ETHAN\n73. *JACOB*\n74. AVERY\n75. TAYLOR\n76. AUSTIN\n77. EMMETT\n78. SAWYER\n79. AIDAN\n80. *VIOLET*\n81. JASPER\n82. JENNY\n83. *MAXWELL*\n84. GAVIN\n85. COLE\n86. MARCUS\n87. AUBREY\n88. *LUCAS*\n89. BRADEN\n90. LAYLA\n91. KYMAN\n92. JASMIN\n93. *EMILY*\n94. JASPER\n95. JACOB\n96. JENNY\n97. *MAX*\n98. GAVIN\n99. COLE\n100. *EMILY*",
+   "reasoning_chars": 0,
+   "raw": "HERE IS THE LIST OF 100 RANDOM NAMES:\n\n1. JASPER\n2. LUCAS\n3. *CAMERON*\n4. KYLER\n5. ELIJAH\n6. AUSTIN\n7. *EMILY*\n8. TYLER\n9. BRADLEY\n10. JENNY\n11. *MAXWELL*\n12. ETHAN\n13. SAWYER\n14. AIDEN\n15. *LILY*\n16. OLIVER\n17. AUBREY\n18. COLTON\n19. ZACHARY\n20. EMILY\n21. *SOPHIA*\n22. BRYCE\n23. GAVIN\n24. NATASHA\n25. JORDAN\n26. *ALEXANDRA*\n27. COLE\n28. LAYLA\n29. KYMAN\n30. JASMIN\n31. *JACOB*\n32. KENDALL\n33. EMILY\n34. MARCUS\n35. *VIOLET*\n36. JORDAN\n37. AVERY\n38. BRADEN\n39. ZAYDEN\n40. RYAN\n41. LILAH\n42. JENSON\n43. CAMERON\n44. ETHAN\n45. *LUCAS*\n46. TAYLOR\n47. AUSTIN\n48. EMMETT\n49. SAWYER\n50. AIDAN\n51. *EMILY*\n52. JASPER\n53. JACOB\n54. JENNY\n55. *MAX*\n56. GAVIN\n57. COLE\n58. MARCUS\n59. AUBREY\n60. *SOPHIA*\n61. BRADEN\n62. LAYLA\n63. KYMAN\n64. JASMIN\n65. *ALEX*\n66. KENDALL\n67. EMILY\n68. RYAN\n69. LILAH\n70. JENSON\n71. CAMERON\n72. ETHAN\n73. *JACOB*\n74. AVERY\n75. TAYLOR\n76. AUSTIN\n77. EMMETT\n78. SAWYER\n79. AIDAN\n80. *VIOLET*\n81. JASPER\n82. JENNY\n83. *MAXWELL*\n84. GAVIN\n85. COLE\n86. MARCUS\n87. AUBREY\n88. *LUCAS*\n89. BRADEN\n90. LAYLA\n91. KYMAN\n92. JASMIN\n93. *EMILY*\n94. JASPER\n95. JACOB\n96. JENNY\n97. *MAX*\n98. GAVIN\n99. COLE\n100. *EMILY*",
+   "calls": [],
+   "prompt_tokens": 104,
+   "generated_tokens": 619,
+   "prefill_ms": 1915,
+   "decode_ms": 74484,
+   "wall_ms": 76411,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-3631",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "Verse 1\nGather your ingredients you'll need\nTwo slices of bread a perfect deed\nPeanut butter and jelly your choice\nGrab a knife and a plate to rejoice\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze\n\nVerse 2\nTake your knife and spread it all around\nMake sure it's smooth no crumbs are found\nNow take your jelly and give it a go\nOn the other slice of bread let it flow\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze\n\nBridge\nCut the sandwich diagonally if you like\nOr horizontally if you're feeling nice\nYou can even add some crunch if you desire\nA fun twist on the classic PB&J fire\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze",
+   "reasoning_chars": 0,
+   "raw": "Verse 1\nGather your ingredients you'll need\nTwo slices of bread a perfect deed\nPeanut butter and jelly your choice\nGrab a knife and a plate to rejoice\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze\n\nVerse 2\nTake your knife and spread it all around\nMake sure it's smooth no crumbs are found\nNow take your jelly and give it a go\nOn the other slice of bread let it flow\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze\n\nBridge\nCut the sandwich diagonally if you like\nOr horizontally if you're feeling nice\nYou can even add some crunch if you desire\nA fun twist on the classic PB&J fire\n\nChorus\nMaking a PB&J it's easy as can be\nSpread the peanut butter on one slice of tea\nOpen your jelly jar and give it a squeeze\nOn the other slice of bread that's all you need to freeze",
+   "calls": [],
+   "prompt_tokens": 56,
+   "generated_tokens": 267,
+   "prefill_ms": 1008,
+   "decode_ms": 28973,
+   "wall_ms": 29990,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_34",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"travel_itinerary_generator\", \"parameters\": {\"destination\": \"Tokyo\", \"days\": \"7\", \"daily_budget\": \"100\", \"exploration_type\": \"nature\"}}",
+   "calls": [
+    {
+     "name": "travel_itinerary_generator",
+     "arguments": "{\"destination\": \"Tokyo\", \"days\": \"7\", \"daily_budget\": \"100\", \"exploration_type\": \"nature\"}"
+    }
+   ],
+   "prompt_tokens": 339,
+   "generated_tokens": 40,
+   "prefill_ms": 6330,
+   "decode_ms": 4676,
+   "wall_ms": 11016,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_47",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"get_boiling_melting_points\", \"parameters\": {\"substance\": \"water\", \"sea_level\": \"5000\"}}",
+   "calls": [
+    {
+     "name": "get_boiling_melting_points",
+     "arguments": "{\"substance\": \"water\", \"sea_level\": \"5000\"}"
+    }
+   ],
+   "prompt_tokens": 252,
+   "generated_tokens": 30,
+   "prefill_ms": 4585,
+   "decode_ms": 3259,
+   "wall_ms": 7850,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_75",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"elephant_population_estimate\", \"parameters\": {\"current_population\": 35000, \"growth_rate\": 0.015, \"years\": 5}}",
+   "calls": [
+    {
+     "name": "elephant_population_estimate",
+     "arguments": "{\"current_population\": 35000, \"growth_rate\": 0.015, \"years\": 5}"
+    }
+   ],
+   "prompt_tokens": 286,
+   "generated_tokens": 35,
+   "prefill_ms": 5316,
+   "decode_ms": 4000,
+   "wall_ms": 9325,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_88",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"calculate_BMI\", \"parameters\": {\"weight_kg\": \"70\", \"height_m\": \"1\"}}",
+   "calls": [
+    {
+     "name": "calculate_BMI",
+     "arguments": "{\"weight_kg\": \"70\", \"height_m\": \"1\"}"
+    }
+   ],
+   "prompt_tokens": 257,
+   "generated_tokens": 26,
+   "prefill_ms": 4444,
+   "decode_ms": 3184,
+   "wall_ms": 7635,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_91",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"get_restaurant\", \"parameters\": {\"cuisine\": \"sushi\", \"location\": \"Boston\", \"condition\": \"operating days\"}}",
+   "calls": [
+    {
+     "name": "get_restaurant",
+     "arguments": "{\"cuisine\": \"sushi\", \"location\": \"Boston\", \"condition\": \"operating days\"}"
+    }
+   ],
+   "prompt_tokens": 277,
+   "generated_tokens": 33,
+   "prefill_ms": 5069,
+   "decode_ms": 3404,
+   "wall_ms": 8482,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_116",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"probabilities.calculate_single\", \"parameters\": {\"total_outcomes\": \"52\", \"event_outcomes\": \"4\", \"round\": \"2\"}}",
+   "calls": [
+    {
+     "name": "probabilities.calculate_single",
+     "arguments": "{\"total_outcomes\": \"52\", \"event_outcomes\": \"4\", \"round\": \"2\"}"
+    }
+   ],
+   "prompt_tokens": 279,
+   "generated_tokens": 34,
+   "prefill_ms": 5149,
+   "decode_ms": 3891,
+   "wall_ms": 9050,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_131",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"calculate_compound_interest\", \"parameters\": {\"principal\": 10000, \"rate\": 0.05, \"time\": 10, \"n\": 4}}",
+   "calls": [
+    {
+     "name": "calculate_compound_interest",
+     "arguments": "{\"principal\": 10000, \"rate\": 0.05, \"time\": 10, \"n\": 4}"
+    }
+   ],
+   "prompt_tokens": 353,
+   "generated_tokens": 39,
+   "prefill_ms": 6597,
+   "decode_ms": 4597,
+   "wall_ms": 11202,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_133",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"finance.predict_future_value\", \"parameters\": {\"present_value\": 5000, \"annual_interest_rate\": 0.05, \"compounding_periods_per_year\": 12, \"time_years\": 3}}",
+   "calls": [
+    {
+     "name": "finance.predict_future_value",
+     "arguments": "{\"present_value\": 5000, \"annual_interest_rate\": 0.05, \"compounding_periods_per_year\": 12, \"time_years\": 3}"
+    }
+   ],
+   "prompt_tokens": 347,
+   "generated_tokens": 47,
+   "prefill_ms": 6674,
+   "decode_ms": 5512,
+   "wall_ms": 12196,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_152",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"calculate_mutual_fund_balance\", \"parameters\": {\"investment_amount\": \"50000\", \"annual_yield\": \"0.05\", \"years\": \"3\"}}",
+   "calls": [
+    {
+     "name": "calculate_mutual_fund_balance",
+     "arguments": "{\"investment_amount\": \"50000\", \"annual_yield\": \"0.05\", \"years\": \"3\"}"
+    }
+   ],
+   "prompt_tokens": 302,
+   "generated_tokens": 37,
+   "prefill_ms": 5694,
+   "decode_ms": 4215,
+   "wall_ms": 9922,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_168",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"lawsuit_search\", \"parameters\": {\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}}",
+   "calls": [
+    {
+     "name": "lawsuit_search",
+     "arguments": "{\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}"
+    }
+   ],
+   "prompt_tokens": 353,
+   "generated_tokens": 42,
+   "prefill_ms": 6695,
+   "decode_ms": 5092,
+   "wall_ms": 11796,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_174",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"get_top_cases\", \"parameters\": {\"field_of_law\": \"constitutional law\", \"top_number\": \"10\", \"country\": \"China\"}}",
+   "calls": [
+    {
+     "name": "get_top_cases",
+     "arguments": "{\"field_of_law\": \"constitutional law\", \"top_number\": \"10\", \"country\": \"China\"}"
+    }
+   ],
+   "prompt_tokens": 294,
+   "generated_tokens": 34,
+   "prefill_ms": 5475,
+   "decode_ms": 3893,
+   "wall_ms": 9379,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_230",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"historic_leader_search\", \"parameters\": {\"location\": \"France\", \"date\": \"1510\", \"title\": \"King\"}}",
+   "calls": [
+    {
+     "name": "historic_leader_search",
+     "arguments": "{\"location\": \"France\", \"date\": \"1510\", \"title\": \"King\"}"
+    }
+   ],
+   "prompt_tokens": 261,
+   "generated_tokens": 30,
+   "prefill_ms": 4613,
+   "decode_ms": 3200,
+   "wall_ms": 7822,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_256",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"generate_circle_image\", \"parameters\": {\"radius\": \"50\", \"color\": \"Red\", \"background\": \"white\"}}",
+   "calls": [
+    {
+     "name": "generate_circle_image",
+     "arguments": "{\"radius\": \"50\", \"color\": \"Red\", \"background\": \"white\"}"
+    }
+   ],
+   "prompt_tokens": 270,
+   "generated_tokens": 29,
+   "prefill_ms": 5057,
+   "decode_ms": 3250,
+   "wall_ms": 8314,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_291",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"music_generator.generate_melody\", \"parameters\": {\"key\": \"C\", \"start_note\": \"C4\", \"length\": \"16\", \"tempo\": \"120\"}}",
+   "calls": [
+    {
+     "name": "music_generator.generate_melody",
+     "arguments": "{\"key\": \"C\", \"start_note\": \"C4\", \"length\": \"16\", \"tempo\": \"120\"}"
+    }
+   ],
+   "prompt_tokens": 346,
+   "generated_tokens": 41,
+   "prefill_ms": 6525,
+   "decode_ms": 4795,
+   "wall_ms": 11326,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_292",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"compose_melody\", \"parameters\": {\"progression\": \"['C', 'F', 'G']\", \"measures\": \"4\", \"instrument\": \"Piano\"}}",
+   "calls": [
+    {
+     "name": "compose_melody",
+     "arguments": "{\"progression\": \"['C', 'F', 'G']\", \"measures\": \"4\", \"instrument\": \"Piano\"}"
+    }
+   ],
+   "prompt_tokens": 295,
+   "generated_tokens": 40,
+   "prefill_ms": 5391,
+   "decode_ms": 4418,
+   "wall_ms": 9819,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_304",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"player_stats.getLastGame\", \"parameters\": {\"player_name\": \"LeBron James\", \"team\": \"\", \"metrics\": \"[\\\"Points\\\", \\\"Rebounds\\\"]\"}}",
+   "calls": [
+    {
+     "name": "player_stats.getLastGame",
+     "arguments": "{\"player_name\": \"LeBron James\", \"team\": \"\", \"metrics\": \"[\\\"Points\\\", \\\"Rebounds\\\"]\"}"
+    }
+   ],
+   "prompt_tokens": 317,
+   "generated_tokens": 37,
+   "prefill_ms": 5728,
+   "decode_ms": 4284,
+   "wall_ms": 10022,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_323",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"sports_ranking.get_top_player\", \"parameters\": {\"sport\": \"tennis\", \"gender\": \"women\"}}",
+   "calls": [
+    {
+     "name": "sports_ranking.get_top_player",
+     "arguments": "{\"sport\": \"tennis\", \"gender\": \"women\"}"
+    }
+   ],
+   "prompt_tokens": 234,
+   "generated_tokens": 27,
+   "prefill_ms": 4298,
+   "decode_ms": 2661,
+   "wall_ms": 6966,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-simple_326",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"get_team_score\", \"parameters\": {\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\", \"include_player_stats\": \"false\"}}",
+   "calls": [
+    {
+     "name": "get_team_score",
+     "arguments": "{\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\", \"include_player_stats\": \"false\"}"
+    }
+   ],
+   "prompt_tokens": 291,
+   "generated_tokens": 35,
+   "prefill_ms": 5414,
+   "decode_ms": 3978,
+   "wall_ms": 9401,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_334",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"blackjack.check_winner\", \"parameters\": {\"player_cards\": \"['A', '10']\", \"dealer_cards\": \"['10', '9']\", \"ace_value\": \"1\"}}",
+   "calls": [
+    {
+     "name": "blackjack.check_winner",
+     "arguments": "{\"player_cards\": \"['A', '10']\", \"dealer_cards\": \"['10', '9']\", \"ace_value\": \"1\"}"
+    }
+   ],
+   "prompt_tokens": 327,
+   "generated_tokens": 41,
+   "prefill_ms": 6085,
+   "decode_ms": 4647,
+   "wall_ms": 10745,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-simple_379",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"get_current_time\", \"parameters\": {\"location\": \"Sydney\", \"country\": \"Australia\"}}",
+   "calls": [
+    {
+     "name": "get_current_time",
+     "arguments": "{\"location\": \"Sydney\", \"country\": \"Australia\"}"
+    }
+   ],
+   "prompt_tokens": 255,
+   "generated_tokens": 24,
+   "prefill_ms": 4675,
+   "decode_ms": 2672,
+   "wall_ms": 7356,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_23",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"basketball.player_stats.get\", \"parameters\": {\"player_name\": \"LeBron James\", \"stats_fields\": \"[\\\"points_per_game\\\", \\\"assists\\\", \\\"minutes_per_game\\\"]\"}}",
+   "calls": [
+    {
+     "name": "basketball.player_stats.get",
+     "arguments": "{\"player_name\": \"LeBron James\", \"stats_fields\": \"[\\\"points_per_game\\\", \\\"assists\\\", \\\"minutes_per_game\\\"]\"}"
+    }
+   ],
+   "prompt_tokens": 656,
+   "generated_tokens": 42,
+   "prefill_ms": 13419,
+   "decode_ms": 5805,
+   "wall_ms": 19241,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-multiple_33",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"calculate_integral\", \"parameters\": {\"func\": \"3x^2\", \"a\": \"1\", \"b\": \"2\"}}",
+   "calls": [
+    {
+     "name": "calculate_integral",
+     "arguments": "{\"func\": \"3x^2\", \"a\": \"1\", \"b\": \"2\"}"
+    }
+   ],
+   "prompt_tokens": 440,
+   "generated_tokens": 31,
+   "prefill_ms": 8555,
+   "decode_ms": 3777,
+   "wall_ms": 12343,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-multiple_47",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"cosine_similarity.calculate\", \"parameters\": {\"vector1\": \"[3, 2, 1]\", \"vector2\": \"[1, 2, 3]\", \"rounding\": \"0\"}}",
+   "calls": [
+    {
+     "name": "cosine_similarity.calculate",
+     "arguments": "{\"vector1\": \"[3, 2, 1]\", \"vector2\": \"[1, 2, 3]\", \"rounding\": \"0\"}"
+    }
+   ],
+   "prompt_tokens": 527,
+   "generated_tokens": 45,
+   "prefill_ms": 10324,
+   "decode_ms": 5627,
+   "wall_ms": 15964,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-multiple_50",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"house_price_forecast\", \"parameters\": {\"location\": \"New York\", \"months\": \"1\", \"features\": \"[]\"}}",
+   "calls": [
+    {
+     "name": "house_price_forecast",
+     "arguments": "{\"location\": \"New York\", \"months\": \"1\", \"features\": \"[]\"}"
+    }
+   ],
+   "prompt_tokens": 592,
+   "generated_tokens": 31,
+   "prefill_ms": 11578,
+   "decode_ms": 3910,
+   "wall_ms": 15498,
+   "grade": "fail"
+  },
+  {
+   "id": "bfcl-multiple_52",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"currency_conversion\", \"parameters\": {\"amount\": \"100\", \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}}",
+   "calls": [
+    {
+     "name": "currency_conversion",
+     "arguments": "{\"amount\": \"100\", \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}"
+    }
+   ],
+   "prompt_tokens": 417,
+   "generated_tokens": 30,
+   "prefill_ms": 8017,
+   "decode_ms": 3243,
+   "wall_ms": 11272,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_56",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"avg_closing_price\", \"parameters\": {\"company\": \"Apple\", \"days\": \"60\", \"data_source\": \"yahoo finance\"}}",
+   "calls": [
+    {
+     "name": "avg_closing_price",
+     "arguments": "{\"company\": \"Apple\", \"days\": \"60\", \"data_source\": \"yahoo finance\"}"
+    }
+   ],
+   "prompt_tokens": 618,
+   "generated_tokens": 32,
+   "prefill_ms": 12051,
+   "decode_ms": 3690,
+   "wall_ms": 15755,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_79",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"exhibition_info\", \"parameters\": {\"museum_name\": \"Museum of Modern Art, New York\", \"month\": \"1\"}}",
+   "calls": [
+    {
+     "name": "exhibition_info",
+     "arguments": "{\"museum_name\": \"Museum of Modern Art, New York\", \"month\": \"1\"}"
+    }
+   ],
+   "prompt_tokens": 396,
+   "generated_tokens": 32,
+   "prefill_ms": 6701,
+   "decode_ms": 3240,
+   "wall_ms": 9951,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_170",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"soccer_stat.get_player_stats\", \"parameters\": {\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}}",
+   "calls": [
+    {
+     "name": "soccer_stat.get_player_stats",
+     "arguments": "{\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}"
+    }
+   ],
+   "prompt_tokens": 772,
+   "generated_tokens": 34,
+   "prefill_ms": 15032,
+   "decode_ms": 3933,
+   "wall_ms": 18980,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_177",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"board_game.chess.get_top_players\", \"parameters\": {\"location\": \"New York\", \"minimum_rating\": 2300}}",
+   "calls": [
+    {
+     "name": "board_game.chess.get_top_players",
+     "arguments": "{\"location\": \"New York\", \"minimum_rating\": 2300}"
+    }
+   ],
+   "prompt_tokens": 633,
+   "generated_tokens": 30,
+   "prefill_ms": 11147,
+   "decode_ms": 3489,
+   "wall_ms": 14651,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_179",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "{\"name\": \"poker_probability.full_house\", \"parameters\": {\"deck_size\": 52, \"hand_size\": 5}}",
+   "calls": [
+    {
+     "name": "poker_probability.full_house",
+     "arguments": "{\"deck_size\": 52, \"hand_size\": 5}"
+    }
+   ],
+   "prompt_tokens": 646,
+   "generated_tokens": 27,
+   "prefill_ms": 10962,
+   "decode_ms": 3117,
+   "wall_ms": 14090,
+   "grade": "pass"
+  }
+ ],
+ "tally": {
+  "gsm8k": {
+   "pass": 21,
+   "fail": 9,
+   "skipped": 0,
+   "error": 0
+  },
+  "ifeval": {
+   "pass": 18,
+   "fail": 12,
+   "skipped": 0,
+   "error": 0
+  },
+  "bfcl": {
+   "pass": 20,
+   "fail": 10,
+   "skipped": 0,
+   "error": 0
+  }
+ }
+}

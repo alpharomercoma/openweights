@@ -1,0 +1,32 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-155930-42978-e2s-bench-llamacpp-LFM2.5/]
+
+Test [matrix-2jbvkeo5ii2qz] has been created in the Google Cloud.
+Creating individual test executions...
+...........................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8850551646570718967 ].
+16:02:17 Test is Pending
+16:03:34 Starting attempt 1.
+16:03:34 Test is Running
+16:11:27 Done. Test time = 409 (secs)
+16:11:27 Starting results processing. Attempt: 1
+16:11:39 Completed results processing. Time taken = 5 (secs)
+16:11:39 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8850551646570718967 ].
+┌─────────┬────────────────────┬─────────────────────┐
+│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ e2s-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────┴─────────────────────┘

@@ -34,3 +34,6 @@ build-ios-sim/
 # Built release bundles and their R8 maps, copied here for upload. Never committed:
 # a bundle is reproducible from the tag and a mapping file is 60 MB.
 /play/release/
+
+# Test Lab logcats for the benchmark matrices run to 25 MB each; the reports and runner logs are what the repo keeps
+tools/eval/results/*bench*.logcat

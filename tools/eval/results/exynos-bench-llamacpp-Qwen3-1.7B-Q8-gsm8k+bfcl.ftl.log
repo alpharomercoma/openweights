@@ -1,0 +1,32 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/Qwen3-1.7B-Q8_0.gguf] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-163759-50876-e2s-bench-llamacpp-Qwen3-1.7B-Q8/]
+
+Test [matrix-3k7kpjvy32pjy] has been created in the Google Cloud.
+Creating individual test executions...
+............................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8302169635766009156 ].
+16:41:52 Test is Pending
+16:42:43 Starting attempt 1.
+16:42:43 Test is Running
+17:01:46 Done. Test time = 992 (secs)
+17:01:59 Starting results processing. Attempt: 1
+17:01:59 Completed results processing. Time taken = 6 (secs)
+17:01:59 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8302169635766009156 ].
+┌─────────┬────────────────────┬─────────────────────┐
+│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ e2s-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────┴─────────────────────┘

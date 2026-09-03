@@ -1,0 +1,410 @@
+{
+  "suite": "benchmark",
+  "model": "Qwen3-1.7B-Q8_0",
+  "engine": "LlamaCppEngine",
+  "params": "greedy topK=1 seed=7 thinking=false",
+  "prompts_seed": 7,
+  "completed": 21,
+  "budget_exhausted": false,
+  "cases": [
+    {
+      "id": "bfcl-simple_168",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"lawsuit_search\", \"arguments\": {\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "lawsuit_search",
+          "arguments": "{\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}"
+        }
+      ],
+      "prompt_tokens": 309,
+      "generated_tokens": 49,
+      "prefill_ms": 3612,
+      "decode_ms": 8157,
+      "wall_ms": 11843
+    },
+    {
+      "id": "bfcl-simple_174",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_top_cases\", \"arguments\": {\"field_of_law\": \"constitutional law\", \"top_number\": 10, \"country\": \"China\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_top_cases",
+          "arguments": "{\"field_of_law\": \"constitutional law\", \"top_number\": 10, \"country\": \"China\"}"
+        }
+      ],
+      "prompt_tokens": 211,
+      "generated_tokens": 38,
+      "prefill_ms": 2397,
+      "decode_ms": 6212,
+      "wall_ms": 8628
+    },
+    {
+      "id": "bfcl-simple_230",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"historic_leader_search\", \"arguments\": {\"location\": \"France\", \"date\": 1510}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "historic_leader_search",
+          "arguments": "{\"location\": \"France\", \"date\": 1510}"
+        }
+      ],
+      "prompt_tokens": 179,
+      "generated_tokens": 29,
+      "prefill_ms": 1619,
+      "decode_ms": 4645,
+      "wall_ms": 6281
+    },
+    {
+      "id": "bfcl-simple_256",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"generate_circle_image\", \"arguments\": {\"radius\": 50, \"color\": \"Red\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "generate_circle_image",
+          "arguments": "{\"radius\": 50, \"color\": \"Red\"}"
+        }
+      ],
+      "prompt_tokens": 187,
+      "generated_tokens": 27,
+      "prefill_ms": 1310,
+      "decode_ms": 3772,
+      "wall_ms": 5095
+    },
+    {
+      "id": "bfcl-simple_291",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"music_generator.generate_melody\", \"arguments\": {\"key\": \"C\", \"start_note\": \"C4\", \"length\": 16, \"tempo\": 120}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "music_generator.generate_melody",
+          "arguments": "{\"key\": \"C\", \"start_note\": \"C4\", \"length\": 16, \"tempo\": 120}"
+        }
+      ],
+      "prompt_tokens": 261,
+      "generated_tokens": 47,
+      "prefill_ms": 2943,
+      "decode_ms": 7700,
+      "wall_ms": 10665
+    },
+    {
+      "id": "bfcl-simple_292",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"compose_melody\", \"arguments\": {\"progression\": [\"C\", \"F\", \"G\"], \"measures\": 4, \"instrument\": \"Piano\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "compose_melody",
+          "arguments": "{\"progression\": [\"C\", \"F\", \"G\"], \"measures\": 4, \"instrument\": \"Piano\"}"
+        }
+      ],
+      "prompt_tokens": 206,
+      "generated_tokens": 42,
+      "prefill_ms": 2155,
+      "decode_ms": 7036,
+      "wall_ms": 9211
+    },
+    {
+      "id": "bfcl-simple_304",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"player_stats.getLastGame\", \"arguments\": {\"player_name\": \"LeBron James\", \"team\": \"Boston Celtics\", \"metrics\": [\"Points\", \"Rebounds\"]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "player_stats.getLastGame",
+          "arguments": "{\"player_name\": \"LeBron James\", \"team\": \"Boston Celtics\", \"metrics\": [\"Points\", \"Rebounds\"]}"
+        }
+      ],
+      "prompt_tokens": 221,
+      "generated_tokens": 42,
+      "prefill_ms": 2013,
+      "decode_ms": 7178,
+      "wall_ms": 9218
+    },
+    {
+      "id": "bfcl-simple_323",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"sports_ranking.get_top_player\", \"arguments\": {\"sport\": \"tennis\", \"gender\": \"women\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "sports_ranking.get_top_player",
+          "arguments": "{\"sport\": \"tennis\", \"gender\": \"women\"}"
+        }
+      ],
+      "prompt_tokens": 155,
+      "generated_tokens": 30,
+      "prefill_ms": 1670,
+      "decode_ms": 4994,
+      "wall_ms": 6688
+    },
+    {
+      "id": "bfcl-simple_326",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_team_score\", \"arguments\": {\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_team_score",
+          "arguments": "{\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\"}"
+        }
+      ],
+      "prompt_tokens": 206,
+      "generated_tokens": 30,
+      "prefill_ms": 1872,
+      "decode_ms": 5152,
+      "wall_ms": 7045
+    },
+    {
+      "id": "bfcl-simple_334",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"blackjack.check_winner\", \"arguments\": {\"player_cards\": [\"A\", \"10\"], \"dealer_cards\": [\"10\", \"9\"], \"ace_value\": 1}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "blackjack.check_winner",
+          "arguments": "{\"player_cards\": [\"A\", \"10\"], \"dealer_cards\": [\"10\", \"9\"], \"ace_value\": 1}"
+        }
+      ],
+      "prompt_tokens": 235,
+      "generated_tokens": 44,
+      "prefill_ms": 2548,
+      "decode_ms": 7334,
+      "wall_ms": 9910
+    },
+    {
+      "id": "bfcl-simple_379",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_current_time\", \"arguments\": {\"location\": \"Sydney\", \"country\": \"Australia\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_current_time",
+          "arguments": "{\"location\": \"Sydney\", \"country\": \"Australia\"}"
+        }
+      ],
+      "prompt_tokens": 171,
+      "generated_tokens": 27,
+      "prefill_ms": 1417,
+      "decode_ms": 3905,
+      "wall_ms": 5343
+    },
+    {
+      "id": "bfcl-multiple_23",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"basketball.player_stats.get\", \"arguments\": {\"player_name\": \"LeBron James\", \"stats_fields\": [\"points\", \"assists\", \"minutes\"]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "basketball.player_stats.get",
+          "arguments": "{\"player_name\": \"LeBron James\", \"stats_fields\": [\"points\", \"assists\", \"minutes\"]}"
+        }
+      ],
+      "prompt_tokens": 487,
+      "generated_tokens": 40,
+      "prefill_ms": 4897,
+      "decode_ms": 7224,
+      "wall_ms": 12153
+    },
+    {
+      "id": "bfcl-multiple_33",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"calculate_integral\", \"arguments\": {\"func\": \"3x^2\", \"a\": 1, \"b\": 2}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "calculate_integral",
+          "arguments": "{\"func\": \"3x^2\", \"a\": 1, \"b\": 2}"
+        }
+      ],
+      "prompt_tokens": 316,
+      "generated_tokens": 34,
+      "prefill_ms": 3312,
+      "decode_ms": 6305,
+      "wall_ms": 9644
+    },
+    {
+      "id": "bfcl-multiple_47",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"cosine_similarity.calculate\", \"arguments\": {\"vector1\": [3, 2, 1], \"vector2\": [1, 2, 3]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "cosine_similarity.calculate",
+          "arguments": "{\"vector1\": [3, 2, 1], \"vector2\": [1, 2, 3]}"
+        }
+      ],
+      "prompt_tokens": 380,
+      "generated_tokens": 42,
+      "prefill_ms": 3319,
+      "decode_ms": 7810,
+      "wall_ms": 11153
+    },
+    {
+      "id": "bfcl-multiple_50",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"house_price_forecast\", \"arguments\": {\"location\": \"New York\", \"months\": 1}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "house_price_forecast",
+          "arguments": "{\"location\": \"New York\", \"months\": 1}"
+        }
+      ],
+      "prompt_tokens": 430,
+      "generated_tokens": 28,
+      "prefill_ms": 4950,
+      "decode_ms": 5187,
+      "wall_ms": 10159
+    },
+    {
+      "id": "bfcl-multiple_52",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"currency_conversion\", \"arguments\": {\"amount\": 100, \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "currency_conversion",
+          "arguments": "{\"amount\": 100, \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}"
+        }
+      ],
+      "prompt_tokens": 296,
+      "generated_tokens": 35,
+      "prefill_ms": 2933,
+      "decode_ms": 6055,
+      "wall_ms": 9014
+    },
+    {
+      "id": "bfcl-multiple_56",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"avg_closing_price\", \"arguments\": {\"company\": \"Apple\", \"days\": 60}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "avg_closing_price",
+          "arguments": "{\"company\": \"Apple\", \"days\": 60}"
+        }
+      ],
+      "prompt_tokens": 458,
+      "generated_tokens": 28,
+      "prefill_ms": 4216,
+      "decode_ms": 5244,
+      "wall_ms": 9484
+    },
+    {
+      "id": "bfcl-multiple_79",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"exhibition_info\", \"arguments\": {\"museum_name\": \"Museum of Modern Art, New York\", \"month\": 1}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "exhibition_info",
+          "arguments": "{\"museum_name\": \"Museum of Modern Art, New York\", \"month\": 1}"
+        }
+      ],
+      "prompt_tokens": 279,
+      "generated_tokens": 35,
+      "prefill_ms": 2301,
+      "decode_ms": 6045,
+      "wall_ms": 8368
+    },
+    {
+      "id": "bfcl-multiple_170",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"soccer_stat.get_player_stats\", \"arguments\": {\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "soccer_stat.get_player_stats",
+          "arguments": "{\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}"
+        }
+      ],
+      "prompt_tokens": 580,
+      "generated_tokens": 41,
+      "prefill_ms": 8284,
+      "decode_ms": 8304,
+      "wall_ms": 16604
+    },
+    {
+      "id": "bfcl-multiple_177",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"board_game.chess.get_top_players\", \"arguments\": {\"location\": \"New York\", \"minimum_rating\": 2300}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "board_game.chess.get_top_players",
+          "arguments": "{\"location\": \"New York\", \"minimum_rating\": 2300}"
+        }
+      ],
+      "prompt_tokens": 475,
+      "generated_tokens": 35,
+      "prefill_ms": 4601,
+      "decode_ms": 6669,
+      "wall_ms": 11302
+    },
+    {
+      "id": "bfcl-multiple_179",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"poker_probability.full_house\", \"arguments\": {\"deck_size\": 52, \"hand_size\": 5}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "poker_probability.full_house",
+          "arguments": "{\"deck_size\": 52, \"hand_size\": 5}"
+        }
+      ],
+      "prompt_tokens": 483,
+      "generated_tokens": 31,
+      "prefill_ms": 6065,
+      "decode_ms": 5680,
+      "wall_ms": 11772
+    }
+  ]
+}

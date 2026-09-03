@@ -53,6 +53,8 @@ object BenchmarkSuite {
         val sets: Set<String> = emptySet(),
         /** At most this many prompts per set; 0 is all of them. */
         val limit: Int = 0,
+        /** Prompts to skip at the start of each set: the rerun of a time-boxed class. */
+        val skip: Int = 0,
         /** Minutes the whole class may use before it stops and writes. */
         val budgetMinutes: Int = DEFAULT_BUDGET_MINUTES,
     )
@@ -88,8 +90,9 @@ object BenchmarkSuite {
             val set = p.getString("set")
             if (options.sets.isNotEmpty() && set !in options.sets) continue
             val seen = perSet.getOrDefault(set, 0)
-            if (options.limit > 0 && seen >= options.limit) continue
             perSet[set] = seen + 1
+            if (seen < options.skip) continue
+            if (options.limit > 0 && seen - options.skip >= options.limit) continue
             val id = p.getString("id")
             if (set == "bfcl" && toolless) {
                 results.put(
@@ -131,12 +134,8 @@ object BenchmarkSuite {
         resultsDir.mkdirs()
         // One file per run of a set selection, so per-set runs on a slow phone do not
         // overwrite each other; bench/report.py merges them by model and device.
-        val suffix = if (options.sets.isEmpty()) {
-            ""
-        } else {
-            "-" +
-                options.sets.sorted().joinToString("+")
-        }
+        val sets = if (options.sets.isEmpty()) "" else "-" + options.sets.sorted().joinToString("+")
+        val suffix = sets + if (options.skip > 0) "@${options.skip}" else ""
         val out = File(resultsDir, "$modelName.bench$suffix.json")
         out.writeText(report.toString(2))
         return out
@@ -202,6 +201,7 @@ object BenchmarkSuite {
         sets = (args.getString("sets") ?: "").split(',')
             .map(String::trim).filter(String::isNotEmpty).toSet(),
         limit = args.getString("limit")?.toIntOrNull() ?: 0,
+        skip = args.getString("skip")?.toIntOrNull() ?: 0,
         budgetMinutes = args.getString("budget")?.toIntOrNull() ?: DEFAULT_BUDGET_MINUTES,
     )
 

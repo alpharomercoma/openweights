@@ -1,0 +1,32 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/gemma-3-1b-it-Q4_K_M.gguf] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-151357-33864-mustang-bench-llamacpp-gemma-3/]
+
+Test [matrix-3ftis0g2bjj8b] has been created in the Google Cloud.
+Creating individual test executions...
+..............................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.24361860f96340fe/matrices/8558283698141534021 ].
+15:17:39 Test is Pending
+15:18:44 Starting attempt 1.
+15:18:44 Test is Running
+15:36:28 Done. Test time = 952 (secs)
+15:36:28 Starting results processing. Attempt: 1
+15:36:28 Completed results processing. Time taken = 8 (secs)
+15:36:28 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.24361860f96340fe/matrices/8558283698141534021 ].
+┌─────────┬────────────────────────┬─────────────────────┐
+│ OUTCOME │    TEST_AXIS_VALUE     │     TEST_DETAILS    │
+├─────────┼────────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ mustang-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────────┴─────────────────────┘

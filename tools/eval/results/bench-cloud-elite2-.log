@@ -1,0 +1,7 @@
+== 2 matrices to run, 2 at a time
+== building the test APK once
+-> elite- bench-executorch Gemma3 [gsm8k] 16:19
+-> elite- bench-executorch llama-3.2 [gsm8k,bfcl] 16:19
+ok elite- bench-executorch Gemma3 [gsm8k] 16:36
+ok elite- bench-executorch llama-3.2 [gsm8k,bfcl] 16:38
+== all matrices returned 16:38

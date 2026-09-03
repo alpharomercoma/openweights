@@ -1,0 +1,38 @@
+push gemma-3-1b-it-Q4_K_M.gguf 14:43
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/gemma-3-1b-it-Q4_K_M.gguf: 1 file pushed, 0 skipped. 10.8 MB/s (806058240 bytes in 71.427s)
+push Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.pte 14:44
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.pte: 1 file pushed, 0 skipped. 12.0 MB/s (866707200 bytes in 69.167s)
+push Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json 14:46
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json: 1 file pushed, 0 skipped. 79.7 MB/s (33384568 bytes in 0.400s)
+push LFM2.5-1.2B-Instruct-Q4_K_M.gguf 14:46
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/LFM2.5-1.2B-Instruct-Q4_K_M.gguf: 1 file pushed, 0 skipped. 10.9 MB/s (730895168 bytes in 64.226s)
+push Llama-3.2-3B-Instruct-Q4_K_M.gguf 14:47
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Llama-3.2-3B-Instruct-Q4_K_M.gguf: 1 file pushed, 0 skipped. 10.5 MB/s (2019377600 bytes in 182.601s)
+push Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.pte 14:50
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.pte: 1 file pushed, 0 skipped. 12.0 MB/s (1280617088 bytes in 102.118s)
+push Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json 14:52
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json: 1 file pushed, 0 skipped. 175.7 MB/s (11422654 bytes in 0.062s)
+push Qwen3-1.7B-Q8_0.gguf 14:52
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/Qwen3-1.7B-Q8_0.gguf: 1 file pushed, 0 skipped. 11.3 MB/s (1834426016 bytes in 154.959s)
+push react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.pte 14:54
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.pte: 1 file pushed, 0 skipped. 15.8 MB/s (1143218176 bytes in 69.087s)
+push react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.tokenizer.json 14:56
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.tokenizer.json: 1 file pushed, 0 skipped. 239.3 MB/s (4733389 bytes in 0.019s)
+push react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.pte 14:56
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.pte: 1 file pushed, 0 skipped. 11.4 MB/s (2553367552 bytes in 213.257s)
+push react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.tokenizer.json 14:59
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.tokenizer.json: 1 file pushed, 0 skipped. 152.5 MB/s (9906781 bytes in 0.062s)
+push SmolLM3-3B-INT8-INT4.pte 14:59
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/SmolLM3-3B-INT8-INT4.pte: 1 file pushed, 0 skipped. 12.4 MB/s (1994579200 bytes in 153.342s)
+push SmolLM3-3B-INT8-INT4.tokenizer.json 15:02
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/SmolLM3-3B-INT8-INT4.tokenizer.json: 1 file pushed, 0 skipped. 288.4 MB/s (17208819 bytes in 0.057s)
+push SmolLM3-Q4_K_M.gguf 15:02
+/private/tmp/claude-501/-Users-alpha-mobile-inference/f8890602-8a2d-4c8c-9501-a2d30ef39b9d/scratchpad/matrix/eval/SmolLM3-Q4_K_M.gguf: 1 file pushed, 0 skipped. 10.7 MB/s (1915305312 bytes in 171.251s)
+== pushed 15:05
+/Users/alpha/mobile-inference/tools/eval/bench/benchmarks.json: 1 file pushed, 0 skipped. 12.8 MB/s (78631 bytes in 0.006s)
+/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk: 1 file pushed, 0 skipped. 33.3 MB/s (41262373 bytes in 1.182s)
+Success
+== ExecuTorchBenchmarkEval 15:05
+== LlamaCppBenchmarkEval 17:07
+/sdcard/Android/data/io.github.alpharomercoma.openweights.core.engine.test/files/eval-results/./: 10 files pulled, 0 skipped. 0.5 MB/s (1832781 bytes in 3.322s)
+== done 19:24

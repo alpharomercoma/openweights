@@ -13,7 +13,7 @@ while true; do
     prefix=${name%%bench-*}                  # elite-
     rest=${name#*bench-}                     # executorch-Gemma3-ifeval
     fam=$(echo "$rest" | cut -d- -f2- | sed 's/-[^-]*$//')   # Gemma3 (or Qwen3-1.7B-INT8)
-    suffix=${rest##*-}                       # ifeval or gsm8k+bfcl
+    suffix=$(echo "${rest##*-}" | tr + '\n' | sort | paste -sd+ -)   # ifeval or bfcl+gsm8k, sorted like the report
     if ls "$OUT/$prefix"*"$fam"*".bench-$suffix.json" >/dev/null 2>&1; then continue; fi
     M=$(grep -o "matrix-[a-z0-9]*" "$log" | head -1); [ -n "$M" ] || continue
     TOKEN=$(gcloud auth print-access-token 2>/dev/null)

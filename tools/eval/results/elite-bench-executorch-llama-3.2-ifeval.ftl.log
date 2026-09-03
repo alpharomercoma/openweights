@@ -1,0 +1,33 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.tokenizer.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-132835-13039-pa3q-bench-executorch-llama-3.2/]
+
+Test [matrix-1399d7he6v90o] has been created in the Google Cloud.
+Creating individual test executions...
+...............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/9021093174740097463 ].
+13:35:10 Test is Pending
+13:36:02 Starting attempt 1.
+13:36:02 Test is Running
+13:48:21 Done. Test time = 649 (secs)
+13:48:21 Starting results processing. Attempt: 1
+13:48:33 Completed results processing. Time taken = 8 (secs)
+13:48:33 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/9021093174740097463 ].
+┌─────────┬─────────────────────┬─────────────────────┐
+│ OUTCOME │   TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼─────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ pa3q-36-en-portrait │ 1 test cases passed │
+└─────────┴─────────────────────┴─────────────────────┘

@@ -1,0 +1,33 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.tokenizer.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-132908-13252-mustang-bench-executorch-lfm/]
+
+Test [matrix-2rf725dky6r5f] has been created in the Google Cloud.
+Creating individual test executions...
+...........................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.24361860f96340fe/matrices/7111384172087183187 ].
+13:32:59 Test is Pending
+13:34:03 Starting attempt 1.
+13:34:03 Test is Running
+13:38:02 Done. Test time = 147 (secs)
+13:38:02 Starting results processing. Attempt: 1
+13:38:15 Completed results processing. Time taken = 7 (secs)
+13:38:15 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.24361860f96340fe/matrices/7111384172087183187 ].
+┌─────────┬────────────────────────┬─────────────────────┐
+│ OUTCOME │    TEST_AXIS_VALUE     │     TEST_DETAILS    │
+├─────────┼────────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ mustang-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────────┴─────────────────────┘

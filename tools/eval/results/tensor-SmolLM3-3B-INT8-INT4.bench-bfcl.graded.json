@@ -1,0 +1,59 @@
+{
+ "suite": "benchmark",
+ "model": "SmolLM3-3B-INT8-INT4",
+ "engine": "ExecuTorchEngine",
+ "params": "greedy topK=1 seed=7 thinking=false",
+ "prompts_seed": 7,
+ "completed": 2,
+ "budget_exhausted": false,
+ "cases": [
+  {
+   "id": "bfcl-multiple_177",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "<tool_call>\n{\"name\": \"board_game.chess.get_top_players\", \"arguments\": {\"location\": \"New York\", \"minimum_rating\": 2300}}\n</tool_call>",
+   "calls": [
+    {
+     "name": "board_game.chess.get_top_players",
+     "arguments": "{\"location\": \"New York\", \"minimum_rating\": 2300}"
+    }
+   ],
+   "prompt_tokens": 515,
+   "generated_tokens": 33,
+   "prefill_ms": 45209,
+   "decode_ms": 3290,
+   "wall_ms": 48529,
+   "grade": "pass"
+  },
+  {
+   "id": "bfcl-multiple_179",
+   "set": "bfcl",
+   "status": "ok",
+   "content": "",
+   "reasoning_chars": 0,
+   "raw": "<tool_call>\n{\"name\": \"poker_probability.full_house\", \"arguments\": {\"deck_size\": 52, \"hand_size\": 5}}\n</tool_call>",
+   "calls": [
+    {
+     "name": "poker_probability.full_house",
+     "arguments": "{\"deck_size\": 52, \"hand_size\": 5}"
+    }
+   ],
+   "prompt_tokens": 528,
+   "generated_tokens": 30,
+   "prefill_ms": 43587,
+   "decode_ms": 2641,
+   "wall_ms": 46230,
+   "grade": "pass"
+  }
+ ],
+ "tally": {
+  "bfcl": {
+   "pass": 2,
+   "fail": 0,
+   "skipped": 0,
+   "error": 0
+  }
+ }
+}

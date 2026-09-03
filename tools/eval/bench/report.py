@@ -10,9 +10,9 @@ import argparse, json, statistics
 from collections import defaultdict
 from pathlib import Path
 
-DEVICES = [("qdc-", "8 Gen 3"), ("tensor-", "Tensor G5"), ("exynos-", "Exynos 2400"),
-           ("elite-", "8 Elite"), ("", "D9400")]
-ORDER = ["D9400", "8 Gen 3", "8 Elite", "Tensor G5", "Exynos 2400"]
+DEVICES = [("qdc-", "8 Gen 3"), ("tensor-", "Tensor G5"), ("exynos2500-", "Exynos 2500"),
+           ("exynos-", "Exynos 2400"), ("elite-", "8 Elite"), ("", "D9400")]
+ORDER = ["D9400", "8 Gen 3", "8 Elite", "Tensor G5", "Exynos 2400", "Exynos 2500"]
 FAMILIES = [("gemma", "Gemma 3"), ("lfm", "LFM 2.5"), ("llama", "Llama 3.2"),
             ("qwen3", "Qwen3"), ("smollm3", "SmolLM3")]
 SETS = [("gsm8k", "GSM8K"), ("ifeval", "IFEval"), ("bfcl", "BFCL")]

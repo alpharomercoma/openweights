@@ -1,0 +1,7 @@
+/Users/alpha/mobile-inference/tools/eval/bench/benchmarks.json: 1 file pushed, 0 skipped. 21.2 MB/s (78631 bytes in 0.004s)
+/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk: 1 file pushed, 0 skipped. 0.4 MB/s (41262373 bytes in 103.963s)
+Success
+== ExecuTorchBenchmarkEval 14:35
+== LlamaCppBenchmarkEval 16:53
+tools/eval/bench/run_local.sh: line 33: B: command not found
+tools/eval/bench/run_local.sh: line 34: syntax error near unexpected token `done'

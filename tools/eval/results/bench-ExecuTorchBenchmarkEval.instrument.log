@@ -1,0 +1,8 @@
+INSTRUMENTATION_STATUS: class=io.github.alpharomercoma.openweights.core.engine.eval.ExecuTorchBenchmarkEval
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.github.alpharomercoma.openweights.core.engine.eval.ExecuTorchBenchmarkEval:
+INSTRUMENTATION_STATUS: test=benchmarkEveryPushedPte
+INSTRUMENTATION_STATUS_CODE: 1

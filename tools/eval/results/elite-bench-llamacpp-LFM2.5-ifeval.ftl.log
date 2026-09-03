@@ -1,0 +1,32 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260903-150258-31777-pa3q-bench-llamacpp-LFM2.5/]
+
+Test [matrix-2ijdhyum3vlm3] has been created in the Google Cloud.
+Creating individual test executions...
+..........................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/6030156800712019830 ].
+15:06:15 Test is Pending
+15:07:05 Starting attempt 1.
+15:07:05 Test is Running
+15:10:50 Done. Test time = 145 (secs)
+15:10:50 Starting results processing. Attempt: 1
+15:10:50 Completed results processing. Time taken = 5 (secs)
+15:10:50 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.22e2b154f0d1b8e4/matrices/6030156800712019830 ].
+┌─────────┬─────────────────────┬─────────────────────┐
+│ OUTCOME │   TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼─────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ pa3q-36-en-portrait │ 1 test cases passed │
+└─────────┴─────────────────────┴─────────────────────┘

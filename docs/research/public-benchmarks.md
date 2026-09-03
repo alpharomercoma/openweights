@@ -119,7 +119,17 @@ llama.cpp writes "130 - 39 = 91" and the Dimensity's writes "150 - 45 = 105", th
 model and the same greedy decoder having diverged in the arithmetic setup a few tokens
 earlier.
 
-## Time per prompt
+## Speed, on ninety prompts instead of seven
+
+Every prompt records prompt tokens, generated tokens, prefill and decode milliseconds
+and wall time, and [benchmark-matrix.md](benchmark-matrix.md) renders the median prefill
+and decode rates per family, engine and phone. They confirm the parity suite's ranking on
+a sample thirteen times larger: ExecuTorch prefills faster on Gemma 3, LFM2.5 and
+Llama 3.2 on every phone (about 2 to 3x), the two engines trade places on Qwen3 (llama.cpp's
+Q8_0 prefills faster on the Snapdragons, ExecuTorch on the Tensor and Exynos), and
+SmolLM3 on ExecuTorch prefills at a third of llama.cpp's rate everywhere. Decode is
+closer, and the Tensor G5's llama.cpp decode of 4 to 9 tok/s against 8 to 20 on ExecuTorch
+is the same unexplained gap the parity note left open.
 
 Median seconds per GSM8K prompt for Qwen3-1.7B, a 640-token cap:
 

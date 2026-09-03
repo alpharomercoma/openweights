@@ -72,6 +72,19 @@ def render(cells) -> str:
                     row.append(f"{p}/{len(graded)}")
             out.append("| " + " | ".join(row) + " |")
         out.append("")
+    for label, num, den in [("Median prefill tokens per second", "prompt_tokens", "prefill_ms"),
+                            ("Median decode tokens per second", "generated_tokens", "decode_ms")]:
+        out += [f"## {label}", "",
+                "| Family | " + " | ".join(f"{e} {d}" for e, d in cols) + " |",
+                "|---|" + "---|" * len(cols)]
+        for _, fam in FAMILIES:
+            row = [fam]
+            for e, d in cols:
+                rates = [c[num] / c[den] * 1000 for c in cells.get((fam, e, d), {}).values()
+                         if c.get(den) and c.get(num, 0) > 1]
+                row.append(f"{statistics.median(rates):.0f}" if rates else "—")
+            out.append("| " + " | ".join(row) + " |")
+        out.append("")
     out += ["## Median seconds per prompt", "",
             "| Family, set | " + " | ".join(f"{e} {d}" for e, d in cols) + " |",
             "|---|" + "---|" * len(cols)]

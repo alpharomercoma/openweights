@@ -51,8 +51,8 @@ what the app would have acted on.
 **Sampling is the app's, on each runtime.** llama.cpp runs with the app's repeat penalty
 (1.1); ExecuTorch's runner has none. That asymmetry is the product as shipped, so what is
 compared below is each family's published artifact on each runtime with the app's
-settings, not two runtimes under matched sampling; where the penalty is the whole story,
-the control run under "Gemma 3" says so.
+settings, not two runtimes under matched sampling. The one place the penalty could have
+been the whole story, Gemma 3, was rerun with it off; it was not.
 
 ## What the numbers say
 
@@ -91,11 +91,17 @@ GSM8K and BFCL and keeps its IFEval score. That is the decision rule the runtime
 needs: not which engine is faster, but what the publisher's artifact for that engine gives
 up.
 
-**Gemma 3 on ExecuTorch loops.** 21 to 24 of its 30 GSM8K answers on every phone run to
-the cap repeating a step ("Let C be the number of bags..." over and over), scoring 0 to 2
-where llama.cpp's Gemma scores 12 to 14. The ExecuTorch runner has no repetition penalty
-and the app cannot add one from outside; the trap was already named, and this is its
-price on a public set.
+**Gemma 3 on ExecuTorch loops, and it is not the repeat penalty.** 21 to 24 of its 30
+GSM8K answers on every phone run to the cap repeating a step ("Let C be the number of
+bags..." over and over), scoring 0 to 2 where llama.cpp's Gemma scores 12 to 14. The
+first reading was the ExecuTorch runner's missing repetition penalty, since llama.cpp runs
+with the app's 1.1. A control run answers that: the same GGUF on the Poco with the
+penalty set to 1.0, pure greedy, scores the same 14 of 30, with six replies at the cap
+instead of three (`tools/eval/results/controls/`). The penalty is worth a few looped
+tails, not the gap. What is left is the artifact and the runtime: the publisher's 8da4w
+`.pte` under XNNPACK degenerates on this task where the Q4_K_M GGUF under ggml does not,
+and separating those two would need the same weights on both, which no publisher ships.
+The runner still has no penalty to offer, and that stays on the list.
 
 **SmolLM3 on llama.cpp never calls a tool: 0 of 30 on every phone**, while the same
 family on ExecuTorch scores 22 to 27. The evidence points at the template, not the model.

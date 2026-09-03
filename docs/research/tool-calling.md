@@ -763,3 +763,37 @@ Known and accepted: popular-entity questions ("What does Google do?") still draw
 occasional search — a wasted call with a correct answer, the long-standing over-eager
 tail. Llama-3.2-3B produced wholesale zeros under this harness's OpenAI-shape calls —
 a harness artifact to resolve before its rows are read as routing truth.
+
+## LFM2.5-2.6B's tool calls are not parsed (2026-09-04)
+
+Found while trying to film the canvas for the Play listing video, on the accelerated debug
+build with a folder shared, asking the model to write `site/index.html` and show it.
+
+**LFM2.5-1.2B-Instruct-Q4_0 works.** The call parses, the turn raises the approval card
+("Run write_file?" with the full payload and Not now / Run), the file lands, and the canvas
+renders it in the app. The page it writes is correct but thin: 297 bytes, no CSS, the eight
+planets listed in order. Pushed for styling it emits real CSS (`background: #111`, a
+`.planet` class with `border-radius`) and then fills every card with the placeholder
+`<strong>Planet</strong><span>Planet Name</span>`. Structure right, substance empty. That is
+a model-size ceiling, not a bug.
+
+**LFM2.5-2.6B-Q4_0 does not.** Its call arrives in the reply as literal text:
+
+```
+<|tool_call_start|>[write_file(path='site/index.html', content='<!DOCTYPE html>\n\n ...
+```
+
+rendered as prose in the message body, not executed. Same build, same folder, same prompt,
+same family: only the variant changed. So the renderer handles the 1.2B's call format and
+not the 2.6B's, which is the same class of defect as Llama 3.2's `python_tag` reaching the
+parser as text, and worth checking before either is called supported.
+
+**It then loops.** The model reasons about it correctly, "The file already exists and the
+write_file tool doesn't replace by default. I need to use the `replace` parameter to
+overwrite it", the turn reports `Saved skipped . Already refused this turn`, and it re-emits
+the same unparsed call. Still generating at 56 s when it was stopped by hand.
+
+The CSS the 2.6B wrote was the better of the two (`#1a1a1a` ground, `.planet-card` with
+padding and a 12 px radius, a `.planet-fact` class), so the content ceiling and the parsing
+gap are in different models: the one that writes well cannot call, and the one that calls
+cannot write. Neither is filmable, which is why the listing video carries no canvas shot.

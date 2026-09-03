@@ -146,6 +146,92 @@ Made, checked against the spec, and in `play/graphics`. How to regenerate any of
 | Phone screenshots | `screenshots-phone/01..06` | six at 1080 x 1920, 24-bit, no alpha |
 | 7-inch tablet | `screenshots-tablet-7/01..05` | five at 1200 x 2133 |
 | 10-inch tablet | `screenshots-tablet-10/01..05` | five at 1800 x 3200 |
+| Promo video | `play/videos/listing-promo.mp4` | 1920 x 1080, 26.4 s, H.264, silent track |
+
+## The promo video
+
+Made by `play/graphics/cut.py` from real captures; `promo.py` holds the compositor. Four
+facts about how Play shows it decided every design choice: it autoplays **inline, muted,
+for up to 30 seconds**, so the cut is 26.4 s and says everything in type; it plays in a
+**landscape** player, so it is 1920 x 1080; the **feature graphic is its cover image**, so
+it stays in that art's colour family and imports the same mark; and **ads must be off**,
+which is why it carries no music. A Content ID claim can force ads onto a video, and that
+would put the listing out of policy, so silence is a compliance decision before a taste one.
+
+**The ground is not the feature graphic's flat ink, on purpose.** The cover art sits on
+`#052B42`, but the app's own dark surface is a neutral near-black (`OpenWeightsColors.Canvas`,
+`#0D0E10`). Real capture laid on flat navy read as a sticker on a billboard, so the field is
+a vertical gradient from `#06202F` to `#03101A`: dark enough for the capture to settle into,
+blue enough to stay in the cover's family. The capture sits on a card with a 26 px radius
+masked into the alpha (so the corners are real, not drawn over), a 2 px `#17435F` hairline,
+and a navy-tinted shadow rather than a black one, which turns to dirt after compression.
+
+**The mark is imported, never redrawn.** An earlier end card rebuilt the three bars by hand
+and put their height at 0.079 of the longest bar instead of the real 0.22, so they drew long
+and thin. `endcard()` now calls `mark.draw_mark`, the same function behind the icon and the
+feature graphic.
+
+Four shots and an end card, each claim shown by the frame under it: a reply streaming with
+the header's `CPU . 32768 ctx` in view; the app's own `114->30 tok/s 15.9s` and `ctx 5%` at
+1.28x; one model file's `needs 1.13 GB . ~98 tok/s prefill` before any download; and the
+Tools screen across the boundary between its two literal groups, `On this device` and
+`Leaves the device`. Hard cuts, because a dissolve also dissolves the two captions and for a
+few frames the viewer reads both.
+
+The opening headline types on at **120 characters a second**, finishing in about 0.17 s. The
+app decodes roughly 30 tokens a second in that very shot and a token averages about four
+characters, so 120 cps is the honest match, and a muted autoplay punishes a headline that
+cannot be read at once. The eyebrow, the subhead and the streaming reply are all on screen
+at frame one.
+
+**One card, one grid.** Every shot occupies the same 1560 x 700 rectangle at x=180, y=96;
+the lime rule spans exactly that card's width; the eyebrow and headline align to its left
+edge and the subhead to its right. Every crop is cut to the card's 2.2286:1 aspect and
+centred on the phone's own 640 px axis, so the app's content sits centred and nothing
+shifts between shots. An earlier version sized the card from each crop, which put the card,
+the rule and the caption on three different grids and left 100 px of dead space below
+against 74 above. Measured on a render, the margins are now 96 above and 95 below.
+
+**Every headline types on**, at 120 characters a second, so each finishes inside 0.25 s and
+reads as the caption snapping into place. codex argued for keeping it to the first shot
+only; agy argued that a one-off effect reads as a mistake while a consistent one reads as a
+language, and that is the call taken here.
+
+**Held frames, not crops into a scroll.** A rectangle cropped into a moving list cannot be
+framed: wherever the cut falls some card is sliced, and the gap above it stops matching the
+gap below. That produced the defects this file went through three review rounds without
+anyone catching, because codex and agy were reviewing a written description and never saw a
+frame. The app's own geometry is now measured off the pixels and the crops land on it: file
+cards are 513 px tall on the model page with 33 px gaps, the 8B page's are 411 px on a
+444 px pitch, and the Tools screen's row dividers sit at 782, 1065 and 1410, so the crop
+opens on a whole row rather than a sliced title. Where a card cannot be isolated, the
+neighbours are shown symmetrically, 29 px above and 31 px below, which reads as a list.
+
+**Two shots move, and they are the only two that can.** The opening rides the reply arriving
+line by line; the download shot rides the byte counter climbing while its layout stays
+perfectly still, which is the one kind of motion a fixed crop can hold. Everything else is
+held, with the cut between two views carrying the change. Measured on the finished file, the
+longest motionless stretch is 3.0 s and there is a cut about every three seconds.
+
+**The evidence is paired.** "It says if it fits" over a file that runs comfortably, then
+"It says when it is tight" over the 4.80 GB file that wants 5.29 GB, which is the same model
+the next shot downloads. Two cards that both said "Runs comfortably" differed so little that
+the cut between them did not register, and a caption changing over an apparently unchanged
+picture reads as a stuck title.
+
+**Uploading it.** YouTube, 16:9 (not Shorts), **Public or Unlisted** (Private breaks the
+listing), embedding allowed, no age restriction, not made for kids, no region blocks,
+monetisation off, auto-captions off so they do not sit on the lower third. Wait for HD
+processing to finish before pasting the URL into the Console, and paste the plain watch
+URL, not a playlist or timestamped link.
+
+**Not in it, on purpose.** The web-search citation chip, because a video whose first claim
+is "no sign-in, the model file is on this phone" should not then show the app fetching a
+page. The canvas builder, whose tools stay off until a folder is shared and which
+returns an empty reply on a 1.2B model, so showing it would mean staging a result. And the two-runtimes claim, which is the product's real differentiator but
+had no honest footage: Discover shows no engine label per row, and a `.pte` model's detail
+page renders its header with **no file list at all** in build 467, which is a bug worth
+fixing and, until it is, a claim the camera cannot support.
 
 The screenshots are the one place the product explains itself, so they are captioned in that
 order: the telemetry, a tool round, a plan, the Hub across both runtimes, the Models screen

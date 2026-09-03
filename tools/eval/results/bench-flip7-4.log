@@ -35,3 +35,20 @@ cat: Llama-3.2-3B-Instruct-Q4_K_M.gguf.part-*: No such file or directory
 have Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.pte
 have Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json
 == ExecuTorchBenchmarkEval Gemma3 19:24
+   Gemma3-1B-IT-INT8-INT4-ExecuTorch-XNNPACK.bench.json
+   react-native-executorch-llama-3.2-llama_3_2_3b_xnnpack_spinquant.bench.json
+have gemma-3-1b-it-Q4_K_M.gguf
+== LlamaCppBenchmarkEval gemma-3 19:51
+adb: device 'localhost:58244' not found
+push SmolLM3-3B-INT8-INT4.pte 20:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+push SmolLM3-3B-INT8-INT4.tokenizer.json 20:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== ExecuTorchBenchmarkEval SmolLM3-3B 20:06
+adb: device 'localhost:58244' not found
+push SmolLM3-Q4_K_M.gguf 20:06
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== LlamaCppBenchmarkEval SmolLM3-Q4 20:06
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+== done 20:07

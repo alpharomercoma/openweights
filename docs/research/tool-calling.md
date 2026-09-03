@@ -764,36 +764,41 @@ occasional search — a wasted call with a correct answer, the long-standing ove
 tail. Llama-3.2-3B produced wholesale zeros under this harness's OpenAI-shape calls —
 a harness artifact to resolve before its rows are read as routing truth.
 
-## LFM2.5-2.6B's tool calls are not parsed (2026-09-04)
+## An unparsed tool call ends the turn empty (2026-09-04)
 
 Found while trying to film the canvas for the Play listing video, on the accelerated debug
-build with a folder shared, asking the model to write `site/index.html` and show it.
+build with a folder shared under Tools.
 
-**LFM2.5-1.2B-Instruct-Q4_0 works.** The call parses, the turn raises the approval card
-("Run write_file?" with the full payload and Not now / Run), the file lands, and the canvas
-renders it in the app. The page it writes is correct but thin: 297 bytes, no CSS, the eight
-planets listed in order. Pushed for styling it emits real CSS (`background: #111`, a
-`.planet` class with `border-radius`) and then fills every card with the placeholder
-`<strong>Planet</strong><span>Planet Name</span>`. Structure right, substance empty. That is
-a model-size ceiling, not a bug.
+**The symptom is the empty reply.** When the model emits its call as
+`<|tool_call_start|>[write_file(path='site/index.html', content=...)]` and the parser does
+not recognise that form, the markup is not executed and not shown, and the turn finishes as
+*"The model returned an empty reply. Ask again, or put it another way."* That is the same
+message a slide-deck request produced by hand earlier the same day, so the empty reply is
+not a model that said nothing: it is a call that was never parsed.
 
-**LFM2.5-2.6B-Q4_0 does not.** Its call arrives in the reply as literal text:
+**It is not one variant.** The first attempts, before a folder was shared, had
+LFM2.5-1.2B-Instruct-Q4_0 parsing correctly: the turn raised the approval card ("Run
+write_file?" with the full payload and Not now / Run), the file landed, and the canvas
+rendered it. LFM2.5-2.6B-Q4_0 leaked on every attempt. But with the folder shared, the
+**1.2B leaked too**, on a plain question. So the parser handles one call form and not the
+other, and which form a model emits varies by turn. Do not read this as "the 2.6B is
+broken and the 1.2B is fine".
 
-```
-<|tool_call_start|>[write_file(path='site/index.html', content='<!DOCTYPE html>\n\n ...
-```
+**Sharing a folder changes what the model does with a question.** Asked "Explain the
+transformer architecture" with the file tools live, the 1.2B answered "I don't have a direct
+tool that provides a detailed explanation of that" and tried to `write_file` a note to
+`notes/transformer_architecture.md` instead of simply answering. A knowledge question routed
+into a file write is a routing problem sitting on top of the parsing one, and it means chat
+footage should be captured with no folder shared.
 
-rendered as prose in the message body, not executed. Same build, same folder, same prompt,
-same family: only the variant changed. So the renderer handles the 1.2B's call format and
-not the 2.6B's, which is the same class of defect as Llama 3.2's `python_tag` reaching the
-parser as text, and worth checking before either is called supported.
+**And it loops.** After a refused write the 2.6B reasons correctly, "The file already exists
+and the write_file tool doesn't replace by default. I need to use the `replace` parameter",
+the turn reports `Saved skipped . Already refused this turn`, and it re-emits the same
+unparsed call. Still generating at 56 s when stopped by hand.
 
-**It then loops.** The model reasons about it correctly, "The file already exists and the
-write_file tool doesn't replace by default. I need to use the `replace` parameter to
-overwrite it", the turn reports `Saved skipped . Already refused this turn`, and it re-emits
-the same unparsed call. Still generating at 56 s when it was stopped by hand.
-
-The CSS the 2.6B wrote was the better of the two (`#1a1a1a` ground, `.planet-card` with
-padding and a 12 px radius, a `.planet-fact` class), so the content ceiling and the parsing
-gap are in different models: the one that writes well cannot call, and the one that calls
-cannot write. Neither is filmable, which is why the listing video carries no canvas shot.
+**The content ceilings are separate from all of this.** The 1.2B, when its call does parse,
+writes 297 bytes of correct but unstyled HTML listing the eight planets in order; pushed for
+CSS it emits a real stylesheet and fills every card with the placeholder
+`<strong>Planet</strong><span>Planet Name</span>`. The 2.6B writes the better CSS
+(`#1a1a1a` ground, `.planet-card` with padding and a 12 px radius) and cannot get it through
+the parser. Neither is filmable, which is why the listing video carries no canvas shot.

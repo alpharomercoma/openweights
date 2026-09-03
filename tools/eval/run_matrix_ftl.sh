@@ -36,11 +36,29 @@ case "$ENGINE" in
   llamacpp)   CLASS=LlamaCppParityEval;   PATTERN='\.gguf$' ;;
   # The thread sweep, on the one GGUF it needs. See SpeedProbe.kt.
   probe)      CLASS=SpeedProbe;           PATTERN='Qwen3-1.7B-Q8_0\.gguf$' ;;
-  *) echo "engine must be executorch, llamacpp or probe" >&2; exit 2 ;;
+  # The public benchmarks (BenchmarkSuite.kt). BENCH_MODEL narrows to one family's
+  # files and BENCH_SETS to some of gsm8k,ifeval,bfcl, because one family's ninety
+  # prompts do not fit the 45-minute window on the slower phones.
+  bench-executorch) CLASS=ExecuTorchBenchmarkEval; PATTERN='\.pte$|\.tokenizer\.json$' ;;
+  bench-llamacpp)   CLASS=LlamaCppBenchmarkEval;   PATTERN='\.gguf$' ;;
+  *) echo "engine must be executorch, llamacpp, probe, bench-executorch or bench-llamacpp" >&2; exit 2 ;;
+esac
+BENCH_MODEL=${BENCH_MODEL:-}
+BENCH_SETS=${BENCH_SETS:-}
+BENCH_BUDGET=${BENCH_BUDGET:-38}
+ENV_VARS=""
+case "$CLASS" in
+  *BenchmarkEval)
+    # gcloud's dict flag splits on commas; the ^:^ prefix makes the colon the separator
+    # so a sets value such as gsm8k,bfcl survives.
+    ENV_VARS="^:^budget=$BENCH_BUDGET${BENCH_MODEL:+:model=$BENCH_MODEL}${BENCH_SETS:+:sets=$BENCH_SETS}"
+    [ -z "$BENCH_MODEL" ] || PATTERN="$BENCH_MODEL.*($PATTERN)" ;;
 esac
 
-echo "== building the accelerated test APK (both engines live in it)"
-(cd "$ROOT" && ./gradlew :core:engine:assembleAcceleratedDebugAndroidTest --console=plain -q)
+if [ -z "${SKIP_BUILD:-}" ]; then
+  echo "== building the accelerated test APK (both engines live in it)"
+  (cd "$ROOT" && ./gradlew :core:engine:assembleAcceleratedDebugAndroidTest --console=plain -q)
+fi
 
 echo "== the $ENGINE models in $BUCKET"
 FILES=""
@@ -50,15 +68,18 @@ for uri in $(gcloud storage ls "$BUCKET/" | grep -E "$PATTERN"); do
   echo "   $name"
 done
 [ -n "$FILES" ] || { echo "no $ENGINE models in $BUCKET" >&2; exit 1; }
+case "$CLASS" in
+  *BenchmarkEval) FILES="$FILES,$EVAL/benchmarks.json=$BUCKET/benchmarks.json" ;;
+esac
 
 mkdir -p "$OUT"
-LOG="$OUT/$PREFIX$ENGINE.ftl.log"
+LOG="$OUT/$PREFIX$ENGINE${BENCH_MODEL:+-$BENCH_MODEL}${BENCH_SETS:+-$(echo "$BENCH_SETS" | tr , +)}.ftl.log"
 echo "== running $CLASS on $MODEL ($VERSION); log in $LOG"
 gcloud firebase test android run --quiet --type instrumentation \
   --app "$APK" --test "$APK" \
   --device "model=$MODEL,version=$VERSION,locale=en,orientation=portrait" \
   --test-targets "class io.github.alpharomercoma.openweights.core.engine.eval.$CLASS" \
-  --timeout 45m \
+  --timeout 45m ${ENV_VARS:+--environment-variables "$ENV_VARS"} \
   --results-bucket "$BUCKET" --results-dir "runs/$(date +%Y%m%d-%H%M%S)-$MODEL-$ENGINE" \
   --other-files "$FILES" \
   --directories-to-pull "/sdcard/Android/data/$PKG/files/eval-results" \
@@ -75,8 +96,12 @@ for f in $(find "$TMP" -name '*.json' | grep -v instrumentation); do
   cp "$f" "$OUT/$PREFIX$(basename "$f")"
   echo "   $OUT/$PREFIX$(basename "$f")"
 done
-gcloud storage cp "${RESULTS}$MODEL-$VERSION-en-portrait/logcat" "$OUT/$PREFIX$ENGINE.logcat" >/dev/null 2>&1 || true
+gcloud storage cp "${RESULTS}$MODEL-$VERSION-en-portrait/logcat" "${LOG%.ftl.log}.logcat" >/dev/null 2>&1 || true
 
-echo "== rendering comparison"
-python3 "$HERE/compare.py" "$OUT" --out "$ROOT/docs/research/backend-parity.md"
-echo "done: docs/research/backend-parity.md"
+case "$CLASS" in
+  *BenchmarkEval) echo "done: grade with tools/eval/bench/grade.py, render with bench/report.py" ;;
+  *)
+    echo "== rendering comparison"
+    python3 "$HERE/compare.py" "$OUT" --out "$ROOT/docs/research/backend-parity.md"
+    echo "done: docs/research/backend-parity.md" ;;
+esac

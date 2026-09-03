@@ -78,6 +78,8 @@ def load_reports(results_dir: Path):
     reports = {}
     for path in sorted(results_dir.glob("*.json")):
         report = json.loads(path.read_text())
+        if report.get("suite") == "benchmark":
+            continue  # the public-benchmark reports are bench/report.py's
         engine = "executorch" if "ExecuTorch" in report.get("engine", "") else "llamacpp"
         family = family_of(report["model"])
         if family:

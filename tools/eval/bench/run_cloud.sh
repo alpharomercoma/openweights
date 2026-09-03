@@ -31,7 +31,9 @@ for phone in $PHONES; do
       case "$fam" in *emma*) groups="gsm8k ifeval" ;; *) groups="gsm8k,bfcl ifeval" ;; esac
       for sets in $groups; do
         suffix=$(echo "$sets" | tr , '\n' | sort | paste -sd+ -)
-        if ls "$OUT/$prefix"*"$fam"*".bench-$suffix.json" >/dev/null 2>&1; then continue; fi
+        # Done means a report that was not cut by the time box; a cut one is finished with skip.
+        if ls "$OUT/$prefix"*"$fam"*".bench-$suffix.json" >/dev/null 2>&1 \
+           && ! grep -q '"budget_exhausted": true' "$OUT/$prefix"*"$fam"*".bench-$suffix.json"; then continue; fi
         echo "$dev $ver $prefix $engine $fam $sets" >> "$JOBS"
       done
     done

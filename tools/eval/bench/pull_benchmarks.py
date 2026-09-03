@@ -86,8 +86,17 @@ def schema(params):
                 p["type"] = TYPES[t]
         if "properties" in p:
             p.update(schema(p))
-        if isinstance(p.get("items"), dict) and p["items"].get("type") in TYPES:
-            p["items"] = dict(p["items"], type=TYPES[p["items"]["type"]] or "string")
+        if isinstance(p.get("items"), dict):
+            items = dict(p["items"])
+            if items.get("type") in TYPES:
+                mapped = TYPES[items["type"]]
+                if mapped is None:
+                    items.pop("type", None)  # an unconstrained item stays unconstrained
+                else:
+                    items["type"] = mapped
+            if "properties" in items:
+                items.update(schema(items))
+            p["items"] = items
         props[name] = p
     return {"type": "object", "properties": props, "required": params.get("required", [])}
 

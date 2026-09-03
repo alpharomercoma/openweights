@@ -57,13 +57,21 @@ object BenchmarkSuite {
         val skip: Int = 0,
         /** Minutes the whole class may use before it stops and writes. */
         val budgetMinutes: Int = DEFAULT_BUDGET_MINUTES,
-    )
+        /** Repeat penalty for the engines that have one; null keeps the app's default. */
+        val repeatPenalty: Float? = null,
+    ) {
+        init {
+            // Skip counts prompts within each set, so a rerun of a cut class names its set.
+            require(skip == 0 || sets.size == 1) { "skip needs exactly one set" }
+        }
+    }
 
     /** Families whose format has no tool syntax; BFCL is recorded as skipped for them. */
     private val TOOLLESS = listOf("smollm2", "gemma")
 
     @Volatile
     private var deadline = Long.MAX_VALUE
+    private var engineName = "unknown"
 
     fun startClock(options: Options) {
         deadline = SystemClock.elapsedRealtime() + options.budgetMinutes * MS_PER_MINUTE
@@ -79,6 +87,7 @@ object BenchmarkSuite {
         options: Options,
     ): File {
         val toolless = TOOLLESS.any { it in modelName.lowercase().filter(Char::isLetterOrDigit) }
+        engineName = engine::class.simpleName ?: "unknown"
         val doc = JSONObject(promptsFile.readText())
         val all = doc.getJSONArray("prompts")
         val perSet = mutableMapOf<String, Int>()
@@ -107,7 +116,7 @@ object BenchmarkSuite {
             }
             val started = SystemClock.elapsedRealtime()
             val outcome = runCatching {
-                turn(engine, p.getString("prompt"), p.getInt("max_tokens"), tools(p))
+                turn(engine, p.getString("prompt"), p.getInt("max_tokens"), tools(p), options)
             }
             results.put(
                 outcome.fold(
@@ -119,15 +128,37 @@ object BenchmarkSuite {
                 ).put("wall_ms", SystemClock.elapsedRealtime() - started),
             )
             Log.i(TAG, "$modelName $id ${results.length()} done")
+            // Checkpoint after every prompt: a killed class keeps what it reached.
+            write(resultsDir, modelName, doc, results, exhausted = false, options)
         }
 
+        return write(resultsDir, modelName, doc, results, exhausted, options)
+    }
+
+    private fun write(
+        resultsDir: File,
+        modelName: String,
+        doc: JSONObject,
+        results: JSONArray,
+        exhausted: Boolean,
+        options: Options,
+    ): File {
+        val statuses = (0 until results.length()).groupingBy {
+            results.getJSONObject(it).getString("status")
+        }.eachCount()
         val report = JSONObject()
             .put("suite", "benchmark")
             .put("model", modelName)
-            .put("engine", engine::class.simpleName)
-            .put("params", "greedy topK=1 seed=7 thinking=false")
+            .put("engine", engineName)
+            .put(
+                "params",
+                "greedy topK=1 seed=7 thinking=false repeatPenalty=${options.repeatPenalty ?: "default"}",
+            )
             .put("prompts_seed", doc.optInt("seed"))
             .put("completed", results.length())
+            .put("ok", statuses["ok"] ?: 0)
+            .put("errors", statuses["error"] ?: 0)
+            .put("skipped", statuses["skipped"] ?: 0)
             .put("budget_exhausted", exhausted)
             .put("cases", results)
 
@@ -135,9 +166,12 @@ object BenchmarkSuite {
         // One file per run of a set selection, so per-set runs on a slow phone do not
         // overwrite each other; bench/report.py merges them by model and device.
         val sets = if (options.sets.isEmpty()) "" else "-" + options.sets.sorted().joinToString("+")
-        val suffix = sets + if (options.skip > 0) "@${options.skip}" else ""
+        val suffix = sets + (if (options.skip > 0) "@${options.skip}" else "") +
+            (if (options.repeatPenalty != null) "-rp${options.repeatPenalty}" else "")
         val out = File(resultsDir, "$modelName.bench$suffix.json")
-        out.writeText(report.toString(2))
+        val tmp = File(resultsDir, "$modelName.bench$suffix.json.tmp")
+        tmp.writeText(report.toString(2))
+        tmp.renameTo(out)
         return out
     }
 
@@ -178,7 +212,9 @@ object BenchmarkSuite {
         prompt: String,
         maxTokens: Int,
         tools: List<ToolDefinition>,
+        options: Options,
     ): ParitySuite.Turn {
+        val defaults = SamplerParams()
         val params = SamplerParams(
             // Thinking off on both engines. llama.cpp can cap a thinking block at a budget
             // and ExecuTorch cannot, so with thinking on the two would not be answering
@@ -188,6 +224,7 @@ object BenchmarkSuite {
             topK = 1,
             seed = 7,
             maxTokens = maxTokens,
+            repeatPenalty = options.repeatPenalty ?: defaults.repeatPenalty,
         )
         val messages = listOf(ChatMessage.text(ChatRole.USER, prompt))
         val events = engine.chat(messages, params, tools).toList()
@@ -203,6 +240,7 @@ object BenchmarkSuite {
         limit = args.getString("limit")?.toIntOrNull() ?: 0,
         skip = args.getString("skip")?.toIntOrNull() ?: 0,
         budgetMinutes = args.getString("budget")?.toIntOrNull() ?: DEFAULT_BUDGET_MINUTES,
+        repeatPenalty = args.getString("repeat")?.toFloatOrNull(),
     )
 
     private const val DEFAULT_BUDGET_MINUTES = 38

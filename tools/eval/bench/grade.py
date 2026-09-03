@@ -14,7 +14,9 @@ Only the parsed calls count, the way the app would act on them; text is not re-p
 Writes a *.graded.json beside each report and prints a summary; report.py renders it.
 Needs the packages in requirements.txt and nltk's punkt_tab data (see that file).
 """
-import json, re, sys
+import json, random, re, sys
+
+import langdetect
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -24,27 +26,51 @@ PROMPTS = {p["id"]: p for p in json.loads(
     (Path(__file__).resolve().parent / "benchmarks.json").read_text())["prompts"]}
 
 NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+BOXED = re.compile(r"\\boxed\{\s*(-?\d[\d,]*(?:\.\d+)?)\s*\}")
 
 
 def strip_thinking(text: str) -> str:
-    return text.split("</think>")[-1] if "</think>" in text else text
+    if "</think>" in text:
+        return text.split("</think>")[-1]
+    # A thinking block the cap cut open never reached an answer.
+    return "" if "<think>" in text else text
 
 
 def grade_gsm8k(case, ref) -> bool:
+    """The dataset's own '####' marker first, then a boxed answer, then the last number.
+
+    A phone-sized model writes '#### <number> 9', '\\boxed{9}' or just '9' at the end;
+    the marker wins when present so a trailing remark cannot supply the number."""
     text = strip_thinking(case.get("content") or "")
-    tail = text.split("####")[-1] if "####" in text else text
-    nums = NUMBER.findall(tail) or NUMBER.findall(text)
-    if not nums:
-        return False
+    if "####" in text:
+        nums = NUMBER.findall(text.split("####")[-1])
+        if nums:
+            return same_number(nums[0], ref)  # the first number after the marker is the answer
+    boxed = BOXED.findall(text)
+    if boxed:
+        return same_number(boxed[-1], ref)
+    nums = NUMBER.findall(text)
+    return bool(nums) and same_number(nums[-1], ref)
+
+
+def same_number(text: str, ref) -> bool:
     try:
-        return float(nums[-1].replace(",", "")) == float(ref)
+        return float(text.replace(",", "")) == float(ref)
     except ValueError:
         return False
 
 
 def grade_ifeval(case, ref) -> bool:
+    """The strict rule of google-research's evaluation_lib.test_instruction_following_strict,
+    instruction by instruction: build with the dataset's kwargs, then with the prompt for
+    the checkers that read it, then check. langdetect is seeded, and so is random, because
+    both are consulted by some checkers and an unseeded grade is not a grade."""
     response = strip_thinking(case.get("content") or "")
     prompt = PROMPTS[case["id"]]["prompt"]
+    if len(ref["instruction_id_list"]) != len(ref["kwargs"]) or not ref["instruction_id_list"]:
+        raise ValueError(f"malformed IFEval reference for {case['id']}")
+    langdetect.DetectorFactory.seed = 0
+    random.seed(0)
     for iid, kwargs in zip(ref["instruction_id_list"], ref["kwargs"]):
         inst = instructions_registry.INSTRUCTION_DICT[iid](iid)
         inst.build_description(**kwargs)
@@ -59,7 +85,7 @@ def same(value, accepted) -> bool:
     for a in accepted:
         if value == a:
             return True
-        if isinstance(a, (int, float)) and not isinstance(a, bool):
+        if isinstance(a, (int, float)) and not isinstance(a, bool) and not isinstance(value, bool):
             try:
                 if float(value) == float(a):
                     return True

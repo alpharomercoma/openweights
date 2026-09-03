@@ -103,10 +103,13 @@ done
 # Two matrices created in the same second once shared a results directory and the
 # second failed validation, hence the pid in the name above; and the pushed prompts
 # file comes back with the artifacts, so it is not a report.
+PULLED=0
 for f in $(find "$TMP" -name '*.json' | grep -v 'instrumentation\|benchmarks.json'); do
   cp "$f" "$OUT/$PREFIX$(basename "$f")"
   echo "   $OUT/$PREFIX$(basename "$f")"
+  PULLED=$((PULLED + 1))
 done
+[ "$PULLED" -gt 0 ] || { echo "no report came back from $RESULTS" >&2; exit 1; }
 gcloud storage cp "${RESULTS}$MODEL-$VERSION-en-portrait/logcat" "${LOG%.ftl.log}.logcat" >/dev/null 2>&1 || true
 
 case "$CLASS" in

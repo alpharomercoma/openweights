@@ -22,6 +22,12 @@ def device_of(name: str) -> str:
     for prefix, label in DEVICES:
         if prefix and name.startswith(prefix):
             return label
+    # Unprefixed reports are the phone in hand; anything else prefixed is a mistake to
+    # raise, not a column to invent.
+    head = name.split("-")[0].lower()
+    if head in {"tensor", "exynos", "elite", "qdc", "poco", "pixel", "galaxy", "dimensity", "snapdragon"} \
+            or head.startswith(("exynos", "tensor", "qdc")):
+        raise ValueError(f"unknown device prefix in {name}")
     return "D9400"
 
 
@@ -41,7 +47,13 @@ def load(root: Path):
         fam = family_of(r["model"])
         if fam:
             for c in r["cases"]:
-                cells[(fam, engine, device_of(path.name))][c["id"]] = c
+                slot = cells[(fam, engine, device_of(path.name))]
+                have = slot.get(c["id"])
+                # A rerun's file sorts after the original; a graded answer never loses to
+                # an error or a skip, whichever file came later.
+                if have and have.get("grade") in ("pass", "fail") and c.get("grade") not in ("pass", "fail"):
+                    continue
+                slot[c["id"]] = c
     return cells
 
 

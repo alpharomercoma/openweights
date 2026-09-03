@@ -410,7 +410,7 @@
    "prefill_ms": 611,
    "decode_ms": 19581,
    "wall_ms": 20221,
-   "grade": "pass"
+   "grade": "fail"
   },
   {
    "id": "gsm8k-1199",
@@ -1510,8 +1510,8 @@
  ],
  "tally": {
   "gsm8k": {
-   "pass": 25,
-   "fail": 5,
+   "pass": 24,
+   "fail": 6,
    "skipped": 0,
    "error": 0
   },

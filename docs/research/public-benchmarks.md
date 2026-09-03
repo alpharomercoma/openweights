@@ -1,7 +1,8 @@
 # Public benchmarks on six phones: what GSM8K, IFEval and BFCL say about the two runtimes
 
-On 2026-09-03 the five families that ship for both engines answered the same 90 public
-prompts on both runtimes on every phone we could reach: the Dimensity 9400 in hand, the
+On 2026-09-03 the five families that ship for both engines answered the same public
+prompts on both runtimes on every phone we could reach, 90 per family, 60 for Gemma 3,
+which has no tool syntax: the Dimensity 9400 in hand, the
 Snapdragon 8 Gen 3 on Qualcomm Device Cloud, the Snapdragon 8 Elite, Tensor G5 and
 Exynos 2400 on Firebase Test Lab, and an Exynos 2500 (Galaxy Z Flip7) on Samsung Remote
 Test Lab, the last still partial. The tables are in
@@ -11,15 +12,22 @@ taught about running it.
 
 The seven-case [parity suite](parity-five-socs.md) was ours; a reviewer reads it as n=7.
 The prompts here are a seeded subset of three published sets, committed as
-`tools/eval/bench/benchmarks.json` so a rerun answers literally the same ones:
+`tools/eval/bench/benchmarks.json` so a rerun answers literally the same ones. Three things
+in that file are ours and are said so here: the GSM8K questions carry one added line asking
+for the answer after `####`, the BFCL conversations are flattened to their user turns, and
+the BFCL parameter schemas have their Python-style types (`dict`, `float`, `tuple`) mapped to
+JSON Schema's. The source rows are otherwise untouched.
 
 - **GSM8K**, 30 questions from the test split, graded by the final number.
 - **IFEval**, 30 prompts, graded by Google's own instruction checkers, vendored under
   `tools/eval/bench/ifeval/` (Apache-2.0), strict: every instruction in the prompt.
-- **BFCL v3**, 20 `simple` and 10 `multiple` cases, graded by the leaderboard's AST rule
-  for those categories, reimplemented in `grade.py`: one call, the right function, every
-  required parameter, every value among the possible answers. Only the parsed call counts,
-  the way the app would act on it. Gemma 3 has no tool syntax and is skipped.
+- **BFCL v3**, 20 `simple` and 10 `multiple` cases (both are single-call categories),
+  graded by our reimplementation of the leaderboard's AST rule for them in `grade.py`: one
+  call, the right function, every required parameter, every value among the possible
+  answers, no parameter the answer key does not list. It is not the leaderboard's own
+  evaluator, so these are not leaderboard scores; they are the same rule applied to what
+  the app's parser handed back, the call the app would have acted on. Gemma 3 has no tool
+  syntax and is skipped.
 
 ## The rules that make it one comparison
 
@@ -30,16 +38,21 @@ answering under the same rule. The parity suite is where the thinking families t
 **640 tokens per reply, 384 for a call.** An IFEval instruction that needs more than that
 fails on every engine alike, and a few do ("at least 50 sentences"). The cap is what makes
 a class fit Test Lab's 45-minute window, and the numbers are comparisons, not leaderboard
-entries.
+entries. Both engines honoured it: of 4,750 answered prompts, two ExecuTorch replies ran
+1 and 5 tokens past it, none on llama.cpp. Thinking was off on both, and every report
+records zero reasoning characters, so no reply spent its cap on a thought block. The two
+artifacts of a family share its tokenizer, so a token cap is the same text budget on both.
 
 **The phone answers, the host grades.** IFEval's checker and BFCL's answer matching are
 their own code; the device writes every raw reply, the parsed calls and the timings, and
 `grade.py` does the rest. That also kept the app's own parsers honest: what is graded is
 what the app would have acted on.
 
-**Sampling is the app's, on each runtime.** llama.cpp runs with the app's repeat penalty;
-ExecuTorch's runner has none. That asymmetry is the product, and one finding below is its
-cost.
+**Sampling is the app's, on each runtime.** llama.cpp runs with the app's repeat penalty
+(1.1); ExecuTorch's runner has none. That asymmetry is the product as shipped, so what is
+compared below is each family's published artifact on each runtime with the app's
+settings, not two runtimes under matched sampling; where the penalty is the whole story,
+the control run under "Gemma 3" says so.
 
 ## What the numbers say
 
@@ -63,14 +76,20 @@ between any two of those phones:
 | | Qwen3 | 24.8 (1) | 28.0 (0) |
 | | SmolLM3 | 24.2 (5) | 0.0 (0) |
 
-**llama.cpp scores higher on every family and set but two, and the two are ties.** The
-`.pte` artifacts are the publishers' 8da4w quantisations and the GGUFs are Q4_K_M or
-Q8_0, so this is capability as shipped, not bit parity. On the three families where
-ExecuTorch prefills faster (Gemma 3, LFM2.5, Llama 3.2 in
-[parity-five-socs.md](parity-five-socs.md)), the speed comes with fewer right answers on
-two of them; Llama 3.2 pays one to three points and keeps its IFEval score. That is the
-decision rule the runtime choice needs: not which engine is faster, but what the
-publisher's artifact for that engine gives up.
+**The GGUF stack scores higher on 12 of the 14 comparable cells.** Of the fourteen
+family-and-set cells both engines could attempt, the llama.cpp side leads on twelve,
+Llama 3.2 on IFEval is level (17.2 against 17.0, with each engine ahead on two phones),
+and the one ExecuTorch lead, SmolLM3 on tool calls, is the cell where llama.cpp was
+never handed the tools (below), so it is an integration failure and not a comparison.
+The `.pte` artifacts are the publishers' 8da4w quantisations and the GGUFs are Q4_K_M or
+Q8_0, rendered by our templates on one side and the GGUF's on the other, under the app's
+sampling on each; nothing here isolates the runtime from the artifact, and the claim is
+about the stacks as shipped. On the three families where ExecuTorch prefills faster
+(Gemma 3, LFM2.5, Llama 3.2 in [parity-five-socs.md](parity-five-socs.md)), the speed
+comes with fewer right answers on two of them; Llama 3.2 pays one to three points on
+GSM8K and BFCL and keeps its IFEval score. That is the decision rule the runtime choice
+needs: not which engine is faster, but what the publisher's artifact for that engine gives
+up.
 
 **Gemma 3 on ExecuTorch loops.** 21 to 24 of its 30 GSM8K answers on every phone run to
 the cap repeating a step ("Let C be the number of bags..." over and over), scoring 0 to 2
@@ -79,40 +98,50 @@ and the app cannot add one from outside; the trap was already named, and this is
 price on a public set.
 
 **SmolLM3 on llama.cpp never calls a tool: 0 of 30 on every phone**, while the same
-family on ExecuTorch scores 22 to 27. It is not the model. The GGUF's embedded template
-renders tools only from Jinja variables named `xml_tools` and `python_tools`, never from
-the standard `tools`, so llama.cpp's chat layer renders the prompt with no tools in it and
-the engine's probe (`Session::supports_tools`, which looks for a rendered tool name)
-correctly reports `tools=false`; the app then offers none, and the model answers in prose.
-The ExecuTorch renderer is ours and speaks the family's dialect. The fix is a renderer for
-this family on the llama.cpp path too, or passing the tools under the template's own
-names, and the same probe will confirm it.
+family on ExecuTorch scores 22 to 27. The evidence points at the template, not the model.
+The GGUF's embedded Jinja gates its tool block on variables named `xml_tools` and
+`python_tools` and never reads the standard `tools` (the three `{%- if ... %}` lines are
+in the file), so when the suite hands the tools to `engine.chat` and llama.cpp's chat layer
+renders them under `tools`, the prompt comes out with no tools in it and the model
+answers in prose; the engine's own probe, which renders a tool and looks for its name,
+reports `tools=false` for this GGUF for the same reason. The ExecuTorch renderer is ours
+and speaks the family's dialect. What would close the diagnosis is a corrected render on
+the same GGUF that restores the calls; until then it is the working hypothesis, and the
+cell is excluded from the engine comparison above and reported as an integration failure.
 
 ## Greedy is not the same answer on the phone next door
 
 The parity suite's headline was that llama.cpp graded identically on all five phones and
-ExecuTorch did not. With 420 prompts per engine instead of 35, that headline does not
-survive, and what replaces it is more useful:
+ExecuTorch did not. With 390 model-and-prompt cases per engine instead of 35, that
+headline does not survive, and what replaces it is more useful. The cases are the
+thirteen family-and-set cells both engines could attempt (SmolLM3's tool cell is left out
+because llama.cpp had no tools there, and every one of its thirty would count as
+agreement), thirty prompts each, on the five SoCs with complete columns; a case counts as
+differing when the five phones do not all give it the same grade:
 
 | Across the five SoCs | ExecuTorch | llama.cpp |
 |---|---|---|
-| Prompts whose text differs on at least one phone | 323 of 420 (77%) | 301 of 420 (72%) |
-| Prompts whose grade differs on at least one phone | 130 (31%) | 55 (13%) |
-| Single-phone outliers | Exynos 2400 23, 8 Elite 13, Tensor G5 13, D9400 12, 8 Gen 3 4 | 8 Gen 3 5, Exynos 2400 5, D9400 4, 8 Elite 2, Tensor G5 1 |
-| Two-against-three splits | 65, no dominant pair | 38, of which 30 are the two Snapdragons against the other three |
+| Cases whose text differs on at least one phone | about three in four | about three in four |
+| Cases whose grade differs on at least one phone | 123 of 390 (31.5%) | 52 of 390 (13.3%) |
+| Single-phone outliers | Exynos 2400 23, 8 Elite 13, Tensor G5 12, D9400 10, 8 Gen 3 4 | 8 Gen 3 5, Exynos 2400 5, D9400 3, 8 Elite 2, Tensor G5 1 |
+| Two-against-three splits | 61, no dominant pair | 36, of which 29 are the two Snapdragons against the other three |
 
 Both engines produce different text on most prompts once replies are long, because a
 float rounding difference anywhere flips one greedy token and the rest follows. The
 grade is what matters, and there the engines differ by shape as well as by amount.
 ExecuTorch's divergence is diffuse: every phone is the odd one out somewhere, and its
-splits pair phones at random. llama.cpp's is structured: thirty of its thirty-eight splits
-put the Snapdragon 8 Elite and 8 Gen 3 together against the Dimensity, the Tensor and the
-Exynos. The 8 Elite's logcat shows it loading `libggml-cpu-android_armv8.6_1.so` where the
-Poco loads the `armv9.0` build (the SVE and KleidiAI path), so on llama.cpp the answer
-follows the CPU kernel build the phone selects, which is a smaller and nameable set of
-paths than XNNPACK's per-phone dispatch. Nothing here attributes a divergence to a kernel
-without an operator trace; what it does is give the talk a rate and a shape instead of two
-anecdotes.
+splits pair phones at random. llama.cpp's is structured: twenty-nine of its thirty-six
+splits put the Snapdragon 8 Elite and 8 Gen 3 together against the Dimensity, the Tensor
+and the Exynos. The hypothesis for that shape is the CPU kernel build: the 8 Elite's logcat
+shows it loading `libggml-cpu-android_armv8.6_1.so` where the Poco, the Tensor and the
+Exynos load the `armv9.0` build (the SVE and KleidiAI path, from the parity runs' logcats),
+which would make the two Snapdragons the two phones on one build and the other three the
+three on another. It is a hypothesis: the 8 Gen 3's build is inferred from the pairing
+because Qualcomm Device Cloud gave no logcat, and no build was swapped on a phone to see
+the split move. What the data establishes is the cluster; what would establish the cause
+is forcing the armv8.6 build on the Poco and watching the 29 follow it. Nothing here
+attributes a divergence to a kernel; what it does is give the talk a rate and a shape
+instead of two anecdotes.
 
 The Gemma GSM8K example makes the mechanism concrete: on question 192 the 8 Elite's
 llama.cpp writes "130 - 39 = 91" and the Dimensity's writes "150 - 45 = 105", the same
@@ -142,8 +171,10 @@ The Tensor G5's llama.cpp decode, already the open question in the parity note, 
 four time-boxed classes that were finished with the suite's `skip` option. The Poco ran
 under a desk fan after its ExecuTorch class died twice at about 25 minutes without one;
 with it, every class completed. A number from a racked or unfanned phone is a number under
-that condition, and the grades do not depend on it: greedy decoding gives the same tokens
-hot or cold, only the seconds change.
+that condition. The grades were treated as independent of it, on the reasoning that greedy
+decoding picks the same tokens whatever the clock, but that was not tested with paired hot
+and cold runs, and the divergence section above is a reminder that one flipped token is
+enough; it is an assumption, stated.
 
 ## How the runs were done, for the next time
 

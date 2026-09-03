@@ -545,7 +545,7 @@
    "prefill_ms": 170,
    "decode_ms": 3487,
    "wall_ms": 3679,
-   "grade": "pass"
+   "grade": "fail"
   },
   {
    "id": "ifeval-1307",
@@ -1516,8 +1516,8 @@
    "error": 0
   },
   "ifeval": {
-   "pass": 14,
-   "fail": 16,
+   "pass": 13,
+   "fail": 17,
    "skipped": 0,
    "error": 0
   },

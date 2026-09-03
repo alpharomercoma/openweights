@@ -31,7 +31,7 @@ $ADB shell "touch /data/local/tmp/bench-start"
 for class in ExecuTorchBenchmarkEval LlamaCppBenchmarkEval; do
   echo "== $class $(date +%H:%M)"
   $ADB shell "nohup am instrument -r -e budget 600 ${MODEL:+-e model $MODEL} -e class io.github.alpharomercoma.openweights.core.engine.eval.$class $PKG/$RUNNER >/data/local/tmp/bench-$class.log 2>&1 &"
-  sleep 20
+  n=0; until $ADB shell pidof $PKG >/dev/null 2>&1 || [ $n -ge 12 ]; do sleep 5; n=$((n + 1)); done
   while $ADB shell pidof $PKG >/dev/null 2>&1; do sleep 60; done
   $ADB shell "grep -E 'INSTRUMENTATION_(RESULT|STATUS: stack)' /data/local/tmp/bench-$class.log | head -3" || true
 done

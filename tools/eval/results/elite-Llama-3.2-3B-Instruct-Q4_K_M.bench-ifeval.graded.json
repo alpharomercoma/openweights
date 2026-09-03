@@ -440,7 +440,7 @@
    "prefill_ms": 1546,
    "decode_ms": 54712,
    "wall_ms": 56267,
-   "grade": "fail"
+   "grade": "pass"
   },
   {
    "id": "ifeval-3631",
@@ -460,8 +460,8 @@
  ],
  "tally": {
   "ifeval": {
-   "pass": 18,
-   "fail": 12,
+   "pass": 19,
+   "fail": 11,
    "skipped": 0,
    "error": 0
   }

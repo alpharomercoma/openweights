@@ -4,7 +4,10 @@
 # report is already in tools/eval/results/ is skipped, so a rerun after a failed or
 # time-boxed matrix picks up only what is missing.
 #
-#   tools/eval/bench/run_cloud.sh [parallel-jobs]
+#   PHONES="e2s:36:exynos-" tools/eval/bench/run_cloud.sh [parallel-jobs]
+#
+# Test Lab runs one matrix per device model at a time and queues the rest, so the useful
+# shape is one driver per phone with two in flight (one running, one already uploaded).
 #
 # Set groups: gsm8k with bfcl (short calls beside medium answers) and ifeval alone
 # (most replies run to the 640-token cap). Gemma has no tool syntax, so its bfcl half
@@ -13,10 +16,10 @@ set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 OUT="$HERE/../results"
-PAR=${1:-6}
+PAR=${1:-2}
 JOBS=$(mktemp)
 
-PHONES="mustang:36:tensor- e2s:36:exynos- pa3q:36:elite-"
+PHONES=${PHONES:-"mustang:36:tensor- e2s:36:exynos- pa3q:36:elite-"}
 ET="Gemma3 lfm llama-3.2 Qwen3-1.7B-INT8 SmolLM3-3B"
 GG="gemma-3 LFM2.5 Llama-3.2-3B Qwen3-1.7B-Q8 SmolLM3-Q4"
 

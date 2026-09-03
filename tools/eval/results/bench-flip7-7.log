@@ -1,0 +1,19 @@
+/Users/alpha/mobile-inference/tools/eval/bench/benchmarks.json: 1 file pushed, 0 skipped. 10.8 MB/s (78631 bytes in 0.007s)
+/Users/alpha/mobile-inference/tools/eval/bench/../../../core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk: 1 file pushed, 0 skipped. 4.5 MB/s (41266737 bytes in 8.763s)
+Success
+push SmolLM3-3B-INT8-INT4.pte 03:04
+adb: error: 65544-byte write failed: Undefined error: 0
+push SmolLM3-3B-INT8-INT4.tokenizer.json 03:10
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== ExecuTorchBenchmarkEval SmolLM3-3B 03:10
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+push SmolLM3-Q4_K_M.gguf 03:10
+adb: error: failed to get feature set: device 'localhost:58244' not found
+== LlamaCppBenchmarkEval SmolLM3-Q4 03:10
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+adb: device 'localhost:58244' not found
+== done 03:11

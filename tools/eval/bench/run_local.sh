@@ -25,6 +25,9 @@ PREFIX=${PREFIX:-}
 $ADB push "$HERE/benchmarks.json" "$EVAL/benchmarks.json" >/dev/null
 $ADB push "$APK" /data/local/tmp/owtest.apk >/dev/null
 $ADB shell pm install -r -t --user 0 /data/local/tmp/owtest.apk
+# Reports from an earlier run survive a reinstall in the package's external files, so only
+# files newer than this marker are pulled; a failed class cannot pass off an old report.
+$ADB shell "touch /data/local/tmp/bench-start"
 for class in ExecuTorchBenchmarkEval LlamaCppBenchmarkEval; do
   echo "== $class $(date +%H:%M)"
   $ADB shell "nohup am instrument -r -e budget 600 ${MODEL:+-e model $MODEL} -e class io.github.alpharomercoma.openweights.core.engine.eval.$class $PKG/$RUNNER >/data/local/tmp/bench-$class.log 2>&1 &"
@@ -33,6 +36,7 @@ for class in ExecuTorchBenchmarkEval LlamaCppBenchmarkEval; do
   $ADB shell "grep -E 'INSTRUMENTATION_(RESULT|STATUS: stack)' /data/local/tmp/bench-$class.log | head -3" || true
 done
 TMP=$(mktemp -d)
-$ADB pull "/sdcard/Android/data/$PKG/files/eval-results/." "$TMP/" | tail -1
-for f in "$TMP"/*.bench*.json; do [ -e "$f" ] && cp "$f" "$OUT/$PREFIX$(basename "$f")"; done
+for f in $($ADB shell "find /sdcard/Android/data/$PKG/files/eval-results -name '*.bench*.json' -newer /data/local/tmp/bench-start"); do
+  $ADB pull "$f" "$TMP/" >/dev/null && cp "$TMP/$(basename "$f")" "$OUT/$PREFIX$(basename "$f")" && echo "   $PREFIX$(basename "$f")"
+done
 echo "== done $(date +%H:%M)"

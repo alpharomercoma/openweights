@@ -12,6 +12,7 @@ value among the possible answers (a "" among them means the parameter may be omi
 Only the parsed calls count, the way the app would act on them; text is not re-parsed.
 
 Writes a *.graded.json beside each report and prints a summary; report.py renders it.
+Needs the packages in requirements.txt and nltk's punkt_tab data (see that file).
 """
 import json, re, sys
 from pathlib import Path

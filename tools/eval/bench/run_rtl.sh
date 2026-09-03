@@ -28,10 +28,14 @@ push() { name=$(basename "$1"); size=$($ADB shell stat -c %s $EVAL/$name 2>/dev/
     $ADB push "$1" $EVAL/$name | tail -1
   fi; }
 run() { class=$1; filter=$2; echo "== $class $filter $(date +%H:%M)"
+  $ADB shell "touch /data/local/tmp/bench-start"
   $ADB shell "nohup am instrument -r -e budget 600 -e model $filter -e class io.github.alpharomercoma.openweights.core.engine.eval.$class $PKG/$RUNNER >/data/local/tmp/bench.log 2>&1 &"
   sleep 20; while $ADB shell pidof $PKG >/dev/null 2>&1; do sleep 60; done
-  TMP=$(mktemp -d); $ADB pull /sdcard/Android/data/$PKG/files/eval-results/. "$TMP/" >/dev/null 2>&1
-  for f in "$TMP"/*.bench*.json; do [ -e "$f" ] && cp "$f" "$OUT/${PREFIX:-exynos2500-}$(basename "$f")" && echo "   $(basename "$f")"; done; }
+  # Only reports written by this run: earlier families' files are still on the phone.
+  TMP=$(mktemp -d)
+  for f in $($ADB shell "find /sdcard/Android/data/$PKG/files/eval-results -name '*.bench*.json' -newer /data/local/tmp/bench-start"); do
+    $ADB pull "$f" "$TMP/" >/dev/null 2>&1 && cp "$TMP/$(basename "$f")" "$OUT/${PREFIX:-exynos2500-}$(basename "$f")" && echo "   $(basename "$f")"
+  done; }
 # family: <pte stem> <pte filter> <gguf name> <gguf filter>
 for fam in "Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK Qwen3 Qwen3-1.7B-Q8_0.gguf Qwen3" \
            "react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w lfm LFM2.5-1.2B-Instruct-Q4_K_M.gguf LFM2.5" \

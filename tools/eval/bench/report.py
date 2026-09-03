@@ -80,7 +80,10 @@ def render(cells) -> str:
         for _, fam in FAMILIES:
             row = [fam]
             for e, d in cols:
-                rates = [c[num] / c[den] * 1000 for c in cells.get((fam, e, d), {}).values()
+                # The first generated token's latency is prefill's; decode rate counts the
+                # rest, the way GenerationStats and compare.py do.
+                first = 1 if num == "generated_tokens" else 0
+                rates = [(c[num] - first) / c[den] * 1000 for c in cells.get((fam, e, d), {}).values()
                          if c.get(den) and c.get(num, 0) > 1]
                 row.append(f"{statistics.median(rates):.0f}" if rates else "—")
             out.append("| " + " | ".join(row) + " |")

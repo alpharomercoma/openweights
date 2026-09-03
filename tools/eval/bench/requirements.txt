@@ -1,0 +1,8 @@
+# grade.py's vendored IFEval checker (ifeval/) needs these; pull_benchmarks.py needs only curl.
+nltk>=3.9
+langdetect
+immutabledict
+# nltk also needs the punkt_tab tokenizer data. `python3 -c "import nltk; nltk.download('punkt_tab')"`
+# works where this machine's Python has a CA bundle; otherwise fetch it by hand:
+#   curl -sSL -o punkt_tab.zip https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/tokenizers/punkt_tab.zip
+#   mkdir -p ~/nltk_data/tokenizers && unzip -qo punkt_tab.zip -d ~/nltk_data/tokenizers

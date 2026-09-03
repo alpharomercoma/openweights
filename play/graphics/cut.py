@@ -46,18 +46,20 @@ FULL_W, FULL_H = 1280, 574
 END = 2.6  # end-card seconds
 
 SHOTS = [
-    # The opening rides real motion: the reply arrives line by line with the header's
-    # "CPU . 32768 ctx" in frame. The window 5.4..10.6 is bounded at both ends. Earlier and
-    # the reply has not visibly started; later and it runs past 11.0 s, where that recording
-    # pressed Home, which once put the phone's lock-screen wallpaper inside the card under
-    # the words "It answers on-device". Check the tail of a shot, not only its head.
-    dict(src="fs-specialuse-generation.mp4", at=6.6, length=4.0, crop=(40, 262, 1200, 538),
+    # The opening rides real motion: the answer arrives line by line with the header's
+    # "CPU . 32768 ctx" in frame. The question is one a person would actually ask, and the
+    # answer is a list, which is the shape a 1.2B model gets right and which reads well in
+    # five seconds. An earlier take asked it to write a message to a landlord and it wrote
+    # ABOUT contacting one instead: a bad prompt and a worse answer, and the sort of thing
+    # to judge before filming rather than after. The telemetry shot below is held from this
+    # same take, so shots one and two are the same conversation rather than two.
+    dict(src="shot-hook2.mp4", at=6.4, length=5.0, crop=(40, 262, 1200, 538),
          eyebrow="on device", head="It answers on-device",
          sub="No sign-in. The model is on this phone."),
 
     # Held, and cut to end at 2250, above the composer: the chat box has no business in a
     # shot whose whole subject is the telemetry line.
-    dict(src="fs-specialuse-generation.mp4", at=46.6, length=3.4, hold=True,
+    dict(src="shot-hook2.mp4", at=13.0, length=3.4, hold=True,
          crop=(0, 1676, FULL_W, FULL_H),
          eyebrow="live telemetry", head="It shows its own speed",
          sub="Speed and context, as it answers."),

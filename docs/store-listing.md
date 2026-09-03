@@ -146,13 +146,13 @@ Made, checked against the spec, and in `play/graphics`. How to regenerate any of
 | Phone screenshots | `screenshots-phone/01..06` | six at 1080 x 1920, 24-bit, no alpha |
 | 7-inch tablet | `screenshots-tablet-7/01..05` | five at 1200 x 2133 |
 | 10-inch tablet | `screenshots-tablet-10/01..05` | five at 1800 x 3200 |
-| Promo video | `play/videos/listing-promo.mp4` | 1920 x 1080, 26.4 s, H.264, silent track |
+| Promo video | `play/videos/listing-promo.mp4` | 1920 x 1080, 27.4 s, H.264, silent track |
 
 ## The promo video
 
 Made by `play/graphics/cut.py` from real captures; `promo.py` holds the compositor. Four
 facts about how Play shows it decided every design choice: it autoplays **inline, muted,
-for up to 30 seconds**, so the cut is 26.4 s and says everything in type; it plays in a
+for up to 30 seconds**, so the cut is 27.4 s and says everything in type; it plays in a
 **landscape** player, so it is 1920 x 1080; the **feature graphic is its cover image**, so
 it stays in that art's colour family and imports the same mark; and **ads must be off**,
 which is why it carries no music. A Content ID claim can force ads onto a video, and that
@@ -219,6 +219,17 @@ line by line; the download shot rides the byte counter climbing while its layout
 perfectly still, which is the one kind of motion a fixed crop can hold. Everything else is
 held, with the cut between two views carrying the change. Measured on the finished file, the
 longest motionless stretch is 3.0 s and there is a cut about every three seconds.
+
+**The question is one a person would ask.** The opening asks for five things to check
+before buying a used phone, and the answer is a list, which is the shape a 1.2B model gets
+right and which reads in five seconds. An earlier take asked it to write a message to a
+landlord and it wrote *about* contacting one instead: a bad prompt and a worse answer, and
+the sort of thing to judge before filming rather than after. The telemetry shot is held from
+that same take, so the first two shots are one conversation rather than two.
+
+Those two shots come from the **accelerated debug** build, which carries `applicationIdSuffix
+".debug"` and therefore installs alongside a Play copy without touching it. That is the way
+to shoot v2 footage on a phone running the published v1: no uninstall, nothing destroyed.
 
 **The copy says what a person would say.** "Then it downloads it", not "fetches", which is
 developer language and could even be read as cloud inference. "No folder is shared by

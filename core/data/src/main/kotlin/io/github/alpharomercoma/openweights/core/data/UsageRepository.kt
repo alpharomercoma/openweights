@@ -101,29 +101,18 @@ data class UsageSummary(
             null
         }
 
-    /** Average generation speed across everything ever run here. */
-    val averageTokensPerSecond: Double?
-        get() = if (lifetimeInferenceMs > 0 && lifetimeGeneratedTokens > 0) {
-            lifetimeGeneratedTokens * MILLIS_PER_SECOND / lifetimeInferenceMs
-        } else {
-            null
-        }
-
     /**
      * Lifetime decode-only speed, and its prefill mirror.
      *
-     * Split out because one blended number answers neither question a developer brings to
-     * this screen: prefill is bound by compute and scales with the prompt, decode is bound
-     * by memory bandwidth and scales with the reply, and averaging them produces a figure
-     * that changes when conversation habits do rather than when anything about the phone
-     * or the model does. Null until a reply has been recorded with the split measured.
+     * The only two speeds this screen shows. There was a third, generated tokens over total
+     * inference time, and it answered neither question a developer brings here: prefill is
+     * bound by compute and scales with the prompt, decode is bound by memory bandwidth and
+     * scales with the reply, and blending them produces a figure that moves when
+     * conversation habits do rather than when anything about the phone or the model does.
+     * Null until a reply has been recorded with the split measured.
      */
     val decodeTokensPerSecond: Double? = rate(lifetimeDecodeTokens, lifetimeDecodeMs)
     val prefillTokensPerSecond: Double? = rate(lifetimePrefillTokens, lifetimePrefillMs)
-
-    private companion object {
-        const val MILLIS_PER_SECOND = 1000.0
-    }
 }
 
 private fun rate(tokens: Long, millis: Long): Double? =

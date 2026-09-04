@@ -21,27 +21,39 @@ import org.junit.Test
 
 class UsageSummaryTest {
     @Test
-    fun `average speed is total tokens over total time, not a mean of means`() {
+    fun `each speed is total tokens over total time, not a mean of means`() {
         // A slow 1000-token reply and a fast 10-token one must not average to "fast".
-        // Weighting by work done is the only figure that describes the device .
+        // Weighting by work done is the only figure that describes the device.
         val summary = UsageSummary(
-            lifetimeGeneratedTokens = 1010,
-            lifetimeInferenceMs = 101_000,
+            lifetimeDecodeTokens = 1010,
+            lifetimeDecodeMs = 101_000,
+            lifetimePrefillTokens = 2020,
+            lifetimePrefillMs = 101_000,
         )
 
-        assertThat(summary.averageTokensPerSecond).isWithin(0.01).of(10.0)
+        assertThat(summary.decodeTokensPerSecond).isWithin(0.01).of(10.0)
+        assertThat(summary.prefillTokensPerSecond).isWithin(0.01).of(20.0)
     }
 
     @Test
-    fun `speed is unknown before anything has been generated`() {
-        assertThat(UsageSummary().averageTokensPerSecond).isNull()
+    fun `speed is unknown before anything has been measured with the split`() {
+        assertThat(UsageSummary().decodeTokensPerSecond).isNull()
+        assertThat(UsageSummary().prefillTokensPerSecond).isNull()
     }
 
     @Test
-    fun `a day with no inference time does not report an infinite rate`() {
-        val summary = UsageSummary(lifetimeGeneratedTokens = 500, lifetimeInferenceMs = 0)
+    fun `a ledger with no timing does not report an infinite rate`() {
+        // The rows a device wrote before the split columns existed hold zero in all four,
+        // so they drop out of the rate rather than dividing by nothing.
+        val summary = UsageSummary(
+            lifetimeDecodeTokens = 500,
+            lifetimeDecodeMs = 0,
+            lifetimePrefillTokens = 500,
+            lifetimePrefillMs = 0,
+        )
 
-        assertThat(summary.averageTokensPerSecond).isNull()
+        assertThat(summary.decodeTokensPerSecond).isNull()
+        assertThat(summary.prefillTokensPerSecond).isNull()
     }
 
     @Test

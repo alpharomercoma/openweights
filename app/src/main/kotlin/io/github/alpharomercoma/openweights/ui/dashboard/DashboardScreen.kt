@@ -181,12 +181,22 @@ private fun Hero(summary: UsageSummary) {
 }
 
 /**
- * The rest of the ledger, six boxes, no repeats.
+ * The rest of the ledger, no repeats.
  *
  * Everything the hero and the chart do not already say. "Tokens read" earns its place next
  * to a total of tokens written because reading is the other half of the work and the reason
  * a long conversation slows down; the written figure itself is upstairs in display type and
  * does not appear again here.
+ *
+ * "Read" rather than "in", and the distinction is not stylistic. `UsageEntity.promptTokens`
+ * is `GenerationStats.promptTokens`, which is the freshly prefilled remainder alone: a
+ * follow-up turn that the KV cache answered for pays only for what changed, and
+ * `cachedTokens` is not added anywhere on the way to this tile. So this number is what the
+ * phone actually read, and it is smaller than what was submitted by however much the cache
+ * covered, which on a warm conversation is most of it. Calling it "tokens in" would be
+ * borrowing the billing word for a figure that is not the input, and would understate the
+ * prompt by the whole cache hit rate. The ledger has no column for the submitted total, so
+ * there is nothing here that could honestly carry that name.
  */
 @Composable
 private fun StatGrid(summary: UsageSummary) {
@@ -206,22 +216,19 @@ private fun StatGrid(summary: UsageSummary) {
             modifier = Modifier.height(IntrinsicSize.Min),
         ) {
             Stat("Tokens read", summary.lifetimePromptTokens.grouped(), Modifier.weight(1f))
-            Stat(
-                label = stringResource(R.string.speed),
-                value = summary.averageTokensPerSecond
-                    ?.let { String.format(Locale.getDefault(), "%.1f", it) }
-                    ?.plus(" tok/s")
-                    ?: "not yet",
-                modifier = Modifier.weight(1f),
-            )
             Stat("Computing", summary.lifetimeInferenceMs.asDuration(), Modifier.weight(1f))
         }
-        // The blended figure above answers "how much of the day"; these two answer the
-        // question a developer actually brings here. Prefill is compute-bound and scales
-        // with the prompt, decode is bandwidth-bound and scales with the reply, and one
-        // averaged number moves when conversation habits do rather than when the phone
-        // or the model does. The row appears once a reply has been measured with the
-        // split, so old ledgers do not show two tiles of "not yet".
+        // Prefill and decode, and nothing blending them. There used to be a "Speed" tile in
+        // the row above holding generated tokens over total inference time, which is one
+        // number answering neither question anybody brings to this screen. Prefill is
+        // compute-bound and scales with the prompt, decode is bandwidth-bound and scales
+        // with the reply, and the average of the two moves when conversation habits change
+        // rather than when the phone or the model does: the same device on the same model
+        // reads faster on the day its prompts happened to be longer. Two honest numbers were
+        // already sitting under a figure that could only disagree with both.
+        //
+        // The row appears once a reply has been measured with the split, so old ledgers do
+        // not show two tiles of "not yet".
         if (summary.prefillTokensPerSecond != null || summary.decodeTokensPerSecond != null) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

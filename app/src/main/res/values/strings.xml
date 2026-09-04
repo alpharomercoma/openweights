@@ -87,7 +87,6 @@
     <string name="search_result_picture">Search result picture</string>
     <string name="usage">Usage</string>
     <string name="back">Back</string>
-    <string name="speed">Speed</string>
     <string name="draft">Draft</string>
     <string name="week">This week</string>
     <string name="by_model">By model</string>
@@ -211,9 +210,14 @@
     <string name="engine_yahoo_detail">Bing’s index, served in a way that actually answers.</string>
     <string name="on_this_device">On this device</string><string name="choose_folder">Choose a folder</string><string name="change">Change</string><string name="waiting_for_folder">Waiting for a folder</string>
     <string name="search_engines_status">%1$d of %2$d on. Tried in order until one answers; phone-friendly engines come first.</string>
+    <string name="search_results_count">Results per search</string>
+    <string name="search_results_count_detail">How much a search brings back. Fewer is faster and keeps the question in view; more is worth it when sources disagree.</string>
+    <string name="search_results_count_value">%1$d results</string>
+    <string name="search_results_count_one">1 result</string>
     <string name="storage_on_device">%1$s on this device</string>
     <string name="models_empty">Nothing downloaded yet. Browse models from the name at the top of a chat. Each one says whether it runs on this phone before you download it.</string>
     <string name="download_progress">%1$s of %2$s</string>
+    <string name="cancel_download">Cancel download</string>
     <string name="reads_attachments">reads attachments</string>
     <string name="delete_model_title">Delete model?</string>
     <string name="delete_model_message">Delete %1$s and its companion files? This permanently removes about %2$s and requires downloading it again.</string>
@@ -222,7 +226,7 @@
     <string name="unsupported_architecture_detail">This version of OpenWeights cannot load %1$s models. Support requires an app update. You can still browse the files here.</string>
     <string name="vision_projector_detail">This model can read images. Its %1$s vision encoder downloads with it and is included in the estimates below.</string>
     <string name="context_length_tokens">Context length: %1$d tokens</string>
-    <string name="downloading_percent">Downloading %1$d%%</string>
+    <string name="percent_complete">%1$d%%</string>
     <string name="needs_newer_version">Needs a newer OpenWeights: this version cannot load %1$s models.</string>
     <string name="draft_model_not_a_model">A draft model for speculative decoding, not one that answers on its own. It only runs alongside the full model it speeds up.</string>
     <string name="header_read_failed">Could not read this file\'s header: %1$s</string>

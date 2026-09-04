@@ -95,6 +95,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -111,7 +112,6 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
-import io.github.alpharomercoma.openweights.core.data.ReportReason
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
@@ -120,6 +120,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.Markdown
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.ReasoningBlock
 import io.github.alpharomercoma.openweights.core.designsystem.component.hasHiddenTail
+import io.github.alpharomercoma.openweights.core.designsystem.component.markdownToPlainText
 import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.component.rememberFollowTailState
 import io.github.alpharomercoma.openweights.core.designsystem.theme.LocalIsDarkTheme
@@ -188,7 +189,6 @@ fun ChatScreen(
     dictation: DictationState = DictationState(),
     canDictate: Boolean = false,
     onDictate: ((String) -> Unit) -> Unit = {},
-    onReport: (TranscriptEntry, ReportReason, String) -> Unit = { _, _, _ -> },
     onMode: (AgentMode) -> Unit = {},
     onApproval: (Boolean) -> Unit = {},
     plan: TaskPlan? = null,
@@ -314,7 +314,6 @@ fun ChatScreen(
             dictation = dictation,
             canDictate = canDictate,
             onDictate = onDictate,
-            onReport = onReport,
             onMode = onMode,
             onApproval = onApproval,
             plan = plan,
@@ -371,7 +370,6 @@ private fun ChatContent(
     dictation: DictationState,
     canDictate: Boolean,
     onDictate: ((String) -> Unit) -> Unit,
-    onReport: (TranscriptEntry, ReportReason, String) -> Unit,
     onMode: (AgentMode) -> Unit,
     onApproval: (Boolean) -> Unit,
     plan: TaskPlan?,
@@ -642,7 +640,6 @@ private fun ChatContent(
         onDismissActions = { onActionsForId(null) },
         onEdit = { editingId = it.id },
         onBranch = { onBranchFrom(it.id) },
-        onReport = onReport,
     )
 }
 
@@ -802,8 +799,14 @@ private fun Transcript(
                     isSpeaking = isSpeaking,
                     onMore = { onActionsForId(entry.id) },
                     // The answer, not the reasoning and not the tool steps: what a reader
-                    // means by "copy the reply" is the reply.
-                    onCopy = { clipboard.copy(entry.answer.ifEmpty { entry.text }) },
+                    // means by "copy the reply" is the reply. As plain text, matching the
+                    // sheet's "Copy text" rather than diverging from it: the same action is
+                    // offered in two places and they cannot mean two different things. The
+                    // Markdown source is one row further down the sheet, for the editors
+                    // that want it.
+                    onCopy = {
+                        clipboard.copy(entry.answer.ifEmpty { entry.text }.markdownToPlainText())
+                    },
                     onReadAloud = { onToggleReadAloud(entry.answer.ifEmpty { entry.text }) },
                     collapseByDefault = entry.id == lastId && haltedRightHere,
                 )
@@ -829,9 +832,9 @@ private fun ChatSheets(
     /** Puts this turn's text back in the composer. The resend happens from there. */
     onEdit: (TranscriptEntry) -> Unit,
     onBranch: (TranscriptEntry) -> Unit,
-    onReport: (TranscriptEntry, ReportReason, String) -> Unit,
 ) {
     var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
+    val context = LocalContext.current
 
     if (showParameters && state.modelName != null) {
         ParameterSheet(
@@ -857,11 +860,20 @@ private fun ChatSheets(
     }
 
     reportFor?.let { entry ->
+        val replyText = entry.answer.ifEmpty { entry.text }
         ReportSheet(
             modelName = state.modelName.orEmpty(),
-            replyText = entry.answer.ifEmpty { entry.text },
+            replyText = replyText,
+            // Straight to the share sheet, with no view model and nothing written down on
+            // the way. Reporting used to run through one of each and the row it produced
+            // was never read by anything. See ReportSheet.
             onSubmit = { reason, note ->
-                onReport(entry, reason, note)
+                context.shareReport(
+                    modelName = state.modelName.orEmpty(),
+                    reason = reason,
+                    replyText = replyText,
+                    note = note,
+                )
                 reportFor = null
             },
             onDismiss = { reportFor = null },

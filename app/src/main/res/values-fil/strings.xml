@@ -67,7 +67,7 @@
     <string name="which_folder_did_mean">Aling folder ang tinutukoy mo?</string>
     <string name="what_was_wrong">Ano ang mali rito?</string>
     <string name="anything_add">May idadagdag pa</string>
-    <string name="saved_device">Naka-save sa device na ito</string>
+    <string name="what_gets_shared">Ano ang ibabahagi</string>
     <string name="cancel">Kanselahin</string>
     <string name="message_actions">Mga aksyon sa mensahe</string>
     <string name="downloading">Nagda-download</string>
@@ -222,7 +222,7 @@
     <string name="system_prompt_detail">Mga permanenteng tagubilin, ipinapadala bago ang bawat pag-uusap. Mas nasusunod ng maliliit na modelo ang malinaw na tagubilin kaysa sa ipinahihiwatig.</string>
     <string name="tool_prompt_detail">Ipinapadala kasama ng mga tool, bago ang sarili mong prompt. Ito ang buong idinaragdag ng app.</string>
     <string name="thinking_detail">Pag-isipan muna. Mas mabagal, at mas mainam sa anumang may mga hakbang.</string>
-    <string name="report_contents_detail">Ang pangalan ng modelo (%1$s), ang dahilan, ang tala mo at ang sagot. Nananatili ito sa teleponong ito. Wala itong mapagpapadalhan.</string>
+    <string name="report_contents_detail">Ang pangalan ng modelo (%1$s), ang dahilan, ang tala mo at ang sagot. Walang ipapadala bago mo piliin kung saan ito pupunta.</string>
     <string name="an_empty_reply">(walang laman na sagot)</string>
     <string name="usage_empty">Wala pa. Kapag nag-chat ka, lilitaw dito ang mga kabuuan, at mananatili sa teleponong ito.</string>
     <string name="tokens_today">+%1$s ngayon ·</string>

@@ -48,18 +48,36 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
-import io.github.alpharomercoma.openweights.core.data.ReportReason
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
+
+/** Why a reply was reported. The list a user picks from, and what goes in the text. */
+enum class ReportReason(val wireName: String, val label: String) {
+    OFFENSIVE("offensive", "Offensive or hateful"),
+    SEXUAL("sexual", "Sexual content"),
+    DANGEROUS("dangerous", "Dangerous or illegal advice"),
+    HARASSMENT("harassment", "Harassment or threats"),
+    WRONG("wrong", "Confidently wrong"),
+    OTHER("other", "Something else"),
+}
 
 /**
  * Reporting a reply, without leaving the app.
  *
- * Play requires this of anything that generates AI content, and it is the only quality
- * signal an app with no telemetry can have. The report is written to the device. Nothing
- * is sent anywhere: there is no server to send it to, and saying otherwise would break the
- * one promise this app makes.
+ * Play requires this of anything that generates AI content. What it does with the report is
+ * the part that took two attempts. The first version wrote a row into a `content_reports`
+ * table and stopped there, and nothing ever read that table: no screen listed the rows, no
+ * code counted them, and the copy under this sheet once promised a Settings screen to read
+ * them that was never built. A report filed into a store with no reader is worse than no
+ * report action at all, because the sheet implies somebody is going to look.
  *
- * The sheet shows exactly what the report will contain before it is filed, because a
+ * So the report is assembled here and handed to the system share sheet, and the person who
+ * wrote it decides where it goes: a mail, an issue, their own notes, or nowhere. That keeps
+ * the promise this app makes, which is that the app itself sends nothing and has nowhere to
+ * send it to. A share the user starts, reads, and can cancel is their action, not ours.
+ * Nothing is stored either way, which is the right answer for a reported reply plus a note
+ * somebody typed once no part of the app was ever going to read it back.
+ *
+ * The sheet shows exactly what the report will contain before any of that, because a
  * reporting flow that is vague about what it captures is worse than none.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -151,14 +169,16 @@ fun ReportSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.saved_device),
+                    text = stringResource(R.string.what_gets_shared),
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    // It used to end "you can read and delete your reports in Settings",
-                    // which was a promise about a screen that was never built. The store is
-                    // real and this app has no server, so the first half was always true;
-                    // the second half was a plan.
+                    // This has been wrong twice, in opposite directions. It used to end
+                    // "you can read and delete your reports in Settings", a promise about a
+                    // screen that was never built. It then said the report stays on the
+                    // phone because there is nowhere to send it, which was true of the app
+                    // and read as though the report had a destination. It has one now, and
+                    // it is whichever one the reader picks.
                     text = stringResource(R.string.report_contents_detail, modelName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -72,7 +72,7 @@
     <string name="which_folder_did_mean">أي مجلد تقصد؟</string>
     <string name="what_was_wrong">ما الخطأ فيه؟</string>
     <string name="anything_add">هل من شيء تضيفه</string>
-    <string name="saved_device">محفوظ على هذا الجهاز</string>
+    <string name="what_gets_shared">ما الذي ستتم مشاركته</string>
     <string name="cancel">إلغاء</string>
     <string name="message_actions">إجراءات الرسالة</string>
     <string name="downloading">جارٍ التنزيل</string>
@@ -224,7 +224,7 @@
     <string name="system_prompt_detail">تعليمات ثابتة تُرسل قبل كل محادثة. النماذج الصغيرة تتبع التعليمات الصريحة أفضل بكثير من الضمنية.</string>
     <string name="tool_prompt_detail">تُرسل مع الأدوات، قبل رسالتك أنت. هذا كل ما يضيفه التطبيق.</string>
     <string name="thinking_detail">يفكر في الأمر أولًا. أبطأ، وأفضل في أي شيء له خطوات.</string>
-    <string name="report_contents_detail">اسم النموذج (%1$s) والسبب وملاحظتك والرد. يبقى على هذا الهاتف. لا توجد جهة تُرسل إليها.</string>
+    <string name="report_contents_detail">اسم النموذج (%1$s) والسبب وملاحظتك والرد. لا يُرسَل شيء حتى تختار الوجهة.</string>
     <string name="an_empty_reply">(رد فارغ)</string>
     <string name="usage_empty">لا شيء بعد. بمجرد أن تبدأ محادثة، تظهر الإجماليات هنا وتبقى على هذا الهاتف.</string>
     <string name="tokens_today">+%1$s اليوم ·</string>

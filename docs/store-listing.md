@@ -461,15 +461,14 @@ because none of those exist here.
 chose and shows what it produces.
 
 **How does your app handle offensive output?** There is a report action on every reply. It
-offers a reason, an optional note, and shows exactly what the report will contain before it is
-filed. The report is stored on the device.
+offers a reason, an optional note, and shows exactly what the report will contain before
+anything happens: the model name, the reason, the note, and the reply. Tapping Report hands
+that text to the system share sheet, so the user picks where it goes. The app stores no part
+of it and sends nothing on its own.
 
-Two things to raise with review rather than assume:
+One thing to raise with review rather than assume:
 
-1. Whether device-local reporting satisfies the policy for an app with no backend. The control
-   is in the app and requires no exit, which is what the policy asks for; the expectation that
-   reports inform the developer is satisfiable here only if the user chooses to send one.
-2. That the models are third-party and user-chosen, which the listing says in its last
+1. That the models are third-party and user-chosen, which the listing says in its last
    paragraph.
 
 ## Foreground service declaration

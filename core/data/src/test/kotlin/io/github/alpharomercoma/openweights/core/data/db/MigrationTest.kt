@@ -67,6 +67,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_14_15,
         OpenWeightsDatabase.MIGRATION_15_16,
         OpenWeightsDatabase.MIGRATION_16_17,
+        OpenWeightsDatabase.MIGRATION_17_18,
     )
 
     @Test
@@ -433,6 +434,37 @@ class MigrationTest {
             assertThat(db.textAt("SELECT draft FROM conversations WHERE id = 1")).isEmpty()
             assertThat(db.textAt("SELECT title FROM conversations WHERE id = 1"))
                 .isEqualTo("About Ada")
+        }
+    }
+
+    @Test
+    fun `filed reports go, and the conversation they were about stays`() {
+        // The reports were only ever written, never read: no screen listed them and no code
+        // counted them. Dropping the table is the point of the migration, and the thing to
+        // prove alongside it is that a drop aimed at one table took nothing else with it.
+        helper.createDatabase(17).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex, " +
+                    "draft) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1, '')",
+            )
+            db.execSQL(
+                "INSERT INTO content_reports " +
+                    "(id, modelName, reason, replyText, note, reportedAt) " +
+                    "VALUES (1, 'qwen', 'wrong', 'The moon is cheese.', '', 40)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(18, migrations.toList()).use { db ->
+            assertThat(db.textAt("SELECT title FROM conversations WHERE id = 1"))
+                .isEqualTo("About Ada")
+            assertThat(
+                db.intAt(
+                    "SELECT COUNT(*) FROM sqlite_master " +
+                        "WHERE type = 'table' AND name = 'content_reports'",
+                ),
+            ).isEqualTo(0)
         }
     }
 }

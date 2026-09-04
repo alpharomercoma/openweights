@@ -66,7 +66,7 @@
     <string name="which_folder_did_mean">どのフォルダのことですか</string>
     <string name="what_was_wrong">どこが問題でしたか</string>
     <string name="anything_add">補足があれば</string>
-    <string name="saved_device">この端末に保存されます</string>
+    <string name="what_gets_shared">共有される内容</string>
     <string name="cancel">キャンセル</string>
     <string name="message_actions">メッセージの操作</string>
     <string name="downloading">ダウンロード中</string>
@@ -218,7 +218,7 @@
     <string name="system_prompt_detail">すべての会話の前に送られる、変わらない指示です。小さなモデルは、ほのめかすよりもはっきり書いたほうがよく従います。</string>
     <string name="tool_prompt_detail">ツールと一緒に、あなたのプロンプトより前に送られます。アプリが足しているのはこれだけです。</string>
     <string name="thinking_detail">まず筋道を立てて考えます。遅くなりますが、手順のあるものには向いています。</string>
-    <string name="report_contents_detail">モデル名（%1$s）、理由、あなたのメモ、そして回答です。この端末から出ません。送る先はありません。</string>
+    <string name="report_contents_detail">モデル名（%1$s）、理由、あなたのメモ、そして回答です。送信先を選ぶまで、何も送信されません。</string>
     <string name="an_empty_reply">（空の回答）</string>
     <string name="usage_empty">まだ何もありません。チャットを始めると、合計がここに出て、この端末に残ります。</string>
     <string name="tokens_today">+%1$s 今日 ·</string>

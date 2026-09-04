@@ -77,7 +77,7 @@
     <string name="which_folder_did_mean">Which folder did you mean?</string>
     <string name="what_was_wrong">What was wrong with it?</string>
     <string name="anything_add">Anything to add</string>
-    <string name="saved_device">Saved on this device</string>
+    <string name="what_gets_shared">What gets shared</string>
     <string name="cancel">Cancel</string>
     <string name="message_actions">Message actions</string>
     <string name="report">Report</string>
@@ -259,7 +259,7 @@
     <string name="system_prompt_detail">Standing instructions, sent before every conversation. Small models follow explicit ones far better than implied ones.</string>
     <string name="tool_prompt_detail">Sent with the tools, before your own prompt. This is the whole of what the app adds.</string>
     <string name="thinking_detail">Work it through first. Slower, and better on anything with steps in it.</string>
-    <string name="report_contents_detail">The model name (%1$s), the reason, your note and the reply. It stays on this phone. There is nowhere to send it.</string>
+    <string name="report_contents_detail">The model name (%1$s), the reason, your note and the reply. Nothing is sent until you pick where it goes.</string>
     <string name="an_empty_reply">(an empty reply)</string>
     <string name="usage_empty">Nothing yet. Once you chat, the totals appear here, and stay on this phone.</string>
     <string name="tokens_today">+%1$s today ·</string>

@@ -22,8 +22,8 @@ import org.junit.Test
 /**
  * What "copy text" hands over, now that "copy as Markdown" hands over the source.
  *
- * Every case here is a way the two differ. The cases worth guarding are not the easy ones
- * — the ones where taking a mark off would take something the reader needs with it.
+ * Every case here is a way the two differ. The cases worth guarding are not the easy ones,
+ * but the ones where taking a mark off would take something the reader needs with it.
  */
 class PlainTextTest {
     @Test

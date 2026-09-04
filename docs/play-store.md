@@ -276,9 +276,10 @@ user, which makes it no less sensitive, because the model composes it out of the
 conversation. Anything the user pasted or attached can end up in it. The form should be
 filled in on that basis.
 
-What still never leaves the device: the conversation itself, model replies, attachments,
-usage totals and content reports. There is no analytics SDK, no crash reporter, no account
-and no backend of ours. The model runs here and nothing about a reply is uploaded.
+What still never leaves the device: the conversation itself, model replies, attachments
+and usage totals. There is no analytics SDK, no crash reporter, no account and no backend of
+ours. The model runs here and nothing about a reply is uploaded. The one reply that can
+leave is one the user reports and then chooses an app to send it to, described below.
 
 **Hosts contacted.** `huggingface.co` and the delivery hosts it redirects downloads to;
 `duckduckgo.com` for search; and, through `fetch_url`, whatever host the model found in a
@@ -304,38 +305,46 @@ that a decision for a human and noted there was no such flow. That was a release
 not a decision.
 
 There is now a report action on every model reply. It offers a reason, an optional note,
-and shows exactly what the report will contain before it is filed: the model name, the
-reason, the note, and the reply itself. The report is stored on the device in a
-`content_reports` table, added by `MIGRATION_2_3`.
+and shows exactly what the report will contain before anything happens: the model name, the
+reason, the note, and the reply itself. Tapping Report hands that text to the system share
+sheet, and the user picks where it goes.
 
-Verified on a Snapdragon 8 Elite in the debug build: all four message actions render, the
-report sheet opens, a reason can be chosen, and submitting dismisses it. Three unit tests
-cover the write against a real Room database, including that a report with no model is
-refused rather than filed against nothing. **The report action has not been driven by hand
-in the release variant**, because the device tunnel dropped first; the label is present in
-the minified dex and the other conditional rows in the same file render there, so the risk
-is low but it is not zero.
+The first version of this wrote the report into a `content_reports` table and stopped. That
+was the wrong answer twice over. Nothing ever read the table: no screen listed the rows, no
+code counted them, and the sheet's own copy promised a Settings screen to read them that was
+never built, so a filed report was a row written for nobody while the sheet implied somebody
+would look. It also failed the part of the policy the section below was unsure about, since
+a report that cannot reach the developer does not inform them. The table, its DAO, its
+repository and its view model are gone, and `MIGRATION_17_18` drops it.
 
-Adding the fourth action exposed a layout bug worth remembering. The actions sheet was
+A hard-coded destination was considered and rejected. It would have to be a public issue
+tracker, which needs an account most users do not have, and it would publish a model reply
+plus whatever the user put in their note under their real name. The share sheet leaves that
+decision with the person who wrote the report, on a screen that shows them the text and lets
+them back out.
+
+Verified on a Snapdragon 8 Elite in the debug build: all message actions render, the report
+sheet opens, a reason can be chosen, and submitting dismisses it. Five Robolectric tests
+cover the sheet, including that a report with no reason is refused, and four cover the text
+the share carries. **The report action has not been driven by hand in the release variant**,
+because the device tunnel dropped first; the label is present in the minified dex and the
+other conditional rows in the same file render there, so the risk is low but it is not
+zero.
+
+Adding a fourth action exposed a layout bug worth remembering. The actions sheet was
 using the default partially-expanded state, which clipped the last row off the bottom with
 nothing to indicate it existed. Adding `verticalScroll` made it worse rather than better:
 a scrollable column will accept any height, so the sheet handed it the leftover space and
 still showed three rows. The fix is `skipPartiallyExpanded = true` and no scroll, letting
 the sheet size to its content.
 
-Nothing is transmitted, because there is no server to transmit to and acquiring one would
-break the only promise this app makes. What the reports are for is the app itself: they are
-the sole quality signal available when nothing is measured remotely, and a model that
-collects reports is one worth warning the next person about.
+The app still transmits nothing on its own, because there is still no server to transmit
+to and acquiring one would break the only promise this app makes. What leaves is what a user
+read, approved, and chose an app to send, which is their action rather than ours.
 
-Two things still need a human before submission:
-
-1. Whether Play accepts device-local reporting for an app with no backend. The reporting
-   control is in-app and requires no exit, which is what the policy asks for, but the
-   expectation that reports "inform the developer" is only satisfiable here if the user
-   chooses to send one. Ask review directly rather than guessing.
-2. The listing should say plainly that the user chooses the model, that models come from
-   third parties, and that their behaviour is the publisher's rather than ours.
+One thing still needs a human before submission: the listing should say plainly that the
+user chooses the model, that models come from third parties, and that their behaviour is the
+publisher's rather than ours.
 
 ## Version codes are counted, not typed
 

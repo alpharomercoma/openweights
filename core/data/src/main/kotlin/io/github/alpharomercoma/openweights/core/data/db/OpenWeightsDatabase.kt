@@ -27,14 +27,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ConversationEntity::class,
         MessageEntity::class,
         UsageEntity::class,
-        ContentReportEntity::class,
         CompactionEntity::class,
         WatchEntity::class,
         WatchRunEntity::class,
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -43,7 +42,6 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
     abstract fun archive(): ArchiveDao
     abstract fun messages(): MessageDao
     abstract fun usage(): UsageDao
-    abstract fun reports(): ContentReportDao
     abstract fun compactions(): CompactionDao
     abstract fun watches(): WatchDao
     abstract fun watchRuns(): WatchRunDao
@@ -79,6 +77,28 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * every reader. Nothing to backfill: no conversation had a draft before there was
          * anywhere to put one.
          */
+        /**
+         * Drops the table filed reports were written into.
+         *
+         * The reports never went anywhere. Nothing read the table: no screen listed them,
+         * no code counted them, and the sheet's own copy once promised a Settings screen to
+         * read them that was never built. So a report was a row written for nobody, which
+         * is worse than no report action at all, because the sheet implied otherwise.
+         *
+         * The action itself is still there and now hands the text to the share sheet, where
+         * the person who wrote it picks where it goes. That leaves nothing to store, and a
+         * table holding reported model output plus whatever note somebody typed is not a
+         * thing to keep on disk once it has no reader.
+         *
+         * `IF EXISTS` because [MIGRATION_2_3] created this table and a database old enough
+         * to predate it will arrive here without one.
+         */
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS content_reports")
+            }
+        }
+
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

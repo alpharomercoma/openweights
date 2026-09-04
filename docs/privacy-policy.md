@@ -14,7 +14,6 @@ reach the internet on your behalf. This document says exactly when, and what goe
 - Your conversations: what you typed, what the model replied, and the files you attached.
 - The models you download, and the settings you keep for each one.
 - Your usage totals: tokens, speed, and time spent generating.
-- Reports you file about a model's output. These are stored in the app and sent nowhere.
 - The contents of any folder you share with the app, and anything the assistant reads from
   it.
 
@@ -31,6 +30,7 @@ do not travel to a new phone. Uninstalling the app deletes all of it.
 | Your Hugging Face access token, if you set one | With every Hugging Face request | Hugging Face |
 | A search query the assistant composed | Whenever it uses the `web_search` tool | DuckDuckGo |
 | A web address the assistant chose, and the request for it | Whenever it uses the `fetch_url` tool | Whichever site the address names |
+| A report you wrote about a reply | Only if you tap Report and then pick an app to send it to | Wherever you chose to send it |
 
 Every request above also carries the ordinary information any web request carries, including
 your IP address, which the receiving service handles under its own policy.
@@ -56,6 +56,13 @@ the query. The second situation is your own data: once something private has bee
 turn, from a shared file or otherwise, anything that would carry data off the device in that
 same turn is held for your approval too, regardless of which tool it is — this one does
 cover `web_search`.
+
+**Reporting a reply.** Every model reply has a report action. It asks what was wrong,
+takes an optional note, and shows you the whole report before anything happens: the model
+name, the reason, your note, and the reply itself. The app does not store it and has
+nowhere of its own to send it. Tapping Report hands the text to Android's share sheet, and
+where it goes from there is your choice: a mail, an issue, your own notes, or nothing at
+all. Backing out of that sheet sends nothing, and nothing is kept behind.
 
 **Files you share.** If you give the app access to a folder, its contents are read on the
 device and are never uploaded on their own. They can leave only through `web_search` or

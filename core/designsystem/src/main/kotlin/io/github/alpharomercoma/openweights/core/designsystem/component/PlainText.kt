@@ -26,7 +26,7 @@ package io.github.alpharomercoma.openweights.core.designsystem.component
  * now two copy actions rather than one that has to guess which was meant.
  *
  * The rule throughout is to produce what the renderer draws. Where the renderer shows
- * structure with type rather than with characters — headings, emphasis, code spans — the
+ * structure with type rather than with characters (headings, emphasis, code spans), those
  * characters go. Where it draws a mark the reader can see, plain text keeps a mark of its
  * own: a bullet stays a bullet, a checkbox stays a box, a table stays a table, because a
  * list whose bullets have been stripped is no longer a list.

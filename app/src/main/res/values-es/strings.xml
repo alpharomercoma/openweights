@@ -66,7 +66,7 @@
     <string name="which_folder_did_mean">¿Qué carpeta querías decir?</string>
     <string name="what_was_wrong">¿Qué estuvo mal?</string>
     <string name="anything_add">Algo que añadir</string>
-    <string name="saved_device">Guardado en este dispositivo</string>
+    <string name="what_gets_shared">Qué se comparte</string>
     <string name="cancel">Cancelar</string>
     <string name="message_actions">Acciones del mensaje</string>
     <string name="downloading">Descargando</string>
@@ -235,7 +235,7 @@
     <string name="system_prompt_detail">Instrucciones permanentes, enviadas antes de cada conversación. Los modelos pequeños siguen mucho mejor las explícitas que las implícitas.</string>
     <string name="tool_prompt_detail">Se envía con las herramientas, antes de tu propio prompt. Esto es todo lo que añade la app.</string>
     <string name="thinking_detail">Que lo razone primero. Más lento, y mejor en cualquier cosa que tenga pasos.</string>
-    <string name="report_contents_detail">El nombre del modelo (%1$s), el motivo, tu nota y la respuesta. Se queda en este teléfono. No hay ningún sitio al que enviarlo.</string>
+    <string name="report_contents_detail">El nombre del modelo (%1$s), el motivo, tu nota y la respuesta. No se envía nada hasta que elijas a dónde va.</string>
     <string name="an_empty_reply">(una respuesta vacía)</string>
     <string name="usage_empty">Todavía nada. Cuando chatees, los totales aparecen aquí y se quedan en este teléfono.</string>
     <string name="tokens_today">+%1$s hoy ·</string>

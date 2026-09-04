@@ -47,7 +47,6 @@ import io.github.alpharomercoma.openweights.ui.chat.ChatScreen
 import io.github.alpharomercoma.openweights.ui.chat.ChatViewModel
 import io.github.alpharomercoma.openweights.ui.chat.ConversationActions
 import io.github.alpharomercoma.openweights.ui.chat.MediaViewModel
-import io.github.alpharomercoma.openweights.ui.chat.ReportViewModel
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardScreen
 import io.github.alpharomercoma.openweights.ui.dashboard.DashboardViewModel
 import io.github.alpharomercoma.openweights.ui.discover.DiscoverScreen
@@ -178,7 +177,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
             val state by chatViewModel.uiState.collectAsStateWithLifecycle()
             val isSpeaking by mediaViewModel.isSpeaking.collectAsStateWithLifecycle()
             val dictation by mediaViewModel.dictationState.collectAsStateWithLifecycle()
-            val reportViewModel: ReportViewModel = hiltViewModel()
             // Collected from the board rather than mirrored into the chat state: it is
             // already a flow, and a second copy would be a second thing to keep in step.
             val plan by chatViewModel.planning.plan.collectAsStateWithLifecycle()
@@ -269,14 +267,6 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onDismissGoal = chatViewModel::dismissGoal,
                 question = question,
                 onAnswerQuestion = chatViewModel.asking::answer,
-                onReport = { entry, reason, note ->
-                    reportViewModel.report(
-                        modelName = state.modelName,
-                        replyText = entry.answer.ifEmpty { entry.text },
-                        reason = reason,
-                        note = note,
-                    )
-                },
             )
         }
 

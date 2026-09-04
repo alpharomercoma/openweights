@@ -21,7 +21,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import io.github.alpharomercoma.openweights.core.data.ReportReason
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import org.junit.Rule
 import org.junit.Test
@@ -37,8 +36,8 @@ import org.robolectric.annotation.Config
  * in kind from a regression anywhere else on this screen: the app would still work, and it
  * would be out of policy, which is not a state anything else in the suite would notice.
  *
- * `docs/store-listing.md` describes this control to the reviewer in the words below — a
- * reason, an optional note, and the report shown in full before it is filed — so these
+ * `docs/store-listing.md` describes this control to the reviewer in the words below (a
+ * reason, an optional note, and the report shown in full before it is sent), so these
  * assertions are also the ones keeping that paragraph true.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -77,8 +76,8 @@ class ReportSheetTest {
 
     @Test
     fun `nothing is filed until a reason is picked`() {
-        // A report with no reason is a row nobody can act on, and the sheet is the only
-        // thing standing between one and the database.
+        // A report with no reason is one nobody can act on, and the sheet is the only
+        // thing standing between one and the share sheet.
         var filed = false
         showSheet(onSubmit = { _, _ -> filed = true })
 
@@ -99,7 +98,7 @@ class ReportSheetTest {
     }
 
     @Test
-    fun `every reason the repository knows about is offered`() {
+    fun `every reason the sheet knows about is offered`() {
         // Enumerated rather than spot checked. A reason that exists in ReportReason and not
         // on this sheet is unreachable, and the one most likely to be added later is the one
         // a policy change asks for.

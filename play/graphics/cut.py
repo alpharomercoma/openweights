@@ -14,7 +14,8 @@ the reply arriving line by line; the rest are frames held from the same captures
 centred on measured card edges, with the cut between two views carrying the change. The
 card bands and the 33 px gaps between them were measured off the pixels, not eyeballed.
 
-Every frame is from a recording made on a Dimensity 9400 (POCO X8 Pro, Android 16), and
+Every frame is from a recording made on a Dimensity 9400 (POCO X8 Pro Max, Android 16),
+and
 every claim in the type is one the frame underneath it shows.
 
 The opening used to avoid the web-search chip, on the argument that a video whose first

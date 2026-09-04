@@ -66,6 +66,38 @@ correctly a no-op):
 | QDC SM8650 (8 Gen 3) | LFM2.5-1.2B Q4_K_M | snapshot restore | 1018 | **308 ms** |
 | QDC SM8650 | Qwen3-1.7B Q8_0 | rollback | 1052 | 148 ms |
 
+### Re-measured 2026-09-03 on the current build
+
+The table above is from 2026-08-31. `WarmPrefixEval` was rerun on the Poco on 2026-09-03,
+after the two `CpuTopology` fixes of that morning, on the same synthetic 1,036-token prefix:
+
+| model | cold prefill of the head | fresh-chat TTFT | path | snapshot |
+|---|---|---|---|---|
+| LFM2.5-1.2B Q4_K_M | 9,326 ms (1,018 tok, 109 tok/s) | **235 ms** | snapshot restore | 12,388 KB |
+| Qwen3-1.7B Q8_0 | 23,299 ms (1,047 tok, 45 tok/s) | 455 ms | rollback | none |
+| Llama-3.2-3B Q4_K_M | 38,119 ms (1,038 tok, 27 tok/s) | 2,212 ms | rollback | none |
+| SmolLM3-3B Q4_K_M | 45,183 ms (1,049 tok, 23 tok/s) | 414 ms | rollback | none |
+| gemma-3-1b-it Q4_K_M | 43 ms (1 tok) | n/a | no system region | 26 KB |
+
+Three things this settled, and one it opened:
+
+1. **The cold side and the warm side now come from one measurement.** The 18.5 s in this
+   note's opening is a real 2,054-token agent prompt from the usage ledger; the 184 ms was
+   a restore of the eval's synthetic 1,036-token prefix. Pairing them was never apples to
+   apples. The pair to quote is 9,326 ms to 235 ms: same prefix, model, phone and build.
+2. **The snapshot is 12 MB, not 26 MB.** 12,388 KB for LFM2.5-1.2B Q4_K_M. The 26 that had
+   been carried around is gemma's 26 **KB** no-op snapshot.
+3. **The thread fix did not inflate the August baseline.** LFM2.5 prefills the 1,036-token
+   head at 109 tok/s today against the ~100 tok/s this note recorded on 2026-08-31, so
+   2,054 tokens still costs about 19 s and the ledger's 18.5 s stands as measured.
+   What the day's benchmark medians (138 tok/s for the same model) show is **prompt
+   length**, not the thread rule: prefill falls off with length, hard on some models
+   (Qwen3 Q8_0 does 124 tok/s under 200 tokens and 45 at 1,047), so a fixed-prefix cost
+   must never be computed by dividing tokens by a short-prompt rate.
+4. **Open: Llama-3.2-3B's fresh chat came back at 2,212 ms against 453 ms in August.**
+   One run, on a phone that had been benchmarking all day, so it is a lead rather than a
+   regression; the rollback families are the ones to rerun cold.
+
 The correctness claim is scoped honestly. A snapshot restore replaces the state wholesale,
 so its decode schedule is identical to a computed prefix's — and the eval asserts the reply
 is **byte-for-byte identical** to the computed baseline, greedy, on the hybrid. The rollback

@@ -136,11 +136,13 @@ Both engines produce different text on most prompts once replies are long, becau
 float rounding difference anywhere flips one greedy token and the rest follows. The
 grade is what matters, and there the engines differ by shape as well as by amount.
 ExecuTorch's divergence is diffuse: every phone is the odd one out somewhere, and its
-splits pair phones at random. llama.cpp's is structured: twenty-nine of its thirty-six
+splits do not settle on one pair. llama.cpp's is structured: twenty-nine of its thirty-six
 splits put the Snapdragon 8 Elite and 8 Gen 3 together against the Dimensity, the Tensor
 and the Exynos. The hypothesis for that shape is the CPU kernel build: the 8 Elite's logcat
 shows it loading `libggml-cpu-android_armv8.6_1.so` where the Poco, the Tensor and the
-Exynos load the `armv9.0` build (the SVE and KleidiAI path, from the parity runs' logcats),
+Exynos load the `armv9.0` build (the SVE and KleidiAI path; the Tensor and Exynos lines
+are in this run's logcats under `results/logcats/`, the Poco's read from the phone on
+2026-09-03 after the reproducibility rerun),
 which would make the two Snapdragons the two phones on one build and the other three the
 three on another. It is a hypothesis: the 8 Gen 3's build is inferred from the pairing
 because Qualcomm Device Cloud gave no logcat, and no build was swapped on a phone to see
@@ -148,6 +150,13 @@ the split move. What the data establishes is the cluster; what would establish t
 is forcing the armv8.6 build on the Poco and watching the 29 follow it. Nothing here
 attributes a divergence to a kernel; what it does is give the talk a rate and a shape
 instead of two anecdotes.
+
+Same phone, same run twice, is a different matter: the Qwen3 Q8_0 GSM8K class was rerun
+on the Poco on 2026-09-03 and all thirty replies came back byte-identical to the
+afternoon's, so what the table measures is between phones and not between runs. The APK
+that produced every column is one build carrying seven `libggml-cpu-android_*` variants,
+and the loader scores the phone and picks one: identical app, identical model file, not
+necessarily identical machine code.
 
 The Gemma GSM8K example makes the mechanism concrete: on question 192 the 8 Elite's
 llama.cpp writes "130 - 39 = 91" and the Dimensity's writes "150 - 45 = 105", the same

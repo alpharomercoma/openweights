@@ -32,6 +32,7 @@ import okhttp3.Request
 import okhttp3.Response
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -58,7 +59,11 @@ sealed interface DownloadProgress {
  * that. Deliberately not an IOException, so a caller that retries every IOException does
  * not quietly retry a corrupt download too.
  */
-class DownloadException(message: String, val isRetryable: Boolean = false) : Exception(message)
+class DownloadException(
+    message: String,
+    val isRetryable: Boolean = false,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 /**
  * Downloads model files, resumably and verified.
@@ -90,34 +95,9 @@ class ModelDownloader @Inject constructor(
         // The case that matters is a publisher replacing a file with different bytes under
         // the same name and the same size. Without the hash, the app reports "Finished" and
         // keeps running the old weights forever, and nothing on screen ever disagrees.
-        if (destination.isFile) {
-            val expected = file.sha256
-            val hashMatches = expected != null &&
-                destination.length() == file.sizeBytes &&
-                destination.sha256(ioDispatcher).equals(expected, true)
-            val sourceMatches = destinationSource.readTextOrNull() == identity
-            if (destination.length() == file.sizeBytes && (hashMatches || sourceMatches)) {
-                destinationSource.writeText(identity)
-                emit(DownloadProgress.Finished(destination))
-                return@flow
-            }
-            // Said as what is known rather than as an accusation. Without a published
-            // checksum and without a recorded source there is no way to tell whether this
-            // is the same file under the same name or somebody else's, and the two have
-            // very different costs: adopting the wrong one runs the wrong weights forever,
-            // and deleting the right one is gigabytes over a phone connection. So neither
-            // is chosen here, and the person who knows which it is decides.
-            if (expected == null && !sourceMatches) {
-                throw DownloadException(
-                    "${destination.name} is already on this device and this repository " +
-                        "publishes no checksum, so it cannot be confirmed as the same file. " +
-                        "Delete it in Models to download this one.",
-                )
-            }
-            // Different bytes under the same name. Removed rather than resumed: a resume
-            // would append to content that is already wrong.
-            destination.delete()
-            destinationSource.delete()
+        if (destination.isFile && adoptExisting(destination, destinationSource, file, identity)) {
+            emit(DownloadProgress.Finished(destination))
+            return@flow
         }
 
         val partial = File(destination.parentFile, destination.name + PARTIAL_SUFFIX)
@@ -165,6 +145,79 @@ class ModelDownloader @Inject constructor(
         partialSource.delete()
         emit(DownloadProgress.Finished(destination))
     }.flowOn(ioDispatcher)
+
+    /**
+     * Decides what to do about a file already sitting at the destination.
+     *
+     * A file at the right length is normally the same file, and rehashing several
+     * gigabytes to prove it would make every reopen of the models screen cost a minute. So
+     * the length is trusted, unless the Hub published a checksum, in which case it is the
+     * cheaper of two wrong answers to check. The case that matters is a publisher
+     * replacing a file with different bytes under the same name: without the hash the app
+     * reports "Finished" and keeps running the old weights forever.
+     *
+     * @return true when the file on disk is the one being asked for and the download is
+     * already done. False means it has been cleared out of the way for a fresh transfer.
+     */
+    private suspend fun adoptExisting(
+        destination: File,
+        destinationSource: File,
+        file: HubFile,
+        identity: String,
+    ): Boolean {
+        val expected = file.sha256
+        // Reading what is already there can fail on its own terms: a half-written file
+        // from a killed process, storage that has gone bad, a path the app can no longer
+        // open. That is not the transfer failing, and no number of retries can change it —
+        // the same unreadable bytes are there next time.
+        //
+        // Left as a bare IOException it was classified as transient by
+        // `ModelDownloadWorker`, so the work went back on the queue and sat there:
+        // observed live as **"Downloading 0%" through four doomed attempts with a thirty
+        // second backoff between each**, no bytes moving, nothing on screen saying why,
+        // and the only cancel on a screen the user had navigated away from. Named
+        // unretryable here, it fails once and says what to do.
+        val (hashMatches, sourceMatches) = try {
+            val hashed = expected != null &&
+                destination.length() == file.sizeBytes &&
+                destination.sha256(ioDispatcher).equals(expected, true)
+            hashed to (destinationSource.readTextOrNull() == identity)
+        } catch (failure: IOException) {
+            // Caught by type rather than with runCatching, so a cancelled download stays
+            // cancelled: CancellationException is not an IOException and passes straight
+            // through, which is the behaviour WorkManager relies on.
+            throw DownloadException(
+                "${destination.name} is already on this device but could not be read " +
+                    "(${failure.message ?: "no reason given"}). Delete it in Models and " +
+                    "download it again.",
+                isRetryable = false,
+                cause = failure,
+            )
+        }
+
+        if (destination.length() == file.sizeBytes && (hashMatches || sourceMatches)) {
+            destinationSource.writeText(identity)
+            return true
+        }
+        // Said as what is known rather than as an accusation. Without a published checksum
+        // and without a recorded source there is no way to tell whether this is the same
+        // file under the same name or somebody else's, and the two have very different
+        // costs: adopting the wrong one runs the wrong weights forever, and deleting the
+        // right one is gigabytes over a phone connection. So neither is chosen here, and
+        // the person who knows which it is decides.
+        if (expected == null && !sourceMatches) {
+            throw DownloadException(
+                "${destination.name} is already on this device and this repository " +
+                    "publishes no checksum, so it cannot be confirmed as the same file. " +
+                    "Delete it in Models to download this one.",
+            )
+        }
+        // Different bytes under the same name. Removed rather than resumed: a resume would
+        // append to content that is already wrong.
+        destination.delete()
+        destinationSource.delete()
+        return false
+    }
 
     /** Streams the file into [partial], continuing from whatever is already there. */
     private suspend fun FlowCollector<DownloadProgress>.transfer(
@@ -354,7 +407,7 @@ class ModelDownloader @Inject constructor(
         }
 
     private companion object {
-        const val PARTIAL_SUFFIX = ".part"
+        const val PARTIAL_SUFFIX = DOWNLOAD_PARTIAL_SUFFIX
         const val BUFFER_BYTES = 1 shl 16
         const val PROGRESS_INTERVAL_BYTES = 1L shl 20
         const val BYTES_PER_MEBIBYTE = 1024L * 1024L
@@ -362,6 +415,15 @@ class ModelDownloader @Inject constructor(
         const val MAX_UNKNOWN_DOWNLOAD_BYTES = 32L * 1024 * 1024 * 1024
     }
 }
+
+/**
+ * What an unfinished download is called on disk, until it is renamed into place.
+ *
+ * Public because the presence of one of these files is the cheapest true answer to "is
+ * anything still downloading", and the model store asks that before opening a model
+ * nobody has requested yet.
+ */
+const val DOWNLOAD_PARTIAL_SUFFIX = ".part"
 
 /** Stable provenance for files whose repository-controlled basenames may collide. */
 internal fun downloadIdentity(repoId: String, file: HubFile): String =

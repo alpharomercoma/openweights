@@ -103,6 +103,7 @@ A, B, C, D, E, F, G, H = CUTS
 TARGET_LUFS = -15.0
 TARGET_TP = -1.4
 WET = 0.34            # reverb send, against a unit-energy impulse
+TAIL = 0.30           # the ending's extra send into its own longer, darker hall
 
 VARIANTS = {
     "A": dict(pickups=False, pluck=0.86, hat=0.85, clap=0.30, lead8va=False, cym=0.30,
@@ -307,6 +308,18 @@ def make_ir(rng, dur=3.2) -> np.ndarray:
     return x / (np.sqrt(np.sum(x ** 2)) + 1e-9)
 
 
+def make_tail_ir(rng, dur=4.2) -> np.ndarray:
+    """The ending's own hall: longer than the mix reverb and deliberately darker, 120 Hz to
+    6 kHz rather than 180 to 9. A long bright tail is what makes an ending sound synthetic;
+    a long dark one just sounds like a room. Used only on the final cadence, so the reverb
+    everywhere else, including the approved bridge, is untouched."""
+    x = rng.standard_normal(int(dur * SR)) * np.exp(-_t(int(dur * SR)) / 1.15)
+    x = bandpass(x, 120, 6000)
+    x[:int(0.025 * SR)] *= 0.12
+    x[int(0.025 * SR):int(0.07 * SR)] *= 0.40
+    return x / (np.sqrt(np.sum(x ** 2)) + 1e-9)
+
+
 def reverb(x: np.ndarray, ir: np.ndarray) -> np.ndarray:
     if x.ndim == 1:
         return fftconvolve(x, ir)[:len(x)]
@@ -508,12 +521,12 @@ def finale(rng, v) -> np.ndarray:
         add(r, at, sig * (1 + spread))
 
     root, tri = chord(H)
-    st(H, kick_hit(rng, 0.95))
-    st(H + 2 * BEAT, kick_hit(rng, 0.40))
-    st(H, cymbal(rng, 2.8, v["cym"] * 0.55, lo=1800, hi=8000), 0.06)
-    st(H, sub(root, 2.2, 0.70))
+    st(H, kick_hit(rng, 0.74))
+    st(H + 2 * BEAT, kick_hit(rng, 0.32))
+    st(H, cymbal(rng, 3.4, v["cym"] * 0.42, lo=1500, hi=6500), 0.06)
+    st(H, sub(root, 3.4, 0.72))
 
-    for mult, g, dur in ((1.0, 0.30, 2.1), (2.0, 0.17, 1.6)):
+    for mult, g, dur in ((1.0, 0.32, 2.9), (2.0, 0.16, 2.2)):
         for k, f in enumerate(tri):
             st(H, pluck(f * mult, dur, 0.9, g / (k + 1.4)), 0.10 if k % 2 else -0.10)
     # The motif's first two notes, an octave apart, so the film ends on the phrase it opened
@@ -530,10 +543,10 @@ def finale(rng, v) -> np.ndarray:
     n = int((DUR - H) * SR)
     t = _t(n)
     held = np.zeros(n)
-    for f in (D3, F3, A3, D4, F4):
+    for f, w in ((A2, 0.9), (D3, 1.0), (F3, 0.95), (A3, 0.85), (D4, 0.7), (F4, 0.5)):
         for cents in (-6, +6):
-            held += np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
-    held *= np.clip(t / 0.05, 0, 1) * np.exp(-t / 2.30) / 10
+            held += w * np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
+    held *= np.clip(t / 0.07, 0, 1) * np.exp(-t / 3.40) / 10
     st(H, held * 0.62, 0.05)
     return np.stack([l, r])
 
@@ -580,6 +593,7 @@ def render(name: str, out_wav: Path) -> Path:
     v = VARIANTS[name]
     rng = np.random.default_rng(2026_09_04)
     ir = make_ir(rng)
+    tail_ir = make_tail_ir(rng)
 
     kit, kicks = drums(rng, v)
     duckg = duck(kicks)
@@ -587,11 +601,12 @@ def render(name: str, out_wav: Path) -> Path:
 
     dry_mono = (kit + bassline(v) * duckg + pads(rng) * (0.35 + 0.65 * duckg)) * curve
     dry = np.stack([dry_mono, dry_mono])
-    wet = plucks(v) * (0.55 + 0.45 * duckg) * curve + lead(v) + finale(rng, v) + design(rng, v)
+    fin = finale(rng, v)
+    wet = plucks(v) * (0.55 + 0.45 * duckg) * curve + lead(v) + design(rng, v)
 
     # Reverb goes on the tuned voices only. Putting it on the kick and sub smears the low
     # end and costs the mix the headroom the sidechain was there to protect.
-    stereo = dry + wet + reverb(wet, ir) * WET
+    stereo = dry + wet + fin + reverb(wet + fin, ir) * WET + reverb(fin, tail_ir) * TAIL
 
     # Gain staging before the soft knee, so the knee only rounds the tips. Without this the
     # tanh is a brick wall and the whole mix loses its transients: measured on the first
@@ -602,8 +617,8 @@ def render(name: str, out_wav: Path) -> Path:
     stereo *= 0.89 / (np.abs(stereo).max() + 1e-9)
     n = int(0.004 * SR)
     stereo[:, :n] *= np.linspace(0, 1, n)
-    m = int(0.090 * SR)
-    stereo[:, -m:] *= np.linspace(1, 0, m) ** 0.6
+    m = int(0.150 * SR)
+    stereo[:, -m:] *= np.linspace(1, 0, m) ** 0.5
 
     pcm = (np.clip(stereo.T, -1, 1) * 32767).astype("<i2")
     with wave.open(str(out_wav), "wb") as w:

@@ -249,8 +249,18 @@ animation; the cymbal is darker, slower and half the level, the bright layer is 
 kit exhales eight decaying sixteenths into the card, and the impulse response and chord
 decay both lengthened. The ending now falls **22 dB across 2.4 s** with no cliff in it.
 
-Verified on the master: **-15.0 LUFS** integrated, **-1.7 dBTP**, LRA 4.1, **zero clipped
-samples**, crest factor 11.4 to 14.9 dB per section. Every cut's onset lands within
+A final pass touched the ending alone, because it still resolved before the mark had time
+to breathe. The accent is softer, the cadence's two pluck layers ring a second longer, the
+held chord gained a low octave and half its decay rate, and the ending now sends into an
+impulse of its own: 4.2 s and deliberately darker at 120 Hz to 6 kHz, applied to the finale
+only so the reverb on every other section, including the approved bridge, is untouched. The
+tail is **10.8 dB louder at the last frame**, the fall across the first second after the
+accent went from 7.2 dB to **5.0**, and the tail's spectral centroid dropped from 1669 Hz to
+**1426**, so it is warmer rather than brighter. Everything before 22.8 s moved by 0.2 dB,
+which is global normalisation and nothing else.
+
+Verified on the master: **-15.0 LUFS** integrated, **-1.3 dBTP**, LRA 4.3, **zero clipped
+samples**, and every cut still within 5.3 ms of the picture. Every cut's onset lands within
 5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
 stream is stream-copied and its MD5 is identical to the silent master's.
 

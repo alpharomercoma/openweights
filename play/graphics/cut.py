@@ -119,6 +119,16 @@ SHOTS = [
          eyebrow="from hugging face", head="Then it downloads it",
          sub="Progress in the app. Cancel anytime."),
 
+    # On the headline here. An earlier pass ran "No folder is shared by default", because
+    # said flat and unscoped, "nothing is shared" is not true of this build: web search
+    # ships on, and a query a person typed leaves the device when the model calls it. The
+    # line is asked for and it is kept, and what makes it honest is that the eyebrow is not
+    # decoration. YOUR FILES is the subject and the headline is its predicate, the card
+    # underneath says "No folder shared . The file tools stay off until you pick one. Only
+    # that folder is shared", and the subhead names the same scope again in five words. Of
+    # your files, nothing is shared by default, and that is exactly what the screen proves.
+    # The very next beat then says out loud that some tools do leave the device.
+    #
     # The tools. The first view is the screen's own explainer card, centred on its measured
     # edges: it says the file tools stay off until a folder is shared, which is both the
     # strongest privacy claim on the screen and the reason those rows read "Waiting for a
@@ -130,8 +140,8 @@ SHOTS = [
     # row instead of a sliced title.
     dict(src="shot-tools3.mp4", at=0.4, length=2.8, hold=True,
          crop=(0, 380, FULL_W, FULL_H),
-         eyebrow="your files", head="No folder is shared by default",
-         sub="They stay off until you pick one."),
+         eyebrow="your files", head="Nothing is shared by default",
+         sub="No folder, until you choose one."),
     dict(src="shot-tools3.mp4", at=7.0, length=2.8, hold=True,
          crop=(0, 1412, FULL_W, FULL_H),
          eyebrow="your call", head="You decide what leaves the device",

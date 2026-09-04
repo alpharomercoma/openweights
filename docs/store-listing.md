@@ -259,22 +259,34 @@ accent went from 7.2 dB to **5.0**, and the tail's spectral centroid dropped fro
 **1426**, so it is warmer rather than brighter. Everything before 22.8 s moved by 0.2 dB,
 which is global normalisation and nothing else.
 
-One last mastering edit found the real culprit: the master fade-out. A 150 ms ramp to
-silence landed while the card was still on screen, so the track was audibly being faded
-rather than being cut away from. It is now 10 ms, enough to stop a truncated waveform
-clicking and nothing more, so the file ends with the chord still sounding. The pad under the
-card was also ramping itself out over its own last 0.35 s, which is the one voice whose job
-is to hold the card; that ramp is gone. The low resonance and the held chord were lengthened
-again, and the ending's reverb send came up slightly.
+The ending took one more pass, and the fault was structural rather than cosmetic. The code
+stopped every voice at the picture cut: `drums()` skipped the final section outright and the
+bass and pluck loops both ended at 23.0, after which a separate `finale()` began and the pad
+jumped from gain 0.16 into 1.9 kHz to 0.34 into 4.2. That is a second track starting, which
+is exactly what it sounded like, and no amount of lengthening the tail could fix it.
 
-The result, measured against the previous master: the tail is **8.4 dB louder in the final
-100 ms**, the total fall from 23.2 s to 25.4 halved from 10.4 dB to **5.3**, and the decay
-is smoother, losing 0.56 dB per 0.2 s against 0.80 with the worst single step down from 1.58
-to 1.16. The accent did not grow: it went from -2.7 to **-2.9 dBFS**. What is still sounding
-as the picture cuts is the chord itself, with spectral peaks at 73, 147, 293 and 350 Hz,
-which is D2, D3, D4 and F4.
+The last bar and a half is now one phrase. The tonic arrives at **22.4 s**, on the bar line
+and six tenths of a second before the card, so the ear is told the phrase is landing while
+the download shot is still up. The kit, bass and plucks keep playing their own patterns
+straight through the cut under a single wind-down curve, with the kick dropping out first,
+then the backbeat, then the rest. The pad, which has been playing since 6.6 s, swells across
+nearly a second into the bed that holds the card. There is no accent kick, no cymbal wash
+and no separately voiced chord: every voice in the ending appears earlier in the film.
 
-Verified on the master: **-15.0 LUFS** integrated, **-1.6 dBTP**, LRA 4.5, **zero clipped
+Measured with a self-similarity novelty curve, which is how you find section boundaries in
+audio alone, the card's boundary strength fell from 0.46 to **0.26** against a mean of 0.53
+for the film's real transitions. It was as strong as a real section change; it is now half
+of one. The worst loudness step across 22.8 to 23.3 halved to **1.6 dB** and the worst
+timbre step fell from 1032 Hz to **738**.
+
+One other thing that pass caught. A mix's crest factor and the loudness target together fix
+the post-gain true peak exactly, and for this arrangement that is -1.29 dBTP. The ceiling had
+been set to -1.4, below the achievable peak, so loudnorm could not reach the target with a
+constant gain and silently switched to **dynamic** normalisation, re-balancing the whole
+film: the approved hook moved +1.7 dB while every other section moved -0.5. With the ceiling
+at -1.1 the mode stays linear and every section moves by the same -0.31 dB.
+
+Verified on the master: **-15.0 LUFS** integrated, **-1.3 dBTP**, LRA 5.3, **zero clipped
 samples**, and every cut still within 5.3 ms of the picture. Every cut's onset lands within
 5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
 stream is stream-copied and its MD5 is identical to the silent master's.

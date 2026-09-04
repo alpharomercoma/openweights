@@ -101,7 +101,14 @@ CUTS = [0.0, 3.2, 6.6, 9.6, 12.8, 16.4, 19.6, 23.0]
 A, B, C, D, E, F, G, H = CUTS
 
 TARGET_LUFS = -15.0
-TARGET_TP = -1.4
+# The ceiling is a ceiling, not a target. A mix's crest factor and the loudness target
+# together fix the post-gain true peak exactly: TP = target_LUFS + (TP - LUFS) of the mix,
+# which for this arrangement is -1.29 dBTP. Ask loudnorm for anything below that and it
+# cannot get there with a constant gain, so it silently switches to DYNAMIC normalisation
+# and re-balances the whole film. That is what moved the approved hook by +1.7 dB while
+# every other section moved by -0.5. The ceiling now sits above the achievable peak, the
+# mode stays linear, and every section moves by the same number.
+TARGET_TP = -1.1
 WET = 0.34            # reverb send, against a unit-energy impulse
 TAIL = 0.38           # the ending's extra send into its own longer, darker hall
 
@@ -180,7 +187,7 @@ CHORDS = [
     (16.0, BB1, (BB3, D4, F4)),
     (19.2, BB1, (BB3, D4, F4)),
     (21.6, C2, (C4, E4, G4)),
-    (23.0, D2, (D4, F4, A4)),
+    (22.4, D2, (D4, F4, A4)),
 ]
 
 
@@ -190,6 +197,18 @@ def chord(t: float):
         if t >= start - 1e-9:
             root, tri = r, tr
     return root, tri
+
+
+PHRASE = 22.4          # the last bar and a half: one phrase, not an outro
+
+
+def tail(t: float) -> float:
+    """How much of the band is still playing. One curve, applied to every rhythmic voice,
+    so the groove winds down as a performance does instead of being switched off. Before the
+    final phrase it is exactly 1.0, which is why nothing earlier than 22.4 s moves."""
+    if t < PHRASE:
+        return 1.0
+    return float(np.exp(-(t - PHRASE) / 3.60))
 
 
 def section(t: float) -> str:
@@ -326,7 +345,7 @@ def reverb(x: np.ndarray, ir: np.ndarray) -> np.ndarray:
     return np.stack([fftconvolve(ch, ir)[:x.shape[1]] for ch in x])
 
 
-def pad_block(rng, t0, t1, tri, gain, lo, hi, out=0.35) -> np.ndarray:
+def pad_block(rng, t0, t1, tri, gain, lo, hi, out=0.35, attack=0.25, decay=0.0) -> np.ndarray:
     n = int((t1 - t0) * SR)
     t = _t(n)
     v = np.zeros(n)
@@ -334,13 +353,21 @@ def pad_block(rng, t0, t1, tri, gain, lo, hi, out=0.35) -> np.ndarray:
         for cents in (-7, 0, +7):
             v += np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
     v = bandpass(v / (len(tri) * 3), lo, hi)
-    ramp = np.clip(t / 0.25, 0, 1)
+    ramp = np.clip(t / attack, 0, 1)
     if out > 0:
         ramp = ramp * np.clip((t1 - t0 - t) / out, 0, 1)
+    if decay > 0:
+        ramp = ramp * np.exp(-t / decay)
     return v * ramp * gain
 
 
 # ------------------------------------------------------------------------------ the kit
+
+def pattern(t: float) -> str:
+    """What the kit plays. The ending is not a section of its own, so after the
+    final phrase begins the kit carries on with the pattern it already had."""
+    return "G" if t >= G else section(t)
+
 
 def drums(rng, v):
     """The privacy section is a reduction, not a hole. Through F the kick keeps 1 and 3 at
@@ -350,46 +377,47 @@ def drums(rng, v):
     kicks = []
     for s in range(int(DUR / STEP)):
         t = s * STEP
-        sec = section(t)
+        sec = pattern(t)
         beat, six = (s // 4) % 4, s % 4
         thin = sec == "F"
-        if sec == "H":
-            continue                                   # the ending is written by hand
+        tl = tail(t)
 
         if six == 0 and beat in (0, 2):
-            g = (1.0 if beat == 0 else 0.88) * (0.88 if thin else 1.0)
+            g = (1.0 if beat == 0 else 0.88) * (0.88 if thin else 1.0) * tl
             if v["pickups"] and sec in ("E", "G"):
                 g *= 1.05
-            add(buf, t, kick_hit(rng, 0.92 * g))
-            kicks.append(t)
+            if t < PHRASE + 1.8:      # the kit lets the kick go first
+                add(buf, t, kick_hit(rng, 0.92 * g))
+                kicks.append(t)
         elif v["pickups"] and sec in ("E", "G") and beat == 3 and six == 2:
             add(buf, t, kick_hit(rng, 0.48))
             kicks.append(t)
 
         if sec != "A" and six == 0 and beat in (1, 3):
             lvl = 0.58 if thin else (1.12 if sec in ("E", "G") else 1.0)
-            add(buf, t, clap_hit(rng, v["clap"] * lvl))
+            if t < PHRASE + 1.4:      # then the backbeat, one bar later
+                add(buf, t, clap_hit(rng, v["clap"] * lvl * tl))
 
         if not thin:
             g = (0.16 if six == 0 else 0.085 if six == 2 else 0.055) * v["hat"]
             if sec in ("A", "B"):
                 g *= 0.8
-            add(buf, t, hat(rng, False, g))
+            add(buf, t, hat(rng, False, g * tl))
             if sec in ("C", "D", "E", "G") and beat == 3 and six == 2:
                 add(buf, t, hat(rng, True, 0.14 * v["hat"]))
         else:
             g = (0.115 if six == 0 else 0.062 if six == 2 else 0.040) * v["hat"]
-            add(buf, t, hat(rng, False, g))
+            add(buf, t, hat(rng, False, g * tl))
 
         if sec in ("C", "D", "E", "F", "G"):
-            add(buf, t, shaker(rng, 0.048 if six % 2 else 0.030))
+            add(buf, t, shaker(rng, (0.048 if six % 2 else 0.030) * tl))
 
-        if sec in ("D", "E", "G") and six == 3 and beat in (1, 3):
-            add(buf, t, snare(rng, 0.055))
+        if sec in ("D", "E", "G") and six == 3 and beat in (1, 3) and t < PHRASE + 1.0:
+            add(buf, t, snare(rng, 0.055 * tl))
 
     # Three fills, all played rather than swept: into the reduction, out of it, and into
     # the cadence. A fill is a drummer connecting two sections; a riser is an effect.
-    for start, end, top in ((F - 0.6, F, 0.15), (G - 0.8, G, 0.30), (H - 0.6, H, 0.34)):
+    for start, end, top in ((F - 0.6, F, 0.15), (G - 0.8, G, 0.30), (PHRASE - 0.5, PHRASE, 0.22)):
         steps = int(round((end - start) / (STEP / 2)))
         for k in range(steps):
             frac = k / max(steps - 1, 1)
@@ -409,20 +437,20 @@ def duck(kicks, depth=0.55, hold=0.115) -> np.ndarray:
     return g
 
 
-def bassline(v) -> np.ndarray:
+def bassline(v) -> np.ndarray:  # noqa: D401
     """Through the reduction the bass loses level, not notes: it keeps the downbeats so the
     harmony never lets go, which is what stops a thinning from reading as a stop."""
     buf = np.zeros(N)
-    for s in range(int(H / STEP)):
+    for s in range(int(DUR / STEP)):
         t = s * STEP
-        sec = section(t)
+        sec = pattern(t)
         root, _ = chord(t)
         six = s % 4
-        thin = 0.80 if sec == "F" else 1.0
+        thin = (0.80 if sec == "F" else 1.0) * tail(t)
         if six == 0:
             add(buf, t, sub(root, 0.36, 0.80 * thin))
-        elif sec in ("D", "E", "G") and six == 2:
-            add(buf, t, sub(root * (1.5 if s % 8 == 6 else 1.0), 0.16, 0.34))
+        elif sec in ("D", "E", "G") and six == 2 and t < PHRASE + 1.2:
+            add(buf, t, sub(root * (1.5 if s % 8 == 6 else 1.0), 0.16, 0.34 * thin))
         elif sec == "F" and six == 2 and (s // 4) % 2 == 1:
             add(buf, t, sub(root, 0.14, 0.22))
     return buf
@@ -437,9 +465,9 @@ def plucks(v) -> np.ndarray:
     the reduction they keep playing and are shelved rather than removed: the note density
     IS the groove, and taking it away is what made the last version restart."""
     l, r = np.zeros(N), np.zeros(N)
-    for s in range(int(H / STEP)):
+    for s in range(int(DUR / STEP)):
         t = s * STEP
-        sec = section(t)
+        sec = pattern(t)
         _, tri = chord(t)
         deg = MOTIF[s % len(MOTIF)]
         f = tri[0] * 2 ** ((SCALE[deg % 8] + 12 * (deg // 8)) / 12)
@@ -452,7 +480,7 @@ def plucks(v) -> np.ndarray:
             g, brt = 0.34, 1.0
         else:
             g, brt = 0.40, 1.15
-        g *= v["pluck"]
+        g *= v["pluck"] * tail(t)
 
         sig = pluck(f, 0.26, brt, g)
         if sec == "F":
@@ -498,59 +526,62 @@ def pads(rng) -> np.ndarray:
         t0 = max(t0, C)
         if t1 <= t0:
             continue
-        if t0 >= H - 1e-9:
-            add(buf, t0, pad_block(rng, t0, DUR, tri, 0.34, 90, 4200, out=0))
+        if t0 >= PHRASE - 1e-9:
+            # A step, not a jump. The block before this one is 0.16 into 1.9 kHz; going to
+            # 0.34 into 4.2 kHz, as an earlier version did, changed the pad's timbre at the
+            # exact frame the card appeared and was most of why the ending sounded pasted
+            # on. It runs to the end of the file with no out-ramp, because this is the voice
+            # whose job is to hold the card.
+            add(buf, t0, pad_block(rng, t0, DUR, tri, 0.74, 120, 2200,
+                                   out=0, attack=0.90, decay=13.0))
         elif F - 0.5 <= t0 < G:
             # Through the reduction the pad comes forward, so the section loses drums but
             # gains harmony and the total never thins to nothing.
             add(buf, t0, pad_block(rng, t0, t1, tri, 0.30, 90, 3200))
         else:
-            add(buf, t0, pad_block(rng, t0, t1, tri, 0.16, 120, 1900))
+            out = 0.12 if t1 >= PHRASE - 1e-9 else 0.35
+            add(buf, t0, pad_block(rng, t0, t1, tri, 0.16, 120, 1900, out=out))
     return buf
 
 
 def finale(rng, v) -> np.ndarray:
-    """The end card, written as a cadence rather than a stinger.
+    """The landing of the last phrase, played by the instruments that have been playing all
+    along. Nothing here is a voice that does not appear earlier in the film.
 
-    The harmony has already moved Bb to C across the last bar and a half. Here it arrives on
-    D minor exactly on the picture cut: the band plays the chord, a cymbal opens under it, a
-    single soft kick two beats later closes the phrase, and everything from there is the
-    chord and its tail decaying under the mark. No sweep, no glitch and no impact, because
-    the previous version had all three and they are what made it a logo animation."""
+    Everything that made the previous endings sound pasted on is gone. There is no accent
+    kick, no cymbal wash and no separately voiced sine chord, and the drums, bass, plucks and
+    pad are no longer switched off at the picture cut: they keep playing their own patterns
+    under `tail()` and thin out over the following bar, the kick going first, then the
+    backbeat, then the rest.
+
+    The tonic arrives at 22.4, on the bar line and six tenths of a second BEFORE the card,
+    so the ear is told the phrase is landing while the download shot is still on screen. By
+    the time the mark appears the music has already resolved and is sustaining, which is the
+    difference between the song arriving somewhere and an outro being started."""
     l, r = np.zeros(N), np.zeros(N)
 
     def st(at, sig, spread=0.0):
         add(l, at, sig * (1 - spread))
         add(r, at, sig * (1 + spread))
 
-    root, tri = chord(H)
-    st(H, kick_hit(rng, 0.74))
-    st(H + 2 * BEAT, kick_hit(rng, 0.32))
-    st(H, cymbal(rng, 3.4, v["cym"] * 0.42, lo=1500, hi=6500), 0.06)
-    st(H, sub(root, 4.8, 0.72))
+    root, tri = chord(PHRASE)
 
-    for mult, g, dur in ((1.0, 0.32, 2.9), (2.0, 0.16, 2.2)):
-        for k, f in enumerate(tri):
-            st(H, pluck(f * mult, dur, 0.9, g / (k + 1.4)), 0.10 if k % 2 else -0.10)
-    # The motif's first two notes, an octave apart, so the film ends on the phrase it opened
-    # with rather than on a new idea.
-    for k in range(8):
-        tk = H + k * STEP
-        fall = (1 - k / 8) ** 1.8
-        st(tk, hat(rng, False, (0.10 if k % 2 == 0 else 0.045) * v["hat"] * fall), 0.05)
-        st(tk, shaker(rng, 0.030 * fall), -0.05)
+    # The open hat the kit already plays at the end of every other bar, marking this one as
+    # the last. A cymbal wash here was the single most "logo" thing in the old ending.
+    st(PHRASE, hat(rng, True, 0.17 * v["hat"]), 0.05)
 
-    st(H + 0.4, pluck(tri[0] * 2, 1.1, 1.0, 0.13), 0.14)
-    st(H + 0.4, pluck(tri[2], 1.1, 0.9, 0.10), -0.14)
+    # The chord, in the pluck that has carried the whole film, ringing long.
+    for k, f in enumerate(tri):
+        st(PHRASE, pluck(f, 3.6, 0.95, 0.25 / (0.5 * k + 1.0)), 0.10 if k % 2 else -0.10)
+        st(PHRASE, pluck(f * 2, 2.6, 0.90, 0.10 / (0.5 * k + 1.0)), -0.10 if k % 2 else 0.10)
 
-    n = int((DUR - H) * SR)
-    t = _t(n)
-    held = np.zeros(n)
-    for f, w in ((A2, 0.9), (D3, 1.0), (F3, 0.95), (A3, 0.85), (D4, 0.7), (F4, 0.5)):
-        for cents in (-6, +6):
-            held += w * np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
-    held *= np.clip(t / 0.07, 0, 1) * np.exp(-t / 5.60) / 10
-    st(H, held * 0.62, 0.05)
+    # The low resonance under it, same voice as the bassline.
+    st(PHRASE, sub(root, 9.0, 0.66))
+
+    # And two beats later, over the card, the motif's own interval once more, so the phrase
+    # finishes speaking instead of stopping mid-sentence.
+    st(PHRASE + 2 * BEAT, pluck(tri[0] * 2, 3.0, 1.0, 0.13), 0.12)
+    st(PHRASE + 2 * BEAT, pluck(tri[2], 3.0, 0.9, 0.10), -0.12)
     return np.stack([l, r])
 
 

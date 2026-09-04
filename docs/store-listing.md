@@ -233,13 +233,24 @@ on a stopped beat, which is a logo animation; the harmony now cadences Bb to C t
 arriving exactly on the end card, and the chord and its reverb tail decay under the mark to
 the last frame.
 
-Two variants were rendered. **A**, the restrained one, is the chosen mix: its build is
-monotonic from -18.2 dB at the hook to -14.8 at the download where B's stalls, it drops
-4.5 dB across the privacy card, and its loudest moment is **-13.3 dB on the control claim**,
-which is louder than B's peak because loudnorm pulls B's greater overall energy back down.
+Two variants were rendered. **A**, the restrained one, is the master: its build is
+monotonic from -18.3 dB at the hook to -15.0 at the download where B's stalls, and its
+loudest moment is the control claim, which is louder than B's peak because loudnorm pulls
+B's greater overall energy back down.
 
-Verified on the chosen render: **-15.0 LUFS** integrated, **-1.4 dBTP**, LRA 4.4, **zero
-clipped samples**, crest factor 11.4 to 15.1 dB per section. Every cut's onset lands within
+A then took one polish pass, two surgical changes and nothing else. The reduction was still
+too deep, so the clap now stays through it at 58 per cent rather than leaving, the hats keep
+their sixteenths and lose level instead of halving the subdivision, and the pluck shelf
+moved up an octave: the section now sits **2.1 dB** under the download against 4.5 before,
+with its drums **1.6 dB** down, and a level plot through it that alternates on every beat at
+peaks matching the sections either side. And the end card still stung, because a bright
+noise wash arriving with a three-partial pluck stack is the whoosh and the ding of a logo
+animation; the cymbal is darker, slower and half the level, the bright layer is gone, the
+kit exhales eight decaying sixteenths into the card, and the impulse response and chord
+decay both lengthened. The ending now falls **22 dB across 2.4 s** with no cliff in it.
+
+Verified on the master: **-15.0 LUFS** integrated, **-1.7 dBTP**, LRA 4.1, **zero clipped
+samples**, crest factor 11.4 to 14.9 dB per section. Every cut's onset lands within
 5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
 stream is stream-copied and its MD5 is identical to the silent master's.
 

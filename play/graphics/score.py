@@ -107,7 +107,7 @@ WET = 0.34            # reverb send, against a unit-energy impulse
 VARIANTS = {
     "A": dict(pickups=False, pluck=0.86, hat=0.85, clap=0.30, lead8va=False, cym=0.30,
               gains={"A": 0.80, "B": 0.87, "C": 0.93, "D": 0.97,
-                     "E": 1.03, "F": 0.84, "G": 1.08, "H": 1.0}),
+                     "E": 1.03, "F": 0.91, "G": 1.08, "H": 1.0}),
     "B": dict(pickups=True, pluck=1.06, hat=1.00, clap=0.36, lead8va=True, cym=0.38,
               gains={"A": 0.80, "B": 0.88, "C": 0.95, "D": 1.00,
                      "E": 1.09, "F": 0.84, "G": 1.16, "H": 1.0}),
@@ -248,12 +248,12 @@ def snare(rng, gain=1.0) -> np.ndarray:
     return (0.45 * tone + 0.9 * noise) * gain
 
 
-def cymbal(rng, dur=1.6, gain=1.0) -> np.ndarray:
+def cymbal(rng, dur=1.6, gain=1.0, lo=3000, hi=16000) -> np.ndarray:
     """A wash rather than a crash: a six millisecond attack, slow enough to read as an
     arrival instead of a hit. This marks the download peak and the cadence now that the
     impacts are gone."""
     n = int(dur * SR)
-    x = bandpass(rng.standard_normal(n), 3000, 16000)
+    x = bandpass(rng.standard_normal(n), lo, hi)
     return x / (np.abs(x).max() + 1e-9) * env(n, 0.006, dur * 0.30) * gain
 
 
@@ -290,12 +290,12 @@ def riser(rng, dur, f0, f1, gain=1.0) -> np.ndarray:
     return out * (np.linspace(0, 1, n) ** 1.15) * gain
 
 
-def make_ir(rng, dur=2.4) -> np.ndarray:
+def make_ir(rng, dur=3.2) -> np.ndarray:
     """A hall as decaying band-limited noise, with a short pre-delay and quieter early
     reflections. Two and a bit seconds is chosen so the final chord is still under the mark
     at 25 s and gone by the last frame."""
     n = int(dur * SR)
-    x = rng.standard_normal(n) * np.exp(-_t(n) / 0.62)
+    x = rng.standard_normal(n) * np.exp(-_t(n) / 0.85)
     x = bandpass(x, 180, 9000)
     x[:int(0.018 * SR)] *= 0.15
     x[int(0.018 * SR):int(0.05 * SR)] *= 0.45
@@ -341,7 +341,7 @@ def drums(rng, v):
             continue                                   # the ending is written by hand
 
         if six == 0 and beat in (0, 2):
-            g = (1.0 if beat == 0 else 0.88) * (0.75 if thin else 1.0)
+            g = (1.0 if beat == 0 else 0.88) * (0.88 if thin else 1.0)
             if v["pickups"] and sec in ("E", "G"):
                 g *= 1.05
             add(buf, t, kick_hit(rng, 0.92 * g))
@@ -350,8 +350,9 @@ def drums(rng, v):
             add(buf, t, kick_hit(rng, 0.48))
             kicks.append(t)
 
-        if sec != "A" and not thin and six == 0 and beat in (1, 3):
-            add(buf, t, clap_hit(rng, v["clap"] * (1.12 if sec in ("E", "G") else 1.0)))
+        if sec != "A" and six == 0 and beat in (1, 3):
+            lvl = 0.58 if thin else (1.12 if sec in ("E", "G") else 1.0)
+            add(buf, t, clap_hit(rng, v["clap"] * lvl))
 
         if not thin:
             g = (0.16 if six == 0 else 0.085 if six == 2 else 0.055) * v["hat"]
@@ -360,8 +361,9 @@ def drums(rng, v):
             add(buf, t, hat(rng, False, g))
             if sec in ("C", "D", "E", "G") and beat == 3 and six == 2:
                 add(buf, t, hat(rng, True, 0.14 * v["hat"]))
-        elif six in (0, 2):
-            add(buf, t, hat(rng, False, (0.115 if six == 0 else 0.062) * v["hat"]))
+        else:
+            g = (0.115 if six == 0 else 0.062 if six == 2 else 0.040) * v["hat"]
+            add(buf, t, hat(rng, False, g))
 
         if sec in ("C", "D", "E", "F", "G"):
             add(buf, t, shaker(rng, 0.048 if six % 2 else 0.030))
@@ -400,7 +402,7 @@ def bassline(v) -> np.ndarray:
         sec = section(t)
         root, _ = chord(t)
         six = s % 4
-        thin = 0.62 if sec == "F" else 1.0
+        thin = 0.80 if sec == "F" else 1.0
         if six == 0:
             add(buf, t, sub(root, 0.36, 0.80 * thin))
         elif sec in ("D", "E", "G") and six == 2:
@@ -427,7 +429,7 @@ def plucks(v) -> np.ndarray:
         f = tri[0] * 2 ** ((SCALE[deg % 8] + 12 * (deg // 8)) / 12)
 
         if sec == "F":
-            g, brt = 0.25, 0.55
+            g, brt = 0.31, 0.74
         elif sec in ("A", "B"):
             g, brt = 0.30, 0.85
         elif sec in ("C", "D"):
@@ -438,7 +440,7 @@ def plucks(v) -> np.ndarray:
 
         sig = pluck(f, 0.26, brt, g)
         if sec == "F":
-            sig = tilt(sig, 1600, 0.50)
+            sig = tilt(sig, 2800, 0.74)
         pan = 0.34 if s % 2 else -0.34
         pan *= 0.45 if sec in ("A", "B") else (1.25 if sec == "G" else 1.0)
         add(l, t, sig * (1 - pan))
@@ -508,14 +510,20 @@ def finale(rng, v) -> np.ndarray:
     root, tri = chord(H)
     st(H, kick_hit(rng, 0.95))
     st(H + 2 * BEAT, kick_hit(rng, 0.40))
-    st(H, cymbal(rng, 2.0, v["cym"]), 0.06)
+    st(H, cymbal(rng, 2.8, v["cym"] * 0.55, lo=1800, hi=8000), 0.06)
     st(H, sub(root, 2.2, 0.70))
 
-    for mult, g, dur in ((1.0, 0.26, 1.5), (2.0, 0.20, 1.2), (3.0, 0.11, 0.9)):
+    for mult, g, dur in ((1.0, 0.30, 2.1), (2.0, 0.17, 1.6)):
         for k, f in enumerate(tri):
             st(H, pluck(f * mult, dur, 0.9, g / (k + 1.4)), 0.10 if k % 2 else -0.10)
     # The motif's first two notes, an octave apart, so the film ends on the phrase it opened
     # with rather than on a new idea.
+    for k in range(8):
+        tk = H + k * STEP
+        fall = (1 - k / 8) ** 1.8
+        st(tk, hat(rng, False, (0.10 if k % 2 == 0 else 0.045) * v["hat"] * fall), 0.05)
+        st(tk, shaker(rng, 0.030 * fall), -0.05)
+
     st(H + 0.4, pluck(tri[0] * 2, 1.1, 1.0, 0.13), 0.14)
     st(H + 0.4, pluck(tri[2], 1.1, 0.9, 0.10), -0.14)
 
@@ -525,7 +533,7 @@ def finale(rng, v) -> np.ndarray:
     for f in (D3, F3, A3, D4, F4):
         for cents in (-6, +6):
             held += np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
-    held *= np.clip(t / 0.05, 0, 1) * np.exp(-t / 1.55) / 10
+    held *= np.clip(t / 0.05, 0, 1) * np.exp(-t / 2.30) / 10
     st(H, held * 0.62, 0.05)
     return np.stack([l, r])
 
@@ -594,7 +602,8 @@ def render(name: str, out_wav: Path) -> Path:
     stereo *= 0.89 / (np.abs(stereo).max() + 1e-9)
     n = int(0.004 * SR)
     stereo[:, :n] *= np.linspace(0, 1, n)
-    stereo[:, -n:] *= np.linspace(1, 0, n)
+    m = int(0.090 * SR)
+    stereo[:, -m:] *= np.linspace(1, 0, m) ** 0.6
 
     pcm = (np.clip(stereo.T, -1, 1) * 32767).astype("<i2")
     with wave.open(str(out_wav), "wb") as w:

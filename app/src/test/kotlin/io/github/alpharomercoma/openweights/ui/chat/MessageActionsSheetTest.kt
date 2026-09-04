@@ -150,6 +150,7 @@ class MessageActionsSheetTest {
         showSheet(canRegenerate = true, canEdit = true, canBranch = true)
 
         compose.onNodeWithText("Copy text").assertIsDisplayed()
+        compose.onNodeWithText("Copy text as Markdown").assertIsDisplayed()
         compose.onNodeWithText("Report this reply").assertIsDisplayed()
     }
 

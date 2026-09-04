@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CallSplit
+import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
@@ -52,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.designsystem.component.markdownToPlainText
 
 /**
  * Actions for one message, opened by long-pressing it.
@@ -105,12 +107,25 @@ fun MessageActionsSheet(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
+            // The reasoning block is the model talking to itself; copying the answer is what
+            // someone pasting into a document wants. Which form of the answer is the other
+            // half of the question, and it has two honest answers rather than one: a reply
+            // is Markdown source, so the single copy action handed literal asterisks to
+            // anything that could not render them, and stripping them unasked would have
+            // taken the source away from the editors that can.
             ActionRow(
                 icon = Icons.Rounded.ContentCopy,
                 label = stringResource(R.string.copy_text),
                 onClick = {
-                    // The reasoning block is the model talking to itself; copying the
-                    // answer is what someone pasting into a document wants.
+                    val answer = entry.answer.ifEmpty { entry.text }
+                    context.copyToClipboard(answer.markdownToPlainText())
+                    onDismiss()
+                },
+            )
+            ActionRow(
+                icon = Icons.Rounded.Code,
+                label = stringResource(R.string.copy_text_as_markdown),
+                onClick = {
                     context.copyToClipboard(entry.answer.ifEmpty { entry.text })
                     onDismiss()
                 },

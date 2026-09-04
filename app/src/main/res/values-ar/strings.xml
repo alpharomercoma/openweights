@@ -35,6 +35,7 @@
     <string name="close">إغلاق</string>
     <string name="sent_message_open_app_came">أُرسل مع هذه الرسالة. افتحه في التطبيق الذي جاء منه لتشغيله.</string>
     <string name="copy_text">نسخ النص</string>
+    <string name="copy_text_as_markdown">نسخ بتنسيق Markdown</string>
     <string name="regenerate_reply">إعادة توليد الرد</string>
     <string name="edit_resend">تعديل وإعادة الإرسال</string>
     <string name="branch_from_here">التفرع من هنا</string>

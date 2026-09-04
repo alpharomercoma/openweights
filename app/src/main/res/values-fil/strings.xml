@@ -30,6 +30,7 @@
     <string name="close">Isara</string>
     <string name="sent_message_open_app_came">Ipinadala kasama ng mensaheng ito. Buksan ito sa app na pinanggalingan para i-play.</string>
     <string name="copy_text">Kopyahin ang teksto</string>
+    <string name="copy_text_as_markdown">Kopyahin bilang Markdown</string>
     <string name="regenerate_reply">Gumawa ulit ng sagot</string>
     <string name="edit_resend">I-edit at ipadala ulit</string>
     <string name="branch_from_here">Mag-branch mula rito</string>

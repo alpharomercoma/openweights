@@ -29,6 +29,7 @@
     <string name="close">閉じる</string>
     <string name="sent_message_open_app_came">このメッセージと一緒に送信しました。再生するには元のアプリで開いてください。</string>
     <string name="copy_text">テキストをコピー</string>
+    <string name="copy_text_as_markdown">Markdown としてコピー</string>
     <string name="regenerate_reply">返答を作り直す</string>
     <string name="edit_resend">編集して送り直す</string>
     <string name="branch_from_here">ここから分岐する</string>

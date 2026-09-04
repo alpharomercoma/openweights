@@ -38,6 +38,7 @@
     <string name="close">Close</string>
     <string name="sent_message_open_app_came">Sent with this message. Open it in the app it came from to play it.</string>
     <string name="copy_text">Copy text</string>
+    <string name="copy_text_as_markdown">Copy text as Markdown</string>
     <string name="regenerate_reply">Regenerate reply</string>
     <string name="edit_resend">Edit and resend</string>
     <string name="branch_from_here">Branch from here</string>

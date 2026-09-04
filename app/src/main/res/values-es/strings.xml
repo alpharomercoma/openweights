@@ -29,6 +29,7 @@
     <string name="close">Cerrar</string>
     <string name="sent_message_open_app_came">Enviado con este mensaje. Ábrelo en la aplicación de origen para reproducirlo.</string>
     <string name="copy_text">Copiar el texto</string>
+    <string name="copy_text_as_markdown">Copiar como Markdown</string>
     <string name="regenerate_reply">Volver a generar la respuesta</string>
     <string name="edit_resend">Editar y volver a enviar</string>
     <string name="branch_from_here">Ramificar desde aquí</string>

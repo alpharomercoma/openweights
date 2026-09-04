@@ -86,6 +86,18 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val notificationId =
         id.hashCode().let { if (it == REPLY_NOTIFICATION_ID) it + 1 else it }
 
+    /**
+     * Where the "finished" notification goes, which cannot be [notificationId].
+     *
+     * WorkManager takes the foreground notification down when the worker ends, and the two
+     * happen at once. Posting the result under the same id is a race with its removal, and
+     * the download that quietly announced nothing is the one bug this feature cannot have.
+     */
+    private val notifier = DownloadNotifier(context)
+
+    private val doneNotificationId =
+        (id.hashCode() xor DONE_ID_SALT).let { if (it == REPLY_NOTIFICATION_ID) it + 1 else it }
+
     override suspend fun getForegroundInfo(): ForegroundInfo =
         foregroundInfo(bytesDone = 0, bytesTotal = sizeBytes, isVerifying = false)
 
@@ -113,7 +125,10 @@ class ModelDownloadWorker @AssistedInject constructor(
             }
             .collect { progress -> report(progress) }
 
-        val error = failure ?: return Result.success()
+        val error = failure ?: run {
+            notifier.announce(doneNotificationId, label, DownloadNotifier.Outcome.FINISHED)
+            return Result.success()
+        }
 
         val retryable = error.isWorthRetrying()
         val message = error.message ?: error::class.simpleName ?: "unknown failure"
@@ -138,6 +153,9 @@ class ModelDownloadWorker @AssistedInject constructor(
             )
             Result.retry()
         } else {
+            // Only once the retries are spent. Announcing each attempt would turn a flaky
+            // connection into five notifications for one download that is still going.
+            notifier.announce(doneNotificationId, label, DownloadNotifier.Outcome.FAILED)
             Result.failure(errorData(message))
         }
     }
@@ -258,6 +276,15 @@ class ModelDownloadWorker @AssistedInject constructor(
         const val TAG_SHA256 = "sha256:"
 
         private const val CHANNEL = "downloads"
+
+        /**
+         * Keeps a finished notification's id clear of the progress one it replaces.
+         *
+         * Any constant would do; this one is arbitrary and only has to be non-zero, or the
+         * two ids would be equal and the removal of one would take the other.
+         */
+        private const val DONE_ID_SALT = 0x5F1E
+
         private const val PROGRESS_MAX = 100
 
         /** Maximum automatic retries after the first transfer attempt. */

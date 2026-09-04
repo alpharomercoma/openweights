@@ -31,6 +31,7 @@ import io.github.alpharomercoma.openweights.core.data.db.ModelPrefillSpeed
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
 import io.github.alpharomercoma.openweights.core.device.FitReport
+import io.github.alpharomercoma.openweights.core.device.MemoryBandwidth
 import io.github.alpharomercoma.openweights.core.device.ThroughputCalibration
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
@@ -119,6 +120,10 @@ data class DiscoverUiState(
 }
 
 @HiltViewModel
+// One more collaborator than detekt's threshold allows, and the one that pushed it over is
+// the point of the screen: a browse that cannot say how fast a model would be is the
+// download somebody regrets.
+@Suppress("LongParameterList")
 class DiscoverViewModel @Inject constructor(
     private val client: HuggingFaceClient,
     private val profiler: DeviceProfiler,
@@ -127,6 +132,8 @@ class DiscoverViewModel @Inject constructor(
     private val modelStore: ModelStore,
     private val publishers: Publishers,
     private val usageRepository: UsageRepository,
+    /** Only to answer "how fast would this be" before this device has run anything. */
+    private val bandwidth: MemoryBandwidth,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
@@ -626,12 +633,20 @@ class DiscoverViewModel @Inject constructor(
 
             val gguf = byFormat[ModelFormat.GGUF].orEmpty()
                 .associateBy { it.nameWithoutExtension }
-            calibration = matchCalibration(decodeSpeeds, gguf)
+            // Falling back to the device's own memory bandwidth when this phone has run
+            // nothing yet, which is exactly the visit where the answer matters most: a
+            // fresh install browsing for its first model. Without it the card can say a
+            // four gigabyte model fits and cannot say it would answer at walking pace,
+            // and the download is minutes of someone's connection either way. The real
+            // measurement replaces it the moment one exists, per runtime, because the two
+            // runtimes are not comparable and a seeded pair is not a measurement.
+            val seeded = bandwidth.decodeCalibration()
+            calibration = matchCalibration(decodeSpeeds, gguf) ?: seeded
             prefillCalibration = matchPrefillCalibration(prefillSpeeds, gguf)
 
             val compiled = byFormat[ModelFormat.PTE].orEmpty()
                 .associateBy { it.nameWithoutExtension }
-            compiledCalibration = matchCalibration(decodeSpeeds, compiled)
+            compiledCalibration = matchCalibration(decodeSpeeds, compiled) ?: seeded
             compiledPrefillCalibration = matchPrefillCalibration(prefillSpeeds, compiled)
         }
     }

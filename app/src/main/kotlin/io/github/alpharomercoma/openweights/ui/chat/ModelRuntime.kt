@@ -58,6 +58,9 @@ class ModelRuntime @Inject constructor(
 
     fun projectorFor(model: File): File? = modelStore.projectorFor(model)
 
+    /** True while a download is still writing into the models folder. */
+    fun downloadsInFlight(): Boolean = modelStore.downloadsInFlight()
+
     suspend fun settingsFor(fileName: String): ModelPreferences = preferences.current(fileName)
 
     suspend fun saveSettings(fileName: String, value: ModelPreferences) =

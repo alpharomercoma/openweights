@@ -16,9 +16,11 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
+import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Process
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.getSystemService
@@ -75,6 +77,7 @@ import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
 import io.github.alpharomercoma.openweights.core.tools.correlatedWebResearchSources
+import io.github.alpharomercoma.openweights.download.ModelArrivals
 import io.github.alpharomercoma.openweights.model.StagedDocument
 import io.github.alpharomercoma.openweights.runtime.GenerationService
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
@@ -562,6 +565,8 @@ class ChatViewModel @Inject constructor(
     private val workspaceGrant: WorkspaceGrant,
     /** Only to forget them on a switch; the file tools are what fill and read it. */
     private val artifacts: SessionArtifacts,
+    /** Only to hear that a model finished downloading; see the collector in `init`. */
+    private val arrivals: ModelArrivals,
     @param:ApplicationContext private val appContext: Context,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
@@ -714,6 +719,23 @@ class ChatViewModel @Inject constructor(
                 .collect { warmEngine() }
         }
         viewModelScope.launch {
+            // A model that has just finished downloading is the one case the whole warm
+            // mechanism cannot help with: there is no state file to restore, so the
+            // prefix has to be computed once, and until now the first person to send a
+            // message paid for it — a minute of prefill on a phone that had just spent
+            // several more minutes downloading, which is the worst first impression the
+            // app can make.
+            //
+            // The download ending is the moment to spend instead. Nothing is on screen
+            // that needs the engine, the user is still reading the models list, and what
+            // this does is exactly what tapping through to the chat tab would have done a
+            // moment later — [loadDefaultModel], through the same selection and the same
+            // prompt composition, so there is no second path to keep in step with the
+            // first. The warm it ends in writes the state file, and every launch after
+            // this one restores it in milliseconds.
+            arrivals.arrivals.collect { prewarmAfterDownload() }
+        }
+        viewModelScope.launch {
             archive.observeCount()
                 .catch { failure ->
                     // The list beside it is still readable and the archive is not the
@@ -774,6 +796,63 @@ class ChatViewModel @Inject constructor(
         if (unloadedByUser) return
         runtime.preferredModel()?.let(::loadModel)
     }
+
+    /**
+     * Opens a model that has just finished downloading, if nothing else wants the engine.
+     *
+     * Deliberately the same two lines [loadDefaultModel] runs, guarded rather than
+     * reimplemented: the point is to move *when* that happens, not what it does. Anything
+     * that composed its own prefix here would drift from the one a real turn renders, and
+     * a warm whose bytes differ from the next prompt by a single character warms nothing.
+     *
+     * Five reasons not to, and each of them is a case where doing it would be worse than
+     * waiting for the chat tab to ask:
+     *
+     * - The user unloaded the model on purpose. That is a choice, and quietly loading
+     *   several gigabytes back because a download finished would undo it.
+     * - Something is already loaded or loading. Swapping the weights under a conversation
+     *   nobody asked to swap is the one thing this must never do.
+     * - A download is still running. Usually the projector for the model that just landed;
+     *   see `ModelStore.downloadsInFlight`.
+     * - The phone is hot. A download of several gigabytes is itself heating, and a minute
+     *   of prefill for a screen nobody is looking at is not worth the thermal budget of
+     *   the reply that follows it.
+     * - The app is not on screen. This is the common case rather than the exception: a
+     *   multi-gigabyte download is minutes, and nobody watches it, which is the whole
+     *   reason it runs in a worker. Taking two gigabytes into a process Android has
+     *   already filed as cached is how that process gets killed, and the user would come
+     *   back to an app that had restarted for a warm they never asked for.
+     *
+     * None of the five is retried, because none of them needs to be: the chat tab still
+     * loads the model the moment somebody opens it, exactly as it did before this existed.
+     * All this can do is be early, and the last four are the cases where early is wrong.
+     */
+    private fun prewarmAfterDownload() {
+        if (unloadedByUser || hasModel) return
+        if (!isOnScreen) return
+        if (runtime.downloadsInFlight()) return
+        if (runtime.thermalLevel() >= ThermalLevel.HEAVY) return
+        runtime.preferredModel()?.let(::loadModel)
+    }
+
+    /**
+     * True when this app is the thing the user is looking at.
+     *
+     * The same question [ReplyNotifier] asks and answered the same way, because it is a
+     * question about the process rather than about any one screen: the download that
+     * triggers this finished in a worker, and the view model it reaches has no lifecycle
+     * that distinguishes "the chat is behind the models screen" from "the phone is in a
+     * pocket". A foreground *service* — which is what the download itself holds — ranks
+     * below IMPORTANCE_FOREGROUND, so a download finishing in the background reads as
+     * background here, which is exactly the distinction wanted.
+     */
+    private val isOnScreen: Boolean
+        get() {
+            val manager = appContext.getSystemService<ActivityManager>() ?: return false
+            val mine = manager.runningAppProcesses?.firstOrNull { it.pid == Process.myPid() }
+            return mine != null &&
+                mine.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+        }
 
     /** Loads a GGUF file from disk. */
     /**
@@ -915,6 +994,18 @@ class ChatViewModel @Inject constructor(
         keepConversation: Boolean,
     ) {
         _uiState.update { it.copy(isLoadingModel = true, error = null) }
+
+        // The same yield a turn does, and now for the same reason. A warm holds the engine
+        // for as long as it takes to read the whole prefix, and a load queues behind it:
+        // measured on the phone at 9.9 s between tapping a model and having it, of which
+        // 8.4 s was a background warm the user never asked for. Loading a model is exactly
+        // as much a thing somebody is waiting on as sending a message is.
+        //
+        // Nothing is lost by killing it. A warm interrupted mid-batch keeps its committed
+        // tokens, and this load ends in [finishLoad], which warms again — so the work moves
+        // to after the load instead of in front of it. What that costs is the state file
+        // this warm would have written, which the warm after the load writes instead.
+        turns.yieldWarms()
 
         // Inside the catch, not before it. Settings come from DataStore and the projector
         // from a directory listing, and a phone whose storage has gone wrong fails those

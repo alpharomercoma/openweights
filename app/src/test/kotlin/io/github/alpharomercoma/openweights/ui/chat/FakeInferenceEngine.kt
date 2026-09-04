@@ -173,7 +173,14 @@ class FakeInferenceEngine : InferenceEngine {
     // model after every generation and the turn loop sizes what it sends from that.
     override val loadedModel: LoadedModelInfo? get() = loaded?.copy(contextUsed = contextUsed)
 
-    override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
+    // Behind [nativeThread] like [warm] and [setThreads], because opening a model is a
+    // native call on the same one thread: on the phone a tap on a model queued behind a
+    // background warm for 8.4 s, and without this the fake let that load sail past.
+    override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) =
+        nativeThread.withLock { loadLocked(modelFile, params) }
+
+    /** The projector is not modelled here, which is why it does not cross this boundary. */
+    private suspend fun loadLocked(modelFile: File, params: ModelLoadParams) {
         if (loadDelayMs > 0) delay(loadDelayMs)
         loads += modelFile.name
         loadParams += params

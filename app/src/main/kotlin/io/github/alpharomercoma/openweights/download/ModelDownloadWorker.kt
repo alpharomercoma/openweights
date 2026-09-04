@@ -62,6 +62,7 @@ class ModelDownloadWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val downloader: ModelDownloader,
+    private val arrivals: ModelArrivals,
 ) : CoroutineWorker(context, params) {
     private val repoId = inputData.getString(KEY_REPO_ID).orEmpty()
     private val path = inputData.getString(KEY_PATH).orEmpty()
@@ -150,7 +151,11 @@ class ModelDownloadWorker @AssistedInject constructor(
                 runCatching { setForeground(foregroundInfo(sizeBytes, sizeBytes, true)) }
             }
 
-            is DownloadProgress.Finished -> Unit
+            // The one moment the app knows a model is complete on disk and nobody is
+            // waiting on it. What the first turn costs is decided here: warmed now, while
+            // the user is still reading the models screen, or paid in front of them the
+            // first time they send anything. See [ModelArrivals].
+            is DownloadProgress.Finished -> arrivals.announce(progress.file)
         }
     }
 

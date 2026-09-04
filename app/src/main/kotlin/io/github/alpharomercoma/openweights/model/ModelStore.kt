@@ -22,6 +22,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
+import io.github.alpharomercoma.openweights.core.hub.DOWNLOAD_PARTIAL_SUFFIX
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,6 +60,26 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
      * as something to load would get a failure they could not act on.
      */
     fun availableModels(): List<File> = modelFiles().filterNot { it.isProjector }
+
+    /**
+     * True while any download is still writing into this directory.
+     *
+     * Asked before opening a model nobody has asked for yet. Two reasons, and the second
+     * is the one that would otherwise be a bug: a multimodal model and its projector are
+     * two separate downloads, and the weights usually land first. Opening them the moment
+     * they arrive would load the model without the projector that has not finished, and
+     * the chat screen — which only loads a model when it finds none — would then leave it
+     * that way, so the pictures would silently stop working. The first reason is plainer:
+     * a load competes with the transfer for the same flash and the same memory.
+     *
+     * Read from the `.part` files [ModelDownloader] leaves behind rather than from
+     * WorkManager, because that is a fact about this directory and needs no scheduler to
+     * be asked about it. A `.part` orphaned by a cancelled download defers the warm and
+     * costs nothing else: the chat screen still opens the model the moment somebody asks.
+     */
+    fun downloadsInFlight(): Boolean =
+        directory.listFiles { file -> file.isFile && file.name.endsWith(DOWNLOAD_PARTIAL_SUFFIX) }
+            ?.isNotEmpty() == true
 
     /**
      * The model to open with: the one last chosen, or any that is present.

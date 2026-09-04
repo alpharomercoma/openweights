@@ -42,6 +42,7 @@ import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
 import io.github.alpharomercoma.openweights.core.tools.WorkspaceGrant
+import io.github.alpharomercoma.openweights.download.ModelArrivals
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import io.github.alpharomercoma.openweights.model.ModelStore
 import io.github.alpharomercoma.openweights.ui.ReplyNotifier
@@ -107,6 +108,9 @@ abstract class ChatFixture {
     protected lateinit var turns: TurnRunner
     protected lateinit var switches: ToolSwitches
     protected lateinit var grant: WorkspaceGrant
+
+    /** Held so a test can announce a finished download and watch what the model does. */
+    protected lateinit var arrivals: ModelArrivals
     protected val savedState = SavedStateHandle()
 
     @Before
@@ -140,6 +144,7 @@ abstract class ChatFixture {
         goals = GoalBoard()
         switches = ToolSwitches(context)
         grant = WorkspaceGrant(context)
+        arrivals = ModelArrivals()
         turns = TurnRunner(
             engine,
             ToolRegistry(listOf(StubTool)),
@@ -166,6 +171,7 @@ abstract class ChatFixture {
             toolSwitches = switches,
             workspaceGrant = grant,
             artifacts = SessionArtifacts(),
+            arrivals = arrivals,
             // Robolectric has no service to start, and GenerationService swallows the
             // failure on purpose: a turn that cannot raise its own priority still has to
             // produce the reply.

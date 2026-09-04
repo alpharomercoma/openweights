@@ -248,6 +248,13 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
 
             download.isVerifying -> Caption(stringResource(R.string.download_verifying))
 
+            // Before the progress bar, because a job in WorkManager's backoff is not
+            // making progress and a bar at 0% says it is. It had already failed four
+            // times in the case this was written for, with nothing on screen admitting it.
+            download.isRetrying -> Caption(
+                stringResource(R.string.download_retrying, download.attemptsFailed),
+            )
+
             else -> {
                 LinearProgressIndicator(
                     progress = { download.fraction },

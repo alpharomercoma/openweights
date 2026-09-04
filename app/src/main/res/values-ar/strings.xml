@@ -77,6 +77,7 @@
     <string name="downloading">جارٍ التنزيل</string>
     <string name="download_queued">في قائمة الانتظار</string>
     <string name="download_verifying">جارٍ التحقق</string>
+    <string name="download_retrying">متوقف بعد %1$d محاولات، في انتظار إعادة المحاولة</string>
     <string name="report">إبلاغ</string>
     <string name="now">ليس الآن</string>
     <string name="run">تشغيل</string>

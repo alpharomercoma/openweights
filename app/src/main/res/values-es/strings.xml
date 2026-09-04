@@ -71,6 +71,7 @@
     <string name="downloading">Descargando</string>
     <string name="download_queued">En cola</string>
     <string name="download_verifying">Verificando</string>
+    <string name="download_retrying">Detenida tras %1$d intentos, esperando para reintentar</string>
     <string name="report">Informar</string>
     <string name="now">Ahora no</string>
     <string name="run">Ejecutar</string>

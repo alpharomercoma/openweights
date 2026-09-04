@@ -110,6 +110,7 @@
     <string name="downloading">Downloading</string>
     <string name="download_queued">Queued</string>
     <string name="download_verifying">Verifying checksum…</string>
+    <string name="download_retrying">Stalled after %1$d attempts, waiting to retry</string>
     <string name="vision">Vision</string>
     <string name="gated">Gated</string>
     <string name="models">Models</string>

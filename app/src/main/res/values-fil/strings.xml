@@ -72,6 +72,7 @@
     <string name="downloading">Nagda-download</string>
     <string name="download_queued">Nasa pila</string>
     <string name="download_verifying">Bine-verify</string>
+    <string name="download_retrying">Hindi umuusad pagkatapos ng %1$d na pagsubok, naghihintay mag-retry</string>
     <string name="report">I-report</string>
     <string name="now">Hindi ngayon</string>
     <string name="run">Patakbuhin</string>

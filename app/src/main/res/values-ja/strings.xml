@@ -71,6 +71,7 @@
     <string name="downloading">ダウンロード中</string>
     <string name="download_queued">キューに追加済み</string>
     <string name="download_verifying">検証中</string>
+    <string name="download_retrying">%1$d 回失敗して停止中、再試行を待っています</string>
     <string name="download_progress">%1$s / %2$s</string>
     <string name="report">報告</string>
     <string name="now">今はしない</string>

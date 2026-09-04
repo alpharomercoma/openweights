@@ -196,14 +196,38 @@ scoring unembellished evidence like a launch keynote and telling the viewer to d
 thing being proved. Both proposed the same replacement in nearly the same words, and that is
 what is here: a sparse electronic pulse, quiet computational momentum rather than triumph.
 
-75 BPM in 4/4 makes a bar exactly 3.2 s, the length of the opening shot, and eight bars
-exactly 25.6 s, the length of the film. The pulse starts on frame one with no intro, the
-sequence enters at bar 2, a high tick at bar 3, the pad opens at bar 4, the pulse firms up
-under the download at bar 5, bar 6 strips back so "no folder shared" is heard in the clear,
-bar 7 widens, and at 23.0 s the pulse stops dead for a single low hit and a chord resolving
-to the tonic under the end card. No crescendo: "No account" is a statement, not a climax.
-Measured on the render, integrated **-18.0 LUFS**, true peak **-2.9 dBTP**, LRA 4.1 LU, and
-the loudest bar is bar 7 rather than the ending.
+**Tempo is forced by the edit, not chosen.** Measured off the finished picture by frame
+differencing, the cuts land at 3.2, 6.6, 9.6, 12.8, 16.4, 19.6 and 23.0 s. Every one is an
+exact multiple of 0.2 s, so the finest grid the picture shares is 0.2 s, and the only tempos
+whose eighths or sixteenths fall on all of them are **75, 150 and 300 BPM**. A brief asking
+for 120 to 126 cannot be met: the best fit in that range leaves the worst cut 30 ms off,
+which on a transient against a hard cut is a flam rather than a hit. The score runs at
+**150**, so every cut is on the grid and the pulse is fast.
+
+The kick sits on 1 and 3, the clap on 2 and 4, so something lands every 0.4 s; hats and
+plucks run sixteenths at ten a second, which is close to the rate the reply in shot one
+actually arrives at. Three cuts fall off the downbeat (6.6, 16.4, 19.6) and are played as
+syncopations rather than nudged onto a beat.
+
+The cue sheet, one entry per shot:
+
+| at | shot | what the score does |
+| --- | --- | --- |
+| 0.0 | on device | impact on frame one, no intro; kit and motif straight in |
+| 3.2 | telemetry | clap enters, plucks double an octave up, digital ticks |
+| 6.6 | it fits | syncopated hit, pad opens, open hat every second bar |
+| 9.6 | it is tight | sixteenth sub movement, extra percussion for the memory numbers |
+| 12.8 | download | riser through 12.0, impact on the cut, densest drums |
+| 16.4 | no folder shared | everything drops. Downlifter, filtered pad, one pluck a bar |
+| 19.6 | you control | riser through 18.0, then the loudest bar and the lead motif |
+| 23.0 | end card | hard stop, branded hit, tonic chord decaying under the mark |
+
+Verified on the render: **-15.0 LUFS** integrated, **-4.8 dBTP**, LRA 4.8, **zero clipped
+samples**. Every cut's onset lands within 5.3 ms of the picture, which is the analysis hop
+and therefore the measurement floor. The arc runs -17.1 dB at the hook up to -14.5 at the
+download, drops to -19.7 for the privacy card, and peaks at **-13.7 on "You control what
+goes online"**, which is the loudest the film gets. The video stream is stream-copied, and
+its MD5 is identical to the silent master's.
 
 **The silence is deliberate, and so is the track.** The file carries a silent AAC stream at
 about -91 dB of encoder noise, which is below the 16-bit floor and inaudible. Stripping it

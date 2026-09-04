@@ -131,6 +131,19 @@ data class ModelPreferences(
     val answerLength: String = AnswerLength.BALANCED.name,
     /** Whether the model may think before answering, where its template allows it. */
     val thinking: Boolean = true,
+    /**
+     * Whether each reply records how sure the model was of every word it wrote.
+     *
+     * Off, and the default is the interesting part. What it buys is a real signal: the
+     * probability the model gave each token it chose, which is the only thing a local app
+     * can measure about whether an answer is invention. What it costs is speculation for
+     * the whole generation and a log-softmax over the vocabulary per token, and, more to
+     * the point, a number that is easy to over-read. A confident wrong answer is common;
+     * this finds the places the model hesitated, not the places it was wrong.
+     *
+     * llama.cpp only. See [SamplerParams.measuresConfidence].
+     */
+    val measuresConfidence: Boolean = false,
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val reasoningEffort: String = ReasoningEffort.DEFAULT.name,
     /** Stored by name so an unknown value from a newer build falls back to the default. */
@@ -167,6 +180,7 @@ data class ModelPreferences(
 ) {
     fun toSamplerParams() = SamplerParams(
         thinking = thinking,
+        measuresConfidence = measuresConfidence,
         reasoningEffort = ReasoningEffort.fromName(reasoningEffort),
         temperature = temperature,
         topK = topK,

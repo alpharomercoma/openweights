@@ -69,6 +69,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_16_17,
         OpenWeightsDatabase.MIGRATION_17_18,
         OpenWeightsDatabase.MIGRATION_18_19,
+        OpenWeightsDatabase.MIGRATION_19_20,
     )
 
     @Test

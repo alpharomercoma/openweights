@@ -102,6 +102,16 @@ fun TurnStatsPanel(entry: TranscriptEntry, modifier: Modifier = Modifier) {
                 label = stringResource(R.string.stat_total_time),
                 modifier = Modifier.weight(1f),
             )
+            // Only when it was measured. A fourth column reading "-" on every reply would
+            // advertise a feature by showing it broken; the switch that fills it is two
+            // taps away and named on the settings sheet.
+            if (entry.confidence.tokenCount > 0) {
+                Headline(
+                    value = String.format(locale, "%.2f", entry.confidence.perplexity),
+                    label = stringResource(R.string.stat_perplexity),
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

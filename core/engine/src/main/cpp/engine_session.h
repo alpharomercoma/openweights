@@ -113,6 +113,21 @@ struct SamplerConfig {
      * never opened a block.
      */
     int32_t reasoning_budget = -1;
+    /**
+     * Whether the model's own confidence in each token it writes is reported.
+     *
+     * Off by default and not free: it costs a log-softmax over the whole vocabulary per
+     * generated token, and it turns speculation off for the generation, because a token
+     * accepted from a draft was sampled at a batch position that has been left behind by
+     * the time the token is emitted, and a confidence attributed to the wrong position is
+     * worse than none.
+     *
+     * The probability reported is the model's own, taken from the raw logits before the
+     * sampler touches them. That is deliberate: temperature, top-k and the penalties are
+     * the user's settings, and a number that moved when they changed the temperature would
+     * be measuring the sampler rather than the model.
+     */
+    bool report_confidence = false;
 };
 
 /** How a generation ended. */
@@ -188,6 +203,16 @@ public:
     /** Emitted for each decoded token; return false to stop generation early. */
     using TokenCallback = std::function<bool(const char * piece)>;
 
+    /**
+     * One generated token and the natural log of the probability the model gave it.
+     *
+     * Separate from [TokenCallback] rather than folded into it, because the two are about
+     * different things: the token callback carries whole characters, buffering a piece
+     * whose bytes do not yet complete one, while this carries exactly what the model
+     * sampled. Concatenating every piece passed here reproduces the raw reply.
+     */
+    using ConfidenceCallback = std::function<void(const char * piece, float logprob)>;
+
     ~Session();
 
     /**
@@ -223,6 +248,9 @@ public:
          * would turn a slider into a model that will not load.
          */
         int32_t image_tokens,
+        /** Logical and physical prompt batch. See ModelLoadParams.batchTokens. */
+        int32_t n_batch,
+        int32_t n_ubatch,
         std::string & error);
 
     /**
@@ -235,6 +263,8 @@ public:
         const SamplerConfig & sampler,
         const ReasoningConfig & reasoning,
         const TokenCallback & on_token,
+        /** Called per token when [SamplerConfig::report_confidence] is set; may be empty. */
+        const ConfidenceCallback & on_confidence,
         GenerationStats & stats,
         ParsedReply & reply,
         std::string & error);
@@ -374,6 +404,17 @@ private:
      * from. `need_logits` keeps one token back for generation, which a warm does not need.
      */
     size_t align_cache(const std::vector<llama_token> & tokens, bool need_logits);
+
+    /**
+     * The natural log of the probability the model gave `token` at the last decoded
+     * position, from the raw logits.
+     *
+     * A log-softmax rather than a plain normalisation, computed in the numerically stable
+     * order: subtract the maximum before exponentiating, or a vocabulary of a hundred and
+     * fifty thousand logits overflows on the way to a number that is supposed to be a
+     * probability.
+     */
+    float logprob_of(llama_token token) const;
 
     /**
      * Decodes `tokens[from..]` a batch at a time, committing progress after each batch.

@@ -48,6 +48,19 @@ data class SamplerParams(
      * and prose keeps the block open. llama.cpp only; the ExecuTorch engine ignores it.
      */
     val reasoningBudget: Int = NO_REASONING_BUDGET,
+    /**
+     * Whether the model reports how sure it was of each token it wrote.
+     *
+     * Off unless the user has asked to see it. What it costs is a log-softmax over the
+     * whole vocabulary per generated token, which is small beside a forward pass, and
+     * speculation for the whole generation, which is not: a token accepted from a draft was
+     * sampled at a batch position that has been left behind by the time it is emitted, so
+     * the engine takes the single-token path while this is on.
+     *
+     * llama.cpp only. The ExecuTorch runtime returns text and no distribution, and says so
+     * rather than reporting a confidence it did not measure.
+     */
+    val measuresConfidence: Boolean = false,
 ) {
     init {
         require(temperature >= 0f) { "temperature must be >= 0" }
@@ -226,10 +239,39 @@ data class ModelLoadParams(
      * `docs/research/image-tokens.md`.
      */
     val imageTokens: Int = AUTOMATIC_IMAGE_TOKENS,
+    /**
+     * How many prompt tokens the engine submits for evaluation at once.
+     *
+     * 512, which is what this was hard-coded to, and it is here rather than in the code so
+     * it can be swept. Prefill is the compute-bound half of a turn and the one that
+     * dominates a first answer, so batching more of it at a time is the obvious lever;
+     * what it costs is the scratch buffer the graph allocates for intermediate
+     * activations, which scales with [microBatchTokens] and is transient but real on a
+     * phone that is already holding two gigabytes of weights.
+     *
+     * Not a user setting and not intended to become one. It is an engine constant whose
+     * value should be whatever `BatchSizeBenchmark` says, on the same footing as
+     * [kvCacheQuantized]: present, exercised, and moved only by a measurement.
+     */
+    val batchTokens: Int = DEFAULT_BATCH_TOKENS,
+    /**
+     * The physical batch: how much of [batchTokens] is computed in one graph.
+     *
+     * The one that actually sizes the scratch buffer, which is why it is separate. Raising
+     * the logical batch without this changes how work is queued and not how it is done.
+     */
+    val microBatchTokens: Int = DEFAULT_BATCH_TOKENS,
 ) {
     init {
         require(contextLength > 0) { "contextLength must be > 0" }
         require(imageTokens >= 0) { "imageTokens must be >= 0" }
+        require(batchTokens > 0) { "batchTokens must be > 0" }
+        require(microBatchTokens > 0) { "microBatchTokens must be > 0" }
+        // llama.cpp submits the logical batch in physical chunks, so a physical batch
+        // larger than the logical one is a configuration that cannot mean anything.
+        require(microBatchTokens <= batchTokens) {
+            "microBatchTokens must be <= batchTokens"
+        }
         require(threadCount == null || threadCount > 0) { "threadCount must be > 0" }
         require(batchThreadCount == null || batchThreadCount > 0) {
             "batchThreadCount must be > 0"
@@ -257,6 +299,14 @@ data class ModelLoadParams(
 
         /** Leaves the projector's own metadata in charge. See [imageTokens]. */
         const val AUTOMATIC_IMAGE_TOKENS = 0
+
+        /**
+         * The batch this engine has always used, kept until something measures otherwise.
+         *
+         * Both halves, because they were both 512 and moving one without the other is a
+         * third configuration nobody has a question about.
+         */
+        const val DEFAULT_BATCH_TOKENS = 512
 
         /** The range `ImageTokenBenchmark` sweeps. See [imageTokens]. */
         const val MIN_IMAGE_TOKENS = 16

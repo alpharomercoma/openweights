@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.data.db.ConversationEntity
 import io.github.alpharomercoma.openweights.core.data.db.ConversationMatch
 import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
+import io.github.alpharomercoma.openweights.core.engine.TokenConfidence
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -113,6 +114,16 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
         engineHistory: List<ChatMessage>? = null,
         /** The model whose template rendered [engineHistory]; see [EngineHistoryEntity.modelName]. */
         engineHistoryModel: String? = null,
+        /**
+         * The model's confidence in each token of this reply, or empty.
+         *
+         * Last on the list and named at every call site, because the parameters before it
+         * are passed positionally and inserting one in the middle silently moves everything
+         * after it. Passed from the turn rather than read off [stats]: a turn with a tool in
+         * it generates more than once, and only the pass that wrote the answer has anything
+         * to say about the answer.
+         */
+        confidence: List<TokenConfidence> = emptyList(),
     ) = inOrder {
         val messageId = addMessage(
             conversationId = conversationId,
@@ -128,6 +139,8 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
             cachedTokens = stats?.cachedTokens,
             prefillMs = stats?.prefillMs,
             decodeMs = stats?.decodeMs,
+            confidenceTexts = confidence.map { it.text },
+            confidenceLogprobs = confidence.map { it.logprob },
             steps = steps,
         )
         engineHistory?.let { history ->

@@ -130,6 +130,13 @@ fun ParameterSheet(
      * look at an image, on a model that will refuse the attachment.
      */
     readsImages: Boolean = false,
+    /**
+     * Whether this runtime can report how sure the model was of each token.
+     *
+     * llama.cpp can and ExecuTorch cannot: it returns text and no distribution. A switch
+     * that quietly did nothing on a compiled model would be worse than an absent one.
+     */
+    measuresConfidenceIsPossible: Boolean = true,
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
@@ -173,6 +180,33 @@ fun ParameterSheet(
                     draft = draft,
                     onChange = { draft = it },
                 )
+            }
+
+            // Beside thinking rather than in Advanced, because it is not a sampler knob: it
+            // changes what the app reports about an answer, which is a thing a person
+            // chooses on purpose and then wants to find again.
+            if (measuresConfidenceIsPossible) {
+                Setting(
+                    label = stringResource(R.string.show_uncertainty),
+                    explanation = stringResource(R.string.show_uncertainty_detail),
+                    value = stringResource(
+                        if (draft.measuresConfidence) R.string.on else R.string.off,
+                    ),
+                    footnote = stringResource(R.string.show_uncertainty_footnote)
+                        .takeIf { draft.measuresConfidence },
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Switch(
+                            checked = draft.measuresConfidence,
+                            onCheckedChange = {
+                                draft = draft.copy(measuresConfidence = it)
+                            },
+                        )
+                    }
+                }
             }
 
             // Above temperature, because it is the one on this sheet a person who does not

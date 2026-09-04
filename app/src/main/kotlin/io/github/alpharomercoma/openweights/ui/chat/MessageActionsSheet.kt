@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.StopCircle
+import androidx.compose.material.icons.rounded.Troubleshoot
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +77,8 @@ fun MessageActionsSheet(
     /** Opens a new conversation carrying everything up to and including this turn. */
     onBranch: () -> Unit,
     onReport: () -> Unit,
+    /** Opens the uncertainty view for this reply. Absent when nothing was measured. */
+    onShowUncertainty: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -184,6 +187,16 @@ fun MessageActionsSheet(
                         onBranch()
                         onDismiss()
                     },
+                )
+            }
+            if (entry.confidence.tokenCount > 0) {
+                // Only when there is something to show. The view is off by default, so for
+                // most replies this action would open a sheet whose whole content is an
+                // explanation of why it is empty.
+                ActionRow(
+                    icon = Icons.Rounded.Troubleshoot,
+                    label = stringResource(R.string.uncertainty_action),
+                    onClick = onShowUncertainty,
                 )
             }
             if (entry.role == ChatRole.ASSISTANT) {

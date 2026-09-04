@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -665,6 +666,8 @@ Session * Session::load(
     bool kv_quantized,
     bool speculate,
     int32_t image_tokens,
+    int32_t n_batch,
+    int32_t n_ubatch,
     std::string & error) {
     init_backend();
 
@@ -687,8 +690,8 @@ Session * Session::load(
     ctx_params.n_ctx           = static_cast<uint32_t>(n_ctx);
     // Prompt ingestion happens in chunks of this size; 512 keeps peak compute-buffer
     // memory modest on phones while still batching enough work to be fast.
-    ctx_params.n_batch         = 512;
-    ctx_params.n_ubatch        = 512;
+    ctx_params.n_batch         = n_batch;
+    ctx_params.n_ubatch        = n_ubatch;
     ctx_params.n_threads       = n_threads;
     ctx_params.n_threads_batch = n_threads_batch;
     ctx_params.no_perf         = true;
@@ -1393,6 +1396,27 @@ bool Session::ingest_prompt(
     return true;
 }
 
+float Session::logprob_of(llama_token token) const {
+    const float * logits = llama_get_logits_ith(ctx_, -1);
+    if (logits == nullptr) return 0.0f;
+    const int32_t n_vocab = llama_vocab_n_tokens(llama_model_get_vocab(model_));
+    if (token < 0 || token >= n_vocab) return 0.0f;
+
+    // The usual two passes. The first finds the maximum so the exponentials cannot
+    // overflow; the second sums them. What comes back is log p, which is at most zero, and
+    // is zero exactly when the model was certain.
+    float largest = logits[0];
+    for (int32_t i = 1; i < n_vocab; ++i) {
+        if (logits[i] > largest) largest = logits[i];
+    }
+    double total = 0.0;
+    for (int32_t i = 0; i < n_vocab; ++i) {
+        total += std::exp(static_cast<double>(logits[i] - largest));
+    }
+    return static_cast<float>(
+        static_cast<double>(logits[token] - largest) - std::log(total));
+}
+
 size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_logits) {
     size_t reusable = 0;
     while (cached_covers_context_ && reusable < cached_.size() && reusable < tokens.size() &&
@@ -1944,6 +1968,7 @@ StopReason Session::generate(
     const SamplerConfig & sampler_config,
     const ReasoningConfig & reasoning,
     const TokenCallback & on_token,
+    const ConfidenceCallback & on_confidence,
     GenerationStats & stats,
     ParsedReply & reply,
     std::string & error) {
@@ -2096,7 +2121,14 @@ StopReason Session::generate(
     // Draft-free speculation, see speculate_ in the header. The drafter reads the cache
     // record as the history, so it needs the record to be whole, and a rejected tail is
     // dropped with a partial rollback, which a hybrid or recurrent memory refuses.
-    const bool speculating = speculate_ && cached_covers_context_ && !keeps_no_full_history();
+    // Confidence and speculation cannot both be had. A token accepted from a draft was
+    // sampled at a batch position the loop has already moved past by the time the token is
+    // emitted, so its logits are gone; reporting the wrong position's confidence would be
+    // worse than reporting none, and silently dropping some tokens' confidence would make
+    // the perplexity an average over an unnamed subset. Speculation is off by default.
+    const bool measuring = sampler_config.report_confidence && static_cast<bool>(on_confidence);
+    const bool speculating =
+        speculate_ && !measuring && cached_covers_context_ && !keeps_no_full_history();
     const common_ngram_simple_config spec_config{SPEC_NGRAM_SIZE, SPEC_DRAFT_MAX};
     llama_batch spec_batch = speculating ? llama_batch_init(SPEC_DRAFT_MAX + 1, 0, 1) : llama_batch{};
     std::vector<llama_token> draft;
@@ -2189,6 +2221,11 @@ StopReason Session::generate(
         } else {
             token = llama_sampler_sample(sampler, ctx_, -1);
         }
+        // Read before the end-of-turn check, because the logits belong to the position just
+        // decoded and the next iteration overwrites them. The end token itself is not
+        // reported: it is not part of the answer and its probability would be averaged into
+        // a perplexity about text the user can read.
+        const float chosen_logprob = measuring ? logprob_of(token) : 0.0f;
         if (llama_vocab_is_eog(vocab, token)) {
             reason = StopReason::END_OF_TURN;
             break;
@@ -2220,6 +2257,9 @@ StopReason Session::generate(
         ++stats.generated_tokens;
 
         const std::string piece(piece_buffer.data(), piece_len);
+        if (measuring) {
+            on_confidence(piece.c_str(), chosen_logprob);
+        }
         raw_reply += piece;
         if (budgeted) {
             if (in_thinking) {

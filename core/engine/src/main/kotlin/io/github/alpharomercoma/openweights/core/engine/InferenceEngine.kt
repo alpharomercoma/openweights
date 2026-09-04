@@ -127,6 +127,20 @@ data class GenerationStats(
 
 private const val MILLIS_PER_SECOND = 1000.0
 
+/**
+ * One token the model wrote, and how sure it was of it.
+ *
+ * [logprob] is the natural log of the probability the model gave this token, taken from the
+ * raw logits before the sampler touched them: at most zero, and zero exactly when the model
+ * was certain. Raw rather than post-sampler on purpose, since temperature and top-k are the
+ * user's settings and a confidence that moved when they changed the temperature would be
+ * measuring the sampler rather than the model.
+ */
+data class TokenConfidence(val text: String, val logprob: Float) {
+    /** The same thing as a probability between zero and one, which is what a person reads. */
+    val probability: Double get() = kotlin.math.exp(logprob.toDouble())
+}
+
 /** What the engine emits while producing a reply. */
 sealed interface GenerationEvent {
     /** A fragment of the reply. Fragments are not necessarily whole words. */
@@ -146,6 +160,14 @@ sealed interface GenerationEvent {
         val content: String = "",
         val reasoning: String = "",
         val toolCalls: List<ToolCall> = emptyList(),
+        /**
+         * Every token the model wrote and how sure it was, in order, or empty.
+         *
+         * Empty unless [SamplerParams.measuresConfidence] asked for it. Concatenating
+         * [TokenConfidence.text] reproduces the raw reply exactly, which is what lets a
+         * span of the answer be traced back to the tokens that produced it.
+         */
+        val tokens: List<TokenConfidence> = emptyList(),
     ) : GenerationEvent
 }
 

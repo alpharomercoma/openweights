@@ -183,6 +183,14 @@ data class MessageEntity(
      * quantity and one nothing here used to be able to name.
      */
     val decodeMs: Long? = null,
+    /**
+     * How sure the model was of each token of this answer, or null when nobody asked.
+     *
+     * Written only while the uncertainty view is on, which is off by default, so the
+     * overwhelming majority of rows carry nothing here. See [StoredConfidence] for the
+     * shape and for why it is tokens rather than the runs the screen draws.
+     */
+    val confidence: String? = null,
 )
 
 /**

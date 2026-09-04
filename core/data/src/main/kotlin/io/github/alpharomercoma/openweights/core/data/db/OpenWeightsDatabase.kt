@@ -33,7 +33,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -108,6 +108,23 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * into `totalMillis` with the tools and the templating and cannot be pulled back
          * out, so it reads as "not measured" rather than as a number invented for it.
          */
+        /**
+         * Gives a reply somewhere to keep how sure the model was of each word in it.
+         *
+         * One nullable column and no backfill, and no backfill is possible: the
+         * probabilities are read out of the logits as the reply is written and are gone the
+         * moment the next token is decoded. A reply produced before this existed has no
+         * confidence and reads as having none, which is the truth about it.
+         *
+         * Null for almost every row even after this. The view that writes it is off by
+         * default, so the column costs the rows that opted in and nothing else.
+         */
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN confidence TEXT")
+            }
+        }
+
         val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE messages ADD COLUMN prefillMs INTEGER")

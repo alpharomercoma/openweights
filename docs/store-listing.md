@@ -222,12 +222,26 @@ The cue sheet, one entry per shot:
 | 19.6 | you control | riser through 18.0, then the loudest bar and the lead motif |
 | 23.0 | end card | hard stop, branded hit, tonic chord decaying under the mark |
 
-Verified on the render: **-15.0 LUFS** integrated, **-4.8 dBTP**, LRA 4.8, **zero clipped
-samples**. Every cut's onset lands within 5.3 ms of the picture, which is the analysis hop
-and therefore the measurement floor. The arc runs -17.1 dB at the hook up to -14.5 at the
-download, drops to -19.7 for the privacy card, and peaks at **-13.7 on "You control what
-goes online"**, which is the loudest the film gets. The video stream is stream-copied, and
-its MD5 is identical to the silent master's.
+Two faults were found by measuring the second pass and both are fixed. The privacy section
+had been a breakdown rather than a reduction: its drums measured **-53.2 dB** against -12.6
+either side, and energy above 6 kHz fell from 10.1 per cent of the mix to 2.0. Forty
+decibels and a fivefold loss of top is a different track starting, not an arrangement
+thinning. The groove now runs unbroken through it, with the clap as the only layer that
+leaves, and its drums measure within **3 dB** of the neighbouring sections with high
+frequency content within **2 dB**. The ending had been an impact, a glitch and a noise sweep
+on a stopped beat, which is a logo animation; the harmony now cadences Bb to C to D minor,
+arriving exactly on the end card, and the chord and its reverb tail decay under the mark to
+the last frame.
+
+Two variants were rendered. **A**, the restrained one, is the chosen mix: its build is
+monotonic from -18.2 dB at the hook to -14.8 at the download where B's stalls, it drops
+4.5 dB across the privacy card, and its loudest moment is **-13.3 dB on the control claim**,
+which is louder than B's peak because loudnorm pulls B's greater overall energy back down.
+
+Verified on the chosen render: **-15.0 LUFS** integrated, **-1.4 dBTP**, LRA 4.4, **zero
+clipped samples**, crest factor 11.4 to 15.1 dB per section. Every cut's onset lands within
+5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
+stream is stream-copied and its MD5 is identical to the silent master's.
 
 **The silence is deliberate, and so is the track.** The file carries a silent AAC stream at
 about -91 dB of encoder noise, which is below the 16-bit floor and inaudible. Stripping it

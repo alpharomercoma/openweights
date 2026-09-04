@@ -350,7 +350,7 @@ class FetchUrlTool @Inject constructor(
         // host is not the part of the string it looks like: everything before an @ is
         // userinfo and goes nowhere, so "https://example.com@10.0.0.1/" reads as example.com
         // to anything working on the text.
-        var next = url.trim().toHttpUrlOrNull()
+        var next = addressOf(url)
             ?: return@withContext ToolExecution.failure(
                 "That is not an address that can be read. Got: $url",
             )
@@ -564,6 +564,64 @@ class FetchUrlTool @Inject constructor(
             }
     }
 }
+
+/**
+ * The address a model meant, from the string it wrote, or null when it wrote nothing usable.
+ *
+ * `toHttpUrlOrNull` insists on a scheme and answers null without one, and that null was
+ * reaching the user as "That is not an address that can be read". People do not paste
+ * schemes. Asked "what do you think of github.com/alpharomercoma/openweights", a model
+ * passes on the address exactly as it was given, which is exactly the form the parser
+ * refuses, so the tool declined the one call it most obviously should have made and the
+ * reply explained that the page could not be read.
+ *
+ * So a string with no scheme that is shaped like a host gets `https://`, which is the only
+ * scheme this tool would accept anyway: [refuseAddress] turns http into a refusal, so
+ * guessing http here would only produce a worse error message than guessing right.
+ *
+ * Shaped like a host means the part before the first slash carries a dot and ends in
+ * letters. That is what keeps a filename out of the network: `notes.txt` reaching this tool
+ * is already a mistake, and answering "that is not an address" is a better mistake to make
+ * than dialling a hostname invented from it.
+ *
+ * The trailing punctuation goes first. An address lifted out of a sentence keeps the full
+ * stop that ended it, and `https://example.com/docs.` is a path that does not exist rather
+ * than the one that does. Brackets and quotes go for the same reason: a model copying an
+ * address out of Markdown brings the angle brackets with it.
+ */
+internal fun addressOf(raw: String): HttpUrl? {
+    val trimmed = raw.trim()
+        .trim { it in WRAPPERS }
+        .trimEnd { it in SENTENCE_ENDINGS }
+        .trim()
+    if (trimmed.isEmpty()) return null
+    trimmed.toHttpUrlOrNull()?.let { return it }
+    // A scheme it wrote and this could not parse is a scheme this cannot fetch. Prefixing
+    // https onto "ftp://files.example.com" would build a nonsense address and dial it.
+    if (trimmed.contains("://")) return null
+    return trimmed.takeIf { it.looksLikeHost() }?.let { "https://$it".toHttpUrlOrNull() }
+}
+
+/** Whether what comes before the first slash could be a hostname rather than a filename. */
+private fun String.looksLikeHost(): Boolean {
+    if (any { it.isWhitespace() }) return false
+    val host = substringBefore('/').substringBefore('?').substringBefore('#')
+    val labels = host.split('.')
+    if (labels.size < 2 || labels.any { it.isEmpty() }) return false
+    // A real top-level domain is letters. This is what a port, an address written as
+    // digits, and "1.5" all fail, and each of them reaching here means something else
+    // was meant.
+    return labels.last().length >= SHORTEST_TLD && labels.last().all { it.isLetter() }
+}
+
+/** Quotes and brackets a model wraps an address in when it copies one out of a document. */
+private const val WRAPPERS = "<>\"'`()[]"
+
+/** Punctuation that ended the sentence rather than the address. */
+private const val SENTENCE_ENDINGS = ".,;:!?"
+
+/** Two letters, which is every country code and the shortest real suffix there is. */
+private const val SHORTEST_TLD = 2
 
 /**
  * Why this address will not be dialled, or null when it will.

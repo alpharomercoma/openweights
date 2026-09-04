@@ -308,7 +308,8 @@ class FetchUrlTool @Inject constructor(
         name = NAME,
         description = "Fetch a public web page and return its readable text, when you were " +
             "given the address. Not for finding a page, and not when a search result " +
-            "already answers it.",
+            "already answers it. Pass find to search a long page for what you actually " +
+            "need instead of reading its opening.",
         parametersJson = """
             {
               "type": "object",
@@ -320,6 +321,10 @@ class FetchUrlTool @Inject constructor(
                 "save_to": {
                   "type": "string",
                   "description": "Optional file path to save the page's text into the shared folder for scripts"
+                },
+                "find": {
+                  "type": "string",
+                  "description": "Optional. A word, phrase or regular expression to look for. Only the parts of the page that match it come back, with a little text around each, instead of the start of the page"
                 }
               },
               "required": ["url"]
@@ -404,8 +409,16 @@ class FetchUrlTool @Inject constructor(
                 "different source.",
         )
         else -> {
+            // Searched before anything else looks at the text, and against the whole of it
+            // rather than the four thousand characters that survive the cut. That is the
+            // point of asking for one: what a long page says about a particular thing is
+            // rarely in its opening, and reading the opening was all this tool could do.
+            val find = call.argument("find", "pattern", "search", "contains", "grep")
+                ?.takeIf { it.isNotBlank() }
             val saveTo = call.argument("save_to", "saveTo", "save")
-            if (saveTo != null && workspace.isReady && workspace.acceptsNewFiles) {
+            if (find != null) {
+                matchOutcome(page.text, find, requested, finalUrl)
+            } else if (saveTo != null && workspace.isReady && workspace.acceptsNewFiles) {
                 // Saved whole, summarised briefly: a page can be far larger than the
                 // context window, and the sandbox reading the file is how the model
                 // works through what the conversation could never hold.
@@ -429,6 +442,24 @@ class FetchUrlTool @Inject constructor(
             }
         }
     }
+
+    /**
+     * The page, reduced to the parts that match what the model asked for.
+     *
+     * Carries the same [ToolEvidence.Fetch] a whole read does, because the model still
+     * read that address and the same approval and provenance rules apply to what came
+     * back. A search that found nothing is a successful read of a page that does not say
+     * the thing, which is an answer; it is not a failed fetch.
+     */
+    private fun matchOutcome(
+        text: String,
+        find: String,
+        requested: String,
+        finalUrl: HttpUrl,
+    ): ToolExecution = ToolExecution(
+        text = PageSearch.render(PageSearch.search(text, find), find, text.length),
+        evidence = ToolEvidence.Fetch(requested, finalUrl.toString()),
+    )
 
     /**
      * What is worth reading in a response, or why nothing is.

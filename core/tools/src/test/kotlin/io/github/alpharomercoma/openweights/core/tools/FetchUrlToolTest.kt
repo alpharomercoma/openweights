@@ -97,6 +97,50 @@ class FetchUrlToolTest {
     }
 
     @Test
+    fun `a page reaches the model as prose, and is searched as prose`() {
+        // Two questions in one: what does the model actually receive from a real page, and
+        // does a pattern it writes match that or the markup underneath. Both have to be
+        // prose, or a model told to find "battery" matches a CSS class called battery.
+        val html = """
+            <html><head><title>Phone</title>
+            <style>.spec { color: red }</style>
+            <script>var battery = "fake";</script></head>
+            <body><nav>Home About Contact</nav>
+            <article><h1>Specifications</h1>
+            <p>The battery is <b>5000</b> mAh and charges at 67 W.</p>
+            <p>The screen is 6.7 inches.</p></article>
+            <footer>Copyright 2026</footer></body></html>
+        """.trimIndent()
+
+        val text = FetchUrlTool.pageText(html, "text/html")
+
+        // Structured, clean content: no tags, no stylesheet, no script, and the furniture
+        // around the article gone with them.
+        assertThat(text).doesNotContain("<")
+        assertThat(text).doesNotContain("color: red")
+        assertThat(text).doesNotContain("var battery")
+        assertThat(text).doesNotContain("Home About Contact")
+        assertThat(text).contains("The battery is 5000 mAh")
+
+        // And the pattern matches the sentence rather than the script's variable, which is
+        // the reason the search runs after the cleaning rather than before it.
+        val found = PageSearch.search(text, "battery is [0-9]+ mAh")
+            as PageSearch.Result.Found
+        assertThat(found.count).isEqualTo(1)
+        assertThat(found.windows.single()).contains("5000 mAh")
+    }
+
+    @Test
+    fun `find is the parameter the model is told about`() {
+        // The declaration is what a model can act on: a search that works and is not
+        // offered is a search that never happens.
+        val schema = tool.definition.parametersJson
+
+        assertThat(schema).contains("\"find\"")
+        assertThat(tool.definition.description).contains("find")
+    }
+
+    @Test
     fun `refused page is an unsuccessful typed execution with no evidence`() = runTest {
         val execution = tool.execute(
             ToolCall(

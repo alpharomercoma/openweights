@@ -17,7 +17,6 @@
 package io.github.alpharomercoma.openweights.ui.chat
 
 import android.content.Intent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.designsystem.component.KeepTailPinned
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.theme.MetricTextStyle
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
@@ -77,6 +77,12 @@ import java.util.Locale
 fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
     val detail = step.detail()
+
+    // Opening a search step is the size change a reader is most likely to make by hand, and
+    // the one furthest from anything that recomposes the list. Passing `expanded` is what
+    // makes this scope recompose on the tap: every other read of it here is inside a
+    // content lambda that recomposes on its own. See KeepTailPinned.
+    KeepTailPinned(expanded)
 
     Column(
         modifier = modifier
@@ -148,7 +154,10 @@ fun ToolStepBlock(step: AgentStep, modifier: Modifier = Modifier) {
             MediaGrid(pictures = pictures, modifier = Modifier.padding(top = 8.dp))
         }
 
-        AnimatedVisibility(visible = expanded) {
+        // Not animated: the height change has to happen in the frame the tap recomposed, or
+        // the pin request that keeps the reply below from moving arrives after the growth
+        // it was meant to cover. See WorkBlock.
+        if (expanded) {
             val program = step.scriptSource()
             if (program == null) {
                 Text(

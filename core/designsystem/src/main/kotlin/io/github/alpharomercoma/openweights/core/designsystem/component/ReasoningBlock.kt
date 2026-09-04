@@ -16,7 +16,6 @@
 
 package io.github.alpharomercoma.openweights.core.designsystem.component
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,6 +81,10 @@ fun ReasoningBlock(
     LaunchedEffect(isInProgress) { if (!isInProgress) override = null }
     val expanded = override ?: isInProgress
 
+    // In the frame the tap recomposes, so the reply under this block does not move
+    // when the reasoning above it opens. See KeepTailPinned.
+    KeepTailPinned(expanded)
+
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = Motion.quick(),
@@ -108,7 +111,10 @@ fun ReasoningBlock(
             )
         }
 
-        AnimatedVisibility(visible = expanded) {
+        // Not animated, and KeepTailPinned above is why it does not need to be: both
+        // exist so the growth and the scroll correction land in one frame. See
+        // KeepTailPinned.
+        if (expanded) {
             // Readable, and only here at all once the block has been opened. This carried a
             // clearAndSetSemantics {} on the grounds that the header announced the same
             // thing, which the header does not: it says how long thinking took and offers

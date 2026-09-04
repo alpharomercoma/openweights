@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.designsystem.component
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -52,6 +54,61 @@ class FollowTailState internal constructor(
     fun jumpToLatest() {
         isFollowing = true
         scope.launch { listState.pinToBottom() }
+    }
+
+    /**
+     * Asks for the tail to stay at the bottom through a size change happening this frame.
+     *
+     * Idempotent and cheap: [pinToBottom] records a request that the next measure pass
+     * applies, so calling it twice in a frame is the same as calling it once. Gated on no
+     * scroll being in progress for the same reason the effect below is, which is that a
+     * drag or a fling must never be fought.
+     */
+    internal fun keepPinned() {
+        if (isFollowing && !listState.isScrollInProgress) listState.pinToBottom()
+    }
+}
+
+/**
+ * The follow-tail state of the list the content is inside, when it is inside one.
+ *
+ * Provided so that a composable which changes its own height can say so. Everything about
+ * the pin below is driven by the caller of [rememberFollowTailState] recomposing, and a
+ * disclosure opening inside a list item does not recompose that caller: it recomposes
+ * itself, several layers down, and the list simply measures taller. Without this the growth
+ * lands with no pin request pending, the tail goes under the fold, and the correction
+ * arrives a frame later once `isAtBottom` has noticed. See [KeepTailPinned].
+ */
+val LocalFollowTail = staticCompositionLocalOf<FollowTailState?> { null }
+
+/**
+ * Holds the tail in place across a size change this composable is about to make.
+ *
+ * Call it from the composable that owns the disclosure, passing the flag that opens it. The
+ * flag is the whole mechanism and not decoration: a composable is recomposed for the state
+ * it reads, and `expanded` read only inside a `Column`'s content lambda recomposes that
+ * lambda alone. Taking it as a parameter moves the read up into the caller's own scope, so
+ * the frame that recomposes on a tap is the frame that carries the pin request, and the
+ * growth and the correction land in the same measure pass.
+ *
+ * [DisposableEffect] rather than [SideEffect] for the same reason it is keyed: this needs to
+ * fire when the height changes and not on every unrelated recomposition of the block. Its
+ * effect runs while changes are applied, which is before this frame's layout, so the request
+ * is pending by the time the taller content measures. A [LaunchedEffect] would not do: its
+ * coroutine can land after the frame that grew has already been drawn, which is precisely
+ * the bob this exists to remove.
+ *
+ * Null outside a following list, where it does nothing, which is what a preview and a
+ * sheet want.
+ *
+ * @param expanded whatever decides this composable's height.
+ */
+@Composable
+fun KeepTailPinned(expanded: Boolean) {
+    val tail = LocalFollowTail.current
+    DisposableEffect(expanded, tail) {
+        tail?.keepPinned()
+        onDispose {}
     }
 }
 
@@ -98,9 +155,7 @@ fun rememberFollowTailState(listState: LazyListState, scope: CoroutineScope): Fo
     // pin request is already pending by the time the growth measures: one frame, one
     // motion. Gated on no scroll being in progress so a drag or fling is never fought;
     // the pin request itself is not a scroll session, so it never gates itself out.
-    SideEffect {
-        if (state.isFollowing && !listState.isScrollInProgress) listState.pinToBottom()
-    }
+    SideEffect { state.keepPinned() }
 
     return state
 }

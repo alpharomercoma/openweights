@@ -81,6 +81,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -115,6 +116,7 @@ import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.ContextMeter
 import io.github.alpharomercoma.openweights.core.designsystem.component.FAST_TOKENS_PER_SECOND
+import io.github.alpharomercoma.openweights.core.designsystem.component.LocalFollowTail
 import io.github.alpharomercoma.openweights.core.designsystem.component.Mark
 import io.github.alpharomercoma.openweights.core.designsystem.component.MarkdownText
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
@@ -457,15 +459,21 @@ private fun ChatContent(
                             onBrowseModels = destinations.onBrowseModels,
                         )
                     } else {
-                        Transcript(
-                            state = state,
-                            goal = goal,
-                            listState = listState,
-                            isSpeaking = isSpeaking,
-                            clipboard = clipboard,
-                            onActionsForId = onActionsForId,
-                            onToggleReadAloud = onToggleReadAloud,
-                        )
+                        // Handed down rather than passed as a parameter, because the things
+                        // that need it are disclosures four or five layers inside a list
+                        // item and none of the layers between has any business knowing about
+                        // scrolling. See KeepTailPinned.
+                        CompositionLocalProvider(LocalFollowTail provides followTail) {
+                            Transcript(
+                                state = state,
+                                goal = goal,
+                                listState = listState,
+                                isSpeaking = isSpeaking,
+                                clipboard = clipboard,
+                                onActionsForId = onActionsForId,
+                                onToggleReadAloud = onToggleReadAloud,
+                            )
+                        }
                     }
 
                     JumpToLatestButton(

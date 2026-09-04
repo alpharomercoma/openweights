@@ -16,7 +16,6 @@
 
 package io.github.alpharomercoma.openweights.ui.chat
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
+import io.github.alpharomercoma.openweights.core.designsystem.component.KeepTailPinned
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Motion
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import java.util.Locale
@@ -89,6 +89,10 @@ fun WorkBlock(
     val open = isStreaming || isLatest
     val expanded = override ?: open
 
+    // Said in the frame the tap lands, because this composable is the only one that knows
+    // the height is about to change: nothing above it recomposes when a disclosure opens.
+    KeepTailPinned(expanded)
+
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = Motion.quick(),
@@ -121,7 +125,13 @@ fun WorkBlock(
             }
         }
 
-        AnimatedVisibility(visible = expanded) {
+        // Shown or not, with nothing animating the height between the two. An
+        // AnimatedVisibility here grew the item over about three hundred milliseconds of
+        // layout passes that recompose nothing above them, so the list measured taller on
+        // every frame of the animation while the pin request only ever arrives on a
+        // recomposition. The tail slipped under the fold and was hauled back, once per
+        // frame, for the whole of the animation: the bob. One frame, one motion.
+        if (expanded) {
             Column {
                 blocks.forEach { block ->
                     when (block) {

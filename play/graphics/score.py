@@ -103,7 +103,7 @@ A, B, C, D, E, F, G, H = CUTS
 TARGET_LUFS = -15.0
 TARGET_TP = -1.4
 WET = 0.34            # reverb send, against a unit-energy impulse
-TAIL = 0.30           # the ending's extra send into its own longer, darker hall
+TAIL = 0.38           # the ending's extra send into its own longer, darker hall
 
 VARIANTS = {
     "A": dict(pickups=False, pluck=0.86, hat=0.85, clap=0.30, lead8va=False, cym=0.30,
@@ -326,7 +326,7 @@ def reverb(x: np.ndarray, ir: np.ndarray) -> np.ndarray:
     return np.stack([fftconvolve(ch, ir)[:x.shape[1]] for ch in x])
 
 
-def pad_block(rng, t0, t1, tri, gain, lo, hi) -> np.ndarray:
+def pad_block(rng, t0, t1, tri, gain, lo, hi, out=0.35) -> np.ndarray:
     n = int((t1 - t0) * SR)
     t = _t(n)
     v = np.zeros(n)
@@ -334,7 +334,10 @@ def pad_block(rng, t0, t1, tri, gain, lo, hi) -> np.ndarray:
         for cents in (-7, 0, +7):
             v += np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
     v = bandpass(v / (len(tri) * 3), lo, hi)
-    return v * np.clip(t / 0.25, 0, 1) * np.clip((t1 - t0 - t) / 0.35, 0, 1) * gain
+    ramp = np.clip(t / 0.25, 0, 1)
+    if out > 0:
+        ramp = ramp * np.clip((t1 - t0 - t) / out, 0, 1)
+    return v * ramp * gain
 
 
 # ------------------------------------------------------------------------------ the kit
@@ -496,7 +499,7 @@ def pads(rng) -> np.ndarray:
         if t1 <= t0:
             continue
         if t0 >= H - 1e-9:
-            add(buf, t0, pad_block(rng, t0, DUR, tri, 0.34, 90, 4200))
+            add(buf, t0, pad_block(rng, t0, DUR, tri, 0.34, 90, 4200, out=0))
         elif F - 0.5 <= t0 < G:
             # Through the reduction the pad comes forward, so the section loses drums but
             # gains harmony and the total never thins to nothing.
@@ -524,7 +527,7 @@ def finale(rng, v) -> np.ndarray:
     st(H, kick_hit(rng, 0.74))
     st(H + 2 * BEAT, kick_hit(rng, 0.32))
     st(H, cymbal(rng, 3.4, v["cym"] * 0.42, lo=1500, hi=6500), 0.06)
-    st(H, sub(root, 3.4, 0.72))
+    st(H, sub(root, 4.8, 0.72))
 
     for mult, g, dur in ((1.0, 0.32, 2.9), (2.0, 0.16, 2.2)):
         for k, f in enumerate(tri):
@@ -546,7 +549,7 @@ def finale(rng, v) -> np.ndarray:
     for f, w in ((A2, 0.9), (D3, 1.0), (F3, 0.95), (A3, 0.85), (D4, 0.7), (F4, 0.5)):
         for cents in (-6, +6):
             held += w * np.sin(2 * np.pi * f * 2 ** (cents / 1200) * t + rng.random() * 6.28)
-    held *= np.clip(t / 0.07, 0, 1) * np.exp(-t / 3.40) / 10
+    held *= np.clip(t / 0.07, 0, 1) * np.exp(-t / 5.60) / 10
     st(H, held * 0.62, 0.05)
     return np.stack([l, r])
 
@@ -617,7 +620,7 @@ def render(name: str, out_wav: Path) -> Path:
     stereo *= 0.89 / (np.abs(stereo).max() + 1e-9)
     n = int(0.004 * SR)
     stereo[:, :n] *= np.linspace(0, 1, n)
-    m = int(0.150 * SR)
+    m = int(0.010 * SR)
     stereo[:, -m:] *= np.linspace(1, 0, m) ** 0.5
 
     pcm = (np.clip(stereo.T, -1, 1) * 32767).astype("<i2")

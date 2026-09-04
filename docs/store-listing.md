@@ -259,7 +259,22 @@ accent went from 7.2 dB to **5.0**, and the tail's spectral centroid dropped fro
 **1426**, so it is warmer rather than brighter. Everything before 22.8 s moved by 0.2 dB,
 which is global normalisation and nothing else.
 
-Verified on the master: **-15.0 LUFS** integrated, **-1.3 dBTP**, LRA 4.3, **zero clipped
+One last mastering edit found the real culprit: the master fade-out. A 150 ms ramp to
+silence landed while the card was still on screen, so the track was audibly being faded
+rather than being cut away from. It is now 10 ms, enough to stop a truncated waveform
+clicking and nothing more, so the file ends with the chord still sounding. The pad under the
+card was also ramping itself out over its own last 0.35 s, which is the one voice whose job
+is to hold the card; that ramp is gone. The low resonance and the held chord were lengthened
+again, and the ending's reverb send came up slightly.
+
+The result, measured against the previous master: the tail is **8.4 dB louder in the final
+100 ms**, the total fall from 23.2 s to 25.4 halved from 10.4 dB to **5.3**, and the decay
+is smoother, losing 0.56 dB per 0.2 s against 0.80 with the worst single step down from 1.58
+to 1.16. The accent did not grow: it went from -2.7 to **-2.9 dBFS**. What is still sounding
+as the picture cuts is the chord itself, with spectral peaks at 73, 147, 293 and 350 Hz,
+which is D2, D3, D4 and F4.
+
+Verified on the master: **-15.0 LUFS** integrated, **-1.6 dBTP**, LRA 4.5, **zero clipped
 samples**, and every cut still within 5.3 ms of the picture. Every cut's onset lands within
 5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
 stream is stream-copied and its MD5 is identical to the silent master's.

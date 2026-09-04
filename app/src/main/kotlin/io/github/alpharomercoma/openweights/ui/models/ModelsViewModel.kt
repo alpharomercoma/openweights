@@ -123,7 +123,7 @@ data class ActiveDownload(
      * state used to be indistinguishable from a download in progress — observed live as
      * **"Downloading 0%" on a job that had failed four times and moved no bytes** — so it
      * is carried here and said out loud rather than left looking like progress.
-    */
+     */
     val attemptsFailed: Int = 0,
     /** The failure that caused the current backoff, available before work is terminal. */
     val lastError: String? = null,
@@ -134,7 +134,9 @@ data class ActiveDownload(
     val fraction: Float get() = if (bytesTotal > 0) bytesDone.toFloat() / bytesTotal else 0f
 
     /** True when nothing is being transferred and the next attempt is still pending. */
-    val isRetrying: Boolean get() = attemptsFailed > 0 && nextAttemptAtMillis != null && error == null
+    val isRetrying: Boolean get() = attemptsFailed > 0 &&
+        nextAttemptAtMillis != null &&
+        error == null
     val remainingRetries: Int get() = (maxRetries - attemptsFailed).coerceAtLeast(0)
 }
 

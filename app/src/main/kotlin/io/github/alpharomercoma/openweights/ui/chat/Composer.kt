@@ -692,11 +692,13 @@ private fun ComposerActions(
             // while the first prompt is being prepared or a file is still being copied in:
             // sending then would either make the first turn cold or omit the attachment.
             enabled = isGenerating ||
-                (enabled &&
-                    !isLoadingModel &&
-                    !isPreparingFirstResponse &&
-                    !isAttaching &&
-                    hasSomethingToSend),
+                (
+                    enabled &&
+                        !isLoadingModel &&
+                        !isPreparingFirstResponse &&
+                        !isAttaching &&
+                        hasSomethingToSend
+                    ),
             onClick = {
                 if (isGenerating) {
                     onStop()

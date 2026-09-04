@@ -56,7 +56,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,6 +74,7 @@ import io.github.alpharomercoma.openweights.core.designsystem.component.formatBy
 import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -330,13 +330,23 @@ private fun DownloadRow(
 }
 
 private fun formatRetryCountdown(remainingMillis: Long): String {
-    val seconds = (remainingMillis.coerceAtLeast(0L) + 999L) / 1_000L
+    // Rounded up, so a wait with any time left on it never reads as "0s".
+    val seconds = (remainingMillis.coerceAtLeast(0L) + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND
     return when {
-        seconds >= 3_600L -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
-        seconds >= 60L -> "${seconds / 60}m ${seconds % 60}s"
+        seconds >= SECONDS_PER_HOUR ->
+            "${seconds / SECONDS_PER_HOUR}h " +
+                "${(seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE}m"
+
+        seconds >= SECONDS_PER_MINUTE ->
+            "${seconds / SECONDS_PER_MINUTE}m ${seconds % SECONDS_PER_MINUTE}s"
+
         else -> "${seconds}s"
     }
 }
+
+private const val MILLIS_PER_SECOND = 1_000L
+private const val SECONDS_PER_MINUTE = 60L
+private const val SECONDS_PER_HOUR = 60L * 60L
 
 private const val SECOND_MILLIS = 1_000L
 

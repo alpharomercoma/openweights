@@ -244,7 +244,9 @@ abstract class ChatFixture {
             if (state.modelName != null &&
                 !state.isLoadingModel &&
                 !state.isPreparingFirstResponse
-            ) return
+            ) {
+                return
+            }
             settle(steps = 2)
         }
     }

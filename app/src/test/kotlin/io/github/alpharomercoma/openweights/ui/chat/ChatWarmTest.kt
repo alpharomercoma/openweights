@@ -39,33 +39,31 @@ import java.time.LocalDate
 class ChatWarmTest : ChatFixture() {
 
     @Test
-    fun `the first reply waits for the load warm instead of cancelling it`() =
-        runTest(dispatcher) {
-            engine.warmGate = kotlinx.coroutines.CompletableDeferred()
-            viewModel.loadModel(modelFile("model-a.gguf"))
-            settle(steps = 4)
+    fun `the first reply waits for the load warm instead of cancelling it`() = runTest(dispatcher) {
+        engine.warmGate = kotlinx.coroutines.CompletableDeferred()
+        viewModel.loadModel(modelFile("model-a.gguf"))
+        settle(steps = 4)
 
-            assertThat(viewModel.uiState.value.isPreparingFirstResponse).isTrue()
-            assertThat(viewModel.send("hi")).isFalse()
-            assertThat(engine.prompts).isEmpty()
+        assertThat(viewModel.uiState.value.isPreparingFirstResponse).isTrue()
+        assertThat(viewModel.send("hi")).isFalse()
+        assertThat(engine.prompts).isEmpty()
 
-            engine.warmGate?.complete(Unit)
-            settle(steps = FOLD_SETTLE_STEPS)
+        engine.warmGate?.complete(Unit)
+        settle(steps = FOLD_SETTLE_STEPS)
 
-            assertThat(viewModel.uiState.value.isPreparingFirstResponse).isFalse()
-            assertThat(viewModel.uiState.value.canSend).isTrue()
-        }
+        assertThat(viewModel.uiState.value.isPreparingFirstResponse).isFalse()
+        assertThat(viewModel.uiState.value.canSend).isTrue()
+    }
 
     @Test
-    fun `a failed first warm releases the first reply gate`() =
-        runTest(dispatcher) {
-            engine.warmKeepsNothing = true
-            loadModel()
+    fun `a failed first warm releases the first reply gate`() = runTest(dispatcher) {
+        engine.warmKeepsNothing = true
+        loadModel()
 
-            assertThat(viewModel.uiState.value.isPreparingFirstResponse).isFalse()
-            assertThat(viewModel.uiState.value.canSend).isTrue()
-            engine.warmKeepsNothing = false
-        }
+        assertThat(viewModel.uiState.value.isPreparingFirstResponse).isFalse()
+        assertThat(viewModel.uiState.value.canSend).isTrue()
+        engine.warmKeepsNothing = false
+    }
 
     @Test
     fun `branching warms the carried conversation instead of resetting the cache`() =

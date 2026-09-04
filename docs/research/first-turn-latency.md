@@ -334,3 +334,235 @@ replays the first question byte-for-byte, so an open conversation keeps the day 
 sent with; `PromptDay`'s per-conversation pin is unchanged. Verified on the X8 Pro Max:
 new head 2,177 tokens (was 2,188), computed once for the byte change, and "What is
 today's date?" answered "September 1, 2026" at CH99%.
+
+## The first model of all (2026-09-04)
+
+Everything above makes a first turn fast by *having warmed already*. On a model that has
+just been downloaded there is nothing to have warmed: the state file is keyed to the
+weights, so a new model always costs one computed warm. Until this, whoever sent the
+first message paid for it.
+
+The report: a freshly rebooted phone, a model downloaded from the Hub, and a first
+prompt at **31 tok/s prefill and 1 tok/s decode, 80 seconds**. This device's own norms
+are ~100–112 and ~16–24. The prefill figure is not a new number — it is exactly the
+`~31 tok/s` recorded in the swap incident above — which places the whole report in the
+memory-pressure regime rather than the thermal one.
+
+**What was ruled out first.** That decode figure could have been a measurement artefact:
+a turn containing a tool call is several `generate()` passes, and `GenerationStats.through`
+sums them. It is honest — `decode_ms` is `decode_end - first_token_ms` *inside* one
+native call, so tool execution happens between passes and is never counted as decode.
+1 tok/s is real decode, a twentyfold collapse, and only memory or clock explains that.
+
+**Two things changed, and they are different in kind.**
+
+**1. A finished download now warms.** `ModelArrivals` carries the one moment the app
+knows a model is complete and nobody is waiting on the engine, and `ChatViewModel`
+answers it by running the same two lines `loadDefaultModel` runs — same selection, same
+prompt composition, so there is no second path to keep in step with the first, which is
+the standing hazard for anything that renders a prefix. The load ends in `warmEngine`,
+which writes the state file, so the first message is a restore. It defers in five cases,
+each of them one where early is worse than waiting: the user unloaded on purpose, a model
+is already loaded, a download is still running (`ModelStore.downloadsInFlight`, read from
+`.part` files — the projector half of a multimodal model is a second download, and
+opening the weights without it would leave pictures broken for the life of the process),
+the phone is already hot, or the app is not on screen. That last one is the common case
+rather than the exception, since nobody watches a multi-gigabyte transfer: taking two
+gigabytes into a process Android has already filed as cached is how that process gets
+killed, and the user would come back to an app that had restarted for a warm they never
+asked for. None is retried, because none needs to be: the chat tab still opens the model
+the moment somebody asks. Pinned by `PrewarmAfterDownloadTest`, whose foreground and
+background cases pass together, so the guard is doing work rather than blocking
+everything.
+
+**2. A page-cache fix that did not work, and is gone.** With `useMmap` off, llama.cpp
+reads the GGUF through buffered stdio, so the kernel holds its own copy of every byte on
+top of the anonymous backend buffers. Nothing reads it again, and it never appears in RSS
+or PSS, **which is why the mapped-vs-read table in `ModelLoadParams` could not see it**:
+that table compares process accounting and this copy sits outside it. `Session::load` was
+changed to drop it with `posix_fadvise(POSIX_FADV_DONTNEED)` after loading.
+
+Measured on the phone, it does nothing. With the file known cached and 5.6 GB available, a
+load moved system `Cached` from 3,660 MB to 3,664 MB. Up four, not down six hundred and
+sixty-three. `useMmap` was confirmed at its default of false, so the call did run; models
+live under `/storage/emulated/0/Android/data/...`, which is FUSE-backed, and the advice
+does not reach the page cache holding the data. Timing could not have caught this: this
+phone reads that file at ~3.5 GB/s, which is page-cache speed, so cached and cold are
+indistinguishable by throughput and only the growth of `Cached` separates them.
+
+The code is removed rather than left as a no-op with a confident comment on it. The
+reasoning behind it is weaker than it first looked, too: a clean file copy is the first
+thing the kernel reclaims under pressure, so it is the *least* harmful memory in the
+system, and blaming it for the anonymous weights reaching zram was a guess. What survives
+is the caveat on the table, recorded on `ModelLoadParams.useMmap`.
+
+**What the device run showed (2026-09-04, evening).** Fresh install, LFM2.5-1.2B-Q4_0
+(663 MB) downloaded from the Hub with the app on screen. The download notification cleared
+at 17:37:44.903 and `loaded:` landed at 17:37:46.259 - 1.356 s against a measured cold load
+of ~1.39 s, so the load began the moment the download finished. The first touch was at
+17:37:46.101, 158 ms before the load completed, and no load finishes in 158 ms. The
+pre-warm fired. Then `warmed 1102 tokens in 8101 ms`, `warm state saved: 13397 KB`, and on
+the next load `warm restored from disk: 1102 tokens in 22 ms`.
+
+It also caught a regression this change introduces. That tap queued behind the warm and the
+model was ready at 17:37:55.980: **9.9 s of waiting, 8.4 of it a warm nobody asked for.**
+`generate()` interrupts a running warm and `performLoad` never did, because before this
+nothing warmed unless a model was already loaded. `performLoad` now calls
+`turns.yieldWarms()` as well. Nothing is lost by killing the warm, since the load ends in
+one. `FakeInferenceEngine.load` did not take the mutex that models the single native
+thread, which is why no host test could have caught it; it does now, and the new test fails
+with the yield removed.
+
+**The memory hypothesis remains untested.** That run was on a healthy phone: swap moved
+19 MB to 22 MB, 126 major faults across the whole session, and 28,840 ms of CPU over
+4,917 ms of wall on the heavy pass, which is about six threads busy and so compute-bound
+rather than starved. Prefill ran at 136 tok/s against the 31 tok/s of the report. Nothing
+about zram was exercised. The counters that would settle it are logged around every load,
+warm and turn:
+
+    mem: before turn rss 1530 MB, pss 1357 MB, swap 19 MB, majflt 337, minflt 1013221, cpu 88890 ms
+
+Every field is a running total and the difference across a turn says which failure it is. A
+swap-in is a major fault, so `swap` and `majflt` both climbing means the weights are in
+zram; `majflt` climbing with `swap` flat means file pages being re-read; both flat with CPU
+time tracking wall time means throttled or misplaced cores, which is a scheduling problem
+and none of the above. `tools/eval/cold_start_probe.sh` reads the same counters from
+outside.
+
+**What the pre-warm does not fix.** The reported 80 s had two halves. At 31 tok/s the
+1,102-token prefix is ~35 s of prefill, and the pre-warm removes all of it. The rest was
+decode at 1 tok/s, and **nothing here touches decode**: a warm cache does not make token
+generation faster. If that state recurs the first turn should lose its prefill wait and
+still decode slowly. That half is unexplained.
+
+**What was considered and not done.** `LLAMA_LOAD_MODE_DIRECT_IO` exists in the pinned
+build and would keep the page cache empty during the load rather than trying to empty it
+after, which is the only version of that idea that could survive the FUSE finding above.
+It falls back to buffered silently and is unmeasured on this storage stack, so it is a
+measurement, not a change to make blind — and it is worth making only once the counters
+say the duplicate copy costs anything. A file-backed cache of KleidiAI's repacked weights is the only design that
+makes the *hot* weights droppable rather than swappable — the repack destination is
+anonymous whether or not the source was mapped, so mmap cannot deliver that — but it is a
+new on-disk format with a cache key covering the packing version and CPU features, which
+is its own project. Warming *during* a download, which is what was originally asked for,
+cannot work: every token traverses every layer, so a prefix needs practically the whole
+file, and the bytes are not there yet.
+
+## What actually collapses, measured on the phone (2026-09-04, night)
+
+The report was decode at **1 token a second** on a freshly installed app. Warming cannot
+touch that: a warm cache means the prompt is not re-read, and decode still has to generate
+every token. So this went after decode directly, on the device, with a harness rather than
+a theory.
+
+**Healthy baseline, LFM2.5-1.2B-Q4_0 (663 MB), MT6991:** decode 28-33 tok/s across six
+turns; prefill 44-96. Decode reads every weight once per token, so 30 tok/s on 663 MB is
+**19.9 GB/s** of useful weight traffic.
+
+**What the phone can actually do.** A native streaming read, same thread counts:
+
+| threads | 1 | 2 | 4 | 8 |
+| --- | --- | --- | --- | --- |
+| GB/s | 16.0 | 35.3 | 31.9-38.4 | 45.1-45.8 |
+
+So decode achieves about half of a raw streaming loop, and `0.52 x 38.4 / 0.663 = 30.1`
+reproduces the measured rate exactly. **Decode speed is bandwidth over model size and
+almost nothing else**, which is what makes the rest of this tractable.
+
+### The defect that was real: a threadpool per token
+
+`ggml_backend_cpu` starts with `threadpool = NULL` (ggml-cpu.cpp:227) and nothing here ever
+called `llama_attach_threadpool`, so `ggml_graph_compute` took its `disposable_threadpool`
+path: **a pool created and freed inside every graph.** Prefill runs one graph per 512-token
+batch and pays it once for hundreds of tokens; decode runs one graph per token and pays it
+for every one. Measured: the process thread count sat at a flat **61 while idle and
+oscillated between 62 and 70** throughout a reply, and settled to the pool's own eleven
+once a persistent pool was attached.
+
+Worth only ~4% on an idle phone (29.8 -> 30.9 tok/s mean). It is fixed because it is wrong,
+not because it was the reported bug.
+
+**It also nearly shipped a use-after-free.** The first version rebuilt the pools whenever
+the thermal policy re-planned thread counts. `llama_context::graph_compute` hands the CPU
+backend a pool before every graph and `ggml_backend_cpu_set_threadpool` *pauses the
+previous one* when the pointer changes, so a freed pool is still reachable. Under a
+`thermalservice override-status 3` a turn ran **over 310 s** and never finished. One pool,
+sized once to the wider count and never rebuilt, takes the same turn to **21 s**. `kickoff`
+carries the active thread count per graph, so the extra workers simply sit out.
+
+### Replicating the bad state, deterministically
+
+`memhog` (a static arm64 binary that mmaps anonymous memory and keeps touching it) run
+against the app until `MemAvailable` falls under the working set:
+
+| hogs | MemAvailable | app RSS | app Swap |
+| --- | --- | --- | --- |
+| none | 4043 MB | 1513 MB | 23 MB |
+| 3 GB | 2025 MB | 1513 MB | 23 MB |
+| 5.5 GB | 1558 MB | **770 MB** | **693 MB** |
+| 7.5 GB | 2482 MB | 917 MB | 539 MB |
+
+At 693 MB swapped, essentially the whole weight arena is in zram. The next turn logged
+**majflt 1,426 -> 129,256**: 128,000 major faults, 512 MB faulted back, matching the swap
+drop exactly.
+
+### And what that did, which is not what everyone predicted
+
+**Prefill collapsed to 23.4 tok/s. Decode did not move: 32.6.** Under sustained pressure
+(three hogs, 516 MB still swapped, 13,589 major faults in the turn) decode was **31.2**.
+
+That falsifies the zram-decode theory on this hardware, and codex's arithmetic said so
+before the measurement did: sustained full-weight refaulting at one token a second needs
+roughly **53 GiB of swap-in across 80 s**, and the worst turn measured 54 MB. Three orders
+of magnitude short. Memory pressure hits the pass that faults the weights back — prefill —
+and decode runs at full speed behind it.
+
+**31 tok/s prefill under pressure is the number in the original report.** That half
+reproduces exactly.
+
+Also ruled out by measurement, not argument:
+
+- **cpuset demotion.** Backgrounding mid-generation moves the process to `cpuset:/foreground`
+  (cpus 0-7), not `/background` (cpus 0-3), because the generation service holds it there.
+  Decode unaffected.
+- **Our own thermal policy.** `THERMAL_STATUS_SEVERE` drops both counts to `MIN_THREADS`
+  = 2, and that costs 24.9 tok/s against ~31: a fifth, not a collapse.
+- **`posix_fadvise` on the model file.** A no-op on FUSE storage; see above.
+
+### The product gap this exposed
+
+`FitEstimator` predicts speed from a `ThroughputCalibration`, and `DiscoverViewModel` built
+one only from `usageRepository.decodeSpeedByModel()` — models this device **has already
+run**. A fresh install has none, so Discover could say a model *fits* and never that it
+would be usable. Someone spends twenty minutes of their connection on four gigabytes and
+finds out afterwards.
+
+`MemoryBandwidth` closes it: a 48 MB array streamed at the decode thread count, best of
+three passes, cached per build. It seeds the decode calibration when there is no measured
+one, per runtime, and the real measurement replaces it as soon as one exists.
+
+Getting the probe right took three attempts on the device, and the unit tests would not
+have caught any of them:
+
+| written as | reads | reality |
+| --- | --- | --- |
+| direct `LongBuffer.get(i)` | 1.0 GB/s | bounds-checked call, not a load |
+| `LongArray`, one accumulator | 6.8 GB/s | measures the dependency chain |
+| `LongArray`, unrolled x8, four accumulators | **22.6-27.5 GB/s** | loads overlap |
+
+Hence `DECODE_EFFICIENCY = 0.60`, fitted against the probe the app actually runs rather
+than against the native loop, and deliberately about twenty percent under what this phone
+really decodes. An estimate that flatters the phone never shows the warning it exists for.
+A floor rejects an implausible sample — on read as well as on write, since the first bad
+value was cached and served back.
+
+### What is still not explained
+
+Nothing reproduced 1 tok/s **for this model**. At 663 MB that needs 0.66 GB/s of effective
+traffic, a thirtyfold collapse, and neither zram, thermal, backgrounding nor thread churn
+produced it. The arithmetic points elsewhere: decode is bandwidth over size, so the same
+0.66 GB/s is far less exotic on a larger file. A 4 GB model on this phone predicts ~4 tok/s
+before anything goes wrong, and the reported 31 tok/s prefill is roughly a third of this
+model's healthy 96 — both consistent with a model several times larger than the one tested
+here. **Which model produced the report is the missing input**, and it is the difference
+between a bug and a phone being asked for more than it has.

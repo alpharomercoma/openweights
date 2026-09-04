@@ -144,6 +144,23 @@ data class ModelLoadParams(
      * A quarter of a second against 1.27 GB is not a close call on a phone. It also
      * changes the failure mode on a small device from thrashing on evicted pages to
      * needing less memory in the first place.
+     *
+     * **Two corrections to that table (2026-09-04), neither of which changes the choice.**
+     *
+     * Reading is not one copy in physical memory, it is one copy *charged to this
+     * process*. llama.cpp reads through buffered stdio, so the kernel also holds the whole
+     * GGUF in page cache, and page cache is not counted in RSS or PSS — so part of the
+     * 1.27 GB the read path looked lighter by is accounting rather than memory. Dropping
+     * that copy with `posix_fadvise(POSIX_FADV_DONTNEED)` after the load was tried and
+     * **does not work**: models live on emulated external storage, and on the test phone
+     * the file stayed fully cached across a load (system `Cached` moved 4 MB, not 663).
+     * It is a clean, reclaimable copy, which is the first thing the kernel drops under
+     * pressure, so it is charged here as a caveat on the table rather than a problem.
+     *
+     * The second is why mapping would not help even so: the tensors the CPU actually
+     * computes against are anonymous either way, because KleidiAI repacks into its own
+     * buffer whichever mode the source came from. Mapping adds a clean copy on top; it
+     * does not make the hot weights droppable. See docs/research/first-turn-latency.md.
      */
     val useMmap: Boolean = false,
     /**

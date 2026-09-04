@@ -457,7 +457,7 @@ class ToolChoiceBenchmark {
         )
     }
 
-    private fun catalogue(): List<ToolDefinition> = registry().definitions
+    internal fun catalogue(): List<ToolDefinition> = registry().definitions
 
     /**
      * TurnRunner's `describing`, which it keeps private: the tools written into the system
@@ -481,6 +481,16 @@ class ToolChoiceBenchmark {
      */
     internal companion object {
         const val TAG = "OpenWeightsChoice"
+
+        /**
+         * The same catalogue, for the probes that measure the prompt around it.
+         *
+         * Shared rather than copied because the tools the model can see change what it
+         * does with a greeting as much as the date exchange does, so a probe holding its
+         * own list would be measuring a prompt this app never sends.
+         */
+        fun probeCatalogue(): List<ToolDefinition> = ToolChoiceBenchmark().catalogue()
+
         const val CONTEXT = 4096
 
         /**

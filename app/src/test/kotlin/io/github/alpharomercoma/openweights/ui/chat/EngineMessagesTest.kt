@@ -70,6 +70,46 @@ class EngineMessagesTest {
         assertThat(firstUser.text).contains("Today is")
     }
 
+    @Test
+    fun `the date is acknowledged with a promise to leave it alone`() {
+        val state = ChatUiState(
+            transcript = listOf(TranscriptEntry(id = 0, role = ChatRole.USER, text = "hi")),
+        )
+
+        val messages = state.engineMessages()
+        val day = messages.indexOfFirst { it.text.startsWith("Today is") }
+
+        // The bug this shape exists for is not the date being recited: it is the date
+        // being answered instead of the person. The date is the nearest user turn and a
+        // greeting has nothing in it to outweigh that, so "hey" came back as "it seems
+        // like you just mentioned today's date". The promise, in the model's own mouth,
+        // took that from 3 of 16 greetings to none on the pass that writes the reply by
+        // default. The same words as a user instruction break the date question instead,
+        // which is why this asserts whose turn carries them.
+        //
+        // eval/date_structure_eval.py is the measurement and PromptDay.exchange the
+        // reasoning. Changing a word here means running that again.
+        assertThat(day).isAtLeast(0)
+        assertThat(messages[day].role).isEqualTo(ChatRole.USER)
+        assertThat(messages[day + 1].role).isEqualTo(ChatRole.ASSISTANT)
+        assertThat(messages[day + 1].text).isEqualTo(PromptDay.DATE_ACK)
+        assertThat(PromptDay.DATE_ACK).contains("will not bring it up")
+        // And the date itself stays in the user's turn, where it is answerable.
+        assertThat(messages[day].text).doesNotContain("bring it up")
+
+        // The larger half: something ordinary between the date and the question, so the
+        // date is not the nearest thing the user said. Nothing in it is about the date,
+        // which is exactly why it works.
+        assertThat(messages[day + 2].role).isEqualTo(ChatRole.USER)
+        assertThat(messages[day + 2].text).isEqualTo(PromptDay.HANDOVER)
+        assertThat(messages[day + 3].role).isEqualTo(ChatRole.ASSISTANT)
+        assertThat(messages[day + 3].text).isEqualTo(PromptDay.HANDOVER_ACK)
+        assertThat(PromptDay.HANDOVER).doesNotContain("date")
+        // The user's own question comes after all four, and it is still a user turn.
+        assertThat(messages[day + 4].role).isEqualTo(ChatRole.USER)
+        assertThat(messages[day + 4].text).isEqualTo("hi")
+    }
+
     /**
      * A research step's own turn against the configured default: the reported failure was
      * the model answering "I don't have the current information stored" instead of
@@ -122,10 +162,10 @@ class EngineMessagesTest {
     fun `without compaction every turn is sent`() {
         val state = ChatUiState(transcript = transcript(4))
 
-        // Four turns, the date exchange every conversation opens with, and the one
-        // instruction every conversation opens with: how long an answer should be. Tools
-        // are not in it, because this state has none.
-        assertThat(state.engineMessages()).hasSize(7)
+        // Four turns, the four-message exchange every conversation opens with, and the
+        // one instruction every conversation opens with: how long an answer should be.
+        // Tools are not in it, because this state has none.
+        assertThat(state.engineMessages()).hasSize(9)
     }
 
     @Test
@@ -175,11 +215,11 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // The instructions, the date exchange, the recap exchange that stands in for what
-        // was folded, and the two turns after the fold. The folded turns themselves appear
-        // nowhere.
-        assertThat(messages).hasSize(7)
-        assertThat(messages.drop(5).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
+        // The instructions, the four-message date exchange, the recap exchange that
+        // stands in for what was folded, and the two turns after the fold. The folded
+        // turns themselves appear nowhere.
+        assertThat(messages).hasSize(9)
+        assertThat(messages.drop(7).map { it.text }).containsExactly("turn 4", "turn 5").inOrder()
         assertThat(messages.map { it.text }.none { it.contains("turn 0") }).isTrue()
     }
 
@@ -202,8 +242,8 @@ class EngineMessagesTest {
         assertThat(messages.first().text).contains("Answer from what you know")
         // The summary is a turn now, and the alternation it has to keep is the whole reason
         // it is a user turn followed by an assistant one rather than a system turn of its
-        // own. It follows the date exchange, which opens every conversation.
-        assertThat(messages[3].text).contains("summary")
+        // own. It follows the four-message date exchange, which opens every conversation.
+        assertThat(messages[5].text).contains("summary")
         assertAlternates(messages)
     }
 
@@ -411,8 +451,9 @@ class EngineMessagesTest {
 
         val messages = state.engineMessages()
 
-        // Two user turns: the date exchange's, and the question carrying the notes.
-        assertThat(messages.count { it.role == ChatRole.USER }).isEqualTo(2)
+        // Three user turns: the date, the handover, and the question carrying the notes.
+        // See PromptDay.exchange for why the handover is there.
+        assertThat(messages.count { it.role == ChatRole.USER }).isEqualTo(3)
         assertThat(messages.last().role).isEqualTo(ChatRole.USER)
         assertThat(messages.last().text).contains("Vaughan")
     }

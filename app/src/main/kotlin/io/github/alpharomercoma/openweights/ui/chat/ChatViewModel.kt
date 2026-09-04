@@ -1026,15 +1026,29 @@ class ChatViewModel @Inject constructor(
         // exactly as readily as it fails the weights. Outside, they were two unwatched reads
         // in the one path a cold start always takes. The settings come back out because the
         // screen shows them, and they are only known once the read has succeeded.
-        runCatching {
+        try {
             val settings = runtime.settingsFor(modelFile.name)
             val projector = runtime.projectorFor(modelFile)
             forgetLoadedModel(replacing = modelFile)
             runtime.load(modelFile, loadParamsFor(modelFile, settings, contextLength), projector)
-            settings
-        }.onSuccess { preferences ->
-            finishLoad(modelFile, preferences, keepConversation)
-        }.onFailure { failure ->
+            // Inside the same guard as the load, and it was not. `Result.onSuccess` does not
+            // fold a throw of its own back into the Result, so nothing [finishLoad] raised
+            // ever reached the failure branch below: it left `viewModelScope.launch`, where
+            // a root coroutine hands what it cannot catch to Android's uncaught handler.
+            // Two things in there can raise, the native context reset and a database
+            // write, and neither is exotic on a phone whose storage is full.
+            finishLoad(modelFile, settings, keepConversation)
+        } catch (cancellation: CancellationException) {
+            // A load the user superseded is not a load that failed, and must not be reported
+            // as one. Passed on so the job ends cancelled, which the `runCatching` this
+            // replaces did not do.
+            throw cancellation
+        } catch (@Suppress("TooGenericExceptionCaught") failure: Throwable) {
+            // Throwable and not Exception, because the `runCatching` this replaces caught
+            // Throwable: mapping several gigabytes of weights is the one thing here that
+            // credibly ends in an OutOfMemoryError, and a linker that cannot find the
+            // native library raises an Error too.
+            //
             // The name was kept across the swap for the top bar. A load that failed holds no
             // weights, so it goes here rather than staying to describe nothing.
             _uiState.update {
@@ -1076,7 +1090,12 @@ class ChatViewModel @Inject constructor(
 
         if (keepConversation) {
             conversationId?.let { id ->
-                writer.inOrder { setModel(id, modelFile.nameWithoutExtension) }
+                // Reported rather than raised. The weights are mapped and the screen has
+                // already said so; a database that will not take this row is worth a
+                // sentence, not the model the user just waited twenty seconds for. Raised,
+                // it used to leave the load looking like it had failed while the engine
+                // held a perfectly good model.
+                reportingFailure { writer.inOrder { setModel(id, modelFile.nameWithoutExtension) } }
             }
         }
 
@@ -3418,26 +3437,90 @@ internal object PromptDay {
     }
 
     /**
-     * The day as the conversation carries it: the plain fact, plainly acknowledged.
+     * The day as the conversation carries it: the fact, and a commitment to leave it alone.
      *
-     * The 33-case routing matrix (eval/routing_matrix.py, temp 0, both LFM quants) retired
-     * two cleverer wordings: "(For context: … Only mention it if asked.)" broke the date
-     * question itself — 0/1 everywhere, read_memory called for "what is today's date" —
-     * and "(For context: …)" with this ack did the same. This pair answers the date 1/1 on
-     * every model measured and drew the fewest chit-chat tool calls of any ack at the
-     * shipped temperature (1/30). Known cost, accepted: greetings echo the date back ~8/30
-     * at 0.8 — cosmetics, priced against wrong answers. The exchange also cannot be
-     * dropped: with no exchange at all, QAD's trivia fell 6/6→4/6 and Q4_0 lost the
-     * multi-turn rows — two turns of ordinary conversation are a worked example the
-     * routing visibly leans on.
+     * The commitment is load bearing and it has to be in the assistant's mouth. As part of
+     * the user's line, "only mention it if asked" broke the date question itself on every
+     * model measured (2026-09-01: `read_memory` called for "what is today's date"). As
+     * something the model has already said, the same constraint is one it keeps.
      *
-     * A function of its own so the on-device routing benchmark sends these bytes rather
-     * than a copy of them; where they go in the prompt is [withConversationDay]'s to say.
+     * What it fixes is not the date being recited, which would be cosmetic. The date was
+     * the nearest user turn, and a greeting carries nothing to outweigh it, so the reply
+     * answered the date instead of the person:
+     *
+     *     hey → "It seems like you just mentioned today's date. Could you please tell me
+     *            more about what you'd like to discuss?"
+     *
+     * Two changes, because one was not enough and each fixes a different half. The ack
+     * carries the constraint, in the model's own mouth. And an ordinary exchange follows,
+     * so the date is no longer the last thing said before the question.
+     *
+     * Measured by `DateStructureProbe` on the phone, sixteen things a person says when
+     * they mean nothing in particular, on the pass that writes the reply when tools are
+     * on — which is the default, and which no host harness reproduces, because it runs
+     * greedily and under [TOOL_PASS_REASONING_BUDGET]:
+     *
+     * | shape                        | LFM2.5-1.2B | Qwen3-1.7B | date answered |
+     * | ---                          | ---:        | ---:       | ---           |
+     * | bare ack (before)            | 6/16        | 1/16       | yes           |
+     * | scoped ack alone             | 3/16        | 1/16       | yes           |
+     * | bare ack, spaced             | 1/16        | 0/16       | yes           |
+     * | **both, as shipped**         | **0/16**    | **0/16**   | yes           |
+     * | no date at all               | 0/16        | 0/16       | **no**        |
+     *
+     * The last row is why this cannot simply be deleted: with no exchange, "what is
+     * today's date?" drew `run_script` on one model and `web_search` on the other. Two
+     * turns of ordinary conversation are a worked example the routing leans on, and the
+     * date is a fact the model cannot otherwise have.
+     *
+     * A host server disagrees with two rows of that table, and the phone wins. On
+     * `eval/date_structure_eval.py` the spaced shapes lose the date question outright,
+     * because that harness sends the sixteen-tool catalogue from `prompt_dump.json` and a
+     * real turn sends whatever the user switched on. The host suite ranks wordings
+     * cheaply; it does not decide them.
+     *
+     * Also measured and refused: the date in the instructions, which answers greetings
+     * and loses the date question, because the template renders the whole tool block
+     * behind the system message and the fact ends up too far from the question to be
+     * recalled; and the date in the assistant's own mouth as an answer already given,
+     * which was the worst of everything tried at 86 of 128.
+     *
+     * A function of its own so the on-device probes send these bytes rather than a copy
+     * of them; where they go in the prompt is [withConversationDay]'s to say.
      */
     fun exchange(): List<ChatMessage> = listOf(
         ChatMessage.text(ChatRole.USER, "Today is $pinned."),
-        ChatMessage.text(ChatRole.ASSISTANT, "Understood, I have that."),
+        ChatMessage.text(ChatRole.ASSISTANT, DATE_ACK),
+        ChatMessage.text(ChatRole.USER, HANDOVER),
+        ChatMessage.text(ChatRole.ASSISTANT, HANDOVER_ACK),
     )
+
+    /**
+     * What the model says back about the date, and it is exactly these bytes.
+     *
+     * Named because the wording is a measured result rather than a phrasing: the table in
+     * [exchange] is what it costs to change a word of it, and the fold recap's identical
+     * opening is deliberately a different constant, since that one acknowledges a summary
+     * and has no reason to promise silence about it.
+     */
+    const val DATE_ACK: String =
+        "Understood, I have that. I will not bring it up unless a question depends on it."
+
+    /**
+     * The turn that closes the date and opens the floor, and it does the larger half.
+     *
+     * Nothing here is about the date, which is the point: what makes a greeting come back
+     * as a remark about the date is that the date is the nearest thing the user said, and
+     * a greeting has nothing in it to outweigh that. Anything ordinary in between takes
+     * the adjacency away. Scored on the phone at 6/16 to 1/16 on LFM2.5-1.2B on its own,
+     * and to 0/16 with the ack above.
+     *
+     * Constant text, sitting immediately behind the head, so it is warmed once with the
+     * prefix and costs nothing per turn. The whole exchange is about fifteen tokens.
+     */
+    const val HANDOVER: String = "Ready when you are."
+
+    const val HANDOVER_ACK: String = "Ready."
 }
 
 /** Warm-state files kept for models other than the loaded one. */

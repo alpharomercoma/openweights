@@ -268,6 +268,10 @@
     <string name="search_results_count_detail">検索が持ち帰る量です。少ないほど速く、質問が視界に残ります。情報源が食い違うときは多いほうが役に立ちます。</string>
     <string name="search_results_count_value">%1$d 件</string>
     <string name="search_results_count_one">1 件</string>
+    <string name="image_detail">画像の精細さ</string>
+    <string name="image_detail_explanation">モデルが読む前の画像の大きさです。小さいほど大幅に速く、見出しは読めます。大きいほど時間がかかり、細かい文字まで読めます。これから追加する画像に適用されます。</string>
+    <string name="image_detail_pixels">長辺 %1$d px</string>
+    <string name="image_detail_footnote">1024 px を超えると画像はタイルに分割されます。最小の文字まで読めますが、数倍の時間がかかります</string>
     <string name="stat_time_to_first_token">最初のトークンまで</string>
     <string name="stat_tokens">トークン</string>
     <string name="stat_total_time">合計</string>

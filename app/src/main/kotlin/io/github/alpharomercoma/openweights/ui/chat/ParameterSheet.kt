@@ -122,6 +122,14 @@ fun ParameterSheet(
     offloadBuffers: List<Pair<String, Int>> = emptyList(),
     /** The window the model is actually running with, shown while the setting is automatic. */
     loadedContext: Int = ModelLoadParams.DEFAULT_CONTEXT_LENGTH,
+    /**
+     * Whether the loaded model can read a picture at all.
+     *
+     * The image budget is drawn only when it is true. A control that governs something the
+     * loaded model cannot do is worse than a missing one: it is a promise that the app will
+     * look at an image, on a model that will refuse the attachment.
+     */
+    readsImages: Boolean = false,
     onSave: (ModelPreferences) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
@@ -242,6 +250,32 @@ fun ParameterSheet(
                     valueRange = contextRange(loadedContext),
                     steps = ModelLoadParams.CONTEXT_STEPS,
                 )
+            }
+
+            if (readsImages) {
+                Setting(
+                    label = stringResource(R.string.image_detail),
+                    // Said as a size and as a consequence. "Tokens" is what the industry
+                    // calls this control and it is the wrong unit here: on the projectors
+                    // this app recommends a smaller token budget makes a turn slower, by
+                    // making the picture get cut into tiles. What actually moves the time
+                    // is how large the picture is, so that is what the slider moves.
+                    explanation = stringResource(R.string.image_detail_explanation),
+                    value = stringResource(R.string.image_detail_pixels, draft.imageEdgePixels),
+                    footnote = stringResource(R.string.image_detail_footnote)
+                        .takeIf { draft.imageEdgePixels > ModelPreferences.DEFAULT_IMAGE_EDGE },
+                ) {
+                    StepSlider(
+                        value = draft.imageEdgePixels.toFloat(),
+                        onValueChange = {
+                            draft = draft.copy(
+                                imageEdgePixels = it.roundToInt().nearestImageEdge(),
+                            )
+                        },
+                        valueRange = IMAGE_EDGE_RANGE,
+                        steps = ModelPreferences.IMAGE_EDGE_STEPS.size - 2,
+                    )
+                }
             }
 
             Setting(
@@ -598,6 +632,20 @@ private const val MIN_TOP_P = 0.1f
 private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
+
+/** The travel of the image slider, from the smallest size offered to the largest. */
+private val IMAGE_EDGE_RANGE =
+    ModelPreferences.MIN_IMAGE_EDGE.toFloat()..ModelPreferences.MAX_IMAGE_EDGE.toFloat()
+
+/**
+ * The stop nearest a dragged position, so the slider can only produce a measured size.
+ *
+ * The stops are not evenly spaced and are not meant to be: they are the six sizes that
+ * behaved differently on the phone. Between 1024 and 1100 pixels there is nothing to
+ * choose, and a continuous slider would spend most of its travel there.
+ */
+private fun Int.nearestImageEdge(): Int =
+    ModelPreferences.IMAGE_EDGE_STEPS.minBy { step -> kotlin.math.abs(step - this) }
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

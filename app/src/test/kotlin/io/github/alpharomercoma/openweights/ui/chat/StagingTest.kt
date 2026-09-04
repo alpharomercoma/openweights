@@ -20,6 +20,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import org.junit.Test
@@ -38,7 +39,8 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class StagingTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val staging = Staging(AttachmentStore(context), context)
+    private val staging =
+        Staging(AttachmentStore(context, ModelPreferencesRepository(context)), context)
     private val picture = MessagePart.File("/data/attachments/1.png", "image/png")
     private val recording = MessagePart.File("/data/attachments/1.m4a", "audio/mp4")
 

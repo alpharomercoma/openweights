@@ -272,6 +272,10 @@
     <string name="search_results_count_detail">Kung gaano karami ang ibinabalik ng paghahanap. Mas kaunti ay mas mabilis at nananatiling nakikita ang tanong; mas marami ay sulit kapag hindi magkatugma ang mga pinagkunan.</string>
     <string name="search_results_count_value">%1$d na resulta</string>
     <string name="search_results_count_one">1 resulta</string>
+    <string name="image_detail">Detalye ng larawan</string>
+    <string name="image_detail_explanation">Gaano kalaki ang larawan bago ito basahin ng modelo. Mas maliit ay mas mabilis at nababasa pa rin ang malalaking teksto; mas malaki ay mas matagal at nababasa ang maliliit na letra. Sa mga larawang idadagdag mo mula ngayon.</string>
+    <string name="image_detail_pixels">Pinakamahabang gilid %1$d px</string>
+    <string name="image_detail_footnote">Higit sa 1024 px, hinahati sa tiles ang larawan: nababasa ang pinakamaliit na letra ngunit ilang beses na mas matagal</string>
     <string name="stat_time_to_first_token">hanggang unang token</string>
     <string name="stat_tokens">mga token</string>
     <string name="stat_total_time">kabuuan</string>

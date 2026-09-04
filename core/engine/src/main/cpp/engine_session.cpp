@@ -664,6 +664,7 @@ Session * Session::load(
     bool op_offload,
     bool kv_quantized,
     bool speculate,
+    int32_t image_tokens,
     std::string & error) {
     init_backend();
 
@@ -749,6 +750,17 @@ Session * Session::load(
         mtmd_params.use_gpu = n_gpu_layers > 0;
         mtmd_params.n_threads = n_threads;
         mtmd_params.print_timings = false;
+        // How much of an image the model is given, when the caller has said. Both ends
+        // together: clip resizes a picture to somewhere between these two by its aspect
+        // ratio, and it refuses the projector outright when the maximum is below the
+        // minimum, which a ceiling set on its own below a model's own floor would be.
+        // Zero leaves both at -1, which is libmtmd's "read it from the metadata", and is
+        // what the app sends: see ModelLoadParams.imageTokens for the measurement behind
+        // that, and for why the size of the picture is the control instead.
+        if (image_tokens > 0) {
+            mtmd_params.image_min_tokens = image_tokens;
+            mtmd_params.image_max_tokens = image_tokens;
+        }
 
         session->mtmd_ = mtmd_init_from_file(mmproj_path.c_str(), model, mtmd_params);
         if (session->mtmd_ == nullptr) {

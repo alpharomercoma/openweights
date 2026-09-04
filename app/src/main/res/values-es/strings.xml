@@ -285,6 +285,10 @@
     <string name="search_results_count_detail">Cuánto trae una búsqueda. Menos es más rápido y deja la pregunta a la vista; más vale la pena cuando las fuentes no coinciden.</string>
     <string name="search_results_count_value">%1$d resultados</string>
     <string name="search_results_count_one">1 resultado</string>
+    <string name="image_detail">Detalle de imagen</string>
+    <string name="image_detail_explanation">El tamaño de una imagen antes de que el modelo la lea. Más pequeña es mucho más rápida y aún lee los titulares; más grande tarda más y puede leer la letra pequeña. Se aplica a las imágenes que añadas a partir de ahora.</string>
+    <string name="image_detail_pixels">Lado más largo %1$d px</string>
+    <string name="image_detail_footnote">Por encima de 1024 px la imagen se corta en mosaicos, lo que lee la letra más pequeña y tarda varias veces más</string>
     <string name="stat_time_to_first_token">hasta el primer token</string>
     <string name="stat_tokens">tokens</string>
     <string name="stat_total_time">en total</string>

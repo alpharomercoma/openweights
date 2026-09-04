@@ -23,12 +23,16 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.FileProvider
 import androidx.core.graphics.scale
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
+import io.github.alpharomercoma.openweights.core.data.ModelPreferences
+import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FilterInputStream
@@ -78,7 +82,19 @@ internal fun Reader.readDocumentWindow(limit: Int): String {
  * local-only app should have.
  */
 @Singleton
-class AttachmentStore @Inject constructor(@param:ApplicationContext private val context: Context) {
+class AttachmentStore @Inject constructor(
+    @param:ApplicationContext private val context: Context,
+    /**
+     * Read for one number: how large a picture may be when it reaches the model.
+     *
+     * Read here rather than at the model, and read once per attachment rather than per
+     * turn, because the shrinking happens on the way in: the file that lands in storage is
+     * the file every later turn sends, so the setting in force when a picture was attached
+     * is the one it keeps. Changing the setting affects the next attachment, not the ones
+     * already in the conversation, which is the same promise the file itself makes.
+     */
+    private val preferences: ModelPreferencesRepository,
+) {
     private val directory: File
         get() = File(context.filesDir, DIRECTORY).apply { mkdirs() }
 
@@ -148,7 +164,7 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
     }
 
     /** One picture, sound file or document, copied in under the same byte ceiling. */
-    private fun storeOneFile(
+    private suspend fun storeOneFile(
         uri: Uri,
         mediaType: String,
         kind: MediaKind,
@@ -168,6 +184,22 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         }
         return listOf(MessagePart.File(target.absolutePath, mediaType, displayName)).stored()
     }
+
+    /**
+     * The longest edge a picture may keep, clamped to what the app will actually send.
+     *
+     * A settings file is an ordinary file, and a value out of range in it should shrink a
+     * photograph oddly rather than hand the decoder a zero. Falls back to the default if
+     * the settings cannot be read at all: an unreadable preference must not stop somebody
+     * attaching a picture.
+     */
+    @VisibleForTesting
+    internal suspend fun imageEdge(): Int = runCatching {
+        preferences.shared().first().imageEdgePixels
+    }.getOrNull()?.coerceIn(
+        ModelPreferences.MIN_IMAGE_EDGE,
+        ModelPreferences.MAX_IMAGE_EDGE,
+    ) ?: ModelPreferences.DEFAULT_IMAGE_EDGE
 
     private fun largestAccepted(kind: MediaKind): Long =
         if (kind == MediaKind.VIDEO) MAX_VIDEO_SOURCE_BYTES else MAX_COPIED_ATTACHMENT_BYTES
@@ -350,7 +382,8 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
      * around this size anyway, so the detail being dropped is detail the encoder would have
      * discarded itself.
      */
-    private fun copyImageDownscaled(uri: Uri, target: File): Boolean {
+    private suspend fun copyImageDownscaled(uri: Uri, target: File): Boolean {
+        val edge = imageEdge()
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.bounded(MAX_COPIED_ATTACHMENT_BYTES)?.use {
             BitmapFactory.decodeStream(it, null, bounds)
@@ -358,19 +391,19 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
 
         val longestEdge = max(bounds.outWidth, bounds.outHeight)
         if (longestEdge <= 0) return false
-        if (longestEdge <= MAX_IMAGE_EDGE) return copyVerbatim(uri, target)
+        if (longestEdge <= edge) return copyVerbatim(uri, target)
 
         // inSampleSize halves in powers of two, which is the cheap path in the decoder;
         // the exact size is reached by scaling the result afterwards.
         val options = BitmapFactory.Options().apply {
-            inSampleSize = Integer.highestOneBit(longestEdge / MAX_IMAGE_EDGE)
+            inSampleSize = Integer.highestOneBit(longestEdge / edge)
         }
         val decoded = context.contentResolver.openInputStream(uri)
             ?.bounded(MAX_COPIED_ATTACHMENT_BYTES)
             ?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: return false
 
-        val scale = MAX_IMAGE_EDGE.toFloat() / max(decoded.width, decoded.height)
+        val scale = edge.toFloat() / max(decoded.width, decoded.height)
         val resized = if (scale < 1f) {
             decoded.scale(
                 (decoded.width * scale).roundToInt().coerceAtLeast(1),
@@ -505,8 +538,16 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
         const val FALLBACK_MEDIA_TYPE = "application/octet-stream"
         const val MAX_DOCUMENT_CHARS = 1_000_000
 
-        /** Longest edge in pixels. Above this, prompt processing dominates the reply. */
-        const val MAX_IMAGE_EDGE = 1024
+        /**
+         * Longest edge in pixels for a video frame, which has no setting of its own.
+         *
+         * A sampled frame is one of several sent together, so the arithmetic that sizes a
+         * still picture does not apply: the budget has to cover the whole set. Left at the
+         * measured default rather than following [ModelPreferences.imageEdgePixels], since
+         * somebody raising the detail on a photograph is not asking for six frames of a
+         * video at the same size.
+         */
+        const val MAX_IMAGE_EDGE = ModelPreferences.DEFAULT_IMAGE_EDGE
         const val JPEG_QUALITY = 90
         const val COPY_BUFFER_BYTES = 64 * 1024
         const val MAX_COPIED_ATTACHMENT_BYTES = 128L * 1024 * 1024

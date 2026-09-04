@@ -181,11 +181,33 @@ class ParameterSheetTest {
         compose.onNodeWithText("saved for this model only").assertDoesNotExist()
     }
 
+    @Test
+    fun `a text-only model is not offered an image budget`() {
+        // The control governs how much of a picture the projector is given. On a model with
+        // no projector there is no picture, so the slider would be a promise the next
+        // attachment is going to break.
+        showSheet(readsImages = false)
+
+        compose.onNodeWithText("Image detail").assertDoesNotExist()
+    }
+
+    @Test
+    fun `a model that reads pictures is offered one, at the measured default`() {
+        showSheet(readsImages = true)
+
+        compose.onNodeWithText("Image detail").performScrollTo().assertIsDisplayed()
+        // A size rather than a token count. Tokens is what the industry calls this control
+        // and it runs backwards on the projectors this app recommends: a smaller budget
+        // makes libmtmd tile the picture, which is slower. See docs/research/image-tokens.md.
+        compose.onNodeWithText("Longest edge 1024 px").assertIsDisplayed()
+    }
+
     @Suppress("LongParameterList")
     private fun showSheet(
         supportsThinking: Boolean = false,
         hasGpu: Boolean = false,
         outputModality: OutputModality = OutputModality.TEXT,
+        readsImages: Boolean = false,
         onSave: (ModelPreferences) -> Unit = {},
         onReset: () -> Unit = {},
     ) {
@@ -197,6 +219,7 @@ class ParameterSheetTest {
                     supportsThinking = supportsThinking,
                     outputModality = outputModality,
                     hasGpu = hasGpu,
+                    readsImages = readsImages,
                     onSave = onSave,
                     onReset = onReset,
                     onDismiss = {},

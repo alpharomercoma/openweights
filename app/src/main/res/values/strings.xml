@@ -217,6 +217,10 @@
     <string name="storage_on_device">%1$s on this device</string>
     <string name="models_empty">Nothing downloaded yet. Browse models from the name at the top of a chat. Each one says whether it runs on this phone before you download it.</string>
     <string name="download_progress">%1$s of %2$s</string>
+    <string name="image_detail">Image detail</string>
+    <string name="image_detail_explanation">How large a picture is before the model reads it. Smaller is much faster and still reads headings; larger takes longer and can read fine print. Applies to pictures you add from now on.</string>
+    <string name="image_detail_pixels">Longest edge %1$d px</string>
+    <string name="image_detail_footnote">Above 1024 px a picture is cut into tiles, which reads the smallest print and takes several times as long</string>
     <string name="stat_time_to_first_token">to first token</string>
     <string name="stat_tokens">tokens</string>
     <string name="stat_total_time">in total</string>

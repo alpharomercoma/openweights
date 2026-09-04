@@ -104,6 +104,7 @@ class LlamaCppEngine internal constructor(
                     useMmap = params.useMmap,
                     kvCacheQuantized = params.kvCacheQuantized,
                     speculation = params.speculation,
+                    imageTokens = params.imageTokens,
                 )
                 val info = try {
                     readModelInfo(newHandle, modelFile.absolutePath)

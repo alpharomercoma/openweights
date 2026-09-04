@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.model
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,7 +44,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 class CaptureFilesTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val store = AttachmentStore(context)
+    private val store = AttachmentStore(context, ModelPreferencesRepository(context))
     private val captures = File(context.filesDir, "captures")
 
     /** The camera writing its photograph into the file it was handed. */

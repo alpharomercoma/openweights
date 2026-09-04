@@ -214,6 +214,15 @@ public:
         bool op_offload,
         bool kv_quantized,
         bool speculate,
+        /**
+         * Tokens per image, or 0 to leave the projector's metadata in charge.
+         *
+         * Set as both the minimum and the maximum, so a picture costs what was asked for
+         * rather than somewhere between the model's own two numbers. A maximum on its own
+         * below the model's floor makes clip throw while reading the projector, which
+         * would turn a slider into a model that will not load.
+         */
+        int32_t image_tokens,
         std::string & error);
 
     /**

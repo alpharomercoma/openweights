@@ -20,6 +20,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
 import io.github.alpharomercoma.openweights.model.AttachmentStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +46,10 @@ class AttachingTest {
 
     @Test
     fun `a document the provider refuses is reported, not thrown`() = runTest {
-        val refusing = object : Staging(AttachmentStore(context), context) {
+        val refusing = object : Staging(
+            AttachmentStore(context, ModelPreferencesRepository(context)),
+            context,
+        ) {
             override suspend fun document(uri: Uri, budgetChars: Int): Staged =
                 throw SecurityException("Permission Denial: reading the document")
         }

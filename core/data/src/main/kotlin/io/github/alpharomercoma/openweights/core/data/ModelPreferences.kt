@@ -136,6 +136,26 @@ data class ModelPreferences(
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val offload: String = Offload.AUTO.name,
     /**
+     * The longest edge, in pixels, a picture is shrunk to before the model sees it.
+     *
+     * The one control there is over how long an image takes, and it was measured before it
+     * was offered. On LFM2.5-VL-3B on a Snapdragon 8 Gen 3, the same screenshot: at 384 px
+     * the turn takes 5.8 seconds, at 1024 px 13.5 seconds, and sent as the camera took it,
+     * 1080 by 2400, 101 seconds. That last one is not a slope, it is a cliff: past about
+     * twice the projector's own pixel budget libmtmd stops resizing and starts *tiling*,
+     * and every 512-pixel tile is another 256 tokens to encode, prefill and carry in the
+     * cache for the rest of the conversation.
+     *
+     * What it costs is fine print. The probe image carries text at four sizes; 384 and 512
+     * read everything except the smallest line, 768 and above read all of it. So the
+     * default sits where reading stops improving rather than at the top of the range.
+     *
+     * Shared with the other settings rather than kept per model: what it expresses is how
+     * long the user will wait for a picture, which does not change when they switch model.
+     * See `docs/research/image-tokens.md` and `ImageTokenBenchmark`.
+     */
+    val imageEdgePixels: Int = DEFAULT_IMAGE_EDGE,
+    /**
      * Which build wrote this file, so a migration can tell what it is looking at.
      *
      * Absent from anything written before automatic context sizing, which decodes as zero and
@@ -205,6 +225,37 @@ data class ModelPreferences(
 
         /** [contextLength] meaning "work it out from the model and the phone". */
         const val AUTOMATIC: Int = 0
+
+        /**
+         * Where an image stops getting more readable, measured rather than argued.
+         *
+         * 1024 was already the hard-coded limit and the number survives becoming a setting,
+         * for a better reason than it was chosen with: 768 and 1024 both land on the
+         * projector's own 256-token ceiling and read the same fine print, and the first
+         * size below that loses a line. Anything above is the tiling cliff.
+         */
+        const val DEFAULT_IMAGE_EDGE: Int = 1024
+
+        /**
+         * The smallest and largest picture the app will send.
+         *
+         * The floor is where a phone screenshot's body text stops being legible at all: at
+         * 384 px a 1080-wide screenshot is at 36% and 32-pixel type is down to 11. The
+         * ceiling is past the tiling threshold on every projector measured, which is the
+         * point of offering it: somebody photographing a page of small print wants the
+         * tiles, and wants to be the one who decided to wait for them.
+         */
+        const val MIN_IMAGE_EDGE: Int = 384
+        const val MAX_IMAGE_EDGE: Int = 2048
+
+        /**
+         * The sizes offered, which are the ones that behave differently.
+         *
+         * Not a continuous range. The cost is quadratic in this number and the projector
+         * quantises it anyway, so between 1024 and 1100 there is nothing to choose; these
+         * are the six that measured differently on the phone.
+         */
+        val IMAGE_EDGE_STEPS: List<Int> = listOf(384, 512, 768, 1024, 1536, 2048)
 
         /**
          * When to look something up.
@@ -518,6 +569,17 @@ class ModelPreferencesRepository @Inject constructor(
         }
 
     suspend fun current(modelName: String): ModelPreferences = observe(modelName).first()
+
+    /**
+     * The settings that are the same whichever model is loaded, for a caller with no model.
+     *
+     * Everything here is shared except the context window and the offload target, and a
+     * caller that wants neither of those has no business naming a model to get at the rest.
+     * The attachment store is the case this exists for: it shrinks a picture on the way in,
+     * before anyone has said which model will be asked about it, and possibly while none is
+     * loaded at all.
+     */
+    fun shared(): Flow<ModelPreferences> = observe("")
 
     /**
      * Writes the shared settings, and the two that belong to this model, in one edit.

@@ -203,9 +203,33 @@ data class ModelLoadParams(
      * docs/research/qa-sweep-2026-09-02.md.
      */
     val speculation: Boolean = false,
+    /**
+     * How many tokens one picture is turned into, or [AUTOMATIC_IMAGE_TOKENS] for whatever
+     * the projector's own metadata asks for.
+     *
+     * Automatic in the app, and measured before it was left that way. libmtmd exposes a
+     * floor and a ceiling on how much of an image the vision transformer is given, and this
+     * sets both at once, which is what makes it a budget rather than a cap: a ceiling alone
+     * leaves a small picture costing whatever the metadata's floor said, and a ceiling below
+     * the model's own floor makes clip refuse the projector outright rather than clamp it.
+     *
+     * The reason it is not the app's speed control is that on the projector families this
+     * app recommends, lowering it makes a turn *slower*. LFM2 tiles an image whose pixel
+     * count is more than twice its budget, and each 512-pixel tile is a flat 256 tokens, so
+     * asking for a smaller budget asks for more tiles. Measured on a Snapdragon 8 Gen 3
+     * against a 461 by 1024 screenshot: automatic, 280 prompt tokens and 8.5 seconds; the
+     * same picture at a budget of 128, 677 tokens and 32.8 seconds. What the app moves
+     * instead is `ModelPreferences.imageEdgePixels`, the size of the picture itself.
+     *
+     * Kept, and exercised, because it is the knob for the other half of the trade and the
+     * only way to reproduce that finding: see `ImageTokenBenchmark` and
+     * `docs/research/image-tokens.md`.
+     */
+    val imageTokens: Int = AUTOMATIC_IMAGE_TOKENS,
 ) {
     init {
         require(contextLength > 0) { "contextLength must be > 0" }
+        require(imageTokens >= 0) { "imageTokens must be >= 0" }
         require(threadCount == null || threadCount > 0) { "threadCount must be > 0" }
         require(batchThreadCount == null || batchThreadCount > 0) {
             "batchThreadCount must be > 0"
@@ -230,5 +254,12 @@ data class ModelLoadParams(
 
         /** Slider stops between the two, giving roughly 1k granularity. */
         const val CONTEXT_STEPS = 30
+
+        /** Leaves the projector's own metadata in charge. See [imageTokens]. */
+        const val AUTOMATIC_IMAGE_TOKENS = 0
+
+        /** The range `ImageTokenBenchmark` sweeps. See [imageTokens]. */
+        const val MIN_IMAGE_TOKENS = 16
+        const val MAX_IMAGE_TOKENS = 1024
     }
 }

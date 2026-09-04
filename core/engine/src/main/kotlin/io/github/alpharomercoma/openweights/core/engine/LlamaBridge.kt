@@ -66,6 +66,14 @@ internal class LlamaBridge {
         kvCacheQuantized: Boolean,
         /** Draft-free n-gram speculation on the decode loop. See [ModelLoadParams]. */
         speculation: Boolean,
+        /**
+         * Tokens one picture is worth, or 0 for the projector's own metadata.
+         *
+         * Sent to libmtmd as both the minimum and the maximum. Ignored outright when there
+         * is no projector, and ignored by projectors whose resolution is fixed at export.
+         * See [ModelLoadParams.imageTokens].
+         */
+        imageTokens: Int,
     ): Long
 
     external fun nativeFreeModel(handle: Long)

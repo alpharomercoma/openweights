@@ -161,7 +161,10 @@ abstract class ChatFixture {
                 windows = ContextWindows(FitEstimator(), DeviceProfiler(context)),
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
-            staging = Staging(AttachmentStore(context), context),
+            staging = Staging(
+                AttachmentStore(context, ModelPreferencesRepository(context)),
+                context,
+            ),
             writer = writer,
             filing = filing,
             archive = ArchivedConversations(database),

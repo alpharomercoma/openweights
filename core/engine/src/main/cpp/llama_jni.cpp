@@ -255,14 +255,15 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeLoadMode
     jboolean use_mmap,
     jboolean op_offload,
     jboolean kv_quantized,
-    jboolean speculate) try {
+    jboolean speculate,
+    jint image_tokens) try {
     std::string error;
     Session * session = Session::load(
         to_utf8(env, model_path),
         mmproj_path == nullptr ? std::string() : to_utf8(env, mmproj_path),
         context_length, thread_count, batch_thread_count,
         gpu_layers, use_mmap == JNI_TRUE, op_offload == JNI_TRUE,
-        kv_quantized == JNI_TRUE, speculate == JNI_TRUE, error);
+        kv_quantized == JNI_TRUE, speculate == JNI_TRUE, image_tokens, error);
     if (session == nullptr) {
         throw_engine_exception(env, error);
         return 0;

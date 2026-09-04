@@ -456,6 +456,38 @@ private:
     llama_context * ctx_   = nullptr;
 
     /**
+     * The worker threads, kept alive between graphs instead of made for each one.
+     *
+     * ggml creates a *disposable* threadpool inside every `ggml_graph_compute` when the
+     * context has none attached, and frees it on the way out. Prefill runs one graph per
+     * 512-token batch, so it pays that once for hundreds of tokens. Decode runs one graph
+     * per token, so it pays it for every single one: measured on the phone, the process
+     * thread count sat at a flat 61 while idle and oscillated between 62 and 70
+     * throughout a reply.
+     *
+     * The cost is not the `pthread_create` itself. It is that a thread born a moment ago
+     * has no scheduler history — its utilization estimate starts at zero, so EAS places
+     * it on a little core and neither migrates it nor raises the frequency until it has
+     * run long enough to be noticed, which a thread that lives for one token never does.
+     * That is why decode collapses further than prefill under load, and why the big cores
+     * were measured at 1.9-2.1 GHz against the 3.3 and 3.73 GHz they are capable of.
+     *
+     * One pool, sized once to the wider of the two thread counts and never rebuilt: the
+     * CPU backend keeps its own pointer to whatever it was last handed, so freeing a pool
+     * while the context is alive is a use-after-free. See `attach_threadpools`.
+     */
+    ggml_threadpool_t threadpool_ = nullptr;
+
+    /** How wide it was built, which is the widest either half will ever ask for. */
+    int32_t pool_threads_ = 0;
+
+    /** Builds it once, wide enough for both halves, and hands it to the context. */
+    void attach_threadpools(int32_t n_threads, int32_t n_threads_batch);
+
+    /** Frees it. Only safe once the context that was given it is gone. */
+    void free_threadpools();
+
+    /**
      * The model's chat templates, parsed once at load.
      *
      * Held as an opaque pointer so this header does not drag llama.cpp's common layer

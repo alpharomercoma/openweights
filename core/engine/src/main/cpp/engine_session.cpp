@@ -41,6 +41,7 @@
 #include <memory>
 #include <new>
 #include <sys/stat.h>
+#include <unistd.h>
 
 namespace {
 /**
@@ -551,6 +552,9 @@ Session::~Session() {
     if (ctx_ != nullptr) {
         llama_free(ctx_);
     }
+    // After the context, never before: the CPU backend holds the same pointer and would
+    // reach for it on any graph that outlived the free.
+    free_threadpools();
     if (model_ != nullptr) {
         llama_model_free(model_);
     }
@@ -593,6 +597,60 @@ std::string describe_load_failure(const std::string & reported) {
         return "this model could not be loaded: " + reported;
     }
     return "failed to load this model";
+}
+
+/**
+ * What the kernel currently thinks of this process's memory, in one log line.
+ *
+ * There is a whole class of "the phone got slow" report that is really "the weights are
+ * in zram", and it is invisible from inside: throughput drops by a factor of twenty and
+ * every counter the app owns still reads normal.
+ *
+ * Three numbers make that diagnosable rather than guessable, and the third is the one
+ * that decides it. `Swap` says how much of this process is compressed away. Major faults
+ * say how often it had to be brought back — a swap-in is a major fault, and so is a read
+ * from a file whose pages were dropped. And CPU time against wall time says which kind
+ * of slow this is at all: a decode that spends its wall clock on-CPU is being throttled
+ * or misplaced on the wrong cores, while one that spends it off-CPU is waiting for
+ * memory it does not have. A single sample cannot tell the difference; two around a
+ * turn can, which is why every field here is a running total meant to be differenced.
+ *
+ * Logged rather than surfaced. It is a diagnosis aid for a logcat, not a statistic
+ * anybody should have to read to use the app.
+ */
+static void log_memory_state(const char * when) {
+    long rss = -1, pss = -1, swap = -1;
+    if (FILE * rollup = fopen("/proc/self/smaps_rollup", "r")) {
+        char line[256];
+        while (fgets(line, sizeof(line), rollup) != nullptr) {
+            long value = 0;
+            if (rss < 0 && sscanf(line, "Rss: %ld kB", &value) == 1) rss = value;
+            else if (pss < 0 && sscanf(line, "Pss: %ld kB", &value) == 1) pss = value;
+            else if (swap < 0 && sscanf(line, "Swap: %ld kB", &value) == 1) swap = value;
+        }
+        fclose(rollup);
+    }
+
+    // Fields 10 and 12 of /proc/self/stat are minflt and majflt, and 14 and 15 are the
+    // process's user and system jiffies. The comm field at 2 may itself contain spaces
+    // and brackets, so the scan starts after the last ')' rather than at the beginning.
+    unsigned long minflt = 0, majflt = 0, utime = 0, stime = 0;
+    if (FILE * stat_file = fopen("/proc/self/stat", "r")) {
+        char buffer[1024];
+        const size_t length = fread(buffer, 1, sizeof(buffer) - 1, stat_file);
+        fclose(stat_file);
+        buffer[length] = '\0';
+        if (const char * after_comm = strrchr(buffer, ')')) {
+            sscanf(after_comm + 1,
+                   " %*c %*d %*d %*d %*d %*d %*u %lu %*lu %lu %*lu %lu %lu",
+                   &minflt, &majflt, &utime, &stime);
+        }
+    }
+    const long ticks = sysconf(_SC_CLK_TCK) > 0 ? sysconf(_SC_CLK_TCK) : 100;
+
+    LOGI("mem: %s rss %ld MB, pss %ld MB, swap %ld MB, majflt %lu, minflt %lu, cpu %lld ms",
+         when, rss / 1024, pss / 1024, swap / 1024, majflt, minflt,
+         static_cast<long long>((utime + stime) * 1000 / ticks));
 }
 
 Session * Session::load(
@@ -671,6 +729,9 @@ Session * Session::load(
         return nullptr;
     }
     session->ctx_ = ctx;
+    // Before anything computes, so the load-time warm already runs on workers that live
+    // longer than one graph. A thread re-plan later rebuilds them for its own counts.
+    session->attach_threadpools(n_threads, n_threads_batch);
     // Stop must mean now. The cooperative checks between batches and between tokens give
     // Stop a worst-case latency of one whole prefill batch - several seconds of a long
     // prompt on a phone - and the user reads that as the button not working. ggml polls
@@ -706,10 +767,105 @@ Session * Session::load(
         error = std::string("this model's chat template could not be read: ") + failure.what();
         return nullptr;
     }
+    log_memory_state("after load");
     return session.release();
 }
 
+
+/**
+ * The two entry points ggml only publishes through the backend registry.
+ *
+ * `ggml_threadpool_new` and `_free` belong to whichever CPU backend was loaded, so they
+ * are fetched by name rather than linked. Resolved once: the registry lookup is a string
+ * compare over a table and this is on the load path, but there is no reason to repeat it.
+ */
+struct threadpool_api {
+    decltype(ggml_threadpool_new)  * create = nullptr;
+    decltype(ggml_threadpool_free) * destroy = nullptr;
+};
+
+static const threadpool_api & resolve_threadpool_api() {
+    static const threadpool_api api = [] {
+        threadpool_api resolved;
+        ggml_backend_dev_t cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+        if (cpu == nullptr) return resolved;
+        ggml_backend_reg_t reg = ggml_backend_dev_backend_reg(cpu);
+        if (reg == nullptr) return resolved;
+        resolved.create = reinterpret_cast<decltype(ggml_threadpool_new) *>(
+            ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new"));
+        resolved.destroy = reinterpret_cast<decltype(ggml_threadpool_free) *>(
+            ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free"));
+        return resolved;
+    }();
+    return api;
+}
+
+void Session::free_threadpools() {
+    const threadpool_api & api = resolve_threadpool_api();
+    if (api.destroy != nullptr && threadpool_ != nullptr) {
+        api.destroy(threadpool_);
+    }
+    threadpool_ = nullptr;
+    pool_threads_ = 0;
+}
+
+/**
+ * Gives the context worker threads that outlive a single graph.
+ *
+ * Without this, ggml makes a pool inside every `ggml_graph_compute` and frees it again on
+ * the way out. Decode is one graph per token, so those threads are born and reaped once
+ * per token: measured on the phone, the process thread count sat at a flat 61 while idle
+ * and oscillated between 62 and 70 throughout a reply, and settled to the pool's own
+ * eleven once this was in.
+ *
+ * The cost is not the `pthread_create` itself. It is that a thread born a moment ago has
+ * no scheduler history — its utilization estimate starts at zero, so EAS places it on a
+ * little core and neither migrates it nor raises the frequency until it has run long
+ * enough to be noticed, which a thread that lives for one token never does. Prefill hides
+ * the same cost by running one graph per 512-token batch.
+ *
+ * **One pool, built once, never rebuilt.** That is a correctness requirement rather than
+ * a simplification. `llama_context::graph_compute` hands the CPU backend a threadpool
+ * before every graph, and `ggml_backend_cpu_set_threadpool` *pauses the previous one*
+ * whenever the pointer changes — so a pool that has been freed while the backend still
+ * holds it is a use-after-free on the next graph. Rebuilding this per thermal re-plan hung
+ * a turn for over five minutes on the phone before this was understood. Sizing it once, to
+ * the widest count either half will ever ask for, removes the question: `kickoff` carries
+ * the active thread count per graph and the extra workers simply sit out, which is what
+ * `llama_set_n_threads` is then free to vary.
+ *
+ * Attached as both handles, which `attach_threadpool` reads as "use this for batches too".
+ *
+ * Failure is not fatal. If the registry does not publish the entry points, or the pool
+ * cannot be created, the engine keeps the behaviour it has always had: ggml makes a
+ * disposable pool per graph and the model still answers, slower.
+ */
+void Session::attach_threadpools(int32_t n_threads, int32_t n_threads_batch) {
+    if (ctx_ == nullptr || threadpool_ != nullptr) return;
+    const int32_t width = std::max({ n_threads, n_threads_batch, 1 });
+
+    const threadpool_api & api = resolve_threadpool_api();
+    if (api.create == nullptr || api.destroy == nullptr) {
+        LOGI("threads: this build publishes no threadpool entry points; leaving them to ggml");
+        return;
+    }
+
+    ggml_threadpool_params params = ggml_threadpool_params_default(width);
+    ggml_threadpool_t pool = api.create(&params);
+    if (pool == nullptr) {
+        LOGI("threads: could not make the %d-wide pool; leaving them to ggml", width);
+        return;
+    }
+
+    threadpool_   = pool;
+    pool_threads_ = width;
+    llama_attach_threadpool(ctx_, threadpool_, nullptr);
+    LOGI("threads: %d workers kept alive across graphs", width);
+}
+
 void Session::set_threads(int32_t n_threads, int32_t n_threads_batch) {
+    // Only the count. The pool itself is built once at load and outlives every re-plan;
+    // see attach_threadpools for why rebuilding it is not safe.
     llama_set_n_threads(ctx_, n_threads, n_threads_batch);
 }
 
@@ -1630,6 +1786,7 @@ bool Session::warm(
     stats.snapshot_bytes = static_cast<int64_t>(prefix_state_.size());
     LOGI("kv: warmed %d tokens in %lld ms (%d reused)",
          stats.prompt_tokens, static_cast<long long>(stats.prefill_ms), stats.reused_tokens);
+    log_memory_state("after warm");
     // Written only after a warm that completed, and never while a turn is waiting: the
     // write costs a few hundred milliseconds this holds the engine for, and a cancel
     // that has landed means somebody is.
@@ -1779,6 +1936,12 @@ StopReason Session::generate(
     ParsedReply & reply,
     std::string & error) {
     cancelled_.store(false, std::memory_order_relaxed);
+
+    // Two samples around a turn, because every field in them is a running total and it
+    // is the difference that says anything. A turn that answers slowly having taken no
+    // major faults was throttled or badly placed; one that took hundreds of thousands
+    // was reading its own weights back from swap.
+    log_memory_state("before turn");
 
     std::string prompt;
     if (!render_prompt(messages, tools, reasoning, prompt, error)) {
@@ -2252,6 +2415,7 @@ StopReason Session::generate(
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;
     stats.context_used = n_past_;
     stats.thinking_prefilled = thinking_prefilled_;
+    log_memory_state("after turn");
     return reason;
 }
 

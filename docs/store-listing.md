@@ -146,6 +146,249 @@ Made, checked against the spec, and in `play/graphics`. How to regenerate any of
 | Phone screenshots | `screenshots-phone/01..06` | six at 1080 x 1920, 24-bit, no alpha |
 | 7-inch tablet | `screenshots-tablet-7/01..05` | five at 1200 x 2133 |
 | 10-inch tablet | `screenshots-tablet-10/01..05` | five at 1800 x 3200 |
+| Promo video | `play/videos/listing-promo.mp4` | 1920 x 1080, 27.4 s, H.264, silent track |
+
+## The promo video
+
+Made by `play/graphics/cut.py` from real captures; `promo.py` holds the compositor. Four
+facts about how Play shows it decided every design choice: it autoplays **inline, muted,
+for up to 30 seconds**, so the cut is 25.6 s and says everything in type; it plays in a
+**landscape** player, so it is 1920 x 1080; the **feature graphic is its cover image**, so
+it stays in that art's colour family and imports the same mark; and **ads must be off**,
+which is why the file Play points at carries no music. A Content ID claim can force ads onto
+a video, and that would put the listing out of policy, so silence is a compliance decision
+before a taste one.
+
+### Two uploads, and which one goes in the box
+
+Play does not host the file. The listing field takes a **YouTube URL**, and Play plays that
+video inline and muted. So there is no such thing as "silent on Play, scored on YouTube" for
+one upload: whatever is on the YouTube video is on the listing video, muted.
+
+There are therefore two files and two uploads, and only one of them may be pasted into the
+Console:
+
+| File | Audio | Where it goes |
+| --- | --- | --- |
+| `play/videos/listing-promo.mp4` | silent | **the Play listing field** |
+| `play/videos/listing-promo-scored.mp4` | original cue | the YouTube channel only |
+
+The picture is byte-identical between them; `play/graphics/score.py` copies the video stream
+through and only replaces the audio, so the two can never drift apart.
+
+**YouTube settings for the linked upload**: Public, ads off, not age restricted, not made
+for kids. Paste the full `https://www.youtube.com/watch?v=...` form. The thumbnail does not
+matter to Play, which uses the feature graphic as the player's cover.
+
+### The score, and what was refused
+
+`play/graphics/score.py` synthesises the cue from oscillators and band-limited noise. No
+samples, no loops, no library track: an original composition is still copyrighted, and it is
+copyrighted to its author, so the achievable reading of "no copyright" is no third-party
+material and nothing for Content ID to match.
+
+The brief asked for an enterprise keynote bed with applause. codex and agy were asked
+independently and refused the same two things for the same reasons. **Applause** invents an
+audience, which is the argument this project already accepted when it kept UI click foley
+out: invented events are the audio equivalent of staging footage, and canned applause over a
+screencast reads to this audience as parody. A **corporate hype bed** fails differently, by
+scoring unembellished evidence like a launch keynote and telling the viewer to distrust the
+thing being proved. Both proposed the same replacement in nearly the same words, and that is
+what is here: a sparse electronic pulse, quiet computational momentum rather than triumph.
+
+**Tempo is forced by the edit, not chosen.** Measured off the finished picture by frame
+differencing, the cuts land at 3.2, 6.6, 9.6, 12.8, 16.4, 19.6 and 23.0 s. Every one is an
+exact multiple of 0.2 s, so the finest grid the picture shares is 0.2 s, and the only tempos
+whose eighths or sixteenths fall on all of them are **75, 150 and 300 BPM**. A brief asking
+for 120 to 126 cannot be met: the best fit in that range leaves the worst cut 30 ms off,
+which on a transient against a hard cut is a flam rather than a hit. The score runs at
+**150**, so every cut is on the grid and the pulse is fast.
+
+The kick sits on 1 and 3, the clap on 2 and 4, so something lands every 0.4 s; hats and
+plucks run sixteenths at ten a second, which is close to the rate the reply in shot one
+actually arrives at. Three cuts fall off the downbeat (6.6, 16.4, 19.6) and are played as
+syncopations rather than nudged onto a beat.
+
+The cue sheet, one entry per shot:
+
+| at | shot | what the score does |
+| --- | --- | --- |
+| 0.0 | on device | impact on frame one, no intro; kit and motif straight in |
+| 3.2 | telemetry | clap enters, plucks double an octave up, digital ticks |
+| 6.6 | it fits | syncopated hit, pad opens, open hat every second bar |
+| 9.6 | it is tight | sixteenth sub movement, extra percussion for the memory numbers |
+| 12.8 | download | riser through 12.0, impact on the cut, densest drums |
+| 16.4 | no folder shared | everything drops. Downlifter, filtered pad, one pluck a bar |
+| 19.6 | you control | riser through 18.0, then the loudest bar and the lead motif |
+| 23.0 | end card | hard stop, branded hit, tonic chord decaying under the mark |
+
+Two faults were found by measuring the second pass and both are fixed. The privacy section
+had been a breakdown rather than a reduction: its drums measured **-53.2 dB** against -12.6
+either side, and energy above 6 kHz fell from 10.1 per cent of the mix to 2.0. Forty
+decibels and a fivefold loss of top is a different track starting, not an arrangement
+thinning. The groove now runs unbroken through it, with the clap as the only layer that
+leaves, and its drums measure within **3 dB** of the neighbouring sections with high
+frequency content within **2 dB**. The ending had been an impact, a glitch and a noise sweep
+on a stopped beat, which is a logo animation; the harmony now cadences Bb to C to D minor,
+arriving exactly on the end card, and the chord and its reverb tail decay under the mark to
+the last frame.
+
+Two variants were rendered. **A**, the restrained one, is the master: its build is
+monotonic from -18.3 dB at the hook to -15.0 at the download where B's stalls, and its
+loudest moment is the control claim, which is louder than B's peak because loudnorm pulls
+B's greater overall energy back down.
+
+A then took one polish pass, two surgical changes and nothing else. The reduction was still
+too deep, so the clap now stays through it at 58 per cent rather than leaving, the hats keep
+their sixteenths and lose level instead of halving the subdivision, and the pluck shelf
+moved up an octave: the section now sits **2.1 dB** under the download against 4.5 before,
+with its drums **1.6 dB** down, and a level plot through it that alternates on every beat at
+peaks matching the sections either side. And the end card still stung, because a bright
+noise wash arriving with a three-partial pluck stack is the whoosh and the ding of a logo
+animation; the cymbal is darker, slower and half the level, the bright layer is gone, the
+kit exhales eight decaying sixteenths into the card, and the impulse response and chord
+decay both lengthened. The ending now falls **22 dB across 2.4 s** with no cliff in it.
+
+A final pass touched the ending alone, because it still resolved before the mark had time
+to breathe. The accent is softer, the cadence's two pluck layers ring a second longer, the
+held chord gained a low octave and half its decay rate, and the ending now sends into an
+impulse of its own: 4.2 s and deliberately darker at 120 Hz to 6 kHz, applied to the finale
+only so the reverb on every other section, including the approved bridge, is untouched. The
+tail is **10.8 dB louder at the last frame**, the fall across the first second after the
+accent went from 7.2 dB to **5.0**, and the tail's spectral centroid dropped from 1669 Hz to
+**1426**, so it is warmer rather than brighter. Everything before 22.8 s moved by 0.2 dB,
+which is global normalisation and nothing else.
+
+The ending took one more pass, and the fault was structural rather than cosmetic. The code
+stopped every voice at the picture cut: `drums()` skipped the final section outright and the
+bass and pluck loops both ended at 23.0, after which a separate `finale()` began and the pad
+jumped from gain 0.16 into 1.9 kHz to 0.34 into 4.2. That is a second track starting, which
+is exactly what it sounded like, and no amount of lengthening the tail could fix it.
+
+The last bar and a half is now one phrase. The tonic arrives at **22.4 s**, on the bar line
+and six tenths of a second before the card, so the ear is told the phrase is landing while
+the download shot is still up. The kit, bass and plucks keep playing their own patterns
+straight through the cut under a single wind-down curve, with the kick dropping out first,
+then the backbeat, then the rest. The pad, which has been playing since 6.6 s, swells across
+nearly a second into the bed that holds the card. There is no accent kick, no cymbal wash
+and no separately voiced chord: every voice in the ending appears earlier in the film.
+
+Measured with a self-similarity novelty curve, which is how you find section boundaries in
+audio alone, the card's boundary strength fell from 0.46 to **0.26** against a mean of 0.53
+for the film's real transitions. It was as strong as a real section change; it is now half
+of one. The worst loudness step across 22.8 to 23.3 halved to **1.6 dB** and the worst
+timbre step fell from 1032 Hz to **738**.
+
+One other thing that pass caught. A mix's crest factor and the loudness target together fix
+the post-gain true peak exactly, and for this arrangement that is -1.29 dBTP. The ceiling had
+been set to -1.4, below the achievable peak, so loudnorm could not reach the target with a
+constant gain and silently switched to **dynamic** normalisation, re-balancing the whole
+film: the approved hook moved +1.7 dB while every other section moved -0.5. With the ceiling
+at -1.1 the mode stays linear and every section moves by the same -0.31 dB.
+
+Verified on the master: **-15.0 LUFS** integrated, **-1.3 dBTP**, LRA 5.3, **zero clipped
+samples**, and every cut still within 5.3 ms of the picture. Every cut's onset lands within
+5.3 ms of the picture, which is the analysis hop and so the measurement floor. The video
+stream is stream-copied and its MD5 is identical to the silent master's.
+
+**The silence is deliberate, and so is the track.** The file carries a silent AAC stream at
+about -91 dB of encoder noise, which is below the 16-bit floor and inaudible. Stripping it
+would not change what anyone hears; it would only produce a container with no audio stream,
+which is what a strict transcoder or player refuses. Music is out on the policy above.
+Foley is out because there is nothing to sound: the shots are held frames and arriving text,
+with no taps or transitions, so clicks would be invented events.
+
+**The ground is not the feature graphic's flat ink, on purpose.** The cover art sits on
+`#052B42`, but the app's own dark surface is a neutral near-black (`OpenWeightsColors.Canvas`,
+`#0D0E10`). Real capture laid on flat navy read as a sticker on a billboard, so the field is
+a vertical gradient from `#06202F` to `#03101A`: dark enough for the capture to settle into,
+blue enough to stay in the cover's family. The capture sits on a card with a 26 px radius
+masked into the alpha (so the corners are real, not drawn over), a 2 px `#17435F` hairline,
+and a navy-tinted shadow rather than a black one, which turns to dirt after compression.
+
+**The mark is imported, never redrawn.** An earlier end card rebuilt the three bars by hand
+and put their height at 0.079 of the longest bar instead of the real 0.22, so they drew long
+and thin. `endcard()` now calls `mark.draw_mark`, the same function behind the icon and the
+feature graphic.
+
+Four shots and an end card, each claim shown by the frame under it: a reply streaming with
+the header's `CPU . 32768 ctx` in view; the app's own `114->30 tok/s 15.9s` and `ctx 5%` at
+1.28x; one model file's `needs 1.13 GB . ~98 tok/s prefill` before any download; and the
+Tools screen across the boundary between its two literal groups, `On this device` and
+`Leaves the device`. Hard cuts, because a dissolve also dissolves the two captions and for a
+few frames the viewer reads both.
+
+The opening headline types on at **120 characters a second**, finishing in about 0.17 s. The
+app decodes roughly 30 tokens a second in that very shot and a token averages about four
+characters, so 120 cps is the honest match, and a muted autoplay punishes a headline that
+cannot be read at once. The eyebrow, the subhead and the streaming reply are all on screen
+at frame one.
+
+**One card, one grid.** Every shot occupies the same 1560 x 700 rectangle at x=180, y=96;
+the lime rule spans exactly that card's width; the eyebrow and headline align to its left
+edge and the subhead to its right. Every crop is cut to the card's 2.2286:1 aspect and
+centred on the phone's own 640 px axis, so the app's content sits centred and nothing
+shifts between shots. An earlier version sized the card from each crop, which put the card,
+the rule and the caption on three different grids and left 100 px of dead space below
+against 74 above. Measured on a render, the margins are now 96 above and 95 below.
+
+**Every headline types on**, at 120 characters a second, so each finishes inside 0.25 s and
+reads as the caption snapping into place. codex argued for keeping it to the first shot
+only; agy argued that a one-off effect reads as a mistake while a consistent one reads as a
+language, and that is the call taken here.
+
+**Held frames, not crops into a scroll.** A rectangle cropped into a moving list cannot be
+framed: wherever the cut falls some card is sliced, and the gap above it stops matching the
+gap below. That produced the defects this file went through three review rounds without
+anyone catching, because codex and agy were reviewing a written description and never saw a
+frame. The app's own geometry is now measured off the pixels and the crops land on it: file
+cards are 513 px tall on the model page with 33 px gaps, the 8B page's are 411 px on a
+444 px pitch, and the Tools screen's row dividers sit at 782, 1065 and 1410, so the crop
+opens on a whole row rather than a sliced title. Where a card cannot be isolated, the
+neighbours are shown symmetrically, 29 px above and 31 px below, which reads as a list.
+
+**Two shots move, and they are the only two that can.** The opening rides the reply arriving
+line by line; the download shot rides the byte counter climbing while its layout stays
+perfectly still, which is the one kind of motion a fixed crop can hold. Everything else is
+held, with the cut between two views carrying the change. Measured on the finished file, the
+longest motionless stretch is 3.0 s and there is a cut about every three seconds.
+
+**The question is one a person would ask.** The opening asks for five things to check
+before buying a used phone, and the answer is a list, which is the shape a 1.2B model gets
+right and which reads in five seconds. An earlier take asked it to write a message to a
+landlord and it wrote *about* contacting one instead: a bad prompt and a worse answer, and
+the sort of thing to judge before filming rather than after. The telemetry shot is held from
+that same take, so the first two shots are one conversation rather than two.
+
+Those two shots come from the **accelerated debug** build, which carries `applicationIdSuffix
+".debug"` and therefore installs alongside a Play copy without touching it. That is the way
+to shoot v2 footage on a phone running the published v1: no uninstall, nothing destroyed.
+
+**The copy says what a person would say.** "Then it downloads it", not "fetches", which is
+developer language and could even be read as cloud inference. "No folder is shared by
+default" rather than "nothing is shared", because the screen is about the workspace folder
+specifically and the broader claim would outrun it. "You control what goes online" rather
+than "local and networked, split", which was accurate and inert.
+
+**The evidence is paired.** "It says if it fits" over a file that runs comfortably, then
+"It says when it is tight" over the 4.80 GB file that wants 5.29 GB, which is the same model
+the next shot downloads. Two cards that both said "Runs comfortably" differed so little that
+the cut between them did not register, and a caption changing over an apparently unchanged
+picture reads as a stuck title.
+
+**Uploading it.** YouTube, 16:9 (not Shorts), **Public or Unlisted** (Private breaks the
+listing), embedding allowed, no age restriction, not made for kids, no region blocks,
+monetisation off, auto-captions off so they do not sit on the lower third. Wait for HD
+processing to finish before pasting the URL into the Console, and paste the plain watch
+URL, not a playlist or timestamped link.
+
+**Not in it, on purpose.** The web-search citation chip, because a video whose first claim
+is "no sign-in, the model file is on this phone" should not then show the app fetching a
+page. The canvas builder, whose tools stay off until a folder is shared and which
+returns an empty reply on a 1.2B model, so showing it would mean staging a result. And the two-runtimes claim, which is the product's real differentiator but
+had no honest footage: Discover shows no engine label per row, and a `.pte` model's detail
+page renders its header with **no file list at all** in build 467, which is a bug worth
+fixing and, until it is, a claim the camera cannot support.
 
 The screenshots are the one place the product explains itself, so they are captioned in that
 order: the telemetry, a tool round, a plan, the Hub across both runtimes, the Models screen

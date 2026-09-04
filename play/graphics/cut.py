@@ -17,13 +17,18 @@ card bands and the 33 px gaps between them were measured off the pixels, not eye
 Every frame is from a recording made on a Dimensity 9400 (POCO X8 Pro, Android 16), and
 every claim in the type is one the frame underneath it shows.
 
-Deliberately not here: the web-search citation chip, because a video whose first claim is
-"no sign-in" should not then show the app fetching a page; the canvas builder, because its
-tools stay off until a folder is shared and on a 1.2B model the request returns an empty
-reply, and we do not stage results; and the two-runtimes claim, the product's real
-differentiator, because Discover shows no engine label per row and a .pte model's detail
-page renders its header with no file list at all in this build. That last one is a bug, and
-until it is fixed there is nothing honest to point a camera at.
+The opening used to avoid the web-search chip, on the argument that a video whose first
+claim is "no sign-in" should not then show the app fetching a page. That was the wrong
+call. The chip is the proof, not the contradiction: it says the model reached the network
+once, because a switch the viewer owns was on, and then wrote the answer here. The caption
+carries it, and the tools beat later in the cut says the same thing about the switch.
+
+Deliberately not here: the canvas builder, because its tools stay off until a folder is
+shared and on a 1.2B model the request returns an empty reply, and we do not stage results;
+and the two-runtimes claim, the product's real differentiator, because Discover shows no
+engine label per row and a .pte model's detail page renders its header with no file list at
+all in this build. That last one is a bug, and until it is fixed there is nothing honest to
+point a camera at.
 """
 from __future__ import annotations
 
@@ -46,23 +51,46 @@ FULL_W, FULL_H = 1280, 574
 END = 2.6  # end-card seconds
 
 SHOTS = [
-    # The opening rides real motion: the answer arrives line by line with the header's
-    # "CPU . 32768 ctx" in frame. The question is one a person would actually ask, and the
-    # answer is a list, which is the shape a 1.2B model gets right and which reads well in
-    # five seconds. An earlier take asked it to write a message to a landlord and it wrote
-    # ABOUT contacting one instead: a bad prompt and a worse answer, and the sort of thing
-    # to judge before filming rather than after. The telemetry shot below is held from this
-    # same take, so shots one and two are the same conversation rather than two.
-    dict(src="shot-hook2.mp4", at=6.4, length=5.0, crop=(40, 262, 1200, 538),
+    # The opening rides real motion, and now it is the only kind of motion that does not
+    # run out: a reply being written. The question is asked, the app searches, and the
+    # answer arrives word by word for the whole length of the shot.
+    #
+    # The question had to be one whose answer a language model cannot already hold, or the
+    # search is theatre. It also had to be one whose answer is checkable, because a wrong
+    # fact on a store listing is worse than a dull shot: an earlier take answered a
+    # different question with an invented release page, and was thrown away. This answer
+    # was verified against the web before it was filmed. An earlier take than that asked
+    # the model to write a message to a landlord and it wrote ABOUT contacting one
+    # instead, which is the sort of thing to judge before filming rather than after.
+    #
+    # The crop starts at 635, in the gap between the question bubble and the search chip,
+    # and ends between two lines of the reply, so neither edge cuts a glyph. The question
+    # itself is out of frame and not missed: the chip quotes it and the answer opens by
+    # restating it. An earlier framing kept the bubble and paid for it with a line of text
+    # sliced along the card's bottom edge.
+    #
+    # The window is 12.45 to 15.65 and every boundary of it was forced by something in the
+    # footage. Before 11.5 the turn spends about five seconds reading the search results
+    # back into context behind nothing but a counter. At 4.0 the model's own call leaks into
+    # the bubble as literal `<|tool_call_start|>[web_search(query=` markup for about a
+    # second before the parser catches up. And from 12.2 to 12.45 the reply shows a raw
+    # `**Qwen 3.8` because emphasis is rendered only once its closing marker arrives, so
+    # streamed bold spends a quarter second as asterisks. All three are real defects, all
+    # three are logged, and none of them is in frame. What is left is 3.2 seconds that move
+    # from the first frame to the last: the answer writes itself, and the shot ends as the
+    # speed line prints, which is the next caption's subject.
+    dict(src="shot-search.mp4", at=12.45, length=3.2, crop=(0, 635, FULL_W, FULL_H),
          eyebrow="on device", head="It answers on-device",
-         sub="No sign-in. The model is on this phone."),
+         sub="No sign-in. The web only if you allow it."),
 
-    # Held, and cut to end at 2250, above the composer: the chat box has no business in a
-    # shot whose whole subject is the telemetry line.
-    dict(src="shot-hook2.mp4", at=13.0, length=3.4, hold=True,
-         crop=(0, 1676, FULL_W, FULL_H),
+    # Held from the same take, one second later, so shots one and two are one conversation
+    # rather than two. 955 is the gap between two lines of the reply, so the top edge cuts
+    # nothing, and 1529 clears the speed line underneath. The composer stays out: the chat
+    # box has no business in a shot whose whole subject is the number above it.
+    dict(src="shot-search.mp4", at=17.5, length=3.4, hold=True,
+         crop=(0, 965, FULL_W, FULL_H),
          eyebrow="live telemetry", head="It shows its own speed",
-         sub="Speed and context, as it answers."),
+         sub="Tokens per second, on every answer."),
 
     # Two files, each card centred on its own measured edges: the bands are 513 px tall with
     # 33 px gaps, so a 574 px window leaves about 30 px above and below and slices nothing.

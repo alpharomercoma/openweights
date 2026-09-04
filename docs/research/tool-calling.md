@@ -802,3 +802,39 @@ CSS it emits a real stylesheet and fills every card with the placeholder
 `<strong>Planet</strong><span>Planet Name</span>`. The 2.6B writes the better CSS
 (`#1a1a1a` ground, `.planet-card` with padding and a 12 px radius) and cannot get it through
 the parser. Neither is filmable, which is why the listing video carries no canvas shot.
+
+## It leaks on `web_search` too, and there it recovers
+
+Filming the listing video's opening on 2026-09-04 put the same bug in front of a camera
+twice, on a path that has nothing to do with files. Asked "What is the newest open-weight
+model from Qwen" with `web_search` on and **no folder shared**, LFM2.5-1.2B-Instruct-Q4_0
+rendered
+
+```
+<|tool_call_start|>[web_search(query="newe
+```
+
+into the reply bubble as literal text, for roughly a second, in both takes. Then the markup
+vanished, the "Searched the web" chip appeared, and the turn completed normally with a
+correct answer.
+
+That is the same leak, and it changes what the earlier note means. The markup is not being
+withheld until the parser has decided what it is: it is **streamed straight to the view**
+and only retracted once the call is recognised. So a leak that recovers looks like a flicker
+of raw markup, and a leak that is never recognised looks like the empty reply, because the
+retraction happens either way. The empty reply is the same defect with nothing to put back.
+
+Two consequences. The fix is at the boundary, not in the grammar: hold a token run back from
+the view once it opens a call marker, and only release it as text if the run turns out not
+to be a call. And the leak is not confined to `write_file` or to a shared folder, so the
+earlier "capture chat footage with no folder shared" is necessary and not sufficient.
+
+## Streamed emphasis spends a moment as asterisks
+
+Separately, and visible in the same footage: while the reply streams, `**Qwen 3.8` renders
+with its asterisks intact and only becomes bold once the closing `**` arrives. Measured on
+the capture, the raw form is on screen from about 12.20 s to 12.45 s, a quarter of a second.
+It is cosmetic and it is honest, but it lands in body text at the exact moment a reader's
+eye is on the first bolded phrase, and it is the reason the listing video's opening shot
+starts after it rather than before. An incremental markdown renderer that treats an unclosed
+emphasis run as pending rather than as literal would remove it.

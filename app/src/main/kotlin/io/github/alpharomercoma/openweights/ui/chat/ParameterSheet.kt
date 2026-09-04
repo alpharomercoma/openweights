@@ -623,7 +623,12 @@ private fun Setting(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         control()
-        footnote?.let { Metric(it) }
+        // Caption, not Metric. Metric is monospaced, which is right for the value beside the
+        // label and wrong for the footnote, which is a sentence: "Move the slider to fix it,
+        // or reset to go back to automatic" was being set in the face reserved for figures,
+        // which is the mistake Caption's own documentation was written to stop. Seen on the
+        // phone rather than in the code, under a second sentence that had just joined it.
+        footnote?.let { Caption(it) }
     }
 }
 

@@ -122,6 +122,12 @@ class FetchUrlToolTest {
         assertThat(text).doesNotContain("Home About Contact")
         assertThat(text).contains("The battery is 5000 mAh")
 
+        // And it arrives with the shape the author gave it. The heading is a heading and
+        // the two sentences are two paragraphs, which is the difference between a document
+        // a model can navigate and the single unbroken run this used to hand over.
+        assertThat(text).startsWith("# Specifications")
+        assertThat(text).contains("mAh and charges at 67 W.\n\nThe screen is 6.7 inches.")
+
         // And the pattern matches the sentence rather than the script's variable, which is
         // the reason the search runs after the cleaning rather than before it.
         val found = PageSearch.search(text, "battery is [0-9]+ mAh")

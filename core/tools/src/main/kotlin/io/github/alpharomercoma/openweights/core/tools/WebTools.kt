@@ -370,7 +370,7 @@ class FetchUrlTool @Inject constructor(
             val hop = runCatching {
                 httpClient.newCall(request).await().use { response ->
                     redirectTarget(response, next)?.let { return@use Hop.Moved(it) }
-                    Hop.Read(textOf(response))
+                    Hop.Read(textOf(response, next))
                 }
             }.getOrNull()
                 ?: return@withContext ToolExecution.failure(
@@ -475,7 +475,7 @@ class FetchUrlTool @Inject constructor(
      * prose. The model chooses this address, which is what makes it worth checking: a link
      * in a search result can point at a video, an archive, or a page that never stops.
      */
-    private fun textOf(response: Response): PageText {
+    private fun textOf(response: Response, from: HttpUrl): PageText {
         if (!response.isSuccessful) return PageText("HTTP ${response.code}", successful = false)
 
         val type = response.body.contentType()?.let { "${it.type}/${it.subtype}" }
@@ -487,7 +487,11 @@ class FetchUrlTool @Inject constructor(
         }
         // peekBody stops at the limit rather than after it: the bytes past it are never
         // buffered, so a page with no end cannot exhaust the heap.
-        return PageText(pageText(response.peekBody(MAX_BYTES.toLong()).string(), type))
+        // The address this response actually came from, so a relative link in the page
+        // comes out as somewhere the model could go next rather than as "/docs/install".
+        return PageText(
+            pageText(response.peekBody(MAX_BYTES.toLong()).string(), type, from.toString()),
+        )
     }
 
     /** One step of a fetch: either something to read, or somewhere else to look. */
@@ -552,9 +556,9 @@ class FetchUrlTool @Inject constructor(
          * document the server sent. A type the server did not name is read as HTML, which
          * is what an unlabelled response almost always is.
          */
-        fun pageText(body: String, contentType: String?): String =
+        fun pageText(body: String, contentType: String?, baseUrl: String = ""): String =
             if (contentType == null || HTML.any { contentType.startsWith(it) }) {
-                body.readable()
+                body.readable(baseUrl)
             } else {
                 body
             }
@@ -661,15 +665,23 @@ internal fun redirectTarget(response: Response, from: HttpUrl): HttpUrl? {
     return response.header("Location")?.let { from.resolve(it) }
 }
 
-/** Everything between tags, with the tags and the unreadable parts taken out. */
-private fun String.readable(): String = withoutFurniture().stripTags()
+/**
+ * The page as something to read: the furniture gone, and the structure kept.
+ *
+ * Two stages on purpose. [withoutFurniture] works on the markup as a string and answers
+ * "which part of this file did somebody come to read", which is a question about landmarks
+ * and whole elements. [asStructuredText] then parses what is left and answers "what shape is
+ * it", which needs a tree. What used to sit in the second position deleted every tag and
+ * folded all whitespace, so the answer to the second question was always "one paragraph".
+ */
+private fun String.readable(baseUrl: String): String = withoutFurniture().asStructuredText(baseUrl)
 
 /**
  * The page reduced to the part worth reading, still as markup.
  *
- * Separate from [stripTags] because that one decodes entities through the platform and so
- * cannot run off a device, while everything interesting here is string work that can be tested
- * on its own.
+ * Separate from [asStructuredText] because the two answer different questions and need
+ * different tools: this one is string work over whole elements, and needs no tree to say
+ * which part of a file somebody came to read.
  */
 internal fun String.withoutFurniture(): String = mainContent().withoutElements(FURNITURE_TAGS)
 
@@ -855,9 +867,3 @@ private const val ENOUGH_TO_BE_THE_BODY = 500
 
 private val TAGS = Regex("<[^>]+>")
 private val RUNS_OF_SPACE = Regex("""\s+""")
-
-private fun String.stripTags(): String = this
-    .replace(TAGS, " ")
-    .let { android.text.Html.fromHtml(it, android.text.Html.FROM_HTML_MODE_LEGACY).toString() }
-    .replace(RUNS_OF_SPACE, " ")
-    .trim()

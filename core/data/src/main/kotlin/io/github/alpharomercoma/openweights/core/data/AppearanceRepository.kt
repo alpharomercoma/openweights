@@ -17,6 +17,8 @@
 package io.github.alpharomercoma.openweights.core.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,19 +43,30 @@ enum class ThemeChoice {
  * screen, and it belongs to the person rather than to a model.
  */
 @Singleton
-class AppearanceRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
-) {
-    val themeChoice: Flow<ThemeChoice> = context.settingsDataStore.data.map { preferences ->
-        // A value written by a newer build must not stop an older one starting; following
-        // the system is always a safe reading.
-        preferences[KEY]?.let { stored ->
-            ThemeChoice.entries.firstOrNull { it.name == stored }
-        } ?: ThemeChoice.SYSTEM
-    }
+class AppearanceRepository internal constructor(private val store: DataStore<Preferences>) {
+    @Inject
+    constructor(@ApplicationContext context: Context) : this(context.settingsDataStore)
+
+    /**
+     * The stored choice, and never a failure.
+     *
+     * `MainActivity` collects this to draw its first frame, so a throw here is a launch
+     * that does not happen, repeatedly, because the same bytes are there next time. Two
+     * fallbacks rather than one: [orEmptyWhenUnreadable] for a store that will not read,
+     * and the elvis below for a value this build does not recognise.
+     */
+    val themeChoice: Flow<ThemeChoice> = store.data
+        .orEmptyWhenUnreadable()
+        .map { preferences ->
+            // A value written by a newer build must not stop an older one starting;
+            // following the system is always a safe reading.
+            preferences[KEY]?.let { stored ->
+                ThemeChoice.entries.firstOrNull { it.name == stored }
+            } ?: ThemeChoice.SYSTEM
+        }
 
     suspend fun setThemeChoice(choice: ThemeChoice) {
-        context.settingsDataStore.edit { store -> store[KEY] = choice.name }
+        store.edit { preferences -> preferences[KEY] = choice.name }
     }
 
     private companion object {

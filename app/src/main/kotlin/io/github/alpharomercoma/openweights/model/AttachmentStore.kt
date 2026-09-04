@@ -463,20 +463,44 @@ class AttachmentStore @Inject constructor(@param:ApplicationContext private val 
     /**
      * A private file for the camera app to write into.
      *
-     * Older captures are swept first. The camera writes here directly and [store] copies
-     * out of it, so without this the originals would accumulate: including the ones from
+     * Stale captures are swept first. The camera writes here directly and [store] copies
+     * out of it, so without a sweep the originals would accumulate: including the ones from
      * captures the user cancelled, which nothing else would ever hear about.
+     *
+     * By age, and not simply everything, which is what it used to be. Two live files were
+     * in that "everything". The camera app is holding one while it writes, and the
+     * activity behind it can be recreated at any moment (a rotation, a theme change, the
+     * system reclaiming memory), which recomposes the sheet, mints a fresh URI, and used to
+     * delete the photograph being taken into the old one. And [store] copies out of a
+     * capture on a coroutine, so reopening the sheet a second after the shutter deleted the
+     * file mid-copy. Neither lost the app; both lost the picture, silently, which is worse.
+     *
+     * [CAPTURE_LIFETIME_MS] is far longer than either window and far shorter than a
+     * session, so a cancelled capture still goes on the next one.
      */
-    fun newCaptureUri(): Uri {
+    fun newCaptureUri(): Uri =
+        FileProvider.getUriForFile(context, "${context.packageName}.files", newCaptureFile())
+
+    /** The file behind [newCaptureUri], and the sweep that clears the way for it. */
+    internal fun newCaptureFile(): File {
         val captures = File(context.filesDir, CAPTURES).apply { mkdirs() }
-        captures.listFiles()?.forEach { it.delete() }
-        val target = File(captures, "capture-${UUID.randomUUID()}.jpg")
-        return FileProvider.getUriForFile(context, "${context.packageName}.files", target)
+        val stale = System.currentTimeMillis() - CAPTURE_LIFETIME_MS
+        captures.listFiles()?.forEach { if (it.lastModified() < stale) it.delete() }
+        return File(captures, "capture-${UUID.randomUUID()}.jpg")
     }
 
     private companion object {
         const val TAG = "AttachmentStore"
         const val CAPTURES = "captures"
+
+        /**
+         * How long a capture file is left alone before the next capture sweeps it.
+         *
+         * Longer than any camera trip and any copy out of one, so a sweep never takes a
+         * file something is still using; short enough that a handful of cancelled captures
+         * is the most that is ever kept.
+         */
+        const val CAPTURE_LIFETIME_MS = 60L * 60L * 1000L
         const val DIRECTORY = "attachments"
         const val FALLBACK_MEDIA_TYPE = "application/octet-stream"
         const val MAX_DOCUMENT_CHARS = 1_000_000

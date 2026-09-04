@@ -237,8 +237,28 @@ class ModelDownloader @Inject constructor(
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                if (response.saysAlreadyComplete(alreadyHave)) return
-                throw response.toHubException(hasToken = tokenSource.token() != null)
+                when (response.rangeVerdict(alreadyHave)) {
+                    RangeVerdict.COMPLETE -> return
+                    RangeVerdict.STALE -> {
+                        // Longer on disk than the whole file is on the server, which no
+                        // amount of resuming can reconcile: the publisher replaced the file
+                        // with a smaller one under the same name. Removed rather than kept,
+                        // because the next attempt asking to resume gets the same 416
+                        // forever, and because without a published size or checksum
+                        // nothing downstream would have caught it, so those stale bytes
+                        // were verified and installed as the finished model.
+                        partial.delete()
+                        throw DownloadException(
+                            "The file on Hugging Face is smaller than the part already " +
+                                "downloaded, so it is not the same file any more. The " +
+                                "partial download was removed; try again to fetch it whole.",
+                            isRetryable = true,
+                        )
+                    }
+
+                    RangeVerdict.NONE ->
+                        throw response.toHubException(hasToken = tokenSource.token() != null)
+                }
             }
             // A server that ignores the range header restarts the file, so partial bytes
             // must be discarded rather than appended to. Trusting the 206 alone is not
@@ -255,19 +275,44 @@ class ModelDownloader @Inject constructor(
         }
     }
 
+    /** What a 416 says about the bytes already on disk. */
+    private enum class RangeVerdict {
+        /** The part on disk is the whole file: a download that finished before the rename. */
+        COMPLETE,
+
+        /** The part on disk is longer than the file now is, so it cannot be resumed. */
+        STALE,
+
+        /** Not a 416, or one that says nothing usable. Whatever it is, it is a failure. */
+        NONE,
+    }
+
     /**
-     * A 416 for a file we already hold all of, which is a finished download rather than a
-     * failure: the server cannot serve a range that starts at the end of the file.
+     * Reads a 416 for what it says about [alreadyHave].
+     *
+     * The server cannot serve a range that starts at the end of a file, so a 416 whose
+     * `Content-Range` names a total *equal* to what is on disk is a download that finished
+     * and died before the rename. A total *smaller* than what is on disk is a different
+     * thing entirely and used to be read as the same one: the bytes on disk are longer
+     * than the file the server now holds, which happens when a publisher replaces a file
+     * with a smaller one under the same name. Nothing downstream catches that when the
+     * repository publishes no size and no checksum: the length check is skipped for an
+     * unknown size and there is no hash to fail, so the stale part was renamed into place
+     * and run as the model.
+     *
+     * A 416 that does not say how long the file is says nothing about either case.
      */
-    private fun Response.saysAlreadyComplete(alreadyHave: Long): Boolean {
-        if (code != HubHttp.RANGE_NOT_SATISFIABLE || alreadyHave <= 0) return false
+    private fun Response.rangeVerdict(alreadyHave: Long): RangeVerdict {
+        if (code != HubHttp.RANGE_NOT_SATISFIABLE || alreadyHave <= 0) return RangeVerdict.NONE
         val totalFromRange = header("Content-Range")
             ?.substringAfter("*/", "")
             ?.toLongOrNull()
-        // A 416 that does not say how long the file is says nothing about whether this one
-        // is complete, and reading it as complete verified and installed a partial whenever
-        // the size was unknown as well.
-        return totalFromRange != null && alreadyHave >= totalFromRange
+            ?: return RangeVerdict.NONE
+        return when {
+            alreadyHave == totalFromRange -> RangeVerdict.COMPLETE
+            alreadyHave > totalFromRange -> RangeVerdict.STALE
+            else -> RangeVerdict.NONE
+        }
     }
 
     private suspend fun FlowCollector<DownloadProgress>.copyTo(

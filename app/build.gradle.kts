@@ -9,6 +9,18 @@ plugins {
 }
 
 /**
+ * The lowest version code this repository may build from.
+ *
+ * A ratchet, and the only state the scheme keeps: raised by hand, and only ever when a
+ * rewritten history has taken the commit count below a code already uploaded. Left alone it
+ * costs nothing, because the count passes it on every ordinary commit.
+ *
+ * Declared before [gitCommitCount] because a script initialises its properties in the order
+ * they are written, and a forward reference here would read zero and check nothing.
+ */
+val versionCodeFloor = 498
+
+/**
  * The number of commits on this branch, used as the version code.
  *
  * Play's one rule for a version code is that it must be higher than the last one uploaded,
@@ -17,16 +29,23 @@ plugins {
  * something, indefinitely, while doing something else, and the failure mode is finding out
  * at upload time with a bundle already built.
  *
- * The commit count is the cheapest thing that cannot go backwards. It needs no service
+ * The commit count is the cheapest thing that is nearly always going up. It needs no service
  * account, no secret, and no state anywhere outside the repository, and it produces the same
  * answer on this laptop as in CI, which a build-number counter does not: a workflow renamed
  * or recreated resets that counter, and a version code that goes down cannot be undone.
  *
- * Two things to know about it.
+ * Three things to know about it.
  *
  * It is per branch, so a release must be cut from `main`. A build from a branch with fewer
  * commits produces a lower code, which Play will refuse rather than accept, so the failure
  * is loud.
+ *
+ * And it *can* go backwards, which the note here used to deny: a squash merge replaces many
+ * commits with one, a rebase can drop them, and a history cleanup rewrites the lot. Play
+ * refuses the bundle at the door in that case, after it has been built and signed, with no
+ * way to recover the codes already used. So the count is ratcheted against
+ * [versionCodeFloor] below and the build stops here instead, before anything is built,
+ * with the one instruction that fixes it.
  *
  * And it is wrong on a shallow clone, quietly, which is the one that would actually have
  * bitten: `actions/checkout` fetches a single commit by default, so a naive count returns 1
@@ -63,7 +82,21 @@ val gitCommitCount: Int = run {
                 "code would silently be 1. Build again and check that git runs.",
         )
     }
-    counted?.takeIf { it > 0 } ?: 1
+    val code = counted?.takeIf { it > 0 } ?: 1
+
+    // Only when git answered. The line above deliberately reads 1 for a source archive with
+    // no history at all, and nothing built that way is publishable, so it is not held to a
+    // floor it cannot meet.
+    if (counted != null && code < versionCodeFloor) {
+        throw GradleException(
+            "The commit count is $code, below the $versionCodeFloor this repository has " +
+                "already built from, so this bundle's version code would go backwards and " +
+                "Play would refuse it. History was rewritten by a squash, a rebase, " +
+                "or a cleanup. Raise versionCodeFloor in app/build.gradle.kts above the " +
+                "highest code ever uploaded, and add that difference to the count.",
+        )
+    }
+    code
 }
 
 android {

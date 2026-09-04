@@ -86,6 +86,14 @@ class FakeInferenceEngine : InferenceEngine {
     /** Set before a load to make it throw, standing in for a corrupt or missing file. */
     var failNextLoad = false
 
+    /**
+     * Set to make the next [resetContext] throw, the way the native reset can.
+     *
+     * It runs after the weights are mapped, so it is the shape of failure that used to
+     * arrive with the load already reported as a success.
+     */
+    var failNextResetContext = false
+
     /** When true, every call to [chat] throws instead of answering, standing in for a turn
      * that could not complete. Stays true until unset, so a fixed number of failed calls in
      * a row can be scripted for a caller that counts them.
@@ -276,6 +284,10 @@ class FakeInferenceEngine : InferenceEngine {
 
     override suspend fun resetContext() {
         resetContextGate?.await()
+        if (failNextResetContext) {
+            failNextResetContext = false
+            throw LlamaException("could not reset the context")
+        }
         resetCount++
     }
 

@@ -236,8 +236,21 @@ data class HubModelDetail(
     fun defaultProjector(): HubFile? = files.firstOrNull()?.let(::pairedProjector)
 }
 
-/** Raised when the Hub rejects a request in a way the user can act on. */
-class HubException(message: String, val isAuthFailure: Boolean = false) : Exception(message)
+/**
+ * Raised when the Hub rejects a request in a way the user can act on.
+ *
+ * @param isRetryable true when the same request stands a real chance of working shortly:
+ * a rate limit, or the Hub itself being unwell. A download that gets one of these used to
+ * fail at the first attempt and sit there wanting a tap, which is the opposite of what the
+ * five-attempt backoff exists for, while a dropped socket (a strictly smaller problem)
+ * got all five. Nothing about permission or a missing file is retryable: the answer is the
+ * same however many times it is asked.
+ */
+class HubException(
+    message: String,
+    val isAuthFailure: Boolean = false,
+    val isRetryable: Boolean = false,
+) : Exception(message)
 
 /**
  * Reads the Hugging Face Hub.

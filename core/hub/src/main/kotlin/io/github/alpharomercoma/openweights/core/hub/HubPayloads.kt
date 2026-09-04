@@ -142,7 +142,14 @@ fun Response.toHubException(hasToken: Boolean): HubException = when (code) {
     HTTP_NOT_FOUND -> HubException("That model no longer exists on Hugging Face.")
     HTTP_TOO_MANY_REQUESTS -> HubException(
         "Hugging Face is rate limiting requests. Try again shortly.",
+        isRetryable = true,
     )
+
+    in HTTP_SERVER_ERRORS -> HubException(
+        "Hugging Face is having trouble right now ($code). Trying again shortly.",
+        isRetryable = true,
+    )
+
     else -> HubException("Hugging Face returned $code.")
 }
 
@@ -150,6 +157,14 @@ private const val HTTP_UNAUTHORIZED = 401
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_NOT_FOUND = 404
 private const val HTTP_TOO_MANY_REQUESTS = 429
+
+/**
+ * The Hub's own failures, which are the Hub's to recover from and worth waiting out.
+ *
+ * A download resumes from the bytes already on disk, so a wait costs nothing but time,
+ * and 500, 502 and 503 from a CDN are almost always over by the second attempt.
+ */
+private val HTTP_SERVER_ERRORS = 500..599
 
 /** True when a partial response says, in its `Content-Range`, that it starts at [offset]. */
 fun Response.servesRangeFrom(offset: Long): Boolean {

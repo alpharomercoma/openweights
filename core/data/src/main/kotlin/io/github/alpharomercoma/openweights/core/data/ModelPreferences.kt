@@ -487,7 +487,7 @@ class ModelPreferencesRepository @Inject constructor(
      * So the shared set is read first and the two per-model fields are layered over it.
      */
     fun observe(modelName: String): Flow<ModelPreferences> =
-        context.settingsDataStore.data.map { preferences ->
+        context.settingsDataStore.data.orEmptyWhenUnreadable().map { preferences ->
             val shared = preferences[sharedKey()]?.let { stored ->
                 // A settings file written by an older build must not stop the model
                 // loading; falling back to defaults is always safe.

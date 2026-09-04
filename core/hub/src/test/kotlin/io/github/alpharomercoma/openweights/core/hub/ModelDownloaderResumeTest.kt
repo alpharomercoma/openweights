@@ -17,6 +17,7 @@
 package io.github.alpharomercoma.openweights.core.hub
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
@@ -319,6 +320,61 @@ class ModelDownloaderResumeTest {
 
         assertThat(failure).isNotNull()
         assertThat(destination.exists()).isFalse()
+    }
+
+    @Test
+    fun `a Hub that is busy is worth another attempt and a missing file is not`() {
+        // These are the failures the five-attempt backoff exists for, and they used to be
+        // the ones that did not get it: a rate limit and a 5xx arrived as a HubException
+        // with nothing on it to say so, and the download failed at the first attempt.
+        val busy = listOf(429, 500, 502, 503)
+        busy.forEach { code ->
+            server.enqueue(MockResponse.Builder().code(code).build())
+            val failure = runCatching { fetch(File(folder.root, "weights-$code.gguf")) }
+                .exceptionOrNull()
+            assertWithMessage("HTTP $code").that(failure).isInstanceOf(HubException::class.java)
+            assertWithMessage("HTTP $code").that((failure as HubException).isRetryable).isTrue()
+        }
+
+        // And the ones that answer the same however often they are asked do not get it:
+        // waiting five times over only delays the same sentence.
+        listOf(401, 403, 404).forEach { code ->
+            server.enqueue(MockResponse.Builder().code(code).build())
+            val failure = runCatching { fetch(File(folder.root, "weights-$code.gguf")) }
+                .exceptionOrNull()
+            assertWithMessage("HTTP $code").that((failure as HubException).isRetryable).isFalse()
+        }
+    }
+
+    @Test
+    fun `a 416 for a file shorter than the part on disk starts over rather than installing it`() {
+        val destination = File(folder.root, "weights.gguf")
+        // The two things that make this reachable: no published size, so the length check
+        // at the end is skipped, and no published checksum, so there is nothing to fail on.
+        val file = hubFile(size = 0L, sha = null)
+        File(folder.root, "weights.gguf.part").writeBytes(whole)
+        markPartial(destination, file = file)
+
+        // The publisher replaced the file with a smaller one under the same name. Resuming
+        // past the new end returns 416, and the total it names is less than what is on
+        // disk, which was read as "we already have all of it" and installed.
+        server.enqueue(
+            MockResponse.Builder()
+                .code(416)
+                .addHeader("Content-Range", "bytes */${whole.size / 2}")
+                .build(),
+        )
+
+        val failure = runCatching {
+            runBlocking { downloader.download("owner/repo", file, destination).toList() }
+        }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(DownloadException::class.java)
+        // Retryable, and the part is gone, so the retry fetches the new file whole rather
+        // than asking to resume past its end forever.
+        assertThat((failure as DownloadException).isRetryable).isTrue()
+        assertThat(destination.exists()).isFalse()
+        assertThat(File(folder.root, "weights.gguf.part").exists()).isFalse()
     }
 
     @Test

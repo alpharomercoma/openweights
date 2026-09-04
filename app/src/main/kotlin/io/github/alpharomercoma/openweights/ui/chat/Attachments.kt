@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -150,7 +151,12 @@ fun AttachmentSheet(
     onPickedDocument: (Uri) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val captureUri = remember { newCaptureUri() }
+    // Saved, not merely remembered. The camera runs in another app with this activity
+    // behind it, and an activity behind another one is recreated whenever the system
+    // decides to. At that point a bare `remember` minted a second URI, whose creation
+    // deleted the file the camera was writing into, and the result that arrived afterwards
+    // named the new empty one. The photograph was gone and nothing said so.
+    val captureUri = rememberSaveable { newCaptureUri() }
 
     val openDocument = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),

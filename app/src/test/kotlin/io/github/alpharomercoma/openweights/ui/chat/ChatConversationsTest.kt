@@ -827,4 +827,29 @@ class ChatConversationsTest : ChatFixture() {
         assertThat(viewModel.uiState.value.modelName).isNull()
         assertThat(viewModel.uiState.value.error).isNotNull()
     }
+
+    @Test
+    fun `a load that fails after the weights are mapped is reported like any other`() =
+        runTest(dispatcher) {
+            // The load itself was watched; what came after it was not. Clearing the context
+            // for the new weights is a native call on the far side of a successful load, and
+            // it ran inside `Result.onSuccess`, which does not fold its own throw back into
+            // the Result, so the failure branch never saw it and the exception left
+            // `viewModelScope.launch` for Android's uncaught handler.
+            engine.failNextResetContext = true
+
+            loadModel(name = "model-a.gguf")
+            settle()
+
+            assertThat(viewModel.uiState.value.error).isNotNull()
+            assertThat(viewModel.uiState.value.modelName).isNull()
+            assertThat(viewModel.uiState.value.isLoadingModel).isFalse()
+            // And the screen is not left claiming it is about to answer.
+            assertThat(viewModel.uiState.value.isPreparingFirstResponse).isFalse()
+            // The next load is still possible: nothing here wedged the one-at-a-time lock.
+            loadModel(name = "model-b.gguf")
+            settle()
+            assertThat(viewModel.uiState.value.modelName).isEqualTo("model-b")
+            assertThat(viewModel.uiState.value.isLoadingModel).isFalse()
+        }
 }

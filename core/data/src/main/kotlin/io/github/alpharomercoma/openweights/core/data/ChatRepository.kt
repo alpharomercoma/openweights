@@ -237,7 +237,7 @@ class ChatRepository @Inject constructor(
     suspend fun draft(conversationId: Long): String = if (conversationId > 0) {
         database.conversations().byId(conversationId)?.draft.orEmpty()
     } else {
-        context.settingsDataStore.data.first()[NEW_CHAT_DRAFT].orEmpty()
+        context.settingsDataStore.data.orEmptyWhenUnreadable().first()[NEW_CHAT_DRAFT].orEmpty()
     }
 
     /**

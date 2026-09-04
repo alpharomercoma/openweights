@@ -63,7 +63,7 @@ class TokenVault internal constructor(
         this(context.settingsDataStore, ::keystoreKey)
 
     /** The stored token, or null when none is set or none can be read. */
-    val token: Flow<String?> = store.data.map { preferences ->
+    val token: Flow<String?> = store.data.orEmptyWhenUnreadable().map { preferences ->
         preferences[TOKEN_KEY]?.let(::open)
     }
 

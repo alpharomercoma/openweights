@@ -36,6 +36,7 @@ import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.hub.DownloadException
 import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
+import io.github.alpharomercoma.openweights.core.hub.HubException
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.ModelDownloader
 import kotlinx.coroutines.CancellationException
@@ -114,12 +115,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         val error = failure ?: return Result.success()
 
-        // A dropped connection is worth another attempt, because the partial file means
-        // the attempt resumes where it stopped. So is a stream that stopped short, which
-        // arrives as a retryable DownloadException: its own message promises the download
-        // will resume, and treating it as terminal made that message a lie the user had to
-        // act on by hand. A checksum that did not match is not retryable and says so.
-        val retryable = error is IOException || (error as? DownloadException)?.isRetryable == true
+        val retryable = error.isWorthRetrying()
         val message = error.message ?: error::class.simpleName ?: "unknown failure"
         Log.w(
             "OpenWeights",
@@ -263,6 +259,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         private const val CHANNEL = "downloads"
         private const val PROGRESS_MAX = 100
+
         /** Maximum automatic retries after the first transfer attempt. */
         const val MAX_RETRIES = 5
 
@@ -272,4 +269,27 @@ class ModelDownloadWorker @AssistedInject constructor(
         internal fun percentOf(done: Long, total: Long): Int =
             if (total > 0) ((done * PROGRESS_MAX) / total).toInt().coerceIn(0, PROGRESS_MAX) else 0
     }
+}
+
+/**
+ * Whether the same download is worth putting back on the queue.
+ *
+ * A dropped connection is, because the partial file means the attempt resumes where it
+ * stopped. So is a stream that stopped short, which arrives as a retryable
+ * [DownloadException]: its own message promises the download will resume, and treating it
+ * as terminal made that message a lie the user had to act on by hand.
+ *
+ * And so is a Hub that said it was busy. A rate limit or a 5xx from the CDN is the most
+ * retryable thing that happens here and used to be the least: it arrived as a plain
+ * [HubException], matched nothing above, and failed at the first attempt, while a dropped
+ * socket (a strictly smaller problem) got all five. Permission, a missing file and a
+ * checksum that did not match stay terminal: those answer the same however often they are
+ * asked, and the five-attempt countdown in front of them is only a wait before the same
+ * sentence.
+ */
+internal fun Throwable.isWorthRetrying(): Boolean = when (this) {
+    is IOException -> true
+    is DownloadException -> isRetryable
+    is HubException -> isRetryable
+    else -> false
 }

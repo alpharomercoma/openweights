@@ -85,30 +85,53 @@ class MessageActionsSheetTest {
     }
 
     @Test
-    fun `the measurements for this reply are shown`() {
+    fun `the three figures a person waited for lead the panel`() {
         showSheet()
 
-        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("to first token", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("to first token").assertIsDisplayed()
+        compose.onNodeWithText("in total").assertIsDisplayed()
+        // The prompt as tokenized this turn plus what was written, which is the whole of
+        // what the model handled: 96 generated on a 154-token prompt.
+        compose.onNodeWithText("250").assertIsDisplayed()
     }
 
     @Test
-    fun `prefill speed is shown here, labelled apart from decode`() {
-        // Not on the row beside the reply -- there is no room to say which number is which
-        // there -- but there is room here, and unlabelled the two would read as the same
-        // measurement said twice rather than the two different phases they are.
+    fun `each phase says what it read, how long it took, and how fast that was`() {
+        // The failure this replaces was a run-on line of five middot-separated numbers in
+        // which nothing said which rate belonged to which half of the turn.
         showSheet(prefillTokensPerSecond = 142.0)
 
-        compose.onNodeWithText("142.0 tok/s prefill", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Prefill").assertIsDisplayed()
+        compose.onNodeWithText("Decode").assertIsDisplayed()
+        compose.onNodeWithText("142 tok/s").assertIsDisplayed()
+        compose.onNodeWithText("14 tok/s").assertIsDisplayed()
     }
 
     @Test
-    fun `a reply from before prefill speed was measured shows decode speed alone`() {
+    fun `prefill counts what was read, not what the cache already held`() {
+        // 154 tokens of prompt with 100 of them answered by the cache is 54 tokens of
+        // actual work, and 54 is the number the prefill rate was computed against. Pairing
+        // the rate with the whole prompt would make the row fail its own arithmetic.
+        showSheet(prefillTokensPerSecond = 142.0)
+
+        compose.onNodeWithText("54 tokens").assertIsDisplayed()
+        compose.onNodeWithText("96 tokens").assertIsDisplayed()
+    }
+
+    @Test
+    fun `a reply from before prefill was measured says so rather than inventing a number`() {
         showSheet(prefillTokensPerSecond = null)
 
-        compose.onNodeWithText("tok/s prefill", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("13.8 tok/s decode", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Prefill").assertIsDisplayed()
+        compose.onNodeWithText("14 tok/s").assertIsDisplayed()
+    }
+
+    @Test
+    fun `nothing is claimed about a reply still being written`() {
+        showSheet(isStreaming = true)
+
+        compose.onNodeWithText("Prefill").assertDoesNotExist()
+        compose.onNodeWithText("in total").assertDoesNotExist()
     }
 
     @Test
@@ -175,6 +198,7 @@ class MessageActionsSheetTest {
         onEdit: () -> Unit = {},
         onBranch: () -> Unit = {},
         prefillTokensPerSecond: Double? = null,
+        isStreaming: Boolean = false,
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -186,8 +210,13 @@ class MessageActionsSheetTest {
                         tokensPerSecond = 13.8,
                         prefillTokensPerSecond = prefillTokensPerSecond,
                         timeToFirstTokenMs = 412,
-                        generatedTokens = 61,
-                        totalMillis = 4_800,
+                        generatedTokens = 96,
+                        promptTokens = 154,
+                        cachedTokens = 100,
+                        prefillMs = 380,
+                        decodeMs = 6_900,
+                        totalMillis = 7_600,
+                        isStreaming = isStreaming,
                     ),
                     canRegenerate = canRegenerate,
                     canEdit = canEdit,

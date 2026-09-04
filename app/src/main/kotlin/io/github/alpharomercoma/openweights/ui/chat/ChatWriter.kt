@@ -126,6 +126,8 @@ open class ChatWriter @Inject constructor(private val chats: ChatRepository) {
             totalMillis = totalMillis,
             promptTokens = stats?.totalPromptTokens,
             cachedTokens = stats?.cachedTokens,
+            prefillMs = stats?.prefillMs,
+            decodeMs = stats?.decodeMs,
             steps = steps,
         )
         engineHistory?.let { history ->

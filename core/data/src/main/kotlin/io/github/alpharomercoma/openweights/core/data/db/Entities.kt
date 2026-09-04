@@ -163,6 +163,26 @@ data class MessageEntity(
     val promptTokens: Int? = null,
     /** How much of [promptTokens] the KV cache answered for free. See [GenerationStats.cachedTokens]. */
     val cachedTokens: Int? = null,
+    /**
+     * How long the prompt took to read, in milliseconds.
+     *
+     * Stored rather than derived. It can be recovered from the fresh token count and
+     * [prefillTokensPerSecond] most of the time, and "most of the time" is the problem: the
+     * rate is null on a full cache hit and on a turn that decoded a single token, so the
+     * arithmetic produces a blank where there is a real, measured duration. A panel that
+     * says how long each half of a turn took cannot be built on a number that disappears
+     * exactly when the turn was interesting.
+     */
+    val prefillMs: Long? = null,
+    /**
+     * How long the reply took to write, in milliseconds. The other half of [prefillMs].
+     *
+     * Together with [timeToFirstTokenMs] these are the three intervals a turn is made of,
+     * and [totalMillis] is the wall clock around all of it: the gap between their sum and
+     * the total is what the tools, the templating and the screen cost, which is a real
+     * quantity and one nothing here used to be able to name.
+     */
+    val decodeMs: Long? = null,
 )
 
 /**

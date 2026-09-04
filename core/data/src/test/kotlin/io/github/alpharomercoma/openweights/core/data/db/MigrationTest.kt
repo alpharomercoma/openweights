@@ -68,6 +68,7 @@ class MigrationTest {
         OpenWeightsDatabase.MIGRATION_15_16,
         OpenWeightsDatabase.MIGRATION_16_17,
         OpenWeightsDatabase.MIGRATION_17_18,
+        OpenWeightsDatabase.MIGRATION_18_19,
     )
 
     @Test
@@ -465,6 +466,39 @@ class MigrationTest {
                         "WHERE type = 'table' AND name = 'content_reports'",
                 ),
             ).isEqualTo(0)
+        }
+    }
+
+    @Test
+    fun `a reply from before the two durations were stored reads as unmeasured, not as zero`() {
+        // The panel showing where a turn's seconds went has to be able to say "this was
+        // never measured". Backfilling these from totalMillis would be inventing a split
+        // that was never taken: prefill, decode and everything around them were one number
+        // on this row and cannot be pulled apart afterwards.
+        helper.createDatabase(18).use { db ->
+            db.execSQL(
+                "INSERT INTO conversations " +
+                    "(id, title, modelName, createdAt, updatedAt, compactionThroughIndex, " +
+                    "draft) " +
+                    "VALUES (1, 'About Ada', 'qwen', 10, 20, -1, '')",
+            )
+            db.execSQL(
+                "INSERT INTO messages " +
+                    "(id, conversationId, role, text, createdAt, tokensPerSecond, " +
+                    "totalMillis) " +
+                    "VALUES (1, 1, 'assistant', 'She wrote the first algorithm.', 30, " +
+                    "24.5, 4800)",
+            )
+        }
+
+        helper.runMigrationsAndValidate(19, migrations.toList()).use { db ->
+            assertThat(db.isNullAt("SELECT prefillMs FROM messages WHERE id = 1")).isTrue()
+            assertThat(db.isNullAt("SELECT decodeMs FROM messages WHERE id = 1")).isTrue()
+            // What it did measure is untouched, which is the half that still has to render.
+            assertThat(db.doubleAt("SELECT tokensPerSecond FROM messages WHERE id = 1"))
+                .isEqualTo(24.5)
+            assertThat(db.intAt("SELECT totalMillis FROM messages WHERE id = 1"))
+                .isEqualTo(4800)
         }
     }
 }

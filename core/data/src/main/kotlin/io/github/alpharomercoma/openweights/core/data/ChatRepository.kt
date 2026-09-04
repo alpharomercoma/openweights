@@ -128,6 +128,10 @@ class ChatRepository @Inject constructor(
         totalMillis: Long? = null,
         promptTokens: Int? = null,
         cachedTokens: Int? = null,
+        /** How long the prompt took to read. See [MessageEntity.prefillMs]. */
+        prefillMs: Long? = null,
+        /** How long the reply took to write. See [MessageEntity.decodeMs]. */
+        decodeMs: Long? = null,
         /**
          * What this reply's own tool calls found, in the order they ran.
          *
@@ -154,6 +158,8 @@ class ChatRepository @Inject constructor(
                 totalMillis = totalMillis,
                 promptTokens = promptTokens,
                 cachedTokens = cachedTokens,
+                prefillMs = prefillMs,
+                decodeMs = decodeMs,
             ),
         )
         if (steps.isNotEmpty()) {

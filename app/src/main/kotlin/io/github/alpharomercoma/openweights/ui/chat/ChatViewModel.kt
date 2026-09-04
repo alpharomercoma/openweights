@@ -129,6 +129,10 @@ data class TranscriptEntry(
     val promptTokens: Int? = null,
     /** How much of [promptTokens] the KV cache answered for free. See [GenerationStats.cachedTokens]. */
     val cachedTokens: Int? = null,
+    /** How long the prompt took to read. See [MessageEntity.prefillMs]. */
+    val prefillMs: Long? = null,
+    /** How long the reply took to write. See [MessageEntity.decodeMs]. */
+    val decodeMs: Long? = null,
     val isStreaming: Boolean = false,
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
@@ -3105,6 +3109,8 @@ class ChatViewModel @Inject constructor(
                 generatedTokens = turnStats.generatedTokens,
                 promptTokens = turnStats.totalPromptTokens,
                 cachedTokens = turnStats.cachedTokens,
+                prefillMs = turnStats.prefillMs,
+                decodeMs = turnStats.decodeMs,
             )
         }
         recordWork(event.stats)
@@ -4145,6 +4151,8 @@ private fun List<MessageEntity>.toTranscript(
         totalMillis = message.totalMillis,
         promptTokens = message.promptTokens,
         cachedTokens = message.cachedTokens,
+        prefillMs = message.prefillMs,
+        decodeMs = message.decodeMs,
         compactionNote = COMPACTION_NOTE.takeIf {
             foldedThrough != null &&
                 index == foldedThrough + 1

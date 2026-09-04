@@ -99,12 +99,16 @@ fun MessageActionsSheet(
         ) {
             // The measurements that no longer fit beside the actions. There is room here,
             // and a reader who wants time to first token has already gone looking for it.
-            entry.detail()?.let { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            //
+            // A panel rather than the run-on sentence this used to be. Five numbers joined
+            // by middots wrapped to three lines on a phone and read as a single fact said
+            // five ways: nothing in "142.0 tok/s · 36.1 tok/s · 0.41 s · 96 tokens · 4.3 s"
+            // says which of those two rates belongs to which half of the turn, or that the
+            // 96 is the second one's and not the first's. See [TurnStatsPanel].
+            if (entry.hasStats) {
+                TurnStatsPanel(
+                    entry = entry,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
             // The reasoning block is the model talking to itself; copying the answer is what
@@ -219,30 +223,3 @@ private fun Context.copyToClipboard(text: String) {
     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("OpenWeights message", text))
 }
-
-/**
- * Everything measured about one reply, for the sheet.
- *
- * Null while a reply is still arriving, because half a measurement is worse than none.
- */
-@Composable
-private fun TranscriptEntry.detail(): String? {
-    val decode = tokensPerSecond ?: return null
-    return listOfNotNull(
-        // Labelled now that there are two: unlabelled, "142.0 tok/s · 36.1 tok/s" reads as
-        // the same measurement said twice rather than the two different phases it is. Prefill
-        // first because it happens first — reading a prompt, then writing a reply. Resources
-        // rather than literals: this line shipped hard-coded English into four translated
-        // locales for as long as it existed, and adding two more labels to it was the wrong
-        // moment to keep the habit.
-        prefillTokensPerSecond?.let { stringResource(R.string.detail_prefill_speed, it) },
-        stringResource(R.string.detail_decode_speed, decode),
-        timeToFirstTokenMs?.let {
-            stringResource(R.string.detail_first_token, it / MILLIS_PER_SECOND)
-        },
-        generatedTokens?.let { stringResource(R.string.detail_token_count, it) },
-        totalMillis?.let { stringResource(R.string.detail_total_time, it / MILLIS_PER_SECOND) },
-    ).joinToString(" · ")
-}
-
-private const val MILLIS_PER_SECOND = 1000.0

@@ -33,7 +33,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ToolStepEntity::class,
         EngineHistoryEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 abstract class OpenWeightsDatabase : RoomDatabase() {
@@ -93,6 +93,28 @@ abstract class OpenWeightsDatabase : RoomDatabase() {
          * `IF EXISTS` because [MIGRATION_2_3] created this table and a database old enough
          * to predate it will arrive here without one.
          */
+        /**
+         * Gives a reply the two durations it was already measured with.
+         *
+         * The engine has reported `prefillMs` and `decodeMs` for every generation since
+         * before any of these numbers were stored; the row kept the rates computed from
+         * them and threw the durations away, on the reasoning that a rate and a token count
+         * imply a duration. They do not, quite: both rates are null in the cases that make a
+         * turn worth inspecting — a full cache hit prefills nothing, a one-token reply has
+         * no decode rate — and a panel showing where a turn's seconds went cannot have holes
+         * in it exactly there.
+         *
+         * Nothing is backfilled, and nothing can be. An old row's prefill time was folded
+         * into `totalMillis` with the tools and the templating and cannot be pulled back
+         * out, so it reads as "not measured" rather than as a number invented for it.
+         */
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN prefillMs INTEGER")
+                db.execSQL("ALTER TABLE messages ADD COLUMN decodeMs INTEGER")
+            }
+        }
+
         val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS content_reports")

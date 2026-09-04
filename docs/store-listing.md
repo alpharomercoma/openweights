@@ -152,11 +152,58 @@ Made, checked against the spec, and in `play/graphics`. How to regenerate any of
 
 Made by `play/graphics/cut.py` from real captures; `promo.py` holds the compositor. Four
 facts about how Play shows it decided every design choice: it autoplays **inline, muted,
-for up to 30 seconds**, so the cut is 27.4 s and says everything in type; it plays in a
+for up to 30 seconds**, so the cut is 25.6 s and says everything in type; it plays in a
 **landscape** player, so it is 1920 x 1080; the **feature graphic is its cover image**, so
 it stays in that art's colour family and imports the same mark; and **ads must be off**,
-which is why it carries no music. A Content ID claim can force ads onto a video, and that
-would put the listing out of policy, so silence is a compliance decision before a taste one.
+which is why the file Play points at carries no music. A Content ID claim can force ads onto
+a video, and that would put the listing out of policy, so silence is a compliance decision
+before a taste one.
+
+### Two uploads, and which one goes in the box
+
+Play does not host the file. The listing field takes a **YouTube URL**, and Play plays that
+video inline and muted. So there is no such thing as "silent on Play, scored on YouTube" for
+one upload: whatever is on the YouTube video is on the listing video, muted.
+
+There are therefore two files and two uploads, and only one of them may be pasted into the
+Console:
+
+| File | Audio | Where it goes |
+| --- | --- | --- |
+| `play/videos/listing-promo.mp4` | silent | **the Play listing field** |
+| `play/videos/listing-promo-scored.mp4` | original cue | the YouTube channel only |
+
+The picture is byte-identical between them; `play/graphics/score.py` copies the video stream
+through and only replaces the audio, so the two can never drift apart.
+
+**YouTube settings for the linked upload**: Public, ads off, not age restricted, not made
+for kids. Paste the full `https://www.youtube.com/watch?v=...` form. The thumbnail does not
+matter to Play, which uses the feature graphic as the player's cover.
+
+### The score, and what was refused
+
+`play/graphics/score.py` synthesises the cue from oscillators and band-limited noise. No
+samples, no loops, no library track: an original composition is still copyrighted, and it is
+copyrighted to its author, so the achievable reading of "no copyright" is no third-party
+material and nothing for Content ID to match.
+
+The brief asked for an enterprise keynote bed with applause. codex and agy were asked
+independently and refused the same two things for the same reasons. **Applause** invents an
+audience, which is the argument this project already accepted when it kept UI click foley
+out: invented events are the audio equivalent of staging footage, and canned applause over a
+screencast reads to this audience as parody. A **corporate hype bed** fails differently, by
+scoring unembellished evidence like a launch keynote and telling the viewer to distrust the
+thing being proved. Both proposed the same replacement in nearly the same words, and that is
+what is here: a sparse electronic pulse, quiet computational momentum rather than triumph.
+
+75 BPM in 4/4 makes a bar exactly 3.2 s, the length of the opening shot, and eight bars
+exactly 25.6 s, the length of the film. The pulse starts on frame one with no intro, the
+sequence enters at bar 2, a high tick at bar 3, the pad opens at bar 4, the pulse firms up
+under the download at bar 5, bar 6 strips back so "no folder shared" is heard in the clear,
+bar 7 widens, and at 23.0 s the pulse stops dead for a single low hit and a chord resolving
+to the tonic under the end card. No crescendo: "No account" is a statement, not a climax.
+Measured on the render, integrated **-18.0 LUFS**, true peak **-2.9 dBTP**, LRA 4.1 LU, and
+the loudest bar is bar 7 rather than the ending.
 
 **The silence is deliberate, and so is the track.** The file carries a silent AAC stream at
 about -91 dB of encoder noise, which is below the 16-bit floor and inaudible. Stripping it

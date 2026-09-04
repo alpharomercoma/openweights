@@ -24,6 +24,12 @@ call. The chip is the proof, not the contradiction: it says the model reached th
 once, because a switch the viewer owns was on, and then wrote the answer here. The caption
 carries it, and the tools beat later in the cut says the same thing about the switch.
 
+But the first two seconds now carry no network claim at all, which is the point of the
+brand beat. It is the same take framed higher, so the chip is out of shot and what is in
+frame is the app header: a named open-weight model, running on this phone's CPU, with its
+context length printed. The claim and its evidence are the same pixels. Only in the shot
+after it, where the subhead can say "Model local. Web opt-in.", does the chip appear.
+
 Deliberately not here: the canvas builder, because its tools stay off until a folder is
 shared and on a 1.2B model the request returns an empty reply, and we do not stage results;
 and the two-runtimes claim, the product's real differentiator, because Discover shows no
@@ -49,100 +55,87 @@ OUT = ROOT / "play/videos/listing-promo.mp4"
 # Held views are cut from the full 1280-wide screen, so they keep the app's own side
 # margins and need no horizontal centring of their own. 1280 x 574 is the card's aspect.
 FULL_W, FULL_H = 1280, 574
-END = 2.6  # end-card seconds
+END = 3.2  # end-card seconds
 
 SHOTS = [
-    # The opening rides real motion, and now it is the only kind of motion that does not
-    # run out: a reply being written. The question is asked, the app searches, and the
-    # answer arrives word by word for the whole length of the shot.
-    #
-    # The question had to be one whose answer a language model cannot already hold, or the
-    # search is theatre. It also had to be one whose answer is checkable, because a wrong
-    # fact on a store listing is worse than a dull shot: an earlier take answered a
-    # different question with an invented release page, and was thrown away. This answer
-    # was verified against the web before it was filmed. An earlier take than that asked
-    # the model to write a message to a landlord and it wrote ABOUT contacting one
-    # instead, which is the sort of thing to judge before filming rather than after.
-    #
-    # The crop starts at 635, in the gap between the question bubble and the search chip,
-    # and ends between two lines of the reply, so neither edge cuts a glyph. The question
-    # itself is out of frame and not missed: the chip quotes it and the answer opens by
-    # restating it. An earlier framing kept the bubble and paid for it with a line of text
-    # sliced along the card's bottom edge.
-    #
-    # The window is 12.45 to 15.65 and every boundary of it was forced by something in the
-    # footage. Before 11.5 the turn spends about five seconds reading the search results
-    # back into context behind nothing but a counter. At 4.0 the model's own call leaks into
-    # the bubble as literal `<|tool_call_start|>[web_search(query=` markup for about a
-    # second before the parser catches up. And from 12.2 to 12.45 the reply shows a raw
-    # `**Qwen 3.8` because emphasis is rendered only once its closing marker arrives, so
-    # streamed bold spends a quarter second as asterisks. All three are real defects, all
-    # three are logged, and none of them is in frame. What is left is 3.2 seconds that move
-    # from the first frame to the last: the answer writes itself, and the shot ends as the
-    # speed line prints, which is the next caption's subject.
+    # The brand beat, and it costs no runtime: it is the same take as the shot after it,
+    # framed higher. The crop runs 108..682, which clears the status bar glyphs at the top
+    # and stops in the gap above the search chip, so what is in frame is the app header
+    # reading "LFM2.5-1.2B-Inst... CPU . 32768 ctx" and the question. That header IS the
+    # claim: a named open-weight model, running on this phone's CPU, with its context
+    # length printed. Two reviewers independently refused a held title card here on the
+    # grounds that a static slate in the first two seconds of a muted autoplay is how you
+    # lose the viewer; overlaying the brand on live UI says the same thing and spends
+    # nothing. The chip is deliberately out of this frame, so the first two seconds carry
+    # no network claim at all.
+    dict(src="shot-search.mp4", at=12.6, length=2.0, hold=True,
+         crop=(0, 108, FULL_W, FULL_H), zoom=1.035,
+         eyebrow="openweights", head="Run open-weight AI on your phone",
+         sub="No account. On-device by default."),
+
+    # Then the same conversation, lower in the frame, with the answer writing itself. The
+    # subhead does the one job the picture cannot: it separates where the model runs from
+    # where the answer's facts came from. A viewer who reads "Searched the web" over a
+    # headline about on-device inference can otherwise conclude the opposite of the truth.
     dict(src="shot-search.mp4", at=12.45, length=3.2, crop=(0, 635, FULL_W, FULL_H),
          eyebrow="on device", head="It answers on-device",
-         sub="No sign-in. The web only if you allow it."),
+         sub="Model local. Web opt-in."),
 
-    # Held from the same take, one second later, so shots one and two are one conversation
-    # rather than two. 955 is the gap between two lines of the reply, so the top edge cuts
-    # nothing, and 1529 clears the speed line underneath. The composer stays out: the chat
-    # box has no business in a shot whose whole subject is the number above it.
-    dict(src="shot-search.mp4", at=17.5, length=3.4, hold=True,
+    # Held from the same take, so the first three beats are one conversation. 965 is the gap
+    # between two lines of the reply, so the top edge cuts no glyph, and 1539 clears the
+    # speed line underneath. The composer stays out: the chat box has no business in a shot
+    # whose whole subject is the number above it.
+    dict(src="shot-search.mp4", at=17.5, length=3.0, hold=True,
          crop=(0, 965, FULL_W, FULL_H),
-         eyebrow="live telemetry", head="It shows its own speed",
-         sub="Tokens per second, on every answer."),
+         eyebrow="live telemetry", head="See exactly how fast it runs",
+         sub="Tokens per second, every answer."),
 
     # Two files, each card centred on its own measured edges: the bands are 513 px tall with
     # 33 px gaps, so a 574 px window leaves about 30 px above and below and slices nothing.
     # The cut between them is what says "per file": 664 MB needing 1.13 GB at ~98 tok/s,
-    # then 697 MB needing 1.17 GB at ~93.
-    dict(src="shot-fit.mp4", at=2.4, length=3.0, hold=True,
+    # then a 4.80 GB file that wants 5.29 and says so.
+    dict(src="shot-fit.mp4", at=2.4, length=2.8, hold=True,
          crop=(0, 1272, FULL_W, FULL_H),
-         eyebrow="before download", head="It says if it fits",
+         eyebrow="before download", head="Know if a model fits",
          sub="What it needs, and how fast it runs."),
-    # The other verdict, from the 8B page, and deliberately a different screen: two cards
-    # from the same list that both say "Runs comfortably" differ so little that the cut
-    # between them barely registers, and a caption changing over an apparently unchanged
-    # picture reads as a stuck title rather than as a second piece of evidence. This card
-    # says the opposite thing, about the very file the next shot downloads. Its cards are
-    # 411 px tall on a 444 px pitch, so a window wide enough to hold the Download button
-    # cannot avoid the neighbours: it is centred instead, with 29 px of the card above and
-    # 31 px of the one below, which reads as a list rather than as a slip.
-    dict(src="fs-datasync-download.mp4", at=1.2, length=3.2, hold=True,
+    # The same eyebrow as the shot above, deliberately: one claim, two pieces of
+    # evidence, and repeating the label is what says the second card is the same
+    # argument rather than a new one. The other verdict, on a different screen: two cards from the same list
+    # that both say "Runs comfortably" differ so little that the cut between them barely
+    # registers. This one says the opposite thing, about the very file the next shot
+    # downloads. Its cards are 411 px tall on a 444 px pitch, so a window wide enough to
+    # hold the Download button cannot avoid the neighbours: it is centred instead, with
+    # 29 px of the card above and 31 px of the one below, which reads as a list.
+    dict(src="fs-datasync-download.mp4", at=1.2, length=2.8, hold=True,
          crop=(40, 1203, 1200, 538),
-         eyebrow="and when it will not", head="It says when it is tight",
-         sub="4.80 GB asking for 5.29, said upfront."),
+         eyebrow="before download", head="And when it does not",
+         sub="4.80 GB asking for 5.29, upfront."),
 
-    # Motion, and the only other shot that has any: the byte counter climbs and the bar
-    # grows while the layout underneath stays perfectly still, which is the one kind of
-    # movement a fixed crop can hold. 1180 x 529 rather than the full width because the
-    # publisher row below the card creeps into a 1280-wide window.
-    dict(src="fs-datasync-download.mp4", at=5.0, length=3.6, crop=(50, 368, 1180, 529),
+    # Motion, and the only other shot with any: the byte counter climbs and the bar grows
+    # while the layout underneath stays still, which is the one kind of movement a fixed
+    # crop can hold. Shortened from 3.6 s to 3.0: downloading a file is table stakes, not a
+    # differentiator, and the two beats either side of it are the argument.
+    dict(src="fs-datasync-download.mp4", at=5.0, length=3.0, crop=(50, 368, 1180, 529),
          eyebrow="from hugging face", head="Then it downloads it",
          sub="Progress in the app. Cancel anytime."),
 
     # The tools. The first view is the screen's own explainer card, centred on its measured
     # edges: it says the file tools stay off until a folder is shared, which is both the
     # strongest privacy claim on the screen and the reason those rows read "Waiting for a
-    # folder". Any view of the list itself is three-quarters rows in that waiting state,
-    # which made a live product look inert. The second view is centred exactly on the
-    # boundary: the local group's last row sits 200 px above the "Leaves the device" header
-    # and the network group's first row 200 px below it, so the split is symmetrical in
-    # frame rather than approximately so. Both crops land on measured boundaries rather
-    # than near them: 380 puts the screen's own "What the model may do while it answers"
-    # line 10 px from the top with the card 11 px from the bottom, and 1412 is exactly the
-    # divider above the "Run a script" row, so the frame opens on a whole row instead of a
-    # sliced title. What the bottom edge cuts is a row continuing below the fold, which is
-    # what a list does; what the top edge cuts is a mistake.
-    dict(src="shot-tools3.mp4", at=0.4, length=3.2, hold=True,
+    # folder". The second is centred exactly on the boundary: the local group's last row
+    # sits 200 px above the "Leaves the device" header and the network group's first row
+    # 200 px below it, so the split is symmetrical in frame rather than approximately so.
+    # 380 puts the screen's own "What the model may do while it answers" line 10 px from the
+    # top; 1412 is exactly the divider above "Run a script", so the frame opens on a whole
+    # row instead of a sliced title.
+    dict(src="shot-tools3.mp4", at=0.4, length=2.8, hold=True,
          crop=(0, 380, FULL_W, FULL_H),
          eyebrow="your files", head="No folder is shared by default",
          sub="They stay off until you pick one."),
-    dict(src="shot-tools3.mp4", at=7.0, length=3.4, hold=True,
+    dict(src="shot-tools3.mp4", at=7.0, length=2.8, hold=True,
          crop=(0, 1412, FULL_W, FULL_H),
-         eyebrow="your call", head="You control what goes online",
-         sub="Each tool says which side it works on."),
+         eyebrow="your call", head="You decide what leaves the device",
+         sub="Every tool says which side it is on."),
 ]
 
 
@@ -168,7 +161,8 @@ def main() -> None:
             # 0.25 s and reads as the caption snapping into place rather than as an effect.
             clips.append(beat_typed(source, shot["at"], shot["length"], work / f"seq{i}",
                                     work / f"beat{i}.mp4", shot["eyebrow"], shot["head"],
-                                    shot["sub"], mask, shot["crop"], 1.0))
+                                    shot["sub"], mask, shot["crop"],
+                                    shot.get("zoom", 1.0)))
         # 2.6 s. Both reviewers called 4.6 s pacing malpractice: 17 percent of the runtime
         # on a static logo, on a listing whose cover image is already that same brand art.
         clips.append(still(endcard(work / "end.png"), END, work / "end.mp4"))

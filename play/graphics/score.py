@@ -97,8 +97,11 @@ STEP = BEAT / 4
 DUR = 25.6
 N = int(DUR * SR)
 
-CUTS = [0.0, 3.2, 6.6, 9.6, 12.8, 16.4, 19.6, 23.0]
-A, B, C, D, E, F, G, H = CUTS
+# Re-measured off the recut picture. Nine shots now: the brand beat was added at the head
+# and the download beat shortened, so every boundary moved. Still all multiples of 0.2 s,
+# which is what keeps 150 BPM locked to the edit.
+CUTS = [0.0, 2.0, 5.2, 8.2, 11.0, 13.8, 16.8, 19.6, 22.4]
+A, B, C, D, E, F, G, H, I = CUTS
 
 TARGET_LUFS = -15.0
 # The ceiling is a ceiling, not a target. A mix's crest factor and the loudness target
@@ -113,12 +116,14 @@ WET = 0.34            # reverb send, against a unit-energy impulse
 TAIL = 0.38           # the ending's extra send into its own longer, darker hall
 
 VARIANTS = {
+    # A hook / B on device / C telemetry / D fits / E does not / F download /
+    # G your files (the reduction) / H your call (the lift) / I end card
     "A": dict(pickups=False, pluck=0.86, hat=0.85, clap=0.30, lead8va=False, cym=0.30,
-              gains={"A": 0.80, "B": 0.87, "C": 0.93, "D": 0.97,
-                     "E": 1.03, "F": 0.91, "G": 1.08, "H": 1.0}),
+              gains={"A": 0.76, "B": 0.85, "C": 0.92, "D": 0.98, "E": 1.04,
+                     "F": 1.10, "G": 0.90, "H": 1.16, "I": 1.02}),
     "B": dict(pickups=True, pluck=1.06, hat=1.00, clap=0.36, lead8va=True, cym=0.38,
-              gains={"A": 0.80, "B": 0.88, "C": 0.95, "D": 1.00,
-                     "E": 1.09, "F": 0.84, "G": 1.16, "H": 1.0}),
+              gains={"A": 0.76, "B": 0.86, "C": 0.94, "D": 1.01, "E": 1.08,
+                     "F": 1.15, "G": 0.86, "H": 1.24, "I": 1.02}),
 }
 
 
@@ -185,9 +190,9 @@ CHORDS = [
     (9.6, F2, (F4, A4, C4 * 2)),
     (12.8, D2, (D4, F4, A4)),
     (16.0, BB1, (BB3, D4, F4)),
-    (19.2, BB1, (BB3, D4, F4)),
-    (21.6, C2, (C4, E4, G4)),
-    (22.4, D2, (D4, F4, A4)),
+    (19.2, F2, (F4, A4, C4 * 2)),
+    (20.8, C2, (C4, E4, G4)),
+    (21.6, D2, (D4, F4, A4)),
 ]
 
 
@@ -199,7 +204,7 @@ def chord(t: float):
     return root, tri
 
 
-PHRASE = 22.4          # the last bar and a half: one phrase, not an outro
+PHRASE = 21.6          # the last phrase, arriving half a bar before the end card
 
 
 def tail(t: float) -> float:
@@ -212,7 +217,7 @@ def tail(t: float) -> float:
 
 
 def section(t: float) -> str:
-    for name, start in zip("HGFEDCBA", CUTS[::-1]):
+    for name, start in zip("IHGFEDCBA", CUTS[::-1]):
         if t >= start - 1e-9:
             return name
     return "A"
@@ -366,7 +371,7 @@ def pad_block(rng, t0, t1, tri, gain, lo, hi, out=0.35, attack=0.25, decay=0.0) 
 def pattern(t: float) -> str:
     """What the kit plays. The ending is not a section of its own, so after the
     final phrase begins the kit carries on with the pattern it already had."""
-    return "G" if t >= G else section(t)
+    return "H" if t >= H else section(t)
 
 
 def drums(rng, v):
@@ -379,22 +384,22 @@ def drums(rng, v):
         t = s * STEP
         sec = pattern(t)
         beat, six = (s // 4) % 4, s % 4
-        thin = sec == "F"
+        thin = sec == "G"
         tl = tail(t)
 
         if six == 0 and beat in (0, 2):
             g = (1.0 if beat == 0 else 0.88) * (0.88 if thin else 1.0) * tl
-            if v["pickups"] and sec in ("E", "G"):
+            if v["pickups"] and sec in ("F", "H"):
                 g *= 1.05
             if t < PHRASE + 1.8:      # the kit lets the kick go first
                 add(buf, t, kick_hit(rng, 0.92 * g))
                 kicks.append(t)
-        elif v["pickups"] and sec in ("E", "G") and beat == 3 and six == 2:
+        elif v["pickups"] and sec in ("F", "H") and beat == 3 and six == 2:
             add(buf, t, kick_hit(rng, 0.48))
             kicks.append(t)
 
         if sec != "A" and six == 0 and beat in (1, 3):
-            lvl = 0.58 if thin else (1.12 if sec in ("E", "G") else 1.0)
+            lvl = 0.58 if thin else (1.12 if sec in ("F", "H") else 1.0)
             if t < PHRASE + 1.4:      # then the backbeat, one bar later
                 add(buf, t, clap_hit(rng, v["clap"] * lvl * tl))
 
@@ -403,21 +408,21 @@ def drums(rng, v):
             if sec in ("A", "B"):
                 g *= 0.8
             add(buf, t, hat(rng, False, g * tl))
-            if sec in ("C", "D", "E", "G") and beat == 3 and six == 2:
+            if sec in ("D", "E", "F", "H") and beat == 3 and six == 2:
                 add(buf, t, hat(rng, True, 0.14 * v["hat"]))
         else:
             g = (0.115 if six == 0 else 0.062 if six == 2 else 0.040) * v["hat"]
             add(buf, t, hat(rng, False, g * tl))
 
-        if sec in ("C", "D", "E", "F", "G"):
+        if sec in ("C", "D", "E", "F", "G", "H"):
             add(buf, t, shaker(rng, (0.048 if six % 2 else 0.030) * tl))
 
-        if sec in ("D", "E", "G") and six == 3 and beat in (1, 3) and t < PHRASE + 1.0:
+        if sec in ("E", "F", "H") and six == 3 and beat in (1, 3) and t < PHRASE + 1.0:
             add(buf, t, snare(rng, 0.055 * tl))
 
     # Three fills, all played rather than swept: into the reduction, out of it, and into
     # the cadence. A fill is a drummer connecting two sections; a riser is an effect.
-    for start, end, top in ((F - 0.6, F, 0.15), (G - 0.8, G, 0.30), (PHRASE - 0.5, PHRASE, 0.22)):
+    for start, end, top in ((G - 0.6, G, 0.15), (H - 0.8, H, 0.30), (PHRASE - 0.5, PHRASE, 0.22)):
         steps = int(round((end - start) / (STEP / 2)))
         for k in range(steps):
             frac = k / max(steps - 1, 1)
@@ -446,10 +451,10 @@ def bassline(v) -> np.ndarray:  # noqa: D401
         sec = pattern(t)
         root, _ = chord(t)
         six = s % 4
-        thin = (0.80 if sec == "F" else 1.0) * tail(t)
+        thin = (0.80 if sec == "G" else 1.0) * tail(t)
         if six == 0:
             add(buf, t, sub(root, 0.36, 0.80 * thin))
-        elif sec in ("D", "E", "G") and six == 2 and t < PHRASE + 1.2:
+        elif sec in ("E", "F", "H") and six == 2 and t < PHRASE + 1.2:
             add(buf, t, sub(root * (1.5 if s % 8 == 6 else 1.0), 0.16, 0.34 * thin))
         elif sec == "F" and six == 2 and (s // 4) % 2 == 1:
             add(buf, t, sub(root, 0.14, 0.22))
@@ -472,26 +477,26 @@ def plucks(v) -> np.ndarray:
         deg = MOTIF[s % len(MOTIF)]
         f = tri[0] * 2 ** ((SCALE[deg % 8] + 12 * (deg // 8)) / 12)
 
-        if sec == "F":
+        if sec == "G":
             g, brt = 0.31, 0.74
         elif sec in ("A", "B"):
             g, brt = 0.30, 0.85
-        elif sec in ("C", "D"):
+        elif sec in ("C", "D", "E"):
             g, brt = 0.34, 1.0
         else:
             g, brt = 0.40, 1.15
         g *= v["pluck"] * tail(t)
 
         sig = pluck(f, 0.26, brt, g)
-        if sec == "F":
+        if sec == "G":
             sig = tilt(sig, 2800, 0.74)
         pan = 0.34 if s % 2 else -0.34
-        pan *= 0.45 if sec in ("A", "B") else (1.25 if sec == "G" else 1.0)
+        pan *= 0.45 if sec in ("A", "B") else (1.25 if sec == "H" else 1.0)
         add(l, t, sig * (1 - pan))
         add(r, t, sig * (1 + pan))
 
-        if sec in ("B", "C", "D", "E", "G") and s % 2 == 0:
-            hi = pluck(f * 2, 0.16, 1.3, g * (0.34 if sec != "G" else 0.46))
+        if sec in ("B", "C", "D", "E", "F", "H") and s % 2 == 0:
+            hi = pluck(f * 2, 0.16, 1.3, g * (0.34 if sec != "H" else 0.46))
             add(l, t, hi * (1 + pan))
             add(r, t, hi * (1 - pan))
     return np.stack([l, r])
@@ -500,7 +505,7 @@ def plucks(v) -> np.ndarray:
 def lead(v) -> np.ndarray:
     """One melodic statement, saved for the bar under "You control what goes online"."""
     l, r = np.zeros(N), np.zeros(N)
-    _, tri = chord(G + 0.1)
+    _, tri = chord(H + 0.1)
     figure = [(0.0, 7), (0.2, 5), (0.4, 3), (0.8, 7), (1.2, 12),
               (1.6, 10), (1.8, 7), (2.0, 5), (2.4, 3), (2.8, 0)]
     for off, deg in figure:
@@ -512,8 +517,8 @@ def lead(v) -> np.ndarray:
             oct_up = pluck(f * 2, 0.30, 1.5, 0.10)
             sig = sig.copy()
             sig[:len(oct_up)] += oct_up
-        add(l, G + off, sig * 1.1)
-        add(r, G + off, sig * 0.9)
+        add(l, H + off, sig * 1.1)
+        add(r, H + off, sig * 0.9)
     return np.stack([l, r])
 
 
@@ -534,7 +539,7 @@ def pads(rng) -> np.ndarray:
             # whose job is to hold the card.
             add(buf, t0, pad_block(rng, t0, DUR, tri, 0.74, 120, 2200,
                                    out=0, attack=0.90, decay=13.0))
-        elif F - 0.5 <= t0 < G:
+        elif G - 0.5 <= t0 < H:
             # Through the reduction the pad comes forward, so the section loses drums but
             # gains harmony and the total never thins to nothing.
             add(buf, t0, pad_block(rng, t0, t1, tri, 0.30, 90, 3200))
@@ -596,10 +601,10 @@ def design(rng, v) -> np.ndarray:
         add(r, at, sig * (1 + spread))
 
     st(A, cymbal(rng, 1.4, v["cym"] * 0.85), 0.04)
-    st(E - 1.0, riser(rng, 1.0, 400, 7000, 0.32))
-    st(E, cymbal(rng, 1.5, v["cym"] * 0.9), 0.05)
-    st(G - 1.2, riser(rng, 1.2, 400, 8000, 0.38))
-    st(G, cymbal(rng, 1.6, v["cym"]), 0.05)
+    st(F - 1.0, riser(rng, 1.0, 400, 7000, 0.32))
+    st(F, cymbal(rng, 1.5, v["cym"] * 0.9), 0.05)
+    st(H - 1.2, riser(rng, 1.2, 400, 8000, 0.38))
+    st(H, cymbal(rng, 1.6, v["cym"]), 0.05)
 
     # Six ticks under the telemetry, where the picture is showing numbers. The previous
     # version had sixteen of these plus one on every cut.
@@ -616,7 +621,7 @@ def design(rng, v) -> np.ndarray:
 def groove_curve(v) -> np.ndarray:
     g = np.ones(N)
     bounds = CUTS + [DUR]
-    for i, name in enumerate("ABCDEFGH"):
+    for i, name in enumerate("ABCDEFGHI"):
         g[int(bounds[i] * SR):int(bounds[i + 1] * SR)] = v["gains"][name]
     k = int(0.20 * SR)
     win = np.hanning(k) / np.hanning(k).sum()
@@ -666,13 +671,16 @@ def render(name: str, out_wav: Path) -> Path:
 def normalise(raw: Path, dst: Path) -> Path:
     """Two pass loudnorm, linear, so the arrangement's own dynamics survive. A single pass
     is adaptive and would flatten exactly the reduction the arc depends on."""
+    lim = ("alimiter=limit=0.66:attack=4:release=60:level=disabled,"
+           "loudnorm=I={i}:TP={tp}:LRA=11")
     out = subprocess.run(
         ["ffmpeg", "-hide_banner", "-i", str(raw), "-af",
-         f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:print_format=json",
+         lim.format(i=TARGET_LUFS, tp=TARGET_TP) + ":print_format=json",
          "-f", "null", "-"], capture_output=True, text=True).stderr
     m = json.loads(out[out.rindex("{"):out.rindex("}") + 1])
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-af",
+         "alimiter=limit=0.66:attack=4:release=60:level=disabled,"
          f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA=11:linear=true"
          f":measured_I={m['input_i']}:measured_TP={m['input_tp']}"
          f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}"

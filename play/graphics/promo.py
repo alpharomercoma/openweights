@@ -138,7 +138,7 @@ def plate(eyebrow: str, headline: str, sub: str, rect, out: Path,
     # The rule spans exactly the card, so its ends and the card's edges are one line.
     draw.rounded_rectangle([x, RULE_Y, x + w, RULE_Y + 3], radius=2, fill=LIME)
 
-    eyebrow_font = weighted(MONO, 23, 500)
+    eyebrow_font = weighted(MONO, 25, 500)
     head_font = weighted(DISPLAY, 50, 700)
     # Two families, not three. Geist Mono for the eyebrow because the app sets its own
     # telemetry in it; Schibsted for headline and subhead, separated by weight rather than
@@ -148,7 +148,7 @@ def plate(eyebrow: str, headline: str, sub: str, rect, out: Path,
     # It cannot be made readable at that size by any type choice: only the 50 px headline
     # survives the reduction. 32 with shorter strings is the honest improvement, and the
     # subhead's real audience is the viewer who taps to full screen.
-    sub_font = weighted(DISPLAY, 32, 400)
+    sub_font = weighted(DISPLAY, 35, 400)
 
     tracked(draw, (x, EYEBROW_Y), eyebrow.upper(), eyebrow_font, LIME, 3.0)
 
@@ -175,10 +175,10 @@ def endcard(out: Path) -> Path:
     draw = ImageDraw.Draw(image)
     draw_mark(draw, W / 2, H / 2 - 86, 300, LIME)
     name = weighted(DISPLAY, 84, 700)
-    line = weighted(DISPLAY, 32, 400)
+    line = weighted(DISPLAY, 36, 400)
     draw.text(((W - draw.textlength("OpenWeights", font=name)) / 2, H / 2 + 54),
               "OpenWeights", font=name, fill=TEXT_ON_INK)
-    tag = "On-device. Open-weight. No account."
+    tag = "Open-weight AI. On your device. On your terms."
     draw.text(((W - draw.textlength(tag, font=line)) / 2, H / 2 + 166),
               tag, font=line, fill=DIM_ON_INK)
 

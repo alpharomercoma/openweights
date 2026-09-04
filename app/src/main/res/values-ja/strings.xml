@@ -72,6 +72,10 @@
     <string name="download_queued">キューに追加済み</string>
     <string name="download_verifying">検証中</string>
     <string name="download_retrying">%1$d 回失敗して停止中、再試行を待っています</string>
+    <string name="download_retrying_in">%1$s後に再試行</string>
+    <string name="download_retry_attempts">自動再試行 %1$d／%2$d · 残り %3$d回</string>
+    <string name="download_retry_exhausted">自動再試行を使い切りました（%1$d／%2$d）</string>
+    <string name="download_retry_now">今すぐ再試行</string>
     <string name="download_progress">%1$s / %2$s</string>
     <string name="report">報告</string>
     <string name="now">今はしない</string>
@@ -191,6 +195,7 @@
     <string name="no_tool_arguments">引数なし</string>
     <string name="loading_model_into_memory">モデルをメモリに読み込んでいます</string>
     <string name="loading_model">モデルを読み込み中…</string>
+    <string name="preparing_first_reply">最初の回答を準備中…</string>
     <string name="each_model_says_if_it_runs">ダウンロード前に、この端末で動作するかがそれぞれに表示されます。</string>
     <string name="answers_can_search_the_web">モデルが動き出すと、回答がウェブを検索することがあります。ツールで切り替えられます。</string>
     <string name="remove_attachment">%1$s を削除</string>

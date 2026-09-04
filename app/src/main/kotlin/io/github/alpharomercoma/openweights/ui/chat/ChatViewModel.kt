@@ -263,6 +263,7 @@ data class ConversationSummary(
 enum class RuntimeState(val label: String) {
     NO_MODEL("no model"),
     LOADING("loading weights"),
+    PREPARING("preparing the first reply"),
     READY("ready"),
     READING("reading the prompt"),
     GENERATING("generating"),
@@ -297,6 +298,8 @@ data class ChatUiState(
     val modelName: String? = null,
     val modelQuantization: String? = null,
     val isLoadingModel: Boolean = false,
+    /** True until the first fresh-chat prefix has been warmed after a model load. */
+    val isPreparingFirstResponse: Boolean = false,
     val isGenerating: Boolean = false,
     val transcript: List<TranscriptEntry> = emptyList(),
     /**
@@ -445,6 +448,7 @@ data class ChatUiState(
         get() = when {
             isThrottled && isGenerating -> RuntimeState.THROTTLED
             isLoadingModel -> RuntimeState.LOADING
+            isPreparingFirstResponse -> RuntimeState.PREPARING
             modelName == null -> RuntimeState.NO_MODEL
             isCompacting -> RuntimeState.COMPACTING
             // No text yet means the prompt is still being read, which with an attachment
@@ -519,18 +523,18 @@ data class ChatUiState(
             outputModality == OutputModality.TEXT &&
             !isGenerating &&
             !isLoadingModel &&
+            !isPreparingFirstResponse &&
             !isCompacting &&
             !isAttaching
 
     /**
      * Whether the composer may be typed into, staged with a file, or dictated to.
      *
-     * [canSend] minus the loading check: a model coming into memory is the one reason to
-     * disable the composer that has nothing to do with whether *this* draft could be
-     * finished and sent the moment it is ready. A message written while the weights load is
-     * not wasted work — [Composer] still refuses to submit it until [canSend] is true, so
-     * nothing races the load; it only stops the field itself from sitting there disabled
-     * for however long the model takes, inviting a tap that used to do nothing.
+     * [canSend] minus the loading and first-prefix checks: a model coming into memory, or
+     * preparing the first prompt cache, is not a reason to throw away a draft. A message
+     * written while either read runs is kept — [Composer] refuses to submit it until [canSend]
+     * is true, so nothing races the load or pays the cold prefill; the field itself stays open
+     * for however long the preparation takes.
      */
     val canType: Boolean get() =
         modelName != null &&
@@ -617,6 +621,9 @@ class ChatViewModel @Inject constructor(
      * anything but battery the first answer was going to spend anyway.
      */
     private var warmJob: Job? = null
+
+    /** Identifies the current warm so a cancelled warm cannot clear a newer load's readiness. */
+    private var warmGeneration = 0L
 
     private var thermalJob: Job? = null
     private var goalJob: Job? = null
@@ -928,6 +935,7 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 staged = emptyList(),
                 modelName = replacing?.nameWithoutExtension,
+                isPreparingFirstResponse = false,
                 // The engine's record belongs to the template of the model that wrote it.
                 // Judged here because this is where the old name is last known — by the
                 // time the load finishes, the state already carries the new one.
@@ -993,7 +1001,13 @@ class ChatViewModel @Inject constructor(
         contextLength: Int?,
         keepConversation: Boolean,
     ) {
-        _uiState.update { it.copy(isLoadingModel = true, error = null) }
+        _uiState.update {
+            it.copy(
+                isLoadingModel = true,
+                isPreparingFirstResponse = false,
+                error = null,
+            )
+        }
 
         // The same yield a turn does, and now for the same reason. A warm holds the engine
         // for as long as it takes to read the whole prefix, and a load queues behind it:
@@ -1024,7 +1038,12 @@ class ChatViewModel @Inject constructor(
             // The name was kept across the swap for the top bar. A load that failed holds no
             // weights, so it goes here rather than staying to describe nothing.
             _uiState.update {
-                it.copy(isLoadingModel = false, modelName = null, error = failure.userMessage())
+                it.copy(
+                    isLoadingModel = false,
+                    isPreparingFirstResponse = false,
+                    modelName = null,
+                    error = failure.userMessage(),
+                )
             }
         }
     }
@@ -1043,7 +1062,10 @@ class ChatViewModel @Inject constructor(
         preferencesKey = modelFile.name
         loadedFile = modelFile
         val info = runtime.loadedModel
-        _uiState.update { it.afterLoad(modelFile, info, preferences, keepConversation) }
+        _uiState.update {
+            it.afterLoad(modelFile, info, preferences, keepConversation)
+                .copy(isPreparingFirstResponse = true)
+        }
         // Only ever on the startup load, so switching model still starts fresh.
         if (!keepConversation) {
             restoring?.let { id ->
@@ -2458,62 +2480,76 @@ class ChatViewModel @Inject constructor(
      * question, so every warmed byte is a byte the send reuses.
      */
     private fun warmEngine() {
+        val generation = ++warmGeneration
         warmJob?.cancel()
         warmJob = viewModelScope.launch {
-            if (loadedFile == null || _uiState.value.isLoadingModel) return@launch
-            // Cancelling the job above does not reach the engine: the native read runs
-            // to its end whatever the coroutine's state, holding the engine the whole
-            // time, so the warm this launches found it busy and gave up — and the old
-            // warm then finished with the prompt it had, snapshot included. A tool toggle
-            // during the twenty-second load warm, a reopen on a store miss, a new chat
-            // right after load: each warmed nothing. So the running warm is interrupted
-            // first, the way a turn interrupts one, and this warm reads its own prompt.
-            turns.yieldWarms()
-            // Refreshed exactly the way a turn refreshes it, because the instruction that
-            // says tools exist goes in or stays out of the prefix with this flag — and a
-            // warm rendered under yesterday's answer warms a prompt nobody will send.
-            _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
-            val state = _uiState.value
-            // The day refreshes only at a fresh chat's warm. A conversation keeps the
-            // day it started with — flipping it mid-conversation is the midnight bug
-            // below — and a new chat after midnight warms the new day in the background
-            // before anybody has typed.
-            if (state.transcript.isEmpty()) PromptDay.refresh()
-            val head = state.prefixMessages()
-            if (head.isEmpty()) return@launch
-            // The same sampler shape a real turn would pass, because thinking flags reach
-            // the template and the template shapes the bytes being warmed.
-            val params = state.preferences.toSamplerParams().let {
-                if (state.toolsAvailable) it.copy(thinking = true) else it
+            val preparingFirstResponse = _uiState.value.isPreparingFirstResponse
+            try {
+                if (loadedFile == null || _uiState.value.isLoadingModel) return@launch
+                // Cancelling the job above does not reach the engine: the native read runs
+                // to its end whatever the coroutine's state, holding the engine the whole
+                // time, so the warm this launches found it busy and gave up — and the old
+                // warm then finished with the prompt it had, snapshot included. A tool toggle
+                // during the twenty-second load warm, a reopen on a store miss, a new chat
+                // right after load: each warmed nothing. So the running warm is interrupted
+                // first, the way a turn interrupts one, and this warm reads its own prompt.
+                turns.yieldWarms()
+                // Refreshed exactly the way a turn refreshes it, because the instruction that
+                // says tools exist goes in or stays out of the prefix with this flag — and a
+                // warm rendered under yesterday's answer warms a prompt nobody will send.
+                _uiState.update { it.copy(toolsAvailable = turns.hasEnabledTools()) }
+                val state = _uiState.value
+                // The day refreshes only at a fresh chat's warm. A conversation keeps the
+                // day it started with — flipping it mid-conversation is the midnight bug
+                // below — and a new chat after midnight warms the new day in the background
+                // before anybody has typed.
+                if (state.transcript.isEmpty()) PromptDay.refresh()
+                val head = state.prefixMessages()
+                if (head.isEmpty()) return@launch
+                // The same sampler shape a real turn would pass, because thinking flags reach
+                // the template and the template shapes the bytes being warmed.
+                val params = state.preferences.toSamplerParams().let {
+                    if (state.toolsAvailable) it.copy(thinking = true) else it
+                }
+                val headWarm = turns.warmFreshChat(
+                    head,
+                    withTools = state.toolsAvailable,
+                    params = params,
+                    store = warmStore(),
+                )
+                if (preparingFirstResponse) {
+                    _uiState.update { it.copy(isPreparingFirstResponse = false) }
+                }
+                // A head warm that could not run or kept nothing — the engine refused it, a
+                // turn interrupted it at zero, or the compute failed the way a swapping phone
+                // makes it fail — is no base to stack a longer read on. The conversation
+                // stays cold and the next turn reads it once, in front of the user, which is
+                // the price the failure already set.
+                if (headWarm == null || headWarm.warmedTokens + headWarm.reusedTokens == 0) {
+                    return@launch
+                }
+                if (state.transcript.isEmpty()) return@launch
+                val conversation = state.engineMessages()
+                // A conversation carrying media cannot be warmed: the warm path renders text
+                // only, so its bytes diverge at the first picture and warm nothing the send
+                // could use. Media turns re-evaluate the conversation anyway; see the
+                // first-turn-latency notes.
+                if (conversation.any { message -> message.parts.any { it !is MessagePart.Text } }) {
+                    return@launch
+                }
+                turns.warmConversation(
+                    conversation,
+                    withTools = state.toolsAvailable,
+                    params = params,
+                )
+            } finally {
+                // A compute failure or cancellation must not leave the composer disabled
+                // forever. An older warm is allowed to finish its cleanup without clearing
+                // the flag belonging to a newer load.
+                if (preparingFirstResponse && generation == warmGeneration) {
+                    _uiState.update { it.copy(isPreparingFirstResponse = false) }
+                }
             }
-            val headWarm = turns.warmFreshChat(
-                head,
-                withTools = state.toolsAvailable,
-                params = params,
-                store = warmStore(),
-            )
-            // A head warm that could not run or kept nothing — the engine refused it, a
-            // turn interrupted it at zero, or the compute failed the way a swapping phone
-            // makes it fail — is no base to stack a longer read on. The conversation
-            // stays cold and the next turn reads it once, in front of the user, which is
-            // the price the failure already set.
-            if (headWarm == null || headWarm.warmedTokens + headWarm.reusedTokens == 0) {
-                return@launch
-            }
-            if (state.transcript.isEmpty()) return@launch
-            val conversation = state.engineMessages()
-            // A conversation carrying media cannot be warmed: the warm path renders text
-            // only, so its bytes diverge at the first picture and warm nothing the send
-            // could use. Media turns re-evaluate the conversation anyway; see the
-            // first-turn-latency notes.
-            if (conversation.any { message -> message.parts.any { it !is MessagePart.Text } }) {
-                return@launch
-            }
-            turns.warmConversation(
-                conversation,
-                withTools = state.toolsAvailable,
-                params = params,
-            )
         }
     }
 
@@ -3958,6 +3994,7 @@ private fun ChatUiState.refusalReason(): String? = when {
     // turn could not be started" with no idea why.
     isGenerating -> "A reply is still being written. Wait for it, or stop it first."
     isLoadingModel -> "The model is still loading. Ask again in a moment."
+    isPreparingFirstResponse -> "The model is preparing its first reply. Ask again in a moment."
     modelName == null -> "No model is loaded yet. Choose one in Models."
     outputModality == OutputModality.SPEECH ->
         "This model generates speech, which this build can detect but cannot play yet. " +

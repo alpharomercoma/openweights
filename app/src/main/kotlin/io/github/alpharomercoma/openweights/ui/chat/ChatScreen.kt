@@ -531,6 +531,7 @@ private fun ChatContent(
                         enabled = composerEnabled(state.canType, goal),
                         isGenerating = state.isGenerating,
                         isLoadingModel = state.isLoadingModel,
+                        isPreparingFirstResponse = state.isPreparingFirstResponse,
                         staged = state.staged,
                         document = state.stagedDocument,
                         onRemoveDocument = onRemoveDocument,

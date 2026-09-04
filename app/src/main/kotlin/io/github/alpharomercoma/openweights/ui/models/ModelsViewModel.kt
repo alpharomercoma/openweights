@@ -123,13 +123,19 @@ data class ActiveDownload(
      * state used to be indistinguishable from a download in progress — observed live as
      * **"Downloading 0%" on a job that had failed four times and moved no bytes** — so it
      * is carried here and said out loud rather than left looking like progress.
-     */
+    */
     val attemptsFailed: Int = 0,
+    /** The failure that caused the current backoff, available before work is terminal. */
+    val lastError: String? = null,
+    /** When WorkManager says the next retry will run, or null while it is running. */
+    val nextAttemptAtMillis: Long? = null,
+    val maxRetries: Int = ModelDownloadWorker.MAX_RETRIES,
 ) {
     val fraction: Float get() = if (bytesTotal > 0) bytesDone.toFloat() / bytesTotal else 0f
 
     /** True when nothing is being transferred and the next attempt is still pending. */
-    val isRetrying: Boolean get() = attemptsFailed > 0 && error == null
+    val isRetrying: Boolean get() = attemptsFailed > 0 && nextAttemptAtMillis != null && error == null
+    val remainingRetries: Int get() = (maxRetries - attemptsFailed).coerceAtLeast(0)
 }
 
 data class ModelsUiState(
@@ -359,6 +365,7 @@ class ModelsViewModel @Inject constructor(
             .addTag(ModelDownloadWorker.TAG_REPO + repoId)
             .addTag(ModelDownloadWorker.TAG_PATH + file.path)
             .addTag(ModelDownloadWorker.TAG_SIZE + file.sizeBytes)
+            .addTag(ModelDownloadWorker.TAG_SHA256 + file.sha256.orEmpty())
             .build()
 
         // KEEP, so tapping download twice does not start a second writer on the same file.
@@ -372,6 +379,45 @@ class ModelsViewModel @Inject constructor(
         workManager.cancelUniqueWork(key)
         // Also covers dismissing a failure, which has nothing left to cancel.
         dismissed.update { it + key }
+    }
+
+    /** Replaces a failed or backoff job with a fresh attempt using its persisted request. */
+    fun retry(key: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val previous = runCatching {
+                workManager.getWorkInfosForUniqueWork(key).get()
+                    .firstOrNull { it.state != WorkInfo.State.CANCELLED }
+            }.getOrNull() ?: return@launch
+
+            val repoId = previous.tagValue(ModelDownloadWorker.TAG_REPO).orEmpty()
+            val path = previous.tagValue(ModelDownloadWorker.TAG_PATH).orEmpty()
+            val name = previous.tagValue(ModelDownloadWorker.TAG_KEY).orEmpty()
+            if (repoId.isBlank() || path.isBlank() || name.isBlank()) return@launch
+
+            val request = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+                .setInputData(
+                    workDataOf(
+                        ModelDownloadWorker.KEY_REPO_ID to repoId,
+                        ModelDownloadWorker.KEY_PATH to path,
+                        ModelDownloadWorker.KEY_DESTINATION to
+                            File(modelStore.directory, name).absolutePath,
+                        ModelDownloadWorker.KEY_SIZE_BYTES to
+                            (previous.tagValue(ModelDownloadWorker.TAG_SIZE)?.toLongOrNull() ?: 0L),
+                        ModelDownloadWorker.KEY_SHA256 to
+                            previous.tagValue(ModelDownloadWorker.TAG_SHA256)
+                                ?.takeIf { it.isNotBlank() },
+                    ),
+                )
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
+                .apply { previous.tags.forEach { addTag(it) } }
+                .build()
+
+            dismissed.update { it - key }
+            workManager.enqueueUniqueWork(key, ExistingWorkPolicy.REPLACE, request)
+        }
     }
 
     fun delete(model: LocalModel) {
@@ -446,10 +492,19 @@ class ModelsViewModel @Inject constructor(
                 WorkInfo.State.FAILED -> row.copy(
                     error = info.outputData.getString(ModelDownloadWorker.KEY_ERROR)
                         ?: "The download could not be completed.",
+                    attemptsFailed = info.runAttemptCount,
+                    lastError = info.outputData.getString(ModelDownloadWorker.KEY_ERROR),
                 )
 
                 else -> row.copy(
                     attemptsFailed = info.runAttemptCount,
+                    lastError = info.progress.getString(ModelDownloadWorker.KEY_ERROR),
+                    nextAttemptAtMillis = info.nextScheduleTimeMillis.takeIf {
+                        info.state == WorkInfo.State.ENQUEUED &&
+                            info.runAttemptCount > 0 &&
+                            it > 0L &&
+                            it != Long.MAX_VALUE
+                    },
                     bytesDone = info.progress.getLong(ModelDownloadWorker.KEY_BYTES_DONE, 0L),
                     // The declared size until the worker reports its own, so a queued
                     // download still shows what it is about to cost.

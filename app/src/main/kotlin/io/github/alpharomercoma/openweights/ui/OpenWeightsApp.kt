@@ -294,6 +294,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 },
                 onDelete = modelsViewModel::delete,
                 onCancelDownload = modelsViewModel::cancel,
+                onRetryDownload = modelsViewModel::retry,
                 onBack = navController::popBackStack,
             )
         }

@@ -111,6 +111,10 @@
     <string name="download_queued">Queued</string>
     <string name="download_verifying">Verifying checksum…</string>
     <string name="download_retrying">Stalled after %1$d attempts, waiting to retry</string>
+    <string name="download_retrying_in">Retrying in %1$s</string>
+    <string name="download_retry_attempts">Automatic retry %1$d of %2$d · %3$d remaining</string>
+    <string name="download_retry_exhausted">Automatic retries exhausted (%1$d of %2$d)</string>
+    <string name="download_retry_now">Retry now</string>
     <string name="vision">Vision</string>
     <string name="gated">Gated</string>
     <string name="models">Models</string>
@@ -232,6 +236,7 @@
          room for a phrase, not a sentence: beside Attach and Send rather than centred under
          a full-screen spinner. -->
     <string name="loading_model">Loading model…</string>
+    <string name="preparing_first_reply">Preparing first reply…</string>
     <string name="each_model_says_if_it_runs">Each one says whether it runs on this phone before you download it.</string>
     <string name="answers_can_search_the_web">Once a model is running, answers can search the web. That is a switch in Tools.</string>
     <string name="remove_attachment">Remove %1$s</string>
@@ -315,4 +320,3 @@
     <string name="tool_read_memory_name">Read memories</string>
     <string name="tool_read_memory_detail">Lets the model look up the facts it has kept about you.</string>
 </resources>
-

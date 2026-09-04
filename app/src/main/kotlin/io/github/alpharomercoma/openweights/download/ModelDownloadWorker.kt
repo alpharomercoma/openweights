@@ -20,6 +20,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import androidx.hilt.work.HiltWorker
@@ -119,10 +120,29 @@ class ModelDownloadWorker @AssistedInject constructor(
         // will resume, and treating it as terminal made that message a lie the user had to
         // act on by hand. A checksum that did not match is not retryable and says so.
         val retryable = error is IOException || (error as? DownloadException)?.isRetryable == true
-        return if (retryable && runAttemptCount < MAX_ATTEMPTS) {
+        val message = error.message ?: error::class.simpleName ?: "unknown failure"
+        Log.w(
+            "OpenWeights",
+            "model download failed: file=${destination.name}, " +
+                "attempt=${runAttemptCount + 1}, retries=$runAttemptCount/$MAX_RETRIES, " +
+                "retryable=$retryable, reason=$message",
+            error,
+        )
+        return if (retryable && runAttemptCount < MAX_RETRIES) {
+            // WorkManager keeps progress while it waits in backoff. Preserve the reason there
+            // because outputData is only available after the work is finally failed, and a
+            // row that says merely "retrying" makes a network error indistinguishable from a
+            // storage error for the entire wait.
+            setProgress(
+                workDataOf(
+                    KEY_ERROR to message,
+                    KEY_BYTES_DONE to 0L,
+                    KEY_BYTES_TOTAL to sizeBytes,
+                ),
+            )
             Result.retry()
         } else {
-            Result.failure(errorData(error.message ?: "The download could not be completed."))
+            Result.failure(errorData(message))
         }
     }
 
@@ -239,10 +259,12 @@ class ModelDownloadWorker @AssistedInject constructor(
         const val TAG_PATH = "path:"
         const val TAG_KEY = "key:"
         const val TAG_SIZE = "size:"
+        const val TAG_SHA256 = "sha256:"
 
         private const val CHANNEL = "downloads"
         private const val PROGRESS_MAX = 100
-        private const val MAX_ATTEMPTS = 5
+        /** Maximum automatic retries after the first transfer attempt. */
+        const val MAX_RETRIES = 5
 
         /** What ReplyNotifier posts on, which this must never land on. */
         private const val REPLY_NOTIFICATION_ID = 1

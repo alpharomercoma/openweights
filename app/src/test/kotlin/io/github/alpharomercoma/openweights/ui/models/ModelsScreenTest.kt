@@ -135,6 +135,32 @@ class ModelsScreenTest {
         compose.onNodeWithText("Verifying checksum", substring = true).assertIsDisplayed()
     }
 
+    @Test
+    fun `a retrying download shows its deadline budget and retry action`() {
+        var retried: String? = null
+        showModels(
+            downloads = listOf(
+                ActiveDownload(
+                    repoId = "LiquidAI/LFM2.5-1.2B-GGUF",
+                    path = "LFM2.5-1.2B-Q4_K_M.gguf",
+                    key = "LFM2.5-1.2B-Q4_K_M.gguf",
+                    attemptsFailed = 1,
+                    lastError = "The connection was closed.",
+                    nextAttemptAtMillis = System.currentTimeMillis() + 65_000L,
+                ),
+            ),
+            onRetryDownload = { retried = it },
+        )
+
+        compose.onNodeWithText("Retrying in", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Automatic retry 1 of 5", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Retry now").performClick()
+
+        assert(retried == "LFM2.5-1.2B-Q4_K_M.gguf") {
+            "expected the retry action to reach the view model, got $retried"
+        }
+    }
+
     private fun model(name: String): LocalModel {
         val file = File(folder, name).apply { writeBytes(ByteArray(1024)) }
         return LocalModel(file = file)
@@ -145,6 +171,7 @@ class ModelsScreenTest {
         downloads: List<ActiveDownload> = emptyList(),
         onDelete: (LocalModel) -> Unit = {},
         onCancelDownload: (String) -> Unit = {},
+        onRetryDownload: (String) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -153,6 +180,7 @@ class ModelsScreenTest {
                     onUse = {},
                     onDelete = onDelete,
                     onCancelDownload = onCancelDownload,
+                    onRetryDownload = onRetryDownload,
                 )
             }
         }

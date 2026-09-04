@@ -78,6 +78,10 @@
     <string name="download_queued">في قائمة الانتظار</string>
     <string name="download_verifying">جارٍ التحقق</string>
     <string name="download_retrying">متوقف بعد %1$d محاولات، في انتظار إعادة المحاولة</string>
+    <string name="download_retrying_in">إعادة المحاولة خلال %1$s</string>
+    <string name="download_retry_attempts">إعادة المحاولة التلقائية %1$d من %2$d · المتبقي %3$d</string>
+    <string name="download_retry_exhausted">انتهت إعادات المحاولة التلقائية (%1$d من %2$d)</string>
+    <string name="download_retry_now">إعادة المحاولة الآن</string>
     <string name="report">إبلاغ</string>
     <string name="now">ليس الآن</string>
     <string name="run">تشغيل</string>
@@ -197,6 +201,7 @@
     <string name="no_tool_arguments">من دون معاملات</string>
     <string name="loading_model_into_memory">جارٍ تحميل النموذج في الذاكرة</string>
     <string name="loading_model">جارٍ تحميل النموذج…</string>
+    <string name="preparing_first_reply">جارٍ إعداد الرد الأول…</string>
     <string name="each_model_says_if_it_runs">يوضح كل نموذج إمكانية تشغيله على هذا الهاتف قبل تنزيله.</string>
     <string name="answers_can_search_the_web">بمجرد تشغيل نموذج، يمكن للإجابات البحث في الويب. هذا مفتاح في الأدوات.</string>
     <string name="remove_attachment">إزالة %1$s</string>

@@ -70,6 +70,24 @@
         android:networkSecurityConfig="@xml/network_security_config">
 
         <!--
+             Lets `adb shell` sample this build with simpleperf, and nothing more.
+
+             There is a failure we have measured and cannot yet name: a freshly installed
+             app decoding at one token a second while the process burns three cores and
+             writes nothing to the log. Every counter reachable from outside has been read
+             and eliminated, and the only question left is where those cores are, which
+             takes a stack sample. A release build cannot be sampled without this line, so
+             the one build people actually run was the one build that could not answer.
+
+             It grants no access to anything. Sampling still needs developer options, USB
+             debugging, and a cable in the user's own hand, and none of it opens a path off
+             the device. shell="true" is the documented way to profile a release build, and
+             it is what the macrobenchmark in `:baselineprofile` already requires of the
+             variant it records against.
+        -->
+        <profileable android:shell="true" />
+
+        <!--
              Keep phone-sized windows portrait. A QDC phone and a real handset can report their
              current physical orientation as landscape when the app starts, which made the
              first frame arrive sideways before the user had chosen to rotate anything.

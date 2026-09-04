@@ -73,6 +73,10 @@
     <string name="download_queued">Nasa pila</string>
     <string name="download_verifying">Bine-verify</string>
     <string name="download_retrying">Hindi umuusad pagkatapos ng %1$d na pagsubok, naghihintay mag-retry</string>
+    <string name="download_retrying_in">Magre-retry sa loob ng %1$s</string>
+    <string name="download_retry_attempts">Awtomatikong retry %1$d sa %2$d · %3$d ang natitira</string>
+    <string name="download_retry_exhausted">Naubos ang mga awtomatikong retry (%1$d sa %2$d)</string>
+    <string name="download_retry_now">Mag-retry ngayon</string>
     <string name="report">I-report</string>
     <string name="now">Hindi ngayon</string>
     <string name="run">Patakbuhin</string>
@@ -195,6 +199,7 @@
     <string name="no_tool_arguments">walang mga argument</string>
     <string name="loading_model_into_memory">Nilo-load ang modelo sa memory</string>
     <string name="loading_model">Nilo-load ang modelo…</string>
+    <string name="preparing_first_reply">Inihahanda ang unang sagot…</string>
     <string name="each_model_says_if_it_runs">Makikita sa bawat isa kung kaya nitong tumakbo sa teleponong ito bago mo ito i-download.</string>
     <string name="answers_can_search_the_web">Kapag may tumatakbong modelo, puwedeng maghanap sa web ang mga sagot. Isa itong switch sa Mga tool.</string>
     <string name="remove_attachment">Alisin ang %1$s</string>

@@ -64,6 +64,14 @@ class ChatViewModelTest : ChatFixture() {
     }
 
     @Test
+    fun `preparing the first response blocks sending but not typing`() {
+        val state = ChatUiState(modelName = "model-a", isPreparingFirstResponse = true)
+
+        assertThat(state.canType).isTrue()
+        assertThat(state.canSend).isFalse()
+    }
+
+    @Test
     fun `a file still being copied in blocks sending but not typing`() {
         // The paperclip's copy is not instant, and Send during it passed: the question
         // went without the file, which then rode along with whatever was asked next.

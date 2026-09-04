@@ -50,10 +50,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +83,7 @@ fun ModelsScreen(
     onUse: (LocalModel) -> Unit,
     onDelete: (LocalModel) -> Unit,
     onCancelDownload: (String) -> Unit,
+    onRetryDownload: (String) -> Unit = {},
     /**
      * Pops back to the conversation, when this screen was pushed from it.
      *
@@ -89,6 +93,14 @@ fun ModelsScreen(
     modifier: Modifier = Modifier,
 ) {
     var pendingDelete by remember { mutableStateOf<LocalModel?>(null) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val hasRetryCountdown = state.downloads.any { it.nextAttemptAtMillis != null }
+    LaunchedEffect(hasRetryCountdown) {
+        while (hasRetryCountdown) {
+            now = System.currentTimeMillis()
+            delay(SECOND_MILLIS)
+        }
+    }
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -165,7 +177,12 @@ fun ModelsScreen(
                 }
             }
             items(state.downloads, key = { it.key }) { download ->
-                DownloadRow(download = download, onCancel = { onCancelDownload(download.key) })
+                DownloadRow(
+                    download = download,
+                    now = now,
+                    onCancel = { onCancelDownload(download.key) },
+                    onRetry = { onRetryDownload(download.key) },
+                )
             }
             // Under the name of whoever published it, rather than in the order the files
             // came off disk. Disk order is download order, which is a fact about the past.
@@ -228,7 +245,12 @@ fun ModelsScreen(
 }
 
 @Composable
-private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
+private fun DownloadRow(
+    download: ActiveDownload,
+    now: Long,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -240,20 +262,46 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
         Text(download.path.substringAfterLast('/'), style = MaterialTheme.typography.titleSmall)
 
         when {
-            download.error != null -> Text(
-                text = download.error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-
             download.isVerifying -> Caption(stringResource(R.string.download_verifying))
 
-            // Before the progress bar, because a job in WorkManager's backoff is not
-            // making progress and a bar at 0% says it is. It had already failed four
-            // times in the case this was written for, with nothing on screen admitting it.
-            download.isRetrying -> Caption(
-                stringResource(R.string.download_retrying, download.attemptsFailed),
-            )
+            download.isRetrying -> {
+                Caption(
+                    stringResource(
+                        R.string.download_retrying_in,
+                        formatRetryCountdown(download.nextAttemptAtMillis!! - now),
+                    ),
+                )
+                download.lastError?.let { failure ->
+                    Text(
+                        text = failure,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Caption(
+                    stringResource(
+                        R.string.download_retry_attempts,
+                        download.attemptsFailed,
+                        download.maxRetries,
+                        download.remainingRetries,
+                    ),
+                )
+            }
+
+            download.error != null -> {
+                Text(
+                    text = download.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Caption(
+                    stringResource(
+                        R.string.download_retry_exhausted,
+                        download.attemptsFailed,
+                        download.maxRetries,
+                    ),
+                )
+            }
 
             else -> {
                 LinearProgressIndicator(
@@ -270,9 +318,27 @@ private fun DownloadRow(download: ActiveDownload, onCancel: () -> Unit) {
             }
         }
 
-        TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (download.isRetrying || download.error != null) {
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.download_retry_now))
+                }
+            }
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+        }
     }
 }
+
+private fun formatRetryCountdown(remainingMillis: Long): String {
+    val seconds = (remainingMillis.coerceAtLeast(0L) + 999L) / 1_000L
+    return when {
+        seconds >= 3_600L -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
+        seconds >= 60L -> "${seconds / 60}m ${seconds % 60}s"
+        else -> "${seconds}s"
+    }
+}
+
+private const val SECOND_MILLIS = 1_000L
 
 @Composable
 private fun ModelRow(model: LocalModel, onUse: () -> Unit, onDelete: () -> Unit) {

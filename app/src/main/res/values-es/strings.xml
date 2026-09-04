@@ -72,6 +72,10 @@
     <string name="download_queued">En cola</string>
     <string name="download_verifying">Verificando</string>
     <string name="download_retrying">Detenida tras %1$d intentos, esperando para reintentar</string>
+    <string name="download_retrying_in">Reintentando en %1$s</string>
+    <string name="download_retry_attempts">Reintento automático %1$d de %2$d · quedan %3$d</string>
+    <string name="download_retry_exhausted">Se agotaron los reintentos automáticos (%1$d de %2$d)</string>
+    <string name="download_retry_now">Reintentar ahora</string>
     <string name="report">Informar</string>
     <string name="now">Ahora no</string>
     <string name="run">Ejecutar</string>
@@ -208,6 +212,7 @@
     <string name="no_tool_arguments">sin argumentos</string>
     <string name="loading_model_into_memory">Cargando el modelo en memoria</string>
     <string name="loading_model">Cargando modelo…</string>
+    <string name="preparing_first_reply">Preparando la primera respuesta…</string>
     <string name="each_model_says_if_it_runs">Cada uno indica si funciona en este teléfono antes de descargarlo.</string>
     <string name="answers_can_search_the_web">Cuando haya un modelo en marcha, las respuestas pueden buscar en la web. Es un interruptor en Herramientas.</string>
     <string name="remove_attachment">Quitar %1$s</string>

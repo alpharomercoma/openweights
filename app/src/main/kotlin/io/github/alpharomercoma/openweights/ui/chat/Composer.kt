@@ -135,11 +135,12 @@ fun Composer(
     /**
      * True while a model is coming into memory. [enabled] does not depend on this: typing,
      * attaching and dictating all work while the weights load, so a message can be finished
-     * and is ready to go the instant loading ends. Only [SendButton] checks this directly,
-     * to refuse the one thing that genuinely cannot happen yet, and [LoadingModelHint] uses
-     * it to say what Send is waiting for.
+     * while the model is loading. [SendButton] checks this and the first-prefix preparation
+     * directly, refusing the one thing that genuinely cannot happen yet; the hint says why.
      */
     isLoadingModel: Boolean = false,
+    /** True while the first fresh-chat prefix is being read after the weights finish loading. */
+    isPreparingFirstResponse: Boolean = false,
     staged: List<MessagePart.File>,
     document: StagedDocument?,
     onRemoveDocument: () -> Unit,
@@ -523,6 +524,7 @@ fun Composer(
                 enabled = enabled,
                 isGenerating = isGenerating,
                 isLoadingModel = isLoadingModel,
+                isPreparingFirstResponse = isPreparingFirstResponse,
                 leading = leading,
                 isAttaching = isAttaching,
                 canDictate = canDictate,
@@ -640,6 +642,7 @@ private fun ComposerActions(
     enabled: Boolean,
     isGenerating: Boolean,
     isLoadingModel: Boolean,
+    isPreparingFirstResponse: Boolean,
     leading: @Composable () -> Unit,
     isAttaching: Boolean,
     canDictate: Boolean,
@@ -665,8 +668,17 @@ private fun ComposerActions(
         // Left of the spacer, with Attach: both answer "what goes into this message",
         // while the right-hand side is for sending it.
         leading()
-        if (isLoadingModel) {
-            LoadingModelHint(modifier = Modifier.weight(1f))
+        if (isLoadingModel || isPreparingFirstResponse) {
+            LoadingModelHint(
+                text = stringResource(
+                    if (isPreparingFirstResponse) {
+                        R.string.preparing_first_reply
+                    } else {
+                        R.string.loading_model
+                    },
+                ),
+                modifier = Modifier.weight(1f),
+            )
         } else {
             Spacer(Modifier.weight(1f))
         }
@@ -677,10 +689,14 @@ private fun ComposerActions(
             isGenerating = isGenerating,
             // The one control that still waits on the model itself: everything else in this
             // bar works on a loading model, but there is nothing to send it to yet. Nor
-            // while a file is still being copied in: sent then, the question went without
-            // it and the file rode along with the next one.
+            // while the first prompt is being prepared or a file is still being copied in:
+            // sending then would either make the first turn cold or omit the attachment.
             enabled = isGenerating ||
-                (enabled && !isLoadingModel && !isAttaching && hasSomethingToSend),
+                (enabled &&
+                    !isLoadingModel &&
+                    !isPreparingFirstResponse &&
+                    !isAttaching &&
+                    hasSomethingToSend),
             onClick = {
                 if (isGenerating) {
                     onStop()
@@ -701,7 +717,7 @@ private fun ComposerActions(
  * thumb is already resting on.
  */
 @Composable
-private fun LoadingModelHint(modifier: Modifier = Modifier) {
+private fun LoadingModelHint(text: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -712,7 +728,7 @@ private fun LoadingModelHint(modifier: Modifier = Modifier) {
             strokeWidth = 2.dp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Caption(text = stringResource(R.string.loading_model), maxLines = 1)
+        Caption(text = text, maxLines = 1)
     }
 }
 

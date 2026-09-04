@@ -237,10 +237,14 @@ abstract class ChatFixture {
         // Both halves are checked, and the second half is why: the name is now set on the
         // way in so the top bar keeps it while weights are remapped, so a name on its own no
         // longer means a model is loaded. Waiting on the name alone returned here mid-load
-        // and every send that followed was refused.
+        // and every send that followed was refused. The first prefix has its own wait now:
+        // otherwise these helpers would recreate the production tap-before-warm race.
         repeat(AWAIT_STEPS) {
             val state = viewModel.uiState.value
-            if (state.modelName != null && !state.isLoadingModel) return
+            if (state.modelName != null &&
+                !state.isLoadingModel &&
+                !state.isPreparingFirstResponse
+            ) return
             settle(steps = 2)
         }
     }

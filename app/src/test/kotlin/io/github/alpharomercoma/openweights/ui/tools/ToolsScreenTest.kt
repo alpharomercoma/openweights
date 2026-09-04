@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.tools.GrantState
 import io.github.alpharomercoma.openweights.core.tools.Remembered
@@ -168,13 +169,45 @@ class ToolsScreenTest {
     private fun assertEquals(expected: Pair<String, Boolean>?, actual: Pair<String, Boolean>?) =
         assert(expected == actual) { "expected $expected, got $actual" }
 
+    @Test
+    fun `how wide a search is says so before the card is opened`() {
+        // The one setting here that changes what every answer is built from. Behind the
+        // disclosure with the engine switches it would be a number nobody knew they had.
+        showTools(searchResults = 3)
+
+        compose.onNodeWithText("3 results", substring = true).performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `one result is said in the singular`() {
+        showTools(searchResults = 1)
+
+        compose.onNodeWithText("1 result", substring = true).performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun `every count from one to five is one tap away and reaches the caller`() {
+        var chosen: Int? = null
+        showTools(searchResults = 3, onSearchResults = { chosen = it })
+
+        compose.onNodeWithText("Search engines").performScrollTo().performClick()
+        compose.onNodeWithText("5").performScrollTo().performClick()
+
+        assert(chosen == 5) { "the search width must reach the view model, was $chosen" }
+    }
+
+    @Suppress("LongParameterList")
     private fun showTools(
         workspace: WorkspaceSummary = WorkspaceSummary(null, GrantState.NONE),
         memories: List<Remembered> = emptyList(),
+        searchResults: Int = 3,
         onToggle: (String, Boolean) -> Unit = { _, _ -> },
         onForgetFolder: () -> Unit = {},
         onMemoryEdit: (String, String) -> Unit = { _, _ -> },
         onMemoryDelete: (String) -> Unit = {},
+        onSearchResults: (Int) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -208,12 +241,14 @@ class ToolsScreenTest {
                         ),
                         workspace = workspace,
                         memories = memories,
+                        searchResults = searchResults,
                     ),
                     onToggle = onToggle,
                     onChooseFolder = {},
                     onForgetFolder = onForgetFolder,
                     onMemoryEdit = onMemoryEdit,
                     onMemoryDelete = onMemoryDelete,
+                    onSearchResults = onSearchResults,
                 )
             }
         }

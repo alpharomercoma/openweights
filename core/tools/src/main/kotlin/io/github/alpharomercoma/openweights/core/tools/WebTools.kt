@@ -162,7 +162,10 @@ class WebSearchTool @Inject constructor(
         // Through the proxy when one is set, and only here: see SearchSettings.proxy for
         // why this is scoped to search rather than applied to every request the app makes.
         val providers = settings.providers(settings.client(httpClient.forTools()))
-        val (provider, results) = firstAnswer(providers, query, MAX_RESULTS)
+        // Read per call rather than captured at construction: this tool is a singleton that
+        // outlives the settings screen, so a value read once would be the value the process
+        // started with and the slider would appear to do nothing until the app restarted.
+        val (provider, results) = firstAnswer(providers, query, settings.resultCount)
             ?: return@withContext ToolExecution.failure(
                 "No search provider could answer. The device may be offline, or the search " +
                     "may be rate limited. Say so rather than guessing.",
@@ -237,10 +240,13 @@ class WebSearchTool @Inject constructor(
          */
         const val MAX_QUERY_CHARS = 120
 
-        /** Three results is enough to answer from and small enough for a phone's context. */
-        const val MAX_RESULTS = 3
-
-        /** Long enough to answer from, short enough that three of them still fit. */
+        /**
+         * Long enough to answer from, short enough that several of them still fit.
+         *
+         * Sized against the default of three, which is 2,700 characters. At the widest
+         * setting five of these is 4,500, still under a third of a 4k window and well
+         * inside the smallest one the app will open.
+         */
         const val MAX_EXTRACT_CHARS = 900
     }
 }

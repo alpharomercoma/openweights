@@ -53,6 +53,38 @@ class SearchSettingsTest {
         plain.all.values.filter { text in it.toString() }
 
     @Test
+    fun `a fresh install searches for three results`() {
+        assertThat(SearchSettings(context, ReversingSealer()).resultCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `the result count is kept between one and five whichever end it is pushed past`() {
+        val settings = SearchSettings(context, ReversingSealer())
+
+        settings.resultCount = 5
+        assertThat(settings.resultCount).isEqualTo(5)
+
+        settings.resultCount = 12
+        assertThat(settings.resultCount).isEqualTo(5)
+
+        settings.resultCount = 0
+        assertThat(settings.resultCount).isEqualTo(1)
+
+        settings.resultCount = -3
+        assertThat(settings.resultCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `a count written straight into the file is still clamped when it is read`() {
+        // Not hypothetical: the value is an ordinary integer in an ordinary shared
+        // preferences file, and clamping only on the way in leaves the tool asking a
+        // provider for two hundred results from a build that never offered it.
+        plain.edit { putInt("result_count", 200) }
+
+        assertThat(SearchSettings(context, ReversingSealer()).resultCount).isEqualTo(5)
+    }
+
+    @Test
     fun `credentials are sealed and the address stays a plain setting`() {
         val settings = SearchSettings(context, ReversingSealer())
 

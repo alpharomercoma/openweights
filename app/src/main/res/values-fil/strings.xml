@@ -186,7 +186,6 @@
     <string name="unsupported_architecture_detail">Hindi kayang i-load ng bersyong ito ng OpenWeights ang mga modelong %1$s. Kailangan ng update ng app. Maaari mo pa ring tingnan ang mga file dito.</string>
     <string name="vision_projector_detail">Nakakabasa ng larawan ang modelong ito. Kasamang ida-download ang %1$s vision encoder nito at kasama na ito sa mga tantiya sa ibaba.</string>
     <string name="context_length_tokens">Haba ng konteksto: %1$d token</string>
-    <string name="downloading_percent">Dina-download %1$d%%</string>
     <string name="needs_newer_version">Kailangan ng mas bagong OpenWeights: hindi kayang i-load ng bersyong ito ang mga modelong %1$s.</string>
     <string name="draft">Draft</string>
     <string name="draft_model_not_a_model">Isang draft na modelo para sa speculative decoding, hindi ito sumasagot nang mag-isa. Gumagana lang ito kasama ang buong modelong pinapabilis nito.</string>
@@ -208,11 +207,6 @@
     <string name="unknown_command_suggestion">Ibig mo bang sabihin %1$s?</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
     <string name="generated_at_speed_with_prefill">Nabasa ang prompt sa %1$d na token kada segundo, ginawa sa %2$d na token kada segundo</string>
-    <string name="detail_prefill_speed">%1$.1f tok/s sa pagbasa ng prompt</string>
-    <string name="detail_decode_speed">%1$.1f tok/s sa paggawa</string>
-    <string name="detail_first_token">%1$.1fs hanggang sa unang token</string>
-    <string name="detail_token_count">%1$d na token</string>
-    <string name="detail_total_time">%1$.1fs sa kabuuan</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>
     <string name="leave_mode">Umalis sa %1$s mode</string>
     <string name="show_more_answer">Ipakita ang natitira</string>
@@ -273,4 +267,15 @@
     <string name="memory_delete">Burahin ang %1$s</string>
     <string name="tool_read_memory_name">Magbasa ng mga alaala</string>
     <string name="tool_read_memory_detail">Hinahayaan ang model na balikan ang mga detalyeng naitago nito tungkol sa iyo.</string>
+    <string name="cancel_download">Kanselahin ang pag-download</string>
+    <string name="search_results_count">Bilang ng resulta bawat paghahanap</string>
+    <string name="search_results_count_detail">Kung gaano karami ang ibinabalik ng paghahanap. Mas kaunti ay mas mabilis at nananatiling nakikita ang tanong; mas marami ay sulit kapag hindi magkatugma ang mga pinagkunan.</string>
+    <string name="search_results_count_value">%1$d na resulta</string>
+    <string name="search_results_count_one">1 resulta</string>
+    <string name="stat_time_to_first_token">hanggang unang token</string>
+    <string name="stat_tokens">mga token</string>
+    <string name="stat_total_time">kabuuan</string>
+    <string name="stat_prefill">Pagbasa</string>
+    <string name="stat_decode">Pagsulat</string>
+    <string name="stat_tokens_value">%1$d na token</string>
 </resources>

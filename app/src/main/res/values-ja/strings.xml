@@ -182,7 +182,6 @@
     <string name="unsupported_architecture_detail">このバージョンの OpenWeights は %1$s モデルを読み込めません。対応にはアプリの更新が必要です。ファイルの閲覧は続けられます。</string>
     <string name="vision_projector_detail">このモデルは画像を読み取れます。%1$s のビジョンエンコーダーもダウンロードされ、以下の見積もりに含まれています。</string>
     <string name="context_length_tokens">コンテキスト長: %1$d トークン</string>
-    <string name="downloading_percent">ダウンロード中 %1$d%%</string>
     <string name="needs_newer_version">新しい OpenWeights が必要です。このバージョンは %1$s モデルを読み込めません。</string>
     <string name="draft">下書き</string>
     <string name="draft_model_not_a_model">投機的デコーディング用のドラフトモデルで、単独では応答しません。高速化の対象となる完全なモデルと組み合わせてのみ動作します。</string>
@@ -204,11 +203,6 @@
     <string name="unknown_command_suggestion">%1$s のことですか?</string>
     <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
     <string name="generated_at_speed_with_prefill">プロンプトを毎秒 %1$d トークンで読み込み、毎秒 %2$d トークンで生成</string>
-    <string name="detail_prefill_speed">読み込み %1$.1f tok/s</string>
-    <string name="detail_decode_speed">生成 %1$.1f tok/s</string>
-    <string name="detail_first_token">最初のトークンまで %1$.1f 秒</string>
-    <string name="detail_token_count">%1$d トークン</string>
-    <string name="detail_total_time">合計 %1$.1f 秒</string>
     <string name="choose_a_model_spoken">モデルを選ぶ。%1$s</string>
     <string name="leave_mode">%1$sモードを終了</string>
     <string name="show_more_answer">残りを表示</string>
@@ -269,4 +263,15 @@
     <string name="memory_delete">%1$sを削除</string>
     <string name="tool_read_memory_name">メモリーを読む</string>
     <string name="tool_read_memory_detail">保存されたあなたに関する事実をモデルが参照できます。</string>
+    <string name="cancel_download">ダウンロードを中止</string>
+    <string name="search_results_count">1回の検索で返す件数</string>
+    <string name="search_results_count_detail">検索が持ち帰る量です。少ないほど速く、質問が視界に残ります。情報源が食い違うときは多いほうが役に立ちます。</string>
+    <string name="search_results_count_value">%1$d 件</string>
+    <string name="search_results_count_one">1 件</string>
+    <string name="stat_time_to_first_token">最初のトークンまで</string>
+    <string name="stat_tokens">トークン</string>
+    <string name="stat_total_time">合計</string>
+    <string name="stat_prefill">読み込み</string>
+    <string name="stat_decode">生成</string>
+    <string name="stat_tokens_value">%1$d トークン</string>
 </resources>

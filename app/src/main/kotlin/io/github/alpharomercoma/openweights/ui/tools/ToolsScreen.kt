@@ -51,6 +51,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,12 +78,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.designsystem.component.readableColumn
+import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsColors
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 import io.github.alpharomercoma.openweights.core.tools.GrantState
 import io.github.alpharomercoma.openweights.core.tools.Memory
 import io.github.alpharomercoma.openweights.core.tools.Remembered
 import io.github.alpharomercoma.openweights.core.tools.SearchEngine
+import io.github.alpharomercoma.openweights.core.tools.SearchSettings
 
 /**
  * What the model can do, and what each one costs you.
@@ -107,6 +112,7 @@ fun ToolsScreen(
     onForgetFolder: () -> Unit,
     onEngineEnabled: (SearchEngine, Boolean) -> Unit = { _, _ -> },
     onProxy: (String) -> Unit = {},
+    onSearchResults: (Int) -> Unit = {},
     onMemoryEdit: (String, String) -> Unit = { _, _ -> },
     onMemoryDelete: (String) -> Unit = {},
     onMemoryClear: () -> Unit = {},
@@ -187,8 +193,10 @@ fun ToolsScreen(
                 SearchCard(
                     engines = state.engines,
                     proxy = state.proxy,
+                    results = state.searchResults,
                     onEngineEnabled = onEngineEnabled,
                     onProxy = onProxy,
+                    onResults = onSearchResults,
                 )
             }
 
@@ -589,17 +597,21 @@ internal fun MemoryEditDialog(original: String, onSave: (String) -> Unit, onDism
 }
 
 /**
- * Which engines search may use, and a proxy for when they refuse.
+ * How wide a search is, which engines it may use, and a proxy for when they refuse.
  *
  * Collapsed to a summary until opened, because most people never touch it and the two rows
- * it governs are already on this screen. Opened, it is four switches and one field.
+ * it governs are already on this screen. The summary carries the result count rather than
+ * only the engine tally: it is the one setting here that changes what every answer is built
+ * from, and a number nobody can see is a number nobody will move.
  */
 @Composable
 private fun SearchCard(
     engines: List<EngineSummary>,
     proxy: String,
+    results: Int,
     onEngineEnabled: (SearchEngine, Boolean) -> Unit,
     onProxy: (String) -> Unit,
+    onResults: (Int) -> Unit,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     val on = engines.count { it.enabled }
@@ -616,12 +628,46 @@ private fun SearchCard(
         Text(
             // Says what the order means, because it is not the order of index quality and
             // somebody reading the list will otherwise assume it is.
-            text = stringResource(R.string.search_engines_status, on, engines.size),
+            text = resultsLabel(results) + " · " +
+                stringResource(R.string.search_engines_status, on, engines.size),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (!open) return@Column
+
+        // First, above the engines, because it is the setting that changes every answer:
+        // which engine answered is invisible in a reply, how much it returned is not.
+        Text(
+            text = stringResource(R.string.search_results_count),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(top = 14.dp),
+        )
+        Text(
+            text = stringResource(R.string.search_results_count_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Five buttons rather than a slider. The whole range fits in one row at this width,
+        // so every value is one tap away and the chosen one is legible without a label
+        // beside it, which is not true of a slider with four stops on it.
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            val counts = SearchSettings.MIN_RESULT_COUNT..SearchSettings.MAX_RESULT_COUNT
+            counts.forEachIndexed { index, count ->
+                SegmentedButton(
+                    selected = count == results,
+                    onClick = { onResults(count) },
+                    shape = SegmentedButtonDefaults.itemShape(index, counts.count()),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = OpenWeightsColors.Lime,
+                        activeContentColor = OpenWeightsColors.Ink,
+                        activeBorderColor = OpenWeightsColors.Lime,
+                        inactiveBorderColor = MaterialTheme.colorScheme.outline,
+                    ),
+                    label = { Text(count.toString(), maxLines = 1) },
+                )
+            }
+        }
 
         engines.forEach { summary ->
             Row(
@@ -669,6 +715,14 @@ private fun SearchCard(
         )
         TextButton(onClick = { onProxy(typed) }) { Text(stringResource(R.string.save_proxy)) }
     }
+}
+
+/** "1 result" or "N results", because a plural that reads "1 results" is a bug people see. */
+@Composable
+private fun resultsLabel(results: Int): String = if (results == 1) {
+    stringResource(R.string.search_results_count_one)
+} else {
+    stringResource(R.string.search_results_count_value, results)
 }
 
 private fun SearchEngine.detailResource(): Int = when (this) {

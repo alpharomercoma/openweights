@@ -217,6 +217,12 @@
     <string name="storage_on_device">%1$s on this device</string>
     <string name="models_empty">Nothing downloaded yet. Browse models from the name at the top of a chat. Each one says whether it runs on this phone before you download it.</string>
     <string name="download_progress">%1$s of %2$s</string>
+    <string name="stat_time_to_first_token">to first token</string>
+    <string name="stat_tokens">tokens</string>
+    <string name="stat_total_time">in total</string>
+    <string name="stat_prefill">Prefill</string>
+    <string name="stat_decode">Decode</string>
+    <string name="stat_tokens_value">%1$d tokens</string>
     <string name="cancel_download">Cancel download</string>
     <string name="reads_attachments">reads attachments</string>
     <string name="delete_model_title">Delete model?</string>
@@ -226,7 +232,8 @@
     <string name="unsupported_architecture_detail">This version of OpenWeights cannot load %1$s models. Support requires an app update. You can still browse the files here.</string>
     <string name="vision_projector_detail">This model can read images. Its %1$s vision encoder downloads with it and is included in the estimates below.</string>
     <string name="context_length_tokens">Context length: %1$d tokens</string>
-    <string name="percent_complete">%1$d%%</string>
+    <!-- A bare percentage. No words, so nothing to translate. -->
+    <string name="percent_complete" translatable="false">%1$d%%</string>
     <string name="needs_newer_version">Needs a newer OpenWeights: this version cannot load %1$s models.</string>
     <string name="draft_model_not_a_model">A draft model for speculative decoding, not one that answers on its own. It only runs alongside the full model it speeds up.</string>
     <string name="header_read_failed">Could not read this file\'s header: %1$s</string>
@@ -250,11 +257,6 @@
     <string name="unknown_command_suggestion">Did you mean %1$s?</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="generated_at_speed_with_prefill">Prompt read at %1$d tokens per second, generated at %2$d tokens per second</string>
-    <string name="detail_prefill_speed">%1$.1f tok/s prefill</string>
-    <string name="detail_decode_speed">%1$.1f tok/s decode</string>
-    <string name="detail_first_token">%1$.1fs to first token</string>
-    <string name="detail_token_count">%1$d tokens</string>
-    <string name="detail_total_time">%1$.1fs in total</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>
     <string name="leave_mode">Leave %1$s mode</string>
     <string name="show_more_answer">Show the rest</string>

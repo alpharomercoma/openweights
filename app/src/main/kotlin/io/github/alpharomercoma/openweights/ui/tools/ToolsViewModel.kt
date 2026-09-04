@@ -65,6 +65,8 @@ data class ToolsUiState(
     /** Which engines search may use, in the order they are tried. */
     val engines: List<EngineSummary> = emptyList(),
     val proxy: String = "",
+    /** How many results one search brings back. See [SearchSettings.resultCount]. */
+    val searchResults: Int = SearchSettings.DEFAULT_RESULT_COUNT,
     /** What the app has saved about the user, oldest first, for reading and pruning here. */
     val memories: List<Remembered> = emptyList(),
 )
@@ -91,8 +93,9 @@ class ToolsViewModel @Inject constructor(
     private val memory: Memory,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
-    private val _uiState =
-        MutableStateFlow(ToolsUiState(read(), workspace(), engines(), search.proxy))
+    private val _uiState = MutableStateFlow(
+        ToolsUiState(read(), workspace(), engines(), search.proxy, search.resultCount),
+    )
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
 
     init {
@@ -119,6 +122,17 @@ class ToolsViewModel @Inject constructor(
 
     fun setProxy(address: String) {
         search.proxy = address
+        refresh()
+    }
+
+    /**
+     * How wide a search is, from one result to five.
+     *
+     * Written through the settings object rather than held here, because the tool reads it
+     * per call: the change is live on the next search rather than at the next launch.
+     */
+    fun setSearchResults(count: Int) {
+        search.resultCount = count
         refresh()
     }
 
@@ -161,6 +175,7 @@ class ToolsViewModel @Inject constructor(
             workspace = workspace(),
             engines = engines(),
             proxy = search.proxy,
+            searchResults = search.resultCount,
         )
     }
 

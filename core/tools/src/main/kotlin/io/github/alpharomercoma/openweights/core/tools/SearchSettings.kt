@@ -66,6 +66,28 @@ class SearchSettings @Inject constructor(
         set(value) = store.edit { putBoolean(DOCUMENTATION, value) }
 
     /**
+     * How many results one search brings back.
+     *
+     * A knob because the right answer is not a constant. Every result costs context and
+     * costs the model attention: three of them is roughly 2,700 characters of somebody
+     * else's prose in front of a question, and on a 1B that is enough to bury the question.
+     * One is right for "what is the current version of X", where the first hit either has
+     * it or nothing does. Five is right for a question with disagreement in it, where one
+     * source is an opinion and the shape of the answer is which way the others lean.
+     *
+     * Bounded at both ends rather than left free. Below one there is no search, and above
+     * five a phone's window is being spent on material the model will not read: the
+     * measured behaviour of a small model handed eight results is that it answers from the
+     * first two and the rest are prefill.
+     *
+     * Clamped on read as well as on write, so a value put there by an older build, or by
+     * anything editing the file, cannot ask the provider for two hundred.
+     */
+    var resultCount: Int
+        get() = store.getInt(RESULT_COUNT, DEFAULT_RESULT_COUNT).coerceIn(RESULT_RANGE)
+        set(value) = store.edit { putInt(RESULT_COUNT, value.coerceIn(RESULT_RANGE)) }
+
+    /**
      * The client search uses, which is the caller's with the proxy applied when there is one.
      *
      * Derived rather than replaced, so the connection pool, the timeouts and the interceptors
@@ -229,11 +251,27 @@ class SearchSettings @Inject constructor(
     private fun sealedCredentials(): String? =
         store.getString(PROXY_CREDENTIALS, null)?.let(secrets::open)
 
-    private companion object {
-        const val TAG = "OpenWeights"
-        const val DOCUMENTATION = "documentation"
-        const val PROXY = "proxy"
-        const val PROXY_CREDENTIALS = "proxy_credentials"
+    companion object {
+        /**
+         * What a search returns when nobody has said otherwise.
+         *
+         * Three, which is what the tool was hard-coded to before this was a setting: enough
+         * to answer from and to notice when the first result is wrong, small enough that
+         * three extracts still leave room for the conversation they are being read in.
+         */
+        const val DEFAULT_RESULT_COUNT = 3
+
+        /** The narrowest and widest search offered. See [resultCount]. */
+        const val MIN_RESULT_COUNT = 1
+        const val MAX_RESULT_COUNT = 5
+
+        internal val RESULT_RANGE = MIN_RESULT_COUNT..MAX_RESULT_COUNT
+
+        private const val TAG = "OpenWeights"
+        private const val DOCUMENTATION = "documentation"
+        private const val RESULT_COUNT = "result_count"
+        private const val PROXY = "proxy"
+        private const val PROXY_CREDENTIALS = "proxy_credentials"
     }
 }
 

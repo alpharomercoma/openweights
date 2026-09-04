@@ -24,7 +24,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,6 +78,15 @@ fun FitCard(
      * about the one already running.
      */
     downloadFraction: Float? = null,
+    /**
+     * Stops the download this card started.
+     *
+     * This is where somebody changes their mind: they tapped Download a second ago, saw a
+     * gigabyte begin to move, and are looking at the card that started it. Sending them to
+     * the installed-models screen to stop it is asking them to find the thing they just did
+     * somewhere else.
+     */
+    onCancelDownload: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -114,7 +127,7 @@ fun FitCard(
                 inspected.cannotRun -> Unit
                 inspected.fit?.verdict == FitVerdict.WONT_RUN -> Unit
                 downloadFraction != null -> Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(
@@ -123,13 +136,28 @@ fun FitCard(
                         strokeWidth = 2.dp,
                     )
                     Text(
+                        // The word goes and the number stays. "Downloading 43%" beside a
+                        // ring that is 43% full says the same thing twice, and the room it
+                        // took is what the way out needed: this row shares one line with a
+                        // file name that is often long enough to wrap on its own.
                         text = stringResource(
-                            R.string.downloading_percent,
+                            R.string.percent_complete,
                             (downloadFraction * 100).toInt(),
                         ),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    IconButton(
+                        onClick = onCancelDownload,
+                        modifier = Modifier.size(CANCEL_TARGET),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.cancel_download),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(CANCEL_ICON),
+                        )
+                    }
                 }
 
                 else -> AccentButton(onClick = onDownload) {
@@ -320,3 +348,9 @@ private fun FitCardPreview() {
         )
     }
 }
+
+/** The touch target for the cancel, at the accessibility minimum rather than the icon's size. */
+private val CANCEL_TARGET = 40.dp
+
+/** The X itself, sized to sit beside a percentage rather than to compete with it. */
+private val CANCEL_ICON = 18.dp

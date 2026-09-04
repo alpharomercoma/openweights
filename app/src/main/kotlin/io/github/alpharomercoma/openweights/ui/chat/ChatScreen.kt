@@ -166,6 +166,8 @@ fun ChatScreen(
     installedModels: List<LocalModel> = emptyList(),
     /** Downloads in flight, shown in the picker so a queued model is not invisible. */
     activeDownloads: List<ActiveDownload> = emptyList(),
+    /** Stops a download in flight, by the key it runs under. See [ModelPickerSheet]. */
+    onCancelDownload: (String) -> Unit = {},
     publisherAvatars: Map<String, String> = emptyMap(),
     onSelectModel: (LocalModel) -> Unit = {},
     onUnloadModel: () -> Unit = {},
@@ -299,6 +301,7 @@ fun ChatScreen(
             destinations = destinations,
             installedModels = installedModels,
             activeDownloads = activeDownloads,
+            onCancelDownload = onCancelDownload,
             publisherAvatars = publisherAvatars,
             onSelectModel = onSelectModel,
             onUnloadModel = onUnloadModel,
@@ -355,6 +358,7 @@ private fun ChatContent(
     destinations: ChatDestinations,
     installedModels: List<LocalModel>,
     activeDownloads: List<ActiveDownload>,
+    onCancelDownload: (String) -> Unit,
     publisherAvatars: Map<String, String>,
     onSelectModel: (LocalModel) -> Unit,
     onUnloadModel: () -> Unit,
@@ -602,6 +606,7 @@ private fun ChatContent(
         ModelPickerSheet(
             models = installedModels,
             downloads = activeDownloads,
+            onCancelDownload = onCancelDownload,
             activeName = state.modelName,
             avatars = publisherAvatars,
             onSelect = {
@@ -855,6 +860,10 @@ private fun ChatSheets(
             compiledProcessor = state.compiledProcessor,
             offloadBuffers = state.offloadBuffers,
             loadedContext = state.contextSize,
+            // Asked of the loaded model rather than guessed from its name. A vision model
+            // opened without its projector reads nothing, and offering it an image budget
+            // would be a control over a capability it does not have.
+            readsImages = state.mediaSupport.vision,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()

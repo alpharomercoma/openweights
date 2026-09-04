@@ -106,6 +106,8 @@ fun DiscoverScreen(
     onCloseModel: () -> Unit,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
+    /** Stops a download in flight, by the destination filename it is keyed under. */
+    onCancelDownload: (String) -> Unit = {},
     /** Downloads already running, by destination filename, so a started one says so. */
     downloading: Map<String, Float> = emptyMap(),
     /**
@@ -184,6 +186,7 @@ fun DiscoverScreen(
                     onContextLengthChange = onContextLengthChange,
                     onDownload = { path -> onDownload(state.detail.model.id, path) },
                     downloading = downloading,
+                    onCancelDownload = onCancelDownload,
                 )
                 return@Scaffold
             }
@@ -376,6 +379,7 @@ private fun ModelDetail(
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String) -> Unit,
     downloading: Map<String, Float> = emptyMap(),
+    onCancelDownload: (String) -> Unit = {},
 ) {
     val detail = state.detail ?: return
 
@@ -455,6 +459,7 @@ private fun ModelDetail(
                 inspected = inspected,
                 onDownload = { onDownload(inspected.file.path) },
                 downloadFraction = downloading[inspected.file.fileName],
+                onCancelDownload = { onCancelDownload(inspected.file.fileName) },
             )
         }
     }

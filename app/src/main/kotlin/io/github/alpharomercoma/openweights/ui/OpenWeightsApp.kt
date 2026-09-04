@@ -217,6 +217,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 ),
                 installedModels = installedModels,
                 activeDownloads = activeDownloads,
+                onCancelDownload = modelsViewModel::cancel,
                 publisherAvatars = publisherAvatars,
                 onSelectModel = { model ->
                     chatViewModel.loadModel(model.file, keepConversation = true)
@@ -314,6 +315,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 downloading = modelsState.downloads
                     .filterNot { it.error != null }
                     .associate { it.key to it.fraction },
+                onCancelDownload = modelsViewModel::cancel,
                 onDownload = { repoId, path ->
                     state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
                         val tokenizer = state.detail?.tokenizerFor(file)
@@ -349,6 +351,7 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 onForgetFolder = viewModel::forgetFolder,
                 onEngineEnabled = viewModel::setEngineEnabled,
                 onProxy = viewModel::setProxy,
+                onSearchResults = viewModel::setSearchResults,
                 onMemoryEdit = viewModel::updateMemory,
                 onMemoryDelete = viewModel::deleteMemory,
                 onMemoryClear = viewModel::clearMemories,

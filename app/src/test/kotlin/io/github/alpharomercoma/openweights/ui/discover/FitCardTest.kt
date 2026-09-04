@@ -18,7 +18,9 @@ package io.github.alpharomercoma.openweights.ui.discover
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileType
 import io.github.alpharomercoma.openweights.core.common.model.GgufMetadata
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -169,11 +171,35 @@ class FitCardTest {
         compose.onNodeWithText("Runs comfortably").assertDoesNotExist()
     }
 
+    @Test
+    fun `a download in flight can be stopped from the card that started it`() {
+        // The card is where somebody changes their mind: they tapped Download a second ago
+        // and are watching a gigabyte begin to move. Sending them to the installed-models
+        // screen to stop it is asking them to find what they just did somewhere else.
+        var cancelled = false
+        showFit(FitVerdict.COMFORTABLE, downloadFraction = 0.43f, onCancel = { cancelled = true })
+
+        compose.onNodeWithContentDescription("Cancel download").performClick()
+
+        assert(cancelled) { "the cancel must reach the download queue" }
+    }
+
+    @Test
+    fun `a card with no download running offers no way to stop one`() {
+        showFit(FitVerdict.COMFORTABLE, downloadFraction = null)
+
+        compose.onNodeWithContentDescription("Cancel download").assertDoesNotExist()
+        compose.onNodeWithText("Download").assertIsDisplayed()
+    }
+
+    @Suppress("LongParameterList")
     private fun showFit(
         verdict: FitVerdict,
         tokensPerSecond: Double? = 13.8,
         unsupportedArchitecture: String? = null,
         draftArchitecture: String? = null,
+        downloadFraction: Float? = null,
+        onCancel: () -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -206,6 +232,8 @@ class FitCardTest {
                         ),
                     ),
                     onDownload = {},
+                    downloadFraction = downloadFraction,
+                    onCancelDownload = onCancel,
                 )
             }
         }

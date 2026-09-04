@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -80,6 +81,15 @@ fun ModelPickerSheet(
     /** Publisher logos, when the Hub has been asked. Empty offline, and that is fine. */
     avatars: Map<String, String> = emptyMap(),
     onSelect: (LocalModel) -> Unit,
+    /**
+     * Stops a download in flight, by the key it is running under.
+     *
+     * Here as well as on the Manage Models screen because this sheet is where a download
+     * is watched: it opens over the conversation the model is being fetched for, and the
+     * screen that could stop it was two taps away through a row labelled "Manage models",
+     * which is not what somebody who has just changed their mind goes looking for.
+     */
+    onCancelDownload: (String) -> Unit = {},
     onUnload: () -> Unit = {},
     onBrowse: () -> Unit,
     onManage: () -> Unit,
@@ -115,7 +125,7 @@ fun ModelPickerSheet(
                     modifier = Modifier.padding(horizontal = ROW_INSET, vertical = 8.dp),
                 )
                 downloads.forEach { download ->
-                    DownloadingModelRow(download)
+                    DownloadingModelRow(download, onCancel = { onCancelDownload(download.key) })
                 }
             }
 
@@ -191,18 +201,34 @@ fun ModelPickerSheet(
 }
 
 @Composable
-private fun DownloadingModelRow(download: ActiveDownload) {
+private fun DownloadingModelRow(download: ActiveDownload, onCancel: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(start = 20.dp, end = 8.dp)
+            .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(
-            text = download.path.substringAfterLast('/').ifBlank { download.key },
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-        )
+        // The name and the way out on one line, so stopping a download costs no vertical
+        // space in a sheet that is already competing with the model list for it.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = download.path.substringAfterLast('/').ifBlank { download.key },
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onCancel, modifier = Modifier.size(CANCEL_TARGET)) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    // Named for what it stops, not for its shape: a screen reader saying
+                    // "close" beside a progress bar is ambiguous about what closes.
+                    contentDescription = stringResource(R.string.cancel_download),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(CANCEL_ICON),
+                )
+            }
+        }
         androidx.compose.material3.LinearProgressIndicator(
             progress = { download.fraction.coerceIn(0f, 1f) },
             modifier = Modifier.fillMaxWidth(),
@@ -297,3 +323,9 @@ private val LIST_MAX = 300.dp
 
 /** The horizontal padding a row in this sheet uses, which the headings match. */
 private val ROW_INSET = 20.dp
+
+/** The touch target for the cancel, at the accessibility minimum rather than the icon's size. */
+private val CANCEL_TARGET = 40.dp
+
+/** The X itself, sized to sit beside a title rather than to compete with it. */
+private val CANCEL_ICON = 18.dp

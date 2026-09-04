@@ -176,6 +176,27 @@ class CanvasServerTest {
     }
 
     @Test
+    fun `a newline in the file name cannot break the shell's script`() {
+        // The name reaches the shell through a query parameter, and percent-decoding turns
+        // %0A into a real newline. Dropped between the quotes of `var FILE = "..."` that
+        // is a syntax error, which stops the viewer's whole script: a blank canvas, and
+        // the reason only in a console nobody is reading. It is also where a name the
+        // model chose gets to write JavaScript.
+        val (code, body) = get(viewer("/__ow__/doc?file=notes%0A%22%2Balert(1)%2B%22.md"))
+
+        assertThat(code).isEqualTo(200)
+        val literal = body.lines().first { it.contains("var FILE") }
+        // The payload is allowed to appear; what it must not do is get out. Both of its
+        // quotes are escaped, so it stays text inside the literal rather than becoming
+        // `" + alert(1) + "`, and the newline is escaped rather than real.
+        assertThat(literal).doesNotContain("\"+alert(1)+\"")
+        assertThat(literal).contains("\\\"+alert(1)+\\\"")
+        assertThat(literal).contains("\\n")
+        // One line, still closed: which is what "the script did not break" means here.
+        assertThat(literal.trim()).endsWith("\";")
+    }
+
+    @Test
     fun `viewer assets come from the APK`() {
         val (code, body) = get(viewer("/__ow__/asset/marked.min.js"))
         assertThat(code).isEqualTo(200)
@@ -217,6 +238,80 @@ class CanvasServerTest {
         val (wrongKeyCode, _) =
             get("http://127.0.0.1:$port/${"0".repeat(32)}/__ow__/asset/marked.min.js")
         assertThat(wrongKeyCode).isEqualTo(404)
+    }
+
+    /**
+     * One raw request written by hand, and the status line that came back, or null when
+     * the server closed the connection without answering at all.
+     */
+    private fun rawStatusOf(target: String, port: Int, trailing: String = ""): String? =
+        Socket("127.0.0.1", port).use { socket ->
+            socket.soTimeout = 10_000
+            val request = "GET $target HTTP/1.1\r\nHost: 127.0.0.1:$port\r\n\r\n$trailing"
+            socket.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
+            socket.getInputStream().bufferedReader(Charsets.ISO_8859_1).readLine()
+        }
+
+    @Test
+    fun `a path that cannot be percent-decoded is answered rather than thrown`() {
+        // `URLDecoder` throws on a trailing `%`, and the decode happens before the key is
+        // checked, so this is one byte, from any app on the phone, on the unauthenticated
+        // side of the door. It used to leave the answer unwritten and the exception with
+        // Android's uncaught handler.
+        val port = server.port()
+        assertThat(rawStatusOf("/%", port)).isEqualTo("HTTP/1.1 404 Not Found")
+        assertThat(rawStatusOf("/%zz", port)).isEqualTo("HTTP/1.1 404 Not Found")
+        assertThat(rawStatusOf("/${key()}/%e0%a4", port)).isEqualTo("HTTP/1.1 404 Not Found")
+    }
+
+    @Test
+    fun `a request that fails takes nothing down with it`() {
+        // A worker is a root coroutine, so a request that threw did not merely go
+        // unanswered: it retired the worker that was serving it. Four of them retired the
+        // server. What is pinned here is that every worker is still accepting afterwards.
+        val port = server.port()
+        repeat(CanvasServer.CONNECTIONS * 2) { rawStatusOf("/%", port) }
+        // Every worker, not just one: ten clients at once against a bound of four only all
+        // get answered if all four are still there.
+        val clients = List(CanvasServer.CONNECTIONS + 6) {
+            Socket("127.0.0.1", port).apply { soTimeout = 10_000 }
+        }
+        try {
+            val request = "GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:$port\r\n\r\n"
+            clients.forEach {
+                it.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
+            }
+            clients.forEach { client ->
+                val status =
+                    client.getInputStream().bufferedReader(Charsets.ISO_8859_1).readLine()
+                assertThat(status).isEqualTo("HTTP/1.1 404 Not Found")
+            }
+        } finally {
+            clients.forEach { runCatching { it.close() } }
+        }
+    }
+
+    @Test
+    fun `a client that resets the connection does not retire its worker`() {
+        // Closing a socket with data still unread sends RST rather than FIN, so the write
+        // the server is part-way through fails with a broken pipe. Whether the reset beats
+        // the write is the kernel's business and not this test's: what is asserted is that
+        // the server is whole afterwards either way, which is what regressed.
+        val port = server.port()
+        val junk = "x".repeat(64 * 1024)
+        repeat(CanvasServer.CONNECTIONS * 2) {
+            runCatching {
+                Socket("127.0.0.1", port).use { socket ->
+                    socket.setSoLinger(true, 0)
+                    val request =
+                        "GET /${key()}/__ow__/asset/marked.min.js HTTP/1.1\r\n" +
+                            "Host: 127.0.0.1:$port\r\n\r\n$junk"
+                    socket.getOutputStream().write(request.toByteArray(Charsets.ISO_8859_1))
+                }
+            }
+        }
+        val (code, _) = get(viewer("/__ow__/asset/marked.min.js"))
+        assertThat(code).isEqualTo(200)
     }
 
     @Test

@@ -17,7 +17,9 @@
 package io.github.alpharomercoma.openweights.core.tools
 
 import android.content.Context
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -179,7 +181,20 @@ class CanvasServer @Inject constructor(
     private fun accept(server: ServerSocket) {
         while (!server.isClosed) {
             val client = runCatching { server.accept() }.getOrNull() ?: continue
-            client.use { serve(it) }
+            // Nothing a connection does may leave this loop. A worker is a root coroutine,
+            // so an exception escaping here has no parent to hand it to: the coroutines
+            // machinery gives it to the thread's uncaught handler, which on Android is the
+            // one that kills the process. The worker is gone either way, so four bad
+            // requests would have retired the whole server. Both were reachable from
+            // outside: a socket the client reset mid-write, and a path any app on the
+            // loopback could send that `URLDecoder` refuses.
+            try {
+                client.use { serve(it) }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (@Suppress("TooGenericExceptionCaught") failure: Throwable) {
+                Log.w(TAG, "canvas request failed", failure)
+            }
         }
     }
 
@@ -216,12 +231,18 @@ class CanvasServer @Inject constructor(
         if (host != "127.0.0.1:$port") {
             return response("400 Bad Request", "text/plain", "Wrong host".toByteArray())
         }
-        val decoded = URLDecoder.decode(parts[1].substringBefore('?'), "UTF-8").trimStart('/')
+        // The path is decoded before the key is checked, so every app on the loopback gets
+        // to choose what `URLDecoder` is handed, and it throws on a `%` with nothing usable
+        // after it: one byte, on the unauthenticated side of the door.
+        val decoded = decodeOrNull(parts[1].substringBefore('?'))?.trimStart('/')
         // Answered exactly like a missing file, so a scan learns nothing from the reply
-        // about whether it guessed a key or a name.
-        val keyed = decoded.substringBefore('/') == currentKey() && decoded.contains('/')
-        if (!keyed) {
-            val body = "No such file: $decoded".toByteArray()
+        // about whether it guessed a key or a name. A path that will not decode at all is
+        // told the same thing, for the same reason and because that is what it is.
+        if (decoded == null ||
+            decoded.substringBefore('/') != currentKey() ||
+            !decoded.contains('/')
+        ) {
+            val body = "No such file: ${decoded.orEmpty()}".toByteArray()
             return response("404 Not Found", "text/plain", body)
         }
         return route(decoded.substringAfter('/', ""), parts[1].substringAfter('?', ""))
@@ -241,6 +262,44 @@ class CanvasServer @Inject constructor(
 
     @Synchronized
     private fun currentKey(): String = key
+
+    /**
+     * A string safe to drop between the quotes of a JavaScript string literal.
+     *
+     * The file name reaches here from a query parameter, so it is whatever the model named
+     * its file plus whatever anything on the loopback appends: percent-decoding turns
+     * `%0A` into a real newline, and a newline inside a string literal is a syntax error
+     * that stops the viewer's whole script — a blank canvas, with the reason only in a
+     * console nobody is reading. `<` is escaped so the literal cannot close the `<script>`
+     * element around it, and U+2028 and U+2029 because they were line terminators before
+     * ES2019 and this string is also read by whatever browser the user opens it in.
+     */
+    private fun String.asJsStringBody(): String = buildString(length) {
+        for (character in this@asJsStringBody) {
+            when (character) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '<' -> append("\\u003c")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\u2028' -> append("\\u2028")
+                '\u2029' -> append("\\u2029")
+                // Anything else a control character would do to the literal, it does by
+                // being unreadable rather than by ending it; escaped for the same reason.
+                in '\u0000'..'\u001f' -> append("\\u%04x".format(character.code))
+                else -> append(character)
+            }
+        }
+    }
+
+    /**
+     * A percent-decoded path, or null when it is not one.
+     *
+     * `URLDecoder.decode` throws `IllegalArgumentException` on a trailing `%` and on
+     * non-hex after one, and both are one byte for anything on the phone to send.
+     */
+    private fun decodeOrNull(raw: String): String? =
+        runCatching { URLDecoder.decode(raw, "UTF-8") }.getOrNull()
 
     /**
      * The bundled viewers and their assets, or null when [path] is an ordinary file.
@@ -281,7 +340,7 @@ class CanvasServer @Inject constructor(
     private fun shellResponse(template: String, query: String): ByteArray {
         val file = query.split('&')
             .firstOrNull { it.startsWith("file=") }
-            ?.let { URLDecoder.decode(it.removePrefix("file="), "UTF-8") }
+            ?.let { decodeOrNull(it.removePrefix("file=")) }
             .orEmpty()
         val shell = runCatching {
             context.assets.open(template).use { it.readBytes().toString(Charsets.UTF_8) }
@@ -290,11 +349,7 @@ class CanvasServer @Inject constructor(
             "text/plain",
             "viewer missing".toByteArray(),
         )
-        // Into a JS string literal, so everything that could end the literal is escaped.
-        val escaped = file
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("<", "\\u003c")
+        val escaped = file.asJsStringBody()
         // The shells reach their assets and the file by absolute path, and every absolute
         // path on this server begins with the key. Their own scripts carry the nonce the
         // policy names; nothing the rendered Markdown brings in does.
@@ -375,6 +430,7 @@ class CanvasServer @Inject constructor(
     internal companion object {
         /** Connections served at once; the rest wait in the backlog. See [scope]. */
         internal const val CONNECTIONS = 4
+        private const val TAG = "CanvasServer"
         private const val VIEWER_PREFIX = "__ow__"
         private const val BACKLOG = 8
         private const val READ_TIMEOUT_MS = 10_000

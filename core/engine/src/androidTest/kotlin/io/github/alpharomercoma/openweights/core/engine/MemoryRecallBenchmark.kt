@@ -96,7 +96,16 @@ class MemoryRecallBenchmark {
                 for (case in CASES) {
                     val completed = ask(fresh, arm, case.question)
                     val called = completed.toolCalls.any { it.name == READ_MEMORY }
-                    val used = case.evidence.any { completed.content.contains(it, true) }
+                    // The loop has to be finished before the answer can be read. A first
+                    // pass that ends in a tool call has produced no answer at all, so
+                    // scoring its content would score every calling model as a miss and
+                    // measure this harness rather than the model.
+                    val answered = if (called) {
+                        answerAfterTool(fresh, arm, case.question, completed).content
+                    } else {
+                        completed.content
+                    }
+                    val used = case.evidence.any { answered.contains(it, true) }
                     if (called) calls += 1
                     // A call on a question with nothing to do with the user is the round
                     // trip that costs seconds and learns nothing.
@@ -120,6 +129,41 @@ class MemoryRecallBenchmark {
                 )
             }
         }
+    }
+
+    /**
+     * The second pass, with the facts the tool would have returned.
+     *
+     * `read_memory` returns the same block the injected arm puts in the system message, so
+     * the two arms differ in *where* the facts arrive and not in what they say. Anything
+     * else would make the comparison a comparison of two different memories.
+     */
+    private suspend fun answerAfterTool(
+        engine: InferenceEngine,
+        arm: Arm,
+        question: String,
+        first: GenerationEvent.Completed,
+    ): GenerationEvent.Completed {
+        val call = first.toolCalls.first { it.name == READ_MEMORY }
+        return engine.chat(
+            messages = listOf(
+                ChatMessage.text(ChatRole.SYSTEM, arm.systemMessage()),
+                ChatMessage.text(ChatRole.USER, question),
+                // The app replays a tool-calling turn as the assistant's own raw markup,
+                // which is not on `Completed`. A JSON call is the template-agnostic stand
+                // in: what the second pass needs is an assistant turn that asked for
+                // something, followed by the answer to it. Whether a model can re-read its
+                // own call markup is a different question, and `ToolLoopReuseOnDeviceTest`
+                // already asks it.
+                ChatMessage.text(
+                    ChatRole.ASSISTANT,
+                    """{"name": "${call.name}", "arguments": {}}""",
+                ),
+                ChatMessage.toolResult(call.id, FACT_BLOCK),
+            ),
+            params = SamplerParams(temperature = 0f, maxTokens = BUDGET, seed = 7),
+            tools = listOf(READ_MEMORY_TOOL),
+        ).toList().filterIsInstance<GenerationEvent.Completed>().single()
     }
 
     private suspend fun ask(

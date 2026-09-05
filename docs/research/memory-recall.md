@@ -85,16 +85,65 @@ measured on is whether the facts derail the questions that are not about them, w
 failure mode the reverse-engineering work found in the wild: a stored quote about "dopeness"
 applied to a Python debugging session.
 
-It has not been run. The cloud device this project measures on had its reservation lapse
-mid-session, and the phone was at 14% and unplugged. The benchmark is written, compiles, and
-needs one device and about ten minutes.
+### The result
 
-**The expected result, stated in advance so the run cannot be read generously.** The small
-models this app targets have already been measured, in `ToolChoiceBenchmark`, to be
-insensitive to tool wording: three of six models scored identically under four different
-system messages. If that holds here, no rewording of the tool's description will fix a miss
-rate, and injection is the only lever left. Injection would then be right, with `read_memory`
-retired rather than kept as a second door onto the same facts.
+Run on the Poco against both models the app recommends, eight cases each, greedy.
+
+| model | arm | miss (of 4) | overcall (of 4) | tool calls |
+| --- | --- | ---: | ---: | ---: |
+| LFM2.5-1.2B | tool | **3** | 0 | 2 |
+| LFM2.5-1.2B | injected | **2** | 0 | 0 |
+| Qwen3-1.7B | tool | **0** | **2** | 6 |
+| Qwen3-1.7B | injected | **0** | **0** | 0 |
+
+**Injection is never worse and is sometimes much better, and it is always cheaper.**
+
+The two models fail the tool arm in opposite directions, and neither failure is small. The
+1.2B model *under-calls*: it asked for memory on two of the four questions that needed it,
+so half the facts never had a chance to arrive, and it then used what came back only once.
+The 1.7B model *over-calls*: it asked on all four that needed it and on two that did not, a
+general arithmetic question and a recipe, which is six round trips to answer four questions
+about the user and two about nothing. Each of those is a decode, a tool result and a
+re-prefill of a prompt that just grew.
+
+That is exactly the requirement this was measured against, which was almost no false
+positives and almost no false negatives. The small model gives 50% false negatives and the
+larger one 50% false positives. Neither is close.
+
+The injected arm has no routing to get wrong, and the thing it could have got wrong it did
+not: **overcall is 0 of 4 on both models**, so three standing facts about a vegetarian in
+Manila who writes Kotlin did not derail a question about arithmetic, a definition, a recipe
+or the weather. That was the real risk of injection and the failure the reverse-engineering
+work found in the wild, and it did not appear here.
+
+What injection does not fix is the 1.2B model missing two of four with the facts already in
+front of it. That is a capability limit rather than a routing one, and no arm reaches a fact
+the model will not read.
+
+**Verdict: inject.** Which is what ChatGPT, Claude and Hermes all do in some form, and what
+this app did before `ReadMemoryTool` replaced it. The two arguments that justified the
+replacement have both weakened: the token cost is now paid once per load rather than once
+per turn, because the warm prefix prefills a byte-stable head, and the KV stability rule now
+positively favours a constant block over a tool result that arrives mid-conversation.
+
+### The first run of this benchmark was wrong, and it is worth saying how
+
+The first run reported `miss=4/4` for the tool arm on **both** models, including the case
+where the model called correctly. That number was a property of the harness. The tool arm
+generated one pass, saw the pass end in a tool call, and then scored the content of a reply
+that did not exist yet: the tool was never executed and its result was never fed back. Every
+model that called was scored as having missed, so the arm was guaranteed to lose no matter
+what the model did.
+
+It was visible in the log as `called=true, used=false` on every single calling case, which
+is the shape a real result almost never has. The fix runs the second pass with the same fact
+block the injected arm uses, so the two arms differ in where the facts arrive and not in
+what they say. With the loop finished, Qwen's tool arm goes from 4 misses to **0**, which is
+the opposite conclusion.
+
+The lesson is the one this file already applies to vector databases: a benchmark that can
+only produce one answer has measured itself. The tell was in the output of the first run and
+should have been read there.
 
 ## What is already right
 
@@ -108,9 +157,10 @@ retired rather than kept as a second door onto the same facts.
   context window that shrinks without explanation.
 
 Those four are the checklist the reverse-engineering piece ends on, which says not to ship
-memory unless it is user-visible and directly editable and the recall can be scoped. Three of
-four hold today; the fourth, scoping recall to the task, is the thing the benchmark above is
-for.
+memory unless it is user-visible and directly editable and the recall can be scoped. All four
+hold today, and the measurement above says the fourth holds better without the tool than with
+it: a constant block is scoped by the model reading it, where a tool is scoped by the model
+remembering to ask.
 
 ## Sources
 

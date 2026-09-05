@@ -272,7 +272,7 @@
     <string name="image_detail_explanation">モデルが読む前の画像の大きさです。小さいほど大幅に速く、見出しは読めます。大きいほど時間がかかり、細かい文字まで読めます。これから追加する画像に適用されます。</string>
     <string name="image_detail_pixels">長辺 %1$d px</string>
     <string name="image_detail_footnote">1024 px を超えると画像はタイルに分割されます。最小の文字まで読めますが、数倍の時間がかかります</string>
-    <string name="stat_time_to_first_token">最初のトークンまで</string>
+    <string name="stat_reused">再利用</string>
     <string name="stat_tokens">トークン</string>
     <string name="stat_total_time">合計</string>
     <string name="stat_prefill">読み込み</string>

@@ -47,12 +47,34 @@ import java.util.Locale
 /**
  * Where one reply's time went.
  *
- * Three headline figures and then the two phases underneath, which is the order somebody
- * actually reads them in: how long before it started, how much it wrote, how long it took
- * in total, and only then the arithmetic that explains those three. A turn on a phone is
- * two different machines doing two different jobs: a batch pass over everything already
- * written, then one token at a time. A single "24 tok/s" hides whichever of them actually
- * cost the reply its seconds.
+ * Three headline figures and then the two phases underneath: what the turn did not have to
+ * read, how much it handled in all, how long it took, and only then the arithmetic that
+ * explains those three. A turn on a phone is two different machines doing two different
+ * jobs: a batch pass over everything already written, then one token at a time. A single
+ * "24 tok/s" hides whichever of them actually cost the reply its seconds.
+ *
+ * **The headline used to be time to first token, and it could not say anything.** Both it
+ * and prefill are measured from the same instant in `Session::generate`, so their whole
+ * difference is a grammar build and one decode step: at two decimal places, on a phone,
+ * they print the same number. Not a coincidence to be tuned away but the definition, so no
+ * threshold or rounding would have separated them. The prefill row already carries that
+ * duration, and carries the token count and rate that let somebody check it.
+ *
+ * What went in its place is the one term the panel's own arithmetic was missing. The
+ * headline count is the whole prompt plus the reply, while the prefill row counts only what
+ * was freshly read, and nothing on screen explained the gap between them. It is the cache,
+ * and it is the largest single fact about why a turn on this app was fast or slow: reused
+ * plus prefill tokens plus decode tokens is exactly the headline total, so every number
+ * here is now accounted for by another one.
+ *
+ * A count rather than the hit rate, although [GenerationStats.cacheHitRate] exists and
+ * reads more easily, because the conversation footer already shows that percentage. This
+ * panel is per reply and reached by a long press, so it is the place for the figure that
+ * makes this reply's row add up rather than a second copy of a figure two lines below it.
+ *
+ * Zero is a real answer and is drawn as one. A first turn cached nothing, and an attachment
+ * turn cached nothing because embeddings are never matched against the cache, and in both
+ * cases a bare 0 next to a large prefill is the explanation somebody came here for.
  *
  * Both phases are shown as tokens, seconds and a rate rather than a rate alone, because
  * the rate on its own cannot be checked and cannot be compared. Fifteen tokens at 49 tok/s
@@ -88,8 +110,8 @@ fun TurnStatsPanel(entry: TranscriptEntry, modifier: Modifier = Modifier) {
         // lot, it took this long.
         Row(modifier = Modifier.fillMaxWidth()) {
             Headline(
-                value = entry.timeToFirstTokenMs.asSeconds(locale),
-                label = stringResource(R.string.stat_time_to_first_token),
+                value = entry.cachedTokens?.toString() ?: NOT_MEASURED,
+                label = stringResource(R.string.stat_reused),
                 modifier = Modifier.weight(1f),
             )
             Headline(
@@ -285,10 +307,9 @@ private fun TurnStatsPanelPreview() {
                 text = "An answer",
                 tokensPerSecond = 25.1,
                 prefillTokensPerSecond = 49.4,
-                timeToFirstTokenMs = 412,
                 generatedTokens = 96,
-                promptTokens = 15,
-                cachedTokens = 0,
+                promptTokens = 115,
+                cachedTokens = 100,
                 prefillMs = 304,
                 decodeMs = 3826,
                 totalMillis = 4310,

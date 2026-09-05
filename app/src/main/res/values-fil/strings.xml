@@ -276,7 +276,7 @@
     <string name="image_detail_explanation">Gaano kalaki ang larawan bago ito basahin ng modelo. Mas maliit ay mas mabilis at nababasa pa rin ang malalaking teksto; mas malaki ay mas matagal at nababasa ang maliliit na letra. Sa mga larawang idadagdag mo mula ngayon.</string>
     <string name="image_detail_pixels">Pinakamahabang gilid %1$d px</string>
     <string name="image_detail_footnote">Higit sa 1024 px, hinahati sa tiles ang larawan: nababasa ang pinakamaliit na letra ngunit ilang beses na mas matagal</string>
-    <string name="stat_time_to_first_token">hanggang unang token</string>
+    <string name="stat_reused">muling ginamit</string>
     <string name="stat_tokens">mga token</string>
     <string name="stat_total_time">kabuuan</string>
     <string name="stat_prefill">Pagbasa</string>

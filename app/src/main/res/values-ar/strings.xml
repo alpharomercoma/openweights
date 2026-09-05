@@ -278,7 +278,7 @@
     <string name="image_detail_explanation">حجم الصورة قبل أن يقرأها النموذج. الأصغر أسرع بكثير ويقرأ العناوين، والأكبر يستغرق وقتًا أطول ويقرأ الخط الدقيق. يسري على الصور التي تضيفها من الآن.</string>
     <string name="image_detail_pixels">أطول ضلع %1$d بكسل</string>
     <string name="image_detail_footnote">فوق 1024 بكسل تُقطَّع الصورة إلى مربعات، فتُقرأ أدق الخطوط ويستغرق ذلك أضعاف الوقت</string>
-    <string name="stat_time_to_first_token">حتى أول رمز</string>
+    <string name="stat_reused">معاد استخدامها</string>
     <string name="stat_tokens">الرموز</string>
     <string name="stat_total_time">الإجمالي</string>
     <string name="stat_prefill">القراءة</string>

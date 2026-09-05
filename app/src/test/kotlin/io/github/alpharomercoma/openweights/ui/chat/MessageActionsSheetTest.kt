@@ -35,9 +35,9 @@ import org.robolectric.annotation.Config
  * covers the sheet it opens; nothing covered the route to it, and a control that cannot be
  * reached is the same as a control that does not exist as far as a reviewer is concerned.
  *
- * The measurements are here too, which is the other half. Tokens per second and time to
- * first token are what the listing leads on, and this is where a curious user finds them for
- * a particular reply rather than as a running total.
+ * The measurements are here too, which is the other half. The conversation footer carries a
+ * running total, and this is where a curious user finds one reply's own numbers: what the
+ * cache answered for free, what the two phases cost, and whether they add up.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w360dp-h640dp-night-xxhdpi")
@@ -88,11 +88,34 @@ class MessageActionsSheetTest {
     fun `the three figures a person waited for lead the panel`() {
         showSheet()
 
-        compose.onNodeWithText("to first token").assertIsDisplayed()
+        compose.onNodeWithText("reused").assertIsDisplayed()
         compose.onNodeWithText("in total").assertIsDisplayed()
         // The prompt as tokenized this turn plus what was written, which is the whole of
         // what the model handled: 96 generated on a 154-token prompt.
         compose.onNodeWithText("250").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the headline numbers account for every token in the total`() {
+        // The point of putting the cache up top. 100 reused, 54 freshly read and 96
+        // written is the 250 the panel leads with, so nothing on it is unexplained by
+        // something else on it.
+        showSheet(prefillTokensPerSecond = 142.0)
+
+        compose.onNodeWithText("100").assertIsDisplayed()
+        compose.onNodeWithText("54 tokens").assertIsDisplayed()
+        compose.onNodeWithText("96 tokens").assertIsDisplayed()
+        compose.onNodeWithText("250").assertIsDisplayed()
+    }
+
+    @Test
+    fun `time to first token is gone, because it could only ever repeat prefill`() {
+        // Both were measured from the same instant, so their difference was a grammar
+        // build and one decode step and they printed the same seconds. A regression here
+        // would be somebody putting back a headline that cannot say anything.
+        showSheet(prefillTokensPerSecond = 142.0)
+
+        compose.onNodeWithText("to first token").assertDoesNotExist()
     }
 
     @Test

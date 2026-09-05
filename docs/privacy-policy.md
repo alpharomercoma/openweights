@@ -1,6 +1,6 @@
 # OpenWeights privacy policy
 
-Last updated 2026-08-15.
+Last updated 2026-09-06.
 
 OpenWeights runs language models on your phone. There is no OpenWeights account, no
 OpenWeights server, and no analytics or crash reporting of any kind. Nothing in this app

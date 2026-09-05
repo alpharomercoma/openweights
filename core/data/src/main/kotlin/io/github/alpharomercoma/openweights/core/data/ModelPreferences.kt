@@ -437,22 +437,20 @@ private fun ModelPreferences.migratedToTheCurrentToolPrompt(): ModelPreferences 
  * new default, which is what it was measured to be. The old field is zeroed so it cannot
  * be read twice.
  */
-private fun ModelPreferences.migratedToImageTokens(): ModelPreferences =
-    if (imageEdgePixels > 0) {
-        // Keyed on the old field alone rather than on the version, so it runs whatever
-        // order the chain is in: the tool prompt migration beside this stamps CURRENT when
-        // it applies, and a version check here would then skip a row that needed both.
-        copy(
-            imageTokens = when {
-                imageEdgePixels < OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_FAST
-                imageEdgePixels > OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_TILES
-                else -> ModelPreferences.IMAGE_TOKENS_BALANCED
-            },
-            imageEdgePixels = 0,
-        )
-    } else {
-        this
-    }
+private fun ModelPreferences.migratedToImageTokens(): ModelPreferences {
+    if (imageEdgePixels <= 0) return this
+    // Keyed on the old field alone rather than on the version, so it runs whatever
+    // order the chain is in: the tool prompt migration beside this stamps CURRENT when
+    // it applies, and a version check here would then skip a row that needed both.
+    return copy(
+        imageTokens = when {
+            imageEdgePixels < OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_FAST
+            imageEdgePixels > OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_TILES
+            else -> ModelPreferences.IMAGE_TOKENS_BALANCED
+        },
+        imageEdgePixels = 0,
+    )
+}
 
 /** What the longest edge defaulted to while it was the setting. */
 private const val OLD_DEFAULT_IMAGE_EDGE = 1_024

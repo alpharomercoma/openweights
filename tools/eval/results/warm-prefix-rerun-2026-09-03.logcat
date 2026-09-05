@@ -1,0 +1,24 @@
+--------- beginning of main
+09-03 21:44:04.267 21893 21924 I WarmPrefixEval: Qwen3-1.7B-Q8_0.gguf: conversation warmed=28 reused=1047 in 529ms; follow-up cached=1068 ttft=610ms
+09-03 21:44:09.371 21893 21924 I WarmPrefixEval: Qwen3-1.7B-Q8_0.gguf: fresh-after-conversation cached=1052 ttft=291ms
+09-03 21:44:09.832 21893 21924 I WarmPrefixEval: conversation warm eval on SmolLM3-Q4_K_M.gguf
+09-03 21:45:22.728 21893 21924 I WarmPrefixEval: SmolLM3-Q4_K_M.gguf: conversation warmed=24 reused=1049 in 917ms; follow-up cached=1073 ttft=707ms
+09-03 21:45:32.385 21893 21924 I WarmPrefixEval: SmolLM3-Q4_K_M.gguf: fresh-after-conversation cached=1054 ttft=572ms
+09-03 21:45:32.891 21893 21924 I WarmPrefixEval: conversation warm eval on gemma-3-1b-it-Q4_K_M.gguf
+09-03 21:45:37.271 21893 21924 I WarmPrefixEval: gemma-3-1b-it-Q4_K_M.gguf: template carries no warmable prefix, skipping
+09-03 21:45:50.157 21893 21924 I WarmPrefixEval: LFM2.5-1.2B-Instruct-Q4_K_M.gguf: warm interrupted after 0 tokens in 27ms; turn cached=0 ttft=9995ms
+09-03 21:45:50.299 21893 21924 I WarmPrefixEval: warm eval on LFM2.5-1.2B-Instruct-Q4_K_M.gguf
+09-03 21:46:01.307 21893 21924 I WarmPrefixEval: LFM2.5-1.2B-Instruct-Q4_K_M.gguf: warmed=1018 reused=0 in 9326ms snapshot=12388KB
+09-03 21:46:17.306 21893 21924 I WarmPrefixEval: LFM2.5-1.2B-Instruct-Q4_K_M.gguf: fresh-chat cached=1018 prompt=18 ttft=235ms
+09-03 21:46:17.433 21893 21924 I WarmPrefixEval: warm eval on Llama-3.2-3B-Instruct-Q4_K_M.gguf
+09-03 21:47:02.418 21893 21924 I WarmPrefixEval: Llama-3.2-3B-Instruct-Q4_K_M.gguf: warmed=1038 reused=0 in 38119ms snapshot=0KB
+09-03 21:48:06.956 21893 21924 I WarmPrefixEval: Llama-3.2-3B-Instruct-Q4_K_M.gguf: fresh-chat cached=1044 prompt=13 ttft=2212ms
+09-03 21:48:07.556 21893 21924 I WarmPrefixEval: warm eval on Qwen3-1.7B-Q8_0.gguf
+09-03 21:48:46.236 21893 21924 I WarmPrefixEval: Qwen3-1.7B-Q8_0.gguf: warmed=1047 reused=0 in 23299ms snapshot=0KB
+09-03 21:49:46.133 21893 21924 I WarmPrefixEval: Qwen3-1.7B-Q8_0.gguf: fresh-chat cached=1052 prompt=13 ttft=455ms
+09-03 21:49:46.580 21893 21924 I WarmPrefixEval: warm eval on SmolLM3-Q4_K_M.gguf
+09-03 21:50:37.919 21893 21924 I WarmPrefixEval: SmolLM3-Q4_K_M.gguf: warmed=1049 reused=0 in 45183ms snapshot=0KB
+09-03 21:51:53.499 21893 21924 I WarmPrefixEval: SmolLM3-Q4_K_M.gguf: fresh-chat cached=1054 prompt=13 ttft=414ms
+09-03 21:51:53.903 21893 21924 I WarmPrefixEval: warm eval on gemma-3-1b-it-Q4_K_M.gguf
+09-03 21:51:58.438 21893 21924 I WarmPrefixEval: gemma-3-1b-it-Q4_K_M.gguf: warmed=1 reused=0 in 43ms snapshot=26KB
+09-03 21:51:58.439 21893 21924 I WarmPrefixEval: gemma-3-1b-it-Q4_K_M.gguf: template carries no warmable prefix, skipping

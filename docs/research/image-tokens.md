@@ -295,3 +295,55 @@ sold as nothing more.
 
 Not tested here: the app itself. The tunnel moved 80 KB/s this session, so the model was
 fetched by the device's own curl and only the engine test APK was installed.
+
+### The re-tokenization drift, and the splice that ends it (2026-09-05, later)
+
+The follow-up on the device found zero cached tokens for a reason that has nothing to do
+with pictures. The model writes a reply as tokens; the app stores the reply as text; the
+next turn renders the conversation and tokenizes it, and the tokenizer does not cut the
+reply where the model did. "\n\n- **" leaves the model as several tokens and comes back as
+one. The cache holds the model's cut, the comparison diverges a couple of dozen tokens into
+the reply, and a hybrid model, which cannot roll back, re-reads the whole conversation. On
+the host this happened on every markdown reply, text or image alike, so every LFM2.5 text
+chat with a list in it was paying a full re-prefill per turn.
+
+The fix is to stop re-tokenizing the reply. `Session::remember_reply` keeps each generated
+reply as text beside the tokens that produced it, with the character offset of every token,
+and `Session::tokenize_prompt` splices those tokens back in wherever the rendered prompt
+contains that text, tokenizing only the stretches between. The stretches were tokenized on
+their own when the cache was built too: the prompt that produced a reply ended where the
+reply began, and what follows a reply begins with a special token. So what the cache holds
+and what the prompt says agree by construction. A reply that thought first is matched as
+the answer alone as well, since a template that drops thinking from history renders only
+that. On the image path libmtmd tokenizes each text stretch itself and wraps it with the
+projector's image boundary tokens; those are kept as libmtmd made them and only the stretch
+between is spliced.
+
+Measured on the host, three turns each:
+
+| conversation | turn | prompt tokens | cached | prefill |
+| --- | --- | ---: | ---: | ---: |
+| text, LFM2.5-1.2B, markdown lists | 2 | 19 | 84 | 110 ms |
+| text, LFM2.5-1.2B, markdown lists | 3 | 22 | 145 | 122 ms |
+| image, LFM2.5-VL-3B, form | 2 | 22 | 597 | 315 ms (was 619 tokens, 5.6 s) |
+| image, LFM2.5-VL-3B, form | 3 | 18 | 637 | 273 ms |
+
+The embedding store stays, for the re-reads that remain: a folded conversation, a reply
+the app edits before it stores it, a replaced picture.
+
+### A page of small print, which is what the tiles stop is for
+
+An A4 page of 9pt text with seven planted facts (a company name, a fee, a percentage, a
+liability cap, a city, a reference code with a word in it, and the code's prefix), drawn
+at 300 dpi and shrunk to each stop. Host, ceiling 512:
+
+| stop | pixels sent | prompt tokens | read |
+| --- | ---: | ---: | --- |
+| fast | 430x609 | 296 | 4/7 |
+| balanced | 609x861 | 543 | 6/7 |
+| tiles | 1361x1926 | 2086 | **7/7** |
+
+Balanced misread the reference prefix, "HRL" as "IHRI", and got everything else. Tiles got
+all seven at four times the tokens. That is the stop's whole case: a page of small print,
+one more fact, several times the wait. The handwritten form, where tiles read no better,
+is not that case, and the setting's footnote says which is which.

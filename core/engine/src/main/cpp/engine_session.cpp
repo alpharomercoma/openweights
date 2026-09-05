@@ -972,7 +972,144 @@ std::string bitmap_hash(const mtmd_bitmap * bitmap) {
 
 /** How much of the projector's output the session keeps. See Session::media_embd_. */
 constexpr size_t MEDIA_EMBD_BUDGET_BYTES = 96ull * 1024 * 1024;
+
+/** Replies remembered for splicing. A conversation's worth; older ones have been folded. */
+constexpr size_t MAX_REMEMBERED_REPLIES = 64;
+
+/** A reply shorter than this is not worth matching: a bare "Yes." tokenizes one way. */
+constexpr size_t SHORTEST_SPLICE = 8;
+
+/** The most tokens libmtmd puts around a text stretch: a BOS and an image boundary or two. */
+constexpr size_t WRAPPER_TOKENS = 4;
 }  // namespace
+
+void Session::remember_reply(const std::string & text, const std::vector<llama_token> & tokens) {
+    if (tokens.empty() || text.empty()) return;
+    const llama_vocab * vocab = llama_model_get_vocab(model_);
+    ReplyRecord record;
+    record.text = text;
+    record.tokens = tokens;
+    record.offsets.reserve(tokens.size() + 1);
+    size_t at = 0;
+    for (const llama_token token : tokens) {
+        record.offsets.push_back(at);
+        // The same rendering the decode loop appended to the reply, so the offsets land on
+        // the same bytes.
+        const std::string piece = common_token_to_piece(vocab, token, /*special=*/true);
+        if (text.compare(at, piece.size(), piece) != 0) {
+            // The reply on record is not the concatenation of these tokens' pieces, which
+            // happens when the loop withheld or rewrote something. Nothing is kept: a wrong
+            // splice is worse than a re-read.
+            return;
+        }
+        at += piece.size();
+    }
+    if (at != text.size()) return;
+    record.offsets.push_back(at);
+    replies_.push_back(std::move(record));
+    while (replies_.size() > MAX_REMEMBERED_REPLIES) replies_.pop_front();
+}
+
+namespace {
+/** Tokenizes one stretch of text, returning nothing rather than throwing on failure. */
+std::vector<llama_token> tokenize_plain(
+    const llama_vocab * vocab, const char * text, size_t length, bool add_special) {
+    const int32_t needed = -llama_tokenize(
+        vocab, text, static_cast<int32_t>(length), nullptr, 0, add_special, true);
+    if (needed <= 0) return {};
+    std::vector<llama_token> tokens(needed);
+    if (llama_tokenize(vocab, text, static_cast<int32_t>(length), tokens.data(),
+                       static_cast<int32_t>(tokens.size()), add_special, true) < 0) {
+        return {};
+    }
+    return tokens;
+}
+
+/** Where a remembered reply appears in a prompt, and which of its tokens cover it. */
+struct ReplySpan {
+    size_t at;
+    size_t length;
+    size_t first_token;
+    size_t end_token;
+};
+}  // namespace
+
+std::vector<llama_token> Session::tokenize_prompt(const std::string & text, bool add_special) const {
+    const llama_vocab * vocab = llama_model_get_vocab(model_);
+
+    // Every remembered reply the prompt contains, whole. A reply's text is looked for as
+    // the model wrote it and, when it thought first, as the answer alone, since a template
+    // that drops the thinking from history renders only that. Either way the match has to
+    // land on token boundaries at both ends, or the tokens would not describe the span.
+    std::vector<ReplySpan> spans;
+    for (const auto & record : replies_) {
+        std::vector<std::pair<size_t, size_t>> candidates;  // [start, end) within record.text
+        candidates.push_back({0, record.text.size()});
+        if (!thinking_end_tag_.empty()) {
+            const size_t close = record.text.find(thinking_end_tag_);
+            if (close != std::string::npos) {
+                size_t start = close + thinking_end_tag_.size();
+                while (start < record.text.size() && std::isspace(static_cast<unsigned char>(record.text[start]))) {
+                    ++start;
+                }
+                candidates.push_back({start, record.text.size()});
+            }
+        }
+        for (const auto & candidate : candidates) {
+            const size_t length = candidate.second - candidate.first;
+            if (length < SHORTEST_SPLICE) continue;
+            const auto first = std::lower_bound(record.offsets.begin(), record.offsets.end(), candidate.first);
+            const auto last = std::lower_bound(record.offsets.begin(), record.offsets.end(), candidate.second);
+            if (first == record.offsets.end() || last == record.offsets.end()) continue;
+            if (*first != candidate.first || *last != candidate.second) continue;
+            const size_t at = text.find(record.text.data() + candidate.first, 0, length);
+            if (at == std::string::npos) continue;
+            spans.push_back({
+                at, length,
+                static_cast<size_t>(first - record.offsets.begin()),
+                static_cast<size_t>(last - record.offsets.begin()),
+            });
+            break;
+        }
+    }
+    if (spans.empty()) {
+        return tokenize_plain(vocab, text.data(), text.size(), add_special);
+    }
+    std::sort(spans.begin(), spans.end(),
+              [](const ReplySpan & a, const ReplySpan & b) { return a.at < b.at; });
+
+    std::vector<llama_token> tokens;
+    size_t at = 0;
+    size_t spliced = 0;
+    for (const auto & span : spans) {
+        if (span.at < at) continue;  // overlaps a span already taken
+        if (span.at > at) {
+            const auto piece = tokenize_plain(vocab, text.data() + at, span.at - at, add_special && at == 0);
+            tokens.insert(tokens.end(), piece.begin(), piece.end());
+        }
+        // The record that owns this span: found again by position, since the spans were
+        // built in record order and then sorted. Cheap at a few dozen replies.
+        for (const auto & record : replies_) {
+            if (record.text.compare(record.offsets[span.first_token], span.length, text, span.at, span.length) == 0 &&
+                record.offsets.size() > span.end_token &&
+                record.offsets[span.end_token] - record.offsets[span.first_token] == span.length) {
+                tokens.insert(tokens.end(), record.tokens.begin() + span.first_token,
+                              record.tokens.begin() + span.end_token);
+                break;
+            }
+        }
+        at = span.at + span.length;
+        ++spliced;
+    }
+    if (at < text.size()) {
+        const auto piece = tokenize_plain(vocab, text.data() + at, text.size() - at, add_special && at == 0);
+        tokens.insert(tokens.end(), piece.begin(), piece.end());
+    }
+    if (spliced > 0) {
+        LOGI("kv: %zu remembered repl%s spliced into the prompt", spliced, spliced == 1 ? "y" : "ies");
+    }
+    return tokens;
+}
 
 int32_t Session::decode_media_chunk(
     void * mtmd_ctx,
@@ -1101,18 +1238,74 @@ int32_t Session::ingest_media_prompt(
     // Only where one position is one token. A model with M-RoPE (Qwen2-VL and kin) gives
     // an image fewer positions than embeddings, so a placeholder per embedding would
     // misdescribe the cache; those models keep the old rule and re-read every turn.
+    // The text between the pictures, tokenized the way a text turn is: with the model's
+    // own tokens for any reply it generated. libmtmd tokenizes each stretch itself, plainly,
+    // and its tokens are kept only where they agree with the stretch they came from; that
+    // check is what lets the two tokenizations be swapped without guessing which chunk is
+    // which. A stretch whose tokens are replaced is decoded here rather than by the helper.
+    const llama_vocab * vocab = llama_model_get_vocab(model_);
+    const std::string marker = mtmd_get_marker(ctx);
+    std::vector<std::string> stretches;
+    for (size_t from = 0;;) {
+        const size_t hit = prompt.find(marker, from);
+        stretches.push_back(prompt.substr(from, hit == std::string::npos ? std::string::npos : hit - from));
+        if (hit == std::string::npos) break;
+        from = hit + marker.size();
+    }
+
     std::vector<llama_token> tokens;
     std::vector<MediaSpan> spans;
+    std::vector<std::vector<llama_token>> text_tokens;  // per chunk; empty for media chunks
     bool describable = !mtmd_decode_use_mrope(ctx);
     const size_t chunk_count = mtmd_input_chunks_size(chunks);
+    size_t stretch = 0;
     for (size_t index = 0; index < chunk_count && describable; ++index) {
         const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks, index);
         if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT) {
             size_t n = 0;
             const llama_token * text = mtmd_input_chunk_get_tokens_text(chunk, &n);
-            tokens.insert(tokens.end(), text, text + n);
+            std::vector<llama_token> chosen(text, text + n);
+            // Skip the stretches libmtmd produced no chunk for, then find this stretch in
+            // what the chunk spells. The chunk can carry more than the stretch: a BOS at the
+            // front of the first, and the projector's image start and end tokens that
+            // libmtmd puts around a picture. Those tokens are kept exactly as libmtmd made
+            // them, and only the stretch between them is re-tokenized with the replies.
+            while (stretch < stretches.size() && stretches[stretch].empty()) ++stretch;
+            if (stretch < stretches.size()) {
+                const std::vector<llama_token> made(text, text + n);
+                const std::string spelled = common_detokenize(vocab, made, /*special=*/true);
+                const std::string & wanted = stretches[stretch];
+                const size_t at = spelled.find(wanted);
+                if (at != std::string::npos) {
+                    // The fewest leading tokens that spell what precedes the stretch, and the
+                    // fewest trailing ones that spell what follows it. Both are a handful of
+                    // special tokens at most.
+                    size_t lead = 0;
+                    while (lead <= made.size() && lead <= WRAPPER_TOKENS &&
+                           common_detokenize(vocab, {made.begin(), made.begin() + lead}, true) != spelled.substr(0, at)) {
+                        ++lead;
+                    }
+                    size_t trail = 0;
+                    while (trail <= made.size() && trail <= WRAPPER_TOKENS &&
+                           common_detokenize(vocab, {made.end() - trail, made.end()}, true) != spelled.substr(at + wanted.size())) {
+                        ++trail;
+                    }
+                    if (lead <= WRAPPER_TOKENS && trail <= WRAPPER_TOKENS && lead + trail <= made.size()) {
+                        const auto middle = tokenize_prompt(wanted, /*add_special=*/false);
+                        if (!middle.empty()) {
+                            chosen.assign(made.begin(), made.begin() + lead);
+                            chosen.insert(chosen.end(), middle.begin(), middle.end());
+                            chosen.insert(chosen.end(), made.end() - trail, made.end());
+                        }
+                    }
+                }
+                ++stretch;
+            }
+            tokens.insert(tokens.end(), chosen.begin(), chosen.end());
+            text_tokens.push_back(std::move(chosen));
             continue;
         }
+        text_tokens.emplace_back();
         const size_t n_tokens = mtmd_input_chunk_get_n_tokens(chunk);
         const llama_pos n_pos = mtmd_input_chunk_get_n_pos(chunk);
         if (n_tokens == 0 || static_cast<size_t>(n_pos) != n_tokens) {
@@ -1163,9 +1356,11 @@ int32_t Session::ingest_media_prompt(
     std::unordered_map<std::string, size_t> slice_counts;
     for (size_t index = 0; index < chunk_count && evaluated == 0; ++index) {
         const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks, index);
-        const size_t n_tokens = mtmd_input_chunk_get_n_tokens(chunk);
-        const size_t chunk_end = position + n_tokens;
         const bool text = mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT;
+        const size_t n_tokens = text && describable
+            ? text_tokens[index].size()
+            : mtmd_input_chunk_get_n_tokens(chunk);
+        const size_t chunk_end = position + n_tokens;
         if (describable && chunk_end <= reused) {
             if (!text) {
                 ++media_reused;
@@ -1180,14 +1375,15 @@ int32_t Session::ingest_media_prompt(
             return -1;
         }
         const bool last = index + 1 == chunk_count;
-        if (text && describable && position < reused) {
-            // Partly cached: decode the rest of this chunk's tokens, in batches, the way
-            // a text prompt is. Positions follow the sequence, as they do there.
-            size_t n = 0;
-            const llama_token * words = mtmd_input_chunk_get_tokens_text(chunk, &n);
-            std::vector<llama_token> rest(words + (reused - position), words + n);
+        if (text && describable) {
+            // Decoded here, from the tokens the record holds for this stretch, whether the
+            // cache covers part of it or none. Positions follow the sequence, as a text
+            // prompt's do.
+            const std::vector<llama_token> & words = text_tokens[index];
+            const size_t from = position < reused ? reused - position : 0;
+            std::vector<llama_token> rest(words.begin() + static_cast<std::ptrdiff_t>(from), words.end());
             std::string decode_error;
-            if (!ingest_prompt(rest, 0, decode_error)) {
+            if (!rest.empty() && !ingest_prompt(rest, 0, decode_error)) {
                 evaluated = -1;
                 break;
             }
@@ -1984,20 +2180,11 @@ bool Session::warm(
         return false;
     }
 
-    const llama_vocab * vocab = llama_model_get_vocab(model_);
-    const bool add_special = true;
-    const int32_t needed = -llama_tokenize(
-        vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-        nullptr, 0, add_special, true);
-    if (needed <= 0) {
+    // Spliced like a turn's prompt, so a warm of a conversation with replies in it reads
+    // the same tokens the turns did.
+    std::vector<llama_token> tokens = tokenize_prompt(prompt, /*add_special=*/true);
+    if (tokens.empty()) {
         error = "the chat template produced an empty prefix";
-        return false;
-    }
-    std::vector<llama_token> tokens(needed);
-    if (llama_tokenize(
-            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-            tokens.data(), static_cast<int32_t>(tokens.size()), add_special, true) < 0) {
-        error = "failed to tokenize the prefix";
         return false;
     }
     if (static_cast<int32_t>(tokens.size()) >= static_cast<int32_t>(llama_n_ctx(ctx_))) {
@@ -2297,20 +2484,14 @@ StopReason Session::generate(
         // comparison below finds no match and every turn re-decodes from scratch. Whether a
         // BOS is actually inserted is the vocab's decision (models whose template already
         // emits one set add_bos_token = false), so this cannot double up.
-        const bool add_special = true;
-        const int32_t n_tokens_needed = -llama_tokenize(
-            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-            nullptr, 0, add_special, true);
-        if (n_tokens_needed <= 0) {
+        //
+        // Spliced: wherever the prompt carries a reply this session generated, the tokens
+        // the model produced go in rather than the tokenizer's reading of the text, which
+        // differs often enough on markdown to have forced a re-read on most follow-ups.
+        // See ReplyRecord.
+        std::vector<llama_token> prompt_tokens = tokenize_prompt(prompt, /*add_special=*/true);
+        if (prompt_tokens.empty()) {
             error = "the model's chat template produced an empty prompt";
-            return StopReason::ERROR;
-        }
-        std::vector<llama_token> prompt_tokens(n_tokens_needed);
-        if (llama_tokenize(
-                vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
-                prompt_tokens.data(), static_cast<int32_t>(prompt_tokens.size()),
-                add_special, true) < 0) {
-            error = "failed to tokenize the prompt";
             return StopReason::ERROR;
         }
 
@@ -2348,6 +2529,9 @@ StopReason Session::generate(
     const int64_t prefill_end = now_ms();
     stats.prefill_ms   = prefill_end - prefill_start;
     stats.context_size = n_ctx;
+
+    // Where this turn's reply will begin in the record, for remember_reply below.
+    const size_t reply_start = cached_covers_context_ ? cached_.size() : std::string::npos;
 
     llama_sampler * grammar = build_grammar(last_grammar_, vocab);
     // Null means two different things here and only one of them is a failure. A grammar
@@ -2706,6 +2890,15 @@ StopReason Session::generate(
         // unit-tested against output captured from real models. safe_reply, not raw_reply:
         // the caller was never shown the withheld tail and the stored reply must match.
         reply.content = safe_reply;
+    }
+
+    // The reply as decoded, kept so the next turn's prompt can carry the same tokens. Only a
+    // reply the record followed all the way: a cache that stopped describing the context
+    // mid-reply has no tokens worth keeping.
+    if (reply_start != std::string::npos && cached_covers_context_ && cached_.size() > reply_start) {
+        remember_reply(
+            raw_reply,
+            std::vector<llama_token>(cached_.begin() + static_cast<std::ptrdiff_t>(reply_start), cached_.end()));
     }
 
     const int64_t decode_end = now_ms();

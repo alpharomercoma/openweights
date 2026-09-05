@@ -82,8 +82,13 @@ class ImageReuseOnDeviceTest {
         )
         val second = ask(fresh, history)
         Log.i(TAG, "follow-up: ${second.stats.row()} :: ${second.content.oneLine()}")
-        // Extended, or re-read without the encoder. Either way the picture was not encoded
-        // a second time, and that is most of the first turn's time.
+        // Extended, not re-read: the picture and the first reply are already in the cache
+        // and the follow-up prefills only its own words. The first run of this test on the
+        // 8 Gen 3 found zero cached tokens here, because the reply re-tokenized differently
+        // from how it was decoded; the session now splices the decoded tokens back in, and
+        // this pins that it does so on a device and not only on the Mac.
+        assertThat(second.stats.cachedTokens).isGreaterThan(first.stats.promptTokens)
+        assertThat(second.stats.promptTokens).isLessThan(FOLLOW_UP_WORDS)
         val ratio = second.stats.prefillMs.toDouble() / first.stats.prefillMs.coerceAtLeast(1)
         Log.i(TAG, "follow-up prefill is ${"%.2f".format(ratio)} of the first turn's")
         assertThat(ratio).isLessThan(FOLLOW_UP_CEILING)
@@ -127,6 +132,11 @@ class ImageReuseOnDeviceTest {
             "receipt-edge1024" to RECEIPT_FACTS,
             "probe-balanced" to PROBE_FACTS,
             "probe-edge1024" to PROBE_FACTS,
+            // The case the tiles stop exists for: an A4 page of 9pt text. On the host the
+            // fast stop read 4 of its 7 facts, balanced 6, tiles all 7.
+            "page-fast" to PAGE_FACTS,
+            "page-balanced" to PAGE_FACTS,
+            "page-tiles" to PAGE_FACTS,
         )
         for ((name, facts) in ladder) {
             val picture = image(name)
@@ -137,6 +147,7 @@ class ImageReuseOnDeviceTest {
             val question = when {
                 name.startsWith("form") -> FORM_QUESTION
                 name.startsWith("receipt") -> RECEIPT_QUESTION
+                name.startsWith("page") -> PAGE_QUESTION
                 else -> PROBE_QUESTION
             }
             val done = ask(fresh, listOf(imageTurn(picture, question)))
@@ -201,8 +212,17 @@ class ImageReuseOnDeviceTest {
         /** Below this a picture was not tiled; a tiled one is at least seven chunks of 256. */
         const val TILED_FLOOR = 1_700
 
-        /** The follow-up's share of the first turn's prefill. Half is generous. */
-        const val FOLLOW_UP_CEILING = 0.5
+        /**
+         * The follow-up's share of the first turn's prefill.
+         *
+         * A follow-up that extends the cache decodes a couple of dozen tokens against a
+         * first turn that encoded a picture; on the host that was 2%. A fifth leaves room
+         * for a slow phone and still fails a re-read from stored embeddings, which was 29%.
+         */
+        const val FOLLOW_UP_CEILING = 0.2
+
+        /** More prompt tokens than this on a follow-up means the conversation was re-read. */
+        const val FOLLOW_UP_WORDS = 80
 
         val MODEL = File("/data/local/tmp/openweights/vl.gguf")
         val PROJECTOR = File("/data/local/tmp/openweights/mmproj.gguf")
@@ -236,6 +256,19 @@ class ImageReuseOnDeviceTest {
             listOf("42"),
             listOf("12.8"),
             listOf("tangerine"),
+        )
+        const val PAGE_QUESTION =
+            "Read this contract page carefully. Give the Provider's company name, the monthly " +
+                "fee, the availability percentage, the liability cap, the city whose courts have " +
+                "jurisdiction, and the contract reference number."
+        val PAGE_FACTS = listOf(
+            listOf("halcyon ridge"),
+            listOf("48,650", "48650"),
+            listOf("99.7"),
+            listOf("583,800", "583800"),
+            listOf("quezon"),
+            listOf("tangerine"),
+            listOf("hrl-2026-0314"),
         )
     }
 }

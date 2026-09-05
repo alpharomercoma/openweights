@@ -585,6 +585,46 @@ private:
     std::deque<std::string> media_embd_order_;
     size_t media_embd_bytes_ = 0;
 
+    /**
+     * A reply this session generated, as the model wrote it and as the model tokenized it.
+     *
+     * The next turn renders the conversation as text and tokenizes it, and a tokenizer does
+     * not always cut a model's own reply where the model did: "\n\n- **" comes out of the
+     * model as several tokens and goes back in as one. The cache holds the model's cut, so
+     * the comparison found a divergence a few tokens into every markdown reply, and a hybrid
+     * model, which cannot roll back, re-read the whole conversation. Measured on the 8 Gen 3
+     * on every follow-up of the image test, and it is the text path's problem as much as the
+     * image path's.
+     *
+     * So the text of each reply is kept beside the tokens that produced it, with the
+     * character offset at which each token starts, and [tokenize_prompt] splices those
+     * tokens back in wherever the rendered prompt contains that text. What the cache holds
+     * and what the prompt says then agree by construction, for as long as the app renders
+     * the reply it was given.
+     */
+    struct ReplyRecord {
+        std::string text;
+        std::vector<llama_token> tokens;
+        /** `offsets[i]` is where `tokens[i]` starts in [text]; one more entry closes it. */
+        std::vector<size_t> offsets;
+    };
+
+    /** The last few replies, newest last. See [ReplyRecord]. */
+    std::deque<ReplyRecord> replies_;
+
+    /** Keeps [tokens] as the tokenization of [text], if the two agree byte for byte. */
+    void remember_reply(const std::string & text, const std::vector<llama_token> & tokens);
+
+    /**
+     * Tokenizes a rendered prompt the way the cache was built.
+     *
+     * Plain tokenization, except that any span matching a remembered reply is replaced by
+     * the tokens the model actually produced for it. The pieces of text between spans are
+     * tokenized on their own, which is exactly how they were tokenized when the cache was
+     * built: the prompt that produced a reply ended where the reply began.
+     */
+    std::vector<llama_token> tokenize_prompt(const std::string & text, bool add_special) const;
+
     /** Encodes (or recalls) one media chunk and decodes it into the cache at `n_past`. */
     int32_t decode_media_chunk(
         void * mtmd_ctx,

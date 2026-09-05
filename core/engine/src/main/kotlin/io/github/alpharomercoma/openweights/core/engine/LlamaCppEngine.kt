@@ -141,9 +141,6 @@ class LlamaCppEngine internal constructor(
         require(messages.isNotEmpty()) { "cannot generate a reply to an empty conversation" }
 
         var parsed = ParsedReply()
-        // Collected on the engine thread and read once the blocking call returns, so there
-        // is no sharing to guard: the native side calls back on this thread.
-        val confidences = if (params.measuresConfidence) mutableListOf<TokenConfidence>() else null
         val prompt = renderPrompt(activeHandle, messages)
 
         // Registered before the blocking JNI call. During prefill there are no token
@@ -190,15 +187,10 @@ class LlamaCppEngine internal constructor(
                 }
                 parsed = ParsedReply(fallback.text, reasoning, fallback.calls)
             },
-            confidenceSink = confidences?.let { collected ->
-                LlamaBridge.ConfidenceSink { piece, logprob ->
-                    collected += TokenConfidence(piece, logprob)
-                }
-            },
         )
 
         if (stats != null) {
-            send(completionEvent(stats, parsed, confidences.orEmpty()))
+            send(completionEvent(stats, parsed))
             currentModel = currentModel?.copy(contextUsed = stats[CONTEXT_USED].toInt())
         }
         close()
@@ -319,11 +311,7 @@ class LlamaCppEngine internal constructor(
     }
 
     /** The terminal event, read out of the flat array the native layer returns. */
-    private fun completionEvent(
-        stats: LongArray,
-        parsed: ParsedReply,
-        tokens: List<TokenConfidence>,
-    ) = GenerationEvent.Completed(
+    private fun completionEvent(stats: LongArray, parsed: ParsedReply) = GenerationEvent.Completed(
         reason = STOP_REASONS.getOrElse(stats[0].toInt()) { StopReason.ERROR },
         content = parsed.content,
         reasoning = parsed.reasoning,
@@ -339,7 +327,6 @@ class LlamaCppEngine internal constructor(
             thinkingPrefilled = stats.getOrElse(THINKING_PREFILLED) { 0L } == TRUE_FLAG,
             cachedTokens = stats.getOrElse(CACHED_TOKENS) { 0L }.toInt(),
         ),
-        tokens = tokens,
     )
 
     /** The conversation as arrays the native layer can take, media markers included. */

@@ -48,19 +48,6 @@ data class SamplerParams(
      * and prose keeps the block open. llama.cpp only; the ExecuTorch engine ignores it.
      */
     val reasoningBudget: Int = NO_REASONING_BUDGET,
-    /**
-     * Whether the model reports how sure it was of each token it wrote.
-     *
-     * Off unless the user has asked to see it. What it costs is a log-softmax over the
-     * whole vocabulary per generated token, which is small beside a forward pass, and
-     * speculation for the whole generation, which is not: a token accepted from a draft was
-     * sampled at a batch position that has been left behind by the time it is emitted, so
-     * the engine takes the single-token path while this is on.
-     *
-     * llama.cpp only. The ExecuTorch runtime returns text and no distribution, and says so
-     * rather than reporting a confidence it did not measure.
-     */
-    val measuresConfidence: Boolean = false,
 ) {
     init {
         require(temperature >= 0f) { "temperature must be >= 0" }

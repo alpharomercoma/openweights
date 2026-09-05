@@ -295,17 +295,4 @@
     <string name="stat_prefill">Lectura</string>
     <string name="stat_decode">Escritura</string>
     <string name="stat_tokens_value">%1$d tokens</string>
-    <string name="on">Activado</string>
-    <string name="off">Desactivado</string>
-    <string name="show_uncertainty">Mostrar la incertidumbre</string>
-    <string name="show_uncertainty_detail">Registra la seguridad del modelo en cada palabra que escribe, para que una respuesta pueda señalar dónde dudó. Es más lento, y no comprueba la verdad: una respuesta equivocada puede escribirse con total confianza.</string>
-    <string name="show_uncertainty_footnote">Desactiva el atajo de decodificación especulativa mientras está activo</string>
-    <string name="stat_perplexity">perplejidad</string>
-    <string name="uncertainty_action">Dónde dudó</string>
-    <string name="uncertainty_title">Dónde dudó</string>
-    <string name="uncertainty_none">El modelo estaba al menos un %1$d%% seguro de cada palabra de esta respuesta.</string>
-    <string name="uncertainty_count">%1$d de %2$d fragmentos quedaron por debajo del %3$d%%.</string>
-    <string name="uncertainty_caveat">Subrayado donde el modelo dudó. Esto indica dónde elegía entre opciones, no dónde se equivocó: un dato inventado puede escribirse con total seguridad.</string>
-    <string name="uncertainty_perplexity">Perplejidad %1$s sobre %2$d tokens. Palabra más baja %3$d%%.</string>
-    <string name="uncertainty_unmeasured">No se midió nada para esta respuesta. Activa Mostrar la incertidumbre en los ajustes y vuelve a preguntar.</string>
 </resources>

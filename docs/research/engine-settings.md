@@ -18,7 +18,7 @@ on every line and supplied the Android specifics in the two sections that need t
 | repeat penalty | have | under Advanced |
 | XTC threshold, XTC probability | refuse | creative-writing samplers; two more knobs from a paper |
 | typical_p | refuse | same |
-| mirostat v1/v2 | refuse | steers toward a target perplexity, predates min-p, and would put a second definition of perplexity on a screen that now reports one |
+| mirostat v1/v2 | refuse | steers toward a target perplexity, which is a research knob rather than a setting, and it predates min-p by some years |
 | penalty_last_n | refuse | exists at 64; no perceptible difference on phone-sized chat models |
 | penalty_freq, penalty_present | refuse | redundant beside repeat penalty |
 | seed | refuse | exists, `null` means a fresh one; a raw integer on a consumer sheet is friction, and reproducibility already lives in the eval harness |

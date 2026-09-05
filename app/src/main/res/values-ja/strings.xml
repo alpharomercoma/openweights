@@ -278,17 +278,4 @@
     <string name="stat_prefill">読み込み</string>
     <string name="stat_decode">生成</string>
     <string name="stat_tokens_value">%1$d トークン</string>
-    <string name="on">オン</string>
-    <string name="off">オフ</string>
-    <string name="show_uncertainty">確信度を表示</string>
-    <string name="show_uncertainty_detail">モデルが書く一語ごとの確信度を記録し、どこで迷ったかを返答が示せるようにします。処理は遅くなります。正しさの検査ではありません。誤った答えが完全な確信とともに書かれることもあります。</string>
-    <string name="show_uncertainty_footnote">オンの間は投機的デコードの近道を無効にします</string>
-    <string name="stat_perplexity">パープレキシティ</string>
-    <string name="uncertainty_action">迷った箇所</string>
-    <string name="uncertainty_title">迷った箇所</string>
-    <string name="uncertainty_none">この回答のすべての語について、モデルは少なくとも %1$d%% の確信を持っていました。</string>
-    <string name="uncertainty_count">%2$d 区間のうち %1$d 区間が %3$d%% を下回りました。</string>
-    <string name="uncertainty_caveat">モデルが迷った箇所に下線を引いています。これは選択肢の間で迷った場所を示すもので、誤っていた場所ではありません。作り話が完全な確信とともに書かれることもあります。</string>
-    <string name="uncertainty_perplexity">パープレキシティ %1$s、%2$d トークン。最も低い語は %3$d%%。</string>
-    <string name="uncertainty_unmeasured">この返答では何も測定されていません。設定シートで「確信度を表示」をオンにして、もう一度たずねてください。</string>
 </resources>

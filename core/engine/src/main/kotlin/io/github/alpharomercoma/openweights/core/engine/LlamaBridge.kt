@@ -39,19 +39,6 @@ internal class LlamaBridge {
         fun onReply(content: String, reasoning: String, toolCalls: Array<String>)
     }
 
-    /**
-     * Receives each generated token with the natural log of the probability the model gave
-     * it, before the sampler touched the distribution.
-     *
-     * A separate sink from [TokenSink] because the two carry different things. The token
-     * sink carries whole characters and holds back the bytes of one it cannot yet complete;
-     * this carries exactly what was sampled, so concatenating every piece reproduces the
-     * raw reply and the two are not interchangeable.
-     */
-    internal fun interface ConfidenceSink {
-        fun onToken(piece: String, logprob: Float)
-    }
-
     external fun nativeSystemInfo(): String
 
     /** Flattened `[id, description, type, totalMemoryBytes]` per compute device. */
@@ -202,14 +189,6 @@ internal class LlamaBridge {
         reasoningEffort: String?,
         sink: TokenSink,
         replySink: ReplySink,
-        /**
-         * Null unless the model's confidence in each token is wanted.
-         *
-         * Null is the signal, not a flag beside it: the session checks for a callback
-         * before spending a log-softmax over the vocabulary on every token, and passing a
-         * sink that is never wanted would pay for it anyway.
-         */
-        confidenceSink: ConfidenceSink?,
     ): LongArray?
 
     companion object {

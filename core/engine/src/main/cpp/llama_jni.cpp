@@ -584,9 +584,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     jboolean enable_thinking,
     jstring reasoning_effort,
     jobject token_sink,
-    jobject reply_sink,
-    /** Null unless the caller wants the model's confidence in each token it writes. */
-    jobject confidence_sink) try {
+    jobject reply_sink) try {
     Session * session = as_session(handle);
 
     const jsize message_count = env->GetArrayLength(roles);
@@ -644,23 +642,12 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     sampler.seed           = static_cast<uint32_t>(seed);
     sampler.max_tokens     = max_tokens;
     sampler.reasoning_budget = reasoning_budget;
-    sampler.report_confidence = confidence_sink != nullptr;
 
     jclass sink_class = env->GetObjectClass(token_sink);
     jmethodID on_token = env->GetMethodID(sink_class, "onToken", "(Ljava/lang/String;)Z");
     if (on_token == nullptr) {
         throw_engine_exception(env, "TokenSink.onToken not found");
         return nullptr;
-    }
-
-    jmethodID on_confidence = nullptr;
-    if (confidence_sink != nullptr) {
-        jclass confidence_class = env->GetObjectClass(confidence_sink);
-        on_confidence = env->GetMethodID(confidence_class, "onToken", "(Ljava/lang/String;F)V");
-        if (on_confidence == nullptr) {
-            throw_engine_exception(env, "ConfidenceSink.onToken not found");
-            return nullptr;
-        }
     }
 
     jclass reply_class = env->GetObjectClass(reply_sink);
@@ -691,15 +678,6 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
             }
             return keep_going == JNI_TRUE;
         },
-        // Empty when nobody asked, which is what the session checks before spending a
-        // log-softmax over the vocabulary on every token.
-        on_confidence == nullptr
-            ? Session::ConfidenceCallback()
-            : Session::ConfidenceCallback([&](const char * piece, float logprob) {
-                  jstring text = to_jstring(env, piece);
-                  env->CallVoidMethod(confidence_sink, on_confidence, text, logprob);
-                  env->DeleteLocalRef(text);
-              }),
         stats, reply, error);
 
     if (env->ExceptionCheck() == JNI_TRUE) {

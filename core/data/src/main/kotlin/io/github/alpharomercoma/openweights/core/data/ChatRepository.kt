@@ -132,9 +132,6 @@ class ChatRepository @Inject constructor(
         prefillMs: Long? = null,
         /** How long the reply took to write. See [MessageEntity.decodeMs]. */
         decodeMs: Long? = null,
-        /** Each answer token's text and log probability. See [MessageEntity.confidence]. */
-        confidenceTexts: List<String> = emptyList(),
-        confidenceLogprobs: List<Float> = emptyList(),
         /**
          * What this reply's own tool calls found, in the order they ran.
          *
@@ -163,7 +160,6 @@ class ChatRepository @Inject constructor(
                 cachedTokens = cachedTokens,
                 prefillMs = prefillMs,
                 decodeMs = decodeMs,
-                confidence = encodeConfidence(confidenceTexts, confidenceLogprobs),
             ),
         )
         if (steps.isNotEmpty()) {

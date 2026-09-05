@@ -282,17 +282,4 @@
     <string name="stat_prefill">Pagbasa</string>
     <string name="stat_decode">Pagsulat</string>
     <string name="stat_tokens_value">%1$d na token</string>
-    <string name="on">Naka-on</string>
-    <string name="off">Naka-off</string>
-    <string name="show_uncertainty">Ipakita ang pag-aalinlangan</string>
-    <string name="show_uncertainty_detail">Itinatala kung gaano kasigurado ang modelo sa bawat salitang isinusulat nito, para masabi ng sagot kung saan ito nag-atubili. Mas mabagal, at hindi ito pagsusuri ng katotohanan: maaaring isulat nang buong tiwala ang maling sagot.</string>
-    <string name="show_uncertainty_footnote">Naka-off ang speculative decoding shortcut habang bukas ito</string>
-    <string name="stat_perplexity">perplexity</string>
-    <string name="uncertainty_action">Kung saan ito nag-atubili</string>
-    <string name="uncertainty_title">Kung saan ito nag-atubili</string>
-    <string name="uncertainty_none">Hindi bababa sa %1$d%% ang tiwala ng modelo sa bawat salita sa sagot na ito.</string>
-    <string name="uncertainty_count">%1$d sa %2$d na bahagi ang bumaba sa %3$d%%.</string>
-    <string name="uncertainty_caveat">May salungguhit kung saan nag-atubili ang modelo. Ipinapakita nito kung saan ito pumipili sa mga opsyon, hindi kung saan ito nagkamali: maaaring isulat nang buong tiwala ang gawa-gawang impormasyon.</string>
-    <string name="uncertainty_perplexity">Perplexity %1$s sa %2$d na token. Pinakamababang salita %3$d%%.</string>
-    <string name="uncertainty_unmeasured">Walang nasukat para sa sagot na ito. I-on ang Ipakita ang pag-aalinlangan sa settings sheet at magtanong ulit.</string>
 </resources>

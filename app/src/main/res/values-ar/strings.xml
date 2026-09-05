@@ -284,17 +284,4 @@
     <string name="stat_prefill">القراءة</string>
     <string name="stat_decode">الكتابة</string>
     <string name="stat_tokens_value">%1$d رمزًا</string>
-    <string name="on">مفعّل</string>
-    <string name="off">متوقف</string>
-    <string name="show_uncertainty">إظهار عدم اليقين</string>
-    <string name="show_uncertainty_detail">يسجّل مدى ثقة النموذج بكل كلمة يكتبها، فيمكن للرد أن يوضح أين تردّد. أبطأ، وليس فحصًا للصحة: قد تُكتب إجابة خاطئة بثقة تامة.</string>
-    <string name="show_uncertainty_footnote">يعطّل اختصار فك التشفير التخميني أثناء تفعيله</string>
-    <string name="stat_perplexity">الحيرة</string>
-    <string name="uncertainty_action">أين تردّد</string>
-    <string name="uncertainty_title">أين تردّد</string>
-    <string name="uncertainty_none">كان النموذج واثقًا بنسبة %1$d%% على الأقل من كل كلمة في هذه الإجابة.</string>
-    <string name="uncertainty_count">%1$d من %2$d مقطعًا جاءت دون %3$d%%.</string>
-    <string name="uncertainty_caveat">الخط تحت المواضع التي تردّد فيها النموذج. هذا يوضح أين كان يوازن بين خيارات، لا أين أخطأ: يمكن كتابة معلومة مُختلَقة بثقة كاملة.</string>
-    <string name="uncertainty_perplexity">الحيرة %1$s على %2$d رمزًا. أدنى كلمة %3$d%%.</string>
-    <string name="uncertainty_unmeasured">لم يُقَس شيء لهذا الرد. فعّل إظهار عدم اليقين في ورقة الإعدادات ثم اسأل مجددًا.</string>
 </resources>

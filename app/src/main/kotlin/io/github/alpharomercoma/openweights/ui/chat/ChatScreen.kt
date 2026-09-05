@@ -847,7 +847,6 @@ private fun ChatSheets(
     onBranch: (TranscriptEntry) -> Unit,
 ) {
     var reportFor by remember { mutableStateOf<TranscriptEntry?>(null) }
-    var uncertaintyFor by remember { mutableStateOf<TranscriptEntry?>(null) }
     val context = LocalContext.current
 
     if (showParameters && state.modelName != null) {
@@ -865,9 +864,6 @@ private fun ChatSheets(
             // opened without its projector reads nothing, and offering it an image budget
             // would be a control over a capability it does not have.
             readsImages = state.mediaSupport.vision,
-            // The same question the processor rows ask: a compiled model's runtime returns
-            // text and no distribution, so the switch would be a promise it cannot keep.
-            measuresConfidenceIsPossible = state.compiledProcessor == null,
             onSave = {
                 onSavePreferences(it)
                 onDismissParameters()
@@ -926,16 +922,8 @@ private fun ChatSheets(
                 onDismissActions()
                 reportFor = entry
             },
-            onShowUncertainty = {
-                onDismissActions()
-                uncertaintyFor = entry
-            },
             onDismiss = onDismissActions,
         )
-    }
-
-    uncertaintyFor?.let { entry ->
-        UncertaintySheet(entry = entry, onDismiss = { uncertaintyFor = null })
     }
 }
 

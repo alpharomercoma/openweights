@@ -21,7 +21,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
-import io.github.alpharomercoma.openweights.core.common.model.ReplyConfidence
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import org.junit.Rule
 import org.junit.Test
@@ -128,45 +127,6 @@ class MessageActionsSheetTest {
     }
 
     @Test
-    fun `a reply nobody measured offers no uncertainty view`() {
-        // The view is off by default, so for most replies this action would open a sheet
-        // whose whole content is an explanation of why it is empty.
-        showSheet()
-
-        compose.onNodeWithText("Where it was unsure").assertDoesNotExist()
-    }
-
-    @Test
-    fun `a measured reply can be opened to see where it hesitated`() {
-        var opened = false
-        showSheet(
-            confidence = ReplyConfidence.of(
-                texts = listOf("Paris", " is", " the", " capital"),
-                logprobs = listOf(-2.5f, 0f, 0f, 0f),
-            ),
-            onShowUncertainty = { opened = true },
-        )
-
-        compose.onNodeWithText("Where it was unsure").performClick()
-
-        assert(opened) { "the uncertainty view must be reachable from the reply" }
-    }
-
-    @Test
-    fun `perplexity joins the figures once there is one`() {
-        showSheet(
-            confidence = ReplyConfidence.of(
-                texts = listOf("a", "b", "c", "d"),
-                // Four tokens at one half each: an effective branching factor of two.
-                logprobs = List(4) { -0.6931472f },
-            ),
-        )
-
-        compose.onNodeWithText("perplexity").assertIsDisplayed()
-        compose.onNodeWithText("2.00").assertIsDisplayed()
-    }
-
-    @Test
     fun `nothing is claimed about a reply still being written`() {
         showSheet(isStreaming = true)
 
@@ -239,8 +199,6 @@ class MessageActionsSheetTest {
         onBranch: () -> Unit = {},
         prefillTokensPerSecond: Double? = null,
         isStreaming: Boolean = false,
-        confidence: ReplyConfidence = ReplyConfidence.NONE,
-        onShowUncertainty: () -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -259,7 +217,6 @@ class MessageActionsSheetTest {
                         decodeMs = 6_900,
                         totalMillis = 7_600,
                         isStreaming = isStreaming,
-                        confidence = confidence,
                     ),
                     canRegenerate = canRegenerate,
                     canEdit = canEdit,
@@ -270,7 +227,6 @@ class MessageActionsSheetTest {
                     onEdit = onEdit,
                     onBranch = onBranch,
                     onReport = onReport,
-                    onShowUncertainty = onShowUncertainty,
                     onDismiss = {},
                 )
             }

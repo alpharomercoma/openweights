@@ -46,7 +46,6 @@ import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
-import io.github.alpharomercoma.openweights.core.common.model.ReplyConfidence
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
@@ -61,14 +60,12 @@ import io.github.alpharomercoma.openweights.core.data.db.EngineHistoryEntity
 import io.github.alpharomercoma.openweights.core.data.db.MessageEntity
 import io.github.alpharomercoma.openweights.core.data.db.ToolStepEntity
 import io.github.alpharomercoma.openweights.core.data.decodeAttachments
-import io.github.alpharomercoma.openweights.core.data.decodeConfidence
 import io.github.alpharomercoma.openweights.core.device.ThermalLevel
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.LoadedModelInfo
 import io.github.alpharomercoma.openweights.core.engine.MediaSupport
 import io.github.alpharomercoma.openweights.core.engine.StopReason
-import io.github.alpharomercoma.openweights.core.engine.TokenConfidence
 import io.github.alpharomercoma.openweights.core.tools.AgentMode
 import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
@@ -136,14 +133,6 @@ data class TranscriptEntry(
     val prefillMs: Long? = null,
     /** How long the reply took to write. See [MessageEntity.decodeMs]. */
     val decodeMs: Long? = null,
-    /**
-     * How sure the model was of each word of this answer, or nothing measured.
-     *
-     * Nothing measured is the normal case: the view that records it is off by default.
-     * [ReplyConfidence.NONE] rather than null so the difference between "not measured" and
-     * "measured as certain" cannot be lost by a null check somewhere downstream.
-     */
-    val confidence: ReplyConfidence = ReplyConfidence.NONE,
     val isStreaming: Boolean = false,
     /** Set on the first entry that survives a compaction, so the fold is visible. */
     val compactionNote: String? = null,
@@ -605,30 +594,6 @@ class ChatViewModel @Inject constructor(
 
     /** Tool evidence emitted by the current goal turn; reset before every turn starts. */
     private var lastTurnSteps: List<AgentStep> = emptyList()
-
-    /**
-     * The model's confidence in the tokens of the pass that wrote the answer.
-     *
-     * Last pass wins rather than accumulating, which is the opposite of [lastTurnSteps] and
-     * is right for the same reason: the steps are all of what the turn did, while the
-     * confidence describes one particular string, and the string that gets written down is
-     * the one the last pass produced. A tool pass's tokens are about a JSON call nobody
-     * reads.
-     */
-    private var lastTurnConfidence: List<TokenConfidence> = emptyList()
-
-    /**
-     * Clears what the previous turn left behind, at the start of the next one.
-     *
-     * Together because they are the same fact in two shapes: everything a turn accumulates
-     * outside the transcript and reads back when it writes its row. Anything that joins
-     * them belongs here rather than in `generate`, where a forgotten line is a turn
-     * inheriting the last one's tool steps.
-     */
-    private fun forgetLastTurn() {
-        lastTurnSteps = emptyList()
-        lastTurnConfidence = emptyList()
-    }
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
@@ -1787,7 +1752,7 @@ class ChatViewModel @Inject constructor(
             // The turn's engine-side conversation, if it completes normally. Everything
             // needed to build the next prompt as an extension of this one's cache.
             var engineTail: List<ChatMessage>? = null
-            forgetLastTurn()
+            lastTurnSteps = emptyList()
 
             val listener = object : TurnListener {
                 override fun onText(raw: String) {
@@ -1812,7 +1777,6 @@ class ChatViewModel @Inject constructor(
                 override fun onPass(event: GenerationEvent.Completed, raw: String) {
                     val merged = turnStats?.through(event.stats) ?: event.stats
                     turnStats = merged
-                    lastTurnConfidence = event.tokens
                     settled = applyCompletion(event, raw, merged) to merged
                 }
 
@@ -3147,11 +3111,6 @@ class ChatViewModel @Inject constructor(
                 cachedTokens = turnStats.cachedTokens,
                 prefillMs = turnStats.prefillMs,
                 decodeMs = turnStats.decodeMs,
-                confidence = ReplyConfidence.of(
-                    texts = event.tokens.map { token -> token.text },
-                    logprobs = event.tokens.map { token -> token.logprob },
-                    answer = settled,
-                ),
             )
         }
         recordWork(event.stats)
@@ -3299,9 +3258,6 @@ class ChatViewModel @Inject constructor(
                     steps,
                     engineHistory,
                     engineHistoryModel = _uiState.value.modelName,
-                    // Read here for the same reason the steps are: the call sites all just
-                    // finished the turn this was recorded for.
-                    confidence = lastTurnConfidence,
                 )
             }
         }
@@ -4197,9 +4153,6 @@ private fun List<MessageEntity>.toTranscript(
         cachedTokens = message.cachedTokens,
         prefillMs = message.prefillMs,
         decodeMs = message.decodeMs,
-        // Measured against the answer rather than the whole row, so a thinking model's
-        // deliberation is not averaged into a number labelled as being about its answer.
-        confidence = message.confidence.decodeConfidence(parsed.answer),
         compactionNote = COMPACTION_NOTE.takeIf {
             foldedThrough != null &&
                 index == foldedThrough + 1

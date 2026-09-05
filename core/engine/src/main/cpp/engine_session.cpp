@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -35,6 +36,7 @@
 #include "chat.h"
 #include "common.h"
 #include "ngram-map.h"
+#include "gguf.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 
@@ -407,6 +409,30 @@ bool utf8_malformed_at_front(const std::string & text) {
 }
 
 /**
+ * The projector family named in an mmproj file, lower case, or empty when unreadable.
+ *
+ * Read from the metadata alone, without touching a tensor, because the answer decides a
+ * parameter the projector is then opened with. libmtmd knows the type once it has loaded
+ * and does not say, so the file is asked directly.
+ */
+std::string projector_type(const std::string & mmproj_path) {
+    gguf_init_params params{ /*no_alloc=*/true, /*ctx=*/nullptr };
+    gguf_context * meta = gguf_init_from_file(mmproj_path.c_str(), params);
+    if (meta == nullptr) return "";
+    std::string type;
+    const int64_t key = gguf_find_key(meta, "clip.projector_type");
+    if (key >= 0 && gguf_get_kv_type(meta, key) == GGUF_TYPE_STRING) {
+        type = gguf_get_val_str(meta, key);
+    }
+    gguf_free(meta);
+    for (char & c : type) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return type;
+}
+
+/** The single-view ceiling for LFM2 projectors. See Session::load. */
+constexpr int32_t LFM2_IMAGE_MAX_TOKENS = 512;
+
+/**
  * The CPU backend variants built by GGML_CPU_ALL_VARIANTS, best instruction set first.
  * Each exports `ggml_backend_score()`, which inspects the running CPU and returns 0 when
  * the variant's instructions are unavailable.
@@ -750,7 +776,6 @@ Session * Session::load(
     if (!mmproj_path.empty()) {
         mtmd_context_params mtmd_params = mtmd_context_params_default();
         mtmd_params.use_gpu = n_gpu_layers > 0;
-        mtmd_params.n_threads = n_threads;
         mtmd_params.print_timings = false;
         // How much of an image the model is given, when the caller has said. Both ends
         // together: clip resizes a picture to somewhere between these two by its aspect
@@ -762,7 +787,28 @@ Session * Session::load(
         if (image_tokens > 0) {
             mtmd_params.image_min_tokens = image_tokens;
             mtmd_params.image_max_tokens = image_tokens;
+        } else if (projector_type(mmproj_path) == "lfm2") {
+            // LFM2's own ceiling is 256 tokens, and its preprocessor cuts any picture
+            // larger than twice that ceiling's pixels into 512-pixel tiles of 256 tokens
+            // each, up to ten of them plus a thumbnail. A 3:4 photograph shrunk to a
+            // longest edge of 1024 is over that line, so it cost eleven encodes and 2,851
+            // tokens where a tall screenshot at the same edge cost one and 280. Measured
+            // on the host over seven pictures (see docs/research/image-tokens.md): one
+            // view at about 512 tokens read the form, the receipt and the fine print as
+            // well as the tiles did, at a fifth of the tokens and one encode instead of
+            // seven; a view at 1024 tokens read slightly worse than 512 on three of them.
+            // So the ceiling is raised to 512, which moves the tiling line to a megapixel
+            // and lets the app choose the tokens by the pixels it sends, and no further,
+            // because past it the encoder is being asked for more than it was trained on.
+            // The floor is left to the model. Only for this family: other projectors set
+            // their own limits from their own metadata and mean them.
+            mtmd_params.image_max_tokens = LFM2_IMAGE_MAX_TOKENS;
         }
+        // The prefill thread count, not the decode one. Encoding a picture is a forward
+        // pass over a thousand patches at once, which is the shape prefill has and decode
+        // does not, and the app already sizes the batch count for that work and for the
+        // phone's thermal state.
+        mtmd_params.n_threads = n_threads_batch;
 
         session->mtmd_ = mtmd_init_from_file(mmproj_path.c_str(), model, mtmd_params);
         if (session->mtmd_ == nullptr) {
@@ -886,8 +932,10 @@ void Session::set_threads(int32_t n_threads, int32_t n_threads_batch) {
 void Session::reset() {
     llama_memory_clear(llama_get_memory(ctx_), true);
     cached_.clear();
+    media_spans_.clear();
     n_past_ = 0;
     cached_covers_context_ = true;
+    media_spans_.clear();
 }
 
 Session::MediaSupport Session::media_support() const {
@@ -907,11 +955,79 @@ std::string Session::media_marker() const {
     return mtmd_get_marker(static_cast<mtmd_context *>(mtmd_));
 }
 
+namespace {
+/** FNV-1a over a bitmap's decoded bytes, as a hex string. */
+std::string bitmap_hash(const mtmd_bitmap * bitmap) {
+    const unsigned char * data = mtmd_bitmap_get_data(bitmap);
+    const size_t n = mtmd_bitmap_get_n_bytes(bitmap);
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    for (size_t i = 0; i < n; ++i) {
+        hash ^= data[i];
+        hash *= 0x100000001b3ULL;
+    }
+    char text[17];
+    std::snprintf(text, sizeof(text), "%016llx", static_cast<unsigned long long>(hash));
+    return text;
+}
+
+/** How much of the projector's output the session keeps. See Session::media_embd_. */
+constexpr size_t MEDIA_EMBD_BUDGET_BYTES = 96ull * 1024 * 1024;
+}  // namespace
+
+int32_t Session::decode_media_chunk(
+    void * mtmd_ctx,
+    const void * chunk_ptr,
+    const std::string & key,
+    llama_pos * n_past) {
+    auto * ctx = static_cast<mtmd_context *>(mtmd_ctx);
+    const auto * chunk = static_cast<const mtmd_input_chunk *>(chunk_ptr);
+    const size_t n_tokens = mtmd_input_chunk_get_n_tokens(chunk);
+    const size_t n_embd = static_cast<size_t>(llama_model_n_embd_inp(model_));
+    const size_t expected = n_tokens * n_embd;
+
+    std::vector<float> fresh;
+    const float * embd = nullptr;
+    auto found = media_embd_.find(key);
+    if (found != media_embd_.end() && found->second.size() == expected) {
+        embd = found->second.data();
+    } else {
+        const int64_t started = now_ms();
+        if (mtmd_encode_chunk(ctx, chunk) != 0) {
+            return -1;
+        }
+        const float * out = mtmd_get_output_embd(ctx);
+        fresh.assign(out, out + expected);
+        LOGI("media: encoded %zu tokens in %lld ms", n_tokens,
+             static_cast<long long>(now_ms() - started));
+        const size_t bytes = fresh.size() * sizeof(float);
+        if (bytes <= MEDIA_EMBD_BUDGET_BYTES) {
+            while (media_embd_bytes_ + bytes > MEDIA_EMBD_BUDGET_BYTES && !media_embd_order_.empty()) {
+                auto oldest = media_embd_.find(media_embd_order_.front());
+                if (oldest != media_embd_.end()) {
+                    media_embd_bytes_ -= oldest->second.size() * sizeof(float);
+                    media_embd_.erase(oldest);
+                }
+                media_embd_order_.pop_front();
+            }
+            media_embd_order_.push_back(key);
+            media_embd_bytes_ += bytes;
+            embd = media_embd_.emplace(key, std::move(fresh)).first->second.data();
+        } else {
+            embd = fresh.data();
+        }
+    }
+    return mtmd_helper_decode_image_chunk(
+        ctx, ctx_, chunk, const_cast<float *>(embd), *n_past, /*seq_id=*/0,
+        static_cast<int32_t>(llama_n_batch(ctx_)), n_past, nullptr, nullptr);
+}
+
 int32_t Session::ingest_media_prompt(
     const std::string & prompt,
     const std::vector<std::string> & media_paths,
+    size_t & reused,
     std::string & error) {
     auto * ctx = static_cast<mtmd_context *>(mtmd_);
+    reused = 0;
 
     std::vector<mtmd_bitmap *> bitmaps;
     for (const auto & path : media_paths) {
@@ -932,6 +1048,7 @@ int32_t Session::ingest_media_prompt(
         // projector decides what it can accept. It reads the whole file into memory and
         // allocates from its dimensions, both of which are attacker-controlled for a file
         // the user was handed: hence the size cap above and the catch below.
+        //
         mtmd_bitmap * bitmap = nullptr;
         try {
             auto wrapper = mtmd_helper_bitmap_init_from_file(ctx, path.c_str(), false);
@@ -947,6 +1064,11 @@ int32_t Session::ingest_media_prompt(
             error = "could not read the attached file: " + path;
             return -1;
         }
+        // Named by its pixels. libmtmd leaves the id empty unless told, and every chunk it
+        // cuts from the picture inherits that id, so without this two different pictures
+        // of the same size would read as the same span and the cache would serve one for
+        // the other. FNV-1a over the decoded bytes, which is what llama-server does too.
+        mtmd_bitmap_set_id(bitmap, bitmap_hash(bitmap).c_str());
         bitmaps.push_back(bitmap);
     }
 
@@ -971,11 +1093,53 @@ int32_t Session::ingest_media_prompt(
         return -1;
     }
 
-    // Media becomes embeddings rather than tokens, so there is nothing to compare a
-    // prefix against. The context is rebuilt from scratch for these turns.
-    llama_memory_clear(llama_get_memory(ctx_), true);
-    cached_.clear();
-    cached_covers_context_ = false;
+    // The prompt as a record: text as its tokens, each attachment as a run of placeholders
+    // with a span saying which picture filled it. This is what the cache is compared
+    // against and what it will hold afterwards, and it is what lets the second question
+    // about a picture skip the encode the first one paid for.
+    //
+    // Only where one position is one token. A model with M-RoPE (Qwen2-VL and kin) gives
+    // an image fewer positions than embeddings, so a placeholder per embedding would
+    // misdescribe the cache; those models keep the old rule and re-read every turn.
+    std::vector<llama_token> tokens;
+    std::vector<MediaSpan> spans;
+    bool describable = !mtmd_decode_use_mrope(ctx);
+    const size_t chunk_count = mtmd_input_chunks_size(chunks);
+    for (size_t index = 0; index < chunk_count && describable; ++index) {
+        const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks, index);
+        if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT) {
+            size_t n = 0;
+            const llama_token * text = mtmd_input_chunk_get_tokens_text(chunk, &n);
+            tokens.insert(tokens.end(), text, text + n);
+            continue;
+        }
+        const size_t n_tokens = mtmd_input_chunk_get_n_tokens(chunk);
+        const llama_pos n_pos = mtmd_input_chunk_get_n_pos(chunk);
+        if (n_tokens == 0 || static_cast<size_t>(n_pos) != n_tokens) {
+            describable = false;
+            break;
+        }
+        spans.push_back({ tokens.size(), n_tokens, mtmd_input_chunk_get_id(chunk) });
+        tokens.insert(tokens.end(), n_tokens, LLAMA_TOKEN_NULL);
+    }
+
+    llama_pos new_n_past = 0;
+    if (describable) {
+        // The same alignment a text turn gets, span-aware: reuse what matches, roll back
+        // where the memory allows it, restore the warm head where it does not, and start
+        // cold otherwise. A first turn with a picture therefore begins at the end of the
+        // warmed system prefix rather than at zero, and a follow-up begins at its own words.
+        reused = align_cache(tokens, /*need_logits=*/true, &spans);
+        new_n_past = static_cast<llama_pos>(reused);
+        cached_covers_context_ = false;
+    } else {
+        // Media becomes embeddings that this record cannot describe, so the context is
+        // rebuilt from scratch for these turns, as it was for every media turn before.
+        llama_memory_clear(llama_get_memory(ctx_), true);
+        cached_.clear();
+        media_spans_.clear();
+        cached_covers_context_ = false;
+    }
 
     // Driven a chunk at a time rather than handed to mtmd_helper_eval_chunks, so that Stop
     // can be answered part way through. Text prefill has checked cancellation between
@@ -988,29 +1152,91 @@ int32_t Session::ingest_media_prompt(
     // still one uninterruptible encode, so a single attachment answers Stop no faster than
     // before. What changes is the case that took the longest, where every frame after the
     // one in flight is now skipped.
-    llama_pos new_n_past = 0;
-    const size_t chunk_count = mtmd_input_chunks_size(chunks);
+    //
+    // Chunks that the cache already holds are skipped whole; a text chunk the reuse
+    // boundary falls inside is decoded from the boundary. The boundary never falls inside
+    // a media chunk, because common_prefix stops at a span's start rather than in it.
+    const int32_t n_batch = static_cast<int32_t>(llama_n_batch(ctx_));
+    size_t position = 0;
     int32_t evaluated = 0;
+    size_t media_reused = 0;
+    std::unordered_map<std::string, size_t> slice_counts;
     for (size_t index = 0; index < chunk_count && evaluated == 0; ++index) {
+        const mtmd_input_chunk * chunk = mtmd_input_chunks_get(chunks, index);
+        const size_t n_tokens = mtmd_input_chunk_get_n_tokens(chunk);
+        const size_t chunk_end = position + n_tokens;
+        const bool text = mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_TEXT;
+        if (describable && chunk_end <= reused) {
+            if (!text) {
+                ++media_reused;
+                ++slice_counts[mtmd_input_chunk_get_id(chunk)];
+            }
+            position = chunk_end;
+            continue;
+        }
         if (cancelled_.load(std::memory_order_relaxed)) {
             mtmd_input_chunks_free(chunks);
             error = "cancelled";
             return -1;
         }
-        evaluated = mtmd_helper_eval_chunk_single(
-            ctx, ctx_, mtmd_input_chunks_get(chunks, index), new_n_past, /*seq_id=*/0,
-            static_cast<int32_t>(llama_n_batch(ctx_)),
-            // Only the last one, which is what the all-in-one helper does: logits are read
-            // once, from the end of the prompt.
-            /*logits_last=*/index + 1 == chunk_count,
-            &new_n_past);
+        const bool last = index + 1 == chunk_count;
+        if (text && describable && position < reused) {
+            // Partly cached: decode the rest of this chunk's tokens, in batches, the way
+            // a text prompt is. Positions follow the sequence, as they do there.
+            size_t n = 0;
+            const llama_token * words = mtmd_input_chunk_get_tokens_text(chunk, &n);
+            std::vector<llama_token> rest(words + (reused - position), words + n);
+            std::string decode_error;
+            if (!ingest_prompt(rest, 0, decode_error)) {
+                evaluated = -1;
+                break;
+            }
+            new_n_past += static_cast<llama_pos>(rest.size());
+        } else if (!text) {
+            // The key is the picture and the chunk's place in it: a tiled picture is one
+            // hash across seven chunks, and the third tile must not be served the first.
+            const std::string id = mtmd_input_chunk_get_id(chunk);
+            const size_t slice = slice_counts[id]++;
+            evaluated = decode_media_chunk(ctx, chunk, id + "#" + std::to_string(slice), &new_n_past);
+        } else {
+            evaluated = mtmd_helper_eval_chunk_single(
+                ctx, ctx_, chunk, new_n_past, /*seq_id=*/0, n_batch,
+                // Only the last one, which is what the all-in-one helper does: logits are
+                // read once, from the end of the prompt.
+                /*logits_last=*/last,
+                &new_n_past);
+        }
+        position = chunk_end;
     }
 
     mtmd_input_chunks_free(chunks);
 
     if (evaluated != 0) {
-        error = "the model could not process the attachment";
+        error = cancelled_.load(std::memory_order_relaxed)
+            ? "cancelled"
+            : "the model could not process the attachment";
         return -1;
+    }
+
+    if (describable && static_cast<size_t>(new_n_past) == tokens.size()) {
+        // The record now describes every position, pictures included, and the next turn
+        // can extend it. Logged with the picture count because that is the number that
+        // says whether the encode was skipped, which is the whole point of the record.
+        cached_ = std::move(tokens);
+        media_spans_ = std::move(spans);
+        cached_covers_context_ = true;
+        LOGI("kv: media prompt reused %zu of %zu positions, %zu of %zu media chunk(s) in cache, "
+             "%zu embeddings kept (%zu KB)",
+             reused, cached_.size(), media_reused, media_spans_.size(),
+             media_embd_.size(), media_embd_bytes_ / 1024);
+    } else if (describable) {
+        // The helper placed the chunks somewhere other than where the record says. Nothing
+        // is wrong with the cache, but the record cannot be trusted to extend it.
+        LOGI("kv: media prompt ended at %d, record expected %zu; not kept",
+             static_cast<int>(new_n_past), tokens.size());
+        cached_.clear();
+        media_spans_.clear();
+        cached_covers_context_ = false;
     }
     return static_cast<int32_t>(new_n_past);
 }
@@ -1395,12 +1621,40 @@ bool Session::ingest_prompt(
     return true;
 }
 
-size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_logits) {
-    size_t reusable = 0;
-    while (cached_covers_context_ && reusable < cached_.size() && reusable < tokens.size() &&
-           cached_[reusable] == tokens[reusable]) {
-        ++reusable;
+size_t Session::common_prefix(
+    const std::vector<llama_token> & tokens,
+    const std::vector<MediaSpan> * spans) const {
+    if (!cached_covers_context_) return 0;
+    const size_t limit = std::min(cached_.size(), tokens.size());
+    size_t at = 0;
+    while (at < limit) {
+        const llama_token have = cached_[at];
+        const llama_token want = tokens[at];
+        if (have == LLAMA_TOKEN_NULL || want == LLAMA_TOKEN_NULL) {
+            // Both must be a span starting here, of the same picture and length. A
+            // placeholder against a token, or two placeholders describing different
+            // pictures, is a divergence at the span's first position.
+            if (have != want || spans == nullptr) return at;
+            auto starting_at = [at](const MediaSpan & span) { return span.start == at; };
+            const auto cached = std::find_if(media_spans_.begin(), media_spans_.end(), starting_at);
+            const auto wanted = std::find_if(spans->begin(), spans->end(), starting_at);
+            if (cached == media_spans_.end() || wanted == spans->end()) return at;
+            if (cached->id != wanted->id || cached->n_tokens != wanted->n_tokens) return at;
+            if (at + cached->n_tokens > limit) return at;
+            at += cached->n_tokens;
+            continue;
+        }
+        if (have != want) return at;
+        ++at;
     }
+    return at;
+}
+
+size_t Session::align_cache(
+    const std::vector<llama_token> & tokens,
+    bool need_logits,
+    const std::vector<MediaSpan> * spans) {
+    size_t reusable = common_prefix(tokens, spans);
     // Never reuse the entire prompt when logits are wanted: at least one token must be
     // decoded to have something to sample from. A warm samples nothing, so it may.
     if (need_logits && reusable == tokens.size() && reusable > 0) {
@@ -1437,6 +1691,7 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
                 ctx_, prefix_state_.data(), prefix_state_.size(), 0);
             if (applied != 0) {
                 cached_ = prefix_tokens_;
+                media_spans_.clear();
                 n_past_ = static_cast<int32_t>(prefix_tokens_.size());
                 LOGI("kv: restored the warm prefix of %zu, reading %zu instead of %zu",
                      prefix_tokens_.size(), tokens.size() - prefix_tokens_.size(),
@@ -1491,6 +1746,7 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
                     ctx_, prefix_state_.data(), prefix_state_.size(), 0);
                 if (applied != 0) {
                     cached_ = prefix_tokens_;
+                    media_spans_.clear();
                     n_past_ = static_cast<int32_t>(prefix_tokens_.size());
                     LOGI("kv: rollback refused; restored the warm prefix of %zu instead of "
                          "re-reading all %zu",
@@ -1513,6 +1769,12 @@ size_t Session::align_cache(const std::vector<llama_token> & tokens, bool need_l
         }
     }
     cached_.resize(reusable);
+    // A span past the cut is gone with the positions it described; one before it is
+    // whole, because common_prefix never stops inside a span.
+    media_spans_.erase(
+        std::remove_if(media_spans_.begin(), media_spans_.end(),
+                       [reusable](const MediaSpan & span) { return span.start >= reusable; }),
+        media_spans_.end());
     n_past_ = static_cast<int32_t>(reusable);
     return reusable;
 }
@@ -1575,6 +1837,7 @@ bool Session::ingest_warm(
                     if (llama_state_seq_set_data(
                             ctx_, committed_state.data(), committed_state.size(), 0) != 0) {
                         cached_ = kept_tokens;
+                        media_spans_.clear();
                         n_past_ = kept_past;
                         LOGI("kv: interrupted warm kept %d committed tokens", n_past_);
                     }
@@ -1702,6 +1965,19 @@ bool Session::warm(
     std::string & error) {
     cancelled_.store(false, std::memory_order_relaxed);
 
+    // Attachments are not text and this path only reads text. Warming a conversation that
+    // carries a picture would render its marker as ordinary words, find the cache
+    // disagreeing at the picture, and replace embeddings that cost a minute to make with a
+    // token that means nothing. The cache is left as the last turn left it, which is the
+    // state the next question extends.
+    for (const auto & message : messages) {
+        if (!message.media_paths.empty()) {
+            LOGI("kv: warm skipped, the conversation carries %zu attachment(s)",
+                 message.media_paths.size());
+            return true;
+        }
+    }
+
     std::string prompt;
     if (!render_prompt(messages, tools, reasoning, prompt, error,
                        /*add_generation_prompt=*/false)) {
@@ -1794,6 +2070,7 @@ bool Session::warm(
     cached_ = tokens;
     n_past_ = static_cast<int32_t>(tokens.size());
     cached_covers_context_ = true;
+    media_spans_.clear();
     if (snapshot) {
         maybe_snapshot();
     }
@@ -1892,6 +2169,7 @@ bool Session::restore_warm_file(const char * path, const std::vector<llama_token
     cached_ = tokens;
     n_past_ = static_cast<int32_t>(tokens.size());
     cached_covers_context_ = true;
+    media_spans_.clear();
     if (keeps_no_full_history()) {
         // The RAM snapshot armed from the same bytes, with no compute: everything the
         // restore machinery does for a new chat works from the first second.
@@ -1981,9 +2259,11 @@ StopReason Session::generate(
     const int64_t prefill_start = now_ms();
 
     if (!media_paths.empty()) {
-        // Media becomes embeddings, which cannot be compared against cached tokens, so a
-        // turn with an attachment re-evaluates the conversation from the start.
-        const int32_t evaluated = ingest_media_prompt(prompt, media_paths, error);
+        // Media becomes embeddings, which the record describes by the picture's hash rather
+        // than by tokens; a turn that extends the last one reuses everything up to its own
+        // new words, picture included. See ingest_media_prompt.
+        size_t reused = 0;
+        const int32_t evaluated = ingest_media_prompt(prompt, media_paths, reused, error);
         if (evaluated < 0) {
             // The same reckoning the text path does, and for the same reason. Media prefill
             // empties the cache before it evaluates anything, so a failure part way through
@@ -2001,7 +2281,8 @@ StopReason Session::generate(
         // Assigned before the length check: the cache is already full of these positions,
         // and reporting zero would show an empty context meter over a full context.
         n_past_ = evaluated;
-        stats.prompt_tokens = evaluated;
+        stats.prompt_tokens = evaluated - static_cast<int32_t>(reused);
+        stats.cached_tokens = static_cast<int32_t>(reused);
         stats.context_used  = evaluated;
         stats.context_size  = n_ctx;
         if (evaluated >= n_ctx) {
@@ -2061,6 +2342,7 @@ StopReason Session::generate(
         cached_ = prompt_tokens;
         n_past_ = static_cast<int32_t>(prompt_tokens.size());
         cached_covers_context_ = true;
+        media_spans_.clear();
     }
 
     const int64_t prefill_end = now_ms();
@@ -2098,7 +2380,8 @@ StopReason Session::generate(
     // Draft-free speculation, see speculate_ in the header. The drafter reads the cache
     // record as the history, so it needs the record to be whole, and a rejected tail is
     // dropped with a partial rollback, which a hybrid or recurrent memory refuses.
-    const bool speculating = speculate_ && cached_covers_context_ && !keeps_no_full_history();
+    const bool speculating = speculate_ && cached_covers_context_ && media_spans_.empty() &&
+        !keeps_no_full_history();
     const common_ngram_simple_config spec_config{SPEC_NGRAM_SIZE, SPEC_DRAFT_MAX};
     llama_batch spec_batch = speculating ? llama_batch_init(SPEC_DRAFT_MAX + 1, 0, 1) : llama_batch{};
     std::vector<llama_token> draft;

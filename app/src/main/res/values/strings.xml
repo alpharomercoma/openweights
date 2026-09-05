@@ -218,9 +218,11 @@
     <string name="models_empty">Nothing downloaded yet. Browse models from the name at the top of a chat. Each one says whether it runs on this phone before you download it.</string>
     <string name="download_progress">%1$s of %2$s</string>
     <string name="image_detail">Image detail</string>
-    <string name="image_detail_explanation">How large a picture is before the model reads it. Smaller is much faster and still reads headings; larger takes longer and can read fine print. Applies to pictures you add from now on.</string>
-    <string name="image_detail_pixels">Longest edge %1$d px</string>
-    <string name="image_detail_footnote">Above 1024 px a picture is cut into tiles, which reads the smallest print and takes several times as long</string>
+    <string name="image_detail_explanation">How much of a picture the model reads, as tokens. Fast is one look at the picture: headings, layout and what is in it. Balanced looks twice as closely and reads handwriting, receipts and screenshots. Tiles cuts the picture into pieces to read a full page of small print, and takes several minutes. Applies to pictures you add from now on.</string>
+    <string name="image_detail_fast">Fast, %1$d tokens</string>
+    <string name="image_detail_balanced">Balanced, %1$d tokens</string>
+    <string name="image_detail_tiles">Tiles, up to ten pieces</string>
+    <string name="image_detail_footnote">Tiles cost up to ten times a balanced picture and take several minutes on a phone. Choose it for a page of small print, not for a photo</string>
     <string name="stat_reused">reused</string>
     <string name="stat_tokens">tokens</string>
     <string name="stat_total_time">in total</string>

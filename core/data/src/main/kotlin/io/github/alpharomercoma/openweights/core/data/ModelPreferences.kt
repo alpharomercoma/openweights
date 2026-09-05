@@ -136,25 +136,38 @@ data class ModelPreferences(
     /** Stored by name so an unknown value from a newer build falls back to the default. */
     val offload: String = Offload.AUTO.name,
     /**
-     * The longest edge, in pixels, a picture is shrunk to before the model sees it.
+     * How many tokens a picture is worth to the model, which is what a picture costs.
      *
-     * The one control there is over how long an image takes, and it was measured before it
-     * was offered. On LFM2.5-VL-3B on a Snapdragon 8 Gen 3, the same screenshot: at 384 px
-     * the turn takes 5.8 seconds, at 1024 px 13.5 seconds, and sent as the camera took it,
-     * 1080 by 2400, 101 seconds. That last one is not a slope, it is a cliff: past about
-     * twice the projector's own pixel budget libmtmd stops resizing and starts *tiling*,
-     * and every 512-pixel tile is another 256 tokens to encode, prefill and carry in the
-     * cache for the rest of the conversation.
+     * A picture is resized, cut into patches, and run through a vision transformer whose
+     * output is prefilled like text. On LFM2 one token is 1024 pixels, and the app shrinks
+     * every attachment to the pixels this number buys before it is stored, so the number
+     * is the cost: encode time, prefill time and cache all scale with it.
      *
-     * What it costs is fine print. The probe image carries text at four sizes; 384 and 512
-     * read everything except the smallest line, 768 and above read all of it. So the
-     * default sits where reading stops improving rather than at the top of the range.
+     * Three stops, measured on seven pictures of different shapes (a handwritten form, a
+     * receipt, a game screenshot, an anime frame, a resume, a slide and the probe
+     * screenshot) on 2026-09-05, see `docs/research/image-tokens.md`. [IMAGE_TOKENS_FAST]
+     * is one 512-pixel view: headings and layout, small print lost. [IMAGE_TOKENS_BALANCED]
+     * is one view at twice the pixels: it read the form's handwriting, the receipt's
+     * totals and the probe's 24pt line as well as the tiled version did, at a fifth of the
+     * tokens and a single encode. A view at 1024 tokens read slightly worse than 512 on
+     * three of the seven, so there is no stop there. [IMAGE_TOKENS_TILES] sends the picture
+     * large enough that the projector cuts it into up to ten tiles, which is the only way
+     * to read a full page of small print and costs several minutes on a phone.
      *
-     * Shared with the other settings rather than kept per model: what it expresses is how
-     * long the user will wait for a picture, which does not change when they switch model.
-     * See `docs/research/image-tokens.md` and `ImageTokenBenchmark`.
+     * It replaced a longest-edge setting, which measured the wrong thing: the tiler
+     * decides by area, so a 3:4 photograph at a 1024 edge was cut into tiles while a tall
+     * screenshot at the same edge was not, and two stops below the edge produced the same
+     * tokens as each other. Shared with the other settings rather than kept per model:
+     * what it expresses is how long the user will wait for a picture.
      */
-    val imageEdgePixels: Int = DEFAULT_IMAGE_EDGE,
+    val imageTokens: Int = DEFAULT_IMAGE_TOKENS,
+    /**
+     * The setting this replaced, read only to migrate it. See [migratedToImageTokens].
+     *
+     * Zero, the default, means "never set by an older build". The value was a longest
+     * edge in pixels, 384 to 2048.
+     */
+    val imageEdgePixels: Int = 0,
     /**
      * Which build wrote this file, so a migration can tell what it is looking at.
      *
@@ -226,36 +239,50 @@ data class ModelPreferences(
         /** [contextLength] meaning "work it out from the model and the phone". */
         const val AUTOMATIC: Int = 0
 
-        /**
-         * Where an image stops getting more readable, measured rather than argued.
-         *
-         * 1024 was already the hard-coded limit and the number survives becoming a setting,
-         * for a better reason than it was chosen with: 768 and 1024 both land on the
-         * projector's own 256-token ceiling and read the same fine print, and the first
-         * size below that loses a line. Anything above is the tiling cliff.
-         */
-        const val DEFAULT_IMAGE_EDGE: Int = 1024
+        /** One view of a picture, at the projector's own single-view size. */
+        const val IMAGE_TOKENS_FAST: Int = 256
 
         /**
-         * The smallest and largest picture the app will send.
+         * One view at twice the pixels, and the default.
          *
-         * The floor is where a phone screenshot's body text stops being legible at all: at
-         * 384 px a 1080-wide screenshot is at 36% and 32-pixel type is down to 11. The
-         * ceiling is past the tiling threshold on every projector measured, which is the
-         * point of offering it: somebody photographing a page of small print wants the
-         * tiles, and wants to be the one who decided to wait for them.
+         * The engine raises LFM2's single-view ceiling to exactly this, so the picture is
+         * encoded once whatever its shape. See `Session::load` in engine_session.cpp.
          */
-        const val MIN_IMAGE_EDGE: Int = 384
-        const val MAX_IMAGE_EDGE: Int = 2048
+        const val IMAGE_TOKENS_BALANCED: Int = 512
 
         /**
-         * The sizes offered, which are the ones that behave differently.
+         * The picture cut into tiles: up to ten of 256 tokens plus a thumbnail.
          *
-         * Not a continuous range. The cost is quadratic in this number and the projector
-         * quantises it anyway, so between 1024 and 1100 there is nothing to choose; these
-         * are the six that measured differently on the phone.
+         * The number is the most the projector can spend on one picture, and it is a
+         * label rather than a target: what the app does for this stop is send enough
+         * pixels that the projector tiles, and the projector decides the grid.
          */
-        val IMAGE_EDGE_STEPS: List<Int> = listOf(384, 512, 768, 1024, 1536, 2048)
+        const val IMAGE_TOKENS_TILES: Int = 2816
+
+        const val DEFAULT_IMAGE_TOKENS: Int = IMAGE_TOKENS_BALANCED
+
+        /** The stops offered, in order of cost. */
+        val IMAGE_TOKEN_STEPS: List<Int> =
+            listOf(IMAGE_TOKENS_FAST, IMAGE_TOKENS_BALANCED, IMAGE_TOKENS_TILES)
+
+        /**
+         * The pixels to send for a stop, which is how the token count is actually set.
+         *
+         * 1024 pixels a token on LFM2 (a 16-pixel patch, merged two by two), so the two
+         * single-view stops are their token count times that. The projector resizes down
+         * to its ceiling and never up past the picture, so sending exactly the budget
+         * gives the tokens named. The tiles stop is over the tiling line, which sits at
+         * twice the raised ceiling's pixels: 2.5 megapixels lands there for every aspect
+         * ratio a phone produces. Any value that is not a stop is read as the default.
+         */
+        fun imagePixels(tokens: Int): Int = when (tokens) {
+            IMAGE_TOKENS_FAST -> IMAGE_TOKENS_FAST * PIXELS_PER_IMAGE_TOKEN
+            IMAGE_TOKENS_TILES -> TILED_IMAGE_PIXELS
+            else -> IMAGE_TOKENS_BALANCED * PIXELS_PER_IMAGE_TOKEN
+        }
+
+        private const val PIXELS_PER_IMAGE_TOKEN: Int = 1024
+        private const val TILED_IMAGE_PIXELS: Int = 2_560 * 1_024
 
         /**
          * When to look something up.
@@ -402,6 +429,35 @@ private fun ModelPreferences.migratedToTheCurrentToolPrompt(): ModelPreferences 
     }
 
 /**
+ * Reads the longest-edge setting an older build stored as the nearest of the new stops.
+ *
+ * The old stops were 384, 512, 768, 1024 (the default), 1536 and 2048 pixels of longest
+ * edge. Below the default the person wanted speed; the two above it were the only way to
+ * get tiles, and somebody who chose them chose the wait. The default itself becomes the
+ * new default, which is what it was measured to be. The old field is zeroed so it cannot
+ * be read twice.
+ */
+private fun ModelPreferences.migratedToImageTokens(): ModelPreferences =
+    if (imageEdgePixels > 0) {
+        // Keyed on the old field alone rather than on the version, so it runs whatever
+        // order the chain is in: the tool prompt migration beside this stamps CURRENT when
+        // it applies, and a version check here would then skip a row that needed both.
+        copy(
+            imageTokens = when {
+                imageEdgePixels < OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_FAST
+                imageEdgePixels > OLD_DEFAULT_IMAGE_EDGE -> ModelPreferences.IMAGE_TOKENS_TILES
+                else -> ModelPreferences.IMAGE_TOKENS_BALANCED
+            },
+            imageEdgePixels = 0,
+        )
+    } else {
+        this
+    }
+
+/** What the longest edge defaulted to while it was the setting. */
+private const val OLD_DEFAULT_IMAGE_EDGE = 1_024
+
+/**
  * Every wording [ModelPreferences.DEFAULT_TOOL_PROMPT] has ever had, so a stored copy of any
  * of them — not only the very first — reads as "never chosen" rather than "chosen, once,
  * years ago, and never revisited since".
@@ -525,11 +581,13 @@ private const val TOOL_PROMPT_FIXED_AT = 7
 /**
  * The build that knows what every field means. Anything older reads as zero.
  *
- * Seven: the pasted-address clause changed the tool prompt. Six was the entity clause of
- * 2026-09-01, which changed it and left this at five, so a sheet saved at five with the
- * pre-clause wording was never migrated. See the set above.
+ * Eight: the image setting became a token count (its migration keys on the old field, not
+ * on this). Seven was the pasted-address clause in
+ * the tool prompt. Six was the entity clause of 2026-09-01, which changed it and left this
+ * at five, so a sheet saved at five with the pre-clause wording was never migrated. See the
+ * set above.
  */
-private const val CURRENT = 7
+private const val CURRENT = 8
 
 /**
  * Stores per-model settings.
@@ -573,6 +631,7 @@ class ModelPreferencesRepository @Inject constructor(
                     .getOrNull()
                     ?.migratedFromTheOldDefault()
                     ?.migratedToTheCurrentToolPrompt()
+                    ?.migratedToImageTokens()
             } ?: ModelPreferences()
 
             val forThisModel = preferences[key(modelName)]?.let { stored ->
@@ -580,6 +639,7 @@ class ModelPreferencesRepository @Inject constructor(
                     .getOrNull()
                     ?.migratedFromTheOldDefault()
                     ?.migratedToTheCurrentToolPrompt()
+                    ?.migratedToImageTokens()
             }
 
             // An install that predates the shared set has everything under the per-model key

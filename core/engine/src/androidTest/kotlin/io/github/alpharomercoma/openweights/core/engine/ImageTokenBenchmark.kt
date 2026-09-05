@@ -72,9 +72,12 @@ class ImageTokenBenchmark {
      * The sweep at the size the app actually sends, which is the one that decides the
      * default.
      *
-     * `AttachmentStore.MAX_IMAGE_EDGE` shrinks every attachment to a longest edge of 1024
-     * before it is stored, so this is the picture a real turn hands the projector. It is
-     * also the sweep in which the budget does anything at all: see the other test.
+     * The app used to shrink every attachment to a longest edge of 1024 before it was
+     * stored, so this was the picture a real turn handed the projector. It now shrinks by
+     * area to the token stop chosen (see `ModelPreferences.imagePixels`), and the engine
+     * raises LFM2's ceiling to 512; this arm is kept as the picture the earlier tables
+     * were measured on. It is also the sweep in which the budget does anything at all:
+     * see the other test.
      */
     @Test
     fun atTheSizeTheAppSendsEveryBudgetIsMeasured(): Unit = runBlocking {
@@ -97,10 +100,12 @@ class ImageTokenBenchmark {
     /**
      * The other lever, and the one that turns out to matter: how large a picture is sent.
      *
-     * `AttachmentStore` already shrinks every attachment to a longest edge of 1024, and
-     * that number was chosen by argument rather than by measurement. This is the
-     * measurement. Every arm uses the projector's own token limits, so the only thing
-     * moving is the picture.
+     * The app shrank every attachment to a longest edge of 1024, chosen by argument
+     * rather than by measurement, and this was the measurement. It found the tiling
+     * cliff; the host sweep in `eval/image_speed_probe.py` then found that the cliff is
+     * a line in area rather than edge, which is why the setting became a token count.
+     * Every arm uses the projector's own token limits, so the only thing moving is the
+     * picture.
      */
     @Test
     fun everyResolutionIsMeasuredForSpeedAndForWhatItCanStillRead(): Unit = runBlocking {

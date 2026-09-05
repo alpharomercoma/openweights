@@ -196,10 +196,11 @@ class ParameterSheetTest {
         showSheet(readsImages = true)
 
         compose.onNodeWithText("Image detail").performScrollTo().assertIsDisplayed()
-        // A size rather than a token count. Tokens is what the industry calls this control
-        // and it runs backwards on the projectors this app recommends: a smaller budget
-        // makes libmtmd tile the picture, which is slower. See docs/research/image-tokens.md.
-        compose.onNodeWithText("Longest edge 1024 px").assertIsDisplayed()
+        // Tokens, because on this projector tokens are the cost, and the app sets them by
+        // how many pixels it sends. The default is the balanced view, one encode of the
+        // picture at twice the projector's single-view pixels. See
+        // docs/research/image-tokens.md.
+        compose.onNodeWithText("Balanced, 512 tokens").assertIsDisplayed()
     }
 
     @Suppress("LongParameterList")

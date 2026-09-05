@@ -286,9 +286,11 @@
     <string name="search_results_count_value">%1$d resultados</string>
     <string name="search_results_count_one">1 resultado</string>
     <string name="image_detail">Detalle de imagen</string>
-    <string name="image_detail_explanation">El tamaño de una imagen antes de que el modelo la lea. Más pequeña es mucho más rápida y aún lee los titulares; más grande tarda más y puede leer la letra pequeña. Se aplica a las imágenes que añadas a partir de ahora.</string>
-    <string name="image_detail_pixels">Lado más largo %1$d px</string>
-    <string name="image_detail_footnote">Por encima de 1024 px la imagen se corta en mosaicos, lo que lee la letra más pequeña y tarda varias veces más</string>
+    <string name="image_detail_explanation">Cuánto de una imagen lee el modelo, en tokens. Rápido es una sola mirada: títulos, disposición y qué hay en la imagen. Equilibrado mira el doble de cerca y lee letra a mano, recibos y capturas. Mosaicos corta la imagen en piezas para leer una página entera de letra pequeña y tarda varios minutos. Se aplica a las imágenes que añadas a partir de ahora.</string>
+    <string name="image_detail_fast">Rápido, %1$d tokens</string>
+    <string name="image_detail_balanced">Equilibrado, %1$d tokens</string>
+    <string name="image_detail_tiles">Mosaicos, hasta diez piezas</string>
+    <string name="image_detail_footnote">Los mosaicos cuestan hasta diez veces una imagen equilibrada y tardan varios minutos en un teléfono. Elígelo para una página de letra pequeña, no para una foto</string>
     <string name="stat_reused">reutilizados</string>
     <string name="stat_tokens">tokens</string>
     <string name="stat_total_time">en total</string>

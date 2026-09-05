@@ -27,23 +27,20 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * How large a picture is allowed to be when it reaches the model.
+ * How many pixels a picture keeps when it reaches the model, which is what a picture costs.
  *
- * This is the whole of what an image costs, and it was measured on the phone before it was
- * made a setting. The same screenshot through LFM2.5-VL-3B on a Snapdragon 8 Gen 3: at a
- * longest edge of 384 pixels the turn takes 5.8 seconds, at 1024 it takes 13.5, and at 1536
- * it takes 151. That last one is a cliff rather than a slope, because past roughly twice the
- * projector's own pixel budget libmtmd stops resizing the picture and starts cutting it into
- * 512-pixel tiles, and each tile is another 256 tokens to encode, to prefill, and to carry
- * in the cache for the rest of the conversation. See `docs/research/image-tokens.md` and
- * `ImageTokenBenchmark`.
+ * The projector decides by area, not by edge: past twice its ceiling's pixels it cuts the
+ * picture into 512-pixel tiles of 256 tokens each, and a 3:4 photograph shrunk to a 1024
+ * edge was over that line while a tall screenshot at the same edge was under it. That was
+ * the reported case, 2,851 tokens and three and a half minutes for one poster. So the
+ * setting is a token count, the store turns it into an area, and the engine raises LFM2's
+ * single-view ceiling so the middle stop is one encode. See `docs/research/image-tokens.md`.
  *
  * The store is the only place it can be enforced: the file it writes is the file every later
  * turn sends, and nothing downstream can make a picture smaller again.
  *
  * What is asserted here is the number, not the pixels. Robolectric's bitmaps are stubs with
- * no decoder behind them, so a test of the resize itself would be a test of the stub; the
- * resize is a year old and unchanged, and what is new is where its limit comes from.
+ * no decoder behind them, so a test of the resize itself would be a test of the stub.
  * `ImageTokenBenchmark` is where the pixels are checked, on a device, against a model.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -53,48 +50,74 @@ class ImageDetailTest {
     private val store = AttachmentStore(context, preferences)
 
     @Test
-    fun `an install that has never opened the sheet gets the measured default`() = runBlocking {
-        assertThat(store.imageEdge()).isEqualTo(ModelPreferences.DEFAULT_IMAGE_EDGE)
-        assertThat(ModelPreferences.DEFAULT_IMAGE_EDGE).isEqualTo(1024)
+    fun `an install that has never opened the sheet gets the balanced view`() = runBlocking {
+        // The settings store is process-wide under Robolectric, so a sibling test's save can
+        // be sitting in it; the defaults are asserted on a fresh object and on the store
+        // after the defaults are written, which is what a new install's first save does.
+        assertThat(ModelPreferences().imageTokens).isEqualTo(ModelPreferences.IMAGE_TOKENS_BALANCED)
+        preferences.save("", ModelPreferences())
+        assertThat(store.imagePixels()).isEqualTo(512 * 1024)
     }
 
     @Test
-    fun `a picture is shrunk to the size the setting asks for`() = runBlocking {
-        preferences.save("", ModelPreferences(imageEdgePixels = 512))
+    fun `every stop buys the pixels its tokens name, and only those`() = runBlocking {
+        // A token is 1024 pixels on this projector. Sending more than the budget is pixels
+        // the projector throws away; sending more than twice the ceiling is tiles.
+        preferences.save("", ModelPreferences(imageTokens = ModelPreferences.IMAGE_TOKENS_FAST))
+        assertThat(store.imagePixels()).isEqualTo(256 * 1024)
 
-        assertThat(store.imageEdge()).isEqualTo(512)
+        preferences.save("", ModelPreferences(imageTokens = ModelPreferences.IMAGE_TOKENS_BALANCED))
+        assertThat(store.imagePixels()).isEqualTo(512 * 1024)
     }
 
     @Test
-    fun `somebody who wants the fine print gets the pixels to read it with`() = runBlocking {
-        // The other end of the same trade, and why the ceiling is above the default: at this
-        // size the projector tiles, which is several times slower and is the only thing
-        // measured to read twenty-four point type off a phone screenshot.
-        preferences.save("", ModelPreferences(imageEdgePixels = 1536))
-
-        assertThat(store.imageEdge()).isEqualTo(1536)
+    fun `the tiles stop sends enough to cross the tiling line for any phone shape`() = runBlocking {
+        // The engine raises the ceiling to 512 tokens, which puts the line at 1,048,576
+        // pixels. Anything the projector rounds to more than that tiles; 2.5 megapixels
+        // is over it for a square, a 3:4, a 16:9 and a 9:20 alike.
+        preferences.save("", ModelPreferences(imageTokens = ModelPreferences.IMAGE_TOKENS_TILES))
+        assertThat(store.imagePixels()).isGreaterThan(2 * 512 * 1024)
     }
 
     @Test
-    fun `a size written into the settings file outside the range is still enforced`() =
-        runBlocking {
-            // A preferences file is an ordinary file. A value from a build that offered a
-            // different range, or from anything editing it, must shrink a photograph oddly
-            // rather than hand the decoder a zero or ask a phone for sixteen megapixels.
-            preferences.save("", ModelPreferences(imageEdgePixels = 40_000))
-            assertThat(store.imageEdge()).isEqualTo(ModelPreferences.MAX_IMAGE_EDGE)
+    fun `a value that is not a stop reads as the default`() = runBlocking {
+        // A preferences file is an ordinary file. A value from a build that offered a
+        // different range, or from anything editing it, must not hand the decoder a zero or
+        // ask a phone for sixteen megapixels.
+        preferences.save("", ModelPreferences(imageTokens = 40_000))
+        assertThat(store.imagePixels()).isEqualTo(512 * 1024)
 
-            preferences.save("", ModelPreferences(imageEdgePixels = 0))
-            assertThat(store.imageEdge()).isEqualTo(ModelPreferences.MIN_IMAGE_EDGE)
+        preferences.save("", ModelPreferences(imageTokens = 0))
+        assertThat(store.imagePixels()).isEqualTo(512 * 1024)
+    }
+
+    @Test
+    fun `every stop the slider offers is one the store will actually use`() = runBlocking {
+        // The two halves have to agree. A stop the store then reads as the default is a
+        // slider position that silently does nothing, which is the failure this pins.
+        val budgets = ModelPreferences.IMAGE_TOKEN_STEPS.map { tokens ->
+            preferences.save("", ModelPreferences(imageTokens = tokens))
+            store.imagePixels()
         }
+        assertThat(budgets).containsNoDuplicates()
+        assertThat(budgets).isInStrictOrder()
+    }
 
     @Test
-    fun `every size the slider offers is one the store will actually use`() = runBlocking {
-        // The two halves have to agree. A stop the store then clamps away is a slider
-        // position that silently does nothing, which is the failure this pins.
-        for (edge in ModelPreferences.IMAGE_EDGE_STEPS) {
-            preferences.save("", ModelPreferences(imageEdgePixels = edge))
-            assertThat(store.imageEdge()).isEqualTo(edge)
-        }
+    fun `the old longest edge setting migrates to the nearest stop`() = runBlocking {
+        // Below the old default the person wanted speed; above it, the only way to tiles
+        // was the two large stops, and somebody who chose them chose the wait.
+        preferences.save("", ModelPreferences(imageEdgePixels = 512, imageTokens = 0))
+        assertThat(preferences.current("").imageTokens)
+            .isEqualTo(ModelPreferences.IMAGE_TOKENS_FAST)
+        assertThat(preferences.current("").imageEdgePixels).isEqualTo(0)
+
+        preferences.save("", ModelPreferences(imageEdgePixels = 1024, imageTokens = 0))
+        assertThat(preferences.current("").imageTokens)
+            .isEqualTo(ModelPreferences.IMAGE_TOKENS_BALANCED)
+
+        preferences.save("", ModelPreferences(imageEdgePixels = 1536, imageTokens = 0))
+        assertThat(preferences.current("").imageTokens)
+            .isEqualTo(ModelPreferences.IMAGE_TOKENS_TILES)
     }
 }

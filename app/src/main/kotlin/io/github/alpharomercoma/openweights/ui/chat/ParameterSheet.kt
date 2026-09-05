@@ -255,25 +255,29 @@ fun ParameterSheet(
             if (readsImages) {
                 Setting(
                     label = stringResource(R.string.image_detail),
-                    // Said as a size and as a consequence. "Tokens" is what the industry
-                    // calls this control and it is the wrong unit here: on the projectors
-                    // this app recommends a smaller token budget makes a turn slower, by
-                    // making the picture get cut into tiles. What actually moves the time
-                    // is how large the picture is, so that is what the slider moves.
+                    // Said as tokens, because on this projector tokens are the cost and
+                    // the app sets them by how many pixels it sends. It used to be a
+                    // longest edge, which measured the wrong thing: the tiler decides by
+                    // area, so the same edge was one view for a screenshot and ten tiles
+                    // for a photograph. See ModelPreferences.imageTokens.
                     explanation = stringResource(R.string.image_detail_explanation),
-                    value = stringResource(R.string.image_detail_pixels, draft.imageEdgePixels),
+                    value = imageDetailLabel(draft.imageTokens),
                     footnote = stringResource(R.string.image_detail_footnote)
-                        .takeIf { draft.imageEdgePixels > ModelPreferences.DEFAULT_IMAGE_EDGE },
+                        .takeIf { draft.imageTokens == ModelPreferences.IMAGE_TOKENS_TILES },
                 ) {
+                    // Three stops, evenly spaced on the slider whatever their token counts
+                    // are: the middle of the travel is the default, not a point a tenth
+                    // of the way along.
+                    val stops = ModelPreferences.IMAGE_TOKEN_STEPS
                     StepSlider(
-                        value = draft.imageEdgePixels.toFloat(),
+                        value = stops.indexOf(draft.imageTokens).coerceAtLeast(0).toFloat(),
                         onValueChange = {
                             draft = draft.copy(
-                                imageEdgePixels = it.roundToInt().nearestImageEdge(),
+                                imageTokens = stops[it.roundToInt().coerceIn(0, stops.lastIndex)],
                             )
                         },
-                        valueRange = IMAGE_EDGE_RANGE,
-                        steps = ModelPreferences.IMAGE_EDGE_STEPS.size - 2,
+                        valueRange = 0f..stops.lastIndex.toFloat(),
+                        steps = stops.size - 2,
                     )
                 }
             }
@@ -638,19 +642,15 @@ private const val MAX_TOP_K = 100f
 private const val MIN_REPEAT_PENALTY = 1f
 private const val MAX_REPEAT_PENALTY = 1.5f
 
-/** The travel of the image slider, from the smallest size offered to the largest. */
-private val IMAGE_EDGE_RANGE =
-    ModelPreferences.MIN_IMAGE_EDGE.toFloat()..ModelPreferences.MAX_IMAGE_EDGE.toFloat()
-
-/**
- * The stop nearest a dragged position, so the slider can only produce a measured size.
- *
- * The stops are not evenly spaced and are not meant to be: they are the six sizes that
- * behaved differently on the phone. Between 1024 and 1100 pixels there is nothing to
- * choose, and a continuous slider would spend most of its travel there.
- */
-private fun Int.nearestImageEdge(): Int =
-    ModelPreferences.IMAGE_EDGE_STEPS.minBy { step -> kotlin.math.abs(step - this) }
+/** What a stop is called, with its cost: the stop's own word, then the tokens. */
+@Composable
+private fun imageDetailLabel(tokens: Int): String = when (tokens) {
+    ModelPreferences.IMAGE_TOKENS_FAST ->
+        stringResource(R.string.image_detail_fast, tokens)
+    ModelPreferences.IMAGE_TOKENS_TILES ->
+        stringResource(R.string.image_detail_tiles)
+    else -> stringResource(R.string.image_detail_balanced, ModelPreferences.IMAGE_TOKENS_BALANCED)
+}
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

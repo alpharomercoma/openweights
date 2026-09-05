@@ -219,7 +219,7 @@ data class ModelLoadParams(
      * asking for a smaller budget asks for more tiles. Measured on a Snapdragon 8 Gen 3
      * against a 461 by 1024 screenshot: automatic, 280 prompt tokens and 8.5 seconds; the
      * same picture at a budget of 128, 677 tokens and 32.8 seconds. What the app moves
-     * instead is `ModelPreferences.imageEdgePixels`, the size of the picture itself.
+     * instead is `ModelPreferences.imageTokens`, which sets the size of the picture the app sends.
      *
      * Kept, and exercised, because it is the knob for the other half of the trade and the
      * only way to reproduce that finding: see `ImageTokenBenchmark` and

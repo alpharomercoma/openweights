@@ -269,9 +269,11 @@
     <string name="search_results_count_value">%1$d 件</string>
     <string name="search_results_count_one">1 件</string>
     <string name="image_detail">画像の精細さ</string>
-    <string name="image_detail_explanation">モデルが読む前の画像の大きさです。小さいほど大幅に速く、見出しは読めます。大きいほど時間がかかり、細かい文字まで読めます。これから追加する画像に適用されます。</string>
-    <string name="image_detail_pixels">長辺 %1$d px</string>
-    <string name="image_detail_footnote">1024 px を超えると画像はタイルに分割されます。最小の文字まで読めますが、数倍の時間がかかります</string>
+    <string name="image_detail_explanation">モデルが画像をどこまで読むかを、トークン数で選びます。「速い」は画像を一度見るだけで、見出しや配置、何が写っているかが分かります。「バランス」は倍の細かさで見て、手書き、レシート、スクリーンショットを読みます。「タイル」は画像を分割して小さな文字のページ全体を読みますが、数分かかります。これから追加する画像に適用されます。</string>
+    <string name="image_detail_fast">速い、%1$d トークン</string>
+    <string name="image_detail_balanced">バランス、%1$d トークン</string>
+    <string name="image_detail_tiles">タイル、最大10分割</string>
+    <string name="image_detail_footnote">タイルはバランスの最大10倍のコストで、スマートフォンでは数分かかります。写真ではなく、小さな文字のページに使ってください</string>
     <string name="stat_reused">再利用</string>
     <string name="stat_tokens">トークン</string>
     <string name="stat_total_time">合計</string>

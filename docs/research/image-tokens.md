@@ -148,3 +148,104 @@ the several hundred the same model manages on text.
 **An image turn re-reads the whole conversation.** Embeddings are never compared against the
 KV cache, so `cachedTokens` is zero on any turn with an attachment. The picture's cost is
 paid once; the conversation behind it is paid again every time.
+
+## Seven pictures later: the cliff is a line in area, and the setting was on the wrong axis (2026-09-05)
+
+A user attached a 3:4 photograph of a poster, asked what it showed, and waited 213.8
+seconds for 3.1k prompt tokens at a 0% cache hit. Everything above was measured on one
+picture, a 1080 by 2400 screenshot, and that picture never tiles at a 1024 edge because it
+is tall: 461 by 1024 is 472 thousand pixels. `should_tile` compares the picture's area,
+rounded to the patch grid, against twice the ceiling's pixels, which for LFM2's 256-token
+ceiling is 524,288. A 3:4 photograph at the same 1024 edge is 768 by 1024, 786 thousand,
+over the line. So the slider that was measured to sit "just below the cliff" was below it
+for screenshots and above it for photographs, and the default did the slow thing for the
+commonest picture a phone takes.
+
+Two other facts fell out of reading the preprocessor closely:
+
+- **768 and 1024 were the same stop.** Under the line the projector resizes the picture
+  down to its 262,144-pixel ceiling before encoding, so anything the app sent between
+  262 thousand and 524 thousand pixels was downscaled again by libmtmd to the same 256
+  tokens. The table above shows it (280 tokens at both) without saying why.
+- **The tiler decides by rounded area, not by the number the app checks.** A 659 by 795
+  picture, 523,905 pixels and under the line by arithmetic, rounds to 672 by 800 on the
+  32-pixel grid and tiles. The app's budget has to leave that margin.
+
+### The host sweep
+
+Measured on the Mac through llama-server with the same GGUFs, over seven pictures chosen
+for shape and content: a handwritten toga form (3:4 photo), a Starbucks receipt (tall),
+a Genshin splash screen (wide, text), an Attack on Titan frame (16:9, no text), a resume
+(A4 page), a slide (16:9), and the probe screenshot. Each has questions with facts that
+can only come from reading it. Timings are the Mac's and are not the phone's; token
+counts and what was read are exact.
+
+| picture | arm | pixels sent | prompt tokens | read |
+| --- | --- | ---: | ---: | --- |
+| form | model limits, 1024 edge (today) | 849x1024 | 1819 | 3/4 |
+| form | model limits, 262k px | 466x562 | 276 | 2/4 |
+| form | ceiling 1024, 524k px | 659x795 | **563** | **3/4** |
+| form | ceiling 1024, 1.05M px | 932x1125 | 1053 | 2/4 |
+| receipt | model limits, 1024 edge | 448x1024 | 272 | 4/5 |
+| receipt | model limits, 262k px | 339x774 | 272 | 1/5 |
+| receipt | ceiling 1024, 524k px | 479x1095 | **542** | **5/5** |
+| receipt | ceiling 1024, 1.05M px | 677x1548 | 1040 | 5/5 |
+| probe | model limits, 262k px | 343x763 | 279 | 3/4 |
+| probe | ceiling 1024, 524k px | 486x1079 | **559** | **4/4** |
+| probe | ceiling 1024, 1.05M px | 687x1526 | 1057 | 4/4 |
+| resume | model limits, 1024 edge | 724x1024 | 1817 | 2/2 |
+| resume | ceiling 1024, 524k px | 609x861 | 540 | 2/2 |
+| resume | ceiling 1024, 1.05M px | 861x1218 | 1015 | 1/2 |
+| splash | ceiling 1024, 524k px | 1065x492 | 530 | 2/3 |
+| splash | ceiling 1024, 1.05M px | 1507x696 | 1022 | 1/3 |
+
+Three things the table says. **One view at about 512 tokens reads what the tiles read**:
+the form's handwriting, the receipt's totals, the probe's 24pt line, the resume, at a
+fifth of the tokens and one encode instead of seven. **A view at 1024 tokens is worse than
+512 on three of the seven** (form, resume, splash), consistent with asking the encoder for
+four times the patches it was trained on; there is no stop there. **The 256-token view
+loses the receipt and the small print**, which is the fast stop doing what a fast stop
+does.
+
+The encode is where the time goes, measured now rather than inferred: on the Mac's CPU
+the tiled form was seven encodes of 5 to 8 seconds each, 47 of a 67-second turn, and the
+single 480-token view was one encode of 17.6 seconds in a 30-second prefill.
+
+### What shipped
+
+**The engine raises LFM2's ceiling to 512 tokens** when the projector is LFM2 and the
+caller left the token budget automatic (`Session::load`, read from the mmproj metadata).
+This moves the tiling line to 1,048,576 rounded pixels and makes the balanced view one
+encode whatever the picture's shape. The floor stays the model's. Other projector
+families are untouched.
+
+**The setting is a token count, and the store shrinks by area.** `ModelPreferences.imageTokens`
+has three stops: fast (256, one 512-pixel view), balanced (512, the default, twice the
+pixels), and tiles (the picture sent at 2.5 megapixels so the projector cuts it, up to ten
+pieces and a thumbnail). `AttachmentStore` shrinks to the stop's pixels, aspect kept, so the
+stop names what the picture costs for every shape. The longest-edge setting is migrated:
+below 1024 to fast, 1024 to balanced, above to tiles. Video frames are taken at the fast
+stop's size; at the old 1024 edge a 16:9 frame was 590 thousand pixels, over the old line,
+so every frame of a clip was tiled.
+
+**An image turn no longer re-reads the conversation, and a follow-up no longer re-encodes
+the picture.** The cache record keeps a placeholder per media position and a span saying
+which picture, by a hash of its pixels, filled it, the way llama-server's `server_tokens`
+does. A follow-up question extends the record and decodes only its own words: on the host,
+22 tokens and 687 ms against 1,907 and 61 seconds. When the model's own reply re-tokenizes
+differently from how it was decoded, which a hybrid cannot roll back from, the whole
+conversation is re-read as text, but the projector's output for every chunk is kept in a
+96 MB store keyed by picture and tile, so the re-read decodes embeddings rather than
+running the vision transformer: 16 seconds against 61 on the Mac, and the same ratio of
+seconds to minutes on the phone. `warm()` leaves a conversation with attachments alone,
+since it can only render text and would replace the embeddings with a marker word.
+
+**The projector gets the prefill thread count**, which is the shape of the work.
+
+### What this does not settle
+
+The phone was not reachable for this run, so the numbers above are the Mac's. The ratios
+are the claim: one encode instead of seven or eleven, a fifth of the tokens, and no
+encode at all on a follow-up. `ImageTokenBenchmark` runs the same ladder on a device and
+should be run with the ceiling in place. The hybrid re-tokenization drift that forces the
+occasional full text re-read is the text path's problem too and is not addressed here.

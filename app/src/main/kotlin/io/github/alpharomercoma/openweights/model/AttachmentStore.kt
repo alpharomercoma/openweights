@@ -42,8 +42,8 @@ import java.io.Reader
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * A text document waiting in the composer.
@@ -186,20 +186,22 @@ class AttachmentStore @Inject constructor(
     }
 
     /**
-     * The longest edge a picture may keep, clamped to what the app will actually send.
+     * The pixels a picture may keep, which is the token count the setting names.
      *
-     * A settings file is an ordinary file, and a value out of range in it should shrink a
-     * photograph oddly rather than hand the decoder a zero. Falls back to the default if
-     * the settings cannot be read at all: an unreadable preference must not stop somebody
-     * attaching a picture.
+     * Area rather than longest edge, because area is what the projector decides by: its
+     * tiler compares the picture's pixel count against a line, and two pictures with the
+     * same longest edge sit on opposite sides of it when one is a tall screenshot and the
+     * other a 3:4 photograph. That was the reported case: the same 1024-pixel edge cost
+     * 280 tokens for the one and 2,851 for the other. Falls back to the default if the
+     * settings cannot be read at all: an unreadable preference must not stop somebody
+     * attaching a picture. A stored value that is not one of the stops reads as the
+     * default too, inside [ModelPreferences.imagePixels].
      */
     @VisibleForTesting
-    internal suspend fun imageEdge(): Int = runCatching {
-        preferences.shared().first().imageEdgePixels
-    }.getOrNull()?.coerceIn(
-        ModelPreferences.MIN_IMAGE_EDGE,
-        ModelPreferences.MAX_IMAGE_EDGE,
-    ) ?: ModelPreferences.DEFAULT_IMAGE_EDGE
+    internal suspend fun imagePixels(): Int = ModelPreferences.imagePixels(
+        runCatching { preferences.shared().first().imageTokens }
+            .getOrNull() ?: ModelPreferences.DEFAULT_IMAGE_TOKENS,
+    )
 
     private fun largestAccepted(kind: MediaKind): Long =
         if (kind == MediaKind.VIDEO) MAX_VIDEO_SOURCE_BYTES else MAX_COPIED_ATTACHMENT_BYTES
@@ -257,8 +259,8 @@ class AttachmentStore @Inject constructor(
                 val frame = retriever.getScaledFrameAtTime(
                     atMs * MICROS_PER_MILLI,
                     MediaMetadataRetriever.OPTION_CLOSEST,
-                    MAX_IMAGE_EDGE,
-                    MAX_IMAGE_EDGE,
+                    FRAME_EDGE,
+                    FRAME_EDGE,
                 ) ?: return@mapNotNull null
 
                 val target = File(directory, "${UUID.randomUUID()}.jpg")
@@ -382,28 +384,42 @@ class AttachmentStore @Inject constructor(
      * around this size anyway, so the detail being dropped is detail the encoder would have
      * discarded itself.
      */
-    private suspend fun copyImageDownscaled(uri: Uri, target: File): Boolean {
-        val edge = imageEdge()
+    private suspend fun copyImageDownscaled(uri: Uri, target: File): Boolean =
+        copyImageDownscaled(uri, target, imagePixels())
+
+    /**
+     * Copies an image shrunk to at most [pixels] of area, aspect ratio kept.
+     *
+     * The projector resizes down to its own ceiling and never up, so a picture sent at
+     * exactly the budget produces the tokens the budget names; anything larger is pixels
+     * the phone decodes, stores and sends for the projector to throw away, or, over the
+     * tiling line, pixels that multiply the cost by ten.
+     */
+    private fun copyImageDownscaled(uri: Uri, target: File, pixels: Int): Boolean {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.bounded(MAX_COPIED_ATTACHMENT_BYTES)?.use {
             BitmapFactory.decodeStream(it, null, bounds)
         }
 
-        val longestEdge = max(bounds.outWidth, bounds.outHeight)
-        if (longestEdge <= 0) return false
-        if (longestEdge <= edge) return copyVerbatim(uri, target)
+        val width = bounds.outWidth
+        val height = bounds.outHeight
+        if (width <= 0 || height <= 0) return false
+        val area = width.toLong() * height.toLong()
+        if (area <= pixels) return copyVerbatim(uri, target)
 
-        // inSampleSize halves in powers of two, which is the cheap path in the decoder;
+        // The factor that brings the area to the budget, applied to both edges. Decoded
+        // at the nearest power of two below it, which is the cheap path in the decoder;
         // the exact size is reached by scaling the result afterwards.
+        val shrink = sqrt(pixels.toDouble() / area)
         val options = BitmapFactory.Options().apply {
-            inSampleSize = Integer.highestOneBit(longestEdge / edge)
+            inSampleSize = Integer.highestOneBit((1.0 / shrink).toInt().coerceAtLeast(1))
         }
         val decoded = context.contentResolver.openInputStream(uri)
             ?.bounded(MAX_COPIED_ATTACHMENT_BYTES)
             ?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: return false
 
-        val scale = edge.toFloat() / max(decoded.width, decoded.height)
+        val scale = sqrt(pixels.toDouble() / (decoded.width.toLong() * decoded.height)).toFloat()
         val resized = if (scale < 1f) {
             decoded.scale(
                 (decoded.width * scale).roundToInt().coerceAtLeast(1),
@@ -541,13 +557,14 @@ class AttachmentStore @Inject constructor(
         /**
          * Longest edge in pixels for a video frame, which has no setting of its own.
          *
-         * A sampled frame is one of several sent together, so the arithmetic that sizes a
-         * still picture does not apply: the budget has to cover the whole set. Left at the
-         * measured default rather than following [ModelPreferences.imageEdgePixels], since
-         * somebody raising the detail on a photograph is not asking for six frames of a
-         * video at the same size.
+         * A sampled frame is one of several sent together, so the budget has to cover the
+         * whole set, and it is the fast stop's budget: 512 squared is the projector's own
+         * single view. The frames used to be taken at a 1024 edge, which for a 16:9 clip
+         * is 590 thousand pixels, over the old tiling line, so each of the four frames
+         * was cut into tiles and a clip cost eleven encodes a frame. That is where "over
+         * a minute for four video frames" came from.
          */
-        const val MAX_IMAGE_EDGE = ModelPreferences.DEFAULT_IMAGE_EDGE
+        const val FRAME_EDGE = 512
         const val JPEG_QUALITY = 90
         const val COPY_BUFFER_BYTES = 64 * 1024
         const val MAX_COPIED_ATTACHMENT_BYTES = 128L * 1024 * 1024

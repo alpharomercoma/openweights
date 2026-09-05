@@ -275,9 +275,11 @@
     <string name="search_results_count_value">%1$d نتائج</string>
     <string name="search_results_count_one">نتيجة واحدة</string>
     <string name="image_detail">تفاصيل الصورة</string>
-    <string name="image_detail_explanation">حجم الصورة قبل أن يقرأها النموذج. الأصغر أسرع بكثير ويقرأ العناوين، والأكبر يستغرق وقتًا أطول ويقرأ الخط الدقيق. يسري على الصور التي تضيفها من الآن.</string>
-    <string name="image_detail_pixels">أطول ضلع %1$d بكسل</string>
-    <string name="image_detail_footnote">فوق 1024 بكسل تُقطَّع الصورة إلى مربعات، فتُقرأ أدق الخطوط ويستغرق ذلك أضعاف الوقت</string>
+    <string name="image_detail_explanation">كم يقرأ النموذج من الصورة، بالرموز. سريع نظرة واحدة إلى الصورة: العناوين والتخطيط وما فيها. متوازن ينظر بدقة مضاعفة ويقرأ الخط اليدوي والفواتير ولقطات الشاشة. مربعات يقطّع الصورة إلى أجزاء ليقرأ صفحة كاملة بخط صغير ويستغرق عدة دقائق. يُطبَّق على الصور التي تضيفها من الآن.</string>
+    <string name="image_detail_fast">سريع، %1$d رمز</string>
+    <string name="image_detail_balanced">متوازن، %1$d رمز</string>
+    <string name="image_detail_tiles">مربعات، حتى عشرة أجزاء</string>
+    <string name="image_detail_footnote">المربعات تكلّف حتى عشرة أضعاف الصورة المتوازنة وتستغرق عدة دقائق على الهاتف. اختره لصفحة بخط صغير، لا لصورة</string>
     <string name="stat_reused">معاد استخدامها</string>
     <string name="stat_tokens">الرموز</string>
     <string name="stat_total_time">الإجمالي</string>

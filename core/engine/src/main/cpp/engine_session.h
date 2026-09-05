@@ -19,6 +19,8 @@
 #include <atomic>
 #include <functional>
 #include <string>
+#include <deque>
+#include <unordered_map>
 #include <vector>
 
 #include "llama.h"
@@ -369,6 +371,22 @@ private:
     bool ingest_prompt(const std::vector<llama_token> & tokens, size_t from, std::string & error);
 
     /**
+     * One attachment's place in [cached_], and what was there.
+     *
+     * A media chunk occupies `n_tokens` positions that hold embeddings rather than tokens.
+     * In the record those positions are LLAMA_TOKEN_NULL, and this says which picture (or
+     * clip) filled them, by libmtmd's own hash of its pixels. Two prompts agree at a span
+     * when they have the same id and the same length at the same place: then the
+     * embeddings already in the cache are the ones this prompt would have produced, and
+     * the encode that made them, which is most of an image turn, is not paid again.
+     */
+    struct MediaSpan {
+        size_t start = 0;
+        size_t n_tokens = 0;
+        std::string id;
+    };
+
+    /**
      * Brings the cache into agreement with the head of `tokens`, as cheaply as it can.
      *
      * Reuses the longest matching prefix; rolls the rest back where the memory allows it;
@@ -376,7 +394,20 @@ private:
      * prefix; and starts cold otherwise. Returns the position ingestion should continue
      * from. `need_logits` keeps one token back for generation, which a warm does not need.
      */
-    size_t align_cache(const std::vector<llama_token> & tokens, bool need_logits);
+    size_t align_cache(
+        const std::vector<llama_token> & tokens,
+        bool need_logits,
+        const std::vector<MediaSpan> * spans = nullptr);
+
+    /**
+     * How far `tokens` agrees with [cached_], counting a media span as one unit.
+     *
+     * A span matches only whole, id and length alike; anything else stops the prefix at
+     * the span's start, never inside it, so a reuse boundary always lands on text.
+     */
+    size_t common_prefix(
+        const std::vector<llama_token> & tokens,
+        const std::vector<MediaSpan> * spans) const;
 
     /**
      * Decodes `tokens[from..]` a batch at a time, committing progress after each batch.
@@ -462,7 +493,9 @@ private:
     int32_t ingest_media_prompt(
         const std::string & prompt,
         const std::vector<std::string> & media_paths,
+        size_t & reused,
         std::string & error);
+
 
     llama_model   * model_ = nullptr;
     llama_context * ctx_   = nullptr;
@@ -521,8 +554,43 @@ private:
     /** The multimodal projector, or null for a text-only model. */
     void * mtmd_ = nullptr;
 
-    /** Tokens currently represented in the KV cache, in order. */
+    /**
+     * Tokens currently represented in the KV cache, in order.
+     *
+     * A position filled by an attachment holds LLAMA_TOKEN_NULL here, and [media_spans_]
+     * says which attachment; see [MediaSpan]. A real token never equals the placeholder,
+     * so every text-only comparison of this record still means what it did.
+     */
     std::vector<llama_token> cached_;
+
+    /** The attachments in [cached_], in position order. Empty for a text-only cache. */
+    std::vector<MediaSpan> media_spans_;
+
+    /**
+     * What the projector produced for each media chunk this session has encoded, by key.
+     *
+     * The encode is most of an image turn on a phone: one 512-pixel view is fifteen or so
+     * seconds of vision transformer and a tiled picture is ten of them. The record above
+     * saves that when the cache can be extended. It cannot always be: a hybrid model
+     * refuses to roll back, and the model's own reply sometimes re-tokenizes a token
+     * differently from how it was decoded, which forces the whole conversation to be read
+     * again. Reading text again is seconds; encoding the picture again is minutes. So the
+     * embeddings are kept, keyed by the picture's hash and the chunk's place in it, and a
+     * re-read decodes them straight into the cache.
+     *
+     * Bounded in bytes, oldest first out. A 2560-wide model at 256 tokens a chunk is 2.6 MB
+     * per chunk, so the budget holds a few pictures' worth of tiles, which is a conversation.
+     */
+    std::unordered_map<std::string, std::vector<float>> media_embd_;
+    std::deque<std::string> media_embd_order_;
+    size_t media_embd_bytes_ = 0;
+
+    /** Encodes (or recalls) one media chunk and decodes it into the cache at `n_past`. */
+    int32_t decode_media_chunk(
+        void * mtmd_ctx,
+        const void * chunk,
+        const std::string & key,
+        llama_pos * n_past);
 
     /**
      * Position of the next token in the KV cache.

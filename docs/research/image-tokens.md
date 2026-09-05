@@ -249,3 +249,49 @@ are the claim: one encode instead of seven or eleven, a fifth of the tokens, and
 encode at all on a follow-up. `ImageTokenBenchmark` runs the same ladder on a device and
 should be run with the ceiling in place. The hybrid re-tokenization drift that forces the
 occasional full text re-read is the text path's problem too and is not addressed here.
+
+### On a device: Snapdragon 8 Gen 3, the same pictures (2026-09-05)
+
+Run through the QDC tunnel on an SM8650 with `ImageReuseOnDeviceTest`, which is the three
+claims above written as assertions. All three passed. The numbers, prefill in milliseconds,
+with the projector encode time from the engine's own log:
+
+| picture | prompt tokens | prefill | encode | read |
+| --- | ---: | ---: | ---: | --- |
+| form, fast (256) | 309 | 8.0 s | | 2/4 |
+| form, balanced (512) | 519 | 14.0 s | 12.6 s | 2/4 |
+| form, old 1024 edge | 519 | 14.9 s | | 2/4 |
+| form, tiles | 2062 | **63.8 s** | 6 x 5.7 s + 12.6 s | 2/4 |
+| receipt, balanced | 543 | 18.3 s | 14.1 s | 4/4 |
+| probe, balanced | 560 | 18.6 s | 14.2 s | 4/4 |
+| follow-up about the form | 608 (0 cached) | **4.1 s** | none | |
+
+Read critically, four things.
+
+**The ceiling is what fixed the reported case, not the area rule.** With the tiling line
+moved to 1,048,576 pixels, the 849 by 1024 picture the old rule sent is one view too, and
+costs the same 519 tokens as the balanced one, because the projector downsizes both to its
+ceiling. The area rule still stops the app storing and decoding pixels the projector
+discards, and it is what makes the tiles stop reach the line for every shape, but on this
+photograph it did not change the tokens. Tiles on this device cost 64 seconds against 14,
+which is the ratio the user saw on the Poco at 214 seconds.
+
+**The encode is 90% of the prefill.** 12.6 of 14.0 seconds for the balanced view; each
+256-token tile is 5.7 seconds. That is the number every future speed-up has to attack.
+
+**The cache extension did not fire on the device; the embedding store did.** The follow-up
+came back with zero cached tokens: the model's reply re-tokenized differently from how it
+was decoded, the hybrid could not roll back, and the whole 608-token conversation was
+re-read. It took 4.1 seconds instead of 14 because the picture's embeddings came out of the
+store rather than the encoder. The extension path was seen working on the host; on this
+device, with this model's markdown replies, the drift looks systematic, which is a text-path
+problem worth its own measurement.
+
+**Tiles did not read this photograph better.** 2 of 4 at every stop; the handwriting is the
+limit, not the pixels. Tiles got the course code and lost a digit of the phone number; the
+single views got the number and mangled the course. The receipt and the probe were read
+fully at the balanced stop. The tiles stop stays for a page of small print and should be
+sold as nothing more.
+
+Not tested here: the app itself. The tunnel moved 80 KB/s this session, so the model was
+fetched by the device's own curl and only the engine test APK was installed.

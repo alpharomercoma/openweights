@@ -177,10 +177,17 @@ class TurnRunnerDenialTest {
             "I don't have access to the latest information, so I would search the web " +
                 "for it and then summarise what I find.",
         )
+        engine.scripted += ScriptedPass("1. Search the web for it\n2. Summarise what I find")
 
         run(mode = AgentMode.PLAN)
 
-        assertThat(engine.prompts).hasSize(1)
+        // The one pass plan mode does add is its own: a prose plan is asked to become the
+        // list the board can read. What must not follow is the denial push, which would
+        // name web_search and have the model call it.
+        assertThat(engine.prompts).hasSize(2)
+        val push = engine.prompts[1].last { it.role == ChatRole.USER }.text
+        assertThat(push).contains("not a plan")
+        assertThat(push).doesNotContain("You do have a working tool")
         assertThat(search.calls).isEmpty()
     }
 

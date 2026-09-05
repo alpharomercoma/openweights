@@ -79,7 +79,9 @@ class PlanModeSwitchesTest {
             plans = plans,
             asks = asks,
         )
-        engine.scripted += ScriptedPass("Here is the plan.")
+        // Listed, because a prose reply in plan mode now earns one more pass asking for the
+        // list, and this test is about which tools the one pass was offered.
+        engine.scripted += ScriptedPass("1. Find the notes\n2. Summarise them")
 
         assertThat(runner.hasEnabledTools()).isFalse()
         assertThat(runner.hasEnabledTools(AgentMode.PLAN)).isTrue()

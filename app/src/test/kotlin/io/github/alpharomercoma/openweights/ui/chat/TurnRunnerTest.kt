@@ -515,7 +515,9 @@ class TurnRunnerTest {
         val call = ToolCall(id = "2", name = "web_search", argumentsJson = """{"query":"x"}""")
         // A model that ignores the instruction and calls anyway, which is what small ones do.
         engine.scripted += ScriptedPass("I will look this up.", toolCalls = listOf(call))
-        engine.scripted += ScriptedPass("Here is what I would do.")
+        // A plan, not a sentence about one: a prose reply here would earn the plan repair's
+        // push, which is its own test below.
+        engine.scripted += ScriptedPass("1. Search for her\n2. Summarise what comes back")
 
         val steps = run(withTools = true, mode = AgentMode.PLAN)
 
@@ -578,7 +580,7 @@ class TurnRunnerTest {
         // in plan mode has still not left the device.
         val call = ToolCall(id = "s", name = "web_search", argumentsJson = """{"query":"x"}""")
         engine.scripted += ScriptedPass("Looking.", toolCalls = listOf(call))
-        engine.scripted += ScriptedPass("Here is what I would do.")
+        engine.scripted += ScriptedPass("1. Search for it\n2. Summarise what comes back")
 
         val steps = runPlanning(PlanBoard(), AskBoard())
 

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.context.TaskPlan
+import io.github.alpharomercoma.openweights.core.common.context.readPlan
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
@@ -38,6 +39,7 @@ import io.github.alpharomercoma.openweights.core.tools.AgentStep
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.CapabilityDenial
+import io.github.alpharomercoma.openweights.core.tools.NamedSubject
 import io.github.alpharomercoma.openweights.core.tools.PlanBoard
 import io.github.alpharomercoma.openweights.core.tools.Tool
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
@@ -546,6 +548,15 @@ class TurnRunner @Inject constructor(
             withTools && notes.notes.isNotEmpty() && question.length <= GROUNDING_MAX_CHARS
         }
 
+        // A "who is" question gets told, on the question itself, that it names somebody to
+        // look up. Only when the search is actually on offer this turn: named to a model
+        // that cannot call it, the trailer is an instruction to do the impossible, and plan
+        // mode strips every user-facing tool so it never qualifies. See [NamedSubject] for
+        // why this is the app's decision rather than the prompt's.
+        val namedSubject = question
+            .takeIf { withTools && active.find(NamedSubject.TOOL) != null }
+            ?.let(NamedSubject::of)
+
         return Turn(
             active,
             offerPlan,
@@ -556,6 +567,7 @@ class TurnRunner @Inject constructor(
             readsResults,
             conversation,
             groundingQuestion,
+            namedSubject,
             question,
         ).run(params, mode, listener)
     }
@@ -586,6 +598,8 @@ class TurnRunner @Inject constructor(
         private val readsResults: Boolean,
         private val conversation: List<ChatMessage>,
         private val question: String?,
+        /** The name this turn's question is about, when it is that kind of question. */
+        private val subject: String?,
         private val asked: String,
     ) {
         /**
@@ -629,6 +643,7 @@ class TurnRunner @Inject constructor(
         private var messages = conversation
             .describing(active, needed = withTools && !native)
             .grounding(question)
+            .naming(subject)
         private var round = 0
         private var lastRaw = ""
 
@@ -640,6 +655,9 @@ class TurnRunner @Inject constructor(
 
         /** The withdrawal, kept as the exception it should always have been. */
         private var withdrawn = false
+
+        /** Spent at most once a turn, for the same reason [repaired] is. See [planRepair]. */
+        private var planRepaired = false
 
         /**
          * Set by a write-shaped denial repair: the retry is meant to be prose, so calls
@@ -710,21 +728,7 @@ class TurnRunner @Inject constructor(
                 // for that" is a remark about what it cannot do. Ungated, that remark
                 // reached the network.
                 val calls = pass.asked(active, withTools && !proseOnly)
-                val again = when {
-                    mayCall -> advance(pass, calls, mode, listener)
-                    // The budget was two rounds because nothing had chained yet, and the
-                    // model has now asked for the step the longer budget exists for:
-                    // "research this and save it" is search, read, then write, and the
-                    // write is the round that was about to be refused. Earned on the ask
-                    // here rather than only on the run, because by this point there is no
-                    // round left in which to run one. It can only happen once, and only up
-                    // to a ceiling the registry already justified.
-                    wantsToChain(calls) -> {
-                        maxRounds = ceiling
-                        advance(pass, calls, mode, listener)
-                    }
-                    else -> withdraw(pass, calls, listener)
-                }
+                val again = goesRound(pass, calls, mayCall, mode, listener)
                 if (!again) {
                     // The turn is over and [messages] is the conversation the KV cache now
                     // holds, minus this last pass's reply. Handed out so the next turn can
@@ -736,6 +740,40 @@ class TurnRunner @Inject constructor(
                 }
                 listener.onNextPass()
             }
+        }
+
+        /**
+         * Whether this pass earned another, and what the next one is for.
+         *
+         * Three ways round and one fallback, in order of what the pass did: it asked for
+         * tools it may run; it asked for the kind of tool the longer budget exists for; it
+         * asked when it should not have; or, in plan mode, it answered when it was asked
+         * to plan. Its own function because [run] is already the loop and the static
+         * complexity check said so.
+         */
+        private suspend fun goesRound(
+            pass: Pass,
+            calls: List<ToolCall>,
+            mayCall: Boolean,
+            mode: AgentMode,
+            listener: TurnListener,
+        ): Boolean {
+            val ran = when {
+                mayCall -> advance(pass, calls, mode, listener)
+                // The budget was two rounds because nothing had chained yet, and the
+                // model has now asked for the step the longer budget exists for:
+                // "research this and save it" is search, read, then write, and the
+                // write is the round that was about to be refused. Earned on the ask
+                // here rather than only on the run, because by this point there is no
+                // round left in which to run one. It can only happen once, and only up
+                // to a ceiling the registry already justified.
+                wantsToChain(calls) -> {
+                    maxRounds = ceiling
+                    advance(pass, calls, mode, listener)
+                }
+                else -> withdraw(pass, calls, listener)
+            }
+            return ran || planRepair(pass, calls, mode)
         }
 
         /**
@@ -892,6 +930,45 @@ class TurnRunner @Inject constructor(
                 ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
                 ChatMessage.text(ChatRole.USER, CapabilityDenial.retryRequest(fitting))
             Log.i("OpenWeights", "denial repair fitting=$fitting")
+            return true
+        }
+
+        /**
+         * Plan mode got an answer, and pushes once for the plan it asked for.
+         *
+         * Plan mode's instruction says not to act and to say what it would do as steps. On a
+         * request with nothing to act on, which is most of what people type, a small model
+         * reads that as permission to answer: measured 2026-09-05 on the host over eight
+         * requests from "What is 2+2?" to "rename every .txt in my notes folder", the
+         * shipped instruction produced a plan 2 of 8 times on LFM2.5-1.2B and 3 of 8 on
+         * Qwen3-1.7B, and a stricter instruction saying not to give the answer even when
+         * known reached 5 of 8 on both, with the "plans" it added being answers with a
+         * bulleted breakdown underneath. So the wording stays and the loop enforces it:
+         * one push, worded as the observation it is, took both models to 8 of 8, and the
+         * plans it produced were plans ("1. Open report.md 2. Identify the budget section
+         * 3. Summarise it") rather than the answer restated.
+         *
+         * Not for a reply that already lists steps, which is the mode working. Not for a
+         * reply that ends on a question, which is the mode's other legitimate output, a
+         * clarification in prose from a model that did not reach for `ask_user`. And not
+         * for a pass that asked for a tool, because that pass has been answered and goes
+         * round again on its own. Once a turn, like every other repair: a model that
+         * answers twice when asked for a plan is going to answer a third time.
+         *
+         * Enforced here rather than by the screen because it is the loop that knows the
+         * pass is over and can add one more, and because the goal runner's own planning
+         * turn comes through this same path and used to halt with "no plan came back" on
+         * exactly this failure.
+         */
+        private fun planRepair(pass: Pass, calls: List<ToolCall>, mode: AgentMode): Boolean {
+            if (mode != AgentMode.PLAN || planRepaired || calls.isNotEmpty()) return false
+            val spoken = pass.spoken()
+            if (readPlan(spoken) != null || spoken.endsWith("?")) return false
+            planRepaired = true
+            messages = messages +
+                ChatMessage.text(ChatRole.ASSISTANT, assistantHistoryText(pass.raw)) +
+                ChatMessage.text(ChatRole.USER, PLAN_REPAIR)
+            Log.i("OpenWeights", "plan repair: answered instead of planning")
             return true
         }
 
@@ -1281,6 +1358,32 @@ private fun List<ChatMessage>.grounding(question: String?): List<ChatMessage> {
         "or summarising whatever came right before it."
     return dropLast(1) + last.withTrailer(block)
 }
+
+/**
+ * The conversation with a note on the question saying whom it names.
+ *
+ * Attached to the question the way [grounding] is, once, so every pass of the turn extends
+ * the last one's cache. What it says and why it is the app saying it is [NamedSubject]; what
+ * it bought, measured on the host on 2026-09-05, is "Who is Killua?" going to `web_search`
+ * on both test models instead of to Naruto on one and Final Fantasy on the other.
+ */
+private fun List<ChatMessage>.naming(subject: String?): List<ChatMessage> {
+    if (subject.isNullOrBlank()) return this
+    val last = lastOrNull() ?: return this
+    return dropLast(1) + last.withTrailer(NamedSubject.trailer(subject))
+}
+
+/**
+ * What plan mode says to a model that answered instead of planning. See `Turn.planRepair`.
+ *
+ * Verbatim the wording that took both test models from answering to planning on every one
+ * of the eight requests it was measured on. The first sentence is an observation rather than
+ * a reproach, which is what a small model acts on; the rest is the shape wanted, said once.
+ */
+private const val PLAN_REPAIR =
+    "That was the answer, not a plan. Plan mode wants the steps: reply only with a numbered " +
+        "list of two to five short steps saying what you would do, one line each, and do not " +
+        "give the answer."
 
 /**
  * Whether a reply looks like an attempt at a call that did not come out as one.

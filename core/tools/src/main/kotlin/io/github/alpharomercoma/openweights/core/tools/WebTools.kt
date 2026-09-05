@@ -182,6 +182,16 @@ class WebSearchTool @Inject constructor(
         // them as options and asks which one to open, which is how "what is the Eiffel
         // Tower" came back as "how about I fetch the page for Gustave Eiffel". The first
         // result is the best match and saying so is what stops it picking the third.
+        //
+        // And framed as claims, not as facts. Handed two reference snippets agreeing on a
+        // height and a forum post announcing a new one, LFM2.5-1.2B under the old "answer
+        // the question using these" wording reported both as fact in one breath: "stands
+        // at 142 metres. Recent updates indicate it has been expanded to approximately 300
+        // metres." Told that the snippets are what people wrote and that disagreement is to
+        // be reported rather than resolved by picking one, the same model on the same
+        // results named the majority, named the dissenter, and said it could not confirm a
+        // single figure. Qwen3-1.7B flagged the split under either wording, so the sentence
+        // costs it nothing. Measured 2026-09-05 on the host against the app's own prompt.
         webSearchSuccess(query, provider.label, results)
     }
 
@@ -214,7 +224,10 @@ class WebSearchTool @Inject constructor(
         ): ToolExecution {
             val text = buildString {
                 append("Results for \"").append(query).append("\" from ").append(provider)
-                append(", best match first. Answer the question using these. ")
+                append(", best match first. These are snippets other people wrote, not ")
+                append("checked facts. Answer from what most of them agree on. If they ")
+                append("disagree, say so and say which source says what rather than picking ")
+                append("one; a forum post or a comment counts for less than a reference page. ")
                 append("Do not ask which one to read.\n")
                 results.forEachIndexed { index, result ->
                     append("\n[").append(index + 1).append("] ").append(result.title).append('\n')

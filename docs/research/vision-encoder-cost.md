@@ -140,3 +140,92 @@ work from tonight's.
 Two measurements to redo before any of that: the 3B and Qwen3-VL-2B on this phone charged
 and idle, because tonight's clocks were the game's, and the same two on the Snapdragon,
 where the encode was 12.6 s before any of this.
+
+## The rerun: idle phone, charging, performance mode, fan (2026-09-06, 23:25 to 00:43)
+
+Everything above was measured beside a game. This is the same battery of tests with the
+phone doing nothing else, on the charger, in HyperOS performance mode, screen off, a fan on
+the glass. The clocks under the vision encoder did not change: A720s at 2.0 GHz, the big
+cores at 1.7 to 1.9 GHz, in 68 of 99 samples, identical to the game run. During the text
+benchmarks, which load fewer cores, the big cores reached 2.5 GHz. So under the encoder the
+chip is at its own all-core power budget, not a battery or heat cap, and the game had cost
+about a quarter on top. The die ran 72 to 81 C under the encoder and touched 86 to 87 C twice,
+above the framework's 85 C severe line, while the framework's thermal status stayed 0.
+
+**Vision, LFM2.5-VL-3B, ladder and app path.** All five tests green.
+
+| picture | idle phone | beside the game |
+| --- | ---: | ---: |
+| form, fast stop | 15.4 s | 20.2 s |
+| form, balanced | 38.9 s | 45.8 s |
+| form, tiles (3/4) | 135 s | 196 s |
+| receipt, balanced (4/4) | 44.9 s | 67.2 s |
+| screenshot, balanced (4/4) | 44.1 s | 64.2 s |
+| page, balanced (6/7) | 44.9 s | 57.9 s |
+| page, tiles (7/7) | 139 s | 192 s |
+| app attach, first turn | 46.1 s (656 tokens) | 43.8 s |
+| app attach, follow-up | 255 ms (22 tokens, 711 cached) | 281 ms |
+
+Encode is 36 to 40 s of each balanced turn. Batch threads: 8 gives 36 s, 6 gives 41 s, 4
+gives 60 s. The ranking and the reading are unchanged from the capped run.
+
+**The other models, clean.** Prefill of the whole first turn, encode alone, facts read.
+
+| model | form | receipt | screenshot | page | encode per picture |
+| --- | --- | --- | --- | --- | ---: |
+| LFM2.5-VL-3B | 41.4 s, 2/4 | 68.0 s, 4/4 | 45.0 s, 4/4 | 43.0 s, 6/7 | 36 to 40 s (one 60 s) |
+| Qwen3-VL-2B | 37.4 s, 2/4 | 37.4 s, 4/4 | 37.0 s, 4/4 | 36.4 s, 6/7 | 30 to 31 s |
+| SmolVLM2-2.2B | 49.9 s, 1/4 | 39.5 s, 2/4 | 37.5 s, 3/4 | 45.9 s, 0/7 | 6 tiles of 81 tokens, 8 to 10 s each |
+| LFM2.5-VL-450M | 10.0 s, 1/4 | 10.5 s, 1/4 | 10.7 s, 4/4 | 11.1 s, 1/7 | 9.4 to 10.4 s |
+| Gemma 3 4B | 136 s, 1/4 | 169 s, 4/4 | 229 s, 3/4 | 167 s, 6/7 | 130 to 210 s, swapping 2.4 GB |
+
+Two things sharpen with the game gone. Qwen3-VL-2B is now the faster of the two equal
+readers, 30 s of encode against 36 to 40, and its first turns are flat at 37 s where the 3B
+swings from 41 to 68. And Gemma 3 4B swaps on this 12 GB phone even alone: the process sat at
+4.5 GB and HyperOS pushed 2.4 GB of it out, so its fixed 256-token encode took two to three
+and a half minutes. It reads well (6/7 on the page) and is unusable here.
+
+**Text, LFM2.5-1.2B.** Thread count benchmark: prefill 239 / 256 / 266 tok/s at 5 / 6 / 8
+threads; decode 45 / 45 / 38 tok/s. The speed probe on the Q4_K_M build agrees, 185 tok/s
+prefill and 21 tok/s decode on a 21-token prompt. The context-length sweep, cut after 28
+minutes with the rows it had:
+
+| context filled | prompt tokens | prefill | decode |
+| ---: | ---: | ---: | ---: |
+| 0 | 35 | 0.1 s | 49.8 tok/s |
+| 1,024 | 1,480 | 6.5 s | 43.5 tok/s |
+| 4,096 | 5,832 | 59.8 s | 29.8 tok/s |
+| 8,192 | 11,629 | 210 s | 23.3 tok/s |
+| 16,384 | 23,240 | 789 s | 14.4 tok/s |
+
+Prefill falls from 226 tok/s at a thousand tokens to 29 at twenty-three thousand: the
+attention cost, and the reason the compactor exists. After 180 s of rest the empty-context
+decode came back from 40 to 52 tok/s, which is the heat the die sheds when it can.
+
+**Stability.** Sustained use, 20 turns on the 3B: green, RSS flat at 2,030 MB from first
+turn to last, no swap growth. The 20-turn app conversation with tools: **fails, as it did
+before**, on the defect it was written to keep failing on: from turn 16 the tool history
+moves under the cache, the prompt diverges 34 to 64 tokens before its end, the hybrid
+cannot roll back, and the follow-up re-reads 1,737 to 2,743 tokens instead of under 200.
+Tonight's numbers are inside the range the test's own comment records (1,393 to 1,931
+before), so nothing from the last two days moved it, in either direction. Memory across
+those 20 turns: 1,067 to 1,101 MB, flat. The thermal-signal test: status 0 throughout,
+headroom 0.42, forecast NaN.
+
+## What the phone will tell you about its temperature
+
+| layer | count | readable by |
+| --- | ---: | --- |
+| kernel thermal zones (per cluster, per core, PMIC, modem) | 77 | root only; SELinux refuses the adb shell |
+| framework thermal service | 4 distinct sensors under 8 names | adb (`dumpsys thermalservice`): the die (reported as CPU, GPU, NPU, TPU and SOC, one value), the battery cell (reported as BATTERY and SKIN, one value), the radio power amplifier, and the charger IC via power_supply |
+| an app | 2 signals | the battery cell in degrees, and `PowerManager.getThermalHeadroom` |
+
+The die is the one that matters and only adb can read it; the logger for these runs now
+records it beside the clocks every 30 s. The app cannot. Its one chip-side signal, thermal
+headroom, was tried tonight as the replacement for the battery line: it read 0.42 on this
+phone while the die was 4 to 7 C under the 85 C line and had crossed it twice, so on
+MediaTek it is a vendor number that does not follow the silicon. Shown as "chip at 42
+percent" it would have been wrong in the reassuring direction, and the change was reverted
+before it shipped. The status line keeps the battery in degrees, which is at least a true
+reading of something, and the app's thermal policy keeps the framework status, which is the
+signal the scheduler honours even where it lags the die.

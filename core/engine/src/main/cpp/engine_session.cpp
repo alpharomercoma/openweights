@@ -934,8 +934,8 @@ void Session::reset() {
     cached_.clear();
     media_spans_.clear();
     n_past_ = 0;
+    media_cell_gap_ = 0;
     cached_covers_context_ = true;
-    media_spans_.clear();
 }
 
 Session::MediaSupport Session::media_support() const {
@@ -1162,9 +1162,11 @@ int32_t Session::ingest_media_prompt(
     const std::string & prompt,
     const std::vector<std::string> & media_paths,
     size_t & reused,
+    size_t & n_tokens,
     std::string & error) {
     auto * ctx = static_cast<mtmd_context *>(mtmd_);
     reused = 0;
+    n_tokens = 0;
 
     std::vector<mtmd_bitmap *> bitmaps;
     for (const auto & path : media_paths) {
@@ -1406,6 +1408,9 @@ int32_t Session::ingest_media_prompt(
     }
 
     mtmd_input_chunks_free(chunks);
+    // Every chunk advanced `position` by its token count, so this is the cells the prompt
+    // holds, whatever positions the helper gave them.
+    n_tokens = position;
 
     if (evaluated != 0) {
         error = cancelled_.load(std::memory_order_relaxed)
@@ -2450,7 +2455,8 @@ StopReason Session::generate(
         // than by tokens; a turn that extends the last one reuses everything up to its own
         // new words, picture included. See ingest_media_prompt.
         size_t reused = 0;
-        const int32_t evaluated = ingest_media_prompt(prompt, media_paths, reused, error);
+        size_t n_cells = 0;
+        const int32_t evaluated = ingest_media_prompt(prompt, media_paths, reused, n_cells, error);
         if (evaluated < 0) {
             // The same reckoning the text path does, and for the same reason. Media prefill
             // empties the cache before it evaluates anything, so a failure part way through
@@ -2468,9 +2474,13 @@ StopReason Session::generate(
         // Assigned before the length check: the cache is already full of these positions,
         // and reporting zero would show an empty context meter over a full context.
         n_past_ = evaluated;
-        stats.prompt_tokens = evaluated - static_cast<int32_t>(reused);
+        // Cells, not positions: a Qwen-VL picture of 500 tokens advances the position by
+        // its grid height, and reporting that as the prompt showed 63 tokens for a picture
+        // that filled 500 cells of the context.
+        media_cell_gap_ = static_cast<int32_t>(n_cells) - evaluated;
+        stats.prompt_tokens = static_cast<int32_t>(n_cells) - static_cast<int32_t>(reused);
         stats.cached_tokens = static_cast<int32_t>(reused);
-        stats.context_used  = evaluated;
+        stats.context_used  = static_cast<int32_t>(n_cells);
         stats.context_size  = n_ctx;
         if (evaluated >= n_ctx) {
             error = "the conversation and its attachments are longer than the context window";
@@ -2518,6 +2528,7 @@ StopReason Session::generate(
                 : StopReason::ERROR;
         }
 
+        media_cell_gap_ = 0;
         stats.prompt_tokens = static_cast<int32_t>(prompt_tokens.size() - reusable);
         stats.cached_tokens = static_cast<int32_t>(reusable);
         cached_ = prompt_tokens;
@@ -2903,7 +2914,7 @@ StopReason Session::generate(
 
     const int64_t decode_end = now_ms();
     stats.decode_ms = first_token_ms > 0 ? decode_end - first_token_ms : 0;
-    stats.context_used = n_past_;
+    stats.context_used = n_past_ + media_cell_gap_;
     stats.thinking_prefilled = thinking_prefilled_;
     log_memory_state("after turn");
     return reason;

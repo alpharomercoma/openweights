@@ -488,13 +488,20 @@ private:
     /**
      * Encodes a prompt containing media and evaluates it into the KV cache.
      *
-     * Returns the new position, or -1 on failure.
+     * Returns the new position, or -1 on failure. `n_tokens` receives the number of KV
+     * cells the prompt occupies, which is more than the position for models whose picture
+     * tokens share positions along a grid (Qwen-VL's M-RoPE): the context meter and the
+     * prompt count are cells, the decode position is not.
      */
     int32_t ingest_media_prompt(
         const std::string & prompt,
         const std::vector<std::string> & media_paths,
         size_t & reused,
+        size_t & n_tokens,
         std::string & error);
+
+    /** KV cells beyond n_past_ that the last media prompt occupies; zero on text turns. */
+    int32_t media_cell_gap_ = 0;
 
 
     llama_model   * model_ = nullptr;

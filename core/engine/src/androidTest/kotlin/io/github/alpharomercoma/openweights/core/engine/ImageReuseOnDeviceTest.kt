@@ -200,7 +200,7 @@ class ImageReuseOnDeviceTest {
 
     private fun String.oneLine(): String = replace('\n', ' ').take(LOG_CHARS)
 
-    private companion object {
+    internal companion object {
         const val TAG = "OpenWeightsImageReuse"
         const val CONTEXT = 8192
         const val BUDGET = 120

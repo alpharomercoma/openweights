@@ -347,3 +347,62 @@ Balanced misread the reference prefix, "HRL" as "IHRI", and got everything else.
 all seven at four times the tokens. That is the stop's whole case: a page of small print,
 one more fact, several times the wait. The handwritten form, where tiles read no better,
 is not that case, and the setting's footnote says which is which.
+
+### On the phone the report came from: Poco X8 Pro Max, MediaTek MT6991 (2026-09-05, night)
+
+Both device test classes on the phone whose screenshot started this, over wireless
+debugging, with the same model files the app had already downloaded. All five tests pass.
+`ImageAttachOnDeviceTest` goes through the app's own door: the attachment store shrinks
+the 2.6-megapixel photograph of the form, `TurnRunner` sends it as the transcript would,
+and the follow-up goes through the same runner.
+
+| what | prompt tokens | cached | prefill | of which encode |
+| --- | ---: | ---: | ---: | ---: |
+| app, first turn (form, balanced) | 656 | 0 | 43.8 s | 35.4 s |
+| app, follow-up | 22 | 711 | 0.28 s | none |
+| engine, first turn (form, balanced) | 519 | 0 | 42.3 s | 36.8 s |
+| engine, follow-up | 22 | 582 | 0.26 s | none |
+
+The follow-up is one percent of the first turn: the reply's tokens are spliced back in
+and the cache extends past them. The store's three stops land at 261,330, 523,110 and
+2,618,994 pixels, each under its budget, which the emulator had shown was not true an hour
+earlier.
+
+The ladder, same pictures as the Snapdragon run:
+
+| picture | tokens | prefill | read |
+| --- | ---: | ---: | --- |
+| form-fast | 309 | 20.2 s | 2/4 |
+| form-balanced | 519 | 45.8 s | 2/4 |
+| form-edge1024 (old default) | 519 | 49.1 s | 2/4 |
+| form-tiles | 2062 | 195.7 s | 3/4 |
+| receipt-balanced | 543 | 67.2 s | 4/4 |
+| receipt-edge1024 | 481 | 54.7 s | 4/4 |
+| probe-balanced | 560 | 64.2 s | 4/4 |
+| probe-edge1024 | 498 | 47.8 s | 4/4 |
+| page-fast | 297 | 20.1 s | 2/7 |
+| page-balanced | 544 | 57.9 s | 6/7 |
+| page-tiles | 2087 | 191.5 s | **7/7** |
+
+The tiles verdict from the host holds on the phone: the page of small print is the one
+picture where tiles read something balanced did not, at four times the wait. The form
+gained one field under tiles this time (3/4) at 196 s, which nobody would take.
+
+**What the emulator run found first, and this run confirmed fixed.** On the emulator both
+app tests failed: the store wrote the photograph at its full 2,622,246 pixels at every stop,
+and the send tiled it at 2,199 tokens. The store asked the content resolver for the file's
+type, and for a `file:` URI, or any provider that answers with a plain octet stream, it got
+nothing, filed the picture as a document, and copied it verbatim. That is the 214 s path
+through a different door. The store now sniffs the header with the bitmap decoder when no
+type is declared, and floors the resized edges instead of rounding them, since rounding left
+the fast stop 214 pixels over its budget.
+
+**What this phone says that the Snapdragon did not.** The encoder is slow here: 480 tokens
+take 35 to 43 s on the MT6991 against 12.6 s on the 8 Gen 3, and it drifts upward over the
+run (the last balanced encode was 59 s, with the battery at 26 percent and the phone warm
+from twenty minutes of it). Prefill without the picture is quick; the vision tower is over
+80 percent of every first turn. So on this phone the balanced stop turns the reported
+214 s into about 44 s, and the follow-ups into a quarter of a second, but a first look at a
+picture is still not fast. The next thing to measure is the vision tower itself on
+MediaTek: thread count and the i8mm and dotprod paths in the clip graph, and whether the
+GPU backend can take the encode. That is a separate investigation and is not started here.

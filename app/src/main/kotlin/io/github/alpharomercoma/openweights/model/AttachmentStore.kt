@@ -42,7 +42,6 @@ import java.io.Reader
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -108,8 +107,7 @@ class AttachmentStore @Inject constructor(
      * picker result whose permission was already revoked.
      */
     suspend fun store(uri: Uri): AttachmentResult = withContext(Dispatchers.IO) {
-        val mediaType = runCatching { context.contentResolver.getType(uri) }
-            .getOrNull() ?: FALLBACK_MEDIA_TYPE
+        val mediaType = declaredMediaType(uri) ?: sniffedImageType(uri) ?: FALLBACK_MEDIA_TYPE
         val kind = MediaKind.of(mediaType)
         val displayName = displayName(uri)
 
@@ -120,6 +118,28 @@ class AttachmentStore @Inject constructor(
                 storeOneFile(uri, mediaType, kind, displayName)
             }
     }
+
+    private fun declaredMediaType(uri: Uri): String? = runCatching {
+        context.contentResolver.getType(uri)?.takeIf { it != FALLBACK_MEDIA_TYPE }
+    }.getOrNull()
+
+    /**
+     * What the bytes say a file is, when nothing else does.
+     *
+     * A provider that hands over a picture with no type, or as a plain octet stream, is
+     * still handing over a picture, and a picture that is not recognised as one is copied
+     * verbatim: full size, past the tiling line, ten encodes instead of one. Found on the
+     * emulator run of 2026-09-05, where a `file:` URI for a 2.6-megapixel photograph went
+     * through at 2,622,246 pixels and cost 2,199 tokens. The decoder reads only the header
+     * here, and reports the type it found, so a JPEG named `.dat` is a JPEG.
+     */
+    private fun sniffedImageType(uri: Uri): String? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.bounded(MAX_COPIED_ATTACHMENT_BYTES)?.use {
+            BitmapFactory.decodeStream(it, null, bounds)
+        }
+        bounds.outMimeType?.takeIf { bounds.outWidth > 0 && bounds.outHeight > 0 }
+    }.getOrNull()
 
     /**
      * What can be refused before a single byte is copied, or null to go ahead.
@@ -420,10 +440,12 @@ class AttachmentStore @Inject constructor(
             ?: return false
 
         val scale = sqrt(pixels.toDouble() / (decoded.width.toLong() * decoded.height)).toFloat()
+        // Floored, not rounded: rounding both edges up can leave the area a few hundred
+        // pixels over the budget, and "at most" is the promise the setting makes.
         val resized = if (scale < 1f) {
             decoded.scale(
-                (decoded.width * scale).roundToInt().coerceAtLeast(1),
-                (decoded.height * scale).roundToInt().coerceAtLeast(1),
+                (decoded.width * scale).toInt().coerceAtLeast(1),
+                (decoded.height * scale).toInt().coerceAtLeast(1),
                 true,
             )
         } else {

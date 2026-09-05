@@ -78,7 +78,7 @@ class MemoryRecallBenchmark {
     }
 
     @Test
-    fun everyModelIsMeasuredOnBothWaysOfRememberingSomebody() = runBlocking {
+    fun everyModelIsMeasuredOnBothWaysOfRememberingSomebody(): Unit = runBlocking {
         val models = MODELS.filter { it.isFile }
         assumeTrue("no model under /data/local/tmp/openweights", models.isNotEmpty())
 

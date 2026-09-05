@@ -72,7 +72,7 @@ class BatchSizeBenchmark {
     }
 
     @Test
-    fun everyBatchPairIsMeasuredForPrefillSpeedAndForWhatItCostsInMemory() = runBlocking {
+    fun everyBatchPairIsMeasuredForPrefillSpeedAndForWhatItCostsInMemory(): Unit = runBlocking {
         val model = MODELS.firstOrNull { it.isFile }
         assumeTrue("no model under /data/local/tmp/openweights", model != null)
         requireNotNull(model)
@@ -94,6 +94,12 @@ class BatchSizeBenchmark {
                     ),
                 )
 
+                // Without this every arm after the first reports the first one's peak:
+                // `VmHWM` is a high water mark for the life of the process, and all ten
+                // arms share one. Writing 5 to `clear_refs` resets it to the current RSS,
+                // so what each arm reports is the weights it has just loaded plus whatever
+                // prefill actually asked for on top of them.
+                resetPeak()
                 val before = residentKb()
                 val completed = fresh.chat(
                     messages = listOf(ChatMessage.text(ChatRole.USER, question)),
@@ -139,6 +145,17 @@ class BatchSizeBenchmark {
             while (length < tokens * CHARS_PER_TOKEN) append(sentence)
             append("\n\nReply with the single word: ready.")
         }
+    }
+
+    /**
+     * Forgets the peak this process has reached so far.
+     *
+     * Writing 5 to `clear_refs` resets `VmHWM` to the current resident set. Ten arms share
+     * one process, so without this every arm after the first would report the first one's
+     * high water mark and the memory column would be a staircase rather than a measurement.
+     */
+    private fun resetPeak() {
+        runCatching { File("/proc/self/clear_refs").writeText("5\n") }
     }
 
     /**

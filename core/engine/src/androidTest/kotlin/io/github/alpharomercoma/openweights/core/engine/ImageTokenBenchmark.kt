@@ -77,7 +77,7 @@ class ImageTokenBenchmark {
      * also the sweep in which the budget does anything at all: see the other test.
      */
     @Test
-    fun atTheSizeTheAppSendsEveryBudgetIsMeasured() = runBlocking {
+    fun atTheSizeTheAppSendsEveryBudgetIsMeasured(): Unit = runBlocking {
         sweep(APP_SIZED_IMAGE)
     }
 
@@ -90,7 +90,7 @@ class ImageTokenBenchmark {
      * full-resolution photograph the slider moves the thumbnail and nothing else.
      */
     @Test
-    fun atFullResolutionTheBudgetIsMeasuredToDoAlmostNothing() = runBlocking {
+    fun atFullResolutionTheBudgetIsMeasuredToDoAlmostNothing(): Unit = runBlocking {
         sweep(FULL_SIZE_IMAGE)
     }
 
@@ -103,7 +103,7 @@ class ImageTokenBenchmark {
      * moving is the picture.
      */
     @Test
-    fun everyResolutionIsMeasuredForSpeedAndForWhatItCanStillRead() = runBlocking {
+    fun everyResolutionIsMeasuredForSpeedAndForWhatItCanStillRead(): Unit = runBlocking {
         assumeTrue("no vision model at ${MODEL.path}", MODEL.isFile)
         assumeTrue("no projector at ${PROJECTOR.path}", PROJECTOR.isFile)
 

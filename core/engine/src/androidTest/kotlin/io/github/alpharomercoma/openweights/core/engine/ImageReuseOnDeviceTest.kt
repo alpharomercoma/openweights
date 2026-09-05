@@ -50,9 +50,9 @@ import java.io.File
  *    many more. Logged as a ladder with what each one read.
  *
  * Fixtures, pushed to `/data/local/tmp/openweights/`: `vl.gguf` (LFM2.5-VL-3B-Q4_0),
- * `mmproj.gguf` (its Q8_0 projector), and the pictures under `img/` made by shrinking the same three
- * pictures to each stop's pixels and to the old edge rule. The pictures are a handwritten
- * form photographed at 3:4, a receipt, and the probe screenshot.
+ * `mmproj.gguf` (its Q8_0 projector), and the pictures under `img/` made by shrinking the
+ * same three pictures to each stop's pixels and to the old edge rule. The pictures are a
+ * handwritten form photographed at 3:4, a receipt, and the probe screenshot.
  */
 @RunWith(AndroidJUnit4::class)
 class ImageReuseOnDeviceTest {
@@ -216,8 +216,8 @@ class ImageReuseOnDeviceTest {
                 "change?"
         const val PROBE_QUESTION =
             "Read this screenshot and answer with four short lines: the heading, the number in " +
-                "the green circle, the percentage change on the Flanges row, and the verification " +
-                "code at the bottom."
+                "the green circle, the percentage change on the Flanges row, and the " +
+                "verification code at the bottom."
 
         val FORM_FACTS = listOf(
             listOf("xynil"),

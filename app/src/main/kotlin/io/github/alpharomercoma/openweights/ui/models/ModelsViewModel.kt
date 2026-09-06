@@ -72,8 +72,23 @@ data class LocalModel(
     /** What this model occupies in total, projector included. */
     val sizeBytes: Long get() = file.length() + (projector?.length() ?: 0)
 
-    /** True when this model can read attachments on this device. */
-    val isMultimodal: Boolean get() = projector != null
+    /**
+     * True when this model can read attachments on this device.
+     *
+     * A GGUF reads pictures through a projector downloaded beside it; a compiled export
+     * carries its encoder inside the one file, so its name is the only sign before load.
+     */
+    val isMultimodal: Boolean get() = projector != null || (isCompiled && namedLikeVlm)
+
+    /**
+     * Matched with every separator removed, the way the prompt templates match families:
+     * Software Mansion's own names are `lfm_2_5_vl_1_6b...`, which `-VL` never finds.
+     */
+    private val namedLikeVlm: Boolean
+        get() {
+            val name = file.name.lowercase().filter { it.isLetterOrDigit() }
+            return VLM_TOKENS.any { it in name }
+        }
 
     /**
      * True for weights compiled ahead of time, which only the ExecuTorch engine can run.
@@ -94,8 +109,7 @@ data class LocalModel(
      * in the model list and picker so users know why the attachment button stays hidden.
      */
     val looksLikeVlm: Boolean
-        get() = projector == null &&
-            VLM_PATTERNS.any { pattern -> file.name.contains(pattern, ignoreCase = true) }
+        get() = !isCompiled && projector == null && namedLikeVlm
 
     private companion object {
         /** Substrings common to vision-language model filenames across every major family. */
@@ -104,6 +118,10 @@ data class LocalModel(
             "Pixtral", "pixtral", "InternVL", "interVL", "QwenVL", "qwenvl", "Gemma3n",
             "gemma3n", "phi-4-mm", "Phi-4-mm",
         )
+
+        /** The same families with separators removed, for names spelled `lfm_2_5_vl`. */
+        val VLM_TOKENS =
+            listOf("vl", "vision", "llava", "pixtral", "internvl", "qwenvl", "gemma3n", "phi4mm")
     }
 }
 

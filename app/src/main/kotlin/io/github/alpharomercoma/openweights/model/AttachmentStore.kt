@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.model
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -31,6 +32,7 @@ import io.github.alpharomercoma.openweights.core.common.model.MediaKind
 import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.data.ModelPreferencesRepository
+import io.github.alpharomercoma.openweights.core.engine.upright
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -434,10 +436,19 @@ class AttachmentStore @Inject constructor(
         val options = BitmapFactory.Options().apply {
             inSampleSize = Integer.highestOneBit((1.0 / shrink).toInt().coerceAtLeast(1))
         }
-        val decoded = context.contentResolver.openInputStream(uri)
+        val raw = context.contentResolver.openInputStream(uri)
             ?.bounded(MAX_COPIED_ATTACHMENT_BYTES)
             ?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: return false
+        // Re-encoding drops the EXIF tag that said which way up the photo is, so the
+        // pixels are turned before it goes: a portrait photo from the camera is stored as
+        // landscape pixels plus that tag, and both engines read the pixels.
+        val decoded = raw.upright(
+            context.contentResolver.openInputStream(uri)
+                ?.bounded(MAX_COPIED_ATTACHMENT_BYTES)
+                ?.use { stream -> runCatching { ExifInterface(stream) }.getOrNull() },
+        )
+        if (decoded !== raw) raw.recycle()
 
         val scale = sqrt(pixels.toDouble() / (decoded.width.toLong() * decoded.height)).toFloat()
         // Floored, not rounded: rounding both edges up can leave the area a few hundred

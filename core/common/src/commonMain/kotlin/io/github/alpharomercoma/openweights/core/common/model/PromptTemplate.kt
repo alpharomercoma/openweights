@@ -65,6 +65,18 @@ interface PromptTemplate {
     val supportsThinking: Boolean get() = false
 
     /**
+     * The square a compiled vision export of this family takes a picture as, or null
+     * when the family has no vision export this app knows how to feed.
+     *
+     * A number here does not make a file multimodal; the file says that itself with a
+     * `vision_encoder` method. It says how to letterbox a picture for one that does.
+     */
+    val visionInputSide: Int? get() = null
+
+    /** The positions one picture takes in the cache on such an export; zero without one. */
+    val visualTokensPerPicture: Int get() = 0
+
+    /**
      * @param thinking whether the model may reason before answering. Families that support
      * it spell the switch differently, and a family that does not simply ignores it.
      */
@@ -96,6 +108,9 @@ object PromptTemplates {
         // family token can claim them: a vision or coder export is not a text-chat
         // model wearing a longer name (codex QA). Qwen3.5 normalises onto "qwen3" the
         // same way, so it sits in the same refusal.
+        // LFM2.5-VL before the exclusions: it is the one vision family with a compiled
+        // export this app can feed, and "vl" would otherwise refuse it with the rest.
+        if ("lfm25vl" in name) return Lfm25Template
         if (EXCLUDED.any { it in name }) return null
         return when {
             "qwen3" in name -> Qwen3Template
@@ -122,6 +137,7 @@ object PromptTemplates {
         "Phi-4-mini",
         "Gemma 3",
         "LFM 2.5",
+        "LFM2.5-VL",
     )
 }
 
@@ -266,6 +282,10 @@ private object Lfm25Template : PromptTemplate {
     // its own. Declaring support here put a toggle on screen that changed nothing
     // (codex QA), and a control that does nothing is worse than no control.
     override val supportsThinking: Boolean = false
+
+    /** LFM2.5-VL's tile: 512 px, 256 visual tokens after the 2x downsample. */
+    override val visionInputSide: Int = 512
+    override val visualTokensPerPicture: Int = 256
 
     override fun render(
         messages: List<ChatMessage>,

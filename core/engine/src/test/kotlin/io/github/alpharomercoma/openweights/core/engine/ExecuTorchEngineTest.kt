@@ -19,6 +19,7 @@ package io.github.alpharomercoma.openweights.core.engine
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
@@ -185,6 +186,161 @@ class ExecuTorchEngineTest {
         assertThat(completed.stats.contextSize).isEqualTo(2048)
         assertThat(completed.stats.contextUsed).isEqualTo(43)
         assertThat(engine.loadedModel?.contextUsed).isEqualTo(43)
+    }
+
+    @Test
+    fun `a picture is fed between the text around it, in the export's brackets`() = runTest {
+        // What Software Mansion's processor writes and their runner feeds: the text up to
+        // the picture ending in <|image_start|>, the picture as embeddings, and the rest of
+        // the prompt opening with <|image_end|>. Order is everything to the cache.
+        bridge.hasVision = true
+        bridge.reply = "A red square on blue.<|im_end|>"
+        val pixelsRead = mutableListOf<String>()
+        val engine =
+            ExecuTorchEngine(bridge, reader = { path, side ->
+                pixelsRead += "$path@$side"
+                FloatArray(
+                    3 * side * side,
+                )
+            })
+        engine.load(installed(VISION_MODEL), PARAMS)
+        assertThat(bridge.loadedMultimodal).isTrue()
+        assertThat(engine.loadedModel?.mediaSupport?.vision).isTrue()
+
+        val message = ChatMessage(
+            ChatRole.USER,
+            listOf(
+                MessagePart.Text("Describe this."),
+                MessagePart.File("/pictures/square.png", "image/png"),
+            ),
+        )
+        val events = engine.chat(listOf(message)).toList()
+
+        assertThat(pixelsRead).containsExactly("/pictures/square.png@512")
+        assertThat(bridge.pictures).containsExactly(Triple(512, 512, 3))
+        assertThat(bridge.fed).hasSize(2)
+        // Exactly what the processor writes: the text, then the opening bracket, with no
+        // whitespace added on either side of the picture (codex QA: a newline there is a
+        // token the model was never shown at that spot, and it moves every later position).
+        assertThat(bridge.fed[0]).endsWith("<|im_start|>user\nDescribe this.<|image_start|>")
+        assertThat(bridge.fed[0]).doesNotContain("\u0000")
+        assertThat(bridge.fed[1]).isEqualTo("<picture 512 x 512>")
+        assertThat(bridge.lastPrompt).isEqualTo("<|image_end|><|im_end|>\n<|im_start|>assistant\n")
+        val completed = events.filterIsInstance<GenerationEvent.Completed>().single()
+        assertThat(completed.content).isEqualTo("A red square on blue.")
+    }
+
+    @Test
+    fun `a turn with a picture never extends the cache and is never extended`() = runTest {
+        bridge.hasVision = true
+        bridge.reply = "Hello.<|im_end|>"
+        val engine = ExecuTorchEngine(bridge, reader = { _, side -> FloatArray(3 * side * side) })
+        engine.load(installed(VISION_MODEL), PARAMS)
+
+        engine.chat(listOf(user("Hi"))).toList()
+        val withPicture = listOf(
+            user("Hi"),
+            assistant("Hello."),
+            ChatMessage(
+                ChatRole.USER,
+                listOf(MessagePart.File("/p.png", "image/png"), MessagePart.Text("What is it?")),
+            ),
+        )
+        engine.chat(withPicture).toList()
+        engine.chat(withPicture + assistant("Hello.") + user("And now?")).toList()
+
+        // Reset before the picture turn, and again after it: embeddings in the cache are
+        // not something the text record can promise to extend.
+        assertThat(bridge.contextResets).isEqualTo(3)
+        assertThat(bridge.pictures).hasSize(2)
+    }
+
+    @Test
+    fun `a file that is not a picture is left out rather than counted`() = runTest {
+        // A PDF beside a PNG used to put two markers in the text for one picture and trip
+        // an invariant check (codex QA). The runtime has no way in for the PDF.
+        bridge.hasVision = true
+        bridge.reply = "One picture.<|im_end|>"
+        val engine = ExecuTorchEngine(bridge, reader = { _, side -> FloatArray(3 * side * side) })
+        engine.load(installed(VISION_MODEL), PARAMS)
+
+        val message = ChatMessage(
+            ChatRole.USER,
+            listOf(
+                MessagePart.File("/docs/report.pdf", "application/pdf"),
+                MessagePart.File("/pictures/a.png", "image/png"),
+                MessagePart.Text("What is it? \u0000picture\u0000"),
+            ),
+        )
+        val events = engine.chat(listOf(message)).toList()
+
+        assertThat(bridge.pictures).hasSize(1)
+        assertThat(bridge.lastPrompt).startsWith("<|image_end|>What is it? <|im_end|>")
+        assertThat(events.filterIsInstance<GenerationEvent.Completed>().single().content)
+            .isEqualTo("One picture.")
+    }
+
+    @Test
+    fun `too many pictures for the window are refused before the first is read`() = runTest {
+        bridge.hasVision = true
+        bridge.exportedContextLength = 2048
+        val engine = ExecuTorchEngine(bridge, reader = { _, side -> FloatArray(3 * side * side) })
+        engine.load(installed(VISION_MODEL), PARAMS)
+
+        val eight = List(8) { MessagePart.File("/p/$it.png", "image/png") }
+        val failure = runCatching {
+            engine.chat(
+                listOf(ChatMessage(ChatRole.USER, eight + MessagePart.Text("Compare."))),
+            ).toList()
+        }.exceptionOrNull()
+
+        assertThat(failure).isInstanceOf(ContextWindowExceededException::class.java)
+        assertThat(bridge.pictures).isEmpty()
+        // Nothing half-fed is left behind for the next turn to extend.
+        assertThat(engine.loadedModel?.contextUsed).isEqualTo(0)
+    }
+
+    @Test
+    fun `a stop between pictures ends the turn as a cancellation`() = runTest {
+        bridge.hasVision = true
+        bridge.reply = "never"
+        lateinit var engine: ExecuTorchEngine
+        engine =
+            ExecuTorchEngine(bridge, reader = { _, side ->
+                engine.cancel()
+                FloatArray(
+                    3 * side * side,
+                )
+            })
+        engine.load(installed(VISION_MODEL), PARAMS)
+
+        val two =
+            listOf(
+                MessagePart.File("/p/a.png", "image/png"),
+                MessagePart.File("/p/b.png", "image/png"),
+            )
+        val events = engine.chat(
+            listOf(
+                ChatMessage(
+                    ChatRole.USER,
+                    two + MessagePart.Text("Compare."),
+                ),
+            ),
+        ).toList()
+
+        val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+        assertThat(done.reason).isEqualTo(StopReason.CANCELLED)
+        assertThat(bridge.pictures).hasSize(1)
+        assertThat(bridge.prompts).isEmpty()
+    }
+
+    @Test
+    fun `a vision export of a family with no square opens as text`() = runTest {
+        bridge.hasVision = true
+        engine.load(installed(MODEL), PARAMS)
+
+        assertThat(bridge.loadedMultimodal).isFalse()
+        assertThat(engine.loadedModel?.mediaSupport?.vision).isFalse()
     }
 
     @Test
@@ -593,6 +749,8 @@ class ExecuTorchEngineTest {
 
     private companion object {
         const val MODEL = "Qwen3-1.7B.pte"
+        const val VISION_MODEL =
+            "react-native-executorch-lfm2.5-VL-1.6B-lfm2_5_vl_1_6b_8da4w_xnnpack.pte"
 
         /** Long enough per fragment for a warm to be waiting while the turn still runs. */
         const val SLOW_FRAGMENT_MS = 20L

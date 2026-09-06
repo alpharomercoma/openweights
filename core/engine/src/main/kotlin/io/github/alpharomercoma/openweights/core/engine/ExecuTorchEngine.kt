@@ -20,6 +20,8 @@ import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
+import io.github.alpharomercoma.openweights.core.common.model.MediaKind
+import io.github.alpharomercoma.openweights.core.common.model.MessagePart
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.PromptTemplate
 import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
@@ -63,6 +65,8 @@ import java.io.File
  */
 class ExecuTorchEngine(
     private val bridge: ExecuTorchBridge,
+    /** How a picture on disk becomes the encoder's square; swapped out in tests. */
+    private val reader: PictureReader = AndroidPictureReader(),
     /**
      * The sampling temperature the model is opened with. A constructor parameter rather
      * than a [SamplerParams] field because ExecuTorch fixes it when the runner is built,
@@ -84,6 +88,9 @@ class ExecuTorchEngine(
      * runtime holds something it does not and skip feeding it.
      */
     private var fedText: String = ""
+
+    /** Whether the open file reads pictures, which is the file's to say and the template's to feed. */
+    private var multimodal: Boolean = false
 
     /**
      * How many tokens the runtime is holding, counted rather than guessed.
@@ -141,17 +148,26 @@ class ExecuTorchEngine(
         // The window is the file's, not the preference's. A preference above it is clamped
         // by the runtime anyway, and reporting the preference upstream made every budget
         // in the app wrong by the difference.
-        val exported = bridge.exportedContextLength(modelFile.absolutePath)
+        val facts = bridge.probe(modelFile.absolutePath)
+        val exported = facts.contextLength
         contextSize = when {
             exported == null -> params.contextLength
             params.contextLength <= 0 -> exported
             else -> minOf(params.contextLength, exported)
         }
+        // Pictures need both halves: an encoder in the file and a template that knows
+        // the square it takes. A vision export of a family this app cannot feed opens as
+        // text, which is honest and still useful.
+        multimodal = facts.hasVision && rendering.visionInputSide != null
         if (!bridge.load(
                 modelFile.absolutePath,
                 tokenizer.absolutePath,
-                temperature,
+                // The publisher's own setting for the vision export: sampled at the text
+                // default it turns generic and repetitive (Software Mansion's model notes,
+                // and their runner's defaults for LFM2.5-VL).
+                if (multimodal) VISION_TEMPERATURE else temperature,
                 contextSize,
+                multimodal,
             )
         ) {
             refuse("ExecuTorch could not open ${modelFile.name}")
@@ -170,6 +186,7 @@ class ExecuTorchEngine(
             layerCount = 0,
             contextUsed = 0,
             offloadedTo = "ExecuTorch",
+            mediaSupport = MediaSupport(vision = multimodal),
             // The template is the authority: a family whose format cannot express tools
             // must not be offered them, or the agent loop waits for calls that cannot come.
             supportsThinking = rendering.supportsThinking,
@@ -210,7 +227,14 @@ class ExecuTorchEngine(
     ) {
         val rendering = template ?: throw LlamaException("No model loaded")
         cancelRequested = false
-        val prompt = rendering.render(messages, tools, params.thinking)
+        val pictures = if (multimodal) messages.pictures() else emptyList()
+        val prompt = rendering.render(
+            messages.markingPictures(pictures.isNotEmpty()),
+            tools,
+            params.thinking,
+        )
+        val started = System.currentTimeMillis()
+        val (fresh, reused) = openTurn(prompt, pictures, rendering, started) ?: return
 
         // What the runtime already holds, and whether this turn extends it.
         //
@@ -231,22 +255,12 @@ class ExecuTorchEngine(
         // An exact hit would leave nothing to send, and this runtime rejects an empty
         // prompt outright — it only accepts one after a separate native prefill call that
         // this bridge never makes. Requiring new text keeps that unreachable.
-        val extending = fedText.isNotEmpty() &&
-            prompt.startsWith(fedText) &&
-            prompt.length > fedText.length
-        val reused = if (extending) heldTokens else 0
-        val fresh = if (extending) {
-            prompt.substring(fedText.length)
-        } else {
-            bridge.resetContext()
-            fedText = ""
-            heldTokens = 0
-
-            prompt
-        }
+        //
+        // A turn with pictures starts from nothing and leaves nothing to extend: the
+        // pictures sit in the cache as embeddings, which the text record here cannot
+        // describe, so the next turn re-feeds them rather than trusting a prefix match.
 
         val reply = StreamedReply(rendering)
-        val started = System.currentTimeMillis()
         var firstTokenAt = 0L
 
         // Zero means "no limit" to llama.cpp, which stops at the context edge on its own.
@@ -303,9 +317,14 @@ class ExecuTorchEngine(
         // token is ordinary text this code cannot identify by character position. So that
         // case gives up reuse entirely rather than guess: an empty record forces the next
         // turn to start over, which is slow and correct.
-        if (reply.endedCleanly) {
+        if (reply.endedCleanly && pictures.isEmpty()) {
             fedText = prompt + reply.answer
             heldTokens = reused + outcome.promptTokens + outcome.generatedTokens
+        } else if (reply.endedCleanly) {
+            // Held, but not extendable: the runtime counts the picture's positions in its
+            // prompt figure, so the meter is right even though the text record is empty.
+            fedText = ""
+            heldTokens = outcome.promptTokens + outcome.generatedTokens
         } else {
             fedText = ""
             heldTokens = 0
@@ -403,6 +422,175 @@ class ExecuTorchEngine(
         warmLocked(messages, tools, params)
     }
 
+    /**
+     * [beginTurn], with its two ways of not getting there.
+     *
+     * A Stop that lands while the pictures are going in ends the turn as a cancellation,
+     * with nothing generated and nothing left in the cache; any other failure clears the
+     * cache too, because half a prompt in it is worse than none (the next turn would
+     * extend it), and is rethrown for the caller to show. Null means the turn is over.
+     */
+    @Suppress("SwallowedException")
+    private suspend fun ProducerScope<GenerationEvent>.openTurn(
+        prompt: String,
+        pictures: List<MessagePart.File>,
+        rendering: PromptTemplate,
+        started: Long,
+    ): Pair<String, Int>? = try {
+        beginTurn(prompt, pictures, rendering)
+    } catch (stopped: StoppedWhileFeeding) {
+        forgetHeld()
+        send(
+            GenerationEvent.Completed(
+                reason = StopReason.CANCELLED,
+                stats = statsFor(ExecuTorchOutcome(StopReason.CANCELLED), started, 0L, 0, prompt),
+                content = "",
+                reasoning = "",
+                toolCalls = emptyList(),
+            ),
+        )
+        null
+    } catch (failure: Throwable) {
+        forgetHeld()
+        throw failure
+    }
+
+    private fun forgetHeld() {
+        fedText = ""
+        heldTokens = 0
+        runCatching { bridge.resetContext() }
+    }
+
+    /**
+     * What this turn hands to generate, and how many tokens the runtime already held.
+     *
+     * The cache is extended when the new prompt begins with what was fed before and the
+     * turn carries no pictures; otherwise it is cleared and the whole prompt is fresh,
+     * with the pictures fed on the way so that only the closing text remains.
+     */
+    private fun beginTurn(
+        prompt: String,
+        pictures: List<MessagePart.File>,
+        rendering: PromptTemplate,
+    ): Pair<String, Int> {
+        val extending = pictures.isEmpty() &&
+            fedText.isNotEmpty() &&
+            prompt.startsWith(fedText) &&
+            prompt.length > fedText.length
+        if (extending) return prompt.substring(fedText.length) to heldTokens
+        bridge.resetContext()
+        fedText = ""
+        heldTokens = 0
+        val fresh = if (pictures.isEmpty()) prompt else feedPictures(prompt, pictures, rendering)
+        return fresh to 0
+    }
+
+    /**
+     * Feeds every text-and-picture pair ahead of the final text, which the generate
+     * call takes.
+     *
+     * The prompt arrives with one [PICTURE_MARKER] where each picture belongs. Around each
+     * the export expects its own brackets, the same ones its processor writes: the text
+     * before, then `<|image_start|>`, then the picture as embeddings, then `<|image_end|>`
+     * leading the text after. What is returned is that last text, brackets included.
+     */
+    private fun feedPictures(
+        fresh: String,
+        pictures: List<MessagePart.File>,
+        rendering: PromptTemplate,
+    ): String {
+        val side =
+            rendering.visionInputSide ?: throw LlamaException("This model cannot read pictures")
+        val segments = fresh.split(PICTURE_MARKER)
+        refuseUnlessPicturesFit(segments, pictures, rendering, fresh)
+        var carried = ""
+        pictures.forEachIndexed { index, picture ->
+            // Each picture is a second or two of encoder; a Stop is honoured between them.
+            if (cancelRequested) throw StoppedWhileFeeding()
+            bridge.prefill(carried + segments[index] + IMAGE_START)
+            bridge.prefillImage(readPicture(picture, side), side, side, Letterbox.CHANNELS)
+            carried = IMAGE_END
+        }
+        return carried + segments.last()
+    }
+
+    private fun readPicture(picture: MessagePart.File, side: Int): FloatArray =
+        reader.read(picture.path, side)
+            ?: throw LlamaException(
+                "Could not read ${picture.name ?: picture.path.substringAfterLast('/')}",
+            )
+
+    /**
+     * Refused before the first encoder call rather than discovered at the last: eight
+     * pictures at 256 positions each are a 2048 window with no room for a word.
+     */
+    private fun refuseUnlessPicturesFit(
+        segments: List<String>,
+        pictures: List<MessagePart.File>,
+        rendering: PromptTemplate,
+        fresh: String,
+    ) {
+        if (segments.size != pictures.size + 1) {
+            throw LlamaException(
+                "${segments.size - 1} picture markers for ${pictures.size} pictures",
+            )
+        }
+        val visual = pictures.size * rendering.visualTokensPerPicture
+        val text = fresh.length / WARM_CHARS_PER_TOKEN
+        if (visual + text >= contextSize) {
+            throw ContextWindowExceededException(
+                "${pictures.size} pictures take $visual of this model's $contextSize positions, " +
+                    "leaving no room for the conversation. Send fewer pictures at a time.",
+            )
+        }
+    }
+
+    /** A Stop that landed between pictures, before anything was generated. */
+    private class StoppedWhileFeeding : LlamaException("Stopped while reading the pictures")
+
+    private fun List<ChatMessage>.pictures(): List<MessagePart.File> =
+        flatMap { message -> message.files.filter { it.kind == MediaKind.IMAGE } }
+
+    /**
+     * The messages with each picture replaced by [PICTURE_MARKER] in its text, so the
+     * template renders the conversation with the pictures in place; untouched when the
+     * turn carries none, so a marker never reaches a model that would read it aloud.
+     */
+    private fun List<ChatMessage>.markingPictures(withPictures: Boolean): List<ChatMessage> =
+        if (!withPictures) {
+            this
+        } else {
+            map { message ->
+                if (message.files.none { it.kind == MediaKind.IMAGE }) {
+                    message
+                } else {
+                    ChatMessage(
+                        message.role,
+                        listOf(MessagePart.Text(message.textWithPictureMarkers())),
+                    )
+                }
+            }
+        }
+
+    /**
+     * The message's text with a marker where each picture sits, and nothing else added.
+     *
+     * The export's processor writes the image brackets straight into the text with no
+     * whitespace around them, so none is added here; the shared media rendering puts a
+     * newline on each side, which the model would read as text and which moves every
+     * later position. Files that are not pictures are left out, since this runtime has
+     * no way in for them, and a marker typed into the text is removed so the count of
+     * markers stays the count of pictures.
+     */
+    private fun ChatMessage.textWithPictureMarkers(): String = buildString {
+        parts.forEach { part ->
+            when (part) {
+                is MessagePart.Text -> append(part.text.replace(PICTURE_MARKER, ""))
+                is MessagePart.File -> if (part.kind == MediaKind.IMAGE) append(PICTURE_MARKER)
+            }
+        }
+    }
+
     private suspend fun warmLocked(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
@@ -416,6 +604,9 @@ class ExecuTorchEngine(
         // to where the assistant opener and the next turn diverge. A family that folds
         // the system text into the first user turn diverges early and warms almost
         // nothing, which is the correct no-op for it.
+        // A conversation with pictures is fed at the turn, embeddings and all; there is
+        // no text-only warm of it that the turn could extend.
+        if (multimodal && messages.pictures().isNotEmpty()) return@withContext null
         val full = rendering.render(messages, tools, params.thinking)
         val probed = rendering.render(
             messages + ChatMessage.text(ChatRole.USER, WARM_PROBE),
@@ -587,6 +778,9 @@ class ExecuTorchEngine(
          * this is the value the model is opened with and [SamplerParams] cannot move it.
          */
         const val DEFAULT_TEMPERATURE = 0.8f
+
+        /** What the publisher samples LFM2.5-VL at; the text default makes it ramble. */
+        const val VISION_TEMPERATURE = 0.1f
     }
 }
 
@@ -669,6 +863,11 @@ private class StreamedReply(private val template: PromptTemplate) {
 
 /** One warm piece: about two hundred tokens, which is the interrupt latency in text. */
 private const val WARM_PIECE_CHARS = 800
+
+/** Stands in for a picture in the rendered prompt until the picture is fed in its place. */
+private const val PICTURE_MARKER = "\u0000picture\u0000"
+private const val IMAGE_START = "<|image_start|>"
+private const val IMAGE_END = "<|image_end|>"
 
 /** The app-wide rough estimate; the runtime reports no token count for a prefill. */
 private const val WARM_CHARS_PER_TOKEN = 4

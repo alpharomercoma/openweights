@@ -44,7 +44,23 @@ data class ExecuTorchOutcome(
  * Implementations are not thread-safe. [stop] is the exception, and may be called from
  * another thread while [generate] is running.
  */
+/**
+ * What a `.pte` says about itself before it is opened for generation.
+ *
+ * @property contextLength the window it was exported with, when it states one.
+ * @property hasVision whether it carries a `vision_encoder` method, which is how the
+ * multimodal export layout announces itself: pictures go through that method into the
+ * decoder as embeddings, in place of text.
+ */
+data class ExportFacts(val contextLength: Int?, val hasVision: Boolean)
+
 interface ExecuTorchBridge {
+
+    /**
+     * Reads [ExportFacts] off the file through the plain module API, without opening it
+     * for generation. Cheap: the file is mapped, nothing is run.
+     */
+    fun probe(modelPath: String): ExportFacts = ExportFacts(exportedContextLength(modelPath), false)
 
     /**
      * Opens a `.pte` and the tokenizer it was exported against.
@@ -56,6 +72,9 @@ interface ExecuTorchBridge {
      * @param contextLength the whole window, prompt and reply together. ExecuTorch counts
      * in total sequence length rather than in new tokens, so it belongs to the model rather
      * than to a call and is kept from here.
+     * @param multimodal open with the multimodal runner, which is a different runner in the
+     * runtime rather than a flag on the text one: it is the only one that can take a
+     * picture, and it is what a file with a `vision_encoder` method was exported for.
      * @return true when the model is ready to generate.
      */
     fun load(
@@ -63,7 +82,19 @@ interface ExecuTorchBridge {
         tokenizerPath: String,
         temperature: Float,
         contextLength: Int,
+        multimodal: Boolean = false,
     ): Boolean
+
+    /**
+     * Feeds one picture into the cache at the current position, between text prefills.
+     *
+     * [pixels] are the encoder's input exactly: channels-first, `channels * height * width`
+     * floats in 0..255. Not normalised, because the exports this app knows bake the
+     * rescale and normalise into the graph, and normalising here would apply them twice.
+     * The runtime runs the encoder and hands its output to the decoder as embeddings.
+     */
+    fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int): Unit =
+        throw LlamaException("This runtime cannot read pictures")
 
     /**
      * The window the file was exported with, or null when the file does not say.

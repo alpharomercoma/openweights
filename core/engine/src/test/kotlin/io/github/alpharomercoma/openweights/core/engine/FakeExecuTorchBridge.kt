@@ -70,8 +70,26 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     /** What [load] answers. False stands for a runtime that could not open the file. */
     var opens: Boolean = true
     var exportedContextLength: Int? = null
+    var hasVision: Boolean = false
+    var loadedMultimodal: Boolean = false
+        private set
+
+    /** Each picture fed, as (width, height, channels), in order with [prefills]. */
+    val pictures: MutableList<Triple<Int, Int, Int>> = mutableListOf()
+
+    /** Everything fed before generate, text and pictures, in the order it arrived. */
+    val fed: MutableList<String> = mutableListOf()
 
     override fun exportedContextLength(modelPath: String): Int? = exportedContextLength
+
+    override fun probe(modelPath: String): ExportFacts =
+        ExportFacts(exportedContextLength, hasVision)
+
+    override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
+        require(pixels.size == width * height * channels)
+        pictures += Triple(width, height, channels)
+        fed += "<picture $width x $height>"
+    }
 
     var outcome: ExecuTorchOutcome = ExecuTorchOutcome(StopReason.END_OF_TURN)
 
@@ -86,7 +104,9 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
         tokenizerPath: String,
         temperature: Float,
         contextLength: Int,
+        multimodal: Boolean,
     ): Boolean {
+        loadedMultimodal = multimodal
         loadedContextLength = contextLength
         loadedModelPath = modelPath
         loadedTokenizerPath = tokenizerPath
@@ -119,6 +139,7 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     override fun prefill(prompt: String) {
         failsDuringPrefill?.let { throw LlamaException(it) }
         prefills += prompt
+        fed += prompt
         onPrefill?.invoke(prompt)
     }
 

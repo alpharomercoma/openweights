@@ -68,6 +68,19 @@ class PromptTemplatesTest {
     }
 
     @Test
+    fun `LFM2 5-VL renders as LFM2 5, and other vision families stay refused`() {
+        // The one vision family with a compiled export this app can feed; a picture goes
+        // in through the export's own brackets, so the text template is the same one.
+        val vl = PromptTemplates.forModel(
+            "react-native-executorch-lfm2.5-VL-1.6B-lfm2_5_vl_1_6b_8da4w_xnnpack.pte",
+        )
+        assertThat(vl).isSameInstanceAs(PromptTemplates.forModel("lfm2.5.pte"))
+        assertThat(vl?.visionInputSide).isEqualTo(512)
+        assertThat(PromptTemplates.forModel("Qwen3-VL-2B.pte")).isNull()
+        assertThat(PromptTemplates.forModel("qwen3.pte")?.visionInputSide).isNull()
+    }
+
+    @Test
     fun `every advertised family is actually recognisable`() {
         // `known` feeds the error message that tells the user what this build can run;
         // advertising a family the matcher cannot reach would be a promise with no door.
@@ -80,6 +93,7 @@ class PromptTemplatesTest {
             "phi-4-mini.pte",
             "gemma-3.pte",
             "lfm2.5.pte",
+            "lfm2.5-vl.pte",
         )
         assertThat(installable.mapNotNull { PromptTemplates.forModel(it) })
             .hasSize(PromptTemplates.known.size)

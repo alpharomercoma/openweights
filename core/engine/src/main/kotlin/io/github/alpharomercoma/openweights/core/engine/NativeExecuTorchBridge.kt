@@ -41,14 +41,19 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         tokenizerPath: String,
         temperature: Float,
         contextLength: Int,
+        multimodal: Boolean,
     ): Boolean {
         close()
+        // The runner is chosen here and cannot be changed after: the multimodal one is a
+        // different class in the runtime, the only one with a way in for a picture.
+        val modelType =
+            if (multimodal) LlmModule.MODEL_TYPE_MULTIMODAL else LlmModule.MODEL_TYPE_TEXT
         // Anything can come back from here: a missing native library throws
         // UnsatisfiedLinkError rather than an exception, and a .pte built for another
         // runtime version fails inside the loader. Both become the same failure the rest
         // of the app knows how to show.
         return runCatching {
-            LlmModule(modelPath, tokenizerPath, temperature).also {
+            LlmModule(modelType, modelPath, tokenizerPath, temperature).also {
                 it.load()
                 module = it
             }
@@ -70,17 +75,48 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
      * The LLM wrapper reads the same constants itself and logs them, but offers no way to
      * ask, so this is the only route to the number before the first turn overflows.
      */
-    override fun exportedContextLength(modelPath: String): Int? = runCatching {
+    override fun exportedContextLength(modelPath: String): Int? = probe(modelPath).contextLength
+
+    override fun probe(modelPath: String): ExportFacts = runCatching {
         val program = Module.load(modelPath, Module.LOAD_MODE_MMAP)
         try {
             val methods = program.getMethods().toSet()
-            WINDOW_METHODS.firstOrNull { it in methods }?.let { name ->
+            val window = WINDOW_METHODS.firstOrNull { it in methods }?.let { name ->
                 program.execute(name).firstOrNull()?.takeIf { it.isInt }?.toInt()?.toInt()
             }
+            ExportFacts(
+                contextLength = window?.takeIf { it > 0 },
+                hasVision = VISION_ENCODER_METHOD in methods,
+            )
         } finally {
             program.destroy()
         }
-    }.getOrNull()?.takeIf { it > 0 }
+    }.getOrDefault(ExportFacts(contextLength = null, hasVision = false))
+
+    override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
+        val running = module ?: throw LlamaException("No model loaded")
+        runCatching { running.prefillImages(pixels, width, height, channels) }.onFailure { cause ->
+            throw cause.asOverflow() ?: LlamaException(
+                "ExecuTorch could not read the picture: ${cause.message ?: cause::class.java.simpleName}",
+            )
+        }
+    }
+
+    /**
+     * The one failure a full window produces, as the exception the turn loop answers.
+     *
+     * Raised the same way from a text prefill, a picture prefill and a generation, because
+     * a window fills at whichever of the three lands last, and only one of them used to be
+     * translated: an overflow during a picture read as "could not read the picture".
+     */
+    private fun Throwable.asOverflow(): ContextWindowExceededException? {
+        val text = message.orEmpty()
+        if ("Max seq length exceeded" !in text && "max_context_len" !in text) return null
+        return ContextWindowExceededException(
+            "The conversation no longer fits this model's exported context window. " +
+                "Start a new chat, or use a model exported with a larger window.",
+        )
+    }
 
     override fun generate(
         prompt: String,
@@ -141,15 +177,7 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
             // The one overflow a conversation can reach in ordinary use, translated: a
             // .pte's window was fixed at export, and a history that has outgrown it is a
             // fact about the file, not a crash to show as one.
-            val text = cause.message.orEmpty()
-            if ("Max seq length exceeded" in text || "max_context_len" in text) {
-                throw ContextWindowExceededException(
-                    "The conversation no longer fits this model's exported context " +
-                        "window. Start a new chat, or use a model exported with a " +
-                        "larger window.",
-                )
-            }
-            throw cause
+            throw cause.asOverflow() ?: cause
         }
 
         lastError?.let { throw LlamaException(it) }
@@ -163,7 +191,7 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         // engine's warm is also verified behaviourally — a chat after a warm must extend
         // it, and the runtime's own prompt count says whether it did.
         runCatching { running.prefillPrompt(prompt) }.onFailure { cause ->
-            throw LlamaException(
+            throw cause.asOverflow() ?: LlamaException(
                 "ExecuTorch could not prefill: ${cause.message ?: cause::class.java.simpleName}",
             )
         }
@@ -172,6 +200,9 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
     private companion object {
         /** What exporters call the window, most specific first. */
         val WINDOW_METHODS = listOf("get_max_context_len", "get_max_seq_len")
+
+        /** The method a multimodal export carries its image encoder under. */
+        const val VISION_ENCODER_METHOD = "vision_encoder"
     }
 
     override fun resetContext() {

@@ -18,6 +18,7 @@ package io.github.alpharomercoma.openweights.core.engine
 
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
@@ -292,14 +293,25 @@ class ExecuTorchOnDeviceTest {
 
     private companion object {
         const val TAG = "ExecuTorchOnDevice"
+
+        /** Another export can be pointed at with `-e pte <path> -e tokenizer <path>`. */
+        private val arguments = InstrumentationRegistry.getArguments()
         val MODEL = File(
-            "/data/local/tmp/openweights/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.pte",
+            arguments.getString("pte")
+                ?: "/data/local/tmp/openweights/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.pte",
         )
         val TOKENIZER = File(
-            "/data/local/tmp/openweights/" +
-                "Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json",
+            arguments.getString("tokenizer")
+                ?: (
+                    "/data/local/tmp/openweights/" +
+                        "Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK.tokenizer.json"
+                    ),
         )
-        val PARAMS = ModelLoadParams(contextLength = 2048)
+
+        /** `-e context <n>` raises the preference for an export with a larger window. */
+        val PARAMS = ModelLoadParams(
+            contextLength = arguments.getString("context")?.toIntOrNull() ?: 2048,
+        )
         const val TOKENS_BEFORE_STOP = 5
         const val BUDGET = 8
 

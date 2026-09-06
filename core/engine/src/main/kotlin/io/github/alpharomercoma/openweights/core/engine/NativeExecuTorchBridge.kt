@@ -94,15 +94,16 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
     }
 
     /**
-     * Read off the file rather than asked of the runtime, which has no such question. The
-     * post-processor is the last top-level section of a tokenizers JSON and is small; the
-     * vocabulary before it is not, so the file is scanned as text rather than parsed.
+     * False for every tokenizer, because this runtime never asks for a BOS: the 1.4.0 JNI
+     * layer's `num_bos_` is 0 unless the module is built with a count the Java constructor
+     * this bridge uses does not take, and the C++ tokenizer adds BOS only when asked, even
+     * for a tokenizer.json whose post-processor declares one (measured on the Mac with the
+     * same tokenizers library: `encode(text, 0, 0)` never yields BOS, `encode(text, 1, 0)`
+     * does, and a literal `<|startoftext|>` in the text is encoded to the BOS id). Every
+     * ExecuTorch prompt this app ever fed was therefore BOS-less; LFM2.5-1.2B tolerated it,
+     * LFM2.5-2.6B answered garbage. The engine writes the family's BOS into the text.
      */
-    override fun tokenizerAddsBos(tokenizerPath: String): Boolean = runCatching {
-        val text = java.io.File(tokenizerPath).readText()
-        val post = text.lastIndexOf("\"post_processor\"")
-        post >= 0 && text.indexOf("\"TemplateProcessing\"", post) >= 0
-    }.getOrDefault(true)
+    override fun tokenizerAddsBos(tokenizerPath: String): Boolean = false
 
     override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
         val running = module ?: throw LlamaException("No model loaded")

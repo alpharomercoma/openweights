@@ -57,11 +57,10 @@ data class ExportFacts(val contextLength: Int?, val hasVision: Boolean)
 interface ExecuTorchBridge {
 
     /**
-     * Whether the runtime's tokenizer, given this `tokenizer.json`, prepends the model's BOS
-     * itself. A Hugging Face tokenizer does so through a `TemplateProcessing` post-processor;
-     * one saved without it (transformers 5 writes LFM2.5-2.6B's that way) yields the bare
-     * text, and the runtime adds nothing of its own. Defaults to true, which is the shape
-     * every publisher export this app knew before 2026-09-07 had.
+     * Whether the runtime, given this `tokenizer.json`, prepends the model's BOS itself. The
+     * native bridge answers false (see there); the engine then writes the family's BOS into
+     * the prompt text, which the tokenizer encodes to the BOS id. Defaults to true so a
+     * bridge that does arm BOS is not given a second one.
      */
     fun tokenizerAddsBos(tokenizerPath: String): Boolean = true
 

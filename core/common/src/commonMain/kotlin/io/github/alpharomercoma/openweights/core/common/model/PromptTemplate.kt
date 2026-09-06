@@ -66,10 +66,10 @@ interface PromptTemplate {
 
     /**
      * The token this family's prompts begin with, or null for a family with none. Rendered
-     * without it (the runtime's tokenizer usually prepends it); an engine that finds a
-     * tokenizer which does not writes it itself. LFM2.5-2.6B's tokenizer.json, saved by
-     * transformers 5, carries no BOS post-processor, and the model without its BOS misread
-     * every prompt (0/30 GSM8K on four chips, 2026-09-07).
+     * without it; an engine whose runtime does not arm BOS writes it into the prompt. The
+     * ExecuTorch runtime this app ships never does, so every compiled model ran BOS-less
+     * until 2026-09-07: LFM2.5-1.2B tolerated it, LFM2.5-2.6B misread every prompt (0/30
+     * GSM8K on four chips).
      */
     val bosToken: String? get() = null
 

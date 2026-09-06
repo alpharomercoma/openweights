@@ -416,6 +416,22 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `a tokenizer that adds no BOS gets the template's written into the prompt`() = runTest {
+        // LFM2.5-2.6B's tokenizer.json (transformers 5) has no BOS post-processor; the runtime
+        // fed the model bare text and it answered garbage on every chip. The engine writes
+        // <|startoftext|> itself then, and only then: the 1.2B's tokenizer adds it already.
+        bridge.tokenizerAddsBos = false
+        engine.load(installed("LFM2.5-2.6B-8da4w-16k.pte"), PARAMS)
+        engine.chat(listOf(ChatMessage.text(ChatRole.USER, "Hi"))).toList()
+        assertThat(bridge.lastPrompt).startsWith("<|startoftext|><|im_start|>user\nHi<|im_end|>")
+
+        bridge.tokenizerAddsBos = true
+        engine.load(installed("LFM2.5-1.2B-Instruct-8da4w-16k.pte"), PARAMS)
+        engine.chat(listOf(ChatMessage.text(ChatRole.USER, "Hi"))).toList()
+        assertThat(bridge.lastPrompt).startsWith("<|im_start|>user\nHi<|im_end|>")
+    }
+
+    @Test
     fun `a vision export without a window is refused before the runner can abort on it`() =
         runTest {
             // Seen on the phone with an older exporter's SmolVLM2: the multimodal runner reads

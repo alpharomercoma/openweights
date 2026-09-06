@@ -93,6 +93,9 @@ class ExecuTorchEngine(
     /** Whether the open file reads pictures, which is the file's to say and the template's to feed. */
     private var multimodal: Boolean = false
 
+    /** The family's BOS, when the tokenizer beside the model will not write it; else empty. */
+    private var bosPrefix: String = ""
+
     /**
      * How many tokens the runtime is holding, counted rather than guessed.
      *
@@ -163,6 +166,10 @@ class ExecuTorchEngine(
         // the square it takes. A vision export of a family this app cannot feed opens as
         // text, which is honest and still useful.
         multimodal = facts.hasVision && rendering.vision != null
+        // A model whose tokenizer will not write its BOS gets it from the template instead.
+        bosPrefix = rendering.bosToken
+            ?.takeUnless { bridge.tokenizerAddsBos(tokenizer.absolutePath) }
+            .orEmpty()
         // The multimodal runner in the AAR this app ships aborts the whole process, not the
         // call, when an export lacks the window method it reads first (measured with an
         // older exporter's SmolVLM2: "Required metadata method get_max_seq_len not found").
@@ -242,7 +249,7 @@ class ExecuTorchEngine(
         val rendering = template ?: throw LlamaException("No model loaded")
         cancelRequested = false
         val pictures = if (multimodal) messages.pictures() else emptyList()
-        val prompt = rendering.render(
+        val prompt = render(
             messages.markingPictures(pictures.isNotEmpty()),
             tools,
             params.thinking,
@@ -639,8 +646,8 @@ class ExecuTorchEngine(
         // A conversation with pictures is fed at the turn, embeddings and all; there is
         // no text-only warm of it that the turn could extend.
         if (multimodal && messages.pictures().isNotEmpty()) return@withContext null
-        val full = rendering.render(messages, tools, params.thinking)
-        val probed = rendering.render(
+        val full = render(messages, tools, params.thinking)
+        val probed = render(
             messages + ChatMessage.text(ChatRole.USER, WARM_PROBE),
             tools,
             params.thinking,
@@ -782,6 +789,20 @@ class ExecuTorchEngine(
      * A sibling rather than a lookup, because the pairing has to survive a user moving
      * files around: `Qwen3-1.7B.pte` is answered by `Qwen3-1.7B.tokenizer.json`.
      */
+    /**
+     * The prompt as the runtime should see it: the template's text, led by the family's BOS
+     * when the tokenizer beside this model will not add one. Every render goes through here
+     * so the cache's record of what was fed and the next prompt agree on the prefix.
+     */
+    private fun render(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        thinking: Boolean,
+    ): String {
+        val rendering = template ?: throw LlamaException("No model loaded")
+        return bosPrefix + rendering.render(messages, tools, thinking)
+    }
+
     private fun tokenizerFor(model: File): File? =
         File(model.parentFile, ExecuTorchFileName.tokenizerNameFor(model.name))
             .takeIf { it.isFile }

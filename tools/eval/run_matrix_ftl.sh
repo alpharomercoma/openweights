@@ -47,12 +47,13 @@ BENCH_MODEL=${BENCH_MODEL:-}
 BENCH_SETS=${BENCH_SETS:-}
 BENCH_BUDGET=${BENCH_BUDGET:-38}
 BENCH_SKIP=${BENCH_SKIP:-}
+BENCH_CONTEXT=${BENCH_CONTEXT:-}
 ENV_VARS=""
 case "$CLASS" in
   *BenchmarkEval)
     # gcloud's dict flag splits on commas; the ^:^ prefix makes the colon the separator
     # so a sets value such as gsm8k,bfcl survives.
-    ENV_VARS="^:^budget=$BENCH_BUDGET${BENCH_MODEL:+:model=$BENCH_MODEL}${BENCH_SETS:+:sets=$BENCH_SETS}${BENCH_SKIP:+:skip=$BENCH_SKIP}"
+    ENV_VARS="^:^budget=$BENCH_BUDGET${BENCH_MODEL:+:model=$BENCH_MODEL}${BENCH_SETS:+:sets=$BENCH_SETS}${BENCH_SKIP:+:skip=$BENCH_SKIP}${BENCH_CONTEXT:+:context=$BENCH_CONTEXT}"
     [ -z "$BENCH_MODEL" ] || PATTERN="$BENCH_MODEL.*($PATTERN)" ;;
 esac
 

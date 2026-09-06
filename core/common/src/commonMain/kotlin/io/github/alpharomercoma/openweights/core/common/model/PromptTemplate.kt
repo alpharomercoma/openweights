@@ -65,6 +65,15 @@ interface PromptTemplate {
     val supportsThinking: Boolean get() = false
 
     /**
+     * The token this family's prompts begin with, or null for a family with none. Rendered
+     * without it (the runtime's tokenizer usually prepends it); an engine that finds a
+     * tokenizer which does not writes it itself. LFM2.5-2.6B's tokenizer.json, saved by
+     * transformers 5, carries no BOS post-processor, and the model without its BOS misread
+     * every prompt (0/30 GSM8K on four chips, 2026-09-07).
+     */
+    val bosToken: String? get() = null
+
+    /**
      * How this family's compiled vision export takes a picture, or null when the family
      * has no vision export this app knows how to feed.
      *
@@ -222,6 +231,8 @@ private object SmolLm3Template : PromptTemplate {
  * model never saw in training.
  */
 private object Llama32Template : PromptTemplate {
+    override val bosToken: String = "<|begin_of_text|>"
+
     // <|eom_id|> is how Llama ends a message that expects a tool result — after a call it
     // emits that, not <|eot_id|>. Measured on device: without it the model wrote the call,
     // the end-of-message token as text, and then a second turn explaining the call it had
@@ -257,6 +268,7 @@ private object Phi4Template : PromptTemplate {
 
 /** [Gemma3Prompt] as a [PromptTemplate], without the textual BOS for the same reason. */
 private object Gemma3Template : PromptTemplate {
+    override val bosToken: String = "<bos>"
     override val stopMarkers: List<String> = listOf("<end_of_turn>")
     override val supportsTools: Boolean = false
 
@@ -290,6 +302,7 @@ private object Gemma3Template : PromptTemplate {
  * and reformatting history throws the cache away. BOS is the runner's job, as above.
  */
 private object Lfm25Template : PromptTemplate {
+    override val bosToken: String = "<|startoftext|>"
     override val stopMarkers: List<String> = listOf(IM_END)
 
     // LFM does think, but its template offers no switch for it — the model decides on

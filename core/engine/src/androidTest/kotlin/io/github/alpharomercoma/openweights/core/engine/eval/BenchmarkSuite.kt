@@ -59,6 +59,12 @@ object BenchmarkSuite {
         val budgetMinutes: Int = DEFAULT_BUDGET_MINUTES,
         /** Repeat penalty for the engines that have one; null keeps the app's default. */
         val repeatPenalty: Float? = null,
+        /**
+         * Context length to load with. The default 4096 is what every earlier run used; 0
+         * loads a compiled file at its own exported window, which is how the window matrix
+         * compares exports that differ in nothing else.
+         */
+        val context: Int = DEFAULT_CONTEXT,
     ) {
         init {
             // Skip counts prompts within each set, so a rerun of a cut class names its set.
@@ -72,6 +78,7 @@ object BenchmarkSuite {
     @Volatile
     private var deadline = Long.MAX_VALUE
     private var engineName = "unknown"
+    private var rssAfterLoad: Long = -1
 
     fun startClock(options: Options) {
         deadline = SystemClock.elapsedRealtime() + options.budgetMinutes * MS_PER_MINUTE
@@ -85,6 +92,8 @@ object BenchmarkSuite {
         promptsFile: File,
         resultsDir: File,
         options: Options,
+        /** Resident memory right after the model loaded, before any prompt; -1 when not taken. */
+        loadedRssMb: Long = -1,
     ): File {
         val toolless = TOOLLESS.any { it in modelName.lowercase().filter(Char::isLetterOrDigit) }
         engineName = engine::class.simpleName ?: "unknown"
@@ -92,6 +101,8 @@ object BenchmarkSuite {
         val all = doc.getJSONArray("prompts")
         val perSet = mutableMapOf<String, Int>()
         val results = JSONArray()
+        val window = engine.loadedModel?.contextSize ?: 0
+        rssAfterLoad = loadedRssMb
         var exhausted = false
 
         for (i in 0 until all.length()) {
@@ -129,10 +140,10 @@ object BenchmarkSuite {
             )
             Log.i(TAG, "$modelName $id ${results.length()} done")
             // Checkpoint after every prompt: a killed class keeps what it reached.
-            write(resultsDir, modelName, doc, results, exhausted = false, options)
+            write(resultsDir, modelName, doc, results, exhausted = false, options, window)
         }
 
-        return write(resultsDir, modelName, doc, results, exhausted, options)
+        return write(resultsDir, modelName, doc, results, exhausted, options, window)
     }
 
     private fun write(
@@ -142,6 +153,7 @@ object BenchmarkSuite {
         results: JSONArray,
         exhausted: Boolean,
         options: Options,
+        window: Int,
     ): File {
         val statuses = (0 until results.length()).groupingBy {
             results.getJSONObject(it).getString("status")
@@ -155,6 +167,9 @@ object BenchmarkSuite {
                 "greedy topK=1 seed=7 thinking=false repeatPenalty=${options.repeatPenalty ?: "default"}",
             )
             .put("prompts_seed", doc.optInt("seed"))
+            .put("context_size", window)
+            .put("rss_mb_after_load", rssAfterLoad)
+            .put("rss_mb", residentMb())
             .put("completed", results.length())
             .put("ok", statuses["ok"] ?: 0)
             .put("errors", statuses["error"] ?: 0)
@@ -233,6 +248,13 @@ object BenchmarkSuite {
         return ParitySuite.Turn(done, raw)
     }
 
+    /** This process's resident set in megabytes, so a report says what its model cost to hold. */
+    fun residentMb(): Long = runCatching {
+        File("/proc/self/status").readLines()
+            .firstOrNull { it.startsWith("VmRSS:") }
+            ?.filter { it.isDigit() }?.toLongOrNull()?.div(1024)
+    }.getOrNull() ?: -1
+
     fun optionsFrom(args: Bundle): Options = Options(
         model = args.getString("model") ?: "",
         sets = (args.getString("sets") ?: "").split(',')
@@ -241,9 +263,11 @@ object BenchmarkSuite {
         skip = args.getString("skip")?.toIntOrNull() ?: 0,
         budgetMinutes = args.getString("budget")?.toIntOrNull() ?: DEFAULT_BUDGET_MINUTES,
         repeatPenalty = args.getString("repeat")?.toFloatOrNull(),
+        context = args.getString("context")?.toIntOrNull() ?: DEFAULT_CONTEXT,
     )
 
     private const val DEFAULT_BUDGET_MINUTES = 38
+    private const val DEFAULT_CONTEXT = 4096
     private const val MS_PER_MINUTE = 60_000L
     private const val TAG = "BenchmarkSuite"
 }

@@ -93,6 +93,17 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         }
     }
 
+    /**
+     * Read off the file rather than asked of the runtime, which has no such question. The
+     * post-processor is the last top-level section of a tokenizers JSON and is small; the
+     * vocabulary before it is not, so the file is scanned as text rather than parsed.
+     */
+    override fun tokenizerAddsBos(tokenizerPath: String): Boolean = runCatching {
+        val text = java.io.File(tokenizerPath).readText()
+        val post = text.lastIndexOf("\"post_processor\"")
+        post >= 0 && text.indexOf("\"TemplateProcessing\"", post) >= 0
+    }.getOrDefault(true)
+
     override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
         val running = module ?: throw LlamaException("No model loaded")
         runCatching { running.prefillImages(pixels, width, height, channels) }.onFailure { cause ->

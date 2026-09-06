@@ -71,6 +71,11 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     var opens: Boolean = true
     var exportedContextLength: Int? = null
     var hasVision: Boolean = false
+
+    /** What the tokenizer beside the model does about BOS; true is every publisher export so far. */
+    var tokenizerAddsBos: Boolean = true
+
+    override fun tokenizerAddsBos(tokenizerPath: String): Boolean = tokenizerAddsBos
     var loadedMultimodal: Boolean = false
         private set
 

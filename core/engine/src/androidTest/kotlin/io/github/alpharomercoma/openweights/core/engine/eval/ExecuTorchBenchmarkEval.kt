@@ -52,13 +52,22 @@ class ExecuTorchBenchmarkEval {
             Log.i(TAG, "benchmarking ${model.name}")
             val engine = ExecuTorchEngine(NativeExecuTorchBridge(), temperature = 0f)
             try {
-                engine.load(model, ModelLoadParams(contextLength = CONTEXT))
+                // Context 0 means the file's own exported window, read off the file first
+                // because the load parameters refuse a zero.
+                val window = options.context.takeIf { it > 0 }
+                    ?: NativeExecuTorchBridge().probe(model.absolutePath).contextLength
+                    ?: FALLBACK_CONTEXT
+                Log.i(TAG, "loading ${model.name} at window $window")
+                engine.load(model, ModelLoadParams(contextLength = window))
+                val loadedRss = BenchmarkSuite.residentMb()
+                Log.i(TAG, "loaded ${model.name}: rss $loadedRss MB")
                 val out = BenchmarkSuite.run(
                     engine,
                     model.nameWithoutExtension,
                     prompts,
                     resultsDir,
                     options,
+                    loadedRssMb = loadedRss,
                 )
                 Log.i(TAG, "wrote ${out.absolutePath}")
                 assertThat(out.isFile).isTrue()
@@ -71,7 +80,7 @@ class ExecuTorchBenchmarkEval {
 
     private companion object {
         const val TAG = "ExecuTorchBenchmarkEval"
-        const val CONTEXT = 4096
+        const val FALLBACK_CONTEXT = 4096
         const val PROMPTS = "benchmarks.json"
         val EVAL_DIR = File("/data/local/tmp/openweights/eval")
     }

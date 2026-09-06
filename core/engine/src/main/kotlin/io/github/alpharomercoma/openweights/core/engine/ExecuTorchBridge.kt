@@ -57,6 +57,15 @@ data class ExportFacts(val contextLength: Int?, val hasVision: Boolean)
 interface ExecuTorchBridge {
 
     /**
+     * Whether the runtime's tokenizer, given this `tokenizer.json`, prepends the model's BOS
+     * itself. A Hugging Face tokenizer does so through a `TemplateProcessing` post-processor;
+     * one saved without it (transformers 5 writes LFM2.5-2.6B's that way) yields the bare
+     * text, and the runtime adds nothing of its own. Defaults to true, which is the shape
+     * every publisher export this app knew before 2026-09-07 had.
+     */
+    fun tokenizerAddsBos(tokenizerPath: String): Boolean = true
+
+    /**
      * Reads [ExportFacts] off the file through the plain module API, without opening it
      * for generation. Cheap: the file is mapped, nothing is run. Throws when the file
      * could not be read at all, which is not the same as a file that says nothing (codex

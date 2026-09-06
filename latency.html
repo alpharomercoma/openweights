@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Five Chips, Two Runtimes</title>
+<meta name="description" content="Time to first token and time per output token for five small language models on five phone chips, on llama.cpp and ExecuTorch.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600;75,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#EEF0F3; --panel:#F8F9FA; --ink:#1B2430; --ink2:#4A5563; --ink3:#66717F;
+  --line:#D5DAE1; --grid:#E2E6EB; --hi:#1B2430; --band:rgba(27,36,48,.06);
+  --d9400:#D08A1E; --sm8650:#2F6FB7; --elite:#163E7A; --g5:#3E8E5E; --e2400:#A94A7E;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+    --line:#2B3541; --grid:#232C37; --hi:#E9EDF2; --band:rgba(233,237,242,.08);
+    --d9400:#E6A43A; --sm8650:#5E97DB; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+  --line:#2B3541; --grid:#232C37; --hi:#E9EDF2; --band:rgba(233,237,242,.08);
+  --d9400:#E6A43A; --sm8650:#5E97DB; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;padding:28px 22px 56px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 32px;border-bottom:1px solid var(--line);padding-bottom:16px}
+h1{font:700 40px/1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h1 span{color:var(--ink3)}
+.sub{color:var(--ink2);max-width:62ch;margin:6px 0 0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:6px 14px;font:500 13.5px "Instrument Sans",sans-serif;cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab:focus-visible{outline:2px solid var(--sm8650);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;margin-top:22px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 18px 12px;min-width:0}
+.panel h2{font:600 13px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin:0 0 2px}
+.panel p{margin:0 0 10px;color:var(--ink2);font-size:13.5px}
+svg{width:100%;height:auto;display:block;overflow:visible}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;font-size:13px;color:var(--ink2);align-items:center}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+.ring{width:13px;height:13px;border-radius:50%;display:inline-block;border:2px solid var(--ink);background:transparent}
+.disc{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--ink)}
+.notes{margin-top:22px;color:var(--ink2);font-size:13.5px;max-width:78ch;display:grid;gap:6px}
+.notes b{color:var(--ink);font-weight:600}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 9px;border-radius:4px;font-size:12.5px;line-height:1.35;white-space:pre-line;z-index:5}
+.tip[hidden]{display:none}
+@media (prefers-reduced-motion:no-preference){svg .pt,svg .lnk{transition:opacity .15s}}
+</style>
+<div class="wrap">
+</head>
+<body>
+<header>
+  <div>
+    <h1>Five chips, two runtimes <span>&middot; TTFT and TPOT</span></h1>
+    <p class="sub">Median time to first token and time per output token, from 60 to 90 benchmark prompts per cell (GSM8K, IFEval, BFCL). Prompts run 19 to 772 tokens, median 92.</p>
+  </div>
+  <div class="tabs" id="tabs" role="group" aria-label="Model"></div>
+</header>
+
+<div class="grid">
+  <section class="panel">
+    <h2>Latency map</h2>
+    <p>Each line joins one chip's two runtimes. Lower and left is faster. Both axes are logarithmic.</p>
+    <svg id="map" viewBox="0 0 640 440" role="img" aria-label="Scatter of TTFT against TPOT"></svg>
+    <div class="legend" id="legend"></div>
+  </section>
+  <section class="panel">
+    <h2>All models, all chips</h2>
+    <p>The same numbers as a grid, both columns on logarithmic scales. <span class="k"><i class="disc"></i></span> llama.cpp &nbsp; <span class="k"><i class="ring"></i></span> ExecuTorch. The model picked above is banded.</p>
+    <svg id="dumb" viewBox="0 0 600 700" role="img" aria-label="Dumbbell grid of TTFT and TPOT per model and chip"></svg>
+  </section>
+</div>
+
+<div class="notes">
+  <div><b>Not matched conditions.</b> The Dimensity 9400 ran in hand under a desk fan. The Snapdragon 8 Gen 3 ran on Qualcomm Device Cloud and the 8 Elite, Tensor G5 and Exynos 2400 on Firebase Test Lab, racked, where phones throttle within about 40 seconds.</div>
+  <div><b>Two open gaps.</b> Tensor G5 and Exynos 2400 decode at about half speed on llama.cpp against ExecuTorch, cause unknown. SmolLM3 on ExecuTorch prefills at a third of llama.cpp's rate on every chip, which is the compiled model rather than the phones.</div>
+  <div><b>Files.</b> llama.cpp ran Q4_K_M GGUFs, Qwen3 at Q8_0. ExecuTorch ran the published XNNPACK INT8/INT4 exports, LFM2.5 as 8da4w and Llama 3.2 as SpinQuant. Runs on 2026-09-03 and 04, single pass, no repeats.</div>
+</div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const CHIPS=[
+ {id:"d9400",name:"Dimensity 9400",short:"D9400",v:"--d9400"},
+ {id:"sm8650",name:"Snapdragon 8 Gen 3",short:"8 Gen 3",v:"--sm8650"},
+ {id:"elite",name:"Snapdragon 8 Elite",short:"8 Elite",v:"--elite"},
+ {id:"g5",name:"Tensor G5",short:"Tensor G5",v:"--g5"},
+ {id:"e2400",name:"Exynos 2400",short:"Exynos 2400",v:"--e2400"},
+];
+// [ttft seconds, tpot ms] per chip in CHIPS order
+const DATA={
+ "Gemma 3 1B":  {llama:[[1.27,42],[1.02,51],[0.80,28],[1.35,113],[1.68,75]],  et:[[0.43,48],[0.37,27],[0.40,44],[0.48,50],[0.45,56]]},
+ "LFM2.5 1.2B": {llama:[[0.81,31],[0.73,43],[0.59,27],[0.83,106],[0.97,59]],  et:[[0.30,25],[0.44,27],[0.30,18],[0.32,46],[0.42,38]]},
+ "Qwen3 1.7B":  {llama:[[1.05,57],[0.49,74],[0.37,40],[1.17,184],[0.89,97]],  et:[[0.76,64],[0.77,41],[0.75,41],[0.89,94],[0.81,67]]},
+ "Llama 3.2 3B":{llama:[[2.39,82],[2.11,107],[1.70,83],[2.43,180],[3.46,151]],et:[[1.36,82],[1.82,91],[1.47,63],[1.55,125],[1.73,119]]},
+ "SmolLM3 3B":  {llama:[[1.18,79],[1.43,101],[1.03,79],[1.86,239],[1.79,132]],et:[[12.69,91],[10.33,85],[7.18,67],[15.90,108],[12.26,121]]},
+};
+const MODELS=Object.keys(DATA);
+let model="Qwen3 1.7B";
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const tip=document.getElementById("tip");
+function showTip(e,text){if(typeof text!=="string"){hideTip();return;}tip.textContent=text;tip.hidden=false;
+ const r=tip.getBoundingClientRect(),pad=8;const left=Math.max(pad,Math.min(e.clientX-r.width/2,window.innerWidth-r.width-pad));
+ let top=e.clientY-r.height-12;if(top<pad)top=e.clientY+12;tip.style.left=left+"px";tip.style.top=top+"px";}
+function hideTip(){tip.hidden=true}
+
+// tabs
+const tabs=document.getElementById("tabs");
+MODELS.forEach(m=>{const b=document.createElement("button");b.className="tab";b.textContent=m;b.setAttribute("aria-pressed",m===model);
+ b.onclick=()=>{model=m;[...tabs.children].forEach(c=>c.setAttribute("aria-pressed",c.textContent===m));drawMap();drawDumb();};tabs.appendChild(b);});
+
+// legend
+document.getElementById("legend").innerHTML=CHIPS.map(c=>`<span class="k"><i class="sw" style="background:var(${c.v})"></i>${c.name}</span>`).join("")+
+ `<span class="k"><i class="disc"></i>llama.cpp</span><span class="k"><i class="ring"></i>ExecuTorch</span>`;
+
+// ---------- latency map ----------
+const M={l:64,r:20,t:14,b:46},W=640,H=440;
+const X0=0.25,X1=20,Y0=15,Y1=300;
+const lx=v=>M.l+(Math.log10(v)-Math.log10(X0))/(Math.log10(X1)-Math.log10(X0))*(W-M.l-M.r);
+const ly=v=>H-M.b-(Math.log10(v)-Math.log10(Y0))/(Math.log10(Y1)-Math.log10(Y0))*(H-M.t-M.b);
+const XT=[0.3,0.5,1,2,5,10,20],YT=[20,30,50,100,200,300];
+function drawMap(){
+ hideTip();
+ const s=document.getElementById("map");const d=DATA[model];let o="";
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ XT.forEach(t=>{o+=`<line x1="${lx(t)}" x2="${lx(t)}" y1="${M.t}" y2="${H-M.b}" stroke="${grid}"/><text x="${lx(t)}" y="${H-M.b+18}" text-anchor="middle" font-size="11.5" fill="${ink2}" class="mono">${t<1?t.toFixed(1):t}</text>`});
+ YT.forEach(t=>{o+=`<line x1="${M.l}" x2="${W-M.r}" y1="${ly(t)}" y2="${ly(t)}" stroke="${grid}"/><text x="${M.l-8}" y="${ly(t)+4}" text-anchor="end" font-size="11.5" fill="${ink2}" class="mono">${t}</text>`});
+ o+=`<text x="${(M.l+W-M.r)/2}" y="${H-8}" text-anchor="middle" font-size="12" fill="${ink2}">Time to first token, seconds</text>`;
+ o+=`<text transform="translate(16 ${(M.t+H-M.b)/2}) rotate(-90)" text-anchor="middle" font-size="12" fill="${ink2}">Time per output token, ms</text>`;
+ o+=`<text x="${M.l+6}" y="${H-M.b-8}" font-size="11.5" fill="${ink3}">faster &#8601;</text>`;
+ CHIPS.forEach((c,i)=>{const a=d.llama[i],b=d.et[i],col=css(c.v);
+  o+=`<line class="lnk" x1="${lx(a[0])}" y1="${ly(a[1])}" x2="${lx(b[0])}" y2="${ly(b[1])}" stroke="${col}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".8"/>`});
+ CHIPS.forEach((c,i)=>{const col=css(c.v);const a=d.llama[i],b=d.et[i];
+  const near=Math.hypot(lx(a[0])-lx(b[0]),ly(a[1])-ly(b[1]))<4;
+  const ta=`${c.name} &middot; llama.cpp&#10;TTFT ${a[0].toFixed(2)} s &middot; TPOT ${a[1]} ms`,tb=`${c.name} &middot; ExecuTorch&#10;TTFT ${b[0].toFixed(2)} s &middot; TPOT ${b[1]} ms`;
+  const tt=near?`${c.name} &middot; both runtimes&#10;llama.cpp TTFT ${a[0].toFixed(2)} s &middot; TPOT ${a[1]} ms&#10;ExecuTorch TTFT ${b[0].toFixed(2)} s &middot; TPOT ${b[1]} ms`:null;
+  o+=`<circle class="pt" cx="${lx(b[0])}" cy="${ly(b[1])}" r="9" fill="none" pointer-events="all" stroke="${col}" stroke-width="2.4" data-t="${tt||tb}"/>`;
+  o+=`<circle class="pt" cx="${lx(a[0])}" cy="${ly(a[1])}" r="6" fill="${col}" stroke="${panel}" stroke-width="1.5" data-t="${tt||ta}"/>`;});
+ // chip labels: candidate spots on two rings around the llama.cpp disc, scored against every
+ // point, every connector, the labels already placed and the chart edge; cheapest wins. A spot
+ // on the outer ring gets a hairline leader back to its disc.
+ const pts=[],segs=[];
+ CHIPS.forEach((c,i)=>{const a=d.llama[i],b=d.et[i];const A=[lx(a[0]),ly(a[1])],B=[lx(b[0]),ly(b[1])];pts.push(A,B);segs.push([A,B]);});
+ const segDist=(px,py,[[x1,y1],[x2,y2]])=>{const vx=x2-x1,vy=y2-y1,l2=vx*vx+vy*vy||1;let t=((px-x1)*vx+(py-y1)*vy)/l2;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(x1+t*vx),py-(y1+t*vy));};
+ const boxes=[];const DIRS=[];for(let k=0;k<16;k++){const th=k*Math.PI/8;DIRS.push([Math.cos(th),-Math.sin(th)]);}
+ CHIPS.forEach((c,i)=>{const a=d.llama[i];const ax=lx(a[0]),ay=ly(a[1]);const w=c.short.length*6.6,h=11;
+  let best=null;
+  [15,30].forEach(rad=>DIRS.forEach(([ux,uy],k)=>{
+   const cx=ax+ux*rad,cy=ay+uy*rad;
+   const x0=ux>.3?cx:ux<-.3?cx-w:cx-w/2,y0=uy>.3?cy:uy<-.3?cy-h:cy-h/2;
+   let cost=(rad>15?6:0)+Math.min(k,16-k)*0.25;
+   if(x0<M.l+2||x0+w>W-M.r-2||y0<M.t||y0+h>H-M.b-2)cost+=1000;
+   const sam=[];for(let q=0;q<=4;q++){sam.push([x0+w*q/4,y0],[x0+w*q/4,y0+h],[x0+w*q/4,y0+h/2]);}
+   sam.forEach(([sx,sy])=>{pts.forEach(P=>{const dd=Math.hypot(sx-P[0],sy-P[1]);if(dd<13)cost+=(13-dd)*8;});
+    segs.forEach(S=>{const dd=segDist(sx,sy,S);if(dd<6)cost+=(6-dd)*6;});});
+   boxes.forEach(B=>{const ox=Math.min(x0+w,B.x+B.w+4)-Math.max(x0,B.x-4),oy=Math.min(y0+h,B.y+B.h+3)-Math.max(y0,B.y-3);if(ox>0&&oy>0)cost+=ox*oy*3;});
+   if(!best||cost<best.cost)best={cost,x0,y0,w,h,rad,cx,cy};}));
+  boxes.push({x:best.x0,y:best.y0,w:best.w,h:best.h});segs.push([[best.x0,best.y0+h/2],[best.x0+w,best.y0+h/2]]);
+  if(best.rad>15){const ex=Math.max(best.x0,Math.min(ax,best.x0+w)),ey=Math.max(best.y0,Math.min(ay,best.y0+h));o+=`<line x1="${ax}" y1="${ay}" x2="${ex}" y2="${ey}" stroke="${css(c.v)}" stroke-width="1" opacity=".7"/>`;}
+  o+=`<text x="${best.x0}" y="${best.y0+h-1}" font-size="11.5" fill="${ink}" font-weight="600" stroke="${panel}" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${c.short}</text>`;});
+ s.innerHTML=o;
+ s.querySelectorAll(".pt").forEach(p=>{p.addEventListener("mousemove",e=>showTip(e,p.dataset.t));p.addEventListener("mouseleave",hideTip)});
+}
+
+// ---------- dumbbell grid ----------
+const DW=600,DH=700,rowH=19,groupGap=16,gTop=40,left=112,colGap=28;
+const colW=(DW-left-16-colGap)/2;
+const scaleT=[0.25,20],scaleP=[15,300];
+const sx=(v,c0,s)=>c0+(Math.log10(v)-Math.log10(s[0]))/(Math.log10(s[1])-Math.log10(s[0]))*colW;
+function drawDumb(){
+ hideTip();
+ const s=document.getElementById("dumb");let o="";
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel"),line=css("--line");
+ const c0=left,c1=left+colW+colGap;
+ o+=`<text x="${c0}" y="16" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TTFT, s</text><text x="${c1}" y="16" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TPOT, ms</text>`;
+ [[c0,scaleT,[0.3,1,3,10]],[c1,scaleP,[20,50,100,200]]].forEach(([c,sc,ticks])=>{
+  ticks.forEach(t=>{const x=sx(t,c,sc);o+=`<line x1="${x}" x2="${x}" y1="${gTop-8}" y2="${DH-22}" stroke="${grid}"/><text x="${x}" y="${gTop-12}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${t}</text>`})});
+ let y=gTop+8;
+ MODELS.forEach(m=>{const d=DATA[m],on=m===model;
+  if(on){const h=rowH-2+CHIPS.length*rowH+6;o+=`<rect x="4" y="${y-12}" width="${DW-20}" height="${h}" rx="4" fill="${css("--band")}"/><rect x="4" y="${y-12}" width="3" height="${h}" fill="${ink}"/>`;}
+  o+=`<text x="14" y="${y+6}" font-size="12.5" font-weight="${on?700:600}" fill="${ink}">${m}</text>`;y+=rowH-2;
+  CHIPS.forEach((c,i)=>{const col=css(c.v),a=d.llama[i],b=d.et[i];
+   o+=`<g><text x="${left-10}" y="${y+4}" text-anchor="end" font-size="11" fill="${ink2}">${c.short}</text>`;
+   [[c0,scaleT,a[0],b[0],v=>v.toFixed(2)+" s"],[c1,scaleP,a[1],b[1],v=>v+" ms"]].forEach(([cx0,sc,va,vb,f])=>{
+    const xa=sx(va,cx0,sc),xb=sx(vb,cx0,sc);
+    o+=`<line x1="${xa}" x2="${xb}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="1.6" opacity=".7"/>`;
+    const near=Math.abs(xa-xb)<3;
+    const tt=near?`${m} &middot; ${c.name}&#10;llama.cpp ${f(va)} &middot; ExecuTorch ${f(vb)}`:null;
+    o+=`<circle class="pt" cx="${xb}" cy="${y}" r="6" fill="none" pointer-events="all" stroke="${col}" stroke-width="1.8" data-t="${tt||`${m} &middot; ${c.name}&#10;ExecuTorch ${f(vb)}`}"/>`;
+    o+=`<circle class="pt" cx="${xa}" cy="${y}" r="3.8" fill="${col}" data-t="${tt||`${m} &middot; ${c.name}&#10;llama.cpp ${f(va)}`}"/>`;});
+   o+=`</g>`;y+=rowH;});
+  y+=groupGap;
+  if(m!==MODELS[MODELS.length-1])o+=`<line x1="10" x2="${DW-16}" y1="${y-groupGap/2-2}" y2="${y-groupGap/2-2}" stroke="${line}"/>`;
+ });
+ s.innerHTML=o;
+ s.querySelectorAll(".pt").forEach(p=>{p.addEventListener("mousemove",e=>showTip(e,p.dataset.t));p.addEventListener("mouseleave",hideTip)});
+}
+drawMap();drawDumb();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{drawMap();drawDumb();});
+if(window.matchMedia){window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{drawMap();drawDumb();});}
+new MutationObserver(()=>{drawMap();drawDumb();}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+</script>
+</body>
+</html>

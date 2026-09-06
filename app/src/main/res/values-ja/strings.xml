@@ -242,7 +242,7 @@
     <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
     <string name="runtime">ランタイム</string>
     <string name="context_tokens_short">%1$d ctx</string>
-    <string name="compiled_withheld_multimodal">これはExecuTorch向けにコンパイルされた視覚または音声モデルです。OpenWeightsがExecuTorchで実行できるのはテキストモデルのみです。同じモデルのGGUF版ならllama.cppを通じて画像を読めます。GGUFを付けて名前を検索してください。</string>
+    <string name="compiled_withheld_multimodal">これはExecuTorch向けにコンパイルされた視覚または音声モデルです。ExecuTorchでOpenWeightsが画像を読めるのはLFM2.5-VLとGemma 3のエクスポートのみで、音声モデルは実行できません。他のファミリーの視覚モデルはGGUF版ならllama.cppを通じて画像を読めます。GGUFを付けて名前を検索してください。</string>
     <string name="compiled_withheld_family">OpenWeightsにはExecuTorch上でこのモデルファミリーのプロンプトテンプレートがないため、まだ実行できません。GGUF版があればllama.cppで動作します。</string>
     <string name="compiled_withheld_tokenizer">このリポジトリはコンパイル済みの重みを、必要なトークナイザーなしで公開しているため、実行できません。</string>
     <string name="compiled_withheld_backend">この重みは、このアプリがランタイムを持たないプロセッサ向けにコンパイルされています。同じモデルのXNNPACKエクスポートを探してください。</string>

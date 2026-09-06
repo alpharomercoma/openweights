@@ -246,7 +246,7 @@
     <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
     <string name="runtime">Runtime</string>
     <string name="context_tokens_short">%1$d ctx</string>
-    <string name="compiled_withheld_multimodal">Isang vision o audio na modelo ito na na-compile para sa ExecuTorch. Mga text na modelo lang ang pinapatakbo ng OpenWeights sa ExecuTorch; ang parehong modelo ay nakakabasa ng mga larawan dito sa GGUF nitong anyo, sa pamamagitan ng llama.cpp. Hanapin ang pangalan nito kasama ang GGUF.</string>
+    <string name="compiled_withheld_multimodal">Isang vision o audio na modelo ito na na-compile para sa ExecuTorch. Sa ExecuTorch, mga export lang ng LFM2.5-VL at Gemma 3 ang binabasa ng OpenWeights ng mga larawan, at hindi ito nagpapatakbo ng mga audio na modelo. Ang isang vision na modelo ng ibang pamilya ay nakakabasa ng mga larawan dito sa GGUF nitong anyo, sa pamamagitan ng llama.cpp. Hanapin ang pangalan nito kasama ang GGUF.</string>
     <string name="compiled_withheld_family">Walang prompt template ang OpenWeights para sa pamilyang ito ng modelo sa ExecuTorch, kaya hindi pa ito mapapatakbo. Ang GGUF nitong anyo, kung mayroon, ay tumatakbo sa llama.cpp.</string>
     <string name="compiled_withheld_tokenizer">Naglalathala ang repository na ito ng mga na-compile na weight nang walang tokenizer na kailangan nila, kaya hindi ito mapapatakbo.</string>
     <string name="compiled_withheld_backend">Na-compile ang mga weight na ito para sa isang processor na walang runtime ang app na ito. Maghanap ng XNNPACK export ng parehong modelo.</string>

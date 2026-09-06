@@ -75,9 +75,19 @@ class PromptTemplatesTest {
             "react-native-executorch-lfm2.5-VL-1.6B-lfm2_5_vl_1_6b_8da4w_xnnpack.pte",
         )
         assertThat(vl).isSameInstanceAs(PromptTemplates.forModel("lfm2.5.pte"))
-        assertThat(vl?.visionInputSide).isEqualTo(512)
+        assertThat(vl?.vision?.side).isEqualTo(512)
+        assertThat(vl?.vision?.pixels).isEqualTo(PixelRange.RAW)
         assertThat(PromptTemplates.forModel("Qwen3-VL-2B.pte")).isNull()
-        assertThat(PromptTemplates.forModel("qwen3.pte")?.visionInputSide).isNull()
+        assertThat(PromptTemplates.forModel("qwen3.pte")?.vision).isNull()
+        // Gemma 3's official export: the processor's 896 square, normalised, 256 positions.
+        val gemma = PromptTemplates.forModel("gemma-3-4b-it-HQQ-INT8-INT4.pte")?.vision
+        assertThat(gemma?.side).isEqualTo(896)
+        assertThat(gemma?.tokens).isEqualTo(256)
+        assertThat(gemma?.pixels).isEqualTo(PixelRange.SIGNED)
+        assertThat(gemma?.fit).isEqualTo(Fit.STRETCH)
+        assertThat(vl?.vision?.fit).isEqualTo(Fit.LETTERBOX)
+        assertThat(gemma?.before).endsWith("<start_of_image>")
+        assertThat(gemma?.after).startsWith("<end_of_image>")
     }
 
     @Test

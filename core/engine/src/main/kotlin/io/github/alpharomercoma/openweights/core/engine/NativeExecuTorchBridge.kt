@@ -77,21 +77,21 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
      */
     override fun exportedContextLength(modelPath: String): Int? = probe(modelPath).contextLength
 
-    override fun probe(modelPath: String): ExportFacts = runCatching {
+    override fun probe(modelPath: String): ExportFacts {
         val program = Module.load(modelPath, Module.LOAD_MODE_MMAP)
         try {
             val methods = program.getMethods().toSet()
             val window = WINDOW_METHODS.firstOrNull { it in methods }?.let { name ->
                 program.execute(name).firstOrNull()?.takeIf { it.isInt }?.toInt()?.toInt()
             }
-            ExportFacts(
+            return ExportFacts(
                 contextLength = window?.takeIf { it > 0 },
                 hasVision = VISION_ENCODER_METHOD in methods,
             )
         } finally {
             program.destroy()
         }
-    }.getOrDefault(ExportFacts(contextLength = null, hasVision = false))
+    }
 
     override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
         val running = module ?: throw LlamaException("No model loaded")

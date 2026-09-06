@@ -28,6 +28,7 @@ import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
 import io.github.alpharomercoma.openweights.core.common.model.SamplerParams
 import io.github.alpharomercoma.openweights.core.common.model.ToolCallParser
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
+import io.github.alpharomercoma.openweights.core.common.model.VisionSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ProducerScope
@@ -148,7 +149,10 @@ class ExecuTorchEngine(
         // The window is the file's, not the preference's. A preference above it is clamped
         // by the runtime anyway, and reporting the preference upstream made every budget
         // in the app wrong by the difference.
-        val facts = bridge.probe(modelFile.absolutePath)
+        // A file that cannot be probed is not refused here; the runner's own open below is
+        // the authority on whether it can be run, and says so with a message.
+        val facts = runCatching { bridge.probe(modelFile.absolutePath) }
+            .getOrDefault(ExportFacts(contextLength = null, hasVision = false))
         val exported = facts.contextLength
         contextSize = when {
             exported == null -> params.contextLength
@@ -158,7 +162,17 @@ class ExecuTorchEngine(
         // Pictures need both halves: an encoder in the file and a template that knows
         // the square it takes. A vision export of a family this app cannot feed opens as
         // text, which is honest and still useful.
-        multimodal = facts.hasVision && rendering.visionInputSide != null
+        multimodal = facts.hasVision && rendering.vision != null
+        // The multimodal runner in the AAR this app ships aborts the whole process, not the
+        // call, when an export lacks the window method it reads first (measured with an
+        // older exporter's SmolVLM2: "Required metadata method get_max_seq_len not found").
+        // A file that cannot say its window is refused before the runner sees it.
+        if (multimodal && exported == null) {
+            refuse(
+                "${modelFile.name} was exported without the metadata this app's ExecuTorch " +
+                    "runtime needs to read pictures. Ask its publisher for a current export.",
+            )
+        }
         if (!bridge.load(
                 modelFile.absolutePath,
                 tokenizer.absolutePath,
@@ -506,31 +520,38 @@ class ExecuTorchEngine(
         pictures: List<MessagePart.File>,
         rendering: PromptTemplate,
     ): String {
-        val side =
-            rendering.visionInputSide ?: throw LlamaException("This model cannot read pictures")
+        val spec = rendering.vision ?: throw LlamaException("This model cannot read pictures")
         val segments = fresh.split(PICTURE_MARKER)
-        refuseUnlessPicturesFit(segments, pictures, rendering, fresh)
+        refuseUnlessPicturesFit(segments, pictures, spec, fresh)
         var carried = ""
         pictures.forEachIndexed { index, picture ->
             // Each picture is a second or two of encoder; a Stop is honoured between them.
             if (cancelRequested) throw StoppedWhileFeeding()
-            bridge.prefill(carried + segments[index] + IMAGE_START)
+            bridge.prefill(carried + segments[index] + spec.before)
             feedingPictures = true
             try {
-                bridge.prefillImage(readPicture(picture, side), side, side, Letterbox.CHANNELS)
+                bridge.prefillImage(
+                    readPicture(picture, spec),
+                    spec.side,
+                    spec.side,
+                    Letterbox.CHANNELS,
+                )
             } finally {
                 feedingPictures = false
             }
-            carried = IMAGE_END
+            carried = spec.after
         }
         return carried + segments.last()
     }
 
-    private fun readPicture(picture: MessagePart.File, side: Int): FloatArray =
-        reader.read(picture.path, side)
+    /** The picture on the encoder's square, in the range the encoder takes. */
+    private fun readPicture(picture: MessagePart.File, spec: VisionSpec): FloatArray {
+        val raw = reader.read(picture.path, spec.side, spec.fit)
             ?: throw LlamaException(
                 "Could not read ${picture.name ?: picture.path.substringAfterLast('/')}",
             )
+        return spec.pixels.applyTo(raw)
+    }
 
     /**
      * Refused before the first encoder call rather than discovered at the last: eight
@@ -539,7 +560,7 @@ class ExecuTorchEngine(
     private fun refuseUnlessPicturesFit(
         segments: List<String>,
         pictures: List<MessagePart.File>,
-        rendering: PromptTemplate,
+        spec: VisionSpec,
         fresh: String,
     ) {
         if (segments.size != pictures.size + 1) {
@@ -547,8 +568,9 @@ class ExecuTorchEngine(
                 "${segments.size - 1} picture markers for ${pictures.size} pictures",
             )
         }
-        val visual = pictures.size * rendering.visualTokensPerPicture
-        val text = fresh.length / WARM_CHARS_PER_TOKEN
+        val visual = pictures.size * spec.tokens
+        val brackets = pictures.size * (spec.before.length + spec.after.length)
+        val text = (fresh.length + brackets) / WARM_CHARS_PER_TOKEN
         if (visual + text >= contextSize) {
             throw ContextWindowExceededException(
                 "${pictures.size} pictures take $visual of this model's $contextSize positions, " +
@@ -876,8 +898,6 @@ private const val WARM_PIECE_CHARS = 800
 
 /** Stands in for a picture in the rendered prompt until the picture is fed in its place. */
 private const val PICTURE_MARKER = "\u0000picture\u0000"
-private const val IMAGE_START = "<|image_start|>"
-private const val IMAGE_END = "<|image_end|>"
 
 /** The app-wide rough estimate; the runtime reports no token count for a prefill. */
 private const val WARM_CHARS_PER_TOKEN = 4

@@ -67,6 +67,8 @@ data class LocalModel(
     val publisher: String? = null,
     /** The window a compiled model was exported with; null for a GGUF or until read. */
     val contextWindow: Int? = null,
+    /** Whether a compiled model carries a vision encoder; null until the file has been read. */
+    val readsPictures: Boolean? = null,
 ) {
     val name: String get() = file.nameWithoutExtension
 
@@ -80,12 +82,11 @@ data class LocalModel(
      * carries its encoder inside the one file, so its name is the only sign before load.
      */
     val isMultimodal: Boolean
-        get() = projector != null ||
-            (
-                isCompiled &&
-                    namedLikeVlm &&
-                    PromptTemplates.forModel(file.name)?.visionInputSide != null
-                )
+        get() = projector != null || (isCompiled && feedable && (readsPictures ?: namedLikeVlm))
+
+    /** Whether this app knows how to hand this family's export a picture at all. */
+    private val feedable: Boolean
+        get() = PromptTemplates.forModel(file.name)?.vision != null
 
     /**
      * Matched with every separator removed, the way the prompt templates match families:
@@ -274,17 +275,23 @@ class ModelsViewModel @Inject constructor(
      *
      * Off the main thread, because reading it maps the file and runs one tiny method of
      * the program, and the list is shown before the answers arrive rather than after.
-     * The store remembers each answer, so this is one read per file per install.
+     * The store remembers each answer for the life of the process, so this is one read
+     * per file per launch.
      */
     private fun readWindows(models: List<LocalModel>) {
-        val unread = models.filter { it.isCompiled && it.contextWindow == null }
+        val unread = models.filter { it.isCompiled && it.readsPictures == null }
         if (unread.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
-            val read = unread.associate { it.file to modelStore.exportedWindow(it.file) }
+            val read = unread.associate { it.file to modelStore.exportFacts(it.file) }
             local.update { state ->
                 state.copy(
                     models = state.models.map { model ->
-                        read[model.file]?.let { model.copy(contextWindow = it) } ?: model
+                        read[model.file]?.let {
+                            model.copy(
+                                contextWindow = it.contextLength,
+                                readsPictures = it.hasVision,
+                            )
+                        } ?: model
                     },
                 )
             }
@@ -297,7 +304,8 @@ class ModelsViewModel @Inject constructor(
                 file,
                 modelStore.projectorFor(file),
                 modelStore.publisherOf(file.name),
-                contextWindow = modelStore.knownWindow(file),
+                contextWindow = modelStore.knownFacts(file)?.contextLength,
+                readsPictures = modelStore.knownFacts(file)?.hasVision,
             )
         }
         readWindows(models)

@@ -65,16 +65,13 @@ interface PromptTemplate {
     val supportsThinking: Boolean get() = false
 
     /**
-     * The square a compiled vision export of this family takes a picture as, or null
-     * when the family has no vision export this app knows how to feed.
+     * How this family's compiled vision export takes a picture, or null when the family
+     * has no vision export this app knows how to feed.
      *
-     * A number here does not make a file multimodal; the file says that itself with a
-     * `vision_encoder` method. It says how to letterbox a picture for one that does.
+     * A spec here does not make a file multimodal; the file says that itself with a
+     * `vision_encoder` method. It says how to feed a picture to one that does.
      */
-    val visionInputSide: Int? get() = null
-
-    /** The positions one picture takes in the cache on such an export; zero without one. */
-    val visualTokensPerPicture: Int get() = 0
+    val vision: VisionSpec? get() = null
 
     /**
      * @param thinking whether the model may reason before answering. Families that support
@@ -263,6 +260,23 @@ private object Gemma3Template : PromptTemplate {
     override val stopMarkers: List<String> = listOf("<end_of_turn>")
     override val supportsTools: Boolean = false
 
+    /**
+     * The official Gemma 3 4B export (optimum-executorch, `multimodal-text-to-text`): the
+     * SigLIP tower takes an 896 square as the processor would hand it, mean 0.5 and
+     * standard deviation 0.5, and yields 256 positions. The processor writes the picture
+     * as two blank lines, the opening token, the soft tokens, the closing token and two
+     * more blank lines; the soft tokens are what the embeddings stand in for. Its processor
+     * resizes straight to the square (`do_pan_and_scan` off), so no letterbox.
+     */
+    override val vision: VisionSpec = VisionSpec(
+        side = 896,
+        tokens = 256,
+        before = "\n\n<start_of_image>",
+        after = "<end_of_image>\n\n",
+        pixels = PixelRange.SIGNED,
+        fit = Fit.STRETCH,
+    )
+
     override fun render(
         messages: List<ChatMessage>,
         tools: List<ToolDefinition>,
@@ -283,9 +297,19 @@ private object Lfm25Template : PromptTemplate {
     // (codex QA), and a control that does nothing is worse than no control.
     override val supportsThinking: Boolean = false
 
-    /** LFM2.5-VL's tile: 512 px, 256 visual tokens after the 2x downsample. */
-    override val visionInputSide: Int = 512
-    override val visualTokensPerPicture: Int = 256
+    /**
+     * Software Mansion's LFM2.5-VL export: one 512 tile, 256 positions after the 2x
+     * downsample, rescale and normalise baked into the graph so it takes the raw bytes, the
+     * processor's brackets with nothing else around them, and their runner's letterbox.
+     */
+    override val vision: VisionSpec = VisionSpec(
+        side = 512,
+        tokens = 256,
+        before = "<|image_start|>",
+        after = "<|image_end|>",
+        pixels = PixelRange.RAW,
+        fit = Fit.LETTERBOX,
+    )
 
     override fun render(
         messages: List<ChatMessage>,

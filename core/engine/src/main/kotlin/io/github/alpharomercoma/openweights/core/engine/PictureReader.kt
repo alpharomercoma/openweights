@@ -20,6 +20,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
+import io.github.alpharomercoma.openweights.core.common.model.Fit
 import kotlin.math.roundToInt
 
 /**
@@ -30,7 +31,7 @@ import kotlin.math.roundToInt
  */
 fun interface PictureReader {
     /** Channels-first floats in 0..255, `3 * side * side` of them, or null if unreadable. */
-    fun read(path: String, side: Int): FloatArray?
+    fun read(path: String, side: Int, fit: Fit): FloatArray?
 }
 
 /**
@@ -124,9 +125,23 @@ private const val QUARTER_TURN = 90f
 private const val HALF_TURN = 180f
 private const val THREE_QUARTER_TURN = 270f
 
-/** The reader the app uses: Android's decoder, scaled to fit, then [Letterbox]. */
+/** The reader the app uses: Android's decoder, scaled as the [Fit] says, then [Letterbox]. */
 class AndroidPictureReader : PictureReader {
-    override fun read(path: String, side: Int): FloatArray? {
+    /**
+     * The size a [width] x [height] picture is scaled to for a [side] square. A stretched
+     * picture fills the square, so the letterbox has nothing to pad; one packing serves both.
+     */
+    private fun scaledSize(width: Int, height: Int, side: Int, fit: Fit): Pair<Int, Int> =
+        when (fit) {
+            Fit.STRETCH -> side to side
+            Fit.LETTERBOX -> {
+                val scale = side.toFloat() / maxOf(width, height)
+                (width * scale).roundToInt().coerceIn(1, side) to
+                    (height * scale).roundToInt().coerceIn(1, side)
+            }
+        }
+
+    override fun read(path: String, side: Int, fit: Fit): FloatArray? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
@@ -145,9 +160,7 @@ class AndroidPictureReader : PictureReader {
         val decoded = raw.upright(runCatching { ExifInterface(path) }.getOrNull())
         if (decoded !== raw) raw.recycle()
         try {
-            val scale = side.toFloat() / maxOf(decoded.width, decoded.height)
-            val width = (decoded.width * scale).roundToInt().coerceIn(1, side)
-            val height = (decoded.height * scale).roundToInt().coerceIn(1, side)
+            val (width, height) = scaledSize(decoded.width, decoded.height, side, fit)
             val scaled = if (width == decoded.width && height == decoded.height) {
                 decoded
             } else {

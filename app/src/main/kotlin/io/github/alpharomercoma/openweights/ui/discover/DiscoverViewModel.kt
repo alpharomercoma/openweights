@@ -95,7 +95,10 @@ data class InspectedFile(
 
 /** The reasons every compiled file of a repository can be withheld at once. */
 enum class CompiledWithheld {
-    /** A vision or audio export. This app runs ExecuTorch text models only. */
+    /**
+     * A vision or audio export of a family this app cannot feed a picture to. The families
+     * it can (LFM2.5-VL, Gemma 3) have a template and so are offered, not withheld.
+     */
     MULTIMODAL,
 
     /** A family the prompt side cannot render. */

@@ -248,7 +248,7 @@
     <string name="no_archived_match">لا توجد محادثة مؤرشفة تذكر ذلك.</string>
     <string name="runtime">بيئة التشغيل</string>
     <string name="context_tokens_short">%1$d ctx</string>
-    <string name="compiled_withheld_multimodal">هذا نموذج رؤية أو صوت مُجمَّع لـ ExecuTorch. يشغّل OpenWeights نماذج النص فقط على ExecuTorch؛ النموذج نفسه يقرأ الصور هنا بصيغة GGUF عبر llama.cpp. ابحث عن اسمه مع GGUF.</string>
+    <string name="compiled_withheld_multimodal">هذا نموذج رؤية أو صوت مُجمَّع لـ ExecuTorch. على ExecuTorch، يقرأ OpenWeights الصور بإصدارات LFM2.5-VL وGemma 3 فقط، ولا يشغّل نماذج الصوت. نموذج الرؤية من عائلة أخرى يقرأ الصور هنا بصيغة GGUF عبر llama.cpp. ابحث عن اسمه مع GGUF.</string>
     <string name="compiled_withheld_family">لا يملك OpenWeights قالب موجّه لعائلة النماذج هذه على ExecuTorch، لذا لا يمكن تشغيلها بعد. صيغة GGUF، إن وُجدت، تعمل عبر llama.cpp.</string>
     <string name="compiled_withheld_tokenizer">ينشر هذا المستودع أوزانًا مُجمَّعة بدون المُرمِّز الذي تحتاجه، لذا لا يمكن تشغيلها.</string>
     <string name="compiled_withheld_backend">جُمِّعت هذه الأوزان لمعالج لا يحمل هذا التطبيق بيئة تشغيل له. ابحث عن تصدير XNNPACK للنموذج نفسه.</string>

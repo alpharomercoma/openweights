@@ -22,9 +22,9 @@ import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
+import io.github.alpharomercoma.openweights.core.engine.ExportFacts
 import io.github.alpharomercoma.openweights.core.hub.DOWNLOAD_PARTIAL_SUFFIX
 import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -69,25 +69,33 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
      * the same name is read again and one that has not changed is read once. Null for a
      * GGUF, whose window is chosen at load, and for a file that does not say.
      */
-    fun exportedWindow(model: File): Int? {
+    fun exportedWindow(model: File): Int? = exportFacts(model)?.contextLength
+
+    /**
+     * What a compiled file says about itself, read once and remembered: its window and
+     * whether it carries a vision encoder. Null for a GGUF, whose header is read elsewhere.
+     */
+    fun exportFacts(model: File): ExportFacts? {
         if (ModelFormat.of(model.name) != ModelFormat.PTE) return null
         val key = windowKey(model)
-        windows[key]?.let { return it.takeIf { window -> window > 0 } }
-        val window = runCatching {
-            ExecuTorchSupport.bridge().exportedContextLength(model.absolutePath)
-        }.getOrNull()
-        windows[key] = window ?: 0
-        return window
+        // One probe at a time: two refreshes racing on a 3 GB file would map it twice, and
+        // a probe that fails is not remembered, so it is asked again next time rather than
+        // standing as "text-only" for the rest of the process (codex QA).
+        synchronized(facts) {
+            facts[key]?.let { return it }
+            return runCatching { ExecuTorchSupport.bridge().probe(model.absolutePath) }
+                .getOrNull()
+                ?.also { facts[key] = it }
+        }
     }
 
-    /** What [exportedWindow] already knows, without reading anything. */
-    fun knownWindow(model: File): Int? = windows[windowKey(model)]?.takeIf { it > 0 }
+    /** What [exportFacts] already knows, without reading anything. */
+    fun knownFacts(model: File): ExportFacts? = facts[windowKey(model)]
 
     private fun windowKey(model: File) =
         "${model.absolutePath}:${model.length()}:${model.lastModified()}"
 
-    /** Zero stands for "read, and the file did not say", so it is not read again. */
-    private val windows = ConcurrentHashMap<String, Int>()
+    private val facts = HashMap<String, ExportFacts>()
 
     /**
      * True while any download is still writing into this directory.

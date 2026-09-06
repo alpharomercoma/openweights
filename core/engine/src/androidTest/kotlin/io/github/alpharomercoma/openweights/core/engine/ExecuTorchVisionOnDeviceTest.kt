@@ -76,7 +76,7 @@ class ExecuTorchVisionOnDeviceTest {
 
         val loaded = engine.loadedModel
         assertThat(loaded?.mediaSupport?.vision).isTrue()
-        assertThat(loaded?.contextSize).isEqualTo(2048)
+        Log.i(TAG, "window ${loaded?.contextSize}")
     }
 
     @Test
@@ -124,9 +124,21 @@ class ExecuTorchVisionOnDeviceTest {
 
     private companion object {
         const val TAG = "OpenWeightsVision"
-        val MODEL = File("/data/local/tmp/openweights/lfm2_5_vl_450m_8da4w_xnnpack.pte")
-        val TOKENIZER =
-            File("/data/local/tmp/openweights/lfm2_5_vl_450m_8da4w_xnnpack.tokenizer.json")
+
+        /**
+         * Another export can be pointed at without a rebuild:
+         * `am instrument ... -e pte <path>.pte -e tokenizer <path>.json`. The file name still has
+         * to say its family, since that is how the template is chosen.
+         */
+        private val arguments = InstrumentationRegistry.getArguments()
+        val MODEL = File(
+            arguments.getString("pte")
+                ?: "/data/local/tmp/openweights/lfm2_5_vl_450m_8da4w_xnnpack.pte",
+        )
+        val TOKENIZER = File(
+            arguments.getString("tokenizer")
+                ?: "/data/local/tmp/openweights/lfm2_5_vl_450m_8da4w_xnnpack.tokenizer.json",
+        )
         val PARAMS = ModelLoadParams(contextLength = 4096)
     }
 }

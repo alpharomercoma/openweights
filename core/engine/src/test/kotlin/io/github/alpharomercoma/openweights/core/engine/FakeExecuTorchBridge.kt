@@ -85,9 +85,14 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     override fun probe(modelPath: String): ExportFacts =
         ExportFacts(exportedContextLength, hasVision)
 
+    /** The smallest and largest channel value of the last picture, as the encoder saw them. */
+    var pixelRange: ClosedFloatingPointRange<Float>? = null
+        private set
+
     override fun prefillImage(pixels: FloatArray, width: Int, height: Int, channels: Int) {
         require(pixels.size == width * height * channels)
         pictures += Triple(width, height, channels)
+        pixelRange = pixels.min()..pixels.max()
         fed += "<picture $width x $height>"
     }
 

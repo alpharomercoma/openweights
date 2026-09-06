@@ -58,7 +58,10 @@ interface ExecuTorchBridge {
 
     /**
      * Reads [ExportFacts] off the file through the plain module API, without opening it
-     * for generation. Cheap: the file is mapped, nothing is run.
+     * for generation. Cheap: the file is mapped, nothing is run. Throws when the file
+     * could not be read at all, which is not the same as a file that says nothing (codex
+     * QA: a probe that failed once under memory pressure used to be remembered as
+     * "text-only, no window" for the rest of the process).
      */
     fun probe(modelPath: String): ExportFacts = ExportFacts(exportedContextLength(modelPath), false)
 

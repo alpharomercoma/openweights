@@ -320,6 +320,11 @@ fun OpenWeightsApp(
             val viewModel: DiscoverViewModel = hiltViewModel()
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             val modelsState by modelsViewModel.uiState.collectAsStateWithLifecycle()
+            // A download that lands while the page is open turns its button into "On this
+            // device" here rather than on the next visit.
+            LaunchedEffect(modelsState.models) {
+                viewModel.markInstalled(modelsState.models.map { it.file.name }.toSet())
+            }
 
             DiscoverScreen(
                 state = state,

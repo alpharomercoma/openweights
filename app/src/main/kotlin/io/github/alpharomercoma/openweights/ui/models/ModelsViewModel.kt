@@ -64,6 +64,8 @@ data class LocalModel(
      * and a wrong attribution is worse than none.
      */
     val publisher: String? = null,
+    /** The window a compiled model was exported with; null for a GGUF or until read. */
+    val contextWindow: Int? = null,
 ) {
     val name: String get() = file.nameWithoutExtension
 
@@ -248,10 +250,38 @@ class ModelsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fills in the exported window of each compiled model the store has not read yet.
+     *
+     * Off the main thread, because reading it maps the file and runs one tiny method of
+     * the program, and the list is shown before the answers arrive rather than after.
+     * The store remembers each answer, so this is one read per file per install.
+     */
+    private fun readWindows(models: List<LocalModel>) {
+        val unread = models.filter { it.isCompiled && it.contextWindow == null }
+        if (unread.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val read = unread.associate { it.file to modelStore.exportedWindow(it.file) }
+            local.update { state ->
+                state.copy(
+                    models = state.models.map { model ->
+                        read[model.file]?.let { model.copy(contextWindow = it) } ?: model
+                    },
+                )
+            }
+        }
+    }
+
     fun refresh() {
         val models = modelStore.availableModels().map { file ->
-            LocalModel(file, modelStore.projectorFor(file), modelStore.publisherOf(file.name))
+            LocalModel(
+                file,
+                modelStore.projectorFor(file),
+                modelStore.publisherOf(file.name),
+                contextWindow = modelStore.knownWindow(file),
+            )
         }
+        readWindows(models)
         local.update {
             it.copy(
                 models = models,

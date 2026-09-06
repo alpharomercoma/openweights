@@ -258,6 +258,7 @@
     <string name="nothing_archived">No hay nada archivado. Archivar un chat lo saca de la lista y lo conserva.</string>
     <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
     <string name="runtime">Runtime</string>
+    <string name="context_tokens_short">%1$d ctx</string>
     <string name="context_fixed_at_export">La ventana de contexto quedó fijada al exportar este modelo</string>
     <string name="canvas_title">Lienzo</string>
     <string name="canvas_empty">No se está mostrando nada ahora mismo. Pide al modelo que cree una página o un documento.</string>

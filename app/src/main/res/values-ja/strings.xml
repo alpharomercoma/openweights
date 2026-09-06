@@ -241,6 +241,7 @@
     <string name="nothing_archived">アーカイブは空です。チャットをアーカイブすると、一覧から外れますが残ります。</string>
     <string name="no_archived_match">その言葉を含むアーカイブ済みのチャットはありません。</string>
     <string name="runtime">ランタイム</string>
+    <string name="context_tokens_short">%1$d ctx</string>
     <string name="context_fixed_at_export">コンテキストウィンドウはこのモデルのエクスポート時に固定されています</string>
     <string name="canvas_title">キャンバス</string>
     <string name="canvas_empty">現在表示中のものはありません。モデルにページやドキュメントの作成を頼んでください。</string>

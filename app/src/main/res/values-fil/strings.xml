@@ -245,6 +245,7 @@
     <string name="nothing_archived">Walang naka-archive. Kapag na-archive ang chat, aalis ito sa listahan pero mananatili.</string>
     <string name="no_archived_match">Walang naka-archive na chat na bumabanggit niyan.</string>
     <string name="runtime">Runtime</string>
+    <string name="context_tokens_short">%1$d ctx</string>
     <string name="context_fixed_at_export">Naitakda ang context window noong i-export ang modelong ito</string>
     <string name="canvas_title">Canvas</string>
     <string name="canvas_empty">Walang ipinapakita sa ngayon. Hilingin sa modelo na gumawa ng page o dokumento.</string>

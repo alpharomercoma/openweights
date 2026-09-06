@@ -501,6 +501,32 @@ class DiscoverViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Re-reads which of the open repository's files are on the phone.
+     *
+     * Decided once when the repository opened, and then stale: a download finishing while
+     * the page was open took its progress ring away and put the Download button back, on
+     * a file that had just arrived. The models list is the authority on what is installed
+     * and changes the moment a download lands, so the shell hands its names in here.
+     */
+    fun markInstalled(installed: Set<String>) {
+        val repoId = _uiState.value.detail?.model?.id ?: return
+        _uiState.update { state ->
+            state.copy(
+                files = state.files.map { inspected ->
+                    val name = when (ModelFormat.of(inspected.file.fileName)) {
+                        ModelFormat.PTE -> ExecuTorchFileName.modelNameFor(
+                            repoId,
+                            inspected.file.path,
+                        )
+                        else -> inspected.file.fileName
+                    }
+                    inspected.copy(isDownloaded = name in installed)
+                },
+            )
+        }
+    }
+
     fun closeModel() {
         detailJob?.cancel()
         _uiState.update { it.copy(detail = null, files = emptyList()) }

@@ -20,12 +20,15 @@ import io.github.alpharomercoma.openweights.core.hub.HubHttp.withRangeFrom
 import io.github.alpharomercoma.openweights.core.hub.HubHttp.withToken
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -248,7 +251,47 @@ class ModelDownloader @Inject constructor(
             }
             .build()
 
-        httpClient.newCall(request).execute().use { response ->
+        // Cancelling used to wait for the socket. The copy loop checks for cancellation
+        // between reads, and a read blocks until the next chunk arrives, which on a slow
+        // or stalled connection is the read timeout: a Cancel tap that took a minute to
+        // take. Closing the call from the cancellation itself makes the read fail at once.
+        //
+        // A watcher coroutine rather than a completion handler on the job: a job completes
+        // only once its blocked read returns, which is the wait being removed, whereas a
+        // coroutine parked in awaitCancellation is resumed the moment cancellation is asked
+        // for, and its finally block is where the call is closed.
+        val call = httpClient.newCall(request)
+        coroutineScope {
+            val watcher = launch {
+                try {
+                    awaitCancellation()
+                } finally {
+                    call.cancel()
+                }
+            }
+            try {
+                call.execute().use { response ->
+                    transferResponse(response, file, partial, alreadyHave, running)
+                }
+            } catch (failure: IOException) {
+                // A closed call reads as an IOException; if that is because this download
+                // was cancelled, the cancellation is the truth and the IOException is noise.
+                currentCoroutineContext().ensureActive()
+                throw failure
+            } finally {
+                watcher.cancel()
+            }
+        }
+    }
+
+    private suspend fun FlowCollector<DownloadProgress>.transferResponse(
+        response: Response,
+        file: HubFile,
+        partial: File,
+        alreadyHave: Long,
+        running: RunningHash?,
+    ) {
+        run {
             if (!response.isSuccessful) {
                 when (response.rangeVerdict(alreadyHave)) {
                     RangeVerdict.COMPLETE -> return

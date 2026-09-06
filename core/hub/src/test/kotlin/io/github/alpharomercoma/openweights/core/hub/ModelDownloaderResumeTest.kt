@@ -18,7 +18,9 @@ package io.github.alpharomercoma.openweights.core.hub
 
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -375,6 +377,33 @@ class ModelDownloaderResumeTest {
         assertThat((failure as DownloadException).isRetryable).isTrue()
         assertThat(destination.exists()).isFalse()
         assertThat(File(folder.root, "weights.gguf.part").exists()).isFalse()
+    }
+
+    @Test
+    fun `cancelling a download that is waiting on the socket returns at once`() = runBlocking {
+        // A friend's report from the Play build: Cancel did nothing for a long moment. The
+        // loop only looked for cancellation between reads, and a read waits for the next
+        // chunk, so on a stalled connection Cancel waited for the read timeout.
+        val destination = File(folder.root, "weights.gguf")
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .body(body(whole))
+                // One byte every ten seconds: the reader is always inside a read.
+                .throttleBody(1, 10, java.util.concurrent.TimeUnit.SECONDS)
+                .build(),
+        )
+        val job = launch(kotlinx.coroutines.Dispatchers.IO) {
+            downloader.download("owner/repo", hubFile(), destination).collect { }
+        }
+        kotlinx.coroutines.delay(500)
+
+        val started = System.nanoTime()
+        job.cancelAndJoin()
+        val tookMs = (System.nanoTime() - started) / 1_000_000
+
+        assertThat(tookMs).isLessThan(2_000)
+        assertThat(destination.exists()).isFalse()
     }
 
     @Test

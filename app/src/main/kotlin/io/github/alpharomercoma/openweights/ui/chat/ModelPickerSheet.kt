@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -143,8 +144,12 @@ fun ModelPickerSheet(
             // actions off the sheet with no way to reach them (codex UI review). The
             // weight gives the list whatever the sheet has left after the footer, which
             // is the property the cap was approximating.
+            // Most of the screen, not a fixed 300 dp. Three rows at a time on a list of
+            // eight meant scrolling inside a sheet to find a model, which is the one thing
+            // a picker exists to avoid; the actions below still fit without scrolling.
+            val listMax = (LocalConfiguration.current.screenHeightDp * LIST_SHARE).dp
             LazyColumn(
-                modifier = Modifier.weight(1f, fill = false).heightIn(max = LIST_MAX),
+                modifier = Modifier.weight(1f, fill = false).heightIn(max = listMax),
             ) {
                 // Grouped the same way Manage Models groups them, because they are the same
                 // list and a person who learns one order should not have to learn a second.
@@ -278,8 +283,14 @@ private fun ModelRow(model: LocalModel, isActive: Boolean, onSelect: () -> Unit)
             val runtime = stringResource(
                 if (model.isCompiled) R.string.runtime_executorch else R.string.runtime_gguf,
             )
+            // A compiled model's window is fixed at export and is the number that decides
+            // what fits, so it stands beside the runtime. A GGUF's is chosen at load and
+            // shown in the header once it is, so nothing is claimed for it here.
+            val window = model.contextWindow?.takeIf { model.isCompiled }
+                ?.let { stringResource(R.string.context_tokens_short, it) }
             Metric(
-                listOfNotNull(formatBytes(model.sizeBytes), runtime, badge).joinToString(" · "),
+                listOfNotNull(formatBytes(model.sizeBytes), runtime, window, badge)
+                    .joinToString(" · "),
             )
         }
     }
@@ -319,7 +330,8 @@ private val TICK = 20.dp
  * are, which is the whole point: the way out of this sheet must not be something you have
  * to scroll to find.
  */
-private val LIST_MAX = 300.dp
+/** The share of the screen the list may take before it scrolls. */
+private const val LIST_SHARE = 0.55f
 
 /** The horizontal padding a row in this sheet uses, which the headings match. */
 private val ROW_INSET = 20.dp

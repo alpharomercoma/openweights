@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
 import io.github.alpharomercoma.openweights.core.hub.DOWNLOAD_PARTIAL_SUFFIX
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -60,6 +61,33 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
      * as something to load would get a failure they could not act on.
      */
     fun availableModels(): List<File> = modelFiles().filterNot { it.isProjector }
+
+    /**
+     * The window a compiled model was exported with, read off the file and remembered.
+     *
+     * Keyed on the file's path, length and modification time, so a file replaced under
+     * the same name is read again and one that has not changed is read once. Null for a
+     * GGUF, whose window is chosen at load, and for a file that does not say.
+     */
+    fun exportedWindow(model: File): Int? {
+        if (ModelFormat.of(model.name) != ModelFormat.PTE) return null
+        val key = windowKey(model)
+        windows[key]?.let { return it.takeIf { window -> window > 0 } }
+        val window = runCatching {
+            ExecuTorchSupport.bridge().exportedContextLength(model.absolutePath)
+        }.getOrNull()
+        windows[key] = window ?: 0
+        return window
+    }
+
+    /** What [exportedWindow] already knows, without reading anything. */
+    fun knownWindow(model: File): Int? = windows[windowKey(model)]?.takeIf { it > 0 }
+
+    private fun windowKey(model: File) =
+        "${model.absolutePath}:${model.length()}:${model.lastModified()}"
+
+    /** Zero stands for "read, and the file did not say", so it is not read again. */
+    private val windows = ConcurrentHashMap<String, Int>()
 
     /**
      * True while any download is still writing into this directory.

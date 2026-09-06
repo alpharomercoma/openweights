@@ -247,6 +247,7 @@
     <string name="nothing_archived">لا يوجد شيء مؤرشف. أرشفة محادثة تُخرجها من القائمة مع الاحتفاظ بها.</string>
     <string name="no_archived_match">لا توجد محادثة مؤرشفة تذكر ذلك.</string>
     <string name="runtime">بيئة التشغيل</string>
+    <string name="context_tokens_short">%1$d ctx</string>
     <string name="context_fixed_at_export">نافذة السياق ثُبِّتت عند تصدير هذا النموذج</string>
     <string name="canvas_title">اللوحة</string>
     <string name="canvas_empty">لا يوجد شيء معروض الآن. اطلب من النموذج إنشاء صفحة أو مستند.</string>

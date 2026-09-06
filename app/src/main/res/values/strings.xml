@@ -308,6 +308,7 @@
     <string name="runtime_executorch" translatable="false">ExecuTorch</string>
 
     <!-- Which silicon a compiled model was exported for. Decided at export, not a setting. -->
+    <string name="context_tokens_short">%1$d ctx</string>
     <string name="context_fixed_at_export">Context window fixed when this model was exported</string>
     <string name="canvas_title">Canvas</string>
     <string name="canvas_empty">Nothing is being shown right now. Ask the model to build a page or a document.</string>

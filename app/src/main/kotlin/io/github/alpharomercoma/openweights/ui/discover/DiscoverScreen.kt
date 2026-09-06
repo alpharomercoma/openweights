@@ -415,6 +415,23 @@ private fun ModelDetail(
             }
         }
 
+        // Why a compiled repository offers nothing. Said instead of showing an empty page,
+        // which read as one that had failed to load.
+        state.compiledWithheld?.let { reason ->
+            item {
+                Callout(
+                    stringResource(
+                        when (reason) {
+                            CompiledWithheld.MULTIMODAL -> R.string.compiled_withheld_multimodal
+                            CompiledWithheld.FAMILY -> R.string.compiled_withheld_family
+                            CompiledWithheld.TOKENIZER -> R.string.compiled_withheld_tokenizer
+                            CompiledWithheld.BACKEND -> R.string.compiled_withheld_backend
+                        },
+                    ),
+                )
+            }
+        }
+
         detail.defaultProjector()?.let { projector ->
             item {
                 // Said before the download rather than discovered after it: the projector

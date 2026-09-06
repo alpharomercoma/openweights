@@ -93,6 +93,21 @@ data class InspectedFile(
     val draftArchitecture: String? = null,
 )
 
+/** The reasons every compiled file of a repository can be withheld at once. */
+enum class CompiledWithheld {
+    /** A vision or audio export. This app runs ExecuTorch text models only. */
+    MULTIMODAL,
+
+    /** A family the prompt side cannot render. */
+    FAMILY,
+
+    /** No tokenizer beside the weights, so nothing to run them with. */
+    TOKENIZER,
+
+    /** Compiled for a delegate this build has not linked. */
+    BACKEND,
+}
+
 data class DiscoverUiState(
     val query: HubQuery = HubQuery(),
     val results: List<HubModel> = emptyList(),
@@ -101,6 +116,15 @@ data class DiscoverUiState(
     val canLoadMore: Boolean = false,
     val detail: HubModelDetail? = null,
     val files: List<InspectedFile> = emptyList(),
+    /**
+     * Why a repository of compiled weights offers nothing, when that is the case.
+     *
+     * The page used to show the licence line and then nothing, which read as a page that
+     * had failed to load rather than a decision. Each reason is a sentence the person can
+     * act on: a vision export points at the GGUF of the same model, which does read
+     * pictures here.
+     */
+    val compiledWithheld: CompiledWithheld? = null,
     val contextLength: Int = DEFAULT_CONTEXT,
     val error: String? = null,
     /**
@@ -455,9 +479,14 @@ class DiscoverViewModel @Inject constructor(
                             ) != null
                         }
 
+                    val withheld = detail.compiled
+                        .takeIf { it.isNotEmpty() && compiled.isEmpty() }
+                        ?.let { withheldReason(repoId, detail) }
+
                     _uiState.update { state ->
                         state.copy(
                             detail = detail,
+                            compiledWithheld = withheld,
                             // Compiled weights first. A repository publishes one of them,
                             // occasionally two, against a long list of GGUF quantisations,
                             // and the whole reason to open a repository that has one is
@@ -498,6 +527,32 @@ class DiscoverViewModel @Inject constructor(
                     if (failure is CancellationException) throw failure
                     _uiState.update { it.copy(error = failure.readableMessage()) }
                 }
+        }
+    }
+
+    /**
+     * The first reason that explains an empty offer, in the order a person would ask.
+     *
+     * Multimodal before family, because a vision export fails the family check too and
+     * "no template for this family" would be true and useless: the thing to say is that
+     * pictures need the other runtime.
+     */
+    private fun withheldReason(repoId: String, detail: HubModelDetail): CompiledWithheld {
+        val names = detail.compiled.map {
+            ExecuTorchFileName.modelNameFor(repoId, it.path).lowercase()
+        }
+        return when {
+            names.any { name ->
+                MULTIMODAL_MARKERS.any { it in name }
+            } -> CompiledWithheld.MULTIMODAL
+            !detail.isInstallableCompiled ||
+                detail.compiled.none {
+                    detail.tokenizerFor(it) != null
+                } -> CompiledWithheld.TOKENIZER
+            detail.compiled.none {
+                ExecuTorchSupport.canRun(CompiledBackend.of(repoId + it.path))
+            } -> CompiledWithheld.BACKEND
+            else -> CompiledWithheld.FAMILY
         }
     }
 
@@ -733,3 +788,6 @@ internal fun matchPrefillCalibration(
         measuredTokensPerSecond = model.averageTokensPerSecond,
     )
 }
+
+/** What publishers put in the name of an export that reads pictures or sound. */
+private val MULTIMODAL_MARKERS = listOf("vl", "vision", "audio", "whisper", "asr")

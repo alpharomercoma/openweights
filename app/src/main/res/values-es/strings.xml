@@ -259,6 +259,10 @@
     <string name="no_archived_match">Ningún chat archivado menciona eso.</string>
     <string name="runtime">Runtime</string>
     <string name="context_tokens_short">%1$d ctx</string>
+    <string name="compiled_withheld_multimodal">Este es un modelo de visión o audio compilado para ExecuTorch. OpenWeights solo ejecuta modelos de texto en ExecuTorch; el mismo modelo lee imágenes aquí en su forma GGUF, mediante llama.cpp. Busca su nombre con GGUF.</string>
+    <string name="compiled_withheld_family">OpenWeights no tiene plantilla de prompt para esta familia de modelos en ExecuTorch, así que aún no puede ejecutarse. Su forma GGUF, si existe, funciona mediante llama.cpp.</string>
+    <string name="compiled_withheld_tokenizer">Este repositorio publica pesos compilados sin el tokenizador que necesitan, así que no pueden ejecutarse.</string>
+    <string name="compiled_withheld_backend">Estos pesos se compilaron para un procesador para el que esta app no incluye runtime. Busca una exportación XNNPACK del mismo modelo.</string>
     <string name="context_fixed_at_export">La ventana de contexto quedó fijada al exportar este modelo</string>
     <string name="canvas_title">Lienzo</string>
     <string name="canvas_empty">No se está mostrando nada ahora mismo. Pide al modelo que cree una página o un documento.</string>

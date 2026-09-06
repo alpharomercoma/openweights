@@ -309,6 +309,10 @@
 
     <!-- Which silicon a compiled model was exported for. Decided at export, not a setting. -->
     <string name="context_tokens_short">%1$d ctx</string>
+    <string name="compiled_withheld_multimodal">This is a vision or audio model compiled for ExecuTorch. OpenWeights runs ExecuTorch text models only; the same model reads pictures here in its GGUF form, through llama.cpp. Search for its name with GGUF.</string>
+    <string name="compiled_withheld_family">OpenWeights has no prompt template for this model family on ExecuTorch, so it cannot be run yet. Its GGUF form, if one exists, runs through llama.cpp.</string>
+    <string name="compiled_withheld_tokenizer">This repository publishes compiled weights without the tokenizer they need, so they cannot be run.</string>
+    <string name="compiled_withheld_backend">These weights were compiled for a processor this app does not carry a runtime for. Look for an XNNPACK export of the same model.</string>
     <string name="context_fixed_at_export">Context window fixed when this model was exported</string>
     <string name="canvas_title">Canvas</string>
     <string name="canvas_empty">Nothing is being shown right now. Ask the model to build a page or a document.</string>

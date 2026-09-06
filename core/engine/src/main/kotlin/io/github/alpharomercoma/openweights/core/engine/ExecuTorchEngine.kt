@@ -346,8 +346,15 @@ class ExecuTorchEngine(
     override fun cancel() {
         warmStopped = true
         cancelRequested = true
-        bridge.stop()
+        // The runtime's stop is safe against a running generation and nothing else: a
+        // picture inside the encoder is left to finish, and the flag above ends the turn
+        // before the next one (codex QA).
+        if (!feedingPictures) bridge.stop()
     }
+
+    /** True while a picture is inside the encoder, when the runtime must not be stopped. */
+    @Volatile
+    private var feedingPictures = false
 
     /**
      * Set by [cancel] and read by the token callback, which re-issues the stop. The
@@ -508,7 +515,12 @@ class ExecuTorchEngine(
             // Each picture is a second or two of encoder; a Stop is honoured between them.
             if (cancelRequested) throw StoppedWhileFeeding()
             bridge.prefill(carried + segments[index] + IMAGE_START)
-            bridge.prefillImage(readPicture(picture, side), side, side, Letterbox.CHANNELS)
+            feedingPictures = true
+            try {
+                bridge.prefillImage(readPicture(picture, side), side, side, Letterbox.CHANNELS)
+            } finally {
+                feedingPictures = false
+            }
             carried = IMAGE_END
         }
         return carried + segments.last()
@@ -560,15 +572,13 @@ class ExecuTorchEngine(
         if (!withPictures) {
             this
         } else {
+            // Every message is re-rendered, not only those with pictures: a marker typed
+            // into an earlier text-only message would otherwise be counted as a picture.
             map { message ->
-                if (message.files.none { it.kind == MediaKind.IMAGE }) {
-                    message
-                } else {
-                    ChatMessage(
-                        message.role,
-                        listOf(MessagePart.Text(message.textWithPictureMarkers())),
-                    )
-                }
+                ChatMessage(
+                    message.role,
+                    listOf(MessagePart.Text(message.textWithPictureMarkers())),
+                )
             }
         }
 

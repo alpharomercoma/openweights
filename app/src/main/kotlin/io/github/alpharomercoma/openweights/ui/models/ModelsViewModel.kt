@@ -31,6 +31,7 @@ import androidx.work.workDataOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.PromptTemplates
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.Publishers
@@ -78,7 +79,13 @@ data class LocalModel(
      * A GGUF reads pictures through a projector downloaded beside it; a compiled export
      * carries its encoder inside the one file, so its name is the only sign before load.
      */
-    val isMultimodal: Boolean get() = projector != null || (isCompiled && namedLikeVlm)
+    val isMultimodal: Boolean
+        get() = projector != null ||
+            (
+                isCompiled &&
+                    namedLikeVlm &&
+                    PromptTemplates.forModel(file.name)?.visionInputSide != null
+                )
 
     /**
      * Matched with every separator removed, the way the prompt templates match families:
@@ -113,12 +120,6 @@ data class LocalModel(
 
     private companion object {
         /** Substrings common to vision-language model filenames across every major family. */
-        val VLM_PATTERNS = listOf(
-            "-VL", "-vl", "Vision", "vision", "Llava", "llava",
-            "Pixtral", "pixtral", "InternVL", "interVL", "QwenVL", "qwenvl", "Gemma3n",
-            "gemma3n", "phi-4-mm", "Phi-4-mm",
-        )
-
         /** The same families with separators removed, for names spelled `lfm_2_5_vl`. */
         val VLM_TOKENS =
             listOf("vl", "vision", "llava", "pixtral", "internvl", "qwenvl", "gemma3n", "phi4mm")

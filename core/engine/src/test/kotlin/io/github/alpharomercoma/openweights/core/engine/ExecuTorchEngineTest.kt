@@ -281,6 +281,27 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `a marker typed into an earlier message does not count as a picture`() = runTest {
+        bridge.hasVision = true
+        bridge.reply = "Fine.<|im_end|>"
+        val engine = ExecuTorchEngine(bridge, reader = { _, side -> FloatArray(3 * side * side) })
+        engine.load(installed(VISION_MODEL), PARAMS)
+
+        val conversation = listOf(
+            user("Earlier I typed \u0000picture\u0000 by accident."),
+            assistant("Noted."),
+            ChatMessage(
+                ChatRole.USER,
+                listOf(MessagePart.File("/p/a.png", "image/png"), MessagePart.Text("Now?")),
+            ),
+        )
+        engine.chat(conversation).toList()
+
+        assertThat(bridge.pictures).hasSize(1)
+        assertThat(bridge.fed[0]).contains("Earlier I typed  by accident.")
+    }
+
+    @Test
     fun `too many pictures for the window are refused before the first is read`() = runTest {
         bridge.hasVision = true
         bridge.exportedContextLength = 2048

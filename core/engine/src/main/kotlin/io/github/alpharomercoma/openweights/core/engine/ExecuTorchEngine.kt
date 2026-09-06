@@ -112,7 +112,10 @@ class ExecuTorchEngine(
      */
     private val turns = Mutex()
 
-    override val loadedModel: LoadedModelInfo? get() = info
+    // What the runtime holds right now, not what it held at load. The turn runner reads
+    // this before every round to decide how much tool output fits; a constant zero told
+    // it the whole window was free after every pass.
+    override val loadedModel: LoadedModelInfo? get() = info?.copy(contextUsed = heldTokens)
 
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
         turns.withLock { loadLocked(modelFile, params) }
@@ -135,7 +138,15 @@ class ExecuTorchEngine(
             )
 
         closeModel()
-        contextSize = params.contextLength
+        // The window is the file's, not the preference's. A preference above it is clamped
+        // by the runtime anyway, and reporting the preference upstream made every budget
+        // in the app wrong by the difference.
+        val exported = bridge.exportedContextLength(modelFile.absolutePath)
+        contextSize = when {
+            exported == null -> params.contextLength
+            params.contextLength <= 0 -> exported
+            else -> minOf(params.contextLength, exported)
+        }
         if (!bridge.load(
                 modelFile.absolutePath,
                 tokenizer.absolutePath,
@@ -155,7 +166,7 @@ class ExecuTorchEngine(
             parameterCount = 0,
             sizeBytes = modelFile.length(),
             contextSize = contextSize,
-            trainingContextSize = contextSize,
+            trainingContextSize = exported ?: contextSize,
             layerCount = 0,
             contextUsed = 0,
             offloadedTo = "ExecuTorch",
@@ -523,7 +534,7 @@ class ExecuTorchEngine(
             prefillMs = outcome.prefillMs.takeIf { it > 0 } ?: timeToFirst,
             decodeMs = outcome.decodeMs.takeIf { it > 0 } ?: (finished - started - timeToFirst),
             timeToFirstTokenMs = timeToFirst,
-            contextUsed = 0,
+            contextUsed = heldTokens,
             contextSize = contextSize,
             // What the runtime kept rather than what it re-read. It reports the tokens
             // it was *given*, which on an extending turn is only the new text, so the rest

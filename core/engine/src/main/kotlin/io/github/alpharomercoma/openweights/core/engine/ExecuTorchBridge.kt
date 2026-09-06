@@ -66,6 +66,18 @@ interface ExecuTorchBridge {
     ): Boolean
 
     /**
+     * The window the file was exported with, or null when the file does not say.
+     *
+     * A `.pte` carries its window as a constant method (`get_max_context_len`), and it is
+     * the only number that matters: the runtime clamps to it whatever a caller asks for.
+     * The engine used to report the user's preference instead, so a model exported at
+     * 2048 was shown as 4096, the tool prefix alone took two thirds of the real window,
+     * nothing upstream trimmed a search result to fit, and the runtime refused the turn
+     * with "Max seq length exceeded" (2026-09-06, LFM2.5 1.2B xnnpack).
+     */
+    fun exportedContextLength(modelPath: String): Int? = null
+
+    /**
      * Runs one generation, calling [onToken] with each fragment as it is produced.
      *
      * Blocking: callers run it off the main thread.

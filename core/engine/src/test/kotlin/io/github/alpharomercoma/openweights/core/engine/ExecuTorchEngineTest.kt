@@ -166,6 +166,35 @@ class ExecuTorchEngineTest {
     }
 
     @Test
+    fun `the window is the file's, and what is held is reported`() = runTest {
+        // A .pte exported at 2048 was shown as the 4096 the user had asked for, and every
+        // budget upstream believed it; the runtime then refused the first search result.
+        bridge.exportedContextLength = 2048
+        bridge.reply = "Hello.<|im_end|>"
+        bridge.outcome =
+            ExecuTorchOutcome(StopReason.END_OF_TURN, promptTokens = 40, generatedTokens = 3)
+        engine.load(installed(MODEL), PARAMS.copy(contextLength = 4096))
+
+        assertThat(engine.loadedModel?.contextSize).isEqualTo(2048)
+        assertThat(engine.loadedModel?.trainingContextSize).isEqualTo(2048)
+        assertThat(engine.loadedModel?.contextUsed).isEqualTo(0)
+
+        val events = engine.chat(listOf(user("Hi"))).toList()
+
+        val completed = events.filterIsInstance<GenerationEvent.Completed>().single()
+        assertThat(completed.stats.contextSize).isEqualTo(2048)
+        assertThat(completed.stats.contextUsed).isEqualTo(43)
+        assertThat(engine.loadedModel?.contextUsed).isEqualTo(43)
+    }
+
+    @Test
+    fun `a file that does not say its window keeps the preference`() = runTest {
+        engine.load(installed(MODEL), PARAMS.copy(contextLength = 4096))
+
+        assertThat(engine.loadedModel?.contextSize).isEqualTo(4096)
+    }
+
+    @Test
     fun `feeds only the new turn when the conversation merely grew`() = runTest {
         bridge.reply = "Hello.<|im_end|>"
         engine.load(installed(MODEL), PARAMS)

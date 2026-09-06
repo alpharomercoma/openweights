@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights.core.engine
 
+import org.pytorch.executorch.Module
 import org.pytorch.executorch.extension.llm.LlmCallback
 import org.pytorch.executorch.extension.llm.LlmGenerationConfig
 import org.pytorch.executorch.extension.llm.LlmModule
@@ -60,6 +61,26 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
             },
         )
     }
+
+    /**
+     * Reads the window off the file through the plain module API.
+     *
+     * A second, short-lived handle on the same file: mapped rather than read, and only the
+     * metadata method is loaded, so it costs a few milliseconds and no copy of the weights.
+     * The LLM wrapper reads the same constants itself and logs them, but offers no way to
+     * ask, so this is the only route to the number before the first turn overflows.
+     */
+    override fun exportedContextLength(modelPath: String): Int? = runCatching {
+        val program = Module.load(modelPath, Module.LOAD_MODE_MMAP)
+        try {
+            val methods = program.getMethods().toSet()
+            WINDOW_METHODS.firstOrNull { it in methods }?.let { name ->
+                program.execute(name).firstOrNull()?.takeIf { it.isInt }?.toInt()?.toInt()
+            }
+        } finally {
+            program.destroy()
+        }
+    }.getOrNull()?.takeIf { it > 0 }
 
     override fun generate(
         prompt: String,
@@ -146,6 +167,11 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
                 "ExecuTorch could not prefill: ${cause.message ?: cause::class.java.simpleName}",
             )
         }
+    }
+
+    private companion object {
+        /** What exporters call the window, most specific first. */
+        val WINDOW_METHODS = listOf("get_max_context_len", "get_max_seq_len")
     }
 
     override fun resetContext() {

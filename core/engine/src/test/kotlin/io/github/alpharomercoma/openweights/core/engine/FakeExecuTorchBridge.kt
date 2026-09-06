@@ -69,6 +69,9 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
 
     /** What [load] answers. False stands for a runtime that could not open the file. */
     var opens: Boolean = true
+    var exportedContextLength: Int? = null
+
+    override fun exportedContextLength(modelPath: String): Int? = exportedContextLength
 
     var outcome: ExecuTorchOutcome = ExecuTorchOutcome(StopReason.END_OF_TURN)
 

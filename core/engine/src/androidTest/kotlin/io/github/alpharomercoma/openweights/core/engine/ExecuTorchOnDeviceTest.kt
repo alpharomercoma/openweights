@@ -170,6 +170,52 @@ class ExecuTorchOnDeviceTest {
      * silently — the Java wrapper discards its error code — because a head that never
      * reached the cache leaves the turn's count at the cold figure.
      */
+    /**
+     * The numbers a model-by-window matrix is built from: resident memory after load, prefill
+     * rate on a ~900-token prompt, decode rate over a reply long enough to average, resident
+     * memory after the turn. Logged, not asserted; the phone decides what is acceptable.
+     */
+    @Test
+    fun throughputReport(): Unit = runBlocking {
+        engine.load(MODEL, PARAMS)
+        val loaded = engine.loadedModel
+        Log.i(TAG, "matrix load: window=${loaded?.contextSize} rssMb=${residentMb()}")
+
+        val head = ChatMessage.text(ChatRole.SYSTEM, LONG_PROMPT)
+        val ask = ChatMessage.text(
+            ChatRole.USER,
+            "Write about 150 words on why a language model might run on a phone instead of a server.",
+        )
+        // Three turns from a cold cache each: one run on this phone swings by 2x with
+        // thermals and core scheduling, so the matrix takes the median of three.
+        repeat(REPEATS) { run ->
+            engine.resetContext()
+            val events =
+                engine.chat(
+                    listOf(head, ask),
+                    SamplerParams(maxTokens = 160, thinking = false),
+                ).toList()
+            val done = events.filterIsInstance<GenerationEvent.Completed>().single()
+            val stats = done.stats
+            val prefillRate = stats.promptTokens * 1000.0 / maxOf(stats.prefillMs, 1)
+            val decodeRate = stats.generatedTokens * 1000.0 / maxOf(stats.decodeMs, 1)
+            val rates = "prefillTokS=%.1f decodeTokS=%.1f".format(prefillRate, decodeRate)
+            Log.i(
+                TAG,
+                "matrix turn $run: prompt=${stats.promptTokens} prefillMs=${stats.prefillMs} " +
+                    "generated=${stats.generatedTokens} decodeMs=${stats.decodeMs} $rates " +
+                    "rssMb=${residentMb()}",
+            )
+            if (run == 0) Log.i(TAG, "matrix reply: ${done.content.take(200)}")
+            assertThat(stats.generatedTokens).isGreaterThan(16)
+        }
+    }
+
+    /** This process's resident set, in megabytes, as the kernel reports it. */
+    private fun residentMb(): Long = File("/proc/self/status").readLines()
+        .firstOrNull { it.startsWith("VmRSS:") }
+        ?.filter { it.isDigit() }?.toLongOrNull()?.div(1024) ?: -1
+
     @Test
     fun warmHeadIsReusedByTheFirstTurn(): Unit = runBlocking {
         engine.load(MODEL, PARAMS)
@@ -293,6 +339,7 @@ class ExecuTorchOnDeviceTest {
 
     private companion object {
         const val TAG = "ExecuTorchOnDevice"
+        const val REPEATS = 3
 
         /** Another export can be pointed at with `-e pte <path> -e tokenizer <path>`. */
         private val arguments = InstrumentationRegistry.getArguments()

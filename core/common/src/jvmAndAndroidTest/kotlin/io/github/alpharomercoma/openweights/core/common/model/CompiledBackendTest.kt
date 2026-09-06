@@ -41,6 +41,12 @@ class CompiledBackendTest {
             .isEqualTo(CompiledBackend.VULKAN)
         assertThat(CompiledBackend.of("someone/Llama-3.2-1B-mediatek-mdla"))
             .isEqualTo(CompiledBackend.NEUROPILOT)
+        // Published beside the XNNPACK export in the same repository, for Apple silicon.
+        assertThat(
+            CompiledBackend.of(
+                "software-mansion/react-native-executorch-lfm-2.51_2b/mlx/lfm_2_5_1_2b_mlx_int4.pte",
+            ),
+        ).isEqualTo(CompiledBackend.MLX)
     }
 
     @Test

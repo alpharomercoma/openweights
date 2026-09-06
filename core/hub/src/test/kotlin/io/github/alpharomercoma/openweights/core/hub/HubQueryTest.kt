@@ -26,6 +26,17 @@ import org.junit.Test
  * without a network.
  */
 class HubQueryTest {
+
+    @Test
+    fun `typed text searches the Hub even with the shortlist chip on`() {
+        // Whoever types is looking for something the shelf does not hold, or they would
+        // have tapped it; matching the text against eight ids gave them an empty screen.
+        assertThat(HubQuery().browsesShortlist).isTrue()
+        assertThat(HubQuery(text = "lfm").browsesShortlist).isFalse()
+        assertThat(HubQuery(text = "   ").browsesShortlist).isTrue()
+        assertThat(HubQuery(text = "lfm", recommendedOnly = false).browsesShortlist).isFalse()
+    }
+
     @Test
     fun `an unconstrained query asks for no size band`() {
         assertThat(HubQuery().parameterBand).isNull()

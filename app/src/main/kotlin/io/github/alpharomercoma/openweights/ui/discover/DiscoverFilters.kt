@@ -156,27 +156,31 @@ fun DiscoverFilterBar(
             )
 
             // First in the row, because it is the only one on when the screen opens and the
-            // one that makes the other three unnecessary while it is.
-            FilterChip(
-                selected = query.recommendedOnly,
-                onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
-                label = {
-                    Text(
-                        text = stringResource(R.string.recommended),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Bolt,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                },
-                colors = selectedChipColors(),
-                border = chipBorder(query.recommendedOnly),
-            )
+            // one that makes the other three unnecessary while it is. Gone while there is
+            // text in the box: typed text searches the Hub whatever the chip says, and a
+            // lit chip over results it did not produce is a chip that lies.
+            if (query.text.isBlank()) {
+                FilterChip(
+                    selected = query.recommendedOnly,
+                    onClick = { onRecommendedOnlyChange(!query.recommendedOnly) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.recommended),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Bolt,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    },
+                    colors = selectedChipColors(),
+                    border = chipBorder(query.recommendedOnly),
+                )
+            }
 
             val phoneSized = query.maxParametersBillions != null
             FilterChip(

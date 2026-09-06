@@ -43,6 +43,13 @@ enum class CompiledBackend(val processor: Processor) {
     /** MediaTek's NPU, through NeuroPilot. No published artifact; a source build only. */
     NEUROPILOT(Processor.NPU),
 
+    /**
+     * Apple silicon, through MLX. Software Mansion publishes these beside the XNNPACK
+     * files in the same repository (`1_2b/mlx/…_mlx_int4.pte`), and with the name unread
+     * they were offered as "worth trying" on Android, where the delegate does not exist.
+     */
+    MLX(Processor.GPU),
+
     /** The name said nothing, so nothing is claimed. */
     UNKNOWN(Processor.CPU),
     ;
@@ -71,6 +78,7 @@ enum class CompiledBackend(val processor: Processor) {
                 "vulkan" in name -> VULKAN
                 "qnn" in name || "qualcomm" in name || "htp" in name -> QNN
                 "neuropilot" in name || "mediatek" in name || "mtk" in name -> NEUROPILOT
+                "mlx" in name -> MLX
                 else -> UNKNOWN
             }
         }

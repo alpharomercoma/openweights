@@ -134,7 +134,7 @@ class DiscoverScreenTest {
     @Test
     fun `recommended is the one filter the screen opens on`() {
         var asked: Boolean? = null
-        showDiscover(onRecommendedOnlyChange = { asked = it })
+        showDiscover(query = HubQuery(), onRecommendedOnlyChange = { asked = it })
 
         // On by default, so the first tap is the one that opens the search up. What it
         // narrows to is a shortlist this app has measured on hardware, which is a stronger
@@ -142,6 +142,15 @@ class DiscoverScreenTest {
         compose.onNodeWithText("Recommended").performClick()
 
         assert(asked == false) { "Recommended starts on, so the first tap turns it off: $asked" }
+    }
+
+    @Test
+    fun `typing puts the recommended chip away`() {
+        // Typed text searches the Hub whatever the chip says, so a lit chip over those
+        // results would be a chip that lies. It comes back when the box is cleared.
+        showDiscover(query = HubQuery(text = "lfm"))
+
+        compose.onNodeWithText("Recommended").assertDoesNotExist()
     }
 
     private fun showDiscover(

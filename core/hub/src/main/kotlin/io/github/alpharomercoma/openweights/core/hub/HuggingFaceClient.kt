@@ -647,25 +647,33 @@ class HuggingFaceClient @Inject constructor(
  * `ToolChoiceBenchmark` the list is honest about one axis and inferring the other, and
  * that is better than the reverse, which is what shipping Hammer would have been.
  *
- * **The compiled entries joined on the backend-parity matrix** rather than on anybody's
- * card: `docs/research/backend-parity.md`, the same seven graded cases run greedy on both
- * engines, on this project's two phones (Dimensity 9400 and Snapdragon 8 Gen 3), grades
- * identical across the two SoCs.
+ * **The compiled entries are a whitelist**, and they joined on two measurements rather
+ * than on anybody's card: the five-chip latency report (Dimensity 9400, Snapdragon 8 Gen 3,
+ * Snapdragon 8 Elite, Tensor G5, Exynos 2400; 60 to 90 benchmark prompts per cell;
+ * `docs/research/public-benchmarks.md`, charted at
+ * https://alpharomercoma.github.io/openweights/latency.html) and the GSM8K, IFEval and
+ * BFCL scores from the same runs. Five families were compiled and run; three are listed.
  *
- * - **Qwen3 1.7B compiled** is the only model measured at 7 of 7 on both engines, tool
- *   loop included, so recommending the GGUF and not the `.pte` would be recommending the
- *   engine rather than the model.
- * - **LFM2.5 1.2B compiled** is the fastest decode ever measured in this project: 36.6
- *   tok/s on the Dimensity, 66.6 on the Snapdragon, against 21 to 24 for its own GGUF.
- *   One known divergence, a format-constraint case answered in prose, is the 8da4w
- *   export's quantisation rather than a harness fault, and it is written down.
- * - **SmolLM3 3B compiled** matched its GGUF case for case, including failing the same
- *   tool case for the same reason (a thinking budget spent before the call), which is
- *   what parity means. It is here as the compiled thinking model, from the runtime's own
- *   publisher.
+ * - **Qwen3 1.7B compiled**: first token in 0.75 to 0.89 s on every chip, where its Q8_0
+ *   GGUF ranges from 0.37 s on the Snapdragons to 1.17 s on the Tensor; decode 41 to 94 ms
+ *   a token against 40 to 184. Scores within 4 of its GGUF on all three sets. On the
+ *   seven-case parity suite it was the only model at 7 of 7 on both engines.
+ * - **LFM2.5 1.2B compiled**: the fastest thing measured on any phone. First token in
+ *   0.30 to 0.44 s, decode 18 to 46 ms a token (22 to 56 tok/s), and on the Tensor G5 and
+ *   Exynos 2400 its GGUF decodes at half that rate. GSM8K trails its GGUF (13.0 against
+ *   19.6 of 30), IFEval and BFCL by less; the speed is what it is here for.
+ * - **Llama 3.2 3B compiled**, software-mansion's SpinQuant export: the largest model on
+ *   the list, first token in 1.4 to 1.8 s against 1.7 to 3.5 s for the Q4_K_M GGUF, decode
+ *   63 to 125 ms a token against 83 to 180. Level with its GGUF on IFEval, 3 behind on
+ *   GSM8K and BFCL. The compiled row is the one to take on the Tensor and the Exynos.
  *
- * A build without the ExecuTorch runtime drops these three rows before they render — see
- * the Discover view model — so the standard build's shortlist is unchanged.
+ * Two families ran and are deliberately not listed. **SmolLM3 3B** on ExecuTorch prefills
+ * at a third of llama.cpp's rate on every chip: 7 to 16 s to the first token, which is a
+ * model nobody waits for, whatever its tool-call score. **Gemma 3 1B** on ExecuTorch is
+ * fast (0.4 s to the first token everywhere) and loops: 21 to 24 of its 30 GSM8K answers
+ * on every phone run to the cap repeating a step, scoring 0 to 2 where its GGUF scores 12
+ * to 14, and a control run showed it is the artifact under XNNPACK rather than the
+ * missing repeat penalty. A fast model that does not finish is not a recommendation.
  */
 val RECOMMENDED = listOf(
     "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
@@ -711,11 +719,12 @@ val RECOMMENDED = listOf(
     "LiquidAI/LFM2.5-8B-A1B-GGUF",
     "LiquidAI/LFM2.5-VL-3B-GGUF",
     "unsloth/Qwen3-1.7B-GGUF",
-    // The compiled rows, in the order the matrix argues them: the 7/7 generalist, the
-    // fastest decode measured on either phone, the thinking model at exact parity.
+    // The compiled rows, in the order the report argues them: the generalist that holds
+    // its score, the fastest model measured on any chip, the 3B that beats its own GGUF
+    // to the first token everywhere.
     "larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",
     "software-mansion/react-native-executorch-lfm-2.5",
-    "pytorch/SmolLM3-3B-INT8-INT4",
+    "software-mansion/react-native-executorch-llama-3.2",
 )
 
 /**
@@ -832,6 +841,17 @@ data class HubQuery(
      */
     val officialOnly: Boolean = false,
 ) {
+    /**
+     * Whether this query shows the measured shortlist rather than the Hub.
+     *
+     * The chip alone used to decide it, and typed text was matched against the shortlist's
+     * eight ids. That made typing useless: whoever types a name is looking for something
+     * that is not on the shelf in front of them, or they would have tapped it, and what
+     * they got was an empty screen with the chip still lit. Text goes to the Hub; the
+     * shortlist is what the screen shows before anybody has asked for anything.
+     */
+    val browsesShortlist: Boolean get() = recommendedOnly && text.isBlank()
+
     /** How many filters are on, for the badge on the filter button. */
     val activeCount: Int = listOf(
         task != null,

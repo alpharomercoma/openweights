@@ -175,11 +175,11 @@ class ModelStore @Inject constructor(@ApplicationContext private val context: Co
         File(directory, GgufFileName.projectorNameFor(modelFileName))
 
     /**
-     * Anything on disk a runtime *in this build* can open.
+     * Anything on disk a runtime in this build can open.
      *
-     * The flavour is part of the question. A `.pte` sideloaded onto a standard build has
-     * nothing to run it, and listing it would offer the user a model that can only fail;
-     * it is left out of the list rather than shown and then refused.
+     * A `.pte` is listed only once its tokenizer is beside it; see [isRunnableHere]. The
+     * runtime check stays although every build now carries ExecuTorch, because it is the
+     * right place to ask and a constant true costs nothing.
      */
     private fun modelFiles(): List<File> =
         directory.listFiles { file -> file.isFile && file.name.isRunnableHere() }

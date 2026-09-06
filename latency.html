@@ -111,6 +111,8 @@ function showTip(e,text){if(typeof text!=="string"){hideTip();return;}tip.textCo
  const r=tip.getBoundingClientRect(),pad=8;const left=Math.max(pad,Math.min(e.clientX-r.width/2,window.innerWidth-r.width-pad));
  let top=e.clientY-r.height-12;if(top<pad)top=e.clientY+12;tip.style.left=left+"px";tip.style.top=top+"px";}
 function hideTip(){tip.hidden=true}
+// TPOT as both a period and a rate, e.g. "82 ms (12.2 tok/s)"
+const tpot=ms=>`${ms} ms (${(1000/ms).toFixed(1)} tok/s)`;
 
 // tabs
 const tabs=document.getElementById("tabs");
@@ -140,8 +142,8 @@ function drawMap(){
   o+=`<line class="lnk" x1="${lx(a[0])}" y1="${ly(a[1])}" x2="${lx(b[0])}" y2="${ly(b[1])}" stroke="${col}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".8"/>`});
  CHIPS.forEach((c,i)=>{const col=css(c.v);const a=d.llama[i],b=d.et[i];
   const near=Math.hypot(lx(a[0])-lx(b[0]),ly(a[1])-ly(b[1]))<4;
-  const ta=`${c.name} &middot; llama.cpp&#10;TTFT ${a[0].toFixed(2)} s &middot; TPOT ${a[1]} ms`,tb=`${c.name} &middot; ExecuTorch&#10;TTFT ${b[0].toFixed(2)} s &middot; TPOT ${b[1]} ms`;
-  const tt=near?`${c.name} &middot; both runtimes&#10;llama.cpp TTFT ${a[0].toFixed(2)} s &middot; TPOT ${a[1]} ms&#10;ExecuTorch TTFT ${b[0].toFixed(2)} s &middot; TPOT ${b[1]} ms`:null;
+  const ta=`${c.name} &middot; llama.cpp&#10;TTFT ${a[0].toFixed(2)} s &middot; TPOT ${tpot(a[1])}`,tb=`${c.name} &middot; ExecuTorch&#10;TTFT ${b[0].toFixed(2)} s &middot; TPOT ${tpot(b[1])}`;
+  const tt=near?`${c.name} &middot; both runtimes&#10;llama.cpp TTFT ${a[0].toFixed(2)} s &middot; TPOT ${tpot(a[1])}&#10;ExecuTorch TTFT ${b[0].toFixed(2)} s &middot; TPOT ${tpot(b[1])}`:null;
   o+=`<circle class="pt" cx="${lx(b[0])}" cy="${ly(b[1])}" r="9" fill="none" pointer-events="all" stroke="${col}" stroke-width="2.4" data-t="${tt||tb}"/>`;
   o+=`<circle class="pt" cx="${lx(a[0])}" cy="${ly(a[1])}" r="6" fill="${col}" stroke="${panel}" stroke-width="1.5" data-t="${tt||ta}"/>`;});
  // chip labels: candidate spots on two rings around the llama.cpp disc, scored against every
@@ -189,7 +191,7 @@ function drawDumb(){
   o+=`<text x="14" y="${y+6}" font-size="12.5" font-weight="${on?700:600}" fill="${ink}">${m}</text>`;y+=rowH-2;
   CHIPS.forEach((c,i)=>{const col=css(c.v),a=d.llama[i],b=d.et[i];
    o+=`<g><text x="${left-10}" y="${y+4}" text-anchor="end" font-size="11" fill="${ink2}">${c.short}</text>`;
-   [[c0,scaleT,a[0],b[0],v=>v.toFixed(2)+" s"],[c1,scaleP,a[1],b[1],v=>v+" ms"]].forEach(([cx0,sc,va,vb,f])=>{
+   [[c0,scaleT,a[0],b[0],v=>v.toFixed(2)+" s"],[c1,scaleP,a[1],b[1],tpot]].forEach(([cx0,sc,va,vb,f])=>{
     const xa=sx(va,cx0,sc),xb=sx(vb,cx0,sc);
     o+=`<line x1="${xa}" x2="${xb}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="1.6" opacity=".7"/>`;
     const near=Math.abs(xa-xb)<3;

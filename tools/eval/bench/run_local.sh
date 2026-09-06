@@ -18,7 +18,7 @@ EVAL=/data/local/tmp/openweights/eval
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)
 OUT="$HERE/../results"
-APK="$ROOT/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk"
+APK="$ROOT/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk"
 MODEL=${BENCH_MODEL:-}
 PREFIX=${PREFIX:-}
 

@@ -19,15 +19,18 @@ package io.github.alpharomercoma.openweights.core.engine
 import io.github.alpharomercoma.openweights.core.common.model.CompiledBackend
 
 /**
- * Whether this build can run a model compiled ahead of time. It cannot: this is the
- * standard flavour, which ships llama.cpp alone.
+ * Whether this build can run a model compiled ahead of time. It can: every build carries
+ * the ExecuTorch runtime.
  *
- * Nothing here should ever be reached. [AVAILABLE] is what callers ask, and a false answer
- * means `.pte` files are never offered, never listed and never downloaded — a model that
- * cannot run should not be visible, rather than visible and then refused.
+ * Until 2026-09-06 this was one of two files, selected by a product flavour, so that a
+ * `standard` build could leave the 8.6 MB of native library out. Play takes one bundle per
+ * release, so nobody ever got to choose, and the publishers' exports had by then made a
+ * `.pte` something downloaded as found rather than compiled by hand. One build, one file.
+ * [AVAILABLE] stays because the callers that ask it are the right places to ask, and a
+ * constant true costs nothing.
  */
 object ExecuTorchSupport {
-    const val AVAILABLE: Boolean = false
+    const val AVAILABLE: Boolean = true
 
     /**
      * The delegates this build has linked, and therefore the models it can open.
@@ -38,11 +41,11 @@ object ExecuTorchSupport {
      * gigabyte. UNKNOWN is included because most published exports are XNNPACK and do not
      * say so in their name; excluding it would hide nearly all of them.
      */
-    val BACKENDS: Set<CompiledBackend> = emptySet()
+    val BACKENDS: Set<CompiledBackend> = setOf(CompiledBackend.XNNPACK, CompiledBackend.UNKNOWN)
 
     /** Whether this build could open a model compiled for [backend]. */
     fun canRun(backend: CompiledBackend): Boolean = backend in BACKENDS
 
-    fun bridge(): ExecuTorchBridge =
-        throw LlamaException("This build does not include the ExecuTorch runtime")
+    /** A bridge onto the real runtime. */
+    fun bridge(): ExecuTorchBridge = NativeExecuTorchBridge()
 }

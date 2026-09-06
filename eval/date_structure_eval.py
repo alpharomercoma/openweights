@@ -36,7 +36,7 @@ Five axes, because moving the date has never been free on fewer than all of them
 
 Setup:
   1. PROMPT_DUMP=$PWD/eval/prompt_dump.json ./gradlew \
-         :app:testStandardDebugUnitTest --tests '*PromptDumpTest*'
+         :app:testDebugUnitTest --tests '*PromptDumpTest*'
   2. llama-server -m <model.gguf> --jinja -c 8192 --port 8089
   3. python3 eval/date_structure_eval.py [port] [arm ...]
 """

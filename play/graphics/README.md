@@ -47,17 +47,13 @@ longer exists, so the only record of the icon was the paragraph this replaced. W
 ```
 OPENWEIGHTS_SCREENSHOTS=/tmp/shots \
   JAVA_HOME=/opt/homebrew/opt/openjdk@21 \
-  ./gradlew :app:testAcceleratedDebugUnitTest --tests '*PlayScreenshots*' --rerun-tasks
+  ./gradlew :app:testDebugUnitTest --tests '*PlayScreenshots*' --rerun-tasks
 
 python3 play/graphics/frame.py /tmp/shots play/graphics/screenshots-phone
 python3 play/graphics/frame.py /tmp/shots/7 play/graphics/screenshots-tablet-7 1200 2133
 python3 play/graphics/frame.py /tmp/shots/10 play/graphics/screenshots-tablet-10 1800 3200
 python3 play/graphics/readme.py /tmp/shots
 ```
-
-The accelerated flavour, not the standard one: `DiscoverScreen` draws the runtime chips
-only when `ExecuTorchSupport.AVAILABLE` is true, and a standard render of the Hub is a
-render of one runtime.
 
 The first step draws the real composables at 360 x 640 dp on an xxhdpi night qualifier,
 which is 1080 x 1920 px in the theme the app is designed for. Without the environment

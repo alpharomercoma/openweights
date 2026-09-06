@@ -20,7 +20,7 @@ intent. Where a row says "measured", the command is in the row.
 | Upload signing | Config reads from `keystore.properties` or environment | Never from the repository |
 | Cleartext traffic | Disabled | `usesCleartextTraffic="false"` |
 | Backup and device transfer | Everything excluded | `data_extraction_rules.xml` |
-| Download size | **25.3 MB AAB** standard, **28.6 MB** accelerated, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-04 on the version code 485 bundles |
+| Download size | **28.7 MB AAB**, no bundled model | Under the 200 MB cellular threshold with room to spare. Measured 2026-09-06 on the version code 534 bundle; the llama.cpp-only `standard` flavour that was 3.3 MB smaller was dropped the same day |
 
 ### The release build was run, not just built
 
@@ -456,11 +456,11 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-04, at version code 485, carry
   that key (`keytool -printcert -jarfile` on either shows the same SHA-256 as the
   keystore), and enrolling it in Play App Signing is still the first Console step.
-- **Two bundles, one application id.** The `standard` flavour is llama.cpp alone; the
-  `accelerated` one adds ExecuTorch and is 3.3 MB larger. Play takes one bundle per
-  release, so the choice of which to upload is a product decision, not a build one. The
-  listing art is rendered from the accelerated flavour because it is the one whose Hub
-  screen shows both runtimes.
+- **One bundle.** Until 2026-09-06 there were two flavours, `standard` (llama.cpp alone)
+  and `accelerated` (plus ExecuTorch, 3.3 MB larger). Play takes one bundle per release,
+  so nobody ever chose, and a phone running the standard build showed compiled models on
+  the Hub screen that it could not download. The flavour dimension is gone; every build
+  carries both runtimes.
 - **A fast Watch restored on a background process start can run unprotected.**
   `OpenWeightsApplication.onCreate` calls `watches.sync()` on every process start
   (`OpenWeightsApplication.kt`), including one the system triggered in the background rather

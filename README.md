@@ -100,8 +100,8 @@ Toolchain: JDK 21, Android SDK 37, NDK r29+ (for 16 KB page alignment), CMake 4.
 `./gradlew verify` runs the lot: lint, detekt, ktlint, every host test including the
 multiplatform JVM and iOS-simulator tiers, and assembles both debug flavors.
 
-Two product flavors: `standard` is llama.cpp only; `accelerated` adds the ExecuTorch
-runtime (~8.6 MB) and is what `.pte` support means. `assembleDebug` builds both.
+One build carries both runtimes: llama.cpp for GGUFs and ExecuTorch (~8.6 MB of native
+library per ABI) for `.pte` files compiled ahead of time.
 
 ## Architecture
 

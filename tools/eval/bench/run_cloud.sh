@@ -42,7 +42,7 @@ done
 
 echo "== $(wc -l < "$JOBS" | tr -d ' ') matrices to run, $PAR at a time"
 echo "== building the test APK once"
-(cd "$ROOT" && ./gradlew :core:engine:assembleAcceleratedDebugAndroidTest --console=plain -q)
+(cd "$ROOT" && ./gradlew :core:engine:assembleDebugAndroidTest --console=plain -q)
 
 # One line per job; each runs the Test Lab script with the build skipped and its own
 # log named by the runner. xargs keeps $PAR in flight and Test Lab queues the rest.

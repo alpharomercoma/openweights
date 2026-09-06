@@ -33,10 +33,10 @@ for f in "$MODELS_DIR"/*.pte "$MODELS_DIR"/*.tokenizer.json "$MODELS_DIR"/*.gguf
 done
 
 echo "== building the accelerated test APK (both engines live in it)"
-(cd "$ROOT" && ./gradlew :core:engine:assembleAcceleratedDebugAndroidTest --console=plain -q)
+(cd "$ROOT" && ./gradlew :core:engine:assembleDebugAndroidTest --console=plain -q)
 
 echo "== installing"
-$ADB push "$ROOT/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk" /data/local/tmp/owtest.apk
+$ADB push "$ROOT/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk" /data/local/tmp/owtest.apk
 $ADB shell pm install -r -t --user 0 /data/local/tmp/owtest.apk
 
 run_class() {

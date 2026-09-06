@@ -61,11 +61,6 @@ import java.io.File
  *
  * One screen per test, because a compose rule takes one `setContent` and throws on the
  * second.
- *
- * Run under the accelerated flavour. `DiscoverScreen` only draws the runtime chips when
- * `ExecuTorchSupport.AVAILABLE` is true, and the standard flavour's constant is false, so
- * a standard render of the Hub is a render of one runtime and the listing would be
- * showing the smaller of the two apps.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

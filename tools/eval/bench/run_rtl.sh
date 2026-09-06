@@ -12,7 +12,7 @@ SER=${1:-localhost:58244}; ADB="adb -s $SER"
 S=${MODELS_DIR:?directory holding the matrix models}
 PKG=io.github.alpharomercoma.openweights.core.engine.test; RUNNER=androidx.test.runner.AndroidJUnitRunner
 EVAL=/data/local/tmp/openweights/eval; HERE=$(cd "$(dirname "$0")" && pwd); OUT="$HERE/../results"
-APK=$HERE/../../../core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk
+APK=$HERE/../../../core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk
 $ADB shell mkdir -p $EVAL
 $ADB push "$HERE/benchmarks.json" $EVAL/benchmarks.json | tail -1
 $ADB push "$APK" /data/local/tmp/owtest.apk | tail -1

@@ -48,8 +48,7 @@ suspend fun unload()
 Two implementations ship, and a third class chooses between them. `LlamaCppEngine` runs
 any GGUF the pinned llama.cpp reads — the supported architecture list is code-generated at
 build time from llama.cpp's own table, so it tracks the submodule instead of a hand-kept
-list. `ExecuTorchEngine` runs compiled `.pte` files on XNNPACK in the `accelerated`
-flavor; a `.pte` carries no metadata, so the app supplies the chat template, the stop
+list. `ExecuTorchEngine` runs compiled `.pte` files on XNNPACK; a `.pte` carries no metadata, so the app supplies the chat template, the stop
 tokens and the tool syntax per family, and refuses files whose family it cannot name
 (eight families render today; parity against llama.cpp is measured case-for-case in
 `docs/research/backend-parity.md`). `RoutingInferenceEngine` dispatches on the file

@@ -29,10 +29,9 @@ import java.io.File
 /**
  * Which models on disk this build will offer to open.
  *
- * Written to hold in **both** product flavours rather than in one, which is why the
- * assertions compare against [ExecuTorchSupport.AVAILABLE] instead of against `true`. That
- * constant is the only difference between the two builds, so a test that pinned it would
- * pass in one variant and fail in the other, and `verify` runs both.
+ * The assertions compare against [ExecuTorchSupport.AVAILABLE] rather than against `true`
+ * so that the test states the rule (a `.pte` is offered when the runtime is present) rather
+ * than the current value of the constant.
  */
 @RunWith(RobolectricTestRunner::class)
 class ModelStoreRuntimeTest {

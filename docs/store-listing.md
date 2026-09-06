@@ -360,7 +360,7 @@ landlord and it wrote *about* contacting one instead: a bad prompt and a worse a
 the sort of thing to judge before filming rather than after. The telemetry shot is held from
 that same take, so the first two shots are one conversation rather than two.
 
-Those two shots come from the **accelerated debug** build, which carries `applicationIdSuffix
+Those two shots come from the **debug** build, which carries `applicationIdSuffix
 ".debug"` and therefore installs alongside a Play copy without touching it. That is the way
 to shoot v2 footage on a phone running the published v1: no uninstall, nothing destroyed.
 

@@ -46,13 +46,9 @@ subprojects {
                 "src/androidMain/kotlin",
                 "src/androidHostTest/kotlin",
                 "src/iosMain/kotlin",
-                // The flavour source sets, where the second runtime's JNI bridge lives.
-                // They went unanalysed for the same reason the multiplatform directories
-                // once did. The instrumentation sources are deliberately not listed: ktlint
-                // covers them, and detekt's complexity rules would fail the long on-device
-                // evals for being long, which is what an eval is.
-                "src/standard/kotlin",
-                "src/accelerated/kotlin",
+                // The instrumentation sources are deliberately not listed: ktlint covers
+                // them, and detekt's complexity rules would fail the long on-device evals
+                // for being long, which is what an eval is.
             ).filter { it.exists() },
         )
     }
@@ -99,17 +95,11 @@ tasks.register("verify") {
 /**
  * The host-side tiers, in the order they fail fastest.
  *
- * Regular expressions rather than names, because `:app` and `:core:engine` carry a product
- * flavour and the Android plugin renames every variant task accordingly:
- * `testDebugUnitTest` becomes `testStandardDebugUnitTest` and `testAcceleratedDebugUnitTest`.
- * Matching by exact name would have quietly stopped running the app's unit tests, its lint
- * and its instrumentation compile the moment the flavour was added — which is precisely the
- * silent gap the comment above warns about, arriving through a different door.
- *
- * Both flavours are matched deliberately. The standard one exists to *not* carry ExecuTorch,
- * so its source set is where an unused-runtime mistake would hide, and a variant that is
- * never compiled is a claim rather than a fact. The extra cost is one more assemble; the
- * native build is shared between them.
+ * Matched as regular expressions against task names. They are exact names today, but the
+ * matching is kept because of what happened when a product flavour was added in August
+ * 2026: the Android plugin renamed `testDebugUnitTest` to `testStandardDebugUnitTest`, an
+ * exact-name list matched nothing, and `verify` reported green while running no app tests.
+ * If a flavour ever returns, widen these to `(Flavour)?` rather than trusting the names.
  */
 val verifyTasks = listOf(
     "ktlintCheck",
@@ -118,15 +108,15 @@ val verifyTasks = listOf(
     // was holding four errors, including composables reading the locale in a way that
     // ignores the user changing it. Run it on release, because that is the variant with
     // R8 and the manifest that reaches Play.
-    "lint(Standard|Accelerated)?Release",
-    "assemble(Standard|Accelerated)?Debug",
+    "lintRelease",
+    "assembleDebug",
     // Compiled here even though it cannot be run here. Nothing in this tier builds the
     // instrumentation sources, so they rotted quietly: a composable gained two parameters
     // and the screen test that calls it had not compiled since, which nobody found out
     // until the next person needed to run it. Compiling costs seconds and is the whole
     // difference between a device tier that works when reached for and one that does not.
-    "assemble(Standard|Accelerated)?DebugAndroidTest",
-    "test(Standard|Accelerated)?DebugUnitTest",
+    "assembleDebugAndroidTest",
+    "testDebugUnitTest",
     // The multiplatform tiers, and they are not decoration. A module that compiles for iOS
     // and is never run there is a claim rather than a fact, and `verify` wiring only the
     // Android task names meant the iOS simulator tests existed and nothing ran them: a
@@ -149,12 +139,12 @@ val verifyTasks = listOf(
 tasks.register("verifyOnDevice") {
     group = "verification"
     description = "Instrumented engine tests. Needs a connected device and model files."
-    // A regular expression for the same reason [verifyTasks] uses them: `:app` and
-    // `:core:engine` carry a product flavour, so their device tasks are
-    // `connectedStandardDebugAndroidTest` and `connectedAcceleratedDebugAndroidTest`. The
-    // exact name matched only the six modules that have no device tests, so from the day
-    // the flavour landed this ran nothing that needed a phone and reported green.
-    val deviceTask = Regex("connected(Standard|Accelerated)?DebugAndroidTest")
+    // Matched the way [verifyTasks] is, and for the same reason: while `:app` and
+    // `:core:engine` carried a product flavour their device tasks were
+    // `connectedStandardDebugAndroidTest` and its twin, and the exact name matched only
+    // the six modules that have no device tests, so this ran nothing that needed a phone
+    // and reported green.
+    val deviceTask = Regex("connectedDebugAndroidTest")
     dependsOn(
         subprojects.map { project ->
             project.tasks.matching { deviceTask.matches(it.name) }

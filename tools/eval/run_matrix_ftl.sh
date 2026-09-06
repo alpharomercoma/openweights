@@ -29,7 +29,7 @@ EVAL=/data/local/tmp/openweights/eval
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 OUT="$HERE/results"
-APK="$ROOT/core/engine/build/outputs/apk/androidTest/accelerated/debug/engine-accelerated-debug-androidTest.apk"
+APK="$ROOT/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk"
 
 case "$ENGINE" in
   executorch) CLASS=ExecuTorchParityEval; PATTERN='\.pte$|\.tokenizer\.json$' ;;
@@ -58,7 +58,7 @@ esac
 
 if [ -z "${SKIP_BUILD:-}" ]; then
   echo "== building the accelerated test APK (both engines live in it)"
-  (cd "$ROOT" && ./gradlew :core:engine:assembleAcceleratedDebugAndroidTest --console=plain -q)
+  (cd "$ROOT" && ./gradlew :core:engine:assembleDebugAndroidTest --console=plain -q)
 fi
 
 echo "== the $ENGINE models in $BUCKET"

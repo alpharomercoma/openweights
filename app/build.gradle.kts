@@ -171,20 +171,6 @@ android {
         }
     }
 
-    /**
-     * Mirrors core:engine's dimension, which is where the second runtime actually lives.
-     * The accelerated variant carries ExecuTorch and can open a `.pte`; the standard one
-     * ships llama.cpp alone and never offers models it could not run.
-     */
-    flavorDimensions += "runtime"
-    productFlavors {
-        create("standard") { dimension = "runtime" }
-        create("accelerated") {
-            dimension = "runtime"
-            versionNameSuffix = "-accelerated"
-        }
-    }
-
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -312,14 +298,13 @@ tasks.register("verifyJniSymbols") {
     // Both artifacts, because they are not the same file and only one of them is what
     // Play receives. The guard was written against the APK, which is the one nobody
     // uploads: bundleRelease produces the AAB, and it was going out unchecked.
-    // Under the flavour directories: outputs/apk/standard/release, outputs/bundle/
-    // standardRelease and their accelerated twins. The pre-flavour paths matched a stale
-    // APK and AAB left from before the split, so the guard passed against artifacts that
-    // were not the ones being shipped, and on a clean checkout found nothing at all.
+    // Matched by pattern rather than path so that a stale artifact from an earlier layout
+    // (the flavour directories that existed until 2026-09-06) is checked too rather than
+    // silently passed over; a wrong file failing is better than a wrong file being skipped.
     val artifacts = fileTree(layout.buildDirectory.dir("outputs/apk")) {
-        include("*/release/*.apk")
+        include("**/release/*.apk")
     } + fileTree(layout.buildDirectory.dir("outputs/bundle")) {
-        include("*Release/*.aab")
+        include("**/*.aab")
     }
     val symbols = jniSymbols
     inputs.files(artifacts)
@@ -355,10 +340,8 @@ tasks.register("verifyJniSymbols") {
     }
 }
 
-// The per-flavour tasks as well as the aggregates: `bundleStandardRelease` is the one
-// that produces what Play receives, and it was not on this list.
-tasks.matching {
-    Regex("(assemble|bundle)(Standard|Accelerated)?Release").matches(it.name)
-}.configureEach {
+// `bundleRelease` as well as `assembleRelease`: the bundle is what Play receives, and
+// it was once not on this list.
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
     finalizedBy("verifyJniSymbols")
 }

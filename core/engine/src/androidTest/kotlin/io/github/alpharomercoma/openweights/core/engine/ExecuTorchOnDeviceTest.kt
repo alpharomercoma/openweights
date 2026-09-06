@@ -46,8 +46,6 @@ import java.io.File
  * Both files, because a `.pte` says nothing about which tokenizer produced it and the wrong
  * one gives fluent nonsense rather than an error. Without them these skip rather than fail,
  * so a machine with no device attached stays green.
- *
- * Accelerated flavour only: the standard build has no runtime for these to drive.
  */
 @RunWith(AndroidJUnit4::class)
 class ExecuTorchOnDeviceTest {

@@ -52,3 +52,16 @@
     io.github.alpharomercoma.openweights.core.engine.LlamaBridge$ReplySink {
     void onReply(java.lang.String, java.lang.String, java.lang.String[]);
 }
+
+# fbjni, kept whole.
+#
+# fbjni 0.7.0's AAR ships no consumer rules, and the ExecuTorch AAR's rules cover only its
+# own package. On the shipped release build R8 removed every fbjni class but HybridData:
+# not HybridData$Destructor, whose field the native side finds by name when it wraps the
+# runner it has just built, and not CppException, which is what a C++ exception is raised
+# as. So opening a model reached "Using method: forward" and then fbjni, unable to find
+# either, aborted the process with the message 'ptr' (2026-09-06, Poco X8 Pro, LFM2.5 1.2B
+# xnnpack; the same files load and generate on the unminified build). Every class in the
+# package is reached from native code by descriptor, which R8 cannot see, and the package
+# is fourteen classes. ExecuTorch's own Java classes keep their AAR's rules; they held.
+-keep class com.facebook.jni.** { *; }

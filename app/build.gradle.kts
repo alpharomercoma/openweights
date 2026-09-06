@@ -289,6 +289,21 @@ val jniSymbols = listOf(
     "nativeLoadModel",
     "LlamaBridge",
     "LlamaException",
+    // fbjni finds every one of these from native code by descriptor: the exception
+    // classes when it raises a C++ exception, the destructor when it wraps a native
+    // pointer. Stripped, it aborts the process instead (core/engine/consumer-rules.pro).
+    // Nothing here that R8 may legitimately inline away, such as a config builder.
+    "com.facebook.jni.CppException",
+    "com.facebook.jni.UnknownCppException",
+    "com.facebook.jni.CppSystemErrorException",
+    "com.facebook.jni.HybridData",
+    "com.facebook.jni.HybridData\$Destructor",
+    "com.facebook.jni.HybridClassBase",
+    "com.facebook.jni.ExceptionHelper",
+    "com.facebook.jni.DestructorThread",
+    "com.facebook.jni.ThreadScopeSupport",
+    "org.pytorch.executorch.extension.llm.LlmModule",
+    "org.pytorch.executorch.extension.llm.LlmCallback",
 )
 
 tasks.register("verifyJniSymbols") {
@@ -324,7 +339,22 @@ tasks.register("verifyJniSymbols") {
                     .forEach { entry ->
                         val bytes = zip.getInputStream(entry).readBytes()
                         val text = String(bytes, Charsets.ISO_8859_1)
-                        symbols.forEach { if (text.contains(it)) found += it }
+                        // A bare name is a method or a simple class name, stored as is. A
+                        // qualified class name is stored as a descriptor, slashes and all:
+                        // `Lcom/facebook/jni/CppException;`. Searching the dotted form
+                        // would fail every qualified name, including the ones that survived.
+                        symbols.forEach { symbol ->
+                            val qualified = '.' in symbol
+                            val needle = if (qualified) {
+                                "L" + symbol.replace(
+                                    '.',
+                                    '/',
+                                ) + ";"
+                            } else {
+                                symbol
+                            }
+                            if (text.contains(needle)) found += symbol
+                        }
                     }
             }
             val missing = symbols - found

@@ -19,13 +19,16 @@ package io.github.alpharomercoma.openweights.download
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import androidx.core.content.getSystemService
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import io.github.alpharomercoma.openweights.MainActivity
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import java.io.File
 
 /**
  * What the app says when a download ends while nobody is looking at it.
@@ -90,6 +93,29 @@ class DownloadNotifierTest {
         assertThat(posted.contentIntent).isNotNull()
         assertThat(posted.flags and Notification.FLAG_AUTO_CANCEL)
             .isEqualTo(Notification.FLAG_AUTO_CANCEL)
+    }
+
+    @Test
+    fun `tapping a finished model opens a chat on that file`() {
+        val model = File.createTempFile("Qwen3-1.7B-Q4_0", ".gguf")
+        notifier.announce(ID, "Qwen3-1.7B-Q4_0", DownloadNotifier.Outcome.FINISHED, model)
+
+        val posted = shadowOf(manager).allNotifications.single()
+        val intent = shadowOf(posted.contentIntent).savedIntent
+        assertThat(intent.component?.className).isEqualTo(MainActivity::class.java.name)
+        assertThat(intent.getStringExtra(MainActivity.EXTRA_OPEN_MODEL))
+            .isEqualTo(model.absolutePath)
+        assertThat(intent.flags and Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .isEqualTo(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
+
+    @Test
+    fun `a file that is not a whole model opens the app and nothing more`() {
+        notifier.announce(ID, "Qwen3-1.7B.tokenizer.json", DownloadNotifier.Outcome.FINISHED)
+
+        val posted = shadowOf(manager).allNotifications.single()
+        val intent = shadowOf(posted.contentIntent).savedIntent
+        assertThat(intent.hasExtra(MainActivity.EXTRA_OPEN_MODEL)).isFalse()
     }
 
     @Test

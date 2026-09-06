@@ -59,8 +59,11 @@ import io.github.alpharomercoma.openweights.ui.tools.ToolsScreen
 import io.github.alpharomercoma.openweights.ui.tools.ToolsViewModel
 import io.github.alpharomercoma.openweights.ui.watch.WatchScreen
 import io.github.alpharomercoma.openweights.ui.watch.WatchViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import java.io.File
 
 /**
  * The routes, which are no longer tabs.
@@ -102,8 +105,14 @@ private fun NavHostController.push(route: String) {
 }
 
 @Composable
-fun OpenWeightsApp(modifier: Modifier = Modifier) {
+fun OpenWeightsApp(
+    modifier: Modifier = Modifier,
+    /** A model a notification asked for; the chat opens fresh on it. See `MainActivity`. */
+    openModel: StateFlow<File?> = MutableStateFlow(null),
+    onModelOpened: (File) -> Unit = {},
+) {
     val navController = rememberNavController()
+    val modelToOpen by openModel.collectAsStateWithLifecycle()
 
     // Chat and Models get one view model each, hoisted above the NavHost, so a download
     // keeps running and a loaded model stays loaded while the user moves around the app.
@@ -129,6 +138,15 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
                 .distinctUntilChanged()
         },
     )
+
+    // A tapped "Ready to use" lands wherever the app last was. The chat is where the model
+    // is opened, so anything above it is popped; the chat's own effect does the loading
+    // once it is on screen, whether it was there already or has just been returned to.
+    LaunchedEffect(modelToOpen) {
+        if (modelToOpen != null && navController.currentDestination?.route != Routes.CHAT) {
+            navController.popBackStack(Routes.CHAT, inclusive = false)
+        }
+    }
 
     // No Scaffold here any more. With the bar gone and zero insets it supplied nothing but a
     // container colour, and all six screens set that on their own Scaffold already.
@@ -186,8 +204,17 @@ fun OpenWeightsApp(modifier: Modifier = Modifier) {
 
             LaunchedEffect(Unit) {
                 // The view model outlives the composition, so returning to this tab
-                // must not reload the model and wipe the conversation.
-                if (!chatViewModel.hasModel) chatViewModel.loadDefaultModel()
+                // must not reload the model and wipe the conversation. Nor does the
+                // default load run when a notification has named a model: the two loads
+                // would race and the later one, the default, would win.
+                if (modelToOpen == null && !chatViewModel.hasModel) chatViewModel.loadDefaultModel()
+            }
+            LaunchedEffect(modelToOpen) {
+                // Fresh conversation, not a swap: "ready to use" is an invitation to
+                // start, and the chat that was open belongs to whatever it was about.
+                val file = modelToOpen ?: return@LaunchedEffect
+                onModelOpened(file)
+                chatViewModel.loadModel(file)
             }
 
             ChatScreen(

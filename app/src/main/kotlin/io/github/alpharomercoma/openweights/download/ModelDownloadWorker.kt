@@ -33,6 +33,9 @@ import androidx.work.workDataOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.github.alpharomercoma.openweights.R
+import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
+import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
+import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
 import io.github.alpharomercoma.openweights.core.hub.DownloadException
 import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
@@ -126,7 +129,12 @@ class ModelDownloadWorker @AssistedInject constructor(
             .collect { progress -> report(progress) }
 
         val error = failure ?: run {
-            notifier.announce(doneNotificationId, label, DownloadNotifier.Outcome.FINISHED)
+            notifier.announce(
+                doneNotificationId,
+                label,
+                DownloadNotifier.Outcome.FINISHED,
+                model = destination.takeIf { it.isOpenableModel() },
+            )
             return Result.success()
         }
 
@@ -246,6 +254,19 @@ class ModelDownloadWorker @AssistedInject constructor(
     }
 
     private fun errorData(message: String): Data = workDataOf(KEY_ERROR to message)
+
+    /**
+     * Whether tapping "Ready to use" can open a chat on this file.
+     *
+     * Weights only: a projector or a tokenizer is half of a model, and a `.pte` whose
+     * tokenizer has not landed yet is one the chat would refuse. Those still announce,
+     * they just open the app rather than a chat.
+     */
+    private fun File.isOpenableModel(): Boolean = when (ModelFormat.of(name)) {
+        ModelFormat.GGUF -> !GgufFileName.isProjector(name)
+        ModelFormat.PTE -> File(parentFile, ExecuTorchFileName.tokenizerNameFor(name)).isFile
+        null -> false
+    }
 
     companion object {
         const val KEY_REPO_ID = "repoId"

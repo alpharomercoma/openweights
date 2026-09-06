@@ -16,6 +16,7 @@
 
 package io.github.alpharomercoma.openweights
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,6 +30,8 @@ import io.github.alpharomercoma.openweights.core.data.ThemeChoice
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
 import io.github.alpharomercoma.openweights.core.designsystem.theme.ThemeMode
 import io.github.alpharomercoma.openweights.ui.OpenWeightsApp
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -41,10 +44,22 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appearance: AppearanceRepository
 
+    /**
+     * A model a notification asked to open, until the chat has taken it.
+     *
+     * Set from the launching intent and again from `onNewIntent`, which is how the finished
+     * download's tap reaches an activity that is already running. Cleared by the shell
+     * once the chat has loaded the file, so a rotation does not open it twice.
+     */
+    private val openModel = MutableStateFlow<File?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Only on a fresh start: after a rotation the intent is the same one, and the
+        // chat has already opened what it asked for.
+        if (savedInstanceState == null) openModel.value = intent.modelToOpen()
 
         setContent {
             // SYSTEM until the stored value arrives, which is one frame at most and is the
@@ -52,9 +67,26 @@ class MainActivity : ComponentActivity() {
             val choice by appearance.themeChoice.collectAsStateWithLifecycle(ThemeChoice.SYSTEM)
 
             OpenWeightsTheme(themeMode = choice.toThemeMode(), dynamicColor = false) {
-                OpenWeightsApp()
+                OpenWeightsApp(
+                    openModel = openModel,
+                    onModelOpened = { openModel.compareAndSet(it, null) },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.modelToOpen()?.let { openModel.value = it }
+    }
+
+    private fun Intent?.modelToOpen(): File? =
+        this?.getStringExtra(EXTRA_OPEN_MODEL)?.let(::File)?.takeIf { it.isFile }
+
+    companion object {
+        /** The absolute path of a model file a notification wants opened in a fresh chat. */
+        const val EXTRA_OPEN_MODEL = "io.github.alpharomercoma.openweights.extra.OPEN_MODEL"
     }
 }
 

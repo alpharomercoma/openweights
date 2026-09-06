@@ -20,9 +20,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
+import io.github.alpharomercoma.openweights.MainActivity
 import io.github.alpharomercoma.openweights.R
+import java.io.File
 
 /**
  * Says how a download ended, once there is no progress bar left to say it.
@@ -53,7 +56,7 @@ internal class DownloadNotifier(private val context: Context) {
      * under the same id races its removal, and a download that quietly announced nothing is
      * the one failure this feature cannot have.
      */
-    fun announce(notificationId: Int, label: String, outcome: Outcome) {
+    fun announce(notificationId: Int, label: String, outcome: Outcome, model: File? = null) {
         ensureChannel()
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
@@ -63,7 +66,7 @@ internal class DownloadNotifier(private val context: Context) {
             // notification has done its job and should not need dismissing as well.
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .apply { openTheApp(notificationId)?.let(::setContentIntent) }
+            .apply { openTheApp(notificationId, model)?.let(::setContentIntent) }
             .build()
 
         // Dropped rather than thrown when notifications are refused, which on Android 13
@@ -77,19 +80,29 @@ internal class DownloadNotifier(private val context: Context) {
     /**
      * An intent back into the app, or null on a device that somehow cannot launch it.
      *
-     * The launcher intent rather than a deep link to the models screen. A link would be
-     * nicer and would mean threading a route through navigation for one notification; what
-     * this opens is an app in which the model is now listed, installed, and already warming.
+     * With [model], the intent names the file, and `MainActivity` opens a fresh chat on it.
+     * "Ready to use" used to open the app wherever it last was, with the model listed and
+     * warming, and the next tap was the picker: the notification had said the model was
+     * ready and then made the user go and find it. Without a model (a failure, or a file
+     * that is only half of one) it is the launcher intent as before.
      */
-    private fun openTheApp(requestCode: Int): PendingIntent? =
-        context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { intent ->
-            PendingIntent.getActivity(
-                context,
-                requestCode,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
+    private fun openTheApp(requestCode: Int, model: File?): PendingIntent? {
+        val intent = if (model != null) {
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_OPEN_MODEL, model.absolutePath)
+                // Reuse the running activity so its `onNewIntent` receives the file,
+                // rather than stacking a second copy of the app on top of the first.
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        } else {
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+        } ?: return null
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
 
     /**
      * The finished channel, which is deliberately not the one the progress bar is on.

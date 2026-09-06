@@ -99,8 +99,12 @@ class HubCompiledLayoutsTest {
                     PromptTemplates.forModel(ExecuTorchFileName.modelNameFor(repoId, file.path)) !=
                     null
             }
-            println("$repoId offers " + offered.map { it.path })
+            println("$repoId offers " + offered.map { "${it.path} window=${it.contextWindow}" })
             assertThat(offered).isNotEmpty()
+            // Software Mansion says the window beside each export; the card shows it.
+            if (repoId.startsWith("software-mansion/")) {
+                assertThat(offered.map { it.contextWindow }).doesNotContain(null)
+            }
             // Software Mansion ships MLX exports beside the XNNPACK ones. Never here.
             assertThat(offered.none { "mlx" in it.path }).isTrue()
         }

@@ -103,6 +103,16 @@ data class HubFile(
     val sizeBytes: Long,
     /** SHA-256 of the file contents, when the Hub reports one. Used to verify downloads. */
     val sha256: String?,
+    /**
+     * The window a compiled file was exported with, in tokens, when the publisher says.
+     *
+     * A `.pte` carries its window inside the file, where nothing can read it before the
+     * download. Software Mansion publishes a `config.json` beside each export that repeats
+     * it (`get_max_context_len` per variant), and that is what fills this in; a repository
+     * without one leaves it null, and the card says the window is fixed without saying at
+     * what. Always null for a GGUF, whose window is a runtime choice read from its header.
+     */
+    val contextWindow: Int? = null,
 ) {
     /**
      * The last segment of the repository path, and never a way out of a directory.
@@ -435,6 +445,36 @@ class HuggingFaceClient @Inject constructor(
     private suspend fun modelById(repoId: String): HubModel =
         json.decodeFromString<DetailEntry>(get(apiUrl("models", repoId).build())).toModel()
 
+    /**
+     * Attaches the exported window to each compiled file whose folder publishes it.
+     *
+     * One small fetch per folder that holds both a `.pte` and a `config.json`, run
+     * together, and a folder whose config cannot be fetched or is not the publisher's
+     * spec (a plain transformers config is also called `config.json`) simply leaves its
+     * files without a window. The window is a fact worth a request: it is the one number
+     * a person cannot get any other way before spending a gigabyte, and on the small
+     * exports it decides whether tools fit at all.
+     */
+    private suspend fun List<HubFile>.withExportedWindows(
+        repoId: String,
+        allPaths: List<String>,
+    ): List<HubFile> = coroutineScope {
+        val configs = allPaths.filter { it.substringAfterLast('/') == EXPORT_CONFIG }
+            .associateBy { it.substringBeforeLast('/', "") }
+        val folders = map { it.path.substringBeforeLast('/', "") }.toSet()
+            .filter { it in configs }
+        val windows = folders.map { folder ->
+            async {
+                runCatching {
+                    ExportConfig.windowsIn(get(downloadUrl(repoId, configs.getValue(folder))))
+                }
+                    .getOrDefault(emptyMap())
+                    .mapKeys { (file, _) -> if (folder.isEmpty()) file else "$folder/$file" }
+            }
+        }.awaitAll().fold(emptyMap<String, Int>()) { acc, next -> acc + next }
+        map { file -> windows[file.path]?.let { file.copy(contextWindow = it) } ?: file }
+    }
+
     /** Full detail for one repository, including its downloadable files. */
     suspend fun detail(repoId: String): HubModelDetail {
         val url = apiUrl("models", repoId)
@@ -456,7 +496,10 @@ class HuggingFaceClient @Inject constructor(
         // A repository is one or the other in practice, and asking for both costs nothing:
         // the answer is already in hand, and which one is populated is what says whether
         // this repo needs llama.cpp or ExecuTorch.
-        val compiled = filesEnding(ModelFormat.PTE.suffix).sortedBy { it.sizeBytes }
+        val compiled = filesEnding(ModelFormat.PTE.suffix)
+            .sortedBy { it.sizeBytes }
+            .take(MAX_FILES_PER_REPO)
+            .withExportedWindows(repoId, siblings.map { it.rfilename })
         val tokenizers = siblings
             .filter { ExecuTorchFileName.isRemoteTokenizer(it.rfilename) }
             .map { HubFile(it.rfilename, it.lfs?.size ?: it.size ?: 0L, it.lfs?.sha256) }
@@ -475,7 +518,7 @@ class HuggingFaceClient @Inject constructor(
             model = payload.toModel(),
             files = gguf.filterNot { it.isProjector },
             projectors = gguf.filter { it.isProjector },
-            compiled = compiled.take(MAX_FILES_PER_REPO),
+            compiled = compiled,
             tokenizers = tokenizers,
             license = payload.cardData?.license,
             architecture = payload.gguf?.architecture,
@@ -951,3 +994,6 @@ private fun String.isUnsafeName(): Boolean = isBlank() ||
     contains('\u0000')
 
 private const val MAX_FILES_PER_REPO = 40
+
+/** What Software Mansion calls the file beside each export that describes it. */
+private const val EXPORT_CONFIG = "config.json"

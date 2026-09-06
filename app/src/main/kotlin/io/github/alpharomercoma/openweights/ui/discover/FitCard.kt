@@ -189,7 +189,13 @@ fun FitCard(
         // different heights. The quantisation itself is dropped here rather than given a
         // line of its own: it is already the filename in the row above, and repeating it
         // was the same word twice for a card that is short on lines to spend.
-        val window = inspected.metadata?.rememberLine()
+        // A GGUF's line says what it was trained to remember, because the window is chosen
+        // at load. A compiled file's says the window it was exported with, because that is
+        // the whole of it: on a 2048 export the tool list alone is two thirds, and a person
+        // choosing between two exports needs the number beside the size, not after the
+        // download. Null when the publisher does not say, and the caption above the cards
+        // has already said the window is fixed.
+        val window = inspected.metadata?.rememberLine() ?: inspected.file.windowLine()
         val needs = inspected.fit?.memoryLine()
         listOfNotNull(window, needs).takeIf { it.isNotEmpty() }?.let { parts ->
             Metric(parts.joinToString(" · "), maxLines = 1)
@@ -289,6 +295,9 @@ private fun signal(dark: Color, light: Color, isDark: Boolean) = if (isDark) dar
  */
 private fun GgufMetadata.rememberLine(): String? =
     trainingContextLength.takeIf { it > 0 }?.let { "remembers ${it.asTokens()}" }
+
+private fun HubFile.windowLine(): String? =
+    contextWindow?.takeIf { it > 0 }?.let { "window ${it.asTokens()}" }
 
 /**
  * What running it costs, in words the verdict line above has already framed: "Runs

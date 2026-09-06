@@ -118,11 +118,17 @@ class ModelDownloader @Inject constructor(
             partial.delete()
         }
 
+        // The checksum is computed as the bytes go past rather than by reading the file
+        // again afterwards. A 3 GB model used to sit at 100% under "Checking the file is
+        // intact" for as long as the phone takes to read 3 GB back, which is the slow-down
+        // at the top end people reported; the bytes were in hand once already.
+        val running = file.sha256?.let { RunningHash() }
+
         // A .part of exactly the right length is a download that finished but died before
         // the rename. Asking the server to resume from the end returns 416, so skip
         // straight to verification.
         if (partial.length() != file.sizeBytes || file.sizeBytes <= 0L) {
-            transfer(repoId, file, partial)
+            transfer(repoId, file, partial, running)
         }
 
         if (file.sizeBytes > 0 && partial.length() != file.sizeBytes) {
@@ -132,7 +138,7 @@ class ModelDownloader @Inject constructor(
                 isRetryable = true,
             )
         }
-        verify(file, partial)
+        verify(file, partial, running)
 
         // Commit provenance first. If this write fails, the resumable bytes remain under
         // .part; publishing the model first could leave a valid no-checksum download that
@@ -224,8 +230,15 @@ class ModelDownloader @Inject constructor(
         repoId: String,
         file: HubFile,
         partial: File,
+        running: RunningHash?,
     ) {
         val alreadyHave = if (partial.isFile) partial.length() else 0L
+        // On a resume the bytes already on disk go through the hash first, so the digest
+        // covers the file from its start: one read of the prefix on the rare path instead
+        // of one read of the whole file on every path. Before the request rather than
+        // after, because hashing gigabytes with an unread response open is a read timeout
+        // waiting to happen. A server that ignores the range and starts over resets it.
+        running?.feedPrefix(partial, alreadyHave)
         val request = Request.Builder()
             .url(client.downloadUrl(repoId, file.path))
             .apply {
@@ -271,7 +284,7 @@ class ModelDownloader @Inject constructor(
                     ?.saturatedPlus(if (resuming) alreadyHave else 0L)
                 ?: -1L
 
-            copyTo(partial, response.body.byteStream(), resuming, alreadyHave, total)
+            copyTo(partial, response.body.byteStream(), resuming, alreadyHave, total, running)
         }
     }
 
@@ -321,10 +334,12 @@ class ModelDownloader @Inject constructor(
         resuming: Boolean,
         alreadyHave: Long,
         total: Long,
+        running: RunningHash?,
     ) {
         val startAt = if (resuming) alreadyHave else 0L
         ensureStorageFor(partial, total, startAt)
         emit(DownloadProgress.Downloading(startAt, total))
+        if (!resuming) running?.reset()
 
         val ceiling = if (total > 0) {
             total
@@ -341,7 +356,7 @@ class ModelDownloader @Inject constructor(
 
         input.use { source ->
             FileOutputStream(partial, resuming).use { output ->
-                pump(source, output, partial, startAt, total, ceiling)
+                pump(source, output, partial, startAt, total, ceiling, running)
             }
         }
     }
@@ -367,6 +382,7 @@ class ModelDownloader @Inject constructor(
         startAt: Long,
         total: Long,
         ceiling: Long,
+        running: RunningHash?,
     ) {
         val buffer = ByteArray(BUFFER_BYTES)
         var written = startAt
@@ -390,13 +406,14 @@ class ModelDownloader @Inject constructor(
                 )
             }
             output.write(buffer, 0, read)
+            running?.update(buffer, read)
             written += read
 
             if (written - lastReported >= PROGRESS_INTERVAL_BYTES) {
                 lastReported = written
                 emit(DownloadProgress.Downloading(written, total))
             }
-            if (written - lastSpaceCheck >= PROGRESS_INTERVAL_BYTES) {
+            if (written - lastSpaceCheck >= SPACE_CHECK_INTERVAL_BYTES) {
                 lastSpaceCheck = written
                 val free = partial.parentFile?.usableSpace ?: Long.MAX_VALUE
                 if (free < STORAGE_RESERVE_BYTES.saturatedPlus(PROGRESS_INTERVAL_BYTES)) {
@@ -423,11 +440,21 @@ class ModelDownloader @Inject constructor(
      * A silently truncated GGUF fails much later as an unexplained load error, so it is
      * better to fail here on the hash, with a message that says what to do.
      */
-    private suspend fun FlowCollector<DownloadProgress>.verify(file: HubFile, partial: File) {
+    private suspend fun FlowCollector<DownloadProgress>.verify(
+        file: HubFile,
+        partial: File,
+        running: RunningHash?,
+    ) {
         val expected = file.sha256 ?: return
         emit(DownloadProgress.Verifying)
 
-        if (!partial.sha256(ioDispatcher).equals(expected, ignoreCase = true)) {
+        // The streamed digest stands in for the re-read only when it saw every byte the
+        // file now has. A part that was already complete when this attempt began, or a
+        // transfer the server restarted from zero, leaves it short, and then the file is
+        // read back as before.
+        val actual = running?.takeIf { it.covered == partial.length() }?.hex()
+            ?: partial.sha256(ioDispatcher)
+        if (!actual.equals(expected, ignoreCase = true)) {
             partial.delete()
             throw DownloadException(
                 "The downloaded file does not match the checksum Hugging Face published. " +
@@ -451,10 +478,59 @@ class ModelDownloader @Inject constructor(
             digest.digest().joinToString("") { "%02x".format(it) }
         }
 
+    /**
+     * A SHA-256 fed as the bytes go past, and how many bytes it has seen from the start.
+     *
+     * [covered] is what makes it safe to trust: a digest that skipped a byte is not a
+     * digest of the file, so [verify] compares it against the file's length before using
+     * it and reads the file back when they differ.
+     */
+    private class RunningHash {
+        private val digest = MessageDigest.getInstance("SHA-256")
+        var covered: Long = 0L
+            private set
+
+        fun update(buffer: ByteArray, length: Int) {
+            digest.update(buffer, 0, length)
+            covered += length
+        }
+
+        fun reset() {
+            digest.reset()
+            covered = 0L
+        }
+
+        /** Feeds the first [length] bytes of [file], for a resume that starts past them. */
+        suspend fun feedPrefix(file: File, length: Long) {
+            reset()
+            if (length <= 0) return
+            file.inputStream().use { stream ->
+                val buffer = ByteArray(BUFFER_BYTES)
+                var remaining = length
+                while (remaining > 0) {
+                    currentCoroutineContext().ensureActive()
+                    val read = stream.read(
+                        buffer,
+                        0,
+                        minOf(buffer.size.toLong(), remaining).toInt(),
+                    )
+                    if (read < 0) break
+                    update(buffer, read)
+                    remaining -= read
+                }
+            }
+        }
+
+        fun hex(): String = digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
     private companion object {
         const val PARTIAL_SUFFIX = DOWNLOAD_PARTIAL_SUFFIX
         const val BUFFER_BYTES = 1 shl 16
         const val PROGRESS_INTERVAL_BYTES = 1L shl 20
+
+        /** A `statfs` every mebibyte was noise; the reserve cannot vanish in 64 of them. */
+        const val SPACE_CHECK_INTERVAL_BYTES = 64L shl 20
         const val BYTES_PER_MEBIBYTE = 1024L * 1024L
         const val STORAGE_RESERVE_BYTES = 256L * 1024 * 1024
         const val MAX_UNKNOWN_DOWNLOAD_BYTES = 32L * 1024 * 1024 * 1024

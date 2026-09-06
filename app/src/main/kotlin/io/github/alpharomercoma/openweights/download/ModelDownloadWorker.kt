@@ -20,6 +20,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
@@ -37,6 +38,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ExecuTorchFileName
 import io.github.alpharomercoma.openweights.core.common.model.GgufFileName
 import io.github.alpharomercoma.openweights.core.common.model.ModelFormat
 import io.github.alpharomercoma.openweights.core.designsystem.component.formatBytes
+import io.github.alpharomercoma.openweights.core.hub.DOWNLOAD_PARTIAL_SUFFIX
 import io.github.alpharomercoma.openweights.core.hub.DownloadException
 import io.github.alpharomercoma.openweights.core.hub.DownloadProgress
 import io.github.alpharomercoma.openweights.core.hub.HubException
@@ -77,6 +79,17 @@ class ModelDownloadWorker @AssistedInject constructor(
 
     /** The last whole percent shown, so the notification is rebuilt about a hundred times. */
     private var lastPercent = -1
+
+    /**
+     * When the last progress row was written, so WorkManager's database is not the pace.
+     *
+     * The downloader reports every mebibyte, and each report used to become a Room write
+     * through `setProgress`: three thousand transactions for a 3 GB file, each awaited on
+     * the thread that should have been reading the socket. The row is now written on a
+     * whole percent or after [PROGRESS_WRITE_INTERVAL_MS], whichever comes first: a fast
+     * link is paced by percents, a slow one still moves on screen every second or so.
+     */
+    private var lastWrittenAt = 0L
 
     /**
      * One notification per unit of work, kept clear of the reply notifier's id of 1.
@@ -152,10 +165,13 @@ class ModelDownloadWorker @AssistedInject constructor(
             // because outputData is only available after the work is finally failed, and a
             // row that says merely "retrying" makes a network error indistinguishable from a
             // storage error for the entire wait.
+            // The bytes already on disk stay counted. A failure at 95% used to write a
+            // zero here, so for the whole backoff the row said the download had started
+            // over, when the next attempt resumes from the part that is still there.
             setProgress(
                 workDataOf(
                     KEY_ERROR to message,
-                    KEY_BYTES_DONE to 0L,
+                    KEY_BYTES_DONE to File(destination.path + DOWNLOAD_PARTIAL_SUFFIX).length(),
                     KEY_BYTES_TOTAL to sizeBytes,
                 ),
             )
@@ -171,13 +187,19 @@ class ModelDownloadWorker @AssistedInject constructor(
     private suspend fun report(progress: DownloadProgress) {
         when (progress) {
             is DownloadProgress.Downloading -> {
-                setProgress(
-                    workDataOf(
-                        KEY_BYTES_DONE to progress.bytesDone,
-                        KEY_BYTES_TOTAL to progress.bytesTotal,
-                    ),
-                )
                 val percent = percentOf(progress.bytesDone, progress.bytesTotal)
+                val now = SystemClock.elapsedRealtime()
+                val due =
+                    percent != lastPercent || now - lastWrittenAt >= PROGRESS_WRITE_INTERVAL_MS
+                if (due) {
+                    lastWrittenAt = now
+                    setProgress(
+                        workDataOf(
+                            KEY_BYTES_DONE to progress.bytesDone,
+                            KEY_BYTES_TOTAL to progress.bytesTotal,
+                        ),
+                    )
+                }
                 if (percent != lastPercent) {
                     lastPercent = percent
                     runCatching {
@@ -307,6 +329,9 @@ class ModelDownloadWorker @AssistedInject constructor(
         private const val DONE_ID_SALT = 0x5F1E
 
         private const val PROGRESS_MAX = 100
+
+        /** How long a download may go between progress rows when a percent takes longer. */
+        private const val PROGRESS_WRITE_INTERVAL_MS = 1_000L
 
         /** Maximum automatic retries after the first transfer attempt. */
         const val MAX_RETRIES = 5

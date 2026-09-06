@@ -143,7 +143,7 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
             // fact about the file, not a crash to show as one.
             val text = cause.message.orEmpty()
             if ("Max seq length exceeded" in text || "max_context_len" in text) {
-                throw LlamaException(
+                throw ContextWindowExceededException(
                     "The conversation no longer fits this model's exported context " +
                         "window. Start a new chat, or use a model exported with a " +
                         "larger window.",

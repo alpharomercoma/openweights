@@ -24,6 +24,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.ToolDefinition
 import io.github.alpharomercoma.openweights.core.engine.ComputeDevice
 import io.github.alpharomercoma.openweights.core.engine.ComputeDeviceKind
+import io.github.alpharomercoma.openweights.core.engine.ContextWindowExceededException
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
@@ -99,6 +100,12 @@ class FakeInferenceEngine : InferenceEngine {
      * a row can be scripted for a caller that counts them.
      */
     var failChat = false
+
+    /** Refuses every pass that carries tool definitions, the way a full compiled window does. */
+    var overflowWhileToolsOffered = false
+
+    /** Refuses every pass, tools or not: the conversation itself is too big. */
+    var overflowAlways = false
 
     /**
      * What each completion reports the context as holding.
@@ -230,6 +237,9 @@ class FakeInferenceEngine : InferenceEngine {
         paramsUsed += params
         if (countsPrompt) contextUsed = messages.sumOf { it.text.length } / CHARS_PER_TOKEN
         if (failChat) return flow { throw LlamaException("the turn did not finish") }
+        if (overflowAlways || (overflowWhileToolsOffered && tools.isNotEmpty())) {
+            return flow { throw ContextWindowExceededException("does not fit") }
+        }
         if (!hold) {
             val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)
             return flow {

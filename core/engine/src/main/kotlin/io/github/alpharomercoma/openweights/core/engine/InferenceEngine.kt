@@ -27,7 +27,15 @@ import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 /** Thrown when the native engine fails to load a model or generate. */
-class LlamaException(message: String) : RuntimeException(message)
+open class LlamaException(message: String) : RuntimeException(message)
+
+/**
+ * The prompt and the reply it asked for do not fit the model's window.
+ *
+ * Its own type so the turn loop can answer it rather than show it: with the tool prefix
+ * withdrawn a conversation usually fits again, and that is a retry, not an error.
+ */
+class ContextWindowExceededException(message: String) : LlamaException(message)
 
 /** Why a generation stopped. Ordinals must stay in sync with `StopReason` in the JNI layer. */
 enum class StopReason {

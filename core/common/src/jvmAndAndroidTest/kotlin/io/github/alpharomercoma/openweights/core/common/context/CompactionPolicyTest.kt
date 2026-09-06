@@ -45,6 +45,25 @@ class CompactionPolicyTest {
     }
 
     @Test
+    fun `a small window folds down to the last exchange`() {
+        // A compiled model exported at 2048 holds about one exchange beside its tool
+        // prefix. Keeping two exchanges verbatim there meant nothing could ever be folded
+        // and the second question was refused by the runtime.
+        assertThat(policy.shouldCompact(contextUsed = 1900, contextSize = 2048, entryCount = 5))
+            .isTrue()
+        assertThat(policy.shouldCompact(contextUsed = 1900, contextSize = 2048, entryCount = 4))
+            .isFalse()
+        // Question, answer, question, answer, question: keeping two would leave an answer
+        // at the front of what is kept, so the fold runs on to it and the last question
+        // alone stays verbatim, the same rule the large window follows.
+        val range = policy.foldRange(entryCount = 5, contextSize = 2048) { it % 2 == 1 }
+        assertThat(range).isEqualTo(0..3)
+        // The same five entries on a window of four thousand or more are left alone.
+        assertThat(policy.foldRange(entryCount = 5, contextSize = 4_096)).isNull()
+        assertThat(policy.foldRange(entryCount = 5, contextSize = 32_768)).isNull()
+    }
+
+    @Test
     fun `keeps the most recent exchanges verbatim`() {
         val range = policy.foldRange(entryCount = 20)
 

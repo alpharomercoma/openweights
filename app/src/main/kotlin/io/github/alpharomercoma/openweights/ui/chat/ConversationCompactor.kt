@@ -70,6 +70,7 @@ class ConversationCompactor @Inject constructor(
         val range = policy.foldRange(
             entryCount = transcript.size,
             alreadyFoldedThrough = compaction?.foldedThroughIndex ?: -1,
+            contextSize = contextSize,
         ) { index -> transcript[index].role == ChatRole.ASSISTANT } ?: return 0
         val chars = transcript.slice(range).sumOf { it.text.length }
         val removed = (chars / charsPerToken()).toInt()
@@ -98,6 +99,7 @@ class ConversationCompactor @Inject constructor(
         val range = policy.foldRange(
             entryCount = state.transcript.size,
             alreadyFoldedThrough = state.compaction?.foldedThroughIndex ?: -1,
+            contextSize = state.contextSize,
         ) { index -> state.transcript[index].role == ChatRole.ASSISTANT } ?: return null
 
         // Feed the previous summary back in, or a second compaction would produce a

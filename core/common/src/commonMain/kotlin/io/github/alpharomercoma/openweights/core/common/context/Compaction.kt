@@ -69,7 +69,9 @@ class CompactionPolicy(
         require(triggerFraction in MIN_TRIGGER..MAX_TRIGGER) {
             "triggerFraction must be within $MIN_TRIGGER..$MAX_TRIGGER"
         }
-        require(keepRecentEntries >= 2) { "at least one full exchange must stay verbatim" }
+        require(keepRecentEntries >= MIN_KEEP_RECENT) {
+            "at least one full exchange must stay verbatim"
+        }
     }
 
     /**
@@ -127,7 +129,7 @@ class CompactionPolicy(
     ): Boolean {
         // Folding needs something to fold beyond the turns that must stay verbatim.
         val canFold = contextSize > 0 &&
-            entryCount > keepRecentEntries + MIN_FOLDABLE_ENTRIES
+            entryCount > keepRecentFor(contextSize) + MIN_FOLDABLE_ENTRIES
         if (!canFold) return false
 
         val fractionReached = contextUsed.toFloat() / contextSize >=
@@ -152,10 +154,11 @@ class CompactionPolicy(
     fun foldRange(
         entryCount: Int,
         alreadyFoldedThrough: Int = -1,
+        contextSize: Int = 0,
         isAnswer: (Int) -> Boolean = { false },
     ): IntRange? {
         val start = alreadyFoldedThrough + 1
-        var endExclusive = entryCount - keepRecentEntries
+        var endExclusive = entryCount - keepRecentFor(contextSize)
         if (endExclusive - start < MIN_FOLDABLE_ENTRIES) return null
         // Never past the last entry: folding the whole transcript would leave a prompt with
         // nothing in it, which is a worse answer to this than keeping one answer too many.
@@ -165,12 +168,31 @@ class CompactionPolicy(
         return start until endExclusive
     }
 
+    /**
+     * How many of the latest entries stay verbatim, which depends on how much room there is.
+     *
+     * Four is two exchanges, and it is the right amount of recent detail from four
+     * thousand tokens up. On a smaller window it is the whole window: a
+     * compiled model exported at 2048 holds about one exchange beside its tool prefix,
+     * so keeping two meant a conversation could never be folded at all and the second
+     * question was refused. There the last exchange alone is kept, which is the least
+     * that still lets the model see what it just said.
+     */
+    fun keepRecentFor(contextSize: Int): Int =
+        if (contextSize in 1 until SMALL_WINDOW_TOKENS) MIN_KEEP_RECENT else keepRecentEntries
+
     companion object {
         /**
          * Compact at three-quarters full. Late enough that short chats never pay for it,
          * early enough to leave room for the summarization call itself.
          */
         const val DEFAULT_TRIGGER_FRACTION = 0.75f
+
+        /** Below this a window is small, and only the last exchange stays verbatim. */
+        const val SMALL_WINDOW_TOKENS = 4_096
+
+        /** One exchange: the least that still lets the model see what it just said. */
+        const val MIN_KEEP_RECENT = 2
 
         /** See [CompactionPolicy.ceilingTokens]: about a fifth slower than an empty context. */
         const val DEFAULT_CEILING_TOKENS = 4_096

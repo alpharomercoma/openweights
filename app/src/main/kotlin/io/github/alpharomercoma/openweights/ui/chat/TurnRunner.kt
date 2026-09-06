@@ -27,6 +27,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.common.model.assistantHistoryText
 import io.github.alpharomercoma.openweights.core.common.model.containsToolMarkup
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
+import io.github.alpharomercoma.openweights.core.engine.ContextWindowExceededException
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
@@ -705,13 +706,19 @@ class TurnRunner @Inject constructor(
                 // check would answer about the steps of a chat it has never seen.
                 val plan = plans.plan.value.takeIf { ownsPlan }
                 pinned = pinned || !plan?.statusBlock().isNullOrEmpty()
-                val pass = streamOnce(
-                    messages.pinning(plan),
-                    params.deciding(mayCall),
-                    active,
-                    renderTools,
-                    listener,
-                ) { lastRaw = it } ?: return lastRaw
+                val streamed = try {
+                    streamOnce(
+                        messages.pinning(plan),
+                        params.deciding(mayCall),
+                        active,
+                        renderTools,
+                        listener,
+                    ) { lastRaw = it }
+                } catch (overflow: ContextWindowExceededException) {
+                    if (!withdrawToolsFor(overflow)) throw overflow
+                    continue
+                }
+                val pass = streamed ?: return lastRaw
 
                 // A cancelled or truncated pass ends the turn here, whatever it left behind.
                 // The engine hands its reply back regardless of why it stopped, so half a
@@ -740,6 +747,32 @@ class TurnRunner @Inject constructor(
                 }
                 listener.onNextPass()
             }
+        }
+
+        /**
+         * Takes the tool prefix out of the prompt after the window refused it, once.
+         *
+         * A compiled model's window is fixed at export, and on a 2048 export the tool list
+         * alone is two thirds of it: one question and its answer fill the rest, and the
+         * next question is refused before compaction has anything to fold, since folding
+         * keeps the latest exchange whole. Without the prefix the same conversation is a
+         * third the size. The cache is cleared because the prompt no longer extends it,
+         * and the pass is prose only: a call written into the retry has nothing to run it.
+         *
+         * @return false when the tools were already out, which means the conversation
+         * itself does not fit and the refusal is the answer.
+         */
+        private suspend fun withdrawToolsFor(overflow: ContextWindowExceededException): Boolean {
+            if (!renderTools) return false
+            Log.w(
+                "OpenWeights",
+                "the window refused the prompt with the tool prefix in it; retrying without tools",
+                overflow,
+            )
+            renderTools = false
+            proseOnly = true
+            engine.resetContext()
+            return true
         }
 
         /**

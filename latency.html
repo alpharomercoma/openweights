@@ -103,6 +103,14 @@ const DATA={
  "Llama 3.2 3B":{llama:[[2.39,82],[2.11,107],[1.70,83],[2.43,180],[3.46,151]],et:[[1.36,82],[1.82,91],[1.47,63],[1.55,125],[1.73,119]]},
  "SmolLM3 3B":  {llama:[[1.18,79],[1.43,101],[1.03,79],[1.86,239],[1.79,132]],et:[[12.69,91],[10.33,85],[7.18,67],[15.90,108],[12.26,121]]},
 };
+// median prefill tokens/s per chip in CHIPS order, from docs/research/benchmark-matrix.md
+const PREFILL={
+ "Gemma 3 1B":  {llama:[61,69,79,56,45],     et:[164,192,167,156,151]},
+ "LFM2.5 1.2B": {llama:[138,130,153,112,92], et:[321,217,288,248,208]},
+ "Qwen3 1.7B":  {llama:[113,195,266,93,100], et:[122,120,130,102,112]},
+ "Llama 3.2 3B":{llama:[39,43,48,37,25],     et:[87,66,80,71,64]},
+ "SmolLM3 3B":  {llama:[42,39,47,35,29],     et:[13,14,21,11,11]},
+};
 const MODELS=Object.keys(DATA);
 let model="Qwen3 1.7B";
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -113,6 +121,8 @@ function showTip(e,text){if(typeof text!=="string"){hideTip();return;}tip.textCo
 function hideTip(){tip.hidden=true}
 // TPOT as both a period and a rate, e.g. "82 ms (12.2 tok/s)"
 const tpot=ms=>`${ms} ms (${(1000/ms).toFixed(1)} tok/s)`;
+// TTFT as a time and the prefill rate behind it, e.g. "1.27 s (61 tok/s)"
+const ttft=(s,p)=>`${s.toFixed(2)} s (${p} tok/s)`;
 
 // tabs
 const tabs=document.getElementById("tabs");
@@ -142,8 +152,9 @@ function drawMap(){
   o+=`<line class="lnk" x1="${lx(a[0])}" y1="${ly(a[1])}" x2="${lx(b[0])}" y2="${ly(b[1])}" stroke="${col}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".8"/>`});
  CHIPS.forEach((c,i)=>{const col=css(c.v);const a=d.llama[i],b=d.et[i];
   const near=Math.hypot(lx(a[0])-lx(b[0]),ly(a[1])-ly(b[1]))<4;
-  const ta=`${c.name} &middot; llama.cpp&#10;TTFT ${a[0].toFixed(2)} s &middot; TPOT ${tpot(a[1])}`,tb=`${c.name} &middot; ExecuTorch&#10;TTFT ${b[0].toFixed(2)} s &middot; TPOT ${tpot(b[1])}`;
-  const tt=near?`${c.name} &middot; both runtimes&#10;llama.cpp TTFT ${a[0].toFixed(2)} s &middot; TPOT ${tpot(a[1])}&#10;ExecuTorch TTFT ${b[0].toFixed(2)} s &middot; TPOT ${tpot(b[1])}`:null;
+  const pa=PREFILL[model].llama[i],pb=PREFILL[model].et[i];
+  const ta=`${c.name} &middot; llama.cpp&#10;TTFT ${ttft(a[0],pa)} &middot; TPOT ${tpot(a[1])}`,tb=`${c.name} &middot; ExecuTorch&#10;TTFT ${ttft(b[0],pb)} &middot; TPOT ${tpot(b[1])}`;
+  const tt=near?`${c.name} &middot; both runtimes&#10;llama.cpp TTFT ${ttft(a[0],pa)} &middot; TPOT ${tpot(a[1])}&#10;ExecuTorch TTFT ${ttft(b[0],pb)} &middot; TPOT ${tpot(b[1])}`:null;
   o+=`<circle class="pt" cx="${lx(b[0])}" cy="${ly(b[1])}" r="9" fill="none" pointer-events="all" stroke="${col}" stroke-width="2.4" data-t="${tt||tb}"/>`;
   o+=`<circle class="pt" cx="${lx(a[0])}" cy="${ly(a[1])}" r="6" fill="${col}" stroke="${panel}" stroke-width="1.5" data-t="${tt||ta}"/>`;});
  // chip labels: candidate spots on two rings around the llama.cpp disc, scored against every
@@ -191,12 +202,13 @@ function drawDumb(){
   o+=`<text x="14" y="${y+6}" font-size="12.5" font-weight="${on?700:600}" fill="${ink}">${m}</text>`;y+=rowH-2;
   CHIPS.forEach((c,i)=>{const col=css(c.v),a=d.llama[i],b=d.et[i];
    o+=`<g><text x="${left-10}" y="${y+4}" text-anchor="end" font-size="11" fill="${ink2}">${c.short}</text>`;
-   [[c0,scaleT,a[0],b[0],v=>v.toFixed(2)+" s"],[c1,scaleP,a[1],b[1],tpot]].forEach(([cx0,sc,va,vb,f])=>{
+   const pa=PREFILL[m].llama[i],pb=PREFILL[m].et[i];
+   [[c0,scaleT,a[0],b[0],v=>ttft(v,pa),v=>ttft(v,pb)],[c1,scaleP,a[1],b[1],tpot,tpot]].forEach(([cx0,sc,va,vb,f,g])=>{
     const xa=sx(va,cx0,sc),xb=sx(vb,cx0,sc);
     o+=`<line x1="${xa}" x2="${xb}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="1.6" opacity=".7"/>`;
     const near=Math.abs(xa-xb)<3;
-    const tt=near?`${m} &middot; ${c.name}&#10;llama.cpp ${f(va)} &middot; ExecuTorch ${f(vb)}`:null;
-    o+=`<circle class="pt" cx="${xb}" cy="${y}" r="6" fill="none" pointer-events="all" stroke="${col}" stroke-width="1.8" data-t="${tt||`${m} &middot; ${c.name}&#10;ExecuTorch ${f(vb)}`}"/>`;
+    const tt=near?`${m} &middot; ${c.name}&#10;llama.cpp ${f(va)} &middot; ExecuTorch ${g(vb)}`:null;
+    o+=`<circle class="pt" cx="${xb}" cy="${y}" r="6" fill="none" pointer-events="all" stroke="${col}" stroke-width="1.8" data-t="${tt||`${m} &middot; ${c.name}&#10;ExecuTorch ${g(vb)}`}"/>`;
     o+=`<circle class="pt" cx="${xa}" cy="${y}" r="3.8" fill="${col}" data-t="${tt||`${m} &middot; ${c.name}&#10;llama.cpp ${f(va)}`}"/>`;});
    o+=`</g>`;y+=rowH;});
   y+=groupGap;

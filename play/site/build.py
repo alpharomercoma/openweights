@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the public site: a landing page and the privacy policy Play links to.
+"""Build the public site: a landing page, the privacy policy Play links to, and the benchmark chart.
 
 The policy is generated from `docs/privacy-policy.md` rather than written twice. Play
 requires the linked policy to match what the app actually does, and two copies of a
@@ -138,6 +138,7 @@ download it, and chat with it. Every token is produced by your own hardware.</p>
 <h2>Links</h2>
 <ul>
 <li><a href="privacy.html">Privacy policy</a></li>
+<li><a href="latency.html">Benchmarks: five chips, two runtimes</a></li>
 <li><a href="{REPO}">Source code</a></li>
 <li><a href="{REPO}/issues">Report a problem</a></li>
 </ul>
@@ -156,7 +157,10 @@ if __name__ == "__main__":
     out.mkdir(parents=True, exist_ok=True)
     (out / "privacy.html").write_text(policy_page())
     (out / "index.html").write_text(landing_page())
+    # The chart is hand-written, self-contained HTML (its data is inline); it is copied, not
+    # generated, so that the file in the repository is exactly the file that is served.
+    (out / "latency.html").write_text((Path(__file__).parent / "latency.html").read_text())
     # Without this GitHub runs Jekyll over the branch, which is a build nobody asked for.
     (out / ".nojekyll").write_text("")
-    for name in ("index.html", "privacy.html"):
+    for name in ("index.html", "privacy.html", "latency.html"):
         print(f"{name}: {(out / name).stat().st_size} bytes")

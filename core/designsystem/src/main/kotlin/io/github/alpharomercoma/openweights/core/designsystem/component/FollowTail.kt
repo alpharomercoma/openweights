@@ -207,16 +207,19 @@ fun LazyListState.hasHiddenTail(): Boolean {
             val isLastItem = last.index == layout.totalItemsCount - 1
             val overshoot = last.offset + last.size - layout.viewportEndOffset
             // Either there are whole items below, or the last one runs well past the fold.
-            !isLastItem || overshoot > HIDDEN_TAIL_THRESHOLD_PX
+            val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+            !isLastItem || overshoot > viewport / HIDDEN_TAIL_FRACTION
         }
     }
     return hidden
 }
 
 /**
- * How much has to be out of sight before the jump is offered, in pixels.
+ * How much has to be out of sight before the jump is offered, as a share of the viewport.
  *
- * Roughly a third of a phone screen. Below this the reader can see where they are and a
- * button telling them to go there is noise.
+ * A fifth of whatever the list has. It was a fixed 700 px, about a third of a phone screen,
+ * which a list squeezed to a few hundred pixels by the chrome below it could never reach, so
+ * the way back to the live reply was never offered exactly when it was most needed
+ * (2026-09-07). Below this the reader can see where they are and a button is noise.
  */
-private const val HIDDEN_TAIL_THRESHOLD_PX = 700
+private const val HIDDEN_TAIL_FRACTION = 5

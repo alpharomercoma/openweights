@@ -157,7 +157,9 @@
     <string name="goal_steer_label">Ajustar el siguiente paso</string>
     <string name="goal_steer_support">Se aplicará cuando termine el paso actual</string>
     <string name="goal_stop">Detener objetivo</string>
-    <string name="goal_send_steering">Aplicar</string>
+    <string name="goal_strip_step">Paso %1$d de %2$d: %3$s</string>
+    <string name="goal_details">Detalles del objetivo</string>
+    <string name="composer_answer_hint">Escribe tu respuesta</string>
     <string name="goal_dismiss">Descartar</string>
     <string name="attachment_limit">Puedes adjuntar hasta %1$d elementos multimedia a la vez.</string>
     <string name="read_aloud">Leer en voz alta</string>

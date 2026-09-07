@@ -163,7 +163,9 @@
     <string name="goal_steer_label">تعديل الخطوة التالية</string>
     <string name="goal_steer_support">يُطبّق بعد انتهاء الخطوة الحالية</string>
     <string name="goal_stop">إيقاف الهدف</string>
-    <string name="goal_send_steering">تطبيق</string>
+    <string name="goal_strip_step">الخطوة %1$d من %2$d: %3$s</string>
+    <string name="goal_details">تفاصيل الهدف</string>
+    <string name="composer_answer_hint">اكتب إجابتك</string>
     <string name="goal_dismiss">إغلاق</string>
     <string name="attachment_limit">يمكنك إرفاق ما يصل إلى %1$d عناصر وسائط في المرة الواحدة.</string>
     <string name="read_aloud">قراءة بصوت عالٍ</string>

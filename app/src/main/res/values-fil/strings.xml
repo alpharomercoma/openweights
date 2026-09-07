@@ -158,7 +158,9 @@
     <string name="goal_steer_label">Baguhin ang susunod na hakbang</string>
     <string name="goal_steer_support">Ilalapat pagkatapos ng kasalukuyang hakbang</string>
     <string name="goal_stop">Itigil ang layunin</string>
-    <string name="goal_send_steering">Ilapat</string>
+    <string name="goal_strip_step">Hakbang %1$d ng %2$d: %3$s</string>
+    <string name="goal_details">Detalye ng layunin</string>
+    <string name="composer_answer_hint">I-type ang iyong sagot</string>
     <string name="goal_dismiss">Isara</string>
     <string name="attachment_limit">Maaari kang mag-attach ng hanggang %1$d media item nang sabay.</string>
     <string name="read_aloud">Basahin nang malakas</string>

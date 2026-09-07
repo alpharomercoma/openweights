@@ -112,7 +112,8 @@ deliberately not built, against measurement (`docs/research/gpu-backends.md`).
 ## The agent
 
 `:core:tools` owns everything between "the model asked for a tool" and "the result went
-back in": eighteen tools, sixteen of them user-facing, three of which leave the device
+back in" (how a running goal is shown in the chat, one pinned strip and the rest in the
+transcript, is in `docs/design/goal-surface.md`): eighteen tools, sixteen of them user-facing, three of which leave the device
 (`web_search`, `show_pictures`, `fetch_url`) and say so in the UI. `AgentRunner` decides
 one round, what was requested, what may run, what was skipped and why, and the turn
 loop in `:app` (`TurnRunner`) owns cancellation and the pass-to-pass conversation. Files

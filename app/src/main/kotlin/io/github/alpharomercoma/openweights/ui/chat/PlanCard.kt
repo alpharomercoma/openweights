@@ -45,10 +45,11 @@ import io.github.alpharomercoma.openweights.core.designsystem.theme.Radius
 /**
  * The steps the model proposed, with a box each.
  *
- * Above the composer, where the approval card sits and where the eye already is. It is not
- * part of the transcript because it is not something that was said: it is the state of the
- * work, it changes as steps are done, and a transcript entry that rewrote itself would be
- * the one thing in the chat that is not a record.
+ * At the end of the transcript, where it was made, and in the goal sheet. It is not a
+ * message (it is the state of the work and it changes as steps are done), but it is read
+ * alongside the messages, and pinning it below them left a phone with no room for the reply
+ * being written (2026-09-07). As the last item of a list that follows its tail it stays in
+ * view while the work runs and scrolls away with the rest when the reader looks back.
  *
  * The boxes are real. The model ticks them through `advance` and the user ticks them here,
  * and neither is a special case, because the plan belongs to the app rather than to either
@@ -60,7 +61,6 @@ fun PlanCard(plan: TaskPlan, onTick: (Int) -> Unit, modifier: Modifier = Modifie
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(12.dp)

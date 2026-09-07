@@ -155,6 +155,12 @@ waives those two checks for the current process and is never saved.
 its own and resumes if the app is killed; `/deep-research <question>` researches a
 question through searches and page reads and writes up the findings with sources.
 
+While a goal or research runs, the transcript stays the screen: one line above the composer
+says the state and the current step (tap it for the full plan and notes), the plan and any
+question from the model appear at the end of the transcript, and the composer, the only text
+field on the screen, steers the next step or answers the question. The reasoning is in
+[docs/design/goal-surface.md](docs/design/goal-surface.md).
+
 ### Canvas, Watch, Memory
 
 - **Canvas** renders a website, an A4 document or a 16:9 deck from files in your shared folder, served from a loopback server that refuses every request off the device.
@@ -267,6 +273,7 @@ test tiers, is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | [docs/CONTEXT.md](docs/CONTEXT.md) | The working log: toolchain, device measurements, dated session notes |
 | [docs/research/README.md](docs/research/README.md) | Every research note with its date, question and finding |
 | [docs/design/visual-language.md](docs/design/visual-language.md) | The design rules every screen follows |
+| [docs/design/goal-surface.md](docs/design/goal-surface.md) | What the chat shows while a goal or research runs, and why nothing but one strip is pinned |
 | [docs/privacy-policy.md](docs/privacy-policy.md) | What stays on the device and what leaves; published at [the policy page](https://alpharomercoma.github.io/openweights/privacy.html) |
 | [docs/play-store.md](docs/play-store.md) · [docs/store-listing.md](docs/store-listing.md) | The release checklist and the listing copy, data safety rows and rating answers |
 | [play/site/README.md](play/site/README.md) | How the public pages are built and published |

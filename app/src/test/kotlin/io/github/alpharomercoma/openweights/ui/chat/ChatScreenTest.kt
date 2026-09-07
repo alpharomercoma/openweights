@@ -191,8 +191,9 @@ class ChatScreenTest {
 
     @Test
     fun aQuestionCanBeAnsweredInWordsWhenTheOptionsDoNotFit() {
-        // The text box is always there, and this is why: a model that offers no options, or
-        // offers them wrong, still has to be answerable.
+        // Through the composer, the one text field on the screen: a model that offers no
+        // options, or offers them wrong, still has to be answerable, and the hint says the
+        // next message is the answer.
         var answered: String? = null
         showChat(
             transcript = emptyList(),
@@ -200,8 +201,9 @@ class ChatScreenTest {
             onAnswerQuestion = { answered = it },
         )
 
-        compose.onNodeWithContentDescription("Answer").performTextInput("the shared one")
-        compose.onNodeWithText("Answer").performClick()
+        compose.onNodeWithText("Type your answer").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Message").performTextInput("the shared one")
+        compose.onNodeWithContentDescription("Send message").performClick()
 
         assert(answered == "the shared one") { "typed answers must reach the model, got $answered" }
     }
@@ -263,24 +265,69 @@ class ChatScreenTest {
     }
 
     /**
-     * The other shape reported as bad: a goal still planning asks a clarifying question, and
-     * the goal card's own "steer the next step" box used to sit right above the card actually
-     * asking for input, two lookalike text fields stacked with only one of them live, since
-     * there was no step yet for the other one to apply to.
+     * A goal still planning asks a clarifying question. There is one text field on the
+     * screen and it answers the question; the goal's own steering hint yields to it, and the
+     * goal is still stoppable from its strip.
      */
     @Test
-    fun aQuestionDuringPlanningHidesTheGoalsOwnSteeringBox() {
+    fun aQuestionDuringAGoalRoutesTheComposerToTheAnswer() {
+        var answered: String? = null
+        var steered: String? = null
         showChat(
             transcript = emptyList(),
             goal = Goal(task = "who is alpha romer coma", state = GoalState.PLANNING),
             question = UserQuestion(text = "Who is Alpha Romer?"),
+            onAnswerQuestion = { answered = it },
+            onSteerGoal = { steered = it },
         )
 
         compose.onNodeWithText("Who is Alpha Romer?").assertIsDisplayed()
-        compose.onNodeWithText("Or say it in your own words").assertIsDisplayed()
+        compose.onNodeWithText("Type your answer").assertIsDisplayed()
         compose.onNodeWithText("Adjust the next step").assertDoesNotExist()
-        compose.onNodeWithText("Apply").assertDoesNotExist()
         compose.onNodeWithText("Stop goal").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Message").performTextInput("the researcher")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        assert(answered == "the researcher") { "the answer must reach the question, got $answered" }
+        assert(steered == null) { "an answer must not also steer the goal, got $steered" }
+    }
+
+    /**
+     * The shape reported as "I can't see what's happening": a research run with a plan of
+     * five, a step generating, and the transcript squeezed to nothing under a goal card, a
+     * plan card and a disabled composer. Now the reply being written stays on screen, the
+     * plan is in the transcript with it, the goal is one line, and typing steers the goal.
+     */
+    @Test
+    fun aRunningGoalKeepsTheReplyOnScreenAndTheComposerSteersIt() {
+        var steered: String? = null
+        val plan = TaskPlan(
+            listOf(
+                TaskStep("What is the official name of the model family?"),
+                TaskStep("Who created it?"),
+                TaskStep("What is the core innovation?"),
+                TaskStep("Which company founded the maker?"),
+                TaskStep("How does it differ from a transformer?"),
+            ),
+        )
+        showChat(
+            transcript = listOf(assistantEntry("The reply being written for this step.")),
+            isGenerating = true,
+            plan = plan,
+            goal = Goal(
+                task = "what is the LFM2 architecture",
+                plan = plan,
+                state = GoalState.WORKING,
+            ),
+            onSteerGoal = { steered = it },
+        )
+
+        awaitSubstring("The reply being written")
+        compose.onNodeWithText("Who created it?").assertIsDisplayed()
+        compose.onNodeWithText("Working on goal").assertIsDisplayed()
+        compose.onNodeWithText("Adjust the next step").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Message").performTextInput("skip the history")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        assert(steered == "skip the history") { "typing during a goal must steer it, got $steered" }
     }
 
     @Suppress("LongParameterList")
@@ -294,6 +341,7 @@ class ChatScreenTest {
         question: UserQuestion? = null,
         onAnswerQuestion: (String) -> Unit = {},
         goal: Goal? = null,
+        onSteerGoal: (String) -> Unit = {},
     ) {
         compose.setContent {
             OpenWeightsTheme(dynamicColor = false) {
@@ -316,6 +364,7 @@ class ChatScreenTest {
                     question = question,
                     onAnswerQuestion = onAnswerQuestion,
                     goal = goal,
+                    onSteerGoal = onSteerGoal,
                 )
             }
         }

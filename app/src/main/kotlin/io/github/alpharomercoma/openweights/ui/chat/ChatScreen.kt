@@ -404,6 +404,13 @@ private fun ChatContent(
     var showAttachments by remember { mutableStateOf(false) }
     val clipboard = rememberMessageClipboard()
 
+    // Each step of a goal starts a new reply at the bottom. A reader who scrolled up to
+    // check the last one is brought back for the next, because a run they cannot see is a
+    // run they cannot judge; outside a goal the transcript follows its usual rule.
+    LaunchedEffect(goal?.stepsTaken, state.transcript.size) {
+        if (goal?.isRunning == true) followTail.jumpToLatest()
+    }
+
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -456,7 +463,7 @@ private fun ChatContent(
             // and the render came back byte for byte identical.
             Column(modifier = Modifier.widthIn(max = READABLE_WIDTH).fillMaxSize()) {
                 Box(modifier = Modifier.weight(1f)) {
-                    if (state.transcript.isEmpty()) {
+                    if (!hasReading(state, plan, question)) {
                         EmptyState(
                             isLoadingModel = state.isLoadingModel,
                             hasModel = state.modelName != null,
@@ -471,6 +478,10 @@ private fun ChatContent(
                             Transcript(
                                 state = state,
                                 goal = goal,
+                                plan = plan,
+                                onTick = onTickStep,
+                                question = question,
+                                onAnswer = onAnswerQuestion,
                                 listState = listState,
                                 isSpeaking = isSpeaking,
                                 clipboard = clipboard,
@@ -494,15 +505,15 @@ private fun ChatContent(
                 }
 
                 StatusStrip(state = state, dictationError = dictation.error)
-                GoalSection(
+                // The one pinned thing about a goal. The plan and any question the model
+                // asks are in the transcript above, where the reader's eye already is, and
+                // steering goes through the composer below. See GoalStrip.
+                GoalBar(
                     goal = goal,
                     onStop = onStopGoal,
-                    onSteer = onSteerGoal,
                     onDismiss = onDismissGoal,
-                    awaitingAnswer = question != null,
+                    onTick = onTickStep,
                 )
-                plan?.let { PlanCard(plan = it, onTick = onTickStep) }
-                question?.let { QuestionCard(question = it, onAnswer = onAnswerQuestion) }
                 state.pendingApproval?.let { call ->
                     ToolApproval(call = call, onAnswer = onApproval)
                 }
@@ -533,13 +544,19 @@ private fun ChatContent(
                         conversationKey = state.activeConversationId,
                         initialDraft = state.composerDraft,
                         onDraftChange = onDraftChange,
-                        // A normal message would race the unattended loop between steps.
-                        // GoalCard owns bounded steering until the goal reaches a terminal
-                        // state, so there is exactly one writer to the conversation. Typing
-                        // is allowed while the model is still loading; sending is not, and
-                        // Composer enforces that second half itself via isLoadingModel.
-                        enabled = composerEnabled(state.canType, goal),
-                        isGenerating = state.isGenerating,
+                        // One text field on the screen, whatever is running. While a goal
+                        // runs, what is typed here steers its next step rather than starting
+                        // a turn of its own, and while the model has asked a question, what
+                        // is typed answers it. Both are bounded writes that the goal loop
+                        // folds in at a step boundary, so the composer stays live even while
+                        // a step is generating. Typing is allowed while the model is still
+                        // loading; sending is not, and Composer enforces that itself.
+                        enabled = composerEnabled(state, goal, question),
+                        // The send button stays a send button while steering or answering;
+                        // stopping the goal is the strip's job. Outside a goal it is the
+                        // stop button during a reply, as before.
+                        isGenerating = sendButtonStops(state, goal, question),
+                        placeholder = composerHint(goal, question),
                         isLoadingModel = state.isLoadingModel,
                         isPreparingFirstResponse = state.isPreparingFirstResponse,
                         staged = state.staged,
@@ -577,7 +594,13 @@ private fun ChatContent(
                         // by watching the model reply to "/plan".
                         editing = editing?.text,
                         onSend = { typed ->
-                            submit(
+                            routeTyped(
+                                typed = typed,
+                                goal = goal,
+                                question = question,
+                                onAnswerQuestion = onAnswerQuestion,
+                                onSteerGoal = onSteerGoal,
+                            ) ?: submit(
                                 typed = typed,
                                 editingId = editingId,
                                 onDispatch = dispatch,
@@ -656,27 +679,73 @@ private fun ChatContent(
     )
 }
 
-@Composable
-private fun GoalSection(
+/**
+ * Sends the typed text to the goal loop when that is where it belongs, and says so.
+ *
+ * True or false when it was taken (an answer to the model's question first, then a steer of
+ * the running goal); null when nothing is running and the text is an ordinary message for
+ * [submit] to handle, commands included.
+ */
+private fun routeTyped(
+    typed: String,
     goal: Goal?,
-    onStop: () -> Unit,
-    onSteer: (String) -> Unit,
-    onDismiss: () -> Unit,
-    awaitingAnswer: Boolean,
-) {
-    goal?.let {
-        GoalCard(
-            goal = it,
-            onStop = onStop,
-            onSteer = onSteer,
-            onDismiss = onDismiss,
-            awaitingAnswer = awaitingAnswer,
-        )
+    question: UserQuestion?,
+    onAnswerQuestion: (String) -> Unit,
+    onSteerGoal: (String) -> Unit,
+): Boolean? = when {
+    question != null -> {
+        onAnswerQuestion(typed.trim())
+        true
     }
+    goal?.isRunning == true -> {
+        onSteerGoal(typed.trim())
+        true
+    }
+    else -> null
 }
 
-private fun composerEnabled(canType: Boolean, goal: Goal?): Boolean =
-    canType && goal?.isRunning != true
+/** Whether what is typed goes to the goal loop (a steer or an answer) rather than to a turn. */
+private fun routesToGoal(goal: Goal?, question: UserQuestion?): Boolean =
+    question != null || goal?.isRunning == true
+
+/** Whether there is anything to read: messages, or a plan or question waiting at the end. */
+private fun hasReading(state: ChatUiState, plan: TaskPlan?, question: UserQuestion?): Boolean =
+    state.transcript.isNotEmpty() || plan != null || question != null
+
+/** The composer's button stops a reply only outside a goal; inside one, the strip stops. */
+private fun sendButtonStops(state: ChatUiState, goal: Goal?, question: UserQuestion?): Boolean =
+    state.isGenerating && !routesToGoal(goal, question)
+
+/** The one pinned thing about a goal, or nothing. */
+@Composable
+private fun GoalBar(
+    goal: Goal?,
+    onStop: () -> Unit,
+    onDismiss: () -> Unit,
+    onTick: (Int) -> Unit,
+) {
+    goal?.let { GoalStrip(goal = it, onStop = onStop, onDismiss = onDismiss, onTick = onTick) }
+}
+
+/**
+ * Typing is open while a goal runs even though a step is generating, because the text is
+ * held for the next step boundary rather than sent into the running one. Everything else
+ * follows the ordinary rule.
+ */
+private fun composerEnabled(state: ChatUiState, goal: Goal?, question: UserQuestion?): Boolean =
+    if (routesToGoal(goal, question)) {
+        state.modelName != null && !state.isCompacting
+    } else {
+        state.canType
+    }
+
+/** What the empty composer says it will do with the next thing typed. */
+@Composable
+private fun composerHint(goal: Goal?, question: UserQuestion?): String? = when {
+    question != null -> stringResource(R.string.composer_answer_hint)
+    goal?.isRunning == true -> stringResource(R.string.goal_steer_label)
+    else -> null
+}
 
 /**
  * The narrow band between the transcript and the composer.
@@ -768,6 +837,10 @@ private fun FoldingLine() {
 private fun Transcript(
     state: ChatUiState,
     goal: Goal?,
+    plan: TaskPlan?,
+    onTick: (Int) -> Unit,
+    question: UserQuestion?,
+    onAnswer: (String) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
     isSpeaking: Boolean,
     clipboard: MessageClipboard,
@@ -824,6 +897,13 @@ private fun Transcript(
                     collapseByDefault = entry.id == lastId && haltedRightHere,
                 )
             }
+        }
+        // The plan and the model's question are part of what is being read, so they sit at
+        // the end of the transcript and scroll with it, rather than pinned below where they
+        // pushed the transcript off the screen. Keyed by name: there is one of each.
+        plan?.let { item(key = "plan") { PlanCard(plan = it, onTick = onTick) } }
+        question?.let {
+            item(key = "question") { QuestionCard(question = it, onAnswer = onAnswer) }
         }
     }
 }

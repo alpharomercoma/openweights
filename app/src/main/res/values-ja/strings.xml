@@ -158,7 +158,9 @@
     <string name="goal_steer_label">次のステップを調整</string>
     <string name="goal_steer_support">現在のステップが終わった後に適用されます</string>
     <string name="goal_stop">ゴールを停止</string>
-    <string name="goal_send_steering">適用</string>
+    <string name="goal_strip_step">ステップ %1$d / %2$d: %3$s</string>
+    <string name="goal_details">目標の詳細</string>
+    <string name="composer_answer_hint">回答を入力</string>
     <string name="goal_dismiss">閉じる</string>
     <string name="attachment_limit">一度に添付できるメディアは %1$d 件までです。</string>
     <string name="read_aloud">読み上げる</string>

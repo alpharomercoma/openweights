@@ -154,6 +154,8 @@ fun Composer(
     onSend: (String) -> Boolean,
     onStop: () -> Unit,
     onCommand: (SlashCommand) -> Unit,
+    /** What the empty field promises to do, when it is not an ordinary message. */
+    placeholder: String? = null,
     /**
      * Pictures pasted, dropped or inserted by the keyboard into the field itself.
      *
@@ -508,6 +510,7 @@ fun Composer(
                                         // step with it for no reader who cannot already see
                                         // the chip above.
                                         pendingCommand != null -> pendingCommand.description
+                                        placeholder != null -> placeholder
                                         else -> stringResource(R.string.slash_command_hint)
                                     }
                                 },

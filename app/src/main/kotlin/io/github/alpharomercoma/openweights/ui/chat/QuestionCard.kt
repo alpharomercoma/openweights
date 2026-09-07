@@ -29,7 +29,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,9 +54,10 @@ import io.github.alpharomercoma.openweights.core.tools.UserQuestion
  * The question the model is waiting on, with whatever it suggested.
  *
  * Three ways to answer, in the order they cost the reader anything: tap one chip, tap
- * several, or type. The third is always there. A model that offered no options, or offered
- * them malformed, still gets a question with a box under it, because a feature that only
- * works when a 1B model produces a clean array is a feature that mostly does not work.
+ * several, or type into the composer, whose hint says the next message is the answer. The
+ * third is always there. A model that offered no options, or offered them malformed, still
+ * gets answered, because a feature that only works when a 1B model produces a clean array is
+ * a feature that mostly does not work. The card sits in the transcript, at the end.
  *
  * A single-choice question answers on the tap, because asking someone to choose and then
  * confirm is asking twice. A multiple-choice one has a button, because there is no other
@@ -75,12 +75,10 @@ fun QuestionCard(
     modifier: Modifier = Modifier,
 ) {
     var chosen by remember(question) { mutableStateOf(emptySet<String>()) }
-    var typed by remember(question) { mutableStateOf("") }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(Radius.sm))
             .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(12.dp)
@@ -120,26 +118,25 @@ fun QuestionCard(
             }
         }
 
-        OutlinedTextField(
-            value = typed,
-            onValueChange = { typed = it },
-            label = { Text(stringResource(R.string.say_own_words)) },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = "Answer" },
+        // Words go through the composer below, the one text field on the screen. A second
+        // box here was the second of two lookalike fields stacked at the bottom of the
+        // chat, and the transcript paid for both in height.
+        Caption(
+            text = stringResource(R.string.say_own_words),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AccentButton(
-                onClick = { onAnswer(answerFrom(chosen, typed, question.options)) },
-                enabled = chosen.isNotEmpty() || typed.isNotBlank(),
+        if (question.multiple) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.answer))
+                AccentButton(
+                    onClick = { onAnswer(answerFrom(chosen, "", question.options)) },
+                    enabled = chosen.isNotEmpty(),
+                ) {
+                    Text(stringResource(R.string.answer))
+                }
             }
         }
     }

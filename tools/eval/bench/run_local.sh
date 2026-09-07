@@ -7,6 +7,7 @@
 #                                                     PREFIX=qdc- names another phone's column
 #                                                     CONTEXT=0 loads each .pte at its own exported window
 #                                                     CLASSES narrows to one eval class
+#                                                     SETS=gsm8k,ifeval narrows the sets; CAP=2048 caps every reply
 #
 # The instrumentation is started detached rather than with -w: a wireless-debugging
 # session that drops takes an attached run with it, and one did at prompt 54. The
@@ -35,7 +36,7 @@ $ADB shell pm install -r -t --user 0 /data/local/tmp/owtest.apk
 $ADB shell "touch /data/local/tmp/bench-start"
 for class in ${CLASSES:-ExecuTorchBenchmarkEval LlamaCppBenchmarkEval}; do
   echo "== $class $(date +%H:%M)"
-  $ADB shell "nohup am instrument -r -e budget 600 ${MODEL:+-e model $MODEL} ${CONTEXT:+-e context $CONTEXT} -e class io.github.alpharomercoma.openweights.core.engine.eval.$class $PKG/$RUNNER >/data/local/tmp/bench-$class.log 2>&1 &"
+  $ADB shell "nohup am instrument -r -e budget 600 ${MODEL:+-e model $MODEL} ${CONTEXT:+-e context $CONTEXT} ${SETS:+-e sets $SETS} ${CAP:+-e cap $CAP} -e class io.github.alpharomercoma.openweights.core.engine.eval.$class $PKG/$RUNNER >/data/local/tmp/bench-$class.log 2>&1 &"
   n=0; until $ADB shell pidof $PKG >/dev/null 2>&1 || [ $n -ge 12 ]; do sleep 5; n=$((n + 1)); done
   while $ADB shell pidof $PKG >/dev/null 2>&1; do sleep 60; done
   $ADB shell "grep -E 'INSTRUMENTATION_(RESULT|STATUS: stack)' /data/local/tmp/bench-$class.log | head -3" || true

@@ -65,6 +65,12 @@ object BenchmarkSuite {
          * compares exports that differ in nothing else.
          */
         val context: Int = DEFAULT_CONTEXT,
+        /**
+         * Reply cap in tokens for every prompt; 0 keeps each prompt's own cap. The window
+         * matrix rerun of LFM2.5-2.6B uses 2048, because that model reasons before it answers
+         * and at the prompts' 640 most of its GSM8K and IFEval replies were cut mid-thought.
+         */
+        val cap: Int = 0,
     ) {
         init {
             // Skip counts prompts within each set, so a rerun of a cut class names its set.
@@ -127,7 +133,7 @@ object BenchmarkSuite {
             }
             val started = SystemClock.elapsedRealtime()
             val outcome = runCatching {
-                turn(engine, p.getString("prompt"), p.getInt("max_tokens"), tools(p), options)
+                turn(engine, p.getString("prompt"), options.cap.takeIf { it > 0 } ?: p.getInt("max_tokens"), tools(p), options)
             }
             results.put(
                 outcome.fold(
@@ -181,7 +187,8 @@ object BenchmarkSuite {
         // One file per run of a set selection, so per-set runs on a slow phone do not
         // overwrite each other; bench/report.py merges them by model and device.
         val sets = if (options.sets.isEmpty()) "" else "-" + options.sets.sorted().joinToString("+")
-        val suffix = sets + (if (options.skip > 0) "@${options.skip}" else "") +
+        val suffix = sets + (if (options.cap > 0) "-cap${options.cap}" else "") +
+            (if (options.skip > 0) "@${options.skip}" else "") +
             (if (options.repeatPenalty != null) "-rp${options.repeatPenalty}" else "")
         val out = File(resultsDir, "$modelName.bench$suffix.json")
         val tmp = File(resultsDir, "$modelName.bench$suffix.json.tmp")
@@ -264,6 +271,7 @@ object BenchmarkSuite {
         budgetMinutes = args.getString("budget")?.toIntOrNull() ?: DEFAULT_BUDGET_MINUTES,
         repeatPenalty = args.getString("repeat")?.toFloatOrNull(),
         context = args.getString("context")?.toIntOrNull() ?: DEFAULT_CONTEXT,
+        cap = args.getString("cap")?.toIntOrNull() ?: 0,
     )
 
     private const val DEFAULT_BUDGET_MINUTES = 38

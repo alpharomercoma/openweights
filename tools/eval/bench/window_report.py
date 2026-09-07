@@ -19,12 +19,21 @@ from pathlib import Path
 
 DEVICES = [("qdc-", "8 Gen 3"), ("tensor-", "Tensor G5"), ("exynos-", "Exynos 2400"),
            ("elite-", "8 Elite"), ("repeat-", "D9400 repeat"), ("", "D9400")]
-ORDER = ["D9400", "D9400 repeat", "8 Elite", "Tensor G5", "Exynos 2400", "8 Gen 3"]
+ORDER = ["D9400", "D9400 repeat", "8 Elite", "8 Elite repeat", "Tensor G5", "Tensor G5 repeat",
+         "Exynos 2400", "Exynos 2400 repeat", "8 Gen 3"]
+CAP = re.compile(r"-cap(\d+)")
 SETS = [("gsm8k", "GSM8K"), ("ifeval", "IFEval"), ("bfcl", "BFCL")]
 TAG = re.compile(r"-(\d+)k(?:\.|$|-)")
 
 
 def device_of(name: str) -> str:
+    # `repeat-<phone>-` is that phone's second run of the same file (the run-to-run control).
+    if name.startswith("repeat-"):
+        rest = name[len("repeat-"):]
+        for prefix, label in DEVICES:
+            if prefix and prefix != "repeat-" and rest.startswith(prefix):
+                return label + " repeat"
+        return "D9400 repeat"
     for prefix, label in DEVICES:
         if prefix and name.startswith(prefix):
             return label
@@ -48,6 +57,10 @@ def load(root: Path):
         base, window = model_and_window(r["model"])
         if base is None:
             continue
+        # A run at another reply cap is another condition: its own section, not a merge.
+        cap = CAP.search(path.name)
+        if cap:
+            base += f" (cap {cap.group(1)})"
         key = (base, window, device_of(path.name))
         meta.setdefault(key, {"expected": 0, "budget_exhausted": False})
         for k in ("context_size", "rss_mb", "rss_mb_after_load"):
@@ -55,7 +68,9 @@ def load(root: Path):
                 meta[key][k] = r[k]
         meta[key]["budget_exhausted"] |= bool(r.get("budget_exhausted"))
         # A report covers whole sets: 30 prompts each. Sum over the reports of a cell.
-        meta[key]["expected"] += 30 * len(sets_covered(path.name))
+        # A `@n` file continues a time-boxed set from prompt n; it adds no new sets.
+        if "@" not in path.name:
+            meta[key]["expected"] += 30 * len(sets_covered(path.name))
         for c in r["cases"]:
             have = cells[key].get(c["id"])
             if have and have.get("grade") in ("pass", "fail") and c.get("grade") not in ("pass", "fail"):
@@ -86,6 +101,7 @@ def sets_covered(name):
     """The sets a report file was launched for, from its name: `.bench.json` is all three,
     `.bench-bfcl+gsm8k.json` two, `.bench-ifeval.json` one."""
     tag = name.split(".bench", 1)[1].replace(".graded", "").split(".json")[0].lstrip("-")
+    tag = CAP.sub("", tag).split("@")[0]
     return tag.split("+") if tag else [s for s, _ in SETS]
 
 
@@ -169,13 +185,16 @@ def render(cells, meta, sizes) -> str:
             rows.append(f"| {d} | " + " | ".join(parts) + " |")
         control = []
         for w in windows:
-            a = cells.get((model, w, "D9400")); b = cells.get((model, w, "D9400 repeat"))
-            if a and b:
-                shared = [i for i in a if i in b and a[i].get("status") == "ok" and b[i].get("status") == "ok"]
-                control.append(f"| {w // 1024}k | {identity(a, b, shared)} |")
+            for d in devices:
+                if d.endswith(" repeat"):
+                    continue
+                a = cells.get((model, w, d)); b = cells.get((model, w, d + " repeat"))
+                if a and b:
+                    shared = [i for i in a if i in b and a[i].get("status") == "ok" and b[i].get("status") == "ok"]
+                    control.append(f"| {w // 1024}k | {d} | {identity(a, b, shared)} |")
         if control:
-            out += ["Run-to-run control: the same file run twice on the D9400, replies byte-identical:", "",
-                    "| Window | identical replies |", "|---|---|"] + control + [""]
+            out += ["Run-to-run control: the same file run twice on the same phone, replies byte-identical:", "",
+                    "| Window | Phone | identical replies |", "|---|---|---|"] + control + [""]
         if rows and len(windows) > 1:
             out += [f"Replies identical to the {largest // 1024}k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):", "",
                     "| Phone | " + " | ".join(f"{w // 1024}k" for w in windows[:-1]) + " |",

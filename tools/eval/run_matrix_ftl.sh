@@ -48,12 +48,13 @@ BENCH_SETS=${BENCH_SETS:-}
 BENCH_BUDGET=${BENCH_BUDGET:-38}
 BENCH_SKIP=${BENCH_SKIP:-}
 BENCH_CONTEXT=${BENCH_CONTEXT:-}
+BENCH_CAP=${BENCH_CAP:-}
 ENV_VARS=""
 case "$CLASS" in
   *BenchmarkEval)
     # gcloud's dict flag splits on commas; the ^:^ prefix makes the colon the separator
     # so a sets value such as gsm8k,bfcl survives.
-    ENV_VARS="^:^budget=$BENCH_BUDGET${BENCH_MODEL:+:model=$BENCH_MODEL}${BENCH_SETS:+:sets=$BENCH_SETS}${BENCH_SKIP:+:skip=$BENCH_SKIP}${BENCH_CONTEXT:+:context=$BENCH_CONTEXT}"
+    ENV_VARS="^:^budget=$BENCH_BUDGET${BENCH_MODEL:+:model=$BENCH_MODEL}${BENCH_SETS:+:sets=$BENCH_SETS}${BENCH_SKIP:+:skip=$BENCH_SKIP}${BENCH_CONTEXT:+:context=$BENCH_CONTEXT}${BENCH_CAP:+:cap=$BENCH_CAP}"
     [ -z "$BENCH_MODEL" ] || PATTERN="$BENCH_MODEL.*($PATTERN)" ;;
 esac
 
@@ -75,7 +76,7 @@ case "$CLASS" in
 esac
 
 mkdir -p "$OUT"
-LOG="$OUT/$PREFIX$ENGINE${BENCH_MODEL:+-$BENCH_MODEL}${BENCH_SETS:+-$(echo "$BENCH_SETS" | tr , +)}${BENCH_SKIP:+@$BENCH_SKIP}.ftl.log"
+LOG="$OUT/$PREFIX$ENGINE${BENCH_MODEL:+-$BENCH_MODEL}${BENCH_SETS:+-$(echo "$BENCH_SETS" | tr , +)}${BENCH_CAP:+-cap$BENCH_CAP}${BENCH_SKIP:+@$BENCH_SKIP}.ftl.log"
 echo "== running $CLASS on $MODEL ($VERSION); log in $LOG"
 gcloud firebase test android run --quiet --type instrumentation \
   --app "$APK" --test "$APK" \

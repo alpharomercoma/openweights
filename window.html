@@ -3,1163 +3,346 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Does the exported context window matter?</title>
-<meta name="description" content="ExecuTorch exports of LFM2.5 and Qwen3 at 2k to 32k context on four phone chips: answers, tool calls, speed and memory, with the same 90 prompts.">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="light dark">
+<title>Does the Window Matter?</title>
+<meta name="description" content="ExecuTorch exports of LFM2.5 and Qwen3 at 2k to 32k context on four phone chips: answers, tool calls, speed and memory over the same 90 prompts.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600;75,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-:root {
-  --canvas: #0D0E10; --raised: #161719; --line: #26272A;
-  --text: #F5F6F3; --muted: #A2A4AB; --link: #E0FF4F;
+:root{
+  --bg:#EEF0F3; --panel:#F8F9FA; --ink:#1B2430; --ink2:#4A5563; --ink3:#66717F;
+  --line:#D5DAE1; --grid:#E2E6EB; --hi:#1B2430; --band:rgba(27,36,48,.06); --soft:rgba(27,36,48,.035);
+  --d9400:#A46400; --elite:#163E7A; --g5:#3E8E5E; --e2400:#A94A7E; --warn:#B4452B;
 }
-@media (prefers-color-scheme: light) {
-  :root {
-    --canvas: #FFFFFF; --raised: #F4F5F3; --line: #E7E8E4;
-    --text: #052B42; --muted: #52555B;
-    /* Not lime. Lime as text on white measures 1.13:1, which is why the design system
-       forbids it rather than merely discouraging it. Here a link is ink and underlined. */
-    --link: #052B42;
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+    --line:#2B3541; --grid:#232C37; --hi:#E9EDF2; --band:rgba(233,237,242,.08); --soft:rgba(233,237,242,.05);
+    --d9400:#E6A43A; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF; --warn:#E07A5F;
   }
 }
-* { box-sizing: border-box; }
-body {
-  margin: 0; padding: 0 24px 96px;
-  background: var(--canvas); color: var(--text);
-  font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  -webkit-text-size-adjust: 100%;
+:root[data-theme="dark"]{
+  --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+  --line:#2B3541; --grid:#232C37; --hi:#E9EDF2; --band:rgba(233,237,242,.08); --soft:rgba(233,237,242,.05);
+  --d9400:#E6A43A; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF; --warn:#E07A5F;
 }
-main { max-width: 46rem; margin: 0 auto; }
-header { max-width: 46rem; margin: 0 auto; padding: 56px 0 8px; }
-/* The app's mark, at the app's proportions: bars at 1, 0.7 and 0.41 of the longest, 0.22
-   thick, 0.32 apart, on an ink tile. Lime on ink both ways round the theme, because a lime
-   bar on a white page is the thing the palette forbids. */
-.mark { display: flex; flex-direction: column; justify-content: center; gap: 6px;
-        width: 96px; height: 96px; padding-left: 18px; margin-bottom: 22px;
-        border-radius: 23px; background: #052B42; }
-.mark i { display: block; height: 13px; border-radius: 7px; background: #E0FF4F; }
-h1 { font-size: 2.05rem; line-height: 1.2; letter-spacing: -0.022em; margin: 0 0 6px; }
-h2 { font-size: 1.3rem; letter-spacing: -0.012em; margin: 2.6em 0 0.7em;
-     padding-top: 1.4em; border-top: 1px solid var(--line); }
-h2:first-of-type { border-top: 0; padding-top: 0; }
-a { color: var(--link); text-underline-offset: 3px; }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
-       background: var(--raised); padding: 1px 5px; border-radius: 4px; }
-.updated { color: var(--muted); font-size: 0.94rem; margin: 0 0 2.4em; }
-.table-scroll { overflow-x: auto; margin: 1.4em 0; }
-table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.95rem; }
-th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
-         vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: 0.83rem;
-     letter-spacing: 0.06em; text-transform: uppercase; }
-li { margin: 0.4em 0; }
-footer { max-width: 46rem; margin: 4em auto 0; padding-top: 1.6em;
-         border-top: 1px solid var(--line); color: var(--muted); font-size: 0.92rem; }
-/* The research page: its tables run to fourteen columns, so they get the whole width
-   the viewport has while the prose keeps its measure. */
-.wide { max-width: 80rem; }
-.wide .table-scroll { margin: 1.2em 0 1.8em; }
-.wide table { font-size: 0.86rem; min-width: 0; white-space: nowrap; }
-.wide th, .wide td { padding: 7px 10px; font-variant-numeric: tabular-nums; }
-.wide td:first-child, .wide th:first-child { white-space: normal; }
-h3 { font-size: 1.05rem; margin: 2em 0 0.5em; }
-.chart { margin: 1.4em 0 0.6em; max-width: 46rem; }
-.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
-.chart .grid { stroke: var(--line); }
-.chart .axis { fill: var(--muted); font-size: 11px; }
-.chart .series { fill: none; stroke: var(--text); stroke-width: 1.6; }
-.chart .dot { fill: var(--text); }
-.chart .name { fill: var(--text); font-size: 12px; font-weight: 600; }
-.chart .kill { stroke: var(--muted); stroke-dasharray: 4 4; }
-.chart .killtext { fill: var(--muted); font-size: 11px; }
-.caption { color: var(--muted); font-size: 0.9rem; margin: 0 0 2em; max-width: 60ch; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;padding:28px 22px 56px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 32px;border-bottom:1px solid var(--line);padding-bottom:16px}
+h1{font:700 40px/1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h1 span{color:var(--ink3)}
+.sub{color:var(--ink2);max-width:66ch;margin:8px 0 0}
+.crumbs{font-size:13px;color:var(--ink3);margin:0 0 10px}
+.crumbs a{color:var(--ink2)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:6px 14px;font:500 13.5px "Instrument Sans",sans-serif;cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab:focus-visible,.tab2:focus-visible,summary:focus-visible{outline:2px solid var(--elite);outline-offset:2px}
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
+.verdict{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px 14px;min-width:0}
+.verdict .k{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
+.verdict .v{font:700 22px/1.15 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;margin:0 0 8px;text-wrap:balance}
+.verdict p{margin:0;color:var(--ink2);font-size:13.5px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:22px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 18px 12px;min-width:0}
+.panel h2{font:600 13px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin:0 0 2px}
+.panel p{margin:0 0 10px;color:var(--ink2);font-size:13.5px}
+svg{width:100%;height:auto;display:block;overflow:visible}
+.chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:600px){.chart svg{min-width:600px}}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;font-size:13px;color:var(--ink2);align-items:center}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+.ring{width:13px;height:13px;border-radius:50%;display:inline-block;border:2px solid var(--ink);background:transparent}
+.disc{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--ink)}
+.dash{width:18px;height:0;border-top:2px dashed var(--ink3);display:inline-block}
+.section{margin-top:40px;border-top:1px solid var(--line);padding-top:22px}
+.section h2{font:700 26px/1.1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;margin:0 0 6px}
+.section > p{color:var(--ink2);max-width:72ch;margin:0 0 16px;font-size:14px}
+.tables{display:grid;gap:18px}
+details.tbl{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
+details.tbl summary{cursor:pointer;padding:14px 18px;font-weight:600;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;align-items:baseline;list-style:none}
+details.tbl summary::-webkit-details-marker{display:none}
+details.tbl summary span{color:var(--ink3);font-weight:500;font-size:13px}
+details.tbl summary::after{content:"Show";color:var(--ink3);font-weight:500;font-size:13px}
+details.tbl[open] summary::after{content:"Hide"}
+details.tbl .inner{padding:0 18px 16px}
+details.tbl .inner p{margin:0 0 12px;color:var(--ink2);font-size:13.5px;max-width:78ch}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+th,td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--grid);vertical-align:top;font-variant-numeric:tabular-nums}
+th{color:var(--ink3);font-weight:600;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+tr.win td{border-top:2px solid var(--line)}
+td.dim{color:var(--ink3)}
+td.inc{color:var(--warn);text-align:left}
+tbody tr:hover td{background:var(--soft)}
+table.cells th:first-child,table.cells td:first-child{position:sticky;left:0;background:var(--panel);z-index:1;box-shadow:1px 0 0 var(--line)}
+table.cells tbody tr:hover td:first-child{background:var(--panel)}
+.scroll::after{content:"";display:block}
+.hint{color:var(--ink3);font-size:12px;margin:6px 0 0}
+.notes{margin-top:22px;color:var(--ink2);font-size:13.5px;max-width:78ch;display:grid;gap:8px}
+.notes b{color:var(--ink);font-weight:600}
+.notes a{color:var(--ink)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 9px;border-radius:4px;font-size:12.5px;line-height:1.35;white-space:pre-line;z-index:5;max-width:320px}
+.tip[hidden]{display:none}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink3);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 18px}
+footer a{color:var(--ink2)}
+@media (prefers-reduced-motion:no-preference){svg .pt{transition:opacity .15s}}
+@media (max-width:600px){body{padding:20px 14px 40px}h1{font-size:32px}.verdict .v{font-size:20px}}
 </style>
 </head>
 <body>
-<header><span class="mark"><i style="width:60px"></i><i style="width:42px"></i><i style="width:25px"></i></span><h1>Does the exported context window matter? ExecuTorch on four chips</h1><p class="updated">OpenWeights research &middot; 2026-09-07</p></header><main class="wide"><p><em>2026-09-07. The question, the design as it was actually run, what was found, and what it
-cost. The rendered tables are in <a href="#numbers">the tables below</a>; this note reads
-them. Raw and graded reports: <a href="https://github.com/alpharomercoma/openweights/tree/main/tools/eval/results">tools/eval/results</a>; quarantined cells:
-<a href="https://github.com/alpharomercoma/openweights/tree/main/tools/eval/results/invalid-nobos">tools/eval/results/invalid-nobos</a>.</em></p>
-<h2>The question</h2>
-<p>ExecuTorch fixes the context window at export. We exported the same weights at 2k, 4k, 8k,
-16k and 32k and asked whether the window changes answer quality, tool calling, time to first
-token or time per token, across the Dimensity 9400 in hand and the Snapdragon 8 Elite,
-Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x 5 models x
-4 chips sweep, about 50 device-hours, was worth running.</p>
-<h2>The short answer</h2>
-<ul>
-<li><strong>No window effect on answers or tool calls was found that stands out from the runtime's
-  own run-to-run variation.</strong> Between any two windows of LFM2.5-1.2B on the same phone, the
-  raw token streams agree on 12 to 19 of 90 prompts. Running the <em>same file twice</em> on the
-  same phone agrees on 13 to 15 of 90. Parsed BFCL tool calls agree on 24 to 28 of 30 between
-  windows and 23 to 25 of 30 between repeats. Grades swing by up to five prompts per set
-  between runs of the <em>same</em> file (Qwen3 2k on the Poco: GSM8K 20 then 17, IFEval 15 then
-  18) and by similar amounts between windows in both directions (1.2B GSM8K on the Poco: 17,
-  16, 17, 13, 12 from 2k to 32k; 2.6B GSM8K on the Exynos: 10 at 4k, 18 at 32k). The
-  ExecuTorch runtime is not deterministic run to run on these phones. With one repeat per
-  control cell this is a screen, not a proof: a directional window effect smaller than that
-  variation cannot be excluded, and a stronger test would be three to five counterbalanced
-  runs per export with a predeclared equivalence margin.</li>
-<li><strong>Speed is unchanged by the window, on the Poco, where it was measured in a paired way.</strong>
-  The fixed-prompt probe (929-token prompt, 160-token cap, same turn against same turn,
-  files interleaved) puts every LFM2.5-1.2B window within 0.3 to 1.3% of the 2k export on
-  prefill and within 1.1% on decode; the 2.6B within 0.5% on prefill and 2.4% on decode;
-  Qwen3 32k 5.9% slower on prefill and 4.7% on decode than 2k, the one file whose cache
-  (about 7 GB) is large enough to plausibly cost something in itself. Ranges of the per-turn
-  ratios reach 18% for the 1.2B because one pass-one turn of the 2k reference was slow, so
-  the medians are the figures to read. On the cloud phones no paired probe was run; their
-  suite timings differ by up to 19% between windows (Tensor G5 1.2B decode 15.6 at 4k, 12.6
-  at 32k) and are unpaired, over different replies, on phones that throttle within a
-  minute, so they do not support a speed claim either way.</li>
-<li><strong>The window costs memory, allocated at load, and for a full-attention model it is
-  decisive.</strong> LFM2.5 (8 of 30 or 6 of 16 layers attend) pays 25 to 33 KB per token of
-  window: resident after load 1.05 GB at 2k and 1.77 GB at 32k for the 1.2B, 1.98 and 2.94 GB
-  for the 2.6B. Qwen3-1.7B (all 28 layers attend, 8 KV heads of 128) pays 224 KB per token:
-  the 32k export sat at 6.1 to 8.5 GB resident after load. On the Galaxy S25 Ultra and S24+
-  Samsung's Heimdall memory guard killed the test process ("Trigger Global kill before GC,
-  Usage 8.67 GB, Threshold 6 GB", in the pulled logcats) after 7 to 12 prompts; on the
-  12 GB Poco it ended after 6 prompts with the cause not captured; only the 16 GB Pixel 10
-  Pro XL finished all 90. The 2k export ran everywhere. Those cells are marked incomplete in
-  the table and carry no grade or timing.</li>
-<li><strong>The 2.6B rows measure a deployed configuration, not the model.</strong> With the start token
-  in place it reads prompts correctly, but its own template makes it reason first and 16 of
-  30 GSM8K and 26 of 30 IFEval replies ran to the 640-token cap without answering. Its
-  GSM8K and IFEval grades and raw identity are cap-censored; its BFCL calls (22 to 25 of
-  30 at every window on every phone), load success, memory and probe speed are usable.</li>
-<li><strong>On the original question:</strong> the evidence does not justify launching the full 5 x 5 x 4
-  sweep. What it supports is an adaptive policy: compute the KV cost per window from the
-  architecture, screen the endpoints (smallest and largest window) per model and chip, and
-  add intermediate windows only where the endpoints diverge or fail. That is what this run
-  did, and the intermediate LFM2.5 windows on the Poco added nothing the endpoints had not
-  shown.</li>
-</ul>
-<h2>What was actually run</h2>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th></th>
-<th>Poco (Dimensity 9400)</th>
-<th>8 Elite, Tensor G5, Exynos 2400 (Test Lab)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>LFM2.5-1.2B</td>
-<td>2k, 4k, 8k, 16k, 32k, full 90 prompts; 16k and 32k run twice</td>
-<td>4k and 32k, full 90</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B</td>
-<td>2k and 32k, full 90 (8k, 16k dropped: 55 min per file once the BOS fix made it reason to the cap)</td>
-<td>4k and 32k, full 90</td>
-</tr>
-<tr>
-<td>Qwen3-1.7B</td>
-<td>2k and 32k, full 90; 2k run twice</td>
-<td>2k and 32k, full 90</td>
-</tr>
-<tr>
-<td>Speed probe</td>
-<td>all twelve files, two interleaved passes, three turns each, cooled below 42 C and awake before each load</td>
-<td>not run</td>
-</tr>
-</tbody>
-</table></div>
-<p>Every file was loaded at its own exported window (<code>context=0</code>), greedy, thinking off,
-640-token cap (384 for BFCL), the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL) and the
-same graders as the earlier five-chip run. Exports: ExecuTorch 1.4.0's own recipes,
-8-bit dynamic activations, 4-bit weights in groups of 32, 8-bit embeddings, prefill chunk
-2048, fp32 KV cache. Sizes are in the tables.</p>
-<p>The other three families of the earlier matrix (Llama 3.2, SmolLM3, Gemma 3) were not
-exported: two need another toolchain (optimum-executorch), one a gated checkpoint, and
-the claim under test is about the runtime's static cache, which Qwen3 (full attention, a
-different tokenizer and template, the same exporter) covers as a second architecture.</p>
-<h2>Two things the matrix found that it was not looking for</h2>
-<p><strong>Every compiled model this app ever ran was fed no BOS token.</strong> The 2.6B scored 0/30 on
-GSM8K on all four chips, with replies that paraphrased the prompt wrongly and fell into
-repetition. The same export on the Mac, with a literal <code>&lt;|startoftext|&gt;</code> in the prompt,
-answered correctly, and the Hugging Face reference was sane. The runtime's own C++
-tokenizer (<code>CppHFTokenizer</code>, the library in the AAR) shows why: it adds BOS only when
-asked, the 1.4.0 JNI layer asks for zero with the constructor the app uses, and a
-<code>TemplateProcessing</code> post-processor in tokenizer.json changes nothing. The app's templates
-had rendered without BOS on the assumption that the runtime armed it. LFM2.5-1.2B tolerates
-a missing BOS (same prompt, Mac, sane); LFM2.5-2.6B does not. Fixed in the engine: the
-family's BOS is written into the prompt text, which the tokenizer encodes to the BOS id.
-All 2.6B cells were re-measured with that build; the 1.2B cells stand as measured, BOS-less
-like every earlier 1.2B ExecuTorch figure, and consistent among themselves. Whether Gemma
-3's GSM8K looping in the earlier matrix was the same bug is an open question worth a rerun.</p>
-<p><strong>A dozing phone throttles instrumentation two to five times, with wild variance.</strong> The
-first 1.2B file measured 62, 76 and 307 tok/s prefill on three consecutive turns with the
-screen off. Awake and unlocked the spread collapsed to 370 to 378. The local runner now
-wakes the phone and holds it awake; the thermal service's first "CPU" row is a constant
-57.9 that never moves, so the probe reads the lowest live one.</p>
-<h2>Reading the numbers with the right caveats</h2>
-<ul>
-<li>The suite's prefill ms and ms/token are per-cell figures over the replies that cell
-  produced; replies differ between runs, so they are not a paired speed comparison. The
-  fixed-prompt probe is.</li>
-<li>"Prefill ms" is the runtime's prefill of the whole prompt, the engine-side part of time
-  to first token, not a first-token timestamp.</li>
-<li>Cloud cells are an endpoint screen (4k and 32k, or 2k and 32k). They cannot rule out a
-  non-monotonic effect at 8k or 16k; the Poco's five windows can, for LFM2.5.</li>
-<li>Test Lab phones throttle within about 40 s of load; nothing was done about it beyond
-  medians. The Poco was cooled below 42 C before every probe load but not between suite
-  files.</li>
-<li>The 2.6B reasons before answering whatever the eval asks (its chat template pre-opens
-  <code>&lt;think&gt;</code>), so at a 640-token cap most of its GSM8K and IFEval replies never reach an
-  answer: those grades and its raw identity are cap-censored (the Capped column counts the
-  replies that hit the cap). Its BFCL calls, load success, memory and probe speed are not.</li>
-<li>Parsed-call identity is counted over the 30 BFCL prompts only; the other 60 prompts have
-  an empty call list in every run and would inflate it.</li>
-<li>Cells marked INCOMPLETE are runs whose process ended before its set did, with no error and
-  no time box recorded; they show the last observed resident memory and nothing else.</li>
-</ul>
-<h2>Review</h2>
-<p>Codex reviewed the method twice, before and after the data. Round one asked for same-file
-repeats, a paired speed probe separated from the task eval, honest labels for prefill and
-decode figures, a three-way identity metric, memory after load, and a second architecture;
-all were added. Round two asked that the conclusions be bounded by the observed run
-variability rather than stated as invariance, that parsed-call identity be counted over BFCL
-only, that the Qwen3 32k cells be shown as incomplete with their termination cause qualified,
-that the 2.6B grades be labelled cap-censored, that the two RSS figures be separated, and
-that the verdict on the full sweep be phrased as an adaptive policy rather than a nil
-effect; this note and the renderer follow that. The termination cause was then confirmed
-from the logcats for the two Samsung phones.</p>
-<h2>What is where</h2>
-<ul>
-<li>Exports: Hugging Face <code>alpharomercoma/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK</code> (five
-  windows), <code>alpharomercoma/LFM2.5-2.6B-ExecuTorch-XNNPACK</code> (five windows, tokenizer with a
-  BOS post-processor), <code>alpharomercoma/Qwen3-1.7B-ExecuTorch-XNNPACK</code> (2k and 32k). Each
-  carries a <code>config.json</code> in the variants form Discover reads, and a README with sizes and
-  the KV cost per window.</li>
-<li>Numbers: <code>docs/research/window-matrix.md</code> (rendered), <code>tools/eval/results/</code> (raw and
-  graded JSON, <code>repeat-</code> prefix for the second runs, <code>invalid-nobos/</code> for the quarantined
-  cells), <code>~/ow-models/etexport/matrix/results-windows.log</code> (probe).</li>
-<li>Harness: <code>tools/eval/bench/run_cloud_windows.sh</code>, <code>window_report.py</code>, <code>run_local.sh</code>
-  (<code>CONTEXT=0</code>, <code>CLASSES</code>, <code>PREFIX</code>), <code>ExecuTorchBenchmarkEval</code> (<code>-e context</code>).</li>
-<li>Cloud copies of the variants were deleted from the Test Lab bucket when the runs
-  finished; Test Lab itself provisions nothing persistent.</li>
-</ul><h2 id="numbers">The numbers</h2><div class="chart"><svg viewBox="0 0 640 260" role="img" aria-label="Resident memory after load against exported window, per model">
-<line class="grid" x1="52" x2="520" y1="226.0" y2="226.0"/>
-<text class="axis" x="44" y="230.0" text-anchor="end">0 GB</text>
-<line class="grid" x1="52" x2="520" y1="179.3" y2="179.3"/>
-<text class="axis" x="44" y="183.3" text-anchor="end">2 GB</text>
-<line class="grid" x1="52" x2="520" y1="132.7" y2="132.7"/>
-<text class="axis" x="44" y="136.7" text-anchor="end">4 GB</text>
-<line class="grid" x1="52" x2="520" y1="86.0" y2="86.0"/>
-<text class="axis" x="44" y="90.0" text-anchor="end">6 GB</text>
-<line class="grid" x1="52" x2="520" y1="39.3" y2="39.3"/>
-<text class="axis" x="44" y="43.3" text-anchor="end">8 GB</text>
-<text class="axis" x="52.0" y="248" text-anchor="middle">2k</text>
-<text class="axis" x="169.0" y="248" text-anchor="middle">4k</text>
-<text class="axis" x="286.0" y="248" text-anchor="middle">8k</text>
-<text class="axis" x="403.0" y="248" text-anchor="middle">16k</text>
-<text class="axis" x="520.0" y="248" text-anchor="middle">32k</text>
-<line class="kill" x1="52" x2="520" y1="86.0" y2="86.0"/>
-<text class="killtext" x="56" y="81.0">Samsung Heimdall kill threshold, 6 GB</text>
-<path class="series" d="M52.0,201.5 L169.0,200.4 L286.0,198.1 L403.0,193.7 L520.0,184.7"/>
-<circle class="dot" cx="52.0" cy="201.5" r="3.2"/>
-<circle class="dot" cx="169.0" cy="200.4" r="3.2"/>
-<circle class="dot" cx="286.0" cy="198.1" r="3.2"/>
-<circle class="dot" cx="403.0" cy="193.7" r="3.2"/>
-<circle class="dot" cx="520.0" cy="184.7" r="3.2"/>
-<text class="name" x="528.0" y="188.7">LFM2.5-1.2B 1.8 GB</text>
-<path class="series" d="M52.0,179.7 L169.0,178.3 L286.0,175.3 L403.0,169.4 L520.0,157.5"/>
-<circle class="dot" cx="52.0" cy="179.7" r="3.2"/>
-<circle class="dot" cx="169.0" cy="178.3" r="3.2"/>
-<circle class="dot" cx="286.0" cy="175.3" r="3.2"/>
-<circle class="dot" cx="403.0" cy="169.4" r="3.2"/>
-<circle class="dot" cx="520.0" cy="157.5" r="3.2"/>
-<text class="name" x="528.0" y="161.5">LFM2.5-2.6B 2.9 GB</text>
-<path class="series" d="M52.0,185.0 L520.0,82.4"/>
-<circle class="dot" cx="52.0" cy="185.0" r="3.2"/>
-<circle class="dot" cx="520.0" cy="82.4" r="3.2"/>
-<text class="name" x="528.0" y="86.4">Qwen3-1.7B 6.2 GB</text>
-</svg></div><p class="caption">Resident memory of the test process right after each export loaded on the Dimensity 9400, from the fixed-prompt probe. The window buys nothing else that was measurable; for a full-attention model it buys a process the 12 GB phones will not keep.</p><p>Each cell is one export of one model at one window on one phone, over the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL), greedy, thinking off, loaded at the file's own window. Prefill ms is the runtime's prefill time for the whole prompt (the engine-side part of time to first token, not a first-token timestamp); ms/token is decode time over generated tokens, which differ per cell because the replies differ, so it is a per-cell figure and not a paired speed comparison. Capped is how many completed replies ran to the token cap (640, or 384 for BFCL) and so never finished; a set whose replies are mostly capped is cap-censored and its grade says little. RSS is the test process's resident set right after the model loaded and at the end of the run.</p>
-<h3>LFM2.5-1.2B-Instruct-8da4w</h3>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Window</th>
-<th>File</th>
-<th>Phone</th>
-<th>GSM8K</th>
-<th>IFEval</th>
-<th>BFCL</th>
-<th>Capped</th>
-<th>Prefill ms</th>
-<th>ms/token</th>
-<th>Prefill tok/s</th>
-<th>Decode tok/s</th>
-<th>Ran at</th>
-<th>RSS after load MB</th>
-<th>RSS at end MB</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2k</td>
-<td>796 MB</td>
-<td>D9400</td>
-<td>17/30</td>
-<td>15/30</td>
-<td>26/30</td>
-<td>10/90</td>
-<td>360</td>
-<td>25.9</td>
-<td>254</td>
-<td>38.7</td>
-<td>2048</td>
-<td>-</td>
-<td>1186</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>798 MB</td>
-<td>D9400</td>
-<td>16/30</td>
-<td>17/30</td>
-<td>26/30</td>
-<td>12/90</td>
-<td>363</td>
-<td>26.7</td>
-<td>253</td>
-<td>37.5</td>
-<td>4096</td>
-<td>1099</td>
-<td>1218</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>798 MB</td>
-<td>8 Elite</td>
-<td>13/30</td>
-<td>18/30</td>
-<td>28/30</td>
-<td>11/90</td>
-<td>374</td>
-<td>17.7</td>
-<td>227</td>
-<td>56.4</td>
-<td>4096</td>
-<td>1104</td>
-<td>1207</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>798 MB</td>
-<td>Tensor G5</td>
-<td>13/30</td>
-<td>18/30</td>
-<td>27/30</td>
-<td>14/90</td>
-<td>817</td>
-<td>64.2</td>
-<td>129</td>
-<td>15.6</td>
-<td>4096</td>
-<td>1113</td>
-<td>1225</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>798 MB</td>
-<td>Exynos 2400</td>
-<td>13/30</td>
-<td>17/30</td>
-<td>26/30</td>
-<td>11/90</td>
-<td>460</td>
-<td>34.0</td>
-<td>195</td>
-<td>29.4</td>
-<td>4096</td>
-<td>1126</td>
-<td>1213</td>
-</tr>
-<tr>
-<td>8k</td>
-<td>802 MB</td>
-<td>D9400</td>
-<td>17/30</td>
-<td>18/30</td>
-<td>26/30</td>
-<td>11/90</td>
-<td>353</td>
-<td>26.1</td>
-<td>259</td>
-<td>38.3</td>
-<td>8192</td>
-<td>1226</td>
-<td>1333</td>
-</tr>
-<tr>
-<td>16k</td>
-<td>810 MB</td>
-<td>D9400</td>
-<td>13/30</td>
-<td>20/30</td>
-<td>27/30</td>
-<td>12/90</td>
-<td>354</td>
-<td>25.9</td>
-<td>262</td>
-<td>38.6</td>
-<td>16384</td>
-<td>-</td>
-<td>993</td>
-</tr>
-<tr>
-<td>16k</td>
-<td>810 MB</td>
-<td>D9400 repeat</td>
-<td>14/30</td>
-<td>16/30</td>
-<td>28/30</td>
-<td>12/90</td>
-<td>368</td>
-<td>26.2</td>
-<td>259</td>
-<td>38.2</td>
-<td>16384</td>
-<td>1416</td>
-<td>1528</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>827 MB</td>
-<td>D9400</td>
-<td>12/30</td>
-<td>18/30</td>
-<td>27/30</td>
-<td>16/90</td>
-<td>366</td>
-<td>26.3</td>
-<td>257</td>
-<td>38.0</td>
-<td>32768</td>
-<td>-</td>
-<td>1903</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>827 MB</td>
-<td>D9400 repeat</td>
-<td>12/30</td>
-<td>15/30</td>
-<td>27/30</td>
-<td>12/90</td>
-<td>392</td>
-<td>28.8</td>
-<td>237</td>
-<td>34.8</td>
-<td>32768</td>
-<td>1798</td>
-<td>1901</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>827 MB</td>
-<td>8 Elite</td>
-<td>16/30</td>
-<td>13/30</td>
-<td>26/30</td>
-<td>11/90</td>
-<td>324</td>
-<td>16.3</td>
-<td>261</td>
-<td>61.2</td>
-<td>32768</td>
-<td>-</td>
-<td>1880</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>827 MB</td>
-<td>Tensor G5</td>
-<td>16/30</td>
-<td>18/30</td>
-<td>27/30</td>
-<td>13/90</td>
-<td>862</td>
-<td>79.5</td>
-<td>98</td>
-<td>12.6</td>
-<td>32768</td>
-<td>-</td>
-<td>1896</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>827 MB</td>
-<td>Exynos 2400</td>
-<td>14/30</td>
-<td>20/30</td>
-<td>25/30</td>
-<td>11/90</td>
-<td>462</td>
-<td>37.1</td>
-<td>184</td>
-<td>27.0</td>
-<td>32768</td>
-<td>-</td>
-<td>1883</td>
-</tr>
-</tbody>
-</table></div>
-<p>Run-to-run control: the same file run twice on the D9400, replies byte-identical:</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Window</th>
-<th>identical replies</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>16k</td>
-<td>raw 13/90, calls 23/30, content 20/90</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>raw 15/90, calls 25/30, content 18/90</td>
-</tr>
-</tbody>
-</table></div>
-<p>Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Phone</th>
-<th>2k</th>
-<th>4k</th>
-<th>8k</th>
-<th>16k</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>D9400</td>
-<td>raw 12/90, calls 25/30, content 17/90</td>
-<td>raw 17/90, calls 26/30, content 18/90</td>
-<td>raw 18/90, calls 28/30, content 19/90</td>
-<td>raw 12/90, calls 24/30, content 16/90</td>
-</tr>
-<tr>
-<td>D9400 repeat</td>
-<td>-</td>
-<td>-</td>
-<td>-</td>
-<td>raw 14/90, calls 25/30, content 17/90</td>
-</tr>
-<tr>
-<td>8 Elite</td>
-<td>-</td>
-<td>raw 13/90, calls 26/30, content 15/90</td>
-<td>-</td>
-<td>-</td>
-</tr>
-<tr>
-<td>Tensor G5</td>
-<td>-</td>
-<td>raw 10/90, calls 24/30, content 14/90</td>
-<td>-</td>
-<td>-</td>
-</tr>
-<tr>
-<td>Exynos 2400</td>
-<td>-</td>
-<td>raw 16/90, calls 28/30, content 16/90</td>
-<td>-</td>
-<td>-</td>
-</tr>
-</tbody>
-</table></div>
-<h3>LFM2.5-2.6B-8da4w</h3>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Window</th>
-<th>File</th>
-<th>Phone</th>
-<th>GSM8K</th>
-<th>IFEval</th>
-<th>BFCL</th>
-<th>Capped</th>
-<th>Prefill ms</th>
-<th>ms/token</th>
-<th>Prefill tok/s</th>
-<th>Decode tok/s</th>
-<th>Ran at</th>
-<th>RSS after load MB</th>
-<th>RSS at end MB</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2k</td>
-<td>1783 MB</td>
-<td>D9400</td>
-<td>15/30</td>
-<td>4/30</td>
-<td>24/30</td>
-<td>42/90</td>
-<td>882</td>
-<td>60.3</td>
-<td>108</td>
-<td>16.6</td>
-<td>2048</td>
-<td>1979</td>
-<td>1958</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>1786 MB</td>
-<td>8 Elite</td>
-<td>13/30</td>
-<td>5/30</td>
-<td>22/30</td>
-<td>44/90</td>
-<td>1197</td>
-<td>55.4</td>
-<td>72</td>
-<td>18.0</td>
-<td>4096</td>
-<td>2058</td>
-<td>2194</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>1786 MB</td>
-<td>Tensor G5</td>
-<td>17/30</td>
-<td>6/30</td>
-<td>24/30</td>
-<td>38/90</td>
-<td>1066</td>
-<td>92.2</td>
-<td>88</td>
-<td>10.8</td>
-<td>4096</td>
-<td>2054</td>
-<td>2221</td>
-</tr>
-<tr>
-<td>4k</td>
-<td>1786 MB</td>
-<td>Exynos 2400</td>
-<td>10/30</td>
-<td>5/30</td>
-<td>23/30</td>
-<td>46/90</td>
-<td>1142</td>
-<td>83.5</td>
-<td>81</td>
-<td>12.0</td>
-<td>4096</td>
-<td>2136</td>
-<td>2189</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1815 MB</td>
-<td>D9400</td>
-<td>13/30</td>
-<td>5/30</td>
-<td>24/30</td>
-<td>45/90</td>
-<td>882</td>
-<td>59.7</td>
-<td>109</td>
-<td>16.8</td>
-<td>32768</td>
-<td>2937</td>
-<td>2185</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1815 MB</td>
-<td>8 Elite</td>
-<td>13/30</td>
-<td>5/30</td>
-<td>25/30</td>
-<td>42/90</td>
-<td>1096</td>
-<td>49.7</td>
-<td>81</td>
-<td>20.1</td>
-<td>32768</td>
-<td>2950</td>
-<td>3082</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1815 MB</td>
-<td>Tensor G5</td>
-<td>19/30</td>
-<td>4/30</td>
-<td>25/30</td>
-<td>37/90</td>
-<td>968</td>
-<td>81.1</td>
-<td>101</td>
-<td>12.3</td>
-<td>32768</td>
-<td>2962</td>
-<td>3120</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1815 MB</td>
-<td>Exynos 2400</td>
-<td>18/30</td>
-<td>3/30</td>
-<td>25/30</td>
-<td>39/90</td>
-<td>1085</td>
-<td>84.5</td>
-<td>80</td>
-<td>11.8</td>
-<td>32768</td>
-<td>3032</td>
-<td>3084</td>
-</tr>
-</tbody>
-</table></div>
-<p>Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Phone</th>
-<th>2k</th>
-<th>4k</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>D9400</td>
-<td>raw 0/90, calls 24/30, content 29/90</td>
-<td>-</td>
-</tr>
-<tr>
-<td>8 Elite</td>
-<td>-</td>
-<td>raw 0/90, calls 25/30, content 29/90</td>
-</tr>
-<tr>
-<td>Tensor G5</td>
-<td>-</td>
-<td>raw 0/90, calls 27/30, content 30/90</td>
-</tr>
-<tr>
-<td>Exynos 2400</td>
-<td>-</td>
-<td>raw 0/90, calls 25/30, content 30/90</td>
-</tr>
-</tbody>
-</table></div>
-<h3>Qwen3-1.7B-8da4w</h3>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Window</th>
-<th>File</th>
-<th>Phone</th>
-<th>GSM8K</th>
-<th>IFEval</th>
-<th>BFCL</th>
-<th>Capped</th>
-<th>Prefill ms</th>
-<th>ms/token</th>
-<th>Prefill tok/s</th>
-<th>Decode tok/s</th>
-<th>Ran at</th>
-<th>RSS after load MB</th>
-<th>RSS at end MB</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2k</td>
-<td>1285 MB</td>
-<td>D9400</td>
-<td>20/30</td>
-<td>15/30</td>
-<td>24/30</td>
-<td>8/90</td>
-<td>532</td>
-<td>45.1</td>
-<td>174</td>
-<td>22.2</td>
-<td>2048</td>
-<td>1758</td>
-<td>1833</td>
-</tr>
-<tr>
-<td>2k</td>
-<td>1285 MB</td>
-<td>D9400 repeat</td>
-<td>17/30</td>
-<td>18/30</td>
-<td>24/30</td>
-<td>7/90</td>
-<td>532</td>
-<td>45.7</td>
-<td>174</td>
-<td>21.9</td>
-<td>2048</td>
-<td>1766</td>
-<td>1900</td>
-</tr>
-<tr>
-<td>2k</td>
-<td>1285 MB</td>
-<td>8 Elite</td>
-<td>18/30</td>
-<td>13/30</td>
-<td>25/30</td>
-<td>12/90</td>
-<td>673</td>
-<td>41.9</td>
-<td>141</td>
-<td>23.9</td>
-<td>2048</td>
-<td>1771</td>
-<td>1887</td>
-</tr>
-<tr>
-<td>2k</td>
-<td>1285 MB</td>
-<td>Tensor G5</td>
-<td>23/30</td>
-<td>13/30</td>
-<td>24/30</td>
-<td>8/90</td>
-<td>814</td>
-<td>89.3</td>
-<td>121</td>
-<td>11.2</td>
-<td>2048</td>
-<td>1772</td>
-<td>1892</td>
-</tr>
-<tr>
-<td>2k</td>
-<td>1285 MB</td>
-<td>Exynos 2400</td>
-<td>17/30</td>
-<td>12/30</td>
-<td>23/30</td>
-<td>10/90</td>
-<td>734</td>
-<td>65.9</td>
-<td>125</td>
-<td>15.2</td>
-<td>2048</td>
-<td>1838</td>
-<td>1886</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1348 MB</td>
-<td>D9400</td>
-<td>INCOMPLETE: process ended after 6/90 prompts</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td>32768</td>
-<td>6188</td>
-<td>5426 (last observed)</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1348 MB</td>
-<td>8 Elite</td>
-<td>INCOMPLETE: process ended after 12/90 prompts</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td>32768</td>
-<td>6127</td>
-<td>4836 (last observed)</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1348 MB</td>
-<td>Tensor G5</td>
-<td>16/30</td>
-<td>14/30</td>
-<td>25/30</td>
-<td>8/90</td>
-<td>844</td>
-<td>94.0</td>
-<td>139</td>
-<td>10.6</td>
-<td>32768</td>
-<td>8499</td>
-<td>8602</td>
-</tr>
-<tr>
-<td>32k</td>
-<td>1348 MB</td>
-<td>Exynos 2400</td>
-<td>INCOMPLETE: process ended after 7/90 prompts</td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td>32768</td>
-<td>6396</td>
-<td>6380 (last observed)</td>
-</tr>
-</tbody>
-</table></div>
-<p>Run-to-run control: the same file run twice on the D9400, replies byte-identical:</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Window</th>
-<th>identical replies</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2k</td>
-<td>raw 31/90, calls 30/30, content 31/90</td>
-</tr>
-</tbody>
-</table></div>
-<p>Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Phone</th>
-<th>2k</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>D9400</td>
-<td>raw 0/6, calls 0/0, content 0/6</td>
-</tr>
-<tr>
-<td>8 Elite</td>
-<td>raw 0/12, calls 0/0, content 0/12</td>
-</tr>
-<tr>
-<td>Tensor G5</td>
-<td>raw 29/90, calls 27/30, content 31/90</td>
-</tr>
-<tr>
-<td>Exynos 2400</td>
-<td>raw 0/7, calls 0/0, content 0/7</td>
-</tr>
-</tbody>
-</table></div>
-<h3>Fixed-prompt speed probe (Poco, Dimensity 9400)</h3>
-<p>ExecuTorchOnDeviceTest#throughputReport through matrix/run.sh: 929-token prompt, 160-token reply cap, three turns from a cold cache per load, phone cooled below 42 C and awake before each load, twelve files in two interleaved passes. The second table pairs each turn with the same turn of the model's smallest window in the same pass.</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>File</th>
-<th>Turns</th>
-<th>Prefill tok/s (median, min to max)</th>
-<th>Decode tok/s (median, min to max)</th>
-<th>Prefill ms, 929 tokens</th>
-<th>Resident after load MB</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-2k</td>
-<td>6</td>
-<td>332 (288 to 344)</td>
-<td>40.2 (33.7 to 41.0)</td>
-<td>2804</td>
-<td>1050</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-4k</td>
-<td>6</td>
-<td>340 (330 to 344)</td>
-<td>40.4 (36.9 to 41.0)</td>
-<td>2738</td>
-<td>1098</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-8k</td>
-<td>6</td>
-<td>343 (327 to 345)</td>
-<td>40.8 (40.0 to 41.2)</td>
-<td>2712</td>
-<td>1194</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-16k</td>
-<td>6</td>
-<td>342 (326 to 345)</td>
-<td>40.5 (39.8 to 41.2)</td>
-<td>2718</td>
-<td>1386</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-32k</td>
-<td>6</td>
-<td>343 (329 to 346)</td>
-<td>40.5 (39.9 to 40.9)</td>
-<td>2712</td>
-<td>1768</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-2k</td>
-<td>6</td>
-<td>149 (142 to 153)</td>
-<td>19.0 (16.7 to 19.5)</td>
-<td>6254</td>
-<td>1984</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-4k</td>
-<td>6</td>
-<td>148 (135 to 153)</td>
-<td>18.1 (16.5 to 19.5)</td>
-<td>6264</td>
-<td>2046</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-8k</td>
-<td>6</td>
-<td>149 (140 to 153)</td>
-<td>18.2 (16.7 to 19.5)</td>
-<td>6234</td>
-<td>2172</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-16k</td>
-<td>6</td>
-<td>149 (138 to 153)</td>
-<td>18.4 (16.6 to 19.5)</td>
-<td>6226</td>
-<td>2427</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-32k</td>
-<td>6</td>
-<td>149 (139 to 152)</td>
-<td>18.1 (16.2 to 19.5)</td>
-<td>6240</td>
-<td>2936</td>
-</tr>
-<tr>
-<td>Qwen3-1.7B-8da4w-2k</td>
-<td>6</td>
-<td>200 (193 to 206)</td>
-<td>18.0 (16.1 to 18.2)</td>
-<td>4680</td>
-<td>1758</td>
-</tr>
-<tr>
-<td>Qwen3-1.7B-8da4w-32k</td>
-<td>6</td>
-<td>184 (162 to 203)</td>
-<td>16.6 (15.1 to 17.6)</td>
-<td>5064</td>
-<td>6153</td>
-</tr>
-</tbody>
-</table></div>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>File</th>
-<th>Prefill vs smallest window (median ratio, min to max)</th>
-<th>Decode vs smallest window</th>
-<th>Paired turns</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-2k</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-4k</td>
-<td>1.007 (0.987 to 1.181)</td>
-<td>0.999 (0.927 to 1.190)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-8k</td>
-<td>1.003 (0.995 to 1.198)</td>
-<td>1.011 (0.995 to 1.187)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-16k</td>
-<td>1.008 (0.992 to 1.190)</td>
-<td>1.009 (0.988 to 1.187)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-1.2B-Instruct-8da4w-32k</td>
-<td>1.013 (0.999 to 1.202)</td>
-<td>1.006 (0.993 to 1.184)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-2k</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-4k</td>
-<td>0.995 (0.947 to 1.002)</td>
-<td>0.985 (0.946 to 1.005)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-8k</td>
-<td>0.997 (0.983 to 1.005)</td>
-<td>0.991 (0.943 to 1.000)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-16k</td>
-<td>1.003 (0.971 to 1.005)</td>
-<td>0.997 (0.938 to 1.005)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>LFM2.5-2.6B-8da4w-32k</td>
-<td>0.997 (0.975 to 1.003)</td>
-<td>0.976 (0.943 to 1.005)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>Qwen3-1.7B-8da4w-2k</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>1.000 (1.000 to 1.000)</td>
-<td>6</td>
-</tr>
-<tr>
-<td>Qwen3-1.7B-8da4w-32k</td>
-<td>0.941 (0.793 to 0.982)</td>
-<td>0.953 (0.835 to 1.012)</td>
-<td>6</td>
-</tr>
-</tbody>
-</table></div></main><footer><a href="./">OpenWeights</a> &middot; <a href="latency.html">Five chips, two runtimes</a> &middot; <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/research/executorch-window-matrix.md">This note in the repository</a> &middot; <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/research/window-matrix.md">The tables in the repository</a></footer>
+<div class="wrap">
+<header>
+  <div>
+    <p class="crumbs"><a href="./">OpenWeights</a> &middot; research &middot; 2026-09-07</p>
+    <h1>Does the exported window matter? <span>&middot; ExecuTorch, 2k to 32k</span></h1>
+    <p class="sub">ExecuTorch fixes the context window when a model is exported. Identical weights were compared across exported windows: five LFM2.5-1.2B windows on the Dimensity 9400, the smallest and largest window for the other model and phone pairs, and the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL) in every completed cell, greedy, thinking off. Pick a model; every chart follows.</p>
+  </div>
+  <div class="tabs" id="tabs" role="group" aria-label="Model"></div>
+</header>
+
+<div class="verdicts">
+  <div class="verdict"><p class="k">Answers and tool calls</p><p class="v">No consistent directional effect found</p><p>For LFM2.5-1.2B, the same file run twice was byte-identical on 13 to 15 of 90 prompts and two windows on 12 to 19. Qwen3's same-file control was 31 of 90. With one repeat per control cell, smaller window effects stay unresolved; the 2.6B quality comparisons are cap-censored.</p></div>
+  <div class="verdict"><p class="k">Speed</p><p class="v">Paired medians close; Qwen3 32k slower</p><p>Six paired turns per file on the Dimensity 9400: LFM2.5-1.2B medians within 1.3% on prefill and 1.1% on decode, LFM2.5-2.6B within 0.5% and 2.4%. Qwen3 32k was 5.9% slower on prefill and 4.7% on decode. No equivalence margin was predeclared.</p></div>
+  <div class="verdict"><p class="k">Memory</p><p class="v">The one thing the window buys, at load</p><p>LFM2.5 pays 25 to 33 KB per token of window. Qwen3-1.7B, full attention, pays 224 KB: its 32k export sits above 6 GB before the first prompt.</p></div>
+  <div class="verdict"><p class="k">The full sweep</p><p class="v">Screen the endpoints before any full sweep</p><p>The evidence does not justify launching the full sweep now. Compute the KV cost, screen the smallest and largest window per model and chip, and add intermediate windows where the endpoints diverge or fail. Cloud phones have endpoint measurements only and cannot exclude an effect at 8k or 16k.</p></div>
+</div>
+
+<div class="grid">
+  <section class="panel">
+    <h2>Memory after load</h2>
+    <p>Resident memory of the test process right after each export loaded, Dimensity 9400, from the fixed-prompt probe. The picked model is drawn solid.</p>
+    <div class="chart"><svg id="mem" viewBox="0 0 640 360" role="img" aria-label="Resident memory after load against exported window, per model"></svg></div>
+    
+  </section>
+  <section class="panel">
+    <h2>Speed, paired probe</h2>
+    <p>Each window's throughput as a ratio of the model's smallest window, same 929-token prompt, same turn against same turn, six pairs per file. Dot is the median, bar the range. Dimensity 9400 only.</p>
+    <div class="chart"><svg id="speed" viewBox="0 0 640 360" role="img" aria-label="Prefill and decode throughput ratio against the smallest window"></svg></div>
+    <div class="legend"><span class="k"><i class="disc"></i>Prefill</span><span class="k"><i class="ring"></i>Decode</span><span class="k">1.00 means no difference</span></div>
+  </section>
+  <section class="panel">
+    <h2>Grades by window</h2>
+    <p id="gradesCap"></p>
+    <div class="chart"><svg id="grades" viewBox="0 0 640 380" role="img" aria-label="Passed prompts per set against exported window, per chip"></svg></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <section class="panel">
+    <h2>Identical replies</h2>
+    <p id="identCap"></p>
+    <div class="chart"><svg id="ident" viewBox="0 0 640 380" role="img" aria-label="Share of replies identical to the largest window, per phone and window"></svg></div>
+    <div class="legend" id="identLegend"></div>
+  </section>
+</div>
+
+<div class="notes">
+  <div><b>Two things the matrix found that it was not looking for.</b> Every compiled model this app had ever run was fed no start-of-text token: the ExecuTorch 1.4.0 runtime adds one only when asked and the app never asked. LFM2.5-1.2B shrugs it off; LFM2.5-2.6B scored 0 of 30 on GSM8K on every chip until the engine wrote the token itself, and every 2.6B cell here is from the fixed build. The 1.2B cells remain BOS-less as measured: comparable among themselves, and a description of that deployed configuration. And a phone that has dozed throttles instrumentation two to five times with wild variance, so the local runner now wakes the phone and holds it awake.</div>
+  <div><b>Read the 2.6B with care.</b> Its own template makes it reason before answering, so under the suite's 640-token cap 16 of 30 GSM8K and 26 of 30 IFEval replies never reached an answer. Those grades and its raw identity are cap-censored. Its BFCL calls, memory, load success and probe speed are not.</div>
+  <div><b>Qwen3 32k on 12 GB phones.</b> Samsung's Heimdall memory guard killed the test process on the Galaxy S25 Ultra and S24+ after 7 to 12 prompts ("Trigger Global kill before GC, Usage 8.67 GB, Threshold 6 GB" in the logcats). The Poco ended after 6 with the cause not captured. Only the 16 GB Pixel 10 Pro XL finished. Those cells are marked incomplete and carry no grade or timing.</div>
+  <div><b>Not matched conditions.</b> The Dimensity 9400 ran in hand, cooled below 42 C before each probe load. The 8 Elite, Tensor G5 and Exynos 2400 ran racked on Firebase Test Lab, where phones throttle within about 40 seconds, and had no paired probe: their suite timings are per-cell medians over different replies and do not support a speed claim either way.</div>
+</div>
+
+<div class="section" id="numbers">
+  <h2>Every number</h2>
+  <p>The full matrix, as rendered from the graded reports by <span class="mono">window_report.py</span>. Prefill ms is the runtime's prefill of the whole prompt, the engine-side part of time to first token. ms/token is decode time over generated tokens; replies differ per cell, so it is not a paired comparison. Capped counts replies that ran to the token cap (640, or 384 for BFCL). RSS is resident memory right after load and at the end of the run.</p>
+  <div class="tables" id="tables"></div>
+</div>
+
+<div class="notes">
+  <div><b>What was run.</b> LFM2.5-1.2B: five windows on the Dimensity 9400, 16k and 32k twice; 4k and 32k on the cloud chips. LFM2.5-2.6B: 2k and 32k on the Dimensity, 4k and 32k on the cloud chips. Qwen3-1.7B: 2k and 32k everywhere, 2k twice on the Dimensity. Every file loaded at its own exported window. Exports use ExecuTorch 1.4.0's recipes: 8-bit dynamic activations, 4-bit weights in groups of 32, 8-bit embeddings, fp32 KV cache, prefill chunk 2048.</div>
+  <div><b>Review.</b> Codex reviewed the method twice, before and after the data: same-file repeats, a paired speed probe separate from the task eval, a three-way identity metric counted over BFCL only, memory after load, a second architecture, incomplete cells shown as such, and conclusions bounded by the observed run variation. All are in what you see here.</div>
+  <div><b>Where things are.</b> The note: <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/research/executorch-window-matrix.md">executorch-window-matrix.md</a>. The tables: <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/research/window-matrix.md">window-matrix.md</a>. Raw and graded reports: <a href="https://github.com/alpharomercoma/openweights/tree/main/tools/eval/results">tools/eval/results</a>. The exports, each window a file: <a href="https://huggingface.co/alpharomercoma/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK">LFM2.5-1.2B</a>, <a href="https://huggingface.co/alpharomercoma/LFM2.5-2.6B-ExecuTorch-XNNPACK">LFM2.5-2.6B</a>, <a href="https://huggingface.co/alpharomercoma/Qwen3-1.7B-ExecuTorch-XNNPACK">Qwen3-1.7B</a> on Hugging Face.</div>
+</div>
+
+<footer><a href="./">OpenWeights</a><a href="latency.html">Five chips, two runtimes</a><a href="https://github.com/alpharomercoma/openweights">Source on GitHub</a></footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA={"cells":[{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"2k","file":"796 MB","phone":"D9400","gsm8k":"17/30","ifeval":"15/30","bfcl":"26/30","capped":"10/90","prefill_ms":"360","ms_tok":"25.9","prefill_tps":"254","decode_tps":"38.7","ran_at":"2048","rss_load":"-","rss_end":"1186"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"4k","file":"798 MB","phone":"D9400","gsm8k":"16/30","ifeval":"17/30","bfcl":"26/30","capped":"12/90","prefill_ms":"363","ms_tok":"26.7","prefill_tps":"253","decode_tps":"37.5","ran_at":"4096","rss_load":"1099","rss_end":"1218"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"4k","file":"798 MB","phone":"8 Elite","gsm8k":"13/30","ifeval":"18/30","bfcl":"28/30","capped":"11/90","prefill_ms":"374","ms_tok":"17.7","prefill_tps":"227","decode_tps":"56.4","ran_at":"4096","rss_load":"1104","rss_end":"1207"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"4k","file":"798 MB","phone":"Tensor G5","gsm8k":"13/30","ifeval":"18/30","bfcl":"27/30","capped":"14/90","prefill_ms":"817","ms_tok":"64.2","prefill_tps":"129","decode_tps":"15.6","ran_at":"4096","rss_load":"1113","rss_end":"1225"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"4k","file":"798 MB","phone":"Exynos 2400","gsm8k":"13/30","ifeval":"17/30","bfcl":"26/30","capped":"11/90","prefill_ms":"460","ms_tok":"34.0","prefill_tps":"195","decode_tps":"29.4","ran_at":"4096","rss_load":"1126","rss_end":"1213"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"8k","file":"802 MB","phone":"D9400","gsm8k":"17/30","ifeval":"18/30","bfcl":"26/30","capped":"11/90","prefill_ms":"353","ms_tok":"26.1","prefill_tps":"259","decode_tps":"38.3","ran_at":"8192","rss_load":"1226","rss_end":"1333"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"16k","file":"810 MB","phone":"D9400","gsm8k":"13/30","ifeval":"20/30","bfcl":"27/30","capped":"12/90","prefill_ms":"354","ms_tok":"25.9","prefill_tps":"262","decode_tps":"38.6","ran_at":"16384","rss_load":"-","rss_end":"993"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"16k","file":"810 MB","phone":"D9400 repeat","gsm8k":"14/30","ifeval":"16/30","bfcl":"28/30","capped":"12/90","prefill_ms":"368","ms_tok":"26.2","prefill_tps":"259","decode_tps":"38.2","ran_at":"16384","rss_load":"1416","rss_end":"1528"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","file":"827 MB","phone":"D9400","gsm8k":"12/30","ifeval":"18/30","bfcl":"27/30","capped":"16/90","prefill_ms":"366","ms_tok":"26.3","prefill_tps":"257","decode_tps":"38.0","ran_at":"32768","rss_load":"-","rss_end":"1903"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","file":"827 MB","phone":"D9400 repeat","gsm8k":"12/30","ifeval":"15/30","bfcl":"27/30","capped":"12/90","prefill_ms":"392","ms_tok":"28.8","prefill_tps":"237","decode_tps":"34.8","ran_at":"32768","rss_load":"1798","rss_end":"1901"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","file":"827 MB","phone":"8 Elite","gsm8k":"16/30","ifeval":"13/30","bfcl":"26/30","capped":"11/90","prefill_ms":"324","ms_tok":"16.3","prefill_tps":"261","decode_tps":"61.2","ran_at":"32768","rss_load":"-","rss_end":"1880"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","file":"827 MB","phone":"Tensor G5","gsm8k":"16/30","ifeval":"18/30","bfcl":"27/30","capped":"13/90","prefill_ms":"862","ms_tok":"79.5","prefill_tps":"98","decode_tps":"12.6","ran_at":"32768","rss_load":"-","rss_end":"1896"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","file":"827 MB","phone":"Exynos 2400","gsm8k":"14/30","ifeval":"20/30","bfcl":"25/30","capped":"11/90","prefill_ms":"462","ms_tok":"37.1","prefill_tps":"184","decode_tps":"27.0","ran_at":"32768","rss_load":"-","rss_end":"1883"},{"model":"LFM2.5-2.6B-8da4w","window":"2k","file":"1783 MB","phone":"D9400","gsm8k":"15/30","ifeval":"4/30","bfcl":"24/30","capped":"42/90","prefill_ms":"882","ms_tok":"60.3","prefill_tps":"108","decode_tps":"16.6","ran_at":"2048","rss_load":"1979","rss_end":"1958"},{"model":"LFM2.5-2.6B-8da4w","window":"4k","file":"1786 MB","phone":"8 Elite","gsm8k":"13/30","ifeval":"5/30","bfcl":"22/30","capped":"44/90","prefill_ms":"1197","ms_tok":"55.4","prefill_tps":"72","decode_tps":"18.0","ran_at":"4096","rss_load":"2058","rss_end":"2194"},{"model":"LFM2.5-2.6B-8da4w","window":"4k","file":"1786 MB","phone":"Tensor G5","gsm8k":"17/30","ifeval":"6/30","bfcl":"24/30","capped":"38/90","prefill_ms":"1066","ms_tok":"92.2","prefill_tps":"88","decode_tps":"10.8","ran_at":"4096","rss_load":"2054","rss_end":"2221"},{"model":"LFM2.5-2.6B-8da4w","window":"4k","file":"1786 MB","phone":"Exynos 2400","gsm8k":"10/30","ifeval":"5/30","bfcl":"23/30","capped":"46/90","prefill_ms":"1142","ms_tok":"83.5","prefill_tps":"81","decode_tps":"12.0","ran_at":"4096","rss_load":"2136","rss_end":"2189"},{"model":"LFM2.5-2.6B-8da4w","window":"32k","file":"1815 MB","phone":"D9400","gsm8k":"13/30","ifeval":"5/30","bfcl":"24/30","capped":"45/90","prefill_ms":"882","ms_tok":"59.7","prefill_tps":"109","decode_tps":"16.8","ran_at":"32768","rss_load":"2937","rss_end":"2185"},{"model":"LFM2.5-2.6B-8da4w","window":"32k","file":"1815 MB","phone":"8 Elite","gsm8k":"13/30","ifeval":"5/30","bfcl":"25/30","capped":"42/90","prefill_ms":"1096","ms_tok":"49.7","prefill_tps":"81","decode_tps":"20.1","ran_at":"32768","rss_load":"2950","rss_end":"3082"},{"model":"LFM2.5-2.6B-8da4w","window":"32k","file":"1815 MB","phone":"Tensor G5","gsm8k":"19/30","ifeval":"4/30","bfcl":"25/30","capped":"37/90","prefill_ms":"968","ms_tok":"81.1","prefill_tps":"101","decode_tps":"12.3","ran_at":"32768","rss_load":"2962","rss_end":"3120"},{"model":"LFM2.5-2.6B-8da4w","window":"32k","file":"1815 MB","phone":"Exynos 2400","gsm8k":"18/30","ifeval":"3/30","bfcl":"25/30","capped":"39/90","prefill_ms":"1085","ms_tok":"84.5","prefill_tps":"80","decode_tps":"11.8","ran_at":"32768","rss_load":"3032","rss_end":"3084"},{"model":"Qwen3-1.7B-8da4w","window":"2k","file":"1285 MB","phone":"D9400","gsm8k":"20/30","ifeval":"15/30","bfcl":"24/30","capped":"8/90","prefill_ms":"532","ms_tok":"45.1","prefill_tps":"174","decode_tps":"22.2","ran_at":"2048","rss_load":"1758","rss_end":"1833"},{"model":"Qwen3-1.7B-8da4w","window":"2k","file":"1285 MB","phone":"D9400 repeat","gsm8k":"17/30","ifeval":"18/30","bfcl":"24/30","capped":"7/90","prefill_ms":"532","ms_tok":"45.7","prefill_tps":"174","decode_tps":"21.9","ran_at":"2048","rss_load":"1766","rss_end":"1900"},{"model":"Qwen3-1.7B-8da4w","window":"2k","file":"1285 MB","phone":"8 Elite","gsm8k":"18/30","ifeval":"13/30","bfcl":"25/30","capped":"12/90","prefill_ms":"673","ms_tok":"41.9","prefill_tps":"141","decode_tps":"23.9","ran_at":"2048","rss_load":"1771","rss_end":"1887"},{"model":"Qwen3-1.7B-8da4w","window":"2k","file":"1285 MB","phone":"Tensor G5","gsm8k":"23/30","ifeval":"13/30","bfcl":"24/30","capped":"8/90","prefill_ms":"814","ms_tok":"89.3","prefill_tps":"121","decode_tps":"11.2","ran_at":"2048","rss_load":"1772","rss_end":"1892"},{"model":"Qwen3-1.7B-8da4w","window":"2k","file":"1285 MB","phone":"Exynos 2400","gsm8k":"17/30","ifeval":"12/30","bfcl":"23/30","capped":"10/90","prefill_ms":"734","ms_tok":"65.9","prefill_tps":"125","decode_tps":"15.2","ran_at":"2048","rss_load":"1838","rss_end":"1886"},{"model":"Qwen3-1.7B-8da4w","window":"32k","file":"1348 MB","phone":"D9400","gsm8k":"INCOMPLETE: process ended after 6/90 prompts","ifeval":"","bfcl":"","capped":"","prefill_ms":"","ms_tok":"","prefill_tps":"","decode_tps":"","ran_at":"32768","rss_load":"6188","rss_end":"5426 (last observed)"},{"model":"Qwen3-1.7B-8da4w","window":"32k","file":"1348 MB","phone":"8 Elite","gsm8k":"INCOMPLETE: process ended after 12/90 prompts","ifeval":"","bfcl":"","capped":"","prefill_ms":"","ms_tok":"","prefill_tps":"","decode_tps":"","ran_at":"32768","rss_load":"6127","rss_end":"4836 (last observed)"},{"model":"Qwen3-1.7B-8da4w","window":"32k","file":"1348 MB","phone":"Tensor G5","gsm8k":"16/30","ifeval":"14/30","bfcl":"25/30","capped":"8/90","prefill_ms":"844","ms_tok":"94.0","prefill_tps":"139","decode_tps":"10.6","ran_at":"32768","rss_load":"8499","rss_end":"8602"},{"model":"Qwen3-1.7B-8da4w","window":"32k","file":"1348 MB","phone":"Exynos 2400","gsm8k":"INCOMPLETE: process ended after 7/90 prompts","ifeval":"","bfcl":"","capped":"","prefill_ms":"","ms_tok":"","prefill_tps":"","decode_tps":"","ran_at":"32768","rss_load":"6396","rss_end":"6380 (last observed)"}],"ident":[{"model":"LFM2.5-1.2B-Instruct-8da4w","phone":"D9400","values":["raw 12/90, calls 25/30, content 17/90","raw 17/90, calls 26/30, content 18/90","raw 18/90, calls 28/30, content 19/90","raw 12/90, calls 24/30, content 16/90"]},{"model":"LFM2.5-1.2B-Instruct-8da4w","phone":"D9400 repeat","values":["-","-","-","raw 14/90, calls 25/30, content 17/90"]},{"model":"LFM2.5-1.2B-Instruct-8da4w","phone":"8 Elite","values":["-","raw 13/90, calls 26/30, content 15/90","-","-"]},{"model":"LFM2.5-1.2B-Instruct-8da4w","phone":"Tensor G5","values":["-","raw 10/90, calls 24/30, content 14/90","-","-"]},{"model":"LFM2.5-1.2B-Instruct-8da4w","phone":"Exynos 2400","values":["-","raw 16/90, calls 28/30, content 16/90","-","-"]},{"model":"LFM2.5-2.6B-8da4w","phone":"D9400","values":["raw 0/90, calls 24/30, content 29/90","-"]},{"model":"LFM2.5-2.6B-8da4w","phone":"8 Elite","values":["-","raw 0/90, calls 25/30, content 29/90"]},{"model":"LFM2.5-2.6B-8da4w","phone":"Tensor G5","values":["-","raw 0/90, calls 27/30, content 30/90"]},{"model":"LFM2.5-2.6B-8da4w","phone":"Exynos 2400","values":["-","raw 0/90, calls 25/30, content 30/90"]},{"model":"Qwen3-1.7B-8da4w","phone":"D9400","values":["raw 0/6, calls 0/0, content 0/6"]},{"model":"Qwen3-1.7B-8da4w","phone":"8 Elite","values":["raw 0/12, calls 0/0, content 0/12"]},{"model":"Qwen3-1.7B-8da4w","phone":"Tensor G5","values":["raw 29/90, calls 27/30, content 31/90"]},{"model":"Qwen3-1.7B-8da4w","phone":"Exynos 2400","values":["raw 0/7, calls 0/0, content 0/7"]}],"control":[{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"16k","identity":"raw 13/90, calls 23/30, content 20/90"},{"model":"LFM2.5-1.2B-Instruct-8da4w","window":"32k","identity":"raw 15/90, calls 25/30, content 18/90"},{"model":"Qwen3-1.7B-8da4w","window":"2k","identity":"raw 31/90, calls 30/30, content 31/90"}],"probe":[{"file":"LFM2.5-1.2B-Instruct-8da4w-2k","turns":6,"prefill":"332 (288 to 344)","decode":"40.2 (33.7 to 41.0)","prefill_ms":2804,"rss":1050},{"file":"LFM2.5-1.2B-Instruct-8da4w-4k","turns":6,"prefill":"340 (330 to 344)","decode":"40.4 (36.9 to 41.0)","prefill_ms":2738,"rss":1098},{"file":"LFM2.5-1.2B-Instruct-8da4w-8k","turns":6,"prefill":"343 (327 to 345)","decode":"40.8 (40.0 to 41.2)","prefill_ms":2712,"rss":1194},{"file":"LFM2.5-1.2B-Instruct-8da4w-16k","turns":6,"prefill":"342 (326 to 345)","decode":"40.5 (39.8 to 41.2)","prefill_ms":2718,"rss":1386},{"file":"LFM2.5-1.2B-Instruct-8da4w-32k","turns":6,"prefill":"343 (329 to 346)","decode":"40.5 (39.9 to 40.9)","prefill_ms":2712,"rss":1768},{"file":"LFM2.5-2.6B-8da4w-2k","turns":6,"prefill":"149 (142 to 153)","decode":"19.0 (16.7 to 19.5)","prefill_ms":6254,"rss":1984},{"file":"LFM2.5-2.6B-8da4w-4k","turns":6,"prefill":"148 (135 to 153)","decode":"18.1 (16.5 to 19.5)","prefill_ms":6264,"rss":2046},{"file":"LFM2.5-2.6B-8da4w-8k","turns":6,"prefill":"149 (140 to 153)","decode":"18.2 (16.7 to 19.5)","prefill_ms":6234,"rss":2172},{"file":"LFM2.5-2.6B-8da4w-16k","turns":6,"prefill":"149 (138 to 153)","decode":"18.4 (16.6 to 19.5)","prefill_ms":6226,"rss":2427},{"file":"LFM2.5-2.6B-8da4w-32k","turns":6,"prefill":"149 (139 to 152)","decode":"18.1 (16.2 to 19.5)","prefill_ms":6240,"rss":2936},{"file":"Qwen3-1.7B-8da4w-2k","turns":6,"prefill":"200 (193 to 206)","decode":"18.0 (16.1 to 18.2)","prefill_ms":4680,"rss":1758},{"file":"Qwen3-1.7B-8da4w-32k","turns":6,"prefill":"184 (162 to 203)","decode":"16.6 (15.1 to 17.6)","prefill_ms":5064,"rss":6153}],"ratio":[{"file":"LFM2.5-1.2B-Instruct-8da4w-2k","prefill":"1.000 (1.000 to 1.000)","decode":"1.000 (1.000 to 1.000)","turns":6},{"file":"LFM2.5-1.2B-Instruct-8da4w-4k","prefill":"1.007 (0.987 to 1.181)","decode":"0.999 (0.927 to 1.190)","turns":6},{"file":"LFM2.5-1.2B-Instruct-8da4w-8k","prefill":"1.003 (0.995 to 1.198)","decode":"1.011 (0.995 to 1.187)","turns":6},{"file":"LFM2.5-1.2B-Instruct-8da4w-16k","prefill":"1.008 (0.992 to 1.190)","decode":"1.009 (0.988 to 1.187)","turns":6},{"file":"LFM2.5-1.2B-Instruct-8da4w-32k","prefill":"1.013 (0.999 to 1.202)","decode":"1.006 (0.993 to 1.184)","turns":6},{"file":"LFM2.5-2.6B-8da4w-2k","prefill":"1.000 (1.000 to 1.000)","decode":"1.000 (1.000 to 1.000)","turns":6},{"file":"LFM2.5-2.6B-8da4w-4k","prefill":"0.995 (0.947 to 1.002)","decode":"0.985 (0.946 to 1.005)","turns":6},{"file":"LFM2.5-2.6B-8da4w-8k","prefill":"0.997 (0.983 to 1.005)","decode":"0.991 (0.943 to 1.000)","turns":6},{"file":"LFM2.5-2.6B-8da4w-16k","prefill":"1.003 (0.971 to 1.005)","decode":"0.997 (0.938 to 1.005)","turns":6},{"file":"LFM2.5-2.6B-8da4w-32k","prefill":"0.997 (0.975 to 1.003)","decode":"0.976 (0.943 to 1.005)","turns":6},{"file":"Qwen3-1.7B-8da4w-2k","prefill":"1.000 (1.000 to 1.000)","decode":"1.000 (1.000 to 1.000)","turns":6},{"file":"Qwen3-1.7B-8da4w-32k","prefill":"0.941 (0.793 to 0.982)","decode":"0.953 (0.835 to 1.012)","turns":6}]};
+const CHIPS=[
+ {id:"D9400",name:"Dimensity 9400",where:"Poco, in hand",v:"--d9400"},
+ {id:"8 Elite",name:"Snapdragon 8 Elite",where:"Galaxy S25 Ultra, Test Lab",v:"--elite"},
+ {id:"Tensor G5",name:"Tensor G5",where:"Pixel 10 Pro XL, Test Lab",v:"--g5"},
+ {id:"Exynos 2400",name:"Exynos 2400",where:"Galaxy S24+, Test Lab",v:"--e2400"},
+];
+const SHORT={"LFM2.5-1.2B-Instruct-8da4w":"LFM2.5 1.2B","LFM2.5-2.6B-8da4w":"LFM2.5 2.6B","Qwen3-1.7B-8da4w":"Qwen3 1.7B"};
+const MODELS=Object.keys(SHORT);
+const WINDOWS=[2,4,8,16,32];
+const win=s=>parseInt(s);
+let model=MODELS[0];
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const tip=document.getElementById("tip");
+function showTip(e,text){if(typeof text!=="string"){hideTip();return;}tip.textContent=text;tip.hidden=false;
+ const r=tip.getBoundingClientRect(),pad=8;const left=Math.max(pad,Math.min(e.clientX-r.width/2,window.innerWidth-r.width-pad));
+ let top=e.clientY-r.height-12;if(top<pad)top=e.clientY+12;tip.style.left=left+"px";tip.style.top=top+"px";}
+function hideTip(){tip.hidden=true}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const wire=s=>s.querySelectorAll(".pt").forEach(p=>{p.setAttribute("tabindex","0");p.setAttribute("role","img");p.setAttribute("aria-label",p.dataset.t.replace(/\n/g,". "));
+ p.addEventListener("mousemove",e=>showTip(e,p.dataset.t));p.addEventListener("mouseleave",hideTip);
+ p.addEventListener("focus",()=>{const r=p.getBoundingClientRect();showTip({clientX:r.left+r.width/2,clientY:r.top},p.dataset.t)});p.addEventListener("blur",hideTip);
+ p.addEventListener("touchstart",e=>{showTip(e.touches[0],p.dataset.t)},{passive:true});});
+// one shape per chip, so colour is never the only encoding
+const SHAPES={"D9400":"circle","8 Elite":"square","Tensor G5":"diamond","Exynos 2400":"triangle"};
+function mark(shape,x,y,r,fill,stroke,sw,extra){
+ const st=`fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${extra||""}`;
+ if(shape==="square")return `<rect class="pt" x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" ${st}/>`;
+ if(shape==="diamond")return `<polygon class="pt" points="${x},${y-r*1.3} ${x+r*1.3},${y} ${x},${y+r*1.3} ${x-r*1.3},${y}" ${st}/>`;
+ if(shape==="triangle")return `<polygon class="pt" points="${x},${y-r*1.25} ${x+r*1.2},${y+r*0.9} ${x-r*1.2},${y+r*0.9}" ${st}/>`;
+ return `<circle class="pt" cx="${x}" cy="${y}" r="${r}" ${st}/>`;}
+const swatch=(c)=>{const col=`var(${c.v})`;const sh=SHAPES[c.id];
+ return sh==="square"?`<i class="sw" style="background:${col};border-radius:2px"></i>`:sh==="diamond"?`<i class="sw" style="background:${col};border-radius:2px;transform:rotate(45deg) scale(.85)"></i>`:sh==="triangle"?`<i class="sw" style="background:${col};border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)"></i>`:`<i class="sw" style="background:${col}"></i>`;};
+const adjacent=(a,b)=>WINDOWS.indexOf(b)-WINDOWS.indexOf(a)===1;
+const cellsOf=m=>DATA.cells.filter(c=>c.model===m);
+const complete=c=>!c.gsm8k.startsWith("INCOMPLETE");
+const frac=s=>{const m=/(\d+)\/(\d+)/.exec(s);return m?[+m[1],+m[2]]:null};
+const ratioOf=s=>{const m=/([\d.]+) \(([\d.]+) to ([\d.]+)\)/.exec(s);return m?[+m[1],+m[2],+m[3]]:null};
+const winsOf=m=>[...new Set(cellsOf(m).map(c=>win(c.window)))].sort((a,b)=>a-b);
+
+// tabs
+const tabs=document.getElementById("tabs");
+MODELS.forEach(m=>{const b=document.createElement("button");b.className="tab";b.textContent=SHORT[m];b.setAttribute("aria-pressed",m===model);
+ b.onclick=()=>{model=m;[...tabs.children].forEach(c=>c.setAttribute("aria-pressed",c.textContent===SHORT[m]));drawAll();};tabs.appendChild(b);});
+function legends(){const hasRep=cellsOf(model).some(c=>c.phone.endsWith(" repeat"));
+ document.getElementById("legend").innerHTML=CHIPS.map(c=>`<span class="k">${swatch(c)}${c.name}</span>`).join("")+(hasRep?`<span class="k"><i class="ring"></i>Second run, same file</span>`:"");
+ document.getElementById("identLegend").innerHTML=CHIPS.map(c=>`<span class="k">${swatch(c)}${c.name}</span>`).join("")+(hasRep?`<span class="k"><i class="dash"></i>Same file run twice</span>`:"")+`<span class="k">&#215; fewer prompts than the full set</span>`;
+ document.getElementById("gradesCap").textContent=`Prompts passed out of 30 on each set, per chip. Points are joined only where neighbouring windows were both measured; the cloud phones have endpoint measurements only and cannot exclude an effect at 8k or 16k. `+(hasRep?"Hollow markers are one same-file repeat on the Dimensity 9400, an observed run-to-run reference rather than a noise bound.":"No same-file repeat was run for this model.");
+ document.getElementById("identCap").textContent=`How many prompts came back byte-identical to the largest window's reply: the raw token stream, the parsed tool calls (BFCL prompts only) and the shown text. `+(hasRep?"Dashed lines are same-file repeats, a reference for observed run-to-run agreement.":"No same-file repeat was run for this model.");}
+
+// shared axes helpers: x is the window on a log2 scale
+const xw=(w,l,r)=>l+(Math.log2(w)-1)/(5-1)*(r-l);
+function axes(o,l,r,t,b,H,ink2,grid,label){
+ WINDOWS.forEach(w=>{const x=xw(w,l,r);o.push(`<line x1="${x}" x2="${x}" y1="${t}" y2="${b}" stroke="${grid}"/><text x="${x}" y="${b+18}" text-anchor="middle" font-size="11.5" fill="${ink2}" class="mono">${w}k</text>`)});
+ o.push(`<text x="${(l+r)/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="${ink2}">${label}</text>`);
+}
+
+// ---------- memory ----------
+function drawMem(){
+ const s=document.getElementById("mem");s.setAttribute("aria-label",`Resident memory after load against exported window, ${SHORT[model]} highlighted`);const W=640,H=360,M={l:58,r:20,t:16,b:44};const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ const YMAX=9000;const y=mb=>H-M.b-mb/YMAX*(H-M.t-M.b);
+ for(let gb=0;gb<=8;gb+=2){o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(gb*1000)}" y2="${y(gb*1000)}" stroke="${grid}"/><text x="${M.l-8}" y="${y(gb*1000)+4}" text-anchor="end" font-size="11.5" fill="${ink2}" class="mono">${gb} GB</text>`);}
+ axes(o,M.l,W-M.r,M.t,H-M.b,H,ink2,grid,"Exported context window, tokens");
+ o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(6000)}" y2="${y(6000)}" stroke="${ink3}" stroke-dasharray="4 4"/>`);
+ o.push(`<text x="${M.l+6}" y="${y(6000)-6}" font-size="11.5" fill="${ink3}">Samsung Heimdall threshold seen in the S25 Ultra and S24+ logs, 6 GB</text>`);
+ MODELS.forEach(m=>{const pts=DATA.probe.filter(p=>p.file.startsWith(m+"-")).map(p=>[win(p.file.slice(m.length+1)),p.rss]).sort((a,b)=>a[0]-b[0]);
+  const on=m===model,col=on?ink:ink3;
+  o.push(`<path d="${pts.map((p,i)=>`${i?"L":"M"}${xw(p[0],M.l,W-M.r)},${y(p[1])}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${on?2.2:1.2}" ${on?"":'stroke-dasharray="2 3"'} opacity="${on?1:.7}"/>`);
+  pts.forEach(p=>{const pr=DATA.probe.find(q=>q.file===`${m}-${p[0]}k`);const cell=cellsOf(m).find(c=>win(c.window)===p[0]);
+   const t=`${SHORT[m]} at ${p[0]}k\nResident after load ${(p[1]/1000).toFixed(2)} GB\nFile ${cell?cell.file:"-"}${pts.length>1?`\nResident-process delta against ${pts[0][0]}k: ${((p[1]-pts[0][1])/1000).toFixed(2)} GB (whole process, not a KV-only measurement)`:""}`;
+   o.push(`<circle class="pt" cx="${xw(p[0],M.l,W-M.r)}" cy="${y(p[1])}" r="${on?5.5:4}" fill="${on?ink:panel}" stroke="${col}" stroke-width="1.6" data-t="${esc(t)}"/>`);});
+  const last=pts[pts.length-1];
+  o.push(`<text x="${xw(last[0],M.l,W-M.r)-9}" y="${y(last[1])-9}" text-anchor="end" font-size="11.5" font-weight="${on?700:500}" fill="${col}" stroke="${panel}" stroke-width="3" paint-order="stroke">${SHORT[m]} ${(last[1]/1000).toFixed(1)} GB</text>`);});
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- speed ----------
+function drawSpeed(){
+ const s=document.getElementById("speed");s.setAttribute("aria-label",`${SHORT[model]}: prefill and decode throughput ratio against its smallest window`);const W=640,H=360,M={l:58,r:20,t:16,b:44};const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ const Y0=0.75,Y1=1.25;const y=v=>H-M.b-(v-Y0)/(Y1-Y0)*(H-M.t-M.b);
+ [0.8,0.9,1,1.1,1.2].forEach(v=>{o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}" stroke="${v===1?ink3:grid}" ${v===1?'stroke-dasharray="4 4"':""}/><text x="${M.l-8}" y="${y(v)+4}" text-anchor="end" font-size="11.5" fill="${ink2}" class="mono">${v.toFixed(2)}</text>`);});
+ axes(o,M.l,W-M.r,M.t,H-M.b,H,ink2,grid,"Exported context window, tokens");
+ o.push(`<text transform="translate(14 ${(M.t+H-M.b)/2}) rotate(-90)" text-anchor="middle" font-size="12" fill="${ink2}">Throughput vs smallest window</text>`);
+ const rows=DATA.ratio.filter(r=>r.file.startsWith(model+"-"));
+ rows.forEach(r=>{const w=win(r.file.slice(model.length+1));const x=xw(w,M.l,W-M.r);const pf=ratioOf(r.prefill),dc=ratioOf(r.decode);const pr=DATA.probe.find(q=>q.file===r.file);
+  [[pf,x-7,true],[dc,x+7,false]].forEach(([v,xx,solid])=>{if(!v)return;const vv=v.map(k=>Math.max(Y0,Math.min(Y1,k)));
+   const t=`${SHORT[model]} at ${w}k, ${solid?"prefill":"decode"}\n${(v[0]*100).toFixed(1)}% of the ${rows[0]&&win(rows[0].file.slice(model.length+1))}k rate (range ${(v[1]*100).toFixed(0)} to ${(v[2]*100).toFixed(0)}%)\n${pr?(solid?`Median ${pr.prefill.split(" ")[0]} tok/s prefill, ${pr.prefill_ms} ms for 929 tokens`:`Median ${pr.decode.split(" ")[0]} tok/s decode`):""}`;
+   o.push(`<line x1="${xx}" x2="${xx}" y1="${y(vv[1])}" y2="${y(vv[2])}" stroke="${ink}" stroke-width="1.4" opacity=".55"/>`);
+   o.push(solid?`<circle class="pt" cx="${xx}" cy="${y(vv[0])}" r="5.5" fill="${ink}" data-t="${esc(t)}"/>`:`<circle class="pt" cx="${xx}" cy="${y(vv[0])}" r="6.5" fill="${panel}" stroke="${ink}" stroke-width="2" data-t="${esc(t)}"/>`);
+   if(v[2]>Y1||v[1]<Y0)o.push(`<text x="${xx}" y="${v[2]>Y1?M.t+10:H-M.b-4}" text-anchor="middle" font-size="10" fill="${ink3}">${v[2]>Y1?"&#8593; "+v[2].toFixed(2):"&#8595; "+v[1].toFixed(2)}</text>`);});});
+ o.push(`<text x="${M.l+8}" y="${M.t+10}" font-size="11" fill="${ink3}">above the dashed line is faster than the smallest window; bars are the min to max of six paired turns</text>`);
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- grades ----------
+function drawGrades(){
+ const s=document.getElementById("grades");s.setAttribute("aria-label",`${SHORT[model]}: prompts passed per set against exported window, per chip`);const W=640,H=380,M={l:40,r:12,t:30,b:44},gap=26;const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel"),warn=css("--warn"),band=css("--band");
+ const cw=(W-M.l-M.r-2*gap)/3;const y=v=>H-M.b-v/30*(H-M.t-M.b);
+ const cells=cellsOf(model);const cens=model.includes("2.6B");
+ [["gsm8k","GSM8K"],["ifeval","IFEval"],["bfcl","BFCL"]].forEach(([k,label],i)=>{const l=M.l+i*(cw+gap),r=l+cw;
+  if(cens&&k!=="bfcl")o.push(`<rect x="${l-8}" y="${M.t-6}" width="${cw+16}" height="${H-M.b-M.t+6}" fill="${band}" rx="4"/>`);
+  o.push(`<text x="${l}" y="${M.t-12}" font-size="12" font-weight="600" fill="${ink}">${label}${cens&&k!=="bfcl"?" <tspan font-weight=\"500\" fill=\""+warn+"\">cap-censored</tspan>":""}</text>`);
+  [0,10,20,30].forEach(v=>{o.push(`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}"/>`);if(i===0)o.push(`<text x="${M.l-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="${ink2}" class="mono">${v}</text>`);});
+  WINDOWS.forEach(w=>{const x=xw(w,l+6,r-6);o.push(`<text x="${x}" y="${H-M.b+16}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${w}k</text>`);});
+  CHIPS.forEach(c=>{const col=css(c.v);
+   const mine=cells.filter(x=>x.phone===c.id&&complete(x)).sort((a,b)=>win(a.window)-win(b.window));
+   for(let j=1;j<mine.length;j++){const a=mine[j-1],b=mine[j];if(!adjacent(win(a.window),win(b.window)))continue;
+    o.push(`<line x1="${xw(win(a.window),l+6,r-6)}" y1="${y(frac(a[k])[0])}" x2="${xw(win(b.window),l+6,r-6)}" y2="${y(frac(b[k])[0])}" stroke="${col}" stroke-width="1.4" opacity=".6"/>`);}
+   mine.forEach(x=>{const f=frac(x[k]);const t=`${SHORT[model]} at ${x.window} on the ${c.name}\n${label} ${x[k]} passed\nCapped replies ${x.capped}`;
+    o.push(mark(SHAPES[c.id],xw(win(x.window),l+6,r-6),y(f[0]),5,col,panel,1.2,`data-t="${esc(t)}"`));});
+   cells.filter(x=>x.phone===c.id+" repeat").forEach(x=>{const f=frac(x[k]);const t=`${SHORT[model]} at ${x.window} on the ${c.name}, second run of the same file\n${label} ${x[k]} passed`;
+    o.push(mark(SHAPES[c.id],xw(win(x.window),l+6,r-6),y(f[0]),7,"none",col,2,`pointer-events="all" data-t="${esc(t)}"`));});
+   cells.filter(x=>x.phone===c.id&&!complete(x)).forEach(x=>{const xx=xw(win(x.window),l+6,r-6);const n=/after (\d+)\/(\d+)/.exec(x.gsm8k);
+    const t=`${SHORT[model]} at ${x.window} on the ${c.name}\nIncomplete: the process ended after ${n?n[1]:"?"} of 90 prompts\nResident after load ${x.rss_load} MB`;
+    o.push(`<g class="pt" data-t="${esc(t)}" pointer-events="all"><line x1="${xx-4}" x2="${xx+4}" y1="${y(0)-4}" y2="${y(0)+4}" stroke="${col}" stroke-width="2"/><line x1="${xx-4}" x2="${xx+4}" y1="${y(0)+4}" y2="${y(0)-4}" stroke="${col}" stroke-width="2"/></g>`);});});});
+ if(cells.some(x=>!complete(x)))o.push(`<text x="${W-M.r}" y="${H-M.b+32}" text-anchor="end" font-size="11" fill="${ink3}">&#215; the run ended before the set did: no grade</text>`);
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- identity ----------
+function drawIdent(){
+ const s=document.getElementById("ident");s.setAttribute("aria-label",`${SHORT[model]}: share of replies identical to the largest window, per phone and window`);const W=640,H=380,M={l:40,r:12,t:30,b:44},gap=26;const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ const cw=(W-M.l-M.r-2*gap)/3;const y=v=>H-M.b-v*(H-M.t-M.b);
+ const wins=winsOf(model),largest=wins[wins.length-1],others=wins.slice(0,-1);
+ const rows=DATA.ident.filter(r=>r.model===model);const ctrl=DATA.control.filter(r=>r.model===model);
+ const parse=str=>{const m=/raw (\d+)\/(\d+), calls (\d+)\/(\d+), content (\d+)\/(\d+)/.exec(str);return m?{raw:[+m[1],+m[2]],calls:[+m[3],+m[4]],content:[+m[5],+m[6]]}:null};
+ [["raw","Raw token stream"],["calls","Parsed tool calls"],["content","Shown text"]].forEach(([k,label],i)=>{const l=M.l+i*(cw+gap),r=l+cw;
+  o.push(`<text x="${l}" y="${M.t-12}" font-size="12" font-weight="600" fill="${ink}">${label}</text>`);
+  [0,.25,.5,.75,1].forEach(v=>{o.push(`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}"/>`);if(i===0)o.push(`<text x="${M.l-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="${ink2}" class="mono">${Math.round(v*100)}%</text>`);});
+  const xs=others.map((w,j)=>others.length>1?l+10+j*(cw-20)/(others.length-1):(l+r)/2);
+  others.forEach((w,j)=>o.push(`<text x="${xs[j]}" y="${H-M.b+16}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${w}k</text>`));
+  if(i===1)o.push(`<text x="${(l+r)/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="${ink2}">Window compared with the ${largest}k export</text>`);
+  ctrl.forEach(c=>{const p=parse(c.identity);if(!p||!p[k][1])return;const v=p[k][0]/p[k][1];
+   o.push(`<line class="pt" x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="${ink3}" stroke-dasharray="4 4" stroke-width="1.4" pointer-events="stroke" data-t="${esc(`${SHORT[model]} ${c.window}, same file twice on the Dimensity 9400\n${label}: ${p[k][0]} of ${p[k][1]} identical`)}"/>`);});
+  rows.forEach(rw=>{const rep=rw.phone.endsWith(" repeat");const chip=CHIPS.find(c=>c.id===rw.phone.replace(" repeat",""));if(!chip)return;const col=css(chip.v);
+   rw.values.forEach((val,j)=>{const p=parse(val);if(!p||!p[k][1])return;const v=p[k][0]/p[k][1];
+    const t=`${SHORT[model]}, ${others[j]}k against ${largest}k on the ${chip.name}${rep?" (second run of the "+others[j]+"k)":""}\n${label}: ${p[k][0]} of ${p[k][1]} identical`;
+    const full=p[k][1]>=(k==="calls"?30:90);
+    if(!full){const xx=xs[j]+(CHIPS.indexOf(chip)-1.5)*9;o.push(`<g class="pt" data-t="${esc(t+"\nOnly "+p[k][1]+" prompts were completed by both runs: not a full comparison")}" pointer-events="all"><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)-4}" y2="${y(v)+4}" stroke="${col}" stroke-width="2"/><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)+4}" y2="${y(v)-4}" stroke="${col}" stroke-width="2"/><text x="${xx}" y="${y(v)-8}" text-anchor="middle" font-size="9.5" fill="${ink3}" class="mono">n=${p[k][1]}</text></g>`);return;}
+    o.push(rep?mark(SHAPES[chip.id],xs[j],y(v),7,"none",col,2,`pointer-events="all" data-t="${esc(t)}"`):mark(SHAPES[chip.id],xs[j],y(v),5,col,panel,1.2,`data-t="${esc(t)}"`));});});});
+ const inc=rows.some(rw=>rw.values.some(v=>{const p=parse(v);return p&&p.raw[1]&&p.raw[1]<90}));
+ if(inc)o.push(`<text x="${W-M.r}" y="${H-M.b+32}" text-anchor="end" font-size="11" fill="${ink3}">&#215; runs that ended early share only a few prompts with the other window; not a full comparison</text>`);
+ if(model.includes("2.6B"))o.push(`<text x="${W-M.r}" y="${H-M.b+32}" text-anchor="end" font-size="11" fill="${ink3}">Raw identity is cap-censored: long reasoning replies rarely match byte for byte</text>`);
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- tables ----------
+function tables(){
+ const root=document.getElementById("tables");const out=[];
+ const th=(cols)=>`<thead><tr>${cols.map((c,i)=>`<th${i<2?' class="l"':""}>${c}</th>`).join("")}</tr></thead>`;
+ MODELS.forEach(m=>{const cells=cellsOf(m);let lastW=null;
+  const body=cells.map(c=>{const first=c.window!==lastW;lastW=c.window;const cls=first?' class="win"':"";
+   const lead=`<td>${c.phone} &middot; ${c.window}</td><td class="l">${c.file}</td>`;
+   if(!complete(c))return `<tr${cls}>${lead}<td class="inc" colspan="8">${c.gsm8k}</td><td>${c.ran_at}</td><td>${c.rss_load}</td><td class="dim">${c.rss_end}</td></tr>`;
+   return `<tr${cls}>${lead}<td>${c.gsm8k}</td><td>${c.ifeval}</td><td>${c.bfcl}</td><td>${c.capped}</td><td>${c.prefill_ms}</td><td>${c.ms_tok}</td><td>${c.prefill_tps}</td><td>${c.decode_tps}</td><td>${c.ran_at}</td><td>${c.rss_load==="-"?'<span class="dim">not logged</span>':c.rss_load}</td><td>${c.rss_end}</td></tr>`;}).join("");
+  const wins=winsOf(m),largest=wins[wins.length-1],others=wins.slice(0,-1);
+  const ctrl=DATA.control.filter(r=>r.model===m);const id=DATA.ident.filter(r=>r.model===m);
+  out.push(`<details class="tbl" data-model="${m}"${m===model?" open":""}><summary>${SHORT[m]} <span>${cells.length} cells &middot; ${m}</span></summary><div class="inner">
+   <p class="hint">Scrolls sideways; the phone and window column stays put.</p><div class="scroll"><table class="cells">${th(["Phone and window","File","GSM8K","IFEval","BFCL","Capped","Prefill ms","ms/token","Prefill tok/s","Decode tok/s","Ran at","RSS after load MB","RSS at end MB"])}<tbody>${body}</tbody></table></div>
+   ${ctrl.length?`<p style="margin-top:18px">Run-to-run control: the same file run twice on the Dimensity 9400, replies byte-identical.</p><div class="scroll"><table>${th(["Window","Identical replies"])}<tbody>${ctrl.map(c=>`<tr><td>${c.window}</td><td class="l">${c.identity}</td></tr>`).join("")}</tbody></table></div>`:""}
+   ${id.length&&others.length?`<p style="margin-top:18px">Replies identical to the ${largest}k export, per window: raw stream and shown content over the prompts both runs completed, parsed tool calls over the BFCL prompts among them.</p><div class="scroll"><table>${th(["Phone",...others.map(w=>w+"k")])}<tbody>${id.map(r=>`<tr><td>${r.phone}</td>${r.values.map(v=>`<td class="l${v==="-"?" dim":""}">${v}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}
+  </div></details>`);});
+ out.push(`<details class="tbl"><summary>Fixed-prompt speed probe <span>Dimensity 9400 &middot; 12 files &middot; 929-token prompt, 160-token cap, three turns per load, two interleaved passes</span></summary><div class="inner">
+  <p>Phone cooled below 42 C and awake before each load. The second table pairs each turn with the same turn of the model's smallest window in the same pass.</p>
+  <div class="scroll"><table>${th(["File","Turns","Prefill tok/s (median, min to max)","Decode tok/s (median, min to max)","Prefill ms, 929 tokens","Resident after load MB"])}<tbody>${DATA.probe.map(p=>`<tr><td>${p.file}</td><td>${p.turns}</td><td class="l">${p.prefill}</td><td class="l">${p.decode}</td><td>${p.prefill_ms}</td><td>${p.rss}</td></tr>`).join("")}</tbody></table></div>
+  <div class="scroll" style="margin-top:18px"><table>${th(["File","Prefill vs smallest window (median ratio, min to max)","Decode vs smallest window","Paired turns"])}<tbody>${DATA.ratio.map(p=>`<tr><td>${p.file}</td><td class="l">${p.prefill}</td><td class="l">${p.decode}</td><td>${p.turns}</td></tr>`).join("")}</tbody></table></div>
+ </div></details>`);
+ root.innerHTML=out.join("");
+}
+
+function drawAll(){hideTip();legends();drawMem();drawSpeed();drawGrades();drawIdent();
+ document.querySelectorAll("details.tbl[data-model]").forEach(d=>{if(d.dataset.model===model)d.open=true;});}
+tables();drawAll();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawAll);
+if(window.matchMedia){window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",drawAll);}
+new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+</script>
 </body>
 </html>

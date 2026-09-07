@@ -1,0 +1,31 @@
+{
+  "suite": "benchmark",
+  "model": "LFM2.5-2.6B-8da4w-4k",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 thinking=false repeatPenalty=default",
+  "prompts_seed": 7,
+  "context_size": 4096,
+  "rss_mb_after_load": 2055,
+  "rss_mb": 2139,
+  "completed": 1,
+  "ok": 1,
+  "errors": 0,
+  "skipped": 0,
+  "budget_exhausted": false,
+  "cases": [
+    {
+      "id": "ifeval-3631",
+      "set": "ifeval",
+      "status": "ok",
+      "content": "Verse 1  \nGrab two slices of bread and spread them wide  \nTake a spoonful of peanut butter and place it on the top  \nAdd a dollop of bright yellow jelly on the other side  \nPress gently and watch the sandwich rise  \n\nChorus  \nYum yum yum the perfect snack  \nCrispy bread and sweet dreams  \n\nBridge  \nOpen the jar and pour the creamy spread  \nStir it well then spread it thin  \nCut the sandwich in half and enjoy",
+      "reasoning_chars": 3291,
+      "raw": "<think>The user wants a song about how to make a peanut butter and jelly sandwich. They specifically request: \"Do not use commas in your response.\" So we must produce a response that is a song (likely verses, maybe chorus) about making a peanut butter and jelly sandwich. And we must not use any commas. That includes any commas in the text. Must be careful: no commas at all. Also ensure no punctuation that is a comma. We can use other punctuation like periods, exclamation marks, question marks, hyphens, colon, semicolon? The instruction only forbids commas. So we can use other punctuation. But we need to avoid accidental commas. That includes possibly in the phrase \"peanut butter and jelly\" - that's fine, no comma. Also \"sandwich\" is fine.\n\nWe need to write a song. Could be multiple lines, each line a lyric. Must not contain any commas. Let's craft carefully.\n\nWe'll do something like:\n\nVerse 1:\nGrab two slices of bread and spread them wide\nTake a spoonful of peanut butter and place it on the top\nAdd a dollop of bright yellow jelly on the other side\nPress gently and watch the sandwich rise\n\nChorus:\nYum yum yum the perfect snack\nCrispy bread and sweet dreams\n\nBut need to avoid commas. Also need to ensure no stray commas appear in any line.\n\nCheck each line: \"Grab two slices of bread and spread them wide\" - no comma. Good.\n\"Take a spoonful of peanut butter and place it on the top\" - no comma.\n\"Add a dollop of bright yellow jelly on the other side\" - no comma.\n\"Press gently and watch the sandwich rise\" - no comma.\n\nChorus lines:\n\"Yum yum yum the perfect snack\" - no comma.\n\"Crispy bread and sweet dreams\" - no comma.\n\nWe could add a bridge, maybe.\n\nBut we must ensure no hidden commas like \"peanut butter, jelly\" - we must not use that. So use \"peanut butter and jelly\". Good.\n\nAlso ensure we don't accidentally use \"etc.\" with a comma after it. Avoid that.\n\nWe can also use line breaks. That's okay. The response is a song. Could be multiple verses. Let's maybe add a bridge:\n\nBridge:\nOpen the jar and pour the creamy spread\nStir it well then spread it thin\nCut the sandwich in half and enjoy\n\nCheck for commas: none.\n\nNow check each line for any commas. \"Open the jar and pour the creamy spread\" - no comma. \"Stir it well then spread it thin\" - no comma. \"Cut the sandwich in half and enjoy\" - no comma.\n\nAll good.\n\nNow we need to ensure there are no commas in the entire response. Also avoid using apostrophes? Those are fine. They are not commas. Could use \"don't\" but that's fine.\n\nLet's write the final answer as a block of text with line breaks, no commas. Ensure not to accidentally include a comma after \"Peanut butter and jelly\" - no. Also ensure no stray punctuation like \"...\" which is fine.\n\nThus final answer:\n\nVerse 1\nGrab two slices of bread and spread them wide\nTake a spoonful of peanut butter and place it on the top\nAdd a dollop of bright yellow jelly on the other side\nPress gently and watch the sandwich rise\n\nChorus\nYum yum yum the perfect snack\nCrispy bread and sweet dreams\n\nBridge\nOpen the jar and pour the creamy spread\nStir it well then spread it thin\nCut the sandwich in half and enjoy\n\nCheck for any commas: None. Good. The phrase \"Yum yum yum the perfect snack\" - no comma. \"Crispy bread and sweet dreams\" - no comma.\n\nThus final answer is ready.<\/think>Verse 1  \nGrab two slices of bread and spread them wide  \nTake a spoonful of peanut butter and place it on the top  \nAdd a dollop of bright yellow jelly on the other side  \nPress gently and watch the sandwich rise  \n\nChorus  \nYum yum yum the perfect snack  \nCrispy bread and sweet dreams  \n\nBridge  \nOpen the jar and pour the creamy spread  \nStir it well then spread it thin  \nCut the sandwich in half and enjoy",
+      "calls": [],
+      "prompt_tokens": 31,
+      "generated_tokens": 921,
+      "prefill_ms": 397,
+      "decode_ms": 38749,
+      "wall_ms": 39161
+    }
+  ]
+}

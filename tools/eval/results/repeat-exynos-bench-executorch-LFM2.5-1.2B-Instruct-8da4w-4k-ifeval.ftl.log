@@ -1,0 +1,33 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-4k.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-4k.tokenizer.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260907-125518-57507-e2s-bench-executorch-LFM2.5-1.2B-Instruct-8da4w-4k/]
+
+Test [matrix-debgghkqv2iua] has been created in the Google Cloud.
+Creating individual test executions...
+............................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/7329998329558022183 ].
+12:58:50 Test is Pending
+12:59:41 Starting attempt 1.
+12:59:41 Test is Running
+13:04:48 Done. Test time = 237 (secs)
+13:04:48 Starting results processing. Attempt: 1
+13:04:48 Completed results processing. Time taken = 6 (secs)
+13:04:48 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/7329998329558022183 ].
+┌─────────┬────────────────────┬─────────────────────┐
+│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ e2s-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────┴─────────────────────┘

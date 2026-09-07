@@ -1,6 +1,6 @@
 # Exported window matrix
 
-Each cell is one export of one model at one window on one phone, over the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL), greedy, thinking off, loaded at the file's own window. Prefill ms is the runtime's prefill time for the whole prompt (the engine-side part of time to first token, not a first-token timestamp); ms/token is decode time over generated tokens, which differ per cell because the replies differ, so it is a per-cell figure and not a paired speed comparison. Capped is how many completed replies ran to the token cap (640, or 384 for BFCL) and so never finished; a set whose replies are mostly capped is cap-censored and its grade says little. RSS is the test process's resident set right after the model loaded and at the end of the run.
+Each cell is one export of one model at one window on one phone, over the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL), greedy, thinking off, loaded at the file's own window. Prefill ms is the runtime's prefill time for the whole prompt (the engine-side part of time to first token, not a first-token timestamp); ms/token is decode time over generated tokens, which differ per cell because the replies differ, so it is a per-cell figure and not a paired speed comparison. Capped is how many completed replies ran to the token cap (640, or 384 for BFCL; 2048 in the capped rerun) or to the edge of the window itself, and so never finished; a set whose replies are mostly capped is cap-censored and its grade says little. RSS is the test process's resident set right after the model loaded and at the end of the run.
 
 ## LFM2.5-1.2B-Instruct-8da4w
 
@@ -11,6 +11,7 @@ Each cell is one export of one model at one window on one phone, over the same 9
 | 4k | 798 MB | 8 Elite | 13/30 | 18/30 | 28/30 | 11/90 | 374 | 17.7 | 227 | 56.4 | 4096 | 1104 | 1207 |
 | 4k | 798 MB | Tensor G5 | 13/30 | 18/30 | 27/30 | 14/90 | 817 | 64.2 | 129 | 15.6 | 4096 | 1113 | 1225 |
 | 4k | 798 MB | Exynos 2400 | 13/30 | 17/30 | 26/30 | 11/90 | 460 | 34.0 | 195 | 29.4 | 4096 | 1126 | 1213 |
+| 4k | 798 MB | Exynos 2400 repeat | 15/30 | 21/30 | 27/30 | 10/90 | 516 | 37.5 | 180 | 26.7 | 4096 | 1126 | 1217 |
 | 8k | 802 MB | D9400 | 17/30 | 18/30 | 26/30 | 11/90 | 353 | 26.1 | 259 | 38.3 | 8192 | 1226 | 1333 |
 | 16k | 810 MB | D9400 | 13/30 | 20/30 | 27/30 | 12/90 | 354 | 25.9 | 262 | 38.6 | 16384 | - | 993 |
 | 16k | 810 MB | D9400 repeat | 14/30 | 16/30 | 28/30 | 12/90 | 368 | 26.2 | 259 | 38.2 | 16384 | 1416 | 1528 |
@@ -20,12 +21,13 @@ Each cell is one export of one model at one window on one phone, over the same 9
 | 32k | 827 MB | Tensor G5 | 16/30 | 18/30 | 27/30 | 13/90 | 862 | 79.5 | 98 | 12.6 | 32768 | - | 1896 |
 | 32k | 827 MB | Exynos 2400 | 14/30 | 20/30 | 25/30 | 11/90 | 462 | 37.1 | 184 | 27.0 | 32768 | - | 1883 |
 
-Run-to-run control: the same file run twice on the D9400, replies byte-identical:
+Run-to-run control: the same file run twice on the same phone, replies byte-identical:
 
-| Window | identical replies |
-|---|---|
-| 16k | raw 13/90, calls 23/30, content 20/90 |
-| 32k | raw 15/90, calls 25/30, content 18/90 |
+| Window | Phone | identical replies |
+|---|---|---|
+| 4k | Exynos 2400 | raw 7/90, calls 23/30, content 11/90 |
+| 16k | D9400 | raw 13/90, calls 23/30, content 20/90 |
+| 32k | D9400 | raw 15/90, calls 25/30, content 18/90 |
 
 Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):
 
@@ -42,6 +44,7 @@ Replies identical to the 32k export, per window (raw stream and shown content ov
 | Window | File | Phone | GSM8K | IFEval | BFCL | Capped | Prefill ms | ms/token | Prefill tok/s | Decode tok/s | Ran at | RSS after load MB | RSS at end MB |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2k | 1783 MB | D9400 | 15/30 | 4/30 | 24/30 | 42/90 | 882 | 60.3 | 108 | 16.6 | 2048 | 1979 | 1958 |
+| 2k | 1783 MB | D9400 repeat | 13/30 | 6/30 | 24/30 | 43/90 | 872 | 59.6 | 110 | 16.8 | 2048 | 1984 | 1871 |
 | 4k | 1786 MB | 8 Elite | 13/30 | 5/30 | 22/30 | 44/90 | 1197 | 55.4 | 72 | 18.0 | 4096 | 2058 | 2194 |
 | 4k | 1786 MB | Tensor G5 | 17/30 | 6/30 | 24/30 | 38/90 | 1066 | 92.2 | 88 | 10.8 | 4096 | 2054 | 2221 |
 | 4k | 1786 MB | Exynos 2400 | 10/30 | 5/30 | 23/30 | 46/90 | 1142 | 83.5 | 81 | 12.0 | 4096 | 2136 | 2189 |
@@ -49,6 +52,12 @@ Replies identical to the 32k export, per window (raw stream and shown content ov
 | 32k | 1815 MB | 8 Elite | 13/30 | 5/30 | 25/30 | 42/90 | 1096 | 49.7 | 81 | 20.1 | 32768 | 2950 | 3082 |
 | 32k | 1815 MB | Tensor G5 | 19/30 | 4/30 | 25/30 | 37/90 | 968 | 81.1 | 101 | 12.3 | 32768 | 2962 | 3120 |
 | 32k | 1815 MB | Exynos 2400 | 18/30 | 3/30 | 25/30 | 39/90 | 1085 | 84.5 | 80 | 11.8 | 32768 | 3032 | 3084 |
+
+Run-to-run control: the same file run twice on the same phone, replies byte-identical:
+
+| Window | Phone | identical replies |
+|---|---|---|
+| 2k | D9400 | raw 0/90, calls 24/30, content 29/90 |
 
 Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):
 
@@ -58,6 +67,28 @@ Replies identical to the 32k export, per window (raw stream and shown content ov
 | 8 Elite | - | raw 0/90, calls 25/30, content 29/90 |
 | Tensor G5 | - | raw 0/90, calls 27/30, content 30/90 |
 | Exynos 2400 | - | raw 0/90, calls 25/30, content 30/90 |
+
+## LFM2.5-2.6B-8da4w (cap 2048)
+
+| Window | File | Phone | GSM8K | IFEval | BFCL | Capped | Prefill ms | ms/token | Prefill tok/s | Decode tok/s | Ran at | RSS after load MB | RSS at end MB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2k | 1783 MB | D9400 | 24/30 | 21/30 | - | 14/60 | 693 | 62.8 | 105 | 15.9 | 2048 | 1959 | 1783 |
+| 4k | 1786 MB | 8 Elite | 25/30 | 19/30 | - | 11/60 | 866 | 51.1 | 82 | 19.6 | 4096 | 2055 | 2139 |
+| 4k | 1786 MB | Tensor G5 | 23/30 | 21/30 | - | 13/60 | 776 | 81.9 | 106 | 12.2 | 4096 | 2055 | 2188 |
+| 4k | 1786 MB | Exynos 2400 | 25/30 | 21/30 | - | 13/60 | 893 | 87.1 | 84 | 11.5 | 4096 | 2136 | 2187 |
+| 32k | 1815 MB | D9400 | 26/30 | 21/30 | - | 10/60 | 621 | 59.5 | 113 | 16.8 | 32768 | 2922 | 2262 |
+| 32k | 1815 MB | 8 Elite | 24/30 | 21/30 | - | 15/60 | 982 | 54.5 | 80 | 18.4 | 32768 | 2950 | 2626 |
+| 32k | 1815 MB | Tensor G5 | 28/30 | 18/30 | - | 12/60 | 842 | 102.4 | 80 | 9.8 | 32768 | 2962 | 3123 |
+| 32k | 1815 MB | Exynos 2400 | 27/30 | 19/30 | - | 10/60 | 924 | 87.8 | 82 | 11.4 | 32768 | 3028 | 3080 |
+
+Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):
+
+| Phone | 2k | 4k |
+|---|---|---|
+| D9400 | raw 0/60, calls 0/0, content 0/60 | - |
+| 8 Elite | - | raw 0/60, calls 0/0, content 0/60 |
+| Tensor G5 | - | raw 0/60, calls 0/0, content 0/60 |
+| Exynos 2400 | - | raw 0/60, calls 0/0, content 0/60 |
 
 ## Qwen3-1.7B-8da4w
 
@@ -73,11 +104,11 @@ Replies identical to the 32k export, per window (raw stream and shown content ov
 | 32k | 1348 MB | Tensor G5 | 16/30 | 14/30 | 25/30 | 8/90 | 844 | 94.0 | 139 | 10.6 | 32768 | 8499 | 8602 |
 | 32k | 1348 MB | Exynos 2400 | INCOMPLETE: process ended after 7/90 prompts | | | | | | | | 32768 | 6396 | 6380 (last observed) |
 
-Run-to-run control: the same file run twice on the D9400, replies byte-identical:
+Run-to-run control: the same file run twice on the same phone, replies byte-identical:
 
-| Window | identical replies |
-|---|---|
-| 2k | raw 31/90, calls 30/30, content 31/90 |
+| Window | Phone | identical replies |
+|---|---|---|
+| 2k | D9400 | raw 31/90, calls 30/30, content 31/90 |
 
 Replies identical to the 32k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):
 

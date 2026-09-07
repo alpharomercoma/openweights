@@ -1,0 +1,57 @@
+== upload done 12:39
+gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-4k.pte
+gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-4k.tokenizer.json
+gs://openweights-eval-models/LFM2.5-2.6B-8da4w-32k.pte
+gs://openweights-eval-models/LFM2.5-2.6B-8da4w-32k.tokenizer.json
+gs://openweights-eval-models/LFM2.5-2.6B-8da4w-4k.pte
+gs://openweights-eval-models/LFM2.5-2.6B-8da4w-4k.tokenizer.json
+gs://openweights-eval-models/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.pte
+gs://openweights-eval-models/react-native-executorch-lfm-2.5-lfm_2_5_1_2b_xnnpack_8da4w.tokenizer.json
+== all reruns returned 12:39
+-> repeat-exynos- LFM2.5-1.2B-Instruct-8da4w-4k [bfcl+gsm8k cap=0 skip=0] 12:40
+-> tensor- LFM2.5-2.6B-8da4w-4k [gsm8k cap=2048 skip=0] 12:40
+-> elite- LFM2.5-2.6B-8da4w-4k [gsm8k cap=2048 skip=0] 12:40
+ok repeat-exynos- LFM2.5-1.2B-Instruct-8da4w-4k [bfcl+gsm8k skip=0] 12:55: 60 prompts, complete
+-> repeat-exynos- LFM2.5-1.2B-Instruct-8da4w-4k [ifeval cap=0 skip=0] 12:55
+ok repeat-exynos- LFM2.5-1.2B-Instruct-8da4w-4k [ifeval skip=0] 13:05: 30 prompts, complete
+-> exynos- LFM2.5-2.6B-8da4w-4k [gsm8k cap=2048 skip=0] 13:05
+ok elite- LFM2.5-2.6B-8da4w-4k [gsm8k skip=0] 13:09: 30 prompts, complete
+-> elite- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=0] 13:09
+FAILED elite- LFM2.5-2.6B-8da4w-4k [ifeval skip=0] 13:19
+-> elite- LFM2.5-2.6B-8da4w-32k [gsm8k cap=2048 skip=0] 13:19
+== quota window, resuming 15:05
+-> elite- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=0] 15:05
+-> exynos- LFM2.5-2.6B-8da4w-4k [gsm8k cap=2048 skip=29] 15:05
+-> tensor- LFM2.5-2.6B-8da4w-4k [gsm8k cap=2048 skip=29] 15:05
+ok exynos- LFM2.5-2.6B-8da4w-4k [gsm8k skip=29] 15:12: 1 prompts, complete
+-> exynos- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=0] 15:12
+ok tensor- LFM2.5-2.6B-8da4w-4k [gsm8k skip=29] 15:13: 1 prompts, complete
+-> tensor- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=0] 15:13
+ok elite- LFM2.5-2.6B-8da4w-4k [ifeval skip=0] 15:51: 29 prompts, exhausted
+-> elite- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=29] 15:51
+ok elite- LFM2.5-2.6B-8da4w-4k [ifeval skip=29] 15:58: 1 prompts, complete
+-> elite- LFM2.5-2.6B-8da4w-32k [gsm8k cap=2048 skip=0] 15:58
+ok exynos- LFM2.5-2.6B-8da4w-4k [ifeval skip=0] 15:59: 18 prompts, exhausted
+-> exynos- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=18] 15:59
+ok tensor- LFM2.5-2.6B-8da4w-4k [ifeval skip=0] 15:59: 23 prompts, exhausted
+-> tensor- LFM2.5-2.6B-8da4w-4k [ifeval cap=2048 skip=23] 15:59
+ok tensor- LFM2.5-2.6B-8da4w-4k [ifeval skip=23] 16:25: 7 prompts, complete
+-> tensor- LFM2.5-2.6B-8da4w-32k [gsm8k cap=2048 skip=0] 16:25
+ok exynos- LFM2.5-2.6B-8da4w-4k [ifeval skip=18] 16:27: 12 prompts, complete
+-> exynos- LFM2.5-2.6B-8da4w-32k [gsm8k cap=2048 skip=0] 16:27
+ok elite- LFM2.5-2.6B-8da4w-32k [gsm8k skip=0] 16:35: 30 prompts, complete
+-> elite- LFM2.5-2.6B-8da4w-32k [ifeval cap=2048 skip=0] 16:35
+ok tensor- LFM2.5-2.6B-8da4w-32k [gsm8k skip=0] 17:11: 29 prompts, exhausted
+-> tensor- LFM2.5-2.6B-8da4w-32k [gsm8k cap=2048 skip=29] 17:11
+ok exynos- LFM2.5-2.6B-8da4w-32k [gsm8k skip=0] 17:14: 30 prompts, complete
+-> exynos- LFM2.5-2.6B-8da4w-32k [ifeval cap=2048 skip=0] 17:14
+ok elite- LFM2.5-2.6B-8da4w-32k [ifeval skip=0] 17:19: 30 prompts, complete
+ok tensor- LFM2.5-2.6B-8da4w-32k [gsm8k skip=29] 17:19: 1 prompts, complete
+-> tensor- LFM2.5-2.6B-8da4w-32k [ifeval cap=2048 skip=0] 17:19
+ok exynos- LFM2.5-2.6B-8da4w-32k [ifeval skip=0] 17:59: 18 prompts, exhausted
+-> exynos- LFM2.5-2.6B-8da4w-32k [ifeval cap=2048 skip=18] 17:59
+ok tensor- LFM2.5-2.6B-8da4w-32k [ifeval skip=0] 18:05: 12 prompts, exhausted
+-> tensor- LFM2.5-2.6B-8da4w-32k [ifeval cap=2048 skip=12] 18:05
+ok exynos- LFM2.5-2.6B-8da4w-32k [ifeval skip=18] 18:26: 12 prompts, complete
+ok tensor- LFM2.5-2.6B-8da4w-32k [ifeval skip=12] 18:51: 18 prompts, complete
+== all reruns returned 18:51

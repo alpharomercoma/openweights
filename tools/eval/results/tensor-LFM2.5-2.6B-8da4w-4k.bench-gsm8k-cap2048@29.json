@@ -1,0 +1,31 @@
+{
+  "suite": "benchmark",
+  "model": "LFM2.5-2.6B-8da4w-4k",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 thinking=false repeatPenalty=default",
+  "prompts_seed": 7,
+  "context_size": 4096,
+  "rss_mb_after_load": 2055,
+  "rss_mb": 2138,
+  "completed": 1,
+  "ok": 1,
+  "errors": 0,
+  "skipped": 0,
+  "budget_exhausted": false,
+  "cases": [
+    {
+      "id": "gsm8k-1291",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Here is the step-by-step solution:\n\n1.  **Find the number of pens George has:** The problem states that George has 18 pens.\n2.  **Find the number of pens Timothy has:** Timothy has three times as many pens as George. So, we calculate $3 \\times 18 = 54$. Timothy has 54 pens.\n3.  **Find the number of pens Sarah has:** Sarah has half as many pens as Timothy. So, we calculate $\\frac{54}{2} = 27$. Sarah has 27 pens.\n\n#### 27",
+      "reasoning_chars": 1097,
+      "raw": "<think>The user wants me to solve a math word problem step by step.\n\n**1. Identify the given information:**\n*   George has 18 pens.\n*   Timothy has three times the number of pens George owns.\n*   Sarah has half as many pens as Timothy.\n\n**2. Calculate the number of pens George has:**\n*   George = 18 pens.\n\n**3. Calculate the number of pens Timothy has:**\n*   Timothy = 3 * (George's pens)\n*   Timothy = 3 * 18\n*   Calculation: 3 * 10 = 30, 3 * 8 = 24. 30 + 24 = 54.\n*   So, Timothy has 54 pens.\n\n**4. Calculate the number of pens Sarah has:**\n*   Sarah = (1\/2) * (Timothy's pens)\n*   Sarah = 0.5 * 54\n*   Calculation: 54 \/ 2 = 27.\n\n**5. Final check:**\n*   George: 18\n*   Timothy: 3 * 18 = 54\n*   Sarah: 54 \/ 2 = 27\n*   The question asks for Sarah's number of pens.\n*   The answer is 27.\n\n**6. Format the output:**\n*   Step-by-step explanation.\n*   Final answer on the last line in the format `#### <number>`.\n\n**Drafting the response:**\n*   Step 1: State George's pens (18).\n*   Step 2: Calculate Timothy's pens (3 * 18 = 54).\n*   Step 3: Calculate Sarah's pens (54 \/ 2 = 27).\n*   Final Answer: #### 27<\/think>Here is the step-by-step solution:\n\n1.  **Find the number of pens George has:** The problem states that George has 18 pens.\n2.  **Find the number of pens Timothy has:** Timothy has three times as many pens as George. So, we calculate $3 \\times 18 = 54$. Timothy has 54 pens.\n3.  **Find the number of pens Sarah has:** Sarah has half as many pens as Timothy. So, we calculate $\\frac{54}{2} = 27$. Sarah has 27 pens.\n\n#### 27",
+      "calls": [],
+      "prompt_tokens": 67,
+      "generated_tokens": 475,
+      "prefill_ms": 945,
+      "decode_ms": 33506,
+      "wall_ms": 34482
+    }
+  ]
+}

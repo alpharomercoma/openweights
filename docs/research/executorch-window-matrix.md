@@ -1,7 +1,7 @@
 # Does the exported context window matter? ExecuTorch on four chips
 
-*2026-09-07. The question, the design as it was actually run, what was found, and what it
-cost. The rendered tables are in [window-matrix.md](window-matrix.md); this note reads
+*2026-09-07, reruns added the same evening. The question, the design as it was actually run,
+what was found, and what it cost. The rendered tables are in [window-matrix.md](window-matrix.md); this note reads
 them. Raw and graded reports: `tools/eval/results/*8da4w-*k*.json`; quarantined cells:
 `tools/eval/results/invalid-nobos/`.*
 
@@ -18,8 +18,8 @@ Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x
 - **No window effect on answers or tool calls was found that stands out from the runtime's
   own run-to-run variation.** Between any two windows of LFM2.5-1.2B on the same phone, the
   raw token streams agree on 12 to 19 of 90 prompts. Running the *same file twice* on the
-  same phone agrees on 13 to 15 of 90. Parsed BFCL tool calls agree on 24 to 28 of 30 between
-  windows and 23 to 25 of 30 between repeats. Grades swing by up to five prompts per set
+  same phone agrees on 13 to 15 of 90 on the Dimensity and 7 of 90 on the Exynos 2400. Parsed
+  BFCL tool calls agree on 24 to 28 of 30 between windows and 23 to 25 of 30 between repeats. Grades swing by up to five prompts per set
   between runs of the *same* file (Qwen3 2k on the Poco: GSM8K 20 then 17, IFEval 15 then
   18) and by similar amounts between windows in both directions (1.2B GSM8K on the Poco: 17,
   16, 17, 13, 12 from 2k to 32k; 2.6B GSM8K on the Exynos: 10 at 4k, 18 at 32k). The
@@ -45,14 +45,24 @@ Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x
   the 32k export sat at 6.1 to 8.5 GB resident after load. On the Galaxy S25 Ultra and S24+
   Samsung's Heimdall memory guard killed the test process ("Trigger Global kill before GC,
   Usage 8.67 GB, Threshold 6 GB", in the pulled logcats) after 7 to 12 prompts; on the
-  12 GB Poco it ended after 6 prompts with the cause not captured; only the 16 GB Pixel 10
-  Pro XL finished all 90. The 2k export ran everywhere. Those cells are marked incomplete in
+  12 GB Poco it ended after 6 prompts, and a rerun with logcat attached ended after 7 the same
+  way: MIUI's ActivityManager force-stopped it for "used too many pss resource, pss used
+  8.65 GB, threshold 6 GB". Two vendors, the same 6 GB rule. Only the 16 GB Pixel 10 Pro XL
+  finished all 90. The 2k export ran everywhere. Those cells are marked incomplete in
   the table and carry no grade or timing.
-- **The 2.6B rows measure a deployed configuration, not the model.** With the start token
-  in place it reads prompts correctly, but its own template makes it reason first and 16 of
-  30 GSM8K and 26 of 30 IFEval replies ran to the 640-token cap without answering. Its
-  GSM8K and IFEval grades and raw identity are cap-censored; its BFCL calls (22 to 25 of
-  30 at every window on every phone), load success, memory and probe speed are usable.
+- **The 2.6B has two rows per cell.** At the suite's 640-token cap its own template makes it
+  reason first and 16 of 30 GSM8K and 26 of 30 IFEval replies ran out without answering:
+  those rows are cap-censored and kept for their BFCL calls (22 to 25 of 30 at every window
+  on every phone), memory and speed. Rerun at a 2048 cap, GSM8K and IFEval only, it scores
+  23 to 28 of 30 and 18 to 21 of 30 on every phone and window, moving in both directions
+  between windows (GSM8K 24 then 26 on the Dimensity, 25 then 24 on the 8 Elite, 23 then 28
+  on the Tensor G5, 25 then 27 on the Exynos), while its same-file repeat at the old cap moved
+  GSM8K by 2 and IFEval by 2 with BFCL unchanged at 24.
+- **The one window effect found is a fit, not a grade.** At the 2048 cap on the Dimensity,
+  14 of the 2.6B's 60 GSM8K and IFEval replies at 2k ran into the window itself, prompt plus
+  reply at 2047 tokens, and were cut there; at 32k the same prompts hit only the reply cap,
+  10 of 60. The grades hardly moved (24 against 26, 21 against 21), but a 2k export cannot
+  hold a reasoning reply of that length, and the Capped column now counts either cut.
 - **On the original question:** the evidence does not justify launching the full 5 x 5 x 4
   sweep. What it supports is an adaptive policy: compute the KV cost per window from the
   architecture, screen the endpoints (smallest and largest window) per model and chip, and
@@ -64,9 +74,9 @@ Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x
 
 | | Poco (Dimensity 9400) | 8 Elite, Tensor G5, Exynos 2400 (Test Lab) |
 |---|---|---|
-| LFM2.5-1.2B | 2k, 4k, 8k, 16k, 32k, full 90 prompts; 16k and 32k run twice | 4k and 32k, full 90 |
-| LFM2.5-2.6B | 2k and 32k, full 90 (8k, 16k dropped: 55 min per file once the BOS fix made it reason to the cap) | 4k and 32k, full 90 |
-| Qwen3-1.7B | 2k and 32k, full 90; 2k run twice | 2k and 32k, full 90 |
+| LFM2.5-1.2B | 2k, 4k, 8k, 16k, 32k, full 90 prompts; 16k and 32k run twice | 4k and 32k, full 90; 4k run twice on the Exynos 2400 |
+| LFM2.5-2.6B | 2k and 32k, full 90 at the 640 cap, 2k run twice (8k, 16k dropped: 55 min per file once the BOS fix made it reason to the cap); 2k and 32k again, GSM8K and IFEval at a 2048 cap | 4k and 32k, full 90 at the 640 cap; 4k and 32k again, GSM8K and IFEval at a 2048 cap |
+| Qwen3-1.7B | 2k and 32k, full 90; 2k run twice; 32k run twice to catch the kill | 2k and 32k, full 90 |
 | Speed probe | all twelve files, two interleaved passes, three turns each, cooled below 42 C and awake before each load | not run |
 
 Every file was loaded at its own exported window (`context=0`), greedy, thinking off,
@@ -122,6 +132,10 @@ wakes the phone and holds it awake; the thermal service's first "CPU" row is a c
   an empty call list in every run and would inflate it.
 - Cells marked INCOMPLETE are runs whose process ended before its set did, with no error and
   no time box recorded; they show the last observed resident memory and nothing else.
+- The 2048-cap rerun is its own section (`(cap 2048)`), not merged into the 640-cap rows: a
+  different reply cap is a different condition. Its cloud sets ran one set per Test Lab launch
+  and were continued from where the 38-minute budget cut them (`@n` files), which is also why
+  the day ran into Test Lab's quota of 50 physical-device tests and paused for two hours.
 
 ## Review
 
@@ -134,7 +148,14 @@ only, that the Qwen3 32k cells be shown as incomplete with their termination cau
 that the 2.6B grades be labelled cap-censored, that the two RSS figures be separated, and
 that the verdict on the full sweep be phrased as an adaptive policy rather than a nil
 effect; this note and the renderer follow that. The termination cause was then confirmed
-from the logcats for the two Samsung phones.
+from the logcats for the two Samsung phones, and later for the Poco.
+
+After the first report an audit of every cell for failures and noise led to three reruns, all
+now in the tables: the 2.6B at a cap it can answer under, the Poco's Qwen3 32k with logcat
+attached, and same-file repeats for the 2.6B and for one cloud phone. The cloud suite
+timings, which differ up to threefold between launches of the same cell on the Tensor G5,
+were judged noisy but not worth rerunning: the fix is a paired probe on those phones, not a
+repeat of the suite.
 
 ## What is where
 
@@ -144,9 +165,12 @@ from the logcats for the two Samsung phones.
   carries a `config.json` in the variants form Discover reads, and a README with sizes and
   the KV cost per window.
 - Numbers: `docs/research/window-matrix.md` (rendered), `tools/eval/results/` (raw and
-  graded JSON, `repeat-` prefix for the second runs, `invalid-nobos/` for the quarantined
-  cells), `~/ow-models/etexport/matrix/results-windows.log` (probe).
-- Harness: `tools/eval/bench/run_cloud_windows.sh`, `window_report.py`, `run_local.sh`
-  (`CONTEXT=0`, `CLASSES`, `PREFIX`), `ExecuTorchBenchmarkEval` (`-e context`).
+  graded JSON, `repeat-` prefix for the second runs, `-cap2048` for the capped rerun, `@n`
+  for a continued set, `invalid-nobos/` for the quarantined cells, `qwen3-32k-poco-rerun/`
+  for the kill evidence), `~/ow-models/etexport/matrix/results-windows.log` (probe).
+- Page: <https://alpharomercoma.github.io/openweights/window.html>, from `play/site/window.html`.
+- Harness: `tools/eval/bench/run_cloud_windows.sh`, `run_cloud_rerun.sh` (one set per
+  launch, continued with `skip`), `window_report.py`, `run_local.sh` (`CONTEXT=0`, `CLASSES`,
+  `PREFIX`, `SETS`, `CAP`), `ExecuTorchBenchmarkEval` (`-e context`, `-e cap`).
 - Cloud copies of the variants were deleted from the Test Lab bucket when the runs
   finished; Test Lab itself provisions nothing persistent.

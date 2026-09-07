@@ -62,7 +62,8 @@ def load(root: Path):
         if cap:
             base += f" (cap {cap.group(1)})"
         key = (base, window, device_of(path.name))
-        meta.setdefault(key, {"expected": 0, "budget_exhausted": False})
+        meta.setdefault(key, {"expected": 0, "budget_exhausted": False,
+                              "cap": int(cap.group(1)) if cap else None})
         for k in ("context_size", "rss_mb", "rss_mb_after_load"):
             if r.get(k) and r.get(k) != -1:
                 meta[key][k] = r[k]
@@ -125,7 +126,7 @@ def render(cells, meta, sizes) -> str:
            "Prefill ms is the runtime's prefill time for the whole prompt (the engine-side part of time to first token, "
            "not a first-token timestamp); ms/token is decode time over generated tokens, which differ per cell "
            "because the replies differ, so it is a per-cell figure and not a paired speed comparison. Capped is "
-           "how many completed replies ran to the token cap (640, or 384 for BFCL) and so never finished; a set "
+           "how many completed replies ran to the token cap (640, or 384 for BFCL; 2048 in the capped rerun) or to the edge of the window itself, and so never finished; a set "
            "whose replies are mostly capped is cap-censored and its grade says little. RSS is the test process\x27s "
            "resident set right after the model loaded and at the end of the run.", ""]
     for model in models:
@@ -141,7 +142,7 @@ def render(cells, meta, sizes) -> str:
                     continue
                 ok = [c for c in cases.values() if c.get("status") == "ok"]
                 m = meta.get((model, w, d), {})
-                size = sizes.get(f"{model}-{w // 1024}k")
+                size = sizes.get(f"{model.split(' (')[0]}-{w // 1024}k")
                 expected = m.get("expected", 90)
                 if len(cases) < expected and not m.get("budget_exhausted"):
                     # The process ended before the set did, with no time box and no error
@@ -151,7 +152,12 @@ def render(cells, meta, sizes) -> str:
                         f"INCOMPLETE: process ended after {len(cases)}/{expected} prompts | | | | | | | | "
                         f"{m.get('context_size', '-')} | {m.get('rss_mb_after_load', '-')} | {m.get('rss_mb', '-')} (last observed) |")
                     continue
-                capped = sum(1 for c in ok if c.get("generated_tokens", 0) >= CAP_OF.get(c["set"], 640) - 1)
+                # A reply is cut either by its cap or by the window: prompt plus reply cannot
+                # exceed the exported window, and at 2k a reasoning reply meets that edge first.
+                cap_of = lambda c: m.get("cap") or CAP_OF.get(c["set"], 640)
+                win = m.get("context_size") or w
+                capped = sum(1 for c in ok if c.get("generated_tokens", 0) >= cap_of(c) - 1
+                             or c.get("prompt_tokens", 0) + c.get("generated_tokens", 0) >= win - 1)
                 scores = []
                 for s, _ in SETS:
                     graded = [c for c in cases.values() if c["set"] == s and c.get("grade") in ("pass", "fail")]

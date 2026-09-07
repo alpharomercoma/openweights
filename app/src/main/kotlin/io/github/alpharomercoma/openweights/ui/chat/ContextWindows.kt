@@ -20,8 +20,10 @@ import android.util.Log
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.device.DeviceProfiler
 import io.github.alpharomercoma.openweights.core.device.FitEstimator
+import io.github.alpharomercoma.openweights.core.device.FitVerdict
 import io.github.alpharomercoma.openweights.core.hub.gguf.ByteWindowSource
 import io.github.alpharomercoma.openweights.core.hub.gguf.GgufHeaderParser
+import io.github.alpharomercoma.openweights.model.ModelStore
 import java.io.File
 import java.io.RandomAccessFile
 import javax.inject.Inject
@@ -39,6 +41,7 @@ import javax.inject.Singleton
 class ContextWindows @Inject constructor(
     private val estimator: FitEstimator,
     private val profiler: DeviceProfiler,
+    private val store: ModelStore,
 ) {
     /**
      * Reads the model's own header and returns the window to open it with.
@@ -53,11 +56,26 @@ class ContextWindows @Inject constructor(
      * is a reason to be careful, not a reason to refuse a model that may run perfectly well.
      */
     suspend fun defaultFor(model: File, projector: File?): Int = runCatching {
-        // A compiled model's window is baked into the export and enforced by the runtime;
-        // there is no header here to read and parsing one as GGUF only put a stack trace
-        // in the log on every load. The engine clamps to the export's own limit either way.
+        // A compiled model's window is baked into the export and enforced by the runtime,
+        // so the automatic answer is the export's own window: that is what Discover showed
+        // before the download, and the file allocates its whole cache at load whatever is
+        // asked, so asking for less saves nothing. This used to return the 4096 default,
+        // which the engine then took as a ceiling: a 32k export opened at 4096 and the top
+        // bar said so (2026-09-07, LFM2.5 32k). The one exception is a file whose weights
+        // alone will not fit this phone, where the old default is kept so the load fails
+        // with the message the engine writes rather than with a kill.
         if (model.extension.equals("pte", ignoreCase = true)) {
-            return ModelLoadParams.DEFAULT_CONTEXT_LENGTH
+            val exported = store.exportedWindow(model)
+                ?: return ModelLoadParams.DEFAULT_CONTEXT_LENGTH
+            val fit = estimator.estimateCompiled(
+                device = profiler.profile(),
+                fileSizeBytes = model.length(),
+            )
+            return if (fit.verdict == FitVerdict.WONT_RUN) {
+                ModelLoadParams.DEFAULT_CONTEXT_LENGTH
+            } else {
+                exported
+            }
         }
         val metadata = GgufHeaderParser(model.readHeadOnce()).parse()
         estimator.defaultContextLength(

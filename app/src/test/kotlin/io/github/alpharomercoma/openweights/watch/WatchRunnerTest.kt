@@ -87,7 +87,11 @@ class WatchRunnerTest {
             modelStore = ModelStore(context),
             preferences = ModelPreferencesRepository(context),
             thermal = ThermalPolicy(context, DeviceProfiler(context)),
-            windows = ContextWindows(FitEstimator(), DeviceProfiler(context)),
+            windows = ContextWindows(
+                FitEstimator(),
+                DeviceProfiler(context),
+                ModelStore(context),
+            ),
         )
         runner = WatchRunner(
             watches = watches,

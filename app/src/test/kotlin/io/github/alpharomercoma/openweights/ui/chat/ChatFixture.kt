@@ -158,7 +158,11 @@ abstract class ChatFixture {
                 modelStore = ModelStore(context),
                 preferences = ModelPreferencesRepository(context),
                 thermal = ThermalPolicy(context, DeviceProfiler(context)),
-                windows = ContextWindows(FitEstimator(), DeviceProfiler(context)),
+                windows = ContextWindows(
+                    FitEstimator(),
+                    DeviceProfiler(context),
+                    ModelStore(context),
+                ),
             ),
             compactor = ConversationCompactor(engine, CompactionPolicy()),
             staging = Staging(

@@ -90,7 +90,7 @@ class HubCompiledLayoutsTest {
     fun `every row on the compiled shortlist has something to download`() = runBlocking {
         val backends = setOf(CompiledBackend.XNNPACK, CompiledBackend.UNKNOWN)
         RECOMMENDED.filter {
-            "executorch" in it.lowercase() || "INT8-INT4" in it
+            "executorch" in it.lowercase() || "INT8-INT4" in it || "heretic" in it
         }.forEach { repoId ->
             val detail = client.detail(repoId)
             val offered = detail.compiled.filter { file ->

@@ -658,7 +658,19 @@ class HuggingFaceClient @Inject constructor(
  *
  * So the shortlist selects on the axis a user actually meets first, which is whether the
  * thing answers, and treats routing as the second requirement rather than the first. That
- * axis is measured here on this hardware rather than taken from a card:
+ * axis is measured here on this hardware rather than taken from a card.
+ *
+ * **Reset on 2026-09-07 to six rows, four of them our own ExecuTorch exports at a 32k
+ * window** (`docs/research/executorch-window-matrix.md`, charted at
+ * https://alpharomercoma.github.io/openweights/window.html). The window matrix showed the
+ * exported window changes memory at load and nothing else that could be told from run-to-run
+ * variation, so the 2k publisher exports lost their reason to be here: 2k is smaller than
+ * this app's tool prefix. The GGUF rows of the same family went with them, since the compiled
+ * file is the same weights at the same quality and up to twice the speed; the 8B-A1B and the
+ * VL 3B stay a search away rather than a default; and the Qwen3 compiled row is gone because
+ * its full-attention cache costs 224 KB a token, which at any useful window is a kill on a
+ * 12 GB phone. What follows is the history of how the earlier list was chosen, kept because
+ * the measurements still stand:
  *
  * - **LFM2.5 1.2B Instruct** leads, as the smallest thing here that still behaves like the
  *   2.6B rather than like a 0.6B. Same family, same conversion by the same publisher, and
@@ -732,56 +744,19 @@ class HuggingFaceClient @Inject constructor(
  * missing repeat penalty. A fast model that does not finish is not a recommendation.
  */
 val RECOMMENDED = listOf(
-    "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
-    "LiquidAI/LFM2.5-2.6B-GGUF",
-    // Added on a routing number rather than on its parameter count, which is what the
-    // paragraph above asks for and what the 8B is easiest to get wrong about.
-    //
-    // On a 142 case agentic suite, greedy, prompt rendered by the model's own template, it
-    // scores 134/142 against the 2.6B's 127/142, and 138/142 once the tool prompt tells it
-    // to answer from its own knowledge. It is the only model measured here that got every
-    // multi-turn case right, 30 of 30, and it did not miss a single out-of-scope request.
-    // Those are the two things a small model usually fails at, so the size is buying
-    // exactly what it should.
-    //
-    // It is a mixture of experts, 32 of them with 4 used per token, so a phone pays roughly
-    // a 1B model's arithmetic per token for an 8B model's judgement. What it does not
-    // escape is memory: every expert has to be resident, and Q4_K_M is 4.8 GB, so this
-    // belongs on a flagship and the fit card is what says so per device. There is no QAD
-    // checkpoint at this size, unlike the 1.2B and 2.6B, so it cannot take the Q4_0 fast
-    // path without the quantisation damage that made plain Q4_0 unusable elsewhere.
-    //
-    // The evidence is not one-sided and the list should say so. On a second suite of 48
-    // cases built from this app's own eight tools it scored 38/48 against the 2.6B's 39,
-    // and it reaches for web_search on general knowledge questions more often, six of
-    // twelve against four.
-    //
-    // Separating the two rates changes the reading, though, and it is the reason this is
-    // listed at all. Of the cases where a tool IS the right answer it calls one on 18 of
-    // 18, the same as the 2.6B. Of the cases where no tool is right it calls one on 8 of
-    // 30, against the 2.6B's 14. So it has the 2.6B's recall and half its false alarm
-    // rate, which is a strictly better decision boundary rather than a quieter model:
-    // d' of 2.95 against 2.41, and against 1.05 for the 1.2B, whose apparent restraint is
-    // only a lower call rate and costs it a third of the calls it should make.
-    //
-    // The right pick for work that runs several steps deep. Its weakness is narrow and
-    // known: it will look up a fact it already has.
-    //
-    // One trap if it is ever made the default. The tool descriptions in core:tools were
-    // rewritten against the 2.6B and gain 5.6 points there, but they cost this model 7.8:
-    // 135/142 against 127/142, with out-of-scope handling falling from 8/8 to 4/8. Wording
-    // that helps a smaller model is not neutral on a larger one, so a change of default
-    // model means re-running the suite rather than assuming the prompt work carries over.
-    "LiquidAI/LFM2.5-8B-A1B-GGUF",
-    "LiquidAI/LFM2.5-VL-3B-GGUF",
-    "unsloth/Qwen3-1.7B-GGUF",
-    // The compiled rows, in the order the report argues them: the generalist that holds
-    // its score, the fastest model measured on any chip, the 3B that beats its own GGUF
-    // to the first token everywhere.
-    "larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",
-    "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
+    // Our own exports first (the experimentalmachines organisation), both at a 32k window:
+    // the family that measured best here, compiled for the runtime that measured fastest,
+    // with sixteen times the window of the publisher exports they replace. The heretic
+    // pair are the same two models with refusal behaviour removed, the same recipe.
     "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
-    "software-mansion/react-native-executorch-llama-3.2",
+    "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
+    "experimentalmachines/LFM2.5-1.2B-Instruct-heretic",
+    "experimentalmachines/LFM2.5-2.6B-heretic",
+    // The family with eyes, from Liquid AI's own GGUF repository: ships its mmproj
+    // projector beside the weights, which the app pairs automatically.
+    "LiquidAI/LFM2.5-VL-1.6B-GGUF",
+    // The generalist from another family, so the list is not one publisher's opinion.
+    "unsloth/Qwen3-1.7B-GGUF",
 )
 
 /**

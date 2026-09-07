@@ -26,8 +26,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
@@ -147,25 +147,36 @@ fun ModelPickerSheet(
             // Most of the screen, not a fixed 300 dp. Three rows at a time on a list of
             // eight meant scrolling inside a sheet to find a model, which is the one thing
             // a picker exists to avoid; the actions below still fit without scrolling.
-            val listMax = (LocalConfiguration.current.screenHeightDp * LIST_SHARE).dp
-            LazyColumn(
-                modifier = Modifier.weight(1f, fill = false).heightIn(max = listMax),
+            //
+            // A plain column that scrolls, not a lazy list, and capped by a number that
+            // depends on nothing the sheet lays out. The lazy list sat in a weight inside a
+            // sheet that sizes itself to its content, and a lazy list measures only what
+            // fits the height it is given: the sheet's height fed the list's height fed the
+            // sheet's height, and on the phone the open sheet rose and fell without being
+            // touched (2026-09-07). A column knows its full height at once, so the sheet
+            // measures once and stays put. The downloads above take their share off the cap
+            // so the footer never leaves the screen, which is what the weight was for.
+            val screen = LocalConfiguration.current.screenHeightDp
+            val listMax = (screen * LIST_SHARE - downloads.size * DOWNLOAD_ROW_DP)
+                .coerceAtLeast(LIST_MIN_DP.toFloat()).dp
+            Column(
+                modifier = Modifier
+                    .heightIn(max = listMax)
+                    .verticalScroll(rememberScrollState()),
             ) {
                 // Grouped the same way Manage Models groups them, because they are the same
                 // list and a person who learns one order should not have to learn a second.
                 models.byPublisher().forEach { group ->
                     group.heading?.let { heading ->
-                        item(key = "head:$heading") {
-                            PublisherHeading(
-                                heading = heading,
-                                avatarUrl = group.publisher?.let(avatars::get),
-                                // The same inset the rows here use, so the logo and the
-                                // model names share a left edge.
-                                startPadding = ROW_INSET,
-                            )
-                        }
+                        PublisherHeading(
+                            heading = heading,
+                            avatarUrl = group.publisher?.let(avatars::get),
+                            // The same inset the rows here use, so the logo and the
+                            // model names share a left edge.
+                            startPadding = ROW_INSET,
+                        )
                     }
-                    items(group.models, key = { it.file.absolutePath }) { model ->
+                    group.models.forEach { model ->
                         ModelRow(
                             model = model,
                             isActive = model.name == activeName,
@@ -332,6 +343,12 @@ private val TICK = 20.dp
  */
 /** The share of the screen the list may take before it scrolls. */
 private const val LIST_SHARE = 0.55f
+
+/** Roughly one download row, name, bar and caption, taken off the list's cap per download. */
+private const val DOWNLOAD_ROW_DP = 72
+
+/** The list never shrinks below about two rows, whatever is downloading. */
+private const val LIST_MIN_DP = 120
 
 /** The horizontal padding a row in this sheet uses, which the headings match. */
 private val ROW_INSET = 20.dp

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>What the Reruns Changed</title>
+<meta name="description" content="A second pass over the ExecuTorch window matrix: the 2.6B under two reply caps, where long replies were cut, same-file repeats on two phones, and the 6 GB rule that kills Qwen3 32k.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75,600;75,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#EEF0F3; --panel:#F8F9FA; --ink:#1B2430; --ink2:#4A5563; --ink3:#66717F;
+  --line:#D5DAE1; --grid:#E2E6EB; --band:rgba(27,36,48,.06); --soft:rgba(27,36,48,.035);
+  --d9400:#A46400; --elite:#163E7A; --g5:#3E8E5E; --e2400:#A94A7E; --warn:#B4452B; --ok:#CBD3DC;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+    --line:#2B3541; --grid:#232C37; --band:rgba(233,237,242,.08); --soft:rgba(233,237,242,.05);
+    --d9400:#E6A43A; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF; --warn:#E07A5F; --ok:#3A4655;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141A22; --panel:#1B222C; --ink:#E9EDF2; --ink2:#AEB7C3; --ink3:#929CAA;
+  --line:#2B3541; --grid:#232C37; --band:rgba(233,237,242,.08); --soft:rgba(233,237,242,.05);
+  --d9400:#E6A43A; --elite:#8FB3EA; --g5:#5FB57F; --e2400:#CF7AAF; --warn:#E07A5F; --ok:#3A4655;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;padding:28px 22px 56px}
+.wrap{max-width:1240px;margin:0 auto}
+header{border-bottom:1px solid var(--line);padding-bottom:16px}
+h1{font:700 40px/1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h1 span{color:var(--ink3)}
+.sub{color:var(--ink2);max-width:70ch;margin:8px 0 0}
+.crumbs{font-size:13px;color:var(--ink3);margin:0 0 10px}
+.crumbs a{color:var(--ink2)}
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
+.verdict{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px 14px;min-width:0}
+.verdict .k{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
+.verdict .v{font:700 22px/1.15 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;margin:0 0 8px;text-wrap:balance}
+.verdict p{margin:0;color:var(--ink2);font-size:13.5px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin-top:22px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px 18px 12px;min-width:0}
+.panel.wide{grid-column:1 / -1}
+.panel h2{font:600 13px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin:0 0 2px}
+.panel p{margin:0 0 10px;color:var(--ink2);font-size:13.5px;max-width:90ch}
+svg{width:100%;height:auto;display:block;overflow:visible}
+.chart{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:600px){.chart svg{min-width:600px}.chart svg#kill{min-width:900px}.scrollhint{display:block}}
+.scrollhint{display:none;color:var(--ink3);font-size:12px;margin:0 0 6px}
+.mono{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;font-size:13px;color:var(--ink2);align-items:center}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block}
+.bar{width:14px;height:10px;display:inline-block;border-radius:2px}
+.ring{width:13px;height:13px;border-radius:50%;display:inline-block;border:2px solid var(--ink);background:transparent}
+.disc{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--ink)}
+.dash{width:18px;height:0;border-top:2px dashed var(--ink3);display:inline-block}
+.section{margin-top:40px;border-top:1px solid var(--line);padding-top:22px}
+.section h2{font:700 26px/1.1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;margin:0 0 6px}
+.section > p{color:var(--ink2);max-width:72ch;margin:0 0 16px;font-size:14px}
+.tables{display:grid;gap:18px}
+details.tbl{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}
+details.tbl summary{cursor:pointer;padding:14px 18px;font-weight:600;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;align-items:baseline;list-style:none}
+details.tbl summary::-webkit-details-marker{display:none}
+details.tbl summary span{color:var(--ink3);font-weight:500;font-size:13px}
+details.tbl summary::after{content:"Show";color:var(--ink3);font-weight:500;font-size:13px}
+details.tbl[open] summary::after{content:"Hide"}
+details.tbl .inner{padding:0 18px 16px}
+details.tbl .inner p{margin:0 0 12px;color:var(--ink2);font-size:13.5px;max-width:78ch}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+th,td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--grid);vertical-align:top;font-variant-numeric:tabular-nums}
+th{color:var(--ink3);font-weight:600;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+th.l,td.l{text-align:left}
+td.warn{color:var(--warn)}
+tbody tr:hover td{background:var(--soft)}
+.notes{margin-top:22px;color:var(--ink2);font-size:13.5px;max-width:78ch;display:grid;gap:8px}
+.notes b{color:var(--ink);font-weight:600}
+.notes a{color:var(--ink)}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:6px 9px;border-radius:4px;font-size:12.5px;line-height:1.35;white-space:pre-line;z-index:5;max-width:320px}
+.tip[hidden]{display:none}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink3);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 18px}
+footer a{color:var(--ink2)}
+.pt:focus-visible{outline:2px solid var(--elite)}
+@media (max-width:600px){body{padding:20px 14px 40px}h1{font-size:32px}.verdict .v{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <p class="crumbs"><a href="./">OpenWeights</a> &middot; research &middot; 2026-09-07</p>
+  <h1>What the reruns changed <span>&middot; a second pass over the window matrix</span></h1>
+  <p class="sub">After the <a href="window.html">window matrix</a> was published, every cell was checked for a failed or noisy run. Three things were rerun the same day: LFM2.5-2.6B at a higher reply cap, the Poco's Qwen3 32k with a log attached, and same-file repeats on two phones. The prompt sets, graders, greedy decoding and thinking-off setting were kept. The same-file controls used all 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL); the higher-cap rerun used the 60 GSM8K and IFEval prompts.</p>
+</header>
+
+<div class="verdicts">
+  <div class="verdict"><p class="k">The 2.6B</p><p class="v">The 640-token cap suppressed its grades</p><p>At the suite's 640-token cap it scored 10 to 19 of 30 on GSM8K and 3 to 6 on IFEval. At 2048 tokens: 23 to 28 and 18 to 21, on every phone and window.</p></div>
+  <div class="verdict"><p class="k">The window</p><p class="v">At 2k, 14 of 60 replies reached the window limit</p><p>Prompt plus reply stopped at 2047 tokens, the size of the window. At 4k and 32k, on every phone, no reply reached the window; the ones still cut reached the 2048 reply cap.</p></div>
+  <div class="verdict"><p class="k">Same file, twice</p><p class="v">One cloud repeat, the same low agreement</p><p>The Exynos 2400 repeat of the 1.2B agreed with its first run on 7 of 90 raw replies, at least as variable as the four Poco controls. The other cloud phones were not repeated. The 2.6B repeat moved grades by 2 per set and left its tool calls at 24 of 30.</p></div>
+  <div class="verdict"><p class="k">Qwen3 32k</p><p class="v">Both memory guards report a 6 GB threshold</p><p>The Poco rerun with a log was force-stopped by MIUI for using 8.65 GB against a 6 GB threshold, as the two Samsungs were by Heimdall. The Pixel, with no such guard, ran at 8.5 GB and finished.</p></div>
+</div>
+
+<div class="grid">
+  <section class="panel">
+    <h2>The 2.6B under two reply caps</h2>
+    <p>Prompts passed out of 30, per phone and window. The hollow marker is the 640-token cap the suite uses, the solid one the 2048-token rerun. BFCL was not rerun; its 640-cap grades and calls stay in the original rows.</p>
+    <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="caps" viewBox="0 0 640 380" role="group" aria-label="GSM8K and IFEval passed at a 640 and a 2048 token cap, per phone and window"></svg></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <section class="panel">
+    <h2>Where the long replies were cut</h2>
+    <p>The 60 GSM8K and IFEval replies of each 2048-cap cell: finished, cut by the window (prompt plus reply reached the window size), or cut by the reply cap.</p>
+    <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="cuts" viewBox="0 0 640 380" role="group" aria-label="Finished, window-cut and cap-cut replies per phone and window"></svg></div>
+    <div class="legend"><span class="k"><i class="bar" style="background:var(--ok)"></i>Finished</span><span class="k"><i class="bar" style="background:var(--warn)"></i>Cut by the window</span><span class="k"><i class="bar" style="background:var(--ink3)"></i>Cut by the 2048 cap</span></div>
+  </section>
+  <section class="panel">
+    <h2>Reply length at 2k and at 32k</h2>
+    <p>Dimensity 9400, 2048 cap, 60 replies per window, both panels on one scale. Each bar is a 128-token bin of prompt plus reply. At 2k, 14 replies end at the window limit of 2048 tokens; at 32k, 10 of 60 reached the reply cap and the rest finished earlier.</p>
+    <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="len" viewBox="0 0 640 380" role="group" aria-label="Histogram of prompt plus reply length at the 2k and 32k windows"></svg></div>
+    <div class="legend"><span class="k"><i class="dash"></i>2048 tokens, the 2k window</span></div>
+  </section>
+  <section class="panel">
+    <h2>Same file, run twice</h2>
+    <p>Five controls: the same export, same prompts, same phone, a second time. How many replies came back byte-identical (raw stream and shown text over 90 prompts, parsed tool calls over the 30 BFCL prompts), and how far each grade moved.</p>
+    <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="ctrl" viewBox="0 0 640 380" role="group" aria-label="Identical replies between two runs of the same file, five controls"></svg></div>
+    <div class="legend"><span class="k"><i class="disc"></i>Raw stream</span><span class="k"><i class="ring"></i>Shown text</span><span class="k"><i class="bar" style="background:var(--ink);width:8px;height:14px;border-radius:1px"></i>Tool calls</span></div>
+  </section>
+  <section class="panel wide">
+    <h2>Qwen3-1.7B at 32k against the 6 GB rule</h2>
+    <p>Resident memory (RSS) of the test process right after the 32k export loaded, on each phone, with the phone's RAM. The dashed line is the 6 GB threshold the killed runs' logs reported; that threshold is measured in PSS at kill time, a different measure from the bars, so the bars show which phones were near it, not the moment they crossed it. Three of four processes were stopped within the first dozen prompts.</p>
+    <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="kill" viewBox="0 0 960 250" role="group" aria-label="Resident memory after load of Qwen3 32k on four phones against a 6 GB kill threshold"></svg></div>
+  </section>
+</div>
+
+<div class="notes">
+  <div><b>Why the 2.6B needed a rerun.</b> Its chat template opens a thinking block before every answer, and the suite runs thinking off with a 640-token cap. Most of its GSM8K and IFEval replies were still reasoning when generation reached the cap, so those grades confound answer quality with the 640-token limit. The rerun keeps the same prompts, graders and thinking-off rule and only raises the cap to 2048. The 640-cap rows stay in the matrix as their own condition.</div>
+  <div><b>What the cut replies mean.</b> A reply cut by the window exceeded the export's prompt-plus-reply length in this test; a reply cut by the cap is one the benchmark chose not to wait for. In every cell 10 to 15 of 60 replies were cut. At 2k on the Poco all 14 reached the window limit and none the cap; in the seven other cells, at 4k and 32k on every phone, 10 to 15 reached the 2048 cap and none the window. Some prompts make this model reason past 2000 tokens.</div>
+  <div><b>The kill rule.</b> Samsung's Heimdall wrote "Trigger Global kill before GC, Usage 8.67 GB, Threshold 6 GB" on the S25 Ultra and S24+. MIUI on the Poco wrote "used too many pss resource, pss used 8653468kb, pss threshold 6291456kb". Different code, same number: on those two phones a process whose PSS passes 6 GB is stopped. The 32k Qwen3 export needs about 7 GB of KV cache before the first prompt; it measured 6.1 to 6.4 GB resident after load on the three runs that were stopped and 8.5 GB on the Pixel run that finished.</div>
+  <div><b>What was not rerun.</b> The cloud phones' suite timings, which differed by up to threefold between two launches of the same Tensor G5 cell and may reflect different thermal states. A repeat would be as launch-dependent; a paired probe on those phones is required to compare their speed.</div>
+  <div><b>Cost.</b> The cloud reruns took 22 Test Lab launches, one set per launch and continued where the 38-minute budget cut them; 20 ran and 2 were refused when the Blaze plan's quota of 50 physical-device tests per day ran out at 13:19. They resumed at 15:05 after the reset and finished at 18:51. The Poco ran its four steps in 3 h 20 min.</div>
+</div>
+
+<div class="section" id="numbers">
+  <h2>The rerun tables</h2>
+  <p>The rerun cells and controls. The full matrix, with the 640-cap rows and the fixed-prompt speed probe, is on the <a href="window.html#numbers">window page</a>.</p>
+  <div class="tables" id="tables"></div>
+</div>
+
+<div class="notes">
+  <div><b>Where the numbers come from.</b> Grades, controls and memory figures are the rendered matrix's. The cut reasons and the reply-length histogram come from the graded JSON reports, which record prompt and reply token counts per prompt; a reply is counted as cut by the window when prompt plus reply reached the window size, and as cut by the cap when the reply alone reached 2048. Phone RAM is the manufacturer's figure for each device. Launch times and counts are from the run logs.</div>
+  <div><b>Terms.</b> A cell is one export on one phone over the prompt set. An export is the model compiled for ExecuTorch at a fixed context window. Greedy means the most likely token is always taken, so a run should repeat exactly. Thinking off means the model is not given room to reason before answering, though the 2.6B's template does so anyway. GSM8K is grade-school maths, IFEval instruction following, BFCL tool calling. Raw stream is every token generated, shown text is what a user would see after tool-call markup is removed, parsed tool calls are the function calls the app would act on. RSS is the process's resident memory; PSS is its proportional share, the figure the memory guards read. The KV cache is the memory a model keeps per token of window. Heimdall is Samsung's memory guard. Test Lab is Firebase's rented-phone service.</div>
+  <div><b>Where things are.</b> Raw and graded reports under <a href="https://github.com/alpharomercoma/openweights/tree/main/tools/eval/results">tools/eval/results</a>: the capped rerun as <span class="mono">-cap2048</span> files, continued sets as <span class="mono">@n</span>, second runs under a <span class="mono">repeat-</span> prefix, the Poco kill evidence under <span class="mono">qwen3-32k-poco-rerun/</span>. The note: <a href="https://github.com/alpharomercoma/openweights/blob/main/docs/research/executorch-window-matrix.md">executorch-window-matrix.md</a>. The exports on Hugging Face: <a href="https://huggingface.co/alpharomercoma/LFM2.5-2.6B-ExecuTorch-XNNPACK">LFM2.5-2.6B</a>, <a href="https://huggingface.co/alpharomercoma/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK">LFM2.5-1.2B</a>, <a href="https://huggingface.co/alpharomercoma/Qwen3-1.7B-ExecuTorch-XNNPACK">Qwen3-1.7B</a>.</div>
+</div>
+
+<footer><a href="./">OpenWeights</a><a href="window.html">Does the exported window matter?</a><a href="latency.html">Five chips, two runtimes</a><a href="https://github.com/alpharomercoma/openweights">Source on GitHub</a></footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA={"caps":[{"phone":"8 Elite","window":"32k","gsm8k_640":"13/30","ifeval_640":"5/30","gsm8k_2048":"24/30","ifeval_2048":"21/30"},{"phone":"8 Elite","window":"4k","gsm8k_640":"13/30","ifeval_640":"5/30","gsm8k_2048":"25/30","ifeval_2048":"19/30"},{"phone":"D9400","window":"2k","gsm8k_2048":"24/30","ifeval_2048":"21/30","gsm8k_640":"15/30","ifeval_640":"4/30"},{"phone":"D9400","window":"32k","gsm8k_2048":"26/30","ifeval_2048":"21/30","gsm8k_640":"13/30","ifeval_640":"5/30"},{"phone":"Exynos 2400","window":"32k","gsm8k_640":"18/30","ifeval_640":"3/30","gsm8k_2048":"27/30","ifeval_2048":"19/30"},{"phone":"Exynos 2400","window":"4k","gsm8k_640":"10/30","ifeval_640":"5/30","gsm8k_2048":"25/30","ifeval_2048":"21/30"},{"phone":"Tensor G5","window":"32k","gsm8k_640":"19/30","ifeval_640":"4/30","gsm8k_2048":"28/30","ifeval_2048":"18/30"},{"phone":"Tensor G5","window":"4k","gsm8k_640":"17/30","ifeval_640":"6/30","gsm8k_2048":"23/30","ifeval_2048":"21/30"}],"cuts":[{"phone":"8 Elite","window":"32k","n":60,"finished":45,"edge":0,"cap":15},{"phone":"8 Elite","window":"4k","n":60,"finished":49,"edge":0,"cap":11},{"phone":"D9400","window":"2k","n":60,"finished":46,"edge":14,"cap":0},{"phone":"D9400","window":"32k","n":60,"finished":50,"edge":0,"cap":10},{"phone":"Exynos 2400","window":"32k","n":60,"finished":50,"edge":0,"cap":10},{"phone":"Exynos 2400","window":"4k","n":60,"finished":47,"edge":0,"cap":13},{"phone":"Tensor G5","window":"32k","n":60,"finished":48,"edge":0,"cap":12},{"phone":"Tensor G5","window":"4k","n":60,"finished":47,"edge":0,"cap":13}],"lengths":{"2k":[[886,114,"gsm8k","pass"],[1924,123,"gsm8k","fail"],[468,103,"gsm8k","pass"],[684,84,"gsm8k","pass"],[382,80,"gsm8k","pass"],[872,88,"gsm8k","fail"],[633,99,"gsm8k","pass"],[1974,73,"gsm8k","fail"],[446,71,"gsm8k","pass"],[1226,83,"gsm8k","pass"],[274,69,"gsm8k","pass"],[584,84,"gsm8k","pass"],[1233,141,"gsm8k","pass"],[964,106,"gsm8k","pass"],[435,66,"gsm8k","pass"],[422,71,"gsm8k","pass"],[552,67,"gsm8k","pass"],[733,82,"gsm8k","pass"],[555,103,"gsm8k","pass"],[363,63,"gsm8k","pass"],[1177,61,"gsm8k","pass"],[1958,89,"gsm8k","fail"],[786,83,"gsm8k","pass"],[529,63,"gsm8k","pass"],[784,102,"gsm8k","fail"],[646,72,"gsm8k","pass"],[1120,125,"gsm8k","pass"],[990,191,"gsm8k","pass"],[1919,128,"gsm8k","fail"],[246,67,"gsm8k","pass"],[1996,51,"ifeval","fail"],[2012,35,"ifeval","fail"],[544,59,"ifeval","pass"],[1982,65,"ifeval","fail"],[1210,58,"ifeval","pass"],[2017,30,"ifeval","fail"],[1195,51,"ifeval","pass"],[1982,65,"ifeval","fail"],[1986,61,"ifeval","pass"],[753,49,"ifeval","pass"],[1753,38,"ifeval","pass"],[2002,45,"ifeval","fail"],[1539,56,"ifeval","pass"],[1026,219,"ifeval","pass"],[797,50,"ifeval","pass"],[1008,84,"ifeval","pass"],[813,101,"ifeval","pass"],[1956,91,"ifeval","fail"],[729,51,"ifeval","pass"],[1697,101,"ifeval","pass"],[876,80,"ifeval","pass"],[426,58,"ifeval","pass"],[610,94,"ifeval","pass"],[1973,74,"ifeval","fail"],[800,69,"ifeval","pass"],[1490,32,"ifeval","pass"],[1442,35,"ifeval","pass"],[1738,43,"ifeval","pass"],[1967,80,"ifeval","fail"],[1356,31,"ifeval","pass"]],"32k":[[915,114,"gsm8k","pass"],[1502,123,"gsm8k","pass"],[983,103,"gsm8k","pass"],[664,84,"gsm8k","pass"],[364,80,"gsm8k","pass"],[736,88,"gsm8k","pass"],[336,99,"gsm8k","pass"],[985,73,"gsm8k","pass"],[391,71,"gsm8k","pass"],[729,83,"gsm8k","pass"],[289,69,"gsm8k","pass"],[379,84,"gsm8k","pass"],[2047,141,"gsm8k","fail"],[683,106,"gsm8k","pass"],[273,66,"gsm8k","pass"],[345,71,"gsm8k","pass"],[678,67,"gsm8k","pass"],[630,82,"gsm8k","pass"],[504,103,"gsm8k","pass"],[457,63,"gsm8k","fail"],[806,61,"gsm8k","pass"],[589,89,"gsm8k","pass"],[591,83,"gsm8k","pass"],[836,63,"gsm8k","pass"],[1204,102,"gsm8k","fail"],[892,72,"gsm8k","pass"],[896,125,"gsm8k","pass"],[1395,191,"gsm8k","fail"],[1823,128,"gsm8k","pass"],[442,67,"gsm8k","pass"],[2047,51,"ifeval","fail"],[2047,35,"ifeval","fail"],[530,59,"ifeval","pass"],[2047,65,"ifeval","fail"],[1537,58,"ifeval","pass"],[2030,30,"ifeval","fail"],[1220,51,"ifeval","pass"],[2047,65,"ifeval","fail"],[2004,61,"ifeval","pass"],[937,49,"ifeval","pass"],[2047,38,"ifeval","pass"],[2047,45,"ifeval","fail"],[1537,56,"ifeval","pass"],[1004,219,"ifeval","pass"],[812,50,"ifeval","pass"],[677,84,"ifeval","pass"],[1370,101,"ifeval","pass"],[1207,91,"ifeval","fail"],[1162,51,"ifeval","pass"],[2047,101,"ifeval","pass"],[1224,80,"ifeval","pass"],[746,58,"ifeval","pass"],[853,94,"ifeval","pass"],[2047,74,"ifeval","fail"],[1087,69,"ifeval","pass"],[1227,32,"ifeval","pass"],[522,35,"ifeval","pass"],[1014,43,"ifeval","pass"],[2047,80,"ifeval","fail"],[934,31,"ifeval","pass"]]},"ctrl":[{"model":"LFM2.5-1.2B","window":"16k","phone":"D9400","raw":13,"content":20,"calls":23,"nbfcl":30,"n":90,"first":{"gsm8k":13,"ifeval":20,"bfcl":27},"second":{"gsm8k":14,"ifeval":16,"bfcl":28}},{"model":"LFM2.5-1.2B","window":"32k","phone":"D9400","raw":15,"content":18,"calls":25,"nbfcl":30,"n":90,"first":{"gsm8k":12,"ifeval":18,"bfcl":27},"second":{"gsm8k":12,"ifeval":15,"bfcl":27}},{"model":"LFM2.5-2.6B","window":"2k","phone":"D9400","raw":0,"content":29,"calls":24,"nbfcl":30,"n":90,"first":{"gsm8k":15,"ifeval":4,"bfcl":24},"second":{"gsm8k":13,"ifeval":6,"bfcl":24}},{"model":"Qwen3-1.7B","window":"2k","phone":"D9400","raw":31,"content":31,"calls":30,"nbfcl":30,"n":90,"first":{"gsm8k":20,"ifeval":15,"bfcl":24},"second":{"gsm8k":17,"ifeval":18,"bfcl":24}},{"model":"LFM2.5-1.2B","window":"4k","phone":"Exynos 2400","raw":7,"content":11,"calls":23,"nbfcl":30,"n":90,"first":{"gsm8k":13,"ifeval":17,"bfcl":26},"second":{"gsm8k":15,"ifeval":21,"bfcl":27}}],"kills":[{"phone":"D9400","device":"Poco X8 Pro","ram":12,"prompts":6,"rss":6188,"cause":"MIUI ActivityManager, 6 GB PSS threshold (rerun: 7 prompts, 8.65 GB)"},{"phone":"8 Elite","device":"Galaxy S25 Ultra","ram":12,"prompts":12,"rss":6127,"cause":"Samsung Heimdall, 6 GB threshold (8.67 GB used)"},{"phone":"Exynos 2400","device":"Galaxy S24+","ram":12,"prompts":7,"rss":6396,"cause":"Samsung Heimdall, 6 GB threshold"},{"phone":"Tensor G5","device":"Pixel 10 Pro XL","ram":16,"prompts":90,"rss":8499,"cause":"finished all 90"}]};
+const CHIPS=[
+ {id:"D9400",name:"Dimensity 9400",short:"Dimensity 9400",device:"Poco X8 Pro",ram:12,v:"--d9400",shape:"circle"},
+ {id:"8 Elite",name:"Snapdragon 8 Elite",short:"8 Elite",device:"Galaxy S25 Ultra",ram:12,v:"--elite",shape:"square"},
+ {id:"Tensor G5",name:"Tensor G5",short:"Tensor G5",device:"Pixel 10 Pro XL",ram:16,v:"--g5",shape:"diamond"},
+ {id:"Exynos 2400",name:"Exynos 2400",short:"Exynos 2400",device:"Galaxy S24+",ram:12,v:"--e2400",shape:"triangle"},
+];
+const chip=id=>CHIPS.find(c=>c.id===id);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const tip=document.getElementById("tip");
+function showTip(e,text){if(typeof text!=="string"){hideTip();return;}tip.textContent=text;tip.hidden=false;
+ const r=tip.getBoundingClientRect(),pad=8;const left=Math.max(pad,Math.min(e.clientX-r.width/2,window.innerWidth-r.width-pad));
+ let top=e.clientY-r.height-12;if(top<pad)top=e.clientY+12;tip.style.left=left+"px";tip.style.top=top+"px";}
+function hideTip(){tip.hidden=true}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")hideTip()});document.addEventListener("touchstart",e=>{if(!e.target.closest(".pt"))hideTip()},{passive:true});document.addEventListener("click",e=>{if(!e.target.closest(".pt"))hideTip()});
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+const wire=s=>s.querySelectorAll(".pt").forEach(p=>{p.setAttribute("tabindex","0");p.setAttribute("role","img");p.setAttribute("aria-label",p.dataset.t.replace(/\n/g,". "));
+ p.addEventListener("mousemove",e=>showTip(e,p.dataset.t));p.addEventListener("mouseleave",hideTip);
+ p.addEventListener("focus",()=>{const r=p.getBoundingClientRect();showTip({clientX:r.left+r.width/2,clientY:r.top},p.dataset.t)});p.addEventListener("blur",hideTip);
+ p.addEventListener("touchstart",e=>{showTip(e.touches[0],p.dataset.t)},{passive:true});});
+function mark(shape,x,y,r,fill,stroke,sw,extra){
+ const st=`fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${extra||""}`;
+ if(shape==="square")return `<rect class="pt" x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" ${st}/>`;
+ if(shape==="diamond")return `<polygon class="pt" points="${x},${y-r*1.3} ${x+r*1.3},${y} ${x},${y+r*1.3} ${x-r*1.3},${y}" ${st}/>`;
+ if(shape==="triangle")return `<polygon class="pt" points="${x},${y-r*1.25} ${x+r*1.2},${y+r*0.9} ${x-r*1.2},${y+r*0.9}" ${st}/>`;
+ return `<circle class="pt" cx="${x}" cy="${y}" r="${r}" ${st}/>`;}
+const swatch=c=>{const col=`var(${c.v})`;
+ return c.shape==="square"?`<i class="sw" style="background:${col};border-radius:2px"></i>`:c.shape==="diamond"?`<i class="sw" style="background:${col};border-radius:2px;transform:rotate(45deg) scale(.85)"></i>`:c.shape==="triangle"?`<i class="sw" style="background:${col};border-radius:0;clip-path:polygon(50% 0,100% 100%,0 100%)"></i>`:`<i class="sw" style="background:${col}"></i>`;};
+const frac=s=>{const m=/(\d+)\/(\d+)/.exec(s);return m?[+m[1],+m[2]]:null};
+const win=s=>parseInt(s);
+const ORDER=["D9400","8 Elite","Tensor G5","Exynos 2400"];
+const rowsOf=arr=>arr.slice().sort((a,b)=>ORDER.indexOf(a.phone)-ORDER.indexOf(b.phone)||win(a.window)-win(b.window));
+document.getElementById("legend").innerHTML=CHIPS.map(c=>`<span class="k">${swatch(c)}${c.name}</span>`).join("")+`<span class="k"><i class="ring"></i>640 cap</span><span class="k"><i class="disc"></i>2048 cap</span>`;
+
+// ---------- caps: dumbbells ----------
+function drawCaps(){
+ const s=document.getElementById("caps");const W=640,H=380,M={l:130,r:16,t:34,b:30},gap=30;const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ const rows=rowsOf(DATA.caps);const cw=(W-M.l-M.r-gap)/2;const rowH=(H-M.t-M.b)/rows.length;
+ [["gsm8k","GSM8K"],["ifeval","IFEval"]].forEach(([k,label],i)=>{const l=M.l+i*(cw+gap),r=l+cw;const x=v=>l+v/30*cw;
+  o.push(`<text x="${l}" y="${M.t-18}" font-size="12" font-weight="600" fill="${ink}">${label}</text>`);
+  [0,10,20,30].forEach(v=>o.push(`<line x1="${x(v)}" x2="${x(v)}" y1="${M.t-6}" y2="${H-M.b}" stroke="${grid}"/><text x="${x(v)}" y="${H-M.b+14}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${v}</text>`));
+  rows.forEach((rw,j)=>{const y=M.t+rowH*(j+.5);const c=chip(rw.phone),col=css(c.v);
+   const a=frac(rw[k+"_640"]),b=frac(rw[k+"_2048"]);if(!a||!b)return;
+   if(i===0)o.push(`<text x="${M.l-10}" y="${y+4}" text-anchor="end" font-size="11.5" fill="${ink2}">${c.short} &middot; ${rw.window}</text>`);
+   o.push(`<line x1="${x(a[0])}" x2="${x(b[0])}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="2" opacity=".55"/>`);
+   const ta=`${c.name}, ${rw.window} window, ${label}\n640-token cap: ${rw[k+"_640"]} passed`,tb=`${c.name}, ${rw.window} window, ${label}\n2048-token cap: ${rw[k+"_2048"]} passed`;
+   o.push(mark(c.shape,x(a[0]),y,6,"none",col,2,`pointer-events="all" data-t="${esc(ta)}"`));
+   o.push(mark(c.shape,x(b[0]),y,5,col,panel,1.2,`data-t="${esc(tb)}"`));});});
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- cuts: stacked bars ----------
+function drawCuts(){
+ const s=document.getElementById("cuts");const W=640,H=380,M={l:130,r:16,t:34,b:30};const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),ok=css("--ok"),warn=css("--warn");
+ const rows=rowsOf(DATA.cuts);const rowH=(H-M.t-M.b)/rows.length;const x=v=>M.l+v/60*(W-M.l-M.r);
+ [0,15,30,45,60].forEach(v=>o.push(`<line x1="${x(v)}" x2="${x(v)}" y1="${M.t-6}" y2="${H-M.b}" stroke="${grid}"/><text x="${x(v)}" y="${H-M.b+14}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${v}</text>`));
+ o.push(`<text x="${M.l}" y="${M.t-18}" font-size="12" font-weight="600" fill="${ink}">Replies out of 60</text>`);
+ rows.forEach((rw,j)=>{const y=M.t+rowH*j+4,h=rowH-8;const c=chip(rw.phone);
+  o.push(`<text x="${M.l-10}" y="${y+h/2+4}" text-anchor="end" font-size="11.5" fill="${ink2}">${c.short} &middot; ${rw.window}</text>`);
+  let acc=0;[["finished",ok,"finished"],["edge",warn,"cut by the window: prompt plus reply reached the window size"],["cap",ink3,"cut by the 2048-token reply cap"]].forEach(([k,col,what])=>{
+   const n=rw[k];if(!n)return;const t=`${c.name}, ${rw.window} window\n${n} of ${rw.n} replies ${what}`;
+   o.push(`<rect class="pt" x="${x(acc)}" y="${y}" width="${x(acc+n)-x(acc)}" height="${h}" fill="${col}" data-t="${esc(t)}"/>`);
+   if(n>=4)o.push(`<text x="${x(acc+n/2)}" y="${y+h/2+4}" text-anchor="middle" font-size="10.5" fill="${k==="finished"?ink:css("--panel")}" class="mono" pointer-events="none">${n}${k==="finished"?"":k==="edge"?" window":" cap"}</text>`);
+   acc+=n;});});
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- lengths: two histograms ----------
+function drawLen(){
+ const s=document.getElementById("len");const W=640,H=380,M={l:44,r:16,t:30,b:34},gap=28;const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),warn=css("--warn"),ok=css("--ok");
+ const BIN=128,XMAX=2304;const ph=(H-M.t-M.b-gap)/2;
+ const YMAX=Math.max(...["2k","32k"].map(w=>{const b={};DATA.lengths[w].forEach(([g,p])=>{const k=Math.min(XMAX/BIN-1,Math.floor((g+p)/BIN));b[k]=(b[k]||0)+1});return Math.max(...Object.values(b))}));
+ [["2k","2k window: 14 of 60 stopped at the window"],["32k","32k window: 10 of 60 stopped at the reply cap"]].forEach(([w,label],i)=>{
+  const top=M.t+i*(ph+gap);const bins=new Array(XMAX/BIN).fill(0);const edge=new Array(XMAX/BIN).fill(0);
+  const rows=DATA.lengths[w];rows.forEach(([g,p])=>{const t=g+p;const b=Math.min(bins.length-1,Math.floor(t/BIN));if(w==="2k"&&t>=2047)edge[b]++;else if(g>=2047)edge[b]++;else bins[b]++;});
+  const ymax=YMAX;const yy=v=>top+ph-v/ymax*ph;const x=v=>M.l+v/XMAX*(W-M.l-M.r);
+  o.push(`<text x="${M.l}" y="${top-8}" font-size="12" font-weight="600" fill="${ink}">${label}</text>`);
+  [0,ymax].forEach(v=>o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${yy(v)}" y2="${yy(v)}" stroke="${grid}"/><text x="${M.l-6}" y="${yy(v)+4}" text-anchor="end" font-size="10.5" fill="${ink3}" class="mono">${v}</text>`));
+  bins.forEach((v,k)=>{const x0=x(k*BIN)+1,bw=x(BIN)-x(0)-2;const lo=k*BIN,hi=lo+BIN;
+   if(v)o.push(`<rect class="pt" x="${x0}" y="${yy(v)}" width="${bw}" height="${top+ph-yy(v)}" fill="${ok}" data-t="${esc(`${w} window, ${lo} to ${hi} tokens of prompt plus reply\n${v} replies finished`)}"/>`);
+   if(edge[k])o.push(`<rect class="pt" x="${x0}" y="${yy(v+edge[k])}" width="${bw}" height="${yy(v)-yy(v+edge[k])}" fill="${w==="2k"?warn:ink3}" data-t="${esc(`${w} window, ${lo} to ${hi} tokens of prompt plus reply\n${edge[k]} replies ${w==="2k"?"cut by the window":"cut by the 2048 reply cap"}`)}"/>`);});
+  o.push(`<line x1="${x(2048)}" x2="${x(2048)}" y1="${top-2}" y2="${top+ph}" stroke="${ink3}" stroke-dasharray="4 4"/>`);
+  if(i===1)[0,512,1024,1536,2048].forEach(v=>o.push(`<text x="${x(v)}" y="${H-M.b+16}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${v}</text>`));});
+ o.push(`<text x="${(M.l+W-M.r)/2}" y="${H-4}" text-anchor="middle" font-size="12" fill="${ink2}">Prompt plus reply, tokens</text>`);
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- controls ----------
+function drawCtrl(){
+ const s=document.getElementById("ctrl");const W=640,H=380,M={l:150,r:16,t:34,b:34};const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
+ const rows=DATA.ctrl;const rowH=(H-M.t-M.b)/rows.length;const x=v=>M.l+v*(W-M.l-M.r);
+ [0,.25,.5,.75,1].forEach(v=>o.push(`<line x1="${x(v)}" x2="${x(v)}" y1="${M.t-6}" y2="${H-M.b}" stroke="${grid}"/><text x="${x(v)}" y="${H-M.b+14}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${Math.round(v*100)}%</text>`));
+ o.push(`<text x="${M.l}" y="${M.t-18}" font-size="12" font-weight="600" fill="${ink}">Replies identical between the two runs</text>`);
+ rows.forEach((rw,j)=>{const y=M.t+rowH*(j+.5);const c=chip(rw.phone),col=css(c.v);
+  o.push(`<text x="${M.l-10}" y="${y}" text-anchor="end" font-size="11.5" fill="${ink2}">${rw.model} ${rw.window}</text><text x="${M.l-10}" y="${y+13}" text-anchor="end" font-size="10.5" fill="${ink3}">${c.name}</text>`);
+  const d=k=>{const a=rw.first[k],b=rw.second[k];return `${k.toUpperCase().replace("GSM8K","GSM8K").replace("IFEVAL","IFEval")} ${a} then ${b}`};
+  const grades=`Grades: ${d("gsm8k")}, ${d("ifeval")}, ${d("bfcl")}`;
+  o.push(`<rect class="pt" x="${x(rw.calls/rw.nbfcl)-4}" y="${y-9}" width="8" height="18" rx="1" fill="${col}" data-t="${esc(`${rw.model} ${rw.window} on the ${c.name}\nParsed tool calls identical: ${rw.calls} of ${rw.nbfcl} BFCL prompts\n${grades}`)}"/>`);
+  o.push(mark("circle",x(rw.content/rw.n),y,6.5,"none",col,2,`pointer-events="all" data-t="${esc(`${rw.model} ${rw.window} on the ${c.name}\nShown text identical: ${rw.content} of ${rw.n} prompts\n${grades}`)}"`));
+  o.push(mark("circle",x(rw.raw/rw.n),y,5,col,panel,1.2,`data-t="${esc(`${rw.model} ${rw.window} on the ${c.name}\nRaw token stream identical: ${rw.raw} of ${rw.n} prompts\n${grades}`)}"`));});
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- kills ----------
+function drawKill(){
+ const s=document.getElementById("kill");const W=960,H=250,M={l:60,r:16,t:30,b:40};const o=[];
+ const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel"),warn=css("--warn"),ok=css("--ok");
+ const rows=DATA.kills.slice().sort((a,b)=>ORDER.indexOf(a.phone)-ORDER.indexOf(b.phone));const cw=(W-M.l-M.r)/rows.length;const y=gb=>H-M.b-gb/17*(H-M.t-M.b);
+ [0,4,8,12,16].forEach(g=>o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(g)}" y2="${y(g)}" stroke="${grid}"/><text x="${M.l-8}" y="${y(g)+4}" text-anchor="end" font-size="11" fill="${ink3}" class="mono">${g} GB</text>`));
+ rows.forEach((rw,i)=>{const c=chip(rw.phone),col=css(c.v);const x0=M.l+cw*i+cw*.25,bw=cw*.5;const killed=rw.prompts<90;
+  o.push(`<line x1="${x0-cw*.15}" x2="${x0+bw+cw*.15}" y1="${y(rw.ram)}" y2="${y(rw.ram)}" stroke="${ink2}" stroke-width="1.5"/><text x="${x0+bw/2}" y="${y(rw.ram)-5}" text-anchor="middle" font-size="10.5" fill="${ink2}">${rw.ram} GB RAM</text>`);
+  const t=`${c.name} (${rw.device}), ${rw.ram} GB RAM\nResident after load: ${(rw.rss/1000).toFixed(2)} GB\n${killed?`Killed after ${rw.prompts} prompts: ${rw.cause}`:"Finished all 90 prompts"}`;
+  o.push(`<rect class="pt" x="${x0}" y="${y(rw.rss/1000)}" width="${bw}" height="${y(0)-y(rw.rss/1000)}" fill="${col}" opacity="${killed?.9:.6}" data-t="${esc(t)}"/>`);
+  o.push(`<text x="${x0+bw/2}" y="${y(rw.rss/1000)-6}" text-anchor="middle" font-size="11" fill="${ink}" class="mono">${(rw.rss/1000).toFixed(1)} GB</text>`);
+  o.push(`<text x="${x0+bw/2}" y="${H-M.b+16}" text-anchor="middle" font-size="11.5" fill="${ink2}">${c.name}</text><text x="${x0+bw/2}" y="${H-M.b+30}" text-anchor="middle" font-size="10.5" fill="${killed?warn:ink3}">${killed?`killed after ${rw.prompts} prompts`:"finished 90 prompts"}</text>`);});
+ o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(6)}" y2="${y(6)}" stroke="${warn}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${M.l+4}" y="${y(6)+14}" font-size="11" fill="${warn}">6 GB: the PSS threshold Samsung Heimdall and MIUI reported when they stopped the process</text>`);
+ s.innerHTML=o.join("");wire(s);
+}
+
+// ---------- tables ----------
+function tables(){
+ const root=document.getElementById("tables");const th=cols=>`<thead><tr>${cols.map((c,i)=>`<th${i<2?' class="l"':""}>${c}</th>`).join("")}</tr></thead>`;
+ const caps=rowsOf(DATA.caps),cuts=rowsOf(DATA.cuts);
+ const out=[];
+ out.push(`<details class="tbl" open><summary>LFM2.5-2.6B under two reply caps <span>8 cells &middot; GSM8K and IFEval</span></summary><div class="inner">
+  <p>Passed out of 30 at the suite's 640-token cap and at the 2048-token rerun, and how the 60 rerun replies ended.</p>
+  <div class="scroll"><table>${th(["Phone","Window","GSM8K at 640","GSM8K at 2048","IFEval at 640","IFEval at 2048","Finished","Cut by window","Cut by cap"])}<tbody>${caps.map(r=>{const c=cuts.find(x=>x.phone===r.phone&&x.window===r.window)||{};return `<tr><td class="l">${chip(r.phone).name}</td><td class="l">${r.window}</td><td>${r.gsm8k_640}</td><td>${r.gsm8k_2048}</td><td>${r.ifeval_640}</td><td>${r.ifeval_2048}</td><td>${c.finished}</td><td${c.edge?' class="warn"':""}>${c.edge}</td><td>${c.cap}</td></tr>`}).join("")}</tbody></table></div></div></details>`);
+ out.push(`<details class="tbl" open><summary>Same file, run twice <span>5 controls</span></summary><div class="inner">
+  <p>Replies byte-identical between the two runs, and each set's grade in the first and the second run.</p>
+  <div class="scroll"><table>${th(["Model","Phone","Window","Raw identical","Text identical","Calls identical","GSM8K","IFEval","BFCL"])}<tbody>${DATA.ctrl.map(r=>`<tr><td class="l">${r.model}</td><td class="l">${chip(r.phone).name}</td><td>${r.window}</td><td>${r.raw}/${r.n}</td><td>${r.content}/${r.n}</td><td>${r.calls}/${r.nbfcl}</td><td>${r.first.gsm8k} then ${r.second.gsm8k}</td><td>${r.first.ifeval} then ${r.second.ifeval}</td><td>${r.first.bfcl} then ${r.second.bfcl}</td></tr>`).join("")}</tbody></table></div></div></details>`);
+ out.push(`<details class="tbl" open><summary>Qwen3-1.7B 32k on four phones <span>the kill evidence</span></summary><div class="inner">
+  <div class="scroll"><table>${th(["Phone","Device","RAM","Resident after load","Prompts completed","What the log says"])}<tbody>${DATA.kills.map(r=>`<tr><td class="l">${chip(r.phone).name}</td><td class="l">${r.device}</td><td>${r.ram} GB</td><td>${r.rss} MB</td><td${r.prompts<90?' class="warn"':""}>${r.prompts} of 90</td><td class="l">${r.cause}</td></tr>`).join("")}</tbody></table></div></div></details>`);
+ root.innerHTML=out.join("");
+}
+function drawAll(){hideTip();drawCaps();drawCuts();drawLen();drawCtrl();drawKill();}
+tables();drawAll();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawAll);
+if(window.matchMedia){const mq=window.matchMedia("(prefers-color-scheme: dark)");if(mq.addEventListener)mq.addEventListener("change",drawAll);else if(mq.addListener)mq.addListener(drawAll);}
+new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+</script>
+</body>
+</html>

@@ -1,12 +1,14 @@
 # Play Store release checklist
 
-What has been verified, and what a human still has to do in the Play Console. Every claim
-below was checked against the build rather than assumed.
+What is verified before a bundle goes up, and what the Console needed the first time. The
+app is live at <https://play.google.com/store/apps/details?id=io.github.alpharomercoma.openweights>;
+each release is built and uploaded by hand from this checkout. Every claim below was
+checked against the build rather than assumed.
 
 ## Verified in the build
 
-Everything in this table was re-checked against the artifact on 2026-08-24, not against the
-intent. Where a row says "measured", the command is in the row.
+Everything in this table was re-checked against the artifact on 2026-08-24 and again on
+2026-09-06, not against the intent. Where a row says "measured", the command is in the row.
 
 | Requirement | State | How it was checked |
 |---|---|---|
@@ -179,8 +181,8 @@ On-device language model inference the user asked for, right away or on a schedu
 
 - **What the service does.** Keeps the app's process running while a language model, loaded
   from the user's own storage, produces a reply, works through a goal, or runs one tick of a
-  Watch the user set up. The service itself transfers nothing and contacts nothing — it
-  raises the process and does no networking of its own — and the reply generation it holds
+  Watch the user set up. The service itself transfers nothing and contacts nothing, it
+  raises the process and does no networking of its own, and the reply generation it holds
   the process open for is arithmetic on this device's own processor. What it holds open for a
   goal or a Watch step can be more than that: if `web_search` or `fetch_url` are on (see
   below), the turn those tools run inside is the same turn this service is holding, so a
@@ -224,7 +226,7 @@ the goal feature is being demonstrated in the same video, show it advancing thro
 than one step with the app off screen. If a Watch faster than fifteen minutes is being
 demonstrated, show it being set up, the notification appearing and naming the check, at
 least one tick landing in the Watching screen with the app off screen, and the notification
-gone once the Watch is stopped — since that is the other case the service exists for.
+gone once the Watch is stopped, since that is the other case the service exists for.
 
 ## Data safety form
 
@@ -342,9 +344,9 @@ The app still transmits nothing on its own, because there is still no server to 
 to and acquiring one would break the only promise this app makes. What leaves is what a user
 read, approved, and chose an app to send, which is their action rather than ours.
 
-One thing still needs a human before submission: the listing should say plainly that the
-user chooses the model, that models come from third parties, and that their behaviour is the
-publisher's rather than ours.
+The listing says plainly that the user chooses the model, that models come from third
+parties, and that their behaviour is the publisher's rather than ours (the last paragraph
+of the full description in [store-listing.md](store-listing.md)).
 
 ## Version codes are counted, not typed
 
@@ -363,7 +365,7 @@ The commit count was chosen over the two obvious alternatives:
 - **A CI build number** does not survive a workflow being renamed or recreated, and it
   resets to one when it happens. A version code that goes down cannot be undone, and the
   same source would build a different code on a laptop than in CI.
-- **Resolving from Play** — which the Triple-T plugin can do — needs a service account, a
+- **Resolving from Play**, which the Triple-T plugin can do, needs a service account, a
   secret, and a network call, to answer a question the repository already knows. It is the
   right tool once uploads are automated, and it is a lot of machinery for a counter.
 
@@ -387,17 +389,16 @@ commits builds a lower code, which Play rejects rather than accepts.
 Not done, and it is a separate job from the version code. The shape is a workflow triggered
 by a tag, which builds the bundle and hands it to Play, and it needs two secrets this
 repository deliberately does not have: the upload keystore, and a Play service account key
-with release permissions. Both are worth adding once there is something to release
-repeatedly; until the first upload is done by hand there is nothing for it to promote.
+with release permissions. Both are worth adding now that releases recur; every upload so far has been by hand.
 
-## Still to do, and none of it is code
+## The Console work, done once for the first release
 
 Every box that can be filled in ahead of time is filled in, in
 [store-listing.md](store-listing.md): the name, both descriptions, the data safety answers row
 by row with the reasoning behind each, the generative AI declaration, and the content rating
 notes. What is left is the part that needs a person, a key, or a graphics tool.
 
-1. Create the upload key and enrol in Play App Signing. Never commit it.
+1. ~~Create the upload key and enrol in Play App Signing.~~ Done; the key is never committed.
    Upload `app/build/outputs/mapping/release/mapping.txt` with the bundle, or every crash in
    the pre-launch report and in Android vitals arrives as `q90.a()`. It is 53 MB and is
    produced by every release build; Play takes it from the same upload screen.
@@ -445,7 +446,7 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 
   What still asks, in every mode but `/yolo`, is narrower and is about two specific risks
   rather than about using the tools at all: a call whose destination could have been steered
-  by something untrusted the turn just read (a page telling the model where to go next —
+  by something untrusted the turn just read (a page telling the model where to go next , 
   `fetch_url` only, since `web_search`'s destination is the configured provider regardless of
   what the query says), and a call that could carry data off the device after the turn has
   read something private (either tool). Neither condition is the ordinary case, so the
@@ -453,7 +454,7 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   rather than folded into "the tools ask before they run."
 - **The upload key lives only on one machine.** `keystore.properties` and `upload.jks`
   exist in the working checkout that cuts releases and nowhere else; a fresh clone builds
-  an unsigned AAB, which is the intended failure. Both bundles built on 2026-09-04, at version code 485, carry
+  an unsigned AAB, which is the intended failure. Every bundle since 2026-09-04 (version code 485 then, 570 on 2026-09-07) carries
   that key (`keytool -printcert -jarfile` on either shows the same SHA-256 as the
   keystore), and enrolling it in Play App Signing is still the first Console step.
 - **One bundle.** Until 2026-09-06 there were two flavours, `standard` (llama.cpp alone)
@@ -465,10 +466,10 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   `OpenWeightsApplication.onCreate` calls `watches.sync()` on every process start
   (`OpenWeightsApplication.kt`), including one the system triggered in the background rather
   than one a person opening the app caused. `GenerationService.hold` deliberately swallows a
-  refused `startForegroundService` call — Android 12+ can refuse one from a background start
-  — and generates anyway rather than crashing, which is the right call for a turn the user is
+  refused `startForegroundService` call, Android 12+ can refuse one from a background start
+ , and generates anyway rather than crashing, which is the right call for a turn the user is
   looking at (`GenerationService.kt`). A fast Watch's own ticker inherits that same swallow:
   it starts regardless of whether the hold actually got the foreground guarantee, so a Watch
-  restored this way can tick unprotected until the next thing raises the process. Rare — it
-  needs a background process start with a fast Watch already scheduled — and not a crash,
+  restored this way can tick unprotected until the next thing raises the process. Rare, it
+  needs a background process start with a fast Watch already scheduled, and not a crash,
   only a tick Android may freeze before it finishes.

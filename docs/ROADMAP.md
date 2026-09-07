@@ -7,6 +7,16 @@ rest of it gets built, and why each piece exists.
 
 Status legend: **done** · *in progress* · planned.
 
+> **Read with the date in mind.** The last full rewrite was 2026-08-11 and the notes below
+> describe a one-engine, GGUF-only product. Since then a second runtime shipped and grew:
+> ExecuTorch runs compiled `.pte` files for eight families, reads pictures for two of them,
+> and the app now ships its own 32k exports and opens a compiled model at the window it was
+> exported with. That work is recorded in [ARCHITECTURE.md](ARCHITECTURE.md) and the
+> research notes it links, starting with [research/executorch.md](research/executorch.md)
+> and [research/executorch-window-matrix.md](research/executorch-window-matrix.md). The
+> app is live on Google Play (2026-09). Sections 1, 2 and 9 below are corrected in place;
+> the rest still holds.
+
 Rewritten 2026-08-11. Six of these sections still said "planned" for work that had already
 shipped, which is the sort of drift that makes a roadmap worse than no roadmap: a
 contributor reading it would have built a model browser that already exists. Each heading
@@ -19,8 +29,11 @@ named as gaps rather than left implied.
 
 llama.cpp behind an `InferenceEngine` interface, seven Android CPU backends selected at
 runtime, split thread counts for prefill and decode, KV-cache prefix reuse across turns.
-Measured 76.9 tok/s prefill / 16.2 tok/s decode on a MediaTek MT6991. See
-`docs/research/inference-engines.md` and `docs/CONTEXT.md`.
+Measured 76.9 tok/s prefill / 16.2 tok/s decode on a MediaTek MT6991 in August 2026; by
+September the same phone read about 100 tok/s prefill on llama.cpp and 360 tok/s on the
+ExecuTorch export of the same model (`docs/research/first-turn-latency.md`,
+`docs/research/executorch-own-exports.md`). See `docs/research/inference-engines.md` and
+`docs/CONTEXT.md`.
 
 ## 2. Compute backend choice: **done**, and the answer was the CPU
 
@@ -35,20 +48,26 @@ that is what the measurements kept saying, and Settings explains rather than off
   a more honest outcome than not shipping it.
 - **GPU (Vulkan)**. Not built. Frequently slower than a tuned CPU path on Mali, and adding
   a second GPU backend to be slower twice was not worth the binary.
-- **NPU**. No path through llama.cpp. Reaching MediaTek APU or Qualcomm Hexagon means a
-  second engine and per-SoC pre-exported models, which is the curated-catalog trade-off
-  this project exists to avoid.
+- **NPU**. Not built, on measurement rather than principle: against a KleidiAI-repacked
+  CPU the MediaTek MDLA was level at decode and worth 1.3x to 2.1x at prefill, and real
+  multi-turn conversations prefill a median of 50 tokens after cache reuse
+  (`research/mediatek-npu.md`, `research/npu-prefill-multiturn.md`).
+- **A second engine did ship**, and it is the CPU one: ExecuTorch with XNNPACK, for
+  compiled `.pte` files. It is not a curated catalogue; Discover searches the Hub for
+  compiled repositories the same way it does for GGUFs (`research/executorch.md`).
 
 So there is no backend picker and no one-tap benchmark. Settings lists what the device
 actually reports, including the CPU feature flags, and says in a sentence why there is
 nothing to choose between.
 
-## 3. Getting models: **done**, except that a download dies with the app
+## 3. Getting models: **done**
 
 Nothing else matters if you cannot get a model in. Hugging Face search filtered to GGUF,
 with the app reading each file's GGUF header over HTTP range requests *before* downloading
 so it can tell you: how much RAM this needs at your chosen context length, roughly how fast
-it will run, and whether it will run at all. Then a resumable, checksum-verified download.
+it will run, and whether it will run at all. Then a resumable, checksum-verified download
+that runs in a `dataSync` foreground service, so leaving the app no longer ends it (the
+gap this heading used to name).
 
 The token is stored encrypted with a hardware-backed Android Keystore key, sent only to
 `huggingface.co`, and never logged.
@@ -146,7 +165,7 @@ second engine and still out of scope: llama.cpp generates no pictures at any qua
 Dictation uses Android's on-device recogniser only, so the "nothing leaves this device"
 promise holds for the microphone too. Audio input is proven with LFM2.5-Audio-1.5B.
 
-## 9. Play Store production: *code done, paperwork drafted*
+## 9. Play Store production: **done, and live**
 
 Target API 36, 16 KB alignment (satisfied by NDK r29), the foreground service declaration for
 downloads, R8 with a build step that fails if it renamed a name JNI resolves, and a signed
@@ -165,9 +184,11 @@ and the policy is published at <https://alpharomercoma.github.io/openweights/pri
 The content rating answers are written out question by question in
 [store-listing.md](store-listing.md#content-rating-questionnaire).
 
-What is left genuinely needs a person in front of the Console: pasting those answers into the
-questionnaire, recording the foreground service video, and filing the generative AI
-declaration with its two open questions.
+The app is published at
+<https://play.google.com/store/apps/details?id=io.github.alpharomercoma.openweights>. The
+questionnaire, the foreground service video and the generative AI declaration were filed;
+what remains per release is the checklist in [play-store.md](play-store.md), and the bundle
+is built and uploaded by hand.
 
 ---
 

@@ -3,13 +3,16 @@
 > Living state file. Update at every milestone so no information is lost across sessions
 > or context compaction. Newest facts win; keep it accurate rather than exhaustive.
 
-Last updated: 2026-08-10 (end of Phase 1)
+Last updated: 2026-09-07. The dated sections below run from 2026-08-10; newer facts are in
+the research notes under `research/`, and the accurate summary of the app as shipped is the
+top-level `README.md` and `ARCHITECTURE.md`.
 
 ## What this project is
 
 A native Android app that runs open-weight LLMs from Hugging Face entirely on-device.
 The ChatGPT / Claude / Gemini experience, chat, histories, multimodal input, voice, 
-but for local GGUF models, with no account, no cloud, and no telemetry.
+but for local models, GGUF through llama.cpp and compiled `.pte` through ExecuTorch, with no
+account, no cloud, and no telemetry.
 
 Distribution target: **Google Play Store**. Sideloading over ADB is only for development.
 Fully open source under **Apache-2.0**, aimed at a developer audience.
@@ -19,7 +22,7 @@ Fully open source under **Apache-2.0**, aimed at a developer audience.
 | Decision | Value | Rationale |
 |---|---|---|
 | Language / UI | Kotlin + Jetpack Compose | True native; best perf and UX control |
-| Inference engine | llama.cpp (GGUF), behind `InferenceEngine` | Only engine that can run *any* HF model; see `docs/research/inference-engines.md` |
+| Inference engines | llama.cpp (GGUF) and ExecuTorch (`.pte`, XNNPACK), both behind `InferenceEngine`, routed by file format | llama.cpp runs *any* HF GGUF; ExecuTorch runs compiled exports of named families up to twice as fast; see `docs/research/inference-engines.md` and `docs/research/executorch.md` |
 | Application ID | `io.github.alpharomercoma.openweights` | Permanent once published to Play |
 | License | Apache-2.0 | Permissive + patent grant; compatible with llama.cpp (MIT) |
 | minSdk / targetSdk / compileSdk | 31 / 36 / 37 | Play requires API 36 for new apps from 2026-08-31; current AndroidX needs compileSdk 37 |
@@ -81,13 +84,16 @@ Single source of truth: `gradle/libs.versions.toml`.
 
 | Module | Responsibility | Status |
 |---|---|---|
-| `:app` | Compose UI, navigation, ViewModels | chat screen only |
-| `:core:common` | Shared domain models (messages, sampler/load params) | done |
+| `:app` | Compose UI, navigation, ViewModels, downloads, the watch scheduler | done |
+| `:core:common` | Multiplatform domain models and the compiled-model chat templates | done |
 | `:core:designsystem` | Theme, colour/type tokens, telemetry components | done |
-| `:core:engine` | `InferenceEngine` + llama.cpp JNI (`src/main/cpp`) | done |
-| `:core:hub` | Hugging Face client, GGUF parser, downloader | **P2, not started** |
-| `:core:data` | Room, DataStore, Keystore token vault, usage ledger | **P3, not started** |
-| `:core:device` | Device profiler, fit estimator, benchmark calibration | **P2, not started** |
+| `:core:engine` | `InferenceEngine`, llama.cpp JNI, the ExecuTorch runtime, the router | done |
+| `:core:hub` | Hugging Face client, GGUF parser, downloader | done |
+| `:core:data` | Room, DataStore, Keystore token vault, usage ledger | done |
+| `:core:device` | Device profiler, fit estimator, thermal policy | done |
+| `:core:tools` | The agent loop and its tools | done |
+| `:core:sandbox` | QuickJS in an isolated process | done |
+| `:baselineprofile` | Startup profile for the release build | done |
 
 ## Phase status
 
@@ -99,15 +105,16 @@ Single source of truth: `gradle/libs.versions.toml`.
       long-press actions, slash-command palette
 - [x] **Compaction**: folds older turns into a model-written summary before the context
       window fills, so long conversations continue instead of dying
-- [~] **Compute backend choice**: engine enumerates ggml devices at runtime and the
-      Adreno OpenCL backend is compiled in and verified on a Snapdragon 8 Elite. The
-      choice is not yet in Settings, and `gpuLayers` still defaults to 0, so the GPU is
-      available but nothing offloads to it yet.
+- [x] **Compute backend choice**: engine enumerates ggml devices at runtime and the
+      Adreno OpenCL backend is compiled in and verified on a Snapdragon 8 Elite. By
+      decision there is no backend picker (`ROADMAP.md` section 1); where a phone has a
+      working GPU the parameter sheet lets the user say which processor holds the layers.
 - [x] **P2** HF Hub: Keystore-encrypted token vault, search, GGUF header parse over range
       requests, fit estimator, resumable verified downloads, Discover/Models/Settings screens
 - [x] **Tool calling**: tools are rendered into each model's own syntax and calls are
       parsed back; verified on-device with LFM2.5 emitting
-      `get_weather(city='Manila')`. Execution and permission prompts are still to come.
+      `get_weather(city='Manila')`. Execution, the permission gate and the four run modes
+      shipped since (`ARCHITECTURE.md`, "The agent").
 - [x] **P3** Product: conversations and the usage ledger persist in Room, Usage dashboard,
       a conversation drawer for reopening past chats, and per-model hyperparameters
 - [x] **P4** Multimodal in: libmtmd is compiled in and wired through the engine, the
@@ -129,13 +136,12 @@ Single source of truth: `gradle/libs.versions.toml`.
       [research/inference-engines.md](research/inference-engines.md)). And a device sitting on
       its lockscreen fails every Compose test with "no compose hierarchies found", which reads
       like the app is broken and is not: `adb shell wm dismiss-keyguard` first.
-- [ ] **P5** Play production: the code is done and the paperwork is drafted. API 36, 16 KB
-      alignment, the AAB and the JNI-survives-R8 guard are verified in the build; the
-      listing, the data safety answers row by row, the generative AI declaration and the
-      privacy policy are written out in [store-listing.md](store-listing.md) and
-      [privacy-policy.md](privacy-policy.md). What is left needs a person: the upload key,
-      the graphics, the questionnaire, the foreground service video, and publishing the
-      policy at a URL.
+- [x] **P5** Play production: live at
+      <https://play.google.com/store/apps/details?id=io.github.alpharomercoma.openweights>.
+      API 36, 16 KB alignment, the AAB and the JNI-survives-R8 guard are verified in the
+      build; the listing, data safety answers, generative AI declaration and privacy policy
+      are in [store-listing.md](store-listing.md) and [privacy-policy.md](privacy-policy.md),
+      the policy published at <https://alpharomercoma.github.io/openweights/privacy.html>.
 
 ## Multimodal: what libmtmd gives us, and what it does not
 

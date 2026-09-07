@@ -128,7 +128,7 @@ of memory.
 
 ## Sources
 
-- `tools/mtmd/mtmd.h`, `mtmd-helper.h`, `mtmd-image.cpp`, `CMakeLists.txt` in llama.cpp b10333
+- `tools/mtmd/mtmd.h`, `mtmd-helper.h`, `mtmd-image.cpp`, `CMakeLists.txt` in llama.cpp b10549
 - llama.cpp `docs/multimodal.md` for the supported-model list
 - Vercel AI SDK message-part reference (`FilePart`, `mediaType`, deprecated `ImagePart`)
 - Qwen3-Omni model card for the any-to-any claim and its parameter count

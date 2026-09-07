@@ -13,12 +13,14 @@ cd openweights
 
 You need JDK 21, the Android SDK with platform 37, NDK r29 or newer (older NDKs do not
 align native segments to 16 KB, which Google Play requires), and CMake 4.1.2. Four
-pinned submodules ride along — llama.cpp, the OpenCL headers and ICD loader, and QuickJS
+pinned submodules ride along, llama.cpp, the OpenCL headers and ICD loader, and QuickJS
 for the sandbox: if you cloned without `--recurse-submodules`, run
 `git submodule update --init --depth 1`.
 
-`docs/ARCHITECTURE.md` explains how the modules fit together;
-`docs/research/inference-engines.md` explains why the engine is llama.cpp.
+`docs/ARCHITECTURE.md` explains how the modules fit together. `docs/research/inference-engines.md`
+explains why llama.cpp is the engine for GGUF files and `docs/research/executorch.md` why
+ExecuTorch became the second runtime for compiled `.pte` files; the top-level `README.md`
+lists every measured report.
 
 ## Running the tests
 
@@ -44,8 +46,8 @@ A few things reviewers will look for:
   core module import something from `:app`, the boundary is in the wrong place.
 - **Measure performance claims.** This project has already been surprised twice by
   build configuration mattering more than algorithms. If a change is meant to make
-  inference faster, include before/after numbers from a real device and add them to
-  `docs/CONTEXT.md`.
+  inference faster, include before/after numbers from a real device and write them up
+  under `docs/research/`, the way the existing reports do.
 - **Comments explain constraints, not mechanics.** Say why something must be this way, not
   what the next line does.
 - **No telemetry, no accounts, and every network egress named and switchable.** Model

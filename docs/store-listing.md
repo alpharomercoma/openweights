@@ -1,7 +1,8 @@
 # Play Console: what to put in each box
 
-Everything a human has to type or upload, written out so the submission is a matter of
-copying rather than composing. The claims here match the app; where a form asks something the
+Everything a human types or uploads into the Console, written out so a listing update is a
+matter of copying rather than composing. The app is live; this is the source of what the
+listing says. The claims here match the app; where a form asks something the
 code decides, the code was read rather than remembered.
 
 The checklist of what has been verified in the build is in [play-store.md](play-store.md).
@@ -59,7 +60,8 @@ hardware.
 
 BROWSE THE HUB, RUN WHAT FITS
 Other on-device apps hand you a short list somebody else chose. OpenWeights lets you browse
-GGUF repositories on Hugging Face, inspect the fit, and run supported architectures locally.
+GGUF and ExecuTorch repositories on Hugging Face, inspect the fit, and run supported
+architectures locally.
 
 HONEST ABOUT YOUR DEVICE
 Before you spend gigabytes, the app reads the model's header over the network and tells you
@@ -109,8 +111,8 @@ publisher's work rather than ours. Open source, at github.com/alpharomercoma/ope
 ```
 
 **Category**: Productivity, as filed. Tools was the other candidate and is the better fit for
-what the app is — the description assumes the reader knows what a GGUF is, and tokens per
-second is a first-class feature — but the category is reversible, carries no compliance
+what the app is, the description assumes the reader knows what a GGUF is, and tokens per
+second is a first-class feature, but the category is reversible, carries no compliance
 weight, and the Tools *tag* below recovers most of the discovery either way.
 
 **Tags**: Personal assistant, Productivity, Privacy & security, Tools. Play's tag vocabulary
@@ -386,9 +388,10 @@ URL, not a playlist or timestamped link.
 is "no sign-in, the model file is on this phone" should not then show the app fetching a
 page. The canvas builder, whose tools stay off until a folder is shared and which
 returns an empty reply on a 1.2B model, so showing it would mean staging a result. And the two-runtimes claim, which is the product's real differentiator but
-had no honest footage: Discover shows no engine label per row, and a `.pte` model's detail
-page renders its header with **no file list at all** in build 467, which is a bug worth
-fixing and, until it is, a claim the camera cannot support.
+had no honest footage when the video was cut: in build 467 Discover showed no engine label
+per row and a `.pte` detail page rendered no file list. Both are fixed since (a compiled
+card names its runtime and its exported window; a repository that offers nothing says why),
+so the next cut of the video can show it.
 
 The screenshots are the one place the product explains itself, so they are captioned in that
 order: the telemetry, a tool round, a plan, the Hub across both runtimes, the Models screen
@@ -474,7 +477,7 @@ One thing to raise with review rather than assume:
 ## Foreground service declaration
 
 Type `dataSync`, for model downloads. The words to use and the video to record are in
-[play-store.md](play-store.md#the-foreground-service-declaration).
+[play-store.md](play-store.md#the-foreground-service-declarations).
 
 ## Content rating questionnaire
 
@@ -497,7 +500,7 @@ says.** An earlier draft of this section answered No to the content descriptors 
 grounds that the app authors nothing and ships no model. That reasoning is true and the
 answer it produced was wrong, which an outside review caught before submission.
 
-The exclusion printed beside the question — "this does not refer to user-generated content" —
+The exclusion printed beside the question, "this does not refer to user-generated content" , 
 is there to stop a social app declaring Yes merely because its users can swear at each other.
 It does not cover this app. Model output is not another user's content; it is content this
 app generates and puts on screen, and Google's AI-generated content policy makes the
@@ -513,11 +516,11 @@ costs a higher age band and nothing else.
 | Section | Answer | Why |
 |---|---|---|
 | Potentially offensive language | **Yes** | A model the user chose can produce it and nothing filters the output |
-| — is it the focus of the app? | No | The app runs models. It is not about the language they produce |
-| — minor profanities | **Yes** | As above |
-| — moderate or significant swearing | **Yes** | As above |
-| — discriminatory language | **Yes** | As above. An uncensored model will produce it if asked |
-| — sexual expletives | **Yes** | As above |
+| is it the focus of the app? | No | The app runs models. It is not about the language they produce |
+| minor profanities | **Yes** | As above |
+| moderate or significant swearing | **Yes** | As above |
+| discriminatory language | **Yes** | As above. An uncensored model will produce it if asked |
+| sexual expletives | **Yes** | As above |
 | Violence | **Yes** | Described rather than depicted, but a model will describe it |
 | Sexuality and nudity | **Yes** | In text, for the same reason |
 | Controlled substances | **Yes** | A model asked about drugs answers about drugs |
@@ -580,6 +583,7 @@ Retake the questionnaire if any of this changes; a shipped model catalogue would
 
 ## Release track
 
-Internal testing first, then read the pre-launch report before promoting. It runs the app on
+The app is in production. For each new bundle: internal testing first, then read the
+pre-launch report before promoting. It runs the app on
 real devices, which is the cheapest way to find a crash on hardware nobody here owns, and
 this app has no crash reporter of its own.

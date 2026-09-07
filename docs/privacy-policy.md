@@ -1,6 +1,6 @@
 # OpenWeights privacy policy
 
-Last updated 2026-09-06.
+Last updated 2026-09-07.
 
 OpenWeights runs language models on your phone. There is no OpenWeights account, no
 OpenWeights server, and no analytics or crash reporting of any kind. Nothing in this app
@@ -41,20 +41,20 @@ asking first: it decides when to search and composes the query itself, out of th
 conversation, which means what it sends can contain anything you have said or attached, and
 it decides which page to fetch. You can turn either off at any time in the Tools tab, where
 both are listed under a heading that says they leave the device; the app works without them
-and everything else stays local. What each call sent is not hidden afterwards either — every
+and everything else stays local. What each call sent is not hidden afterwards either, every
 tool call is a row in the reply that used it, naming the tool and what it was given.
 
 Two narrower situations still ask you before anything runs, in every mode except one
 described below. The first is a page telling the assistant where to go next: `fetch_url` is
 the only tool whose destination is a page's to choose rather than yours, so once something
 the assistant read this turn could have been written by someone other than you, a page it
-fetches on that page's own say-so is held for your approval — otherwise a page could talk
+fetches on that page's own say-so is held for your approval, otherwise a page could talk
 the assistant into reading its own follow-up address and calling that a fetch you asked for.
 `web_search` is not held on this basis: its destination is the search provider the app is
 configured with, however the query reads, so a page cannot redirect it anywhere by steering
 the query. The second situation is your own data: once something private has been read in a
 turn, from a shared file or otherwise, anything that would carry data off the device in that
-same turn is held for your approval too, regardless of which tool it is — this one does
+same turn is held for your approval too, regardless of which tool it is, this one does
 cover `web_search`.
 
 **Reporting a reply.** Every model reply has a report action. It asks what was wrong,

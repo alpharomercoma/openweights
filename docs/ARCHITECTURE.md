@@ -18,7 +18,7 @@ surface, and no knowledge of the UI above it.
 
 Build configuration lives in `build-logic/convention` as Gradle convention plugins
 (`openweights.android.application`, `.library`, `.compose`, `.hilt`), so SDK levels, Java
-and Kotlin targets, and the ABI filter are declared once. AGP 9 compiles Kotlin itself —
+and Kotlin targets, and the ABI filter are declared once. AGP 9 compiles Kotlin itself , 
 `org.jetbrains.kotlin.android` must not be applied.
 
 `:core:common` is Kotlin Multiplatform (`android`, `jvm`, `iosArm64`,
@@ -46,18 +46,26 @@ suspend fun unload()
 ```
 
 Two implementations ship, and a third class chooses between them. `LlamaCppEngine` runs
-any GGUF the pinned llama.cpp reads — the supported architecture list is code-generated at
+any GGUF the pinned llama.cpp reads, the supported architecture list is code-generated at
 build time from llama.cpp's own table, so it tracks the submodule instead of a hand-kept
 list. `ExecuTorchEngine` runs compiled `.pte` files on XNNPACK; a `.pte` carries no metadata, so the app supplies the chat template, the stop
 tokens and the tool syntax per family, and refuses files whose family it cannot name
 (eight families render today; parity against llama.cpp is measured case-for-case in
-`docs/research/backend-parity.md`). `RoutingInferenceEngine` dispatches on the file
-format and is what the app actually injects.
+`docs/research/backend-parity.md`). Three things the ExecuTorch side learned in September
+2026: the 1.4.0 runtime never adds a model's start token, so the engine writes each
+family's BOS into the prompt text (`docs/research/executorch-window-matrix.md`); a `.pte`
+reports the window it was exported with through a constant method, the app reads it before
+loading and opens the model at that window, and Discover shows it from the publisher's
+`config.json`; and compiled vision exports of LFM2.5-VL and Gemma 3 are fed pictures through
+the runtime's multimodal runner, with the square, token count and pixel range per family in
+`VisionSpec` (`docs/research/executorch-vision.md`). `RoutingInferenceEngine` dispatches
+on the file format and is what the app actually injects.
 
 ### Native layer
 
-`src/main/cpp` holds the engine sources plus three pinned submodules (llama.cpp, the
-OpenCL headers and ICD loader):
+`src/main/cpp` holds the engine sources plus three of the repository's four pinned
+submodules (llama.cpp, the OpenCL headers and ICD loader; the fourth, QuickJS, belongs to
+`:core:sandbox`):
 
 - `engine_session.{h,cpp}`. A `Session` is one loaded model, one context, one KV cache,
   and the token history that cache represents. It renders prompts with the model's own
@@ -79,7 +87,7 @@ This is why `add_special` is unconditionally true: making it conditional produce
 sequences that differed at position 0 and silently defeated all reuse.
 
 **The first turn is prepaid.** `warm()` reads the instructions and tool definitions into
-the cache while nobody is waiting — at model load, after a fold, a branch or a reopen —
+the cache while nobody is waiting, at model load, after a fold, a branch or a reopen , 
 snapshots the fresh-chat head for the model families that refuse rollback, and persists
 that snapshot to disk, one file per model, restored in tens of milliseconds on the next
 launch. A turn arriving mid-warm interrupts it and keeps the batches that finished. The
@@ -106,7 +114,7 @@ deliberately not built, against measurement (`docs/research/gpu-backends.md`).
 `:core:tools` owns everything between "the model asked for a tool" and "the result went
 back in": eighteen tools, sixteen of them user-facing, three of which leave the device
 (`web_search`, `show_pictures`, `fetch_url`) and say so in the UI. `AgentRunner` decides
-one round — what was requested, what may run, what was skipped and why — and the turn
+one round, what was requested, what may run, what was skipped and why, and the turn
 loop in `:app` (`TurnRunner`) owns cancellation and the pass-to-pass conversation. Files
 live behind a user-granted folder (`Workspace`), scripts run in a QuickJS interpreter in
 an `isolatedProcess` service with no filesystem, no sockets and no libc to reach
@@ -114,7 +122,7 @@ an `isolatedProcess` service with no filesystem, no sockets and no libc to reach
 loopback-only server that resolves every path through the workspace so `../` is inert.
 
 Memory is four verbs behind two switches: reading back is one decision, and the three
-writing verbs — save, update, forget — share the other, because "may the model write to
+writing verbs, save, update, forget, share the other, because "may the model write to
 what the app keeps about you" is one question however many tools answer it. Every writing
 verb shows its exact arguments and asks first in every mode, since its effect outlives the
 conversation, and the saved facts themselves are listed, editable and deletable on the
@@ -126,7 +134,7 @@ naming what is on screen (`CanvasBoard`), a question waiting for an answer (`Ask
 Watches are the one tool whose effect outlives the conversation, so they always ask
 first, and a WorkManager scheduler runs them within battery and thermal limits.
 
-Routing a 1B model to the right tool — and to no tool — is measured work, not prompt
+Routing a 1B model to the right tool, and to no tool, is measured work, not prompt
 folklore: the suites and their verdicts live in `docs/research/tool-calling.md`, and the
 offline harness that replays the app's exact prompt bytes is `eval/routing_matrix.py`.
 
@@ -154,7 +162,7 @@ rather than truncate.
 - The multiplatform tiers (`jvmTest`, `iosSimulatorArm64Test`) keep `:core:common`
   honest on every platform it claims.
 - Instrumented tests (`src/androidTest`) exercise the real engines against real weights
-  on a real device — parity suites, canvas build evals, long-conversation evals. They
+  on a real device, parity suites, canvas build evals, long-conversation evals. They
   skip rather than fail when no model is present, so a checkout without one still runs
   green. `docs/CONTEXT.md` has the commands.
 - Release assembly runs `verifyJniSymbols`, which fails the build if R8 renamed anything

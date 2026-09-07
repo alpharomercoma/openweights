@@ -101,8 +101,11 @@ class HubCompiledLayoutsTest {
             }
             println("$repoId offers " + offered.map { "${it.path} window=${it.contextWindow}" })
             assertThat(offered).isNotEmpty()
-            // Software Mansion says the window beside each export; the card shows it.
-            if (repoId.startsWith("software-mansion/")) {
+            // Software Mansion and our own repositories say the window beside each export
+            // in config.json; the card shows it.
+            val saysWindow = repoId.startsWith("software-mansion/") ||
+                repoId.startsWith("experimentalmachines/")
+            if (saysWindow) {
                 assertThat(offered.map { it.contextWindow }).doesNotContain(null)
             }
             // Software Mansion ships MLX exports beside the XNNPACK ones. Never here.

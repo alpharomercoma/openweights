@@ -704,7 +704,20 @@ class HuggingFaceClient @Inject constructor(
  * - **LFM2.5 1.2B compiled**: the fastest thing measured on any phone. First token in
  *   0.30 to 0.44 s, decode 18 to 46 ms a token (22 to 56 tok/s), and on the Tensor G5 and
  *   Exynos 2400 its GGUF decodes at half that rate. GSM8K trails its GGUF (13.0 against
- *   19.6 of 30), IFEval and BFCL by less; the speed is what it is here for.
+ *   19.6 of 30), IFEval and BFCL by less; the speed is what it is here for. The row now
+ *   points at our own export under the experimentalmachines organisation rather than
+ *   software-mansion's: same weights, same ExecuTorch 1.4.0 recipe and quantisation, and
+ *   the same speed on a paired probe, but compiled for a 32k window where the publisher's
+ *   file has 2k, which is smaller than this app's tool prefix. The window costs memory at
+ *   load and nothing else that could be measured (`docs/research/executorch-window-matrix.md`,
+ *   https://alpharomercoma.github.io/openweights/window.html): 1.77 GB resident against
+ *   1.05 GB at 2k on a Dimensity 9400.
+ * - **LFM2.5 2.6B compiled**, our export, 32k window: the only ExecuTorch build of this
+ *   model there is. 2.94 GB resident after load, 149 tok/s prefill and 18 tok/s decode on
+ *   the Dimensity 9400. It reasons before every answer, for up to two thousand tokens, so
+ *   it needs a reply budget of about 2048 and a window that holds it: at a 2k window 14
+ *   of 60 long replies ran into the window itself. With that budget it scored GSM8K 26 of
+ *   30 and IFEval 21 of 30 on the same prompts; at a 640 cap it looked broken.
  * - **Llama 3.2 3B compiled**, software-mansion's SpinQuant export: the largest model on
  *   the list, first token in 1.4 to 1.8 s against 1.7 to 3.5 s for the Q4_K_M GGUF, decode
  *   63 to 125 ms a token against 83 to 180. Level with its GGUF on IFEval, 3 behind on
@@ -766,7 +779,8 @@ val RECOMMENDED = listOf(
     // its score, the fastest model measured on any chip, the 3B that beats its own GGUF
     // to the first token everywhere.
     "larryliu0820/Qwen3-1.7B-INT8-INT4-ExecuTorch-XNNPACK",
-    "software-mansion/react-native-executorch-lfm-2.5",
+    "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
+    "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
     "software-mansion/react-native-executorch-llama-3.2",
 )
 

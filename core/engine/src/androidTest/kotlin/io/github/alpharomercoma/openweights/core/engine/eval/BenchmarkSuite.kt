@@ -133,7 +133,8 @@ object BenchmarkSuite {
             }
             val started = SystemClock.elapsedRealtime()
             val outcome = runCatching {
-                turn(engine, p.getString("prompt"), options.cap.takeIf { it > 0 } ?: p.getInt("max_tokens"), tools(p), options)
+                val cap = options.cap.takeIf { it > 0 } ?: p.getInt("max_tokens")
+                turn(engine, p.getString("prompt"), cap, tools(p), options)
             }
             results.put(
                 outcome.fold(

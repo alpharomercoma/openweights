@@ -9,13 +9,9 @@ Four pages, live at **<https://alpharomercoma.github.io/openweights/>**:
 | Latency chart | <https://alpharomercoma.github.io/openweights/latency.html> | TTFT and TPOT for five models on five chips, llama.cpp against ExecuTorch |
 | Window study | <https://alpharomercoma.github.io/openweights/window.html> | Does the exported ExecuTorch context window matter: the research note and every table it reads |
 
-`window.html` is rendered from `docs/research/executorch-window-matrix.md` (the note) and
-`docs/research/window-matrix.md` (the tables `tools/eval/bench/window_report.py` writes), for
-the same reason the policy is: one copy in the repository, the page a rendering of it. The
-memory chart is drawn from the probe table at build time.
-
-`latency.html` is hand-written and self-contained (`play/site/latency.html`, data inline);
-the build copies it unchanged. Its numbers come from `tools/eval/results/*.graded.json` via
+`latency.html` and `window.html` are hand-written and self-contained (data inline); the build
+copies them unchanged. `window.html`'s `DATA` constant is the JSON form of the tables in
+`docs/research/window-matrix.md`; when `window_report.py` is rerun, regenerate it. Its numbers come from `tools/eval/results/*.graded.json` via
 `tools/eval/bench/report.py`; when a benchmark is rerun, update the `DATA` table in the file.
 
 ## Why it is built rather than written

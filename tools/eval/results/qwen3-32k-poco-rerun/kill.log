@@ -1,0 +1,3 @@
+09-07 12:39:28.962  2404  2494 D StabilityLocalService: pid:29510,procName:io.github.alpharomercoma.openweights.core.engine.test,procType:third_party_app,prepare to kill,used too many pss resource,pss used:8653468kb,pss threshold:6291456kb
+09-07 12:39:28.973  2404  3405 I ActivityManager: Force stopping io.github.alpharomercoma.openweights.core.engine.test appid=10454 user=0: used too many pss resource,pss used:8653468kb,pss threshold:6291456kb
+09-07 12:39:28.979  2404  3405 I ActivityManager: Killing 29510:io.github.alpharomercoma.openweights.core.engine.test/u0a454 (adj 0): stop io.github.alpharomercoma.openweights.core.engine.test due to used too many pss resource,pss used:8653468kb,pss threshold:6291456kb

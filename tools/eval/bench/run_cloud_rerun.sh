@@ -14,10 +14,11 @@ JOBS=${1:?jobs file}
 run_phone() {
   dev=$1
   grep "^$dev " "$JOBS" | while read -r d ver prefix v set cap; do
-    tag="$v.bench-$set${cap:+-cap$cap}"; [ "$cap" = 0 ] && tag="$v.bench-$set"
+    if [ "$cap" = 0 ]; then tag="$v.bench-$set"; capopt=""; else tag="$v.bench-$set-cap$cap"; capopt=$cap; fi
     skip=0
     while :; do
-      name="$OUT/$prefix$tag$( [ $skip -gt 0 ] && echo "@$skip" ).json"
+      if [ $skip -gt 0 ]; then at="@$skip"; skipopt=$skip; else at=""; skipopt=""; fi
+      name="$OUT/$prefix$tag$at.json"
       if [ -f "$name" ]; then
         if grep -q '"budget_exhausted": true' "$name"; then
           done_n=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['cases']))" "$name")
@@ -26,8 +27,7 @@ run_phone() {
         break
       fi
       echo "-> $prefix $v [$set cap=$cap skip=$skip] $(date +%H:%M)"
-      SKIP_BUILD=1 BENCH_MODEL=$v BENCH_SETS=$(echo "$set" | tr + ,) BENCH_CONTEXT=0 BENCH_SKIP=$( [ $skip -gt 0 ] && echo $skip ) \
-        BENCH_CAP=$( [ "$cap" != 0 ] && echo "$cap" ) \
+      SKIP_BUILD=1 BENCH_MODEL=$v BENCH_SETS=$(echo "$set" | tr + ,) BENCH_CONTEXT=0 BENCH_SKIP=$skipopt BENCH_CAP=$capopt \
         "$ROOT/tools/eval/run_matrix_ftl.sh" "$d" "$ver" "$prefix" bench-executorch >/dev/null 2>&1 || true
       if [ ! -f "$name" ]; then echo "FAILED $prefix $v [$set skip=$skip] $(date +%H:%M)"; break; fi
       echo "ok $prefix $v [$set skip=$skip] $(date +%H:%M): $(python3 -c "import json,sys;r=json.load(open(sys.argv[1]));print(len(r['cases']),'prompts, exhausted' if r.get('budget_exhausted') else 'prompts, complete')" "$name")"

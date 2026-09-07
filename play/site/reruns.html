@@ -34,6 +34,13 @@ h1 span{color:var(--ink3)}
 .sub{color:var(--ink2);max-width:70ch;margin:8px 0 0}
 .crumbs{font-size:13px;color:var(--ink3);margin:0 0 10px}
 .crumbs a{color:var(--ink2)}
+.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.brief h3{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
+.brief p{margin:0 0 10px;color:var(--ink2);font-size:13.5px;max-width:60ch}
+.brief table{width:auto;font-size:12px;white-space:nowrap;margin:0 0 10px}
+.brief th,.brief td{padding:4px 8px 4px 0;border-bottom:1px solid var(--grid)}
+@media (min-width:1000px){.brief{grid-template-columns:1fr 1fr 1.3fr}}
+.brief th{font-size:10.5px}
 .verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
 .verdict{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px 14px;min-width:0}
 .verdict .k{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
@@ -92,14 +99,25 @@ footer a{color:var(--ink2)}
 <header>
   <p class="crumbs"><a href="./">OpenWeights</a> &middot; research &middot; 2026-09-07</p>
   <h1>What the reruns changed <span>&middot; a second pass over the window matrix</span></h1>
-  <p class="sub">After the <a href="window.html">window matrix</a> was published, every cell was checked for a failed or noisy run. Three things were rerun the same day: LFM2.5-2.6B at a higher reply cap, the Poco's Qwen3 32k with a log attached, and same-file repeats on two phones. The prompt sets, graders, greedy decoding and thinking-off setting were kept. The same-file controls used all 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL); the higher-cap rerun used the 60 GSM8K and IFEval prompts.</p>
+  <p class="sub">After the <a href="window.html">window matrix</a> was published, every cell was checked for a failed or noisy run, and three things were rerun the same day.</p>
 </header>
+<div class="brief">
+  <div><h3>Purpose</h3><p>Settle the three cells the first pass left in doubt: the 2.6B's grades, which its 640-token cap had cut short; the Poco's Qwen3 32k run, which had died without a recorded cause; and whether a second run of the same file on another phone varies as much as it did on the Poco.</p></div>
+  <div><h3>How it was graded</h3><p>Same prompts and graders as the matrix: GSM8K by the last number in the reply, IFEval by the benchmark's instruction checkers, BFCL by one call to the right function with the right arguments. Greedy, thinking off. The 2.6B rerun raised only the reply cap, from 640 to 2048, on its 60 GSM8K and IFEval prompts; the repeats used all 90.</p></div>
+  <div><h3>How long it ran</h3><div class="scroll"><table><thead><tr><th class="l">Run</th><th>Where</th><th>Wall clock</th></tr></thead><tbody>
+   <tr><td class="l">Qwen3 32k with a log</td><td>Poco</td><td>2 min, killed</td></tr>
+   <tr><td class="l">2.6B 2k repeat, 90 prompts</td><td>Poco</td><td>48 min</td></tr>
+   <tr><td class="l">2.6B 2k at 2048, 60 prompts</td><td>Poco</td><td>80 min</td></tr>
+   <tr><td class="l">2.6B 32k at 2048, 60 prompts</td><td>Poco</td><td>66 min</td></tr>
+   <tr><td class="l">2.6B 4k and 32k at 2048, 1.2B 4k repeat</td><td>Test Lab, 3 phones</td><td>22 launches, 12:40 to 18:51</td></tr></tbody></table></div>
+  <p>The Test Lab span includes a pause from 13:19 to 15:05 for the daily quota. Generation time alone: 2.6B at 2048, 130 to 213 minutes per phone.</p></div>
+</div>
 
 <div class="verdicts">
-  <div class="verdict"><p class="k">The 2.6B</p><p class="v">The 640-token cap suppressed its grades</p><p>At the suite's 640-token cap it scored 10 to 19 of 30 on GSM8K and 3 to 6 on IFEval. At 2048 tokens: 23 to 28 and 18 to 21, on every phone and window.</p></div>
-  <div class="verdict"><p class="k">The window</p><p class="v">At 2k, 14 of 60 replies reached the window limit</p><p>Prompt plus reply stopped at 2047 tokens, the size of the window. At 4k and 32k, on every phone, no reply reached the window; the ones still cut reached the 2048 reply cap.</p></div>
-  <div class="verdict"><p class="k">Same file, twice</p><p class="v">One cloud repeat, the same low agreement</p><p>The Exynos 2400 repeat of the 1.2B agreed with its first run on 7 of 90 raw replies, at least as variable as the four Poco controls. The other cloud phones were not repeated. The 2.6B repeat moved grades by 2 per set and left its tool calls at 24 of 30.</p></div>
-  <div class="verdict"><p class="k">Qwen3 32k</p><p class="v">Both memory guards report a 6 GB threshold</p><p>The Poco rerun with a log was force-stopped by MIUI for using 8.65 GB against a 6 GB threshold, as the two Samsungs were by Heimdall. The Pixel, with no such guard, ran at 8.5 GB and finished.</p></div>
+  <div class="verdict"><p class="k">The 2.6B</p><p class="v">The 640-token cap suppressed its grades</p><p>GSM8K 10 to 19 of 30 and IFEval 3 to 6 at the 640 cap; 23 to 28 and 18 to 21 at 2048, on every phone and window.</p></div>
+  <div class="verdict"><p class="k">The window</p><p class="v">At 2k, 14 of 60 replies reached the window limit</p><p>Prompt plus reply stopped at the window size. At 4k and 32k no reply reached the window; the ones still cut reached the 2048 reply cap.</p></div>
+  <div class="verdict"><p class="k">Same file, twice</p><p class="v">One cloud repeat, the same low agreement</p><p>The Exynos 2400 repeat of the 1.2B agreed with its first run on 7 of 90 raw replies, at least as variable as the Poco controls. The 2.6B repeat moved grades by 2 per set.</p></div>
+  <div class="verdict"><p class="k">Qwen3 32k</p><p class="v">Both memory guards report a 6 GB threshold</p><p>MIUI stopped the Poco run at 8.65 GB against a 6 GB threshold, as Samsung's Heimdall stopped the two Galaxys. The Pixel, with no such guard, finished at 8.5 GB.</p></div>
 </div>
 
 <div class="grid">
@@ -230,7 +248,7 @@ function drawCuts(){
 
 // ---------- lengths: two histograms ----------
 function drawLen(){
- const s=document.getElementById("len");const W=640,H=380,M={l:44,r:16,t:30,b:34},gap=28;const o=[];
+ const s=document.getElementById("len");const W=640,H=380,M={l:44,r:16,t:30,b:46},gap=28;const o=[];
  const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),warn=css("--warn"),ok=css("--ok");
  const BIN=128,XMAX=2304;const ph=(H-M.t-M.b-gap)/2;
  const YMAX=Math.max(...["2k","32k"].map(w=>{const b={};DATA.lengths[w].forEach(([g,p])=>{const k=Math.min(XMAX/BIN-1,Math.floor((g+p)/BIN));b[k]=(b[k]||0)+1});return Math.max(...Object.values(b))}));
@@ -257,7 +275,7 @@ function drawCtrl(){
  [0,.25,.5,.75,1].forEach(v=>o.push(`<line x1="${x(v)}" x2="${x(v)}" y1="${M.t-6}" y2="${H-M.b}" stroke="${grid}"/><text x="${x(v)}" y="${H-M.b+14}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${Math.round(v*100)}%</text>`));
  o.push(`<text x="${M.l}" y="${M.t-18}" font-size="12" font-weight="600" fill="${ink}">Replies identical between the two runs</text>`);
  rows.forEach((rw,j)=>{const y=M.t+rowH*(j+.5);const c=chip(rw.phone),col=css(c.v);
-  o.push(`<text x="${M.l-10}" y="${y}" text-anchor="end" font-size="11.5" fill="${ink2}">${rw.model} ${rw.window}</text><text x="${M.l-10}" y="${y+13}" text-anchor="end" font-size="10.5" fill="${ink3}">${c.name}</text>`);
+  o.push(`<text x="${M.l-10}" y="${y-3}" text-anchor="end" font-size="11.5" fill="${ink2}">${rw.model} ${rw.window}</text><text x="${M.l-10}" y="${y+12}" text-anchor="end" font-size="10.5" fill="${ink3}">${c.short}</text>`);
   const d=k=>{const a=rw.first[k],b=rw.second[k];return `${k.toUpperCase().replace("GSM8K","GSM8K").replace("IFEVAL","IFEval")} ${a} then ${b}`};
   const grades=`Grades: ${d("gsm8k")}, ${d("ifeval")}, ${d("bfcl")}`;
   o.push(`<rect class="pt" x="${x(rw.calls/rw.nbfcl)-4}" y="${y-9}" width="8" height="18" rx="1" fill="${col}" data-t="${esc(`${rw.model} ${rw.window} on the ${c.name}\nParsed tool calls identical: ${rw.calls} of ${rw.nbfcl} BFCL prompts\n${grades}`)}"/>`);

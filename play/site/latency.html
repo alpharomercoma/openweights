@@ -32,6 +32,13 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 h1{font:700 40px/1 "Archivo","Archivo Narrow",Impact,sans-serif;font-stretch:75%;letter-spacing:-.01em;margin:0;text-wrap:balance}
 h1 span{color:var(--ink3)}
 .sub{color:var(--ink2);max-width:62ch;margin:6px 0 0}
+.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.brief h3{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
+.brief p{margin:0 0 10px;color:var(--ink2);font-size:13.5px;max-width:60ch}
+.brief table{width:auto;font-size:12px;white-space:nowrap;margin:0 0 10px}
+.brief th,.brief td{padding:4px 8px 4px 0;border-bottom:1px solid var(--grid)}
+@media (min-width:1000px){.brief{grid-template-columns:1fr 1fr 1.3fr}}
+.brief th{font-size:10.5px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:6px 14px;font:500 13.5px "Instrument Sans",sans-serif;cursor:pointer}
 .tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -64,6 +71,11 @@ svg{width:100%;height:auto;display:block;overflow:visible}
   </div>
   <div class="tabs" id="tabs" role="group" aria-label="Model"></div>
 </header>
+<div class="brief">
+  <div><h3>Purpose</h3><p>Show how fast five small models answer on five phone chips, on the two runtimes the app ships, so a reader can pick a model and runtime for a given phone. Time to first token is what a user waits before the reply starts; time per output token is how fast it then streams.</p></div>
+  <div><h3>How it was graded</h3><p>Not graded here: this page is timing only. The same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL; Gemma 3 skips BFCL, having no tool syntax) ran greedy with thinking off, and the median prefill and decode time of each cell is plotted. The pass rates for these runs are in the repository's benchmark matrix.</p></div>
+  <div><h3>How long it ran</h3><p>One pass per cell on 2026-09-03 and 04. Generation time per cell ran from 6 minutes (LFM2.5-1.2B on ExecuTorch, 8 Elite) to about 100 minutes (SmolLM3 on llama.cpp, Tensor G5); 29 hours of phone time in all, plus loading and Test Lab queueing.</p></div>
+</div>
 
 <div class="grid">
   <section class="panel">
@@ -145,9 +157,9 @@ function drawMap(){
  const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel");
  XT.forEach(t=>{o+=`<line x1="${lx(t)}" x2="${lx(t)}" y1="${M.t}" y2="${H-M.b}" stroke="${grid}"/><text x="${lx(t)}" y="${H-M.b+18}" text-anchor="middle" font-size="11.5" fill="${ink2}" class="mono">${t<1?t.toFixed(1):t}</text>`});
  YT.forEach(t=>{o+=`<line x1="${M.l}" x2="${W-M.r}" y1="${ly(t)}" y2="${ly(t)}" stroke="${grid}"/><text x="${M.l-8}" y="${ly(t)+4}" text-anchor="end" font-size="11.5" fill="${ink2}" class="mono">${t}</text>`});
- o+=`<text x="${(M.l+W-M.r)/2}" y="${H-8}" text-anchor="middle" font-size="12" fill="${ink2}">Time to first token, seconds</text>`;
+ o+=`<text x="${(M.l+W-M.r)/2}" y="${H-8}" text-anchor="middle" font-size="12" fill="${ink2}">Time to first token, seconds (lower and left is faster)</text>`;
  o+=`<text transform="translate(16 ${(M.t+H-M.b)/2}) rotate(-90)" text-anchor="middle" font-size="12" fill="${ink2}">Time per output token, ms</text>`;
- o+=`<text x="${M.l+6}" y="${H-M.b-8}" font-size="11.5" fill="${ink3}">faster &#8601;</text>`;
+
  CHIPS.forEach((c,i)=>{const a=d.llama[i],b=d.et[i],col=css(c.v);
   o+=`<line class="lnk" x1="${lx(a[0])}" y1="${ly(a[1])}" x2="${lx(b[0])}" y2="${ly(b[1])}" stroke="${col}" stroke-width="1.6" stroke-dasharray="3 3" opacity=".8"/>`});
  CHIPS.forEach((c,i)=>{const col=css(c.v);const a=d.llama[i],b=d.et[i];
@@ -193,9 +205,9 @@ function drawDumb(){
  const s=document.getElementById("dumb");let o="";
  const ink=css("--ink"),ink2=css("--ink2"),ink3=css("--ink3"),grid=css("--grid"),panel=css("--panel"),line=css("--line");
  const c0=left,c1=left+colW+colGap;
- o+=`<text x="${c0}" y="16" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TTFT, s</text><text x="${c1}" y="16" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TPOT, ms</text>`;
+ o+=`<text x="${c0}" y="11" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TTFT, s</text><text x="${c1}" y="11" font-size="11.5" font-weight="600" fill="${ink2}" letter-spacing=".06em">TPOT, ms</text>`;
  [[c0,scaleT,[0.3,1,3,10]],[c1,scaleP,[20,50,100,200]]].forEach(([c,sc,ticks])=>{
-  ticks.forEach(t=>{const x=sx(t,c,sc);o+=`<line x1="${x}" x2="${x}" y1="${gTop-8}" y2="${DH-22}" stroke="${grid}"/><text x="${x}" y="${gTop-12}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${t}</text>`})});
+  ticks.forEach(t=>{const x=sx(t,c,sc);o+=`<line x1="${x}" x2="${x}" y1="${gTop-6}" y2="${DH-22}" stroke="${grid}"/><text x="${x}" y="${gTop-9}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${t}</text>`})});
  let y=gTop+8;
  MODELS.forEach(m=>{const d=DATA[m],on=m===model;
   if(on){const h=rowH-2+CHIPS.length*rowH+6;o+=`<rect x="4" y="${y-12}" width="${DW-20}" height="${h}" rx="4" fill="${css("--band")}"/><rect x="4" y="${y-12}" width="3" height="${h}" fill="${ink}"/>`;}

@@ -34,6 +34,13 @@ h1 span{color:var(--ink3)}
 .sub{color:var(--ink2);max-width:66ch;margin:8px 0 0}
 .crumbs{font-size:13px;color:var(--ink3);margin:0 0 10px}
 .crumbs a{color:var(--ink2)}
+.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0 28px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.brief h3{font:600 12px "Instrument Sans",sans-serif;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin:0 0 6px}
+.brief p{margin:0 0 10px;color:var(--ink2);font-size:13.5px;max-width:60ch}
+.brief table{width:auto;font-size:12px;white-space:nowrap;margin:0 0 10px}
+.brief th,.brief td{padding:4px 8px 4px 0;border-bottom:1px solid var(--grid)}
+@media (min-width:1000px){.brief{grid-template-columns:1fr 1fr 1.3fr}}
+.brief th{font-size:10.5px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:6px 14px;font:500 13.5px "Instrument Sans",sans-serif;cursor:pointer}
 .tab[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -83,6 +90,7 @@ table.cells th:first-child,table.cells td:first-child{position:sticky;left:0;bac
 table.cells tbody tr:hover td:first-child{background:var(--panel)}
 .scroll::after{content:"";display:block}
 .hint{color:var(--ink3);font-size:12px;margin:6px 0 0}
+.foot{color:var(--ink3);font-size:12px;margin:8px 0 0}
 .notes{margin-top:22px;color:var(--ink2);font-size:13.5px;max-width:78ch;display:grid;gap:8px}
 .notes b{color:var(--ink);font-weight:600}
 .notes a{color:var(--ink)}
@@ -100,17 +108,27 @@ footer a{color:var(--ink2)}
   <div>
     <p class="crumbs"><a href="./">OpenWeights</a> &middot; research &middot; 2026-09-07</p>
     <h1>Does the exported window matter? <span>&middot; ExecuTorch, 2k to 32k</span></h1>
-    <p class="sub">ExecuTorch fixes the context window when a model is exported. Identical weights were compared across exported windows: five LFM2.5-1.2B windows on the Dimensity 9400, the smallest and largest window for the other model and phone pairs, and the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL) in every completed cell, greedy, thinking off. Pick a model or condition; every chart follows.</p>
+    <p class="sub">ExecuTorch fixes a model's context window when the model is exported. This page asks whether that choice changes anything but memory. Pick a model or condition; every chart follows.</p>
   </div>
   <div class="tabs" id="tabs" role="group" aria-label="Model"></div>
 </header>
+<div class="brief">
+  <div><h3>Purpose</h3><p>Decide whether a full sweep of five windows, five models and four chips (about 50 device hours) was worth running, by measuring the same weights exported at 2k, 4k, 8k, 16k and 32k on the same prompts. Five windows of LFM2.5-1.2B ran on the Dimensity 9400; the other model and phone pairs ran the smallest and largest window.</p></div>
+  <div><h3>How it was graded</h3><p>90 prompts per cell: 30 GSM8K (the last number in the reply must equal the reference), 30 IFEval (every instruction in the prompt must be satisfied, checked by the benchmark's own code), 30 BFCL (exactly one call to the right function with the right arguments). Greedy decoding, thinking off, replies capped at 640 tokens (384 for BFCL). The 2.6B was also rerun at a 2048 cap.</p></div>
+  <div><h3>How long it ran</h3><div class="scroll"><table><thead><tr><th class="l">Model</th><th>Dimensity</th><th>8 Elite</th><th>Tensor G5</th><th>Exynos</th></tr></thead><tbody>
+   <tr><td class="l">LFM2.5-1.2B</td><td>63</td><td>12</td><td>43</td><td>35</td></tr>
+   <tr><td class="l">LFM2.5-2.6B, 640 cap</td><td>129</td><td>75</td><td>128</td><td>117</td></tr>
+   <tr><td class="l">LFM2.5-2.6B, 2048 cap</td><td>146</td><td>130</td><td>213</td><td>195</td></tr>
+   <tr><td class="l">Qwen3-1.7B</td><td>33</td><td>19</td><td>57</td><td>25</td></tr></tbody></table></div>
+  <p>Minutes the model spent generating, summed over every run in that cell; 23.7 hours in all. Loading, cooling and Test Lab queueing came on top. Run on 2026-09-07.</p></div>
+</div>
 
 <div class="verdicts">
-  <div class="verdict"><p class="k">Answers and tool calls</p><p class="v">No consistent directional effect found</p><p>The same file run twice was byte-identical on 7 to 15 of 90 prompts for LFM2.5-1.2B (Dimensity and Exynos) and 31 of 90 for Qwen3; two windows agree on 12 to 19. Rerun at a cap it can finish under, the 2.6B moves both ways between windows: GSM8K 23 to 28 of 30, IFEval 18 to 21. One repeat per control cell, so smaller effects stay unresolved.</p></div>
-  <div class="verdict"><p class="k">Speed</p><p class="v">Paired medians close; Qwen3 32k slower</p><p>Six paired turns per file on the Dimensity 9400: LFM2.5-1.2B medians within 1.3% on prefill and 1.1% on decode, LFM2.5-2.6B within 0.5% and 2.4%. Qwen3 32k was 5.9% slower on prefill and 4.7% on decode. No equivalence margin was predeclared.</p></div>
-  <div class="verdict"><p class="k">Memory</p><p class="v">The one thing the window buys, at load</p><p>LFM2.5 pays 25 to 33 KB per token of window. Qwen3-1.7B, full attention, pays 224 KB: its 32k export sits above 6 GB before the first prompt, and both MIUI and Samsung kill any process that crosses 6 GB.</p></div>
-  <div class="verdict"><p class="k">Where the window did matter</p><p class="v">A 2k export cannot hold a long reply</p><p>At the 2048 cap, 14 of the 2.6B's 60 GSM8K and IFEval replies at 2k ran into the window itself, prompt plus reply at 2047 tokens, and were cut there. At 32k the same prompts hit only the reply cap, 10 of 60. The grades barely moved, but the reply did not fit.</p></div>
-  <div class="verdict"><p class="k">The full sweep</p><p class="v">Screen the endpoints before any full sweep</p><p>The evidence does not justify launching the full sweep now. Compute the KV cost, screen the smallest and largest window per model and chip, and add intermediate windows where the endpoints diverge or fail. Cloud phones have endpoint measurements only and cannot exclude an effect at 8k or 16k.</p></div>
+  <div class="verdict"><p class="k">Answers and tool calls</p><p class="v">No consistent directional effect found</p><p>Two windows agree on 12 to 19 of 90 replies; the same file run twice agrees on 7 to 15. Grades move both ways between windows by about as much as between repeats.</p></div>
+  <div class="verdict"><p class="k">Speed</p><p class="v">Paired medians close; Qwen3 32k slower</p><p>Same prompt, same turn, Dimensity 9400: LFM2.5 windows within 2.4% of each other. Qwen3 32k was 5.9% slower on prefill and 4.7% on decode than 2k.</p></div>
+  <div class="verdict"><p class="k">Memory</p><p class="v">The one thing the window buys, at load</p><p>LFM2.5 pays 25 to 33 KB per token of window; Qwen3-1.7B pays 224 KB, so its 32k export needs over 6 GB before the first prompt and 12 GB phones kill it.</p></div>
+  <div class="verdict"><p class="k">Where the window did matter</p><p class="v">At 2k, 14 of 60 long replies hit the window</p><p>The 2.6B reasons before it answers. At 2k, prompt plus reply reached the window and was cut; at 4k and above only the reply cap cut them. Grades barely moved.</p></div>
+  <div class="verdict"><p class="k">The full sweep</p><p class="v">Screen the endpoints before any full sweep</p><p>Compute the KV cost, run the smallest and largest window per model and chip, and add middle windows only where those two diverge or fail.</p></div>
 </div>
 
 <div class="grid">
@@ -136,7 +154,7 @@ footer a{color:var(--ink2)}
     <h2>Identical replies</h2>
     <p id="identCap"></p>
     <div class="chart"><svg id="ident" viewBox="0 0 640 392" role="img" aria-label="Share of replies identical to the largest window, per phone and window"></svg></div>
-    <div class="legend" id="identLegend"></div>
+    <p class="foot" id="identFoot"></p><div class="legend" id="identLegend"></div>
   </section>
 </div>
 
@@ -253,7 +271,7 @@ function drawSpeed(){
  o.push(`<text transform="translate(14 ${(M.t+H-M.b)/2}) rotate(-90)" text-anchor="middle" font-size="12" fill="${ink2}">Throughput vs smallest window</text>`);
  const base=baseOf(model);const rows=DATA.ratio.filter(r=>r.file.startsWith(base+"-"));
  rows.forEach(r=>{const w=win(r.file.slice(base.length+1));const x=xw(w,M.l,W-M.r);const pf=ratioOf(r.prefill),dc=ratioOf(r.decode);const pr=DATA.probe.find(q=>q.file===r.file);
-  [[pf,x-7,true],[dc,x+7,false]].forEach(([v,xx,solid])=>{if(!v)return;const vv=v.map(k=>Math.max(Y0,Math.min(Y1,k)));
+  [[pf,x-7+(w===2?8:0),true],[dc,x+7+(w===2?8:0),false]].forEach(([v,xx,solid])=>{if(!v)return;const vv=v.map(k=>Math.max(Y0,Math.min(Y1,k)));
    const t=`${SHORT[base].split(",")[0]} at ${w}k, ${solid?"prefill":"decode"}\n${(v[0]*100).toFixed(1)}% of the ${rows[0]&&win(rows[0].file.slice(base.length+1))}k rate (range ${(v[1]*100).toFixed(0)} to ${(v[2]*100).toFixed(0)}%)\n${pr?(solid?`Median ${pr.prefill.split(" ")[0]} tok/s prefill, ${pr.prefill_ms} ms for 929 tokens`:`Median ${pr.decode.split(" ")[0]} tok/s decode`):""}`;
    o.push(`<line x1="${xx}" x2="${xx}" y1="${y(vv[1])}" y2="${y(vv[2])}" stroke="${ink}" stroke-width="1.4" opacity=".55"/>`);
    o.push(solid?`<circle class="pt" cx="${xx}" cy="${y(vv[0])}" r="5.5" fill="${ink}" data-t="${esc(t)}"/>`:`<circle class="pt" cx="${xx}" cy="${y(vv[0])}" r="6.5" fill="${panel}" stroke="${ink}" stroke-width="2" data-t="${esc(t)}"/>`);
@@ -301,21 +319,22 @@ function drawIdent(){
   o.push(`<text x="${l}" y="${M.t-12}" font-size="12" font-weight="600" fill="${ink}">${label}</text>`);
   [0,.25,.5,.75,1].forEach(v=>{o.push(`<line x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}"/>`);if(i===0)o.push(`<text x="${M.l-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="${ink2}" class="mono">${Math.round(v*100)}%</text>`);});
   const xs=others.map((w,j)=>others.length>1?l+10+j*(cw-20)/(others.length-1):(l+r)/2);
-  others.forEach((w,j)=>o.push(`<text x="${xs[j]}" y="${H-M.b+16}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${w}k</text>`));
-  if(i===1)o.push(`<text x="${(l+r)/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="${ink2}">Window compared with the ${largest}k export</text>`);
+  others.forEach((w,j)=>o.push(`<text x="${xs[j]}" y="${H-M.b+22}" text-anchor="middle" font-size="10.5" fill="${ink3}" class="mono">${w}k</text>`));
+  if(i===1)o.push(`<text x="${(l+r)/2}" y="${H-4}" text-anchor="middle" font-size="11.5" fill="${ink2}">Window compared with the ${largest}k export</text>`);
+
   ctrl.forEach(c=>{const p=parse(c.identity);if(!p||!p[k][1])return;const v=p[k][0]/p[k][1];const chip=CHIPS.find(x=>x.id===c.phone);const col=chip?css(chip.v):ink3;
    o.push(`<line class="pt" x1="${l}" x2="${r}" y1="${y(v)}" y2="${y(v)}" stroke="${col}" stroke-dasharray="4 4" stroke-width="1.4" pointer-events="stroke" data-t="${esc(`${SHORT[model]} ${c.window}, same file twice on the ${chip?chip.name:c.phone}\n${label}: ${p[k][0]} of ${p[k][1]} identical`)}"/>`);});
   rows.forEach(rw=>{const rep=rw.phone.endsWith(" repeat");const chip=CHIPS.find(c=>c.id===rw.phone.replace(" repeat",""));if(!chip)return;const col=css(chip.v);
    rw.values.forEach((val,j)=>{const p=parse(val);if(!p||!p[k][1])return;const v=p[k][0]/p[k][1];
     const t=`${SHORT[model]}, ${others[j]}k against ${largest}k on the ${chip.name}${rep?" (second run of the "+others[j]+"k)":""}\n${label}: ${p[k][0]} of ${p[k][1]} identical`;
     const full=p[k][1]>=(k==="calls"?30:(model.includes("cap")?60:90));
-    if(!full){const xx=xs[j]+(CHIPS.indexOf(chip)-1.5)*9;o.push(`<g class="pt" data-t="${esc(t+"\nOnly "+p[k][1]+" prompts were completed by both runs: not a full comparison")}" pointer-events="all"><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)-4}" y2="${y(v)+4}" stroke="${col}" stroke-width="2"/><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)+4}" y2="${y(v)-4}" stroke="${col}" stroke-width="2"/><text x="${xx}" y="${y(v)-8}" text-anchor="middle" font-size="9.5" fill="${ink3}" class="mono">n=${p[k][1]}</text></g>`);return;}
+    if(!full){const xx=xs[j]+(CHIPS.indexOf(chip)-1.5)*9;o.push(`<g class="pt" data-t="${esc(t+"\nOnly "+p[k][1]+" prompts were completed by both runs: not a full comparison")}" pointer-events="all"><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)-4}" y2="${y(v)+4}" stroke="${col}" stroke-width="2"/><line x1="${xx-4}" x2="${xx+4}" y1="${y(v)+4}" y2="${y(v)-4}" stroke="${col}" stroke-width="2"/></g>`);return;}
     o.push(rep?mark(SHAPES[chip.id],xs[j],y(v),7,"none",col,2,`pointer-events="all" data-t="${esc(t)}"`):mark(SHAPES[chip.id],xs[j],y(v),5,col,panel,1.2,`data-t="${esc(t)}"`));});});});
  const inc=rows.some(rw=>rw.values.some(v=>{const p=parse(v);return p&&p.raw[1]&&p.raw[1]<90}));
  const note=model.includes("cap")?"No BFCL in the capped rerun; long reasoning replies never match byte for byte"
   :model.includes("2.6B")?"Raw identity is cap-censored: long reasoning replies rarely match byte for byte"
-  :inc?"&#215; runs that ended early share only a few prompts with the other window; not a full comparison":"";
- if(note)o.push(`<text x="${W-M.r}" y="${H-M.b+46}" text-anchor="end" font-size="11" fill="${ink3}">${note}</text>`);
+  :inc?"&#215; a run that ended early: only the 6 to 12 prompts both runs completed are compared":"";
+ document.getElementById("identFoot").innerHTML=note;
  s.innerHTML=o.join("");wire(s);
 }
 

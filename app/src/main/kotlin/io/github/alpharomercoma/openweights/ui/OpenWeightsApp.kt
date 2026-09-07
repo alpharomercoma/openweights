@@ -342,12 +342,18 @@ fun OpenWeightsApp(
                 onCloseModel = viewModel::closeModel,
                 onContextLengthChange = viewModel::onContextLengthChange,
                 // What is already being fetched, so this screen stops offering a download
-                // for a file it has one running for. Keyed by destination filename, which
-                // is what ModelsViewModel keys a download by.
+                // for a file it has one running for. Keyed by repository and Hub path, which
+                // is what this screen knows about a file. It used to be keyed by the
+                // destination filename, which equals the Hub name for a GGUF and not for a
+                // compiled file, which is renamed on the way in: a .pte download showed no
+                // progress and no way to stop it (2026-09-07).
                 downloading = modelsState.downloads
                     .filterNot { it.error != null }
-                    .associate { it.key to it.fraction },
-                onCancelDownload = modelsViewModel::cancel,
+                    .associate { "${it.repoId}/${it.path}" to it.fraction },
+                onCancelDownload = { repoPath ->
+                    modelsState.downloads.firstOrNull { "${it.repoId}/${it.path}" == repoPath }
+                        ?.let { modelsViewModel.cancel(it.key) }
+                },
                 onDownload = { repoId, path ->
                     state.files.firstOrNull { it.file.path == path }?.file?.let { file ->
                         val tokenizer = state.detail?.tokenizerFor(file)

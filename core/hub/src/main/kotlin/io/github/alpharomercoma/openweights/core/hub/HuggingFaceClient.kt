@@ -748,8 +748,8 @@ val RECOMMENDED = listOf(
     // the family that measured best here, compiled for the runtime that measured fastest,
     // with sixteen times the window of the publisher exports they replace. The heretic
     // pair are the same two models with refusal behaviour removed, the same recipe.
-    "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
     "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
+    "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
     "experimentalmachines/LFM2.5-1.2B-Instruct-heretic",
     "experimentalmachines/LFM2.5-2.6B-heretic",
     // The family with eyes, from Liquid AI's own GGUF repository: ships its mmproj

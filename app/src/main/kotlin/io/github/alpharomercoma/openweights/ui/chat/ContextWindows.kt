@@ -24,6 +24,8 @@ import io.github.alpharomercoma.openweights.core.device.FitVerdict
 import io.github.alpharomercoma.openweights.core.hub.gguf.ByteWindowSource
 import io.github.alpharomercoma.openweights.core.hub.gguf.GgufHeaderParser
 import io.github.alpharomercoma.openweights.model.ModelStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
 import javax.inject.Inject
@@ -65,7 +67,8 @@ class ContextWindows @Inject constructor(
         // alone will not fit this phone, where the old default is kept so the load fails
         // with the message the engine writes rather than with a kill.
         if (model.extension.equals("pte", ignoreCase = true)) {
-            val exported = store.exportedWindow(model)
+            // The probe maps the file; the chat calls this from the main dispatcher.
+            val exported = withContext(Dispatchers.IO) { store.exportedWindow(model) }
                 ?: return ModelLoadParams.DEFAULT_CONTEXT_LENGTH
             val fit = estimator.estimateCompiled(
                 device = profiler.profile(),

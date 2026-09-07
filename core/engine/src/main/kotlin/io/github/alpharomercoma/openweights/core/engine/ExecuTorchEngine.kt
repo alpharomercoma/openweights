@@ -129,7 +129,12 @@ class ExecuTorchEngine(
     override val loadedModel: LoadedModelInfo? get() = info?.copy(contextUsed = heldTokens)
 
     override suspend fun load(modelFile: File, params: ModelLoadParams, projectorFile: File?) {
-        turns.withLock { loadLocked(modelFile, params) }
+        // Off the caller's thread. The chat loads from the main dispatcher, and this maps
+        // the whole file and allocates the cache for the exported window: on a 1.8 GB
+        // export at 32k that is seconds, and the phone showed "not responding" every five
+        // seconds until it was done (2026-09-07, LFM2.5 2.6B). llama.cpp's engine has
+        // always hopped to its own thread here; this one did not.
+        turns.withLock { withContext(Dispatchers.IO) { loadLocked(modelFile, params) } }
     }
 
     private fun loadLocked(modelFile: File, params: ModelLoadParams) {
@@ -220,7 +225,7 @@ class ExecuTorchEngine(
     /** A load refused for a reason the caller can show. */
     private fun refuse(message: String): Nothing = throw LlamaException(message)
 
-    override suspend fun unload() = turns.withLock { closeModel() }
+    override suspend fun unload() = turns.withLock { withContext(Dispatchers.IO) { closeModel() } }
 
     /** Under [turns]: the callers that already hold it cannot take it twice. */
     private fun closeModel() {

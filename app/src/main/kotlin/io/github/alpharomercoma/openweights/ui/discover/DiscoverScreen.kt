@@ -106,9 +106,9 @@ fun DiscoverScreen(
     onCloseModel: () -> Unit,
     onContextLengthChange: (Int) -> Unit,
     onDownload: (String, String) -> Unit,
-    /** Stops a download in flight, by the destination filename it is keyed under. */
+    /** Stops a download in flight, by `repoId/path` of the Hub file. */
     onCancelDownload: (String) -> Unit = {},
-    /** Downloads already running, by destination filename, so a started one says so. */
+    /** Downloads already running, by `repoId/path` of the Hub file, so a started one says so. */
     downloading: Map<String, Float> = emptyMap(),
     /**
      * Pops back to the conversation, when this screen was pushed from it.
@@ -472,11 +472,12 @@ private fun ModelDetail(
         }
 
         items(state.files, key = { it.file.path }) { inspected ->
+            val repoPath = "${detail.model.id}/${inspected.file.path}"
             FitCard(
                 inspected = inspected,
                 onDownload = { onDownload(inspected.file.path) },
-                downloadFraction = downloading[inspected.file.fileName],
-                onCancelDownload = { onCancelDownload(inspected.file.fileName) },
+                downloadFraction = downloading[repoPath],
+                onCancelDownload = { onCancelDownload(repoPath) },
             )
         }
     }

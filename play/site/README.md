@@ -1,15 +1,16 @@
 # The public site
 
-Four pages, live at **<https://alpharomercoma.github.io/openweights/>**:
+Five pages, live at **<https://alpharomercoma.github.io/openweights/>**:
 
 | Page | URL | What it is for |
 |---|---|---|
 | Privacy policy | <https://alpharomercoma.github.io/openweights/privacy.html> | The URL the Play listing must link to |
 | Landing | <https://alpharomercoma.github.io/openweights/> | Somewhere for that link to sit, and the repository link |
 | Latency chart | <https://alpharomercoma.github.io/openweights/latency.html> | TTFT and TPOT for five models on five chips, llama.cpp against ExecuTorch |
-| Window study | <https://alpharomercoma.github.io/openweights/window.html> | Does the exported ExecuTorch context window matter: the research note and every table it reads |
+| Window study | <https://alpharomercoma.github.io/openweights/window.html> | Does the exported ExecuTorch context window matter: charts and every table |
+| Reruns | <https://alpharomercoma.github.io/openweights/reruns.html> | What the second pass over the window matrix changed: the 2.6B under two caps, window cuts, controls, the 6 GB kill rule |
 
-`latency.html` and `window.html` are hand-written and self-contained (data inline); the build
+`latency.html`, `window.html` and `reruns.html` are hand-written and self-contained (data inline); the build
 copies them unchanged. `window.html`'s `DATA` constant is the JSON form of the tables in
 `docs/research/window-matrix.md`; when `window_report.py` is rerun, regenerate it. Its numbers come from `tools/eval/results/*.graded.json` via
 `tools/eval/bench/report.py`; when a benchmark is rerun, update the `DATA` table in the file.
@@ -30,7 +31,7 @@ python3 play/site/build.py build/site
 
 git worktree add --detach /tmp/ghp
 git -C /tmp/ghp checkout gh-pages
-cp build/site/index.html build/site/privacy.html build/site/latency.html build/site/window.html /tmp/ghp/
+cp build/site/index.html build/site/privacy.html build/site/latency.html build/site/window.html build/site/reruns.html /tmp/ghp/
 git -C /tmp/ghp commit -am "Update the published policy"
 git -C /tmp/ghp push origin gh-pages
 git worktree remove /tmp/ghp
@@ -47,7 +48,7 @@ there and Play reviewers look at it.
 Pages can serve from `docs/`, and that was the obvious option and the wrong one: `docs/` is
 working notes. The roadmap, the tool-calling research, the context file. All of it is already
 readable in a public repository and none of it wants a URL of its own, a nav entry, or a
-Google result. The `gh-pages` branch holds five files and nothing else.
+Google result. The `gh-pages` branch holds six files and nothing else.
 
 `.nojekyll` is one of them, because without it GitHub runs Jekyll over the branch, which is a
 build nobody asked for and one more thing that can fail between an edit and a live policy.

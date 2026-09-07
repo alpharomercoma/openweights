@@ -141,6 +141,7 @@ download it, and chat with it. Every token is produced by your own hardware.</p>
 <li><a href="privacy.html">Privacy policy</a></li>
 <li><a href="latency.html">Benchmarks: five chips, two runtimes</a></li>
 <li><a href="window.html">Research: does the exported context window matter?</a></li>
+<li><a href="reruns.html">Research: what the reruns changed</a></li>
 <li><a href="{REPO}">Source code</a></li>
 <li><a href="{REPO}/issues">Report a problem</a></li>
 </ul>
@@ -161,9 +162,9 @@ if __name__ == "__main__":
     (out / "index.html").write_text(landing_page())
     # The chart and the window study are hand-written, self-contained HTML (data inline); they
     # are copied, not generated, so that the file in the repository is exactly the file that is served.
-    for name in ("latency.html", "window.html"):
+    for name in ("latency.html", "window.html", "reruns.html"):
         (out / name).write_text((Path(__file__).parent / name).read_text())
     # Without this GitHub runs Jekyll over the branch, which is a build nobody asked for.
     (out / ".nojekyll").write_text("")
-    for name in ("index.html", "privacy.html", "latency.html", "window.html"):
+    for name in ("index.html", "privacy.html", "latency.html", "window.html", "reruns.html"):
         print(f"{name}: {(out / name).stat().st_size} bytes")

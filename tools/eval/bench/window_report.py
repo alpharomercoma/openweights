@@ -49,10 +49,13 @@ def load(root: Path):
         if base is None:
             continue
         key = (base, window, device_of(path.name))
-        meta.setdefault(key, {})
-        for k in ("context_size", "rss_mb"):
-            if r.get(k):
+        meta.setdefault(key, {"expected": 0, "budget_exhausted": False})
+        for k in ("context_size", "rss_mb", "rss_mb_after_load"):
+            if r.get(k) and r.get(k) != -1:
                 meta[key][k] = r[k]
+        meta[key]["budget_exhausted"] |= bool(r.get("budget_exhausted"))
+        # A report covers whole sets: 30 prompts each. Sum over the reports of a cell.
+        meta[key]["expected"] += 30 * len(sets_covered(path.name))
         for c in r["cases"]:
             have = cells[key].get(c["id"])
             if have and have.get("grade") in ("pass", "fail") and c.get("grade") not in ("pass", "fail"):
@@ -66,13 +69,24 @@ def calls_of(c):
 
 
 def identity(a, b, shared):
-    """Three counts over the prompts both runs completed: raw token stream identical, parsed
-    tool calls identical (canonicalised JSON), shown content identical (codex QA: content alone
-    can agree while the calls differ, or differ only in what the parser stripped)."""
+    """Raw token stream identical and shown content identical over the prompts both runs
+    completed, and parsed tool calls identical over the BFCL prompts among them only (codex
+    QA round two: counting the 60 prompts whose call list is empty either way inflated it)."""
     raw = sum(a[i].get("raw") == b[i].get("raw") for i in shared)
-    calls = sum(calls_of(a[i]) == calls_of(b[i]) for i in shared)
+    bfcl = [i for i in shared if a[i].get("set") == "bfcl"]
+    calls = sum(calls_of(a[i]) == calls_of(b[i]) for i in bfcl)
     content = sum(a[i].get("content") == b[i].get("content") for i in shared)
-    return f"{raw} / {calls} / {content} of {len(shared)}"
+    return f"raw {raw}/{len(shared)}, calls {calls}/{len(bfcl)}, content {content}/{len(shared)}"
+
+
+CAP_OF = {"gsm8k": 640, "ifeval": 640, "bfcl": 384}
+
+
+def sets_covered(name):
+    """The sets a report file was launched for, from its name: `.bench.json` is all three,
+    `.bench-bfcl+gsm8k.json` two, `.bench-ifeval.json` one."""
+    tag = name.split(".bench", 1)[1].replace(".graded", "").split(".json")[0].lstrip("-")
+    return tag.split("+") if tag else [s for s, _ in SETS]
 
 
 def med(xs):
@@ -94,12 +108,15 @@ def render(cells, meta, sizes) -> str:
            "(30 GSM8K, 30 IFEval, 30 BFCL), greedy, thinking off, loaded at the file's own window. "
            "Prefill ms is the runtime's prefill time for the whole prompt (the engine-side part of time to first token, "
            "not a first-token timestamp); ms/token is decode time over generated tokens, which differ per cell "
-           "because the replies differ, so it is a per-cell figure and not a paired speed comparison.", ""]
+           "because the replies differ, so it is a per-cell figure and not a paired speed comparison. Capped is "
+           "how many completed replies ran to the token cap (640, or 384 for BFCL) and so never finished; a set "
+           "whose replies are mostly capped is cap-censored and its grade says little. RSS is the test process\x27s "
+           "resident set right after the model loaded and at the end of the run.", ""]
     for model in models:
         windows = sorted({k[1] for k in cells if k[0] == model})
         out += [f"## {model}", ""]
         head = "| Window | File | Phone | " + " | ".join(l for _, l in SETS) + \
-               " | Prefill ms | ms/token | Prefill tok/s | Decode tok/s | Ran at | RSS MB |"
+               " | Capped | Prefill ms | ms/token | Prefill tok/s | Decode tok/s | Ran at | RSS after load MB | RSS at end MB |"
         out += [head, "|" + "---|" * (head.count("|") - 1)]
         for w in windows:
             for d in devices:
@@ -107,6 +124,18 @@ def render(cells, meta, sizes) -> str:
                 if not cases:
                     continue
                 ok = [c for c in cases.values() if c.get("status") == "ok"]
+                m = meta.get((model, w, d), {})
+                size = sizes.get(f"{model}-{w // 1024}k")
+                expected = m.get("expected", 90)
+                if len(cases) < expected and not m.get("budget_exhausted"):
+                    # The process ended before the set did, with no time box and no error
+                    # recorded: no grade or timing is shown for such a cell (codex QA).
+                    out.append(
+                        f"| {w // 1024}k | {fmt(size / 1e6) + ' MB' if size else '-'} | {d} | "
+                        f"INCOMPLETE: process ended after {len(cases)}/{expected} prompts | | | | | | | | "
+                        f"{m.get('context_size', '-')} | {m.get('rss_mb_after_load', '-')} | {m.get('rss_mb', '-')} (last observed) |")
+                    continue
+                capped = sum(1 for c in ok if c.get("generated_tokens", 0) >= CAP_OF.get(c["set"], 640) - 1)
                 scores = []
                 for s, _ in SETS:
                     graded = [c for c in cases.values() if c["set"] == s and c.get("grade") in ("pass", "fail")]
@@ -117,12 +146,10 @@ def render(cells, meta, sizes) -> str:
                 tpot = med([c["decode_ms"] / c["generated_tokens"] for c in ok if c.get("generated_tokens")])
                 pre = med([c["prompt_tokens"] * 1000 / c["prefill_ms"] for c in ok if c.get("prefill_ms")])
                 dec = med([c["generated_tokens"] * 1000 / c["decode_ms"] for c in ok if c.get("decode_ms")])
-                m = meta.get((model, w, d), {})
-                size = sizes.get(f"{model}-{w // 1024}k")
                 out.append(
                     f"| {w // 1024}k | {fmt(size / 1e6) + ' MB' if size else '-'} | {d} | " + " | ".join(scores) +
-                    f" | {fmt(ttft)} | {fmt(tpot, 1)} | {fmt(pre)} | {fmt(dec, 1)} | "
-                    f"{m.get('context_size', '-')} | {m.get('rss_mb', '-')} |")
+                    f" | {capped}/{len(ok)} | {fmt(ttft)} | {fmt(tpot, 1)} | {fmt(pre)} | {fmt(dec, 1)} | "
+                    f"{m.get('context_size', '-')} | {m.get('rss_mb_after_load', '-')} | {m.get('rss_mb', '-')} |")
         out.append("")
         # Byte-identical replies against the largest window, per phone.
         largest = windows[-1]
@@ -148,9 +175,9 @@ def render(cells, meta, sizes) -> str:
                 control.append(f"| {w // 1024}k | {identity(a, b, shared)} |")
         if control:
             out += ["Run-to-run control: the same file run twice on the D9400, replies byte-identical:", "",
-                    "| Window | raw / calls / content identical, of shared |", "|---|---|"] + control + [""]
+                    "| Window | identical replies |", "|---|---|"] + control + [""]
         if rows and len(windows) > 1:
-            out += [f"Replies identical to the {largest // 1024}k export, per window (raw stream / parsed tool calls / shown content, of prompts both completed):", "",
+            out += [f"Replies identical to the {largest // 1024}k export, per window (raw stream and shown content over prompts both completed; parsed tool calls over the BFCL prompts):", "",
                     "| Phone | " + " | ".join(f"{w // 1024}k" for w in windows[:-1]) + " |",
                     "|" + "---|" * len(windows)] + rows + [""]
     return "\n".join(out)

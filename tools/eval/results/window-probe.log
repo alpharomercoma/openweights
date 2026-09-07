@@ -1,0 +1,96 @@
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:18:22.525 26538 26563 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1052
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:18:29.327 26538 26563 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2831 generated=159 decodeMs=3952 prefillTokS=328.5 decodeTokS=40.2 rssMb=1124
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:18:35.952 26538 26563 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2705 generated=159 decodeMs=3910 prefillTokS=343.8 decodeTokS=40.7 rssMb=1126
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:18:42.572 26538 26563 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2736 generated=159 decodeMs=3879 prefillTokS=339.9 decodeTokS=41.0 rssMb=1127
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:19:48.865 26716 26742 I ExecuTorchOnDevice: matrix load: window=4096 rssMb=1099
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:19:55.689 26716 26742 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2815 generated=159 decodeMs=3994 prefillTokS=330.4 decodeTokS=39.8 rssMb=1170
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:20:02.351 26716 26742 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2740 generated=159 decodeMs=3913 prefillTokS=339.4 decodeTokS=40.6 rssMb=1172
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:20:08.785 26716 26742 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2721 generated=152 decodeMs=3710 prefillTokS=341.8 decodeTokS=41.0 rssMb=1173
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:20:44.871 26883 26908 I ExecuTorchOnDevice: matrix load: window=8192 rssMb=1195
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:20:51.703 26883 26908 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2844 generated=159 decodeMs=3970 prefillTokS=327.0 decodeTokS=40.1 rssMb=1266
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:20:58.310 26883 26908 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2699 generated=158 decodeMs=3899 prefillTokS=344.6 decodeTokS=40.5 rssMb=1267
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:21:04.563 26883 26908 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2724 generated=145 decodeMs=3527 prefillTokS=341.4 decodeTokS=41.1 rssMb=1268
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:21:40.603 27009 27037 I ExecuTorchOnDevice: matrix load: window=16384 rssMb=1386
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:21:47.445 27009 27037 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2829 generated=159 decodeMs=3994 prefillTokS=328.7 decodeTokS=39.8 rssMb=1457
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:21:54.071 27009 27037 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2706 generated=159 decodeMs=3912 prefillTokS=343.7 decodeTokS=40.6 rssMb=1458
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:22:00.594 27009 27037 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2693 generated=155 decodeMs=3827 prefillTokS=345.3 decodeTokS=40.5 rssMb=1460
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:22:52.102 27176 27202 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=1768
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:22:58.915 27176 27202 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2825 generated=159 decodeMs=3970 prefillTokS=329.2 decodeTokS=40.1 rssMb=1839
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:23:05.570 27176 27202 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2708 generated=159 decodeMs=3939 prefillTokS=343.4 decodeTokS=40.4 rssMb=1840
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:23:12.197 27176 27202 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2715 generated=159 decodeMs=3909 prefillTokS=342.5 decodeTokS=40.7 rssMb=1842
+LFM2.5-2.6B-8da4w-2k 09-07 09:23:50.991 27294 27320 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1984
+LFM2.5-2.6B-8da4w-2k 09-07 09:24:05.451 27294 27320 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6254 generated=159 decodeMs=8188 prefillTokS=148.7 decodeTokS=19.4 rssMb=2071
+LFM2.5-2.6B-8da4w-2k 09-07 09:24:19.732 27294 27320 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6090 generated=159 decodeMs=8183 prefillTokS=152.7 decodeTokS=19.4 rssMb=2074
+LFM2.5-2.6B-8da4w-2k 09-07 09:24:35.566 27294 27320 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6517 generated=159 decodeMs=9313 prefillTokS=142.7 decodeTokS=17.1 rssMb=2076
+LFM2.5-2.6B-8da4w-4k 09-07 09:25:29.522 27480 27522 I ExecuTorchOnDevice: matrix load: window=4096 rssMb=2045
+LFM2.5-2.6B-8da4w-4k 09-07 09:25:43.945 27480 27522 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6243 generated=159 decodeMs=8163 prefillTokS=149.0 decodeTokS=19.5 rssMb=2133
+LFM2.5-2.6B-8da4w-4k 09-07 09:25:58.624 27480 27522 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6092 generated=159 decodeMs=8578 prefillTokS=152.7 decodeTokS=18.5 rssMb=2136
+LFM2.5-2.6B-8da4w-4k 09-07 09:26:14.630 27480 27522 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6551 generated=159 decodeMs=9451 prefillTokS=142.0 decodeTokS=16.8 rssMb=2139
+LFM2.5-2.6B-8da4w-8k 09-07 09:27:08.508 27670 27699 I ExecuTorchOnDevice: matrix load: window=8192 rssMb=2171
+LFM2.5-2.6B-8da4w-8k 09-07 09:27:22.940 27670 27699 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6221 generated=159 decodeMs=8192 prefillTokS=149.5 decodeTokS=19.4 rssMb=2259
+LFM2.5-2.6B-8da4w-8k 09-07 09:27:37.734 27670 27699 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6088 generated=159 decodeMs=8695 prefillTokS=152.8 decodeTokS=18.3 rssMb=2262
+LFM2.5-2.6B-8da4w-8k 09-07 09:27:53.408 27670 27699 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6578 generated=153 decodeMs=9093 prefillTokS=141.4 decodeTokS=16.8 rssMb=2264
+LFM2.5-2.6B-8da4w-16k 09-07 09:28:47.678 27964 27988 I ExecuTorchOnDevice: matrix load: window=16384 rssMb=2426
+LFM2.5-2.6B-8da4w-16k 09-07 09:29:01.675 27964 27988 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6230 generated=151 decodeMs=7747 prefillTokS=149.3 decodeTokS=19.5 rssMb=2513
+LFM2.5-2.6B-8da4w-16k 09-07 09:29:16.477 27964 27988 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6079 generated=159 decodeMs=8714 prefillTokS=153.0 decodeTokS=18.2 rssMb=2517
+LFM2.5-2.6B-8da4w-16k 09-07 09:29:32.543 27964 27988 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6622 generated=159 decodeMs=9440 prefillTokS=140.4 decodeTokS=16.8 rssMb=2519
+LFM2.5-2.6B-8da4w-32k 09-07 09:30:26.838 28164 28188 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=2936
+LFM2.5-2.6B-8da4w-32k 09-07 09:30:41.265 28164 28188 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6247 generated=159 decodeMs=8163 prefillTokS=148.9 decodeTokS=19.5 rssMb=3023
+LFM2.5-2.6B-8da4w-32k 09-07 09:30:56.070 28164 28188 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6114 generated=159 decodeMs=8683 prefillTokS=152.1 decodeTokS=18.3 rssMb=3026
+LFM2.5-2.6B-8da4w-32k 09-07 09:31:12.159 28164 28188 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6601 generated=159 decodeMs=9484 prefillTokS=140.9 decodeTokS=16.8 rssMb=3029
+Qwen3-1.7B-8da4w-2k 09-07 09:32:04.640 28338 28363 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1757
+Qwen3-1.7B-8da4w-2k 09-07 09:32:16.691 28338 28363 I ExecuTorchOnDevice: matrix turn 0: prompt=934 prefillMs=4649 generated=133 decodeMs=7384 prefillTokS=200.9 decodeTokS=18.0 rssMb=1818
+Qwen3-1.7B-8da4w-2k 09-07 09:32:29.038 28338 28363 I ExecuTorchOnDevice: matrix turn 1: prompt=934 prefillMs=4525 generated=141 decodeMs=7812 prefillTokS=206.4 decodeTokS=18.0 rssMb=1821
+Qwen3-1.7B-8da4w-2k 09-07 09:32:41.185 28338 28363 I ExecuTorchOnDevice: matrix turn 2: prompt=934 prefillMs=4797 generated=118 decodeMs=7348 prefillTokS=194.7 decodeTokS=16.1 rssMb=1822
+Qwen3-1.7B-8da4w-32k 09-07 09:33:39.053 28603 28628 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=6295
+Qwen3-1.7B-8da4w-32k 09-07 09:33:50.884 28603 28628 I ExecuTorchOnDevice: matrix turn 0: prompt=934 prefillMs=5162 generated=117 decodeMs=6645 prefillTokS=180.9 decodeTokS=17.6 rssMb=5865
+Qwen3-1.7B-8da4w-32k 09-07 09:34:04.889 28603 28628 I ExecuTorchOnDevice: matrix turn 1: prompt=934 prefillMs=4608 generated=159 decodeMs=9383 prefillTokS=202.7 decodeTokS=16.9 rssMb=5836
+Qwen3-1.7B-8da4w-32k 09-07 09:34:16.604 28603 28628 I ExecuTorchOnDevice: matrix turn 2: prompt=934 prefillMs=4967 generated=110 decodeMs=6745 prefillTokS=188.0 decodeTokS=16.3 rssMb=5796
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:35:09.274 29328 29352 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1048
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:35:16.431 29328 29352 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2835 generated=145 decodeMs=4302 prefillTokS=328.0 decodeTokS=33.7 rssMb=1118
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:35:23.285 29328 29352 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=3231 generated=144 decodeMs=3615 prefillTokS=287.8 decodeTokS=39.8 rssMb=1121
+LFM2.5-1.2B-Instruct-8da4w-2k 09-07 09:35:29.810 29328 29352 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2778 generated=151 decodeMs=3744 prefillTokS=334.8 decodeTokS=40.3 rssMb=1122
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:36:05.666 31061 31086 I ExecuTorchOnDevice: matrix load: window=4096 rssMb=1098
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:36:12.463 31061 31086 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2811 generated=159 decodeMs=3969 prefillTokS=330.8 decodeTokS=40.1 rssMb=1169
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:36:18.734 31061 31086 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2736 generated=130 decodeMs=3527 prefillTokS=339.9 decodeTokS=36.9 rssMb=1170
+LFM2.5-1.2B-Instruct-8da4w-4k 09-07 09:36:25.358 31061 31086 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2705 generated=159 decodeMs=3917 prefillTokS=343.8 decodeTokS=40.6 rssMb=1172
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:37:01.272 31616 31641 I ExecuTorchOnDevice: matrix load: window=8192 rssMb=1194
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:37:07.441 31616 31641 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2830 generated=133 decodeMs=3321 prefillTokS=328.6 decodeTokS=40.0 rssMb=1264
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:37:14.006 31616 31641 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2697 generated=159 decodeMs=3860 prefillTokS=344.8 decodeTokS=41.2 rssMb=1266
+LFM2.5-1.2B-Instruct-8da4w-8k 09-07 09:37:20.410 31616 31641 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2701 generated=152 decodeMs=3700 prefillTokS=344.3 decodeTokS=41.1 rssMb=1267
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:38:11.776 31728 31753 I ExecuTorchOnDevice: matrix load: window=16384 rssMb=1385
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:38:18.625 31728 31753 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2857 generated=159 decodeMs=3974 prefillTokS=325.5 decodeTokS=40.0 rssMb=1456
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:38:25.040 31728 31753 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2715 generated=150 decodeMs=3692 prefillTokS=342.5 decodeTokS=40.6 rssMb=1457
+LFM2.5-1.2B-Instruct-8da4w-16k 09-07 09:38:30.777 31728 31753 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2722 generated=124 decodeMs=3012 prefillTokS=341.7 decodeTokS=41.2 rssMb=1458
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:39:07.018 31910 31935 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=1768
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:39:13.800 31910 31935 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=2784 generated=159 decodeMs=3981 prefillTokS=334.1 decodeTokS=39.9 rssMb=1839
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:39:20.426 31910 31935 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=2689 generated=159 decodeMs=3927 prefillTokS=345.9 decodeTokS=40.5 rssMb=1840
+LFM2.5-1.2B-Instruct-8da4w-32k 09-07 09:39:26.729 31910 31935 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=2708 generated=147 decodeMs=3592 prefillTokS=343.4 decodeTokS=40.9 rssMb=1842
+LFM2.5-2.6B-8da4w-2k 09-07 09:40:05.593 32032 32056 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1983
+LFM2.5-2.6B-8da4w-2k 09-07 09:40:20.020 32032 32056 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6253 generated=159 decodeMs=8155 prefillTokS=148.7 decodeTokS=19.5 rssMb=2071
+LFM2.5-2.6B-8da4w-2k 09-07 09:40:34.700 32032 32056 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6110 generated=159 decodeMs=8558 prefillTokS=152.2 decodeTokS=18.6 rssMb=2074
+LFM2.5-2.6B-8da4w-2k 09-07 09:40:50.757 32032 32056 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6541 generated=159 decodeMs=9512 prefillTokS=142.2 decodeTokS=16.7 rssMb=2076
+LFM2.5-2.6B-8da4w-4k 09-07 09:41:29.622 32269 32293 I ExecuTorchOnDevice: matrix load: window=4096 rssMb=2047
+LFM2.5-2.6B-8da4w-4k 09-07 09:41:44.125 32269 32293 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6285 generated=159 decodeMs=8201 prefillTokS=148.0 decodeTokS=19.4 rssMb=2134
+LFM2.5-2.6B-8da4w-4k 09-07 09:41:59.097 32269 32293 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6197 generated=154 decodeMs=8765 prefillTokS=150.1 decodeTokS=17.6 rssMb=2137
+LFM2.5-2.6B-8da4w-4k 09-07 09:42:15.632 32269 32293 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6911 generated=159 decodeMs=9619 prefillTokS=134.6 decodeTokS=16.5 rssMb=2139
+LFM2.5-2.6B-8da4w-8k 09-07 09:43:09.863 32486 32511 I ExecuTorchOnDevice: matrix load: window=8192 rssMb=2172
+LFM2.5-2.6B-8da4w-8k 09-07 09:43:23.803 32486 32511 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6246 generated=150 decodeMs=7676 prefillTokS=148.9 decodeTokS=19.5 rssMb=2261
+LFM2.5-2.6B-8da4w-8k 09-07 09:43:38.738 32486 32511 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6146 generated=159 decodeMs=8781 prefillTokS=151.3 decodeTokS=18.1 rssMb=2264
+LFM2.5-2.6B-8da4w-8k 09-07 09:43:54.891 32486 32511 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6651 generated=159 decodeMs=9498 prefillTokS=139.8 decodeTokS=16.7 rssMb=2266
+LFM2.5-2.6B-8da4w-16k 09-07 09:45:19.233 32640 32665 I ExecuTorchOnDevice: matrix load: window=16384 rssMb=2428
+LFM2.5-2.6B-8da4w-16k 09-07 09:45:33.628 32640 32665 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6221 generated=159 decodeMs=8156 prefillTokS=149.5 decodeTokS=19.5 rssMb=2515
+LFM2.5-2.6B-8da4w-16k 09-07 09:45:48.283 32640 32665 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6085 generated=159 decodeMs=8560 prefillTokS=152.8 decodeTokS=18.6 rssMb=2519
+LFM2.5-2.6B-8da4w-16k 09-07 09:46:04.596 32640 32665 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6735 generated=159 decodeMs=9575 prefillTokS=138.1 decodeTokS=16.6 rssMb=2520
+LFM2.5-2.6B-8da4w-32k 09-07 09:46:59.091   456   524 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=2937
+LFM2.5-2.6B-8da4w-32k 09-07 09:47:13.501   456   524 I ExecuTorchOnDevice: matrix turn 0: prompt=930 prefillMs=6234 generated=159 decodeMs=8157 prefillTokS=149.2 decodeTokS=19.5 rssMb=3024
+LFM2.5-2.6B-8da4w-32k 09-07 09:47:28.445   456   524 I ExecuTorchOnDevice: matrix turn 1: prompt=930 prefillMs=6120 generated=159 decodeMs=8813 prefillTokS=152.0 decodeTokS=18.0 rssMb=3027
+LFM2.5-2.6B-8da4w-32k 09-07 09:47:44.998   456   524 I ExecuTorchOnDevice: matrix turn 2: prompt=930 prefillMs=6707 generated=159 decodeMs=9841 prefillTokS=138.7 decodeTokS=16.2 rssMb=3029
+Qwen3-1.7B-8da4w-2k 09-07 09:48:37.408  1272  1311 I ExecuTorchOnDevice: matrix load: window=2048 rssMb=1759
+Qwen3-1.7B-8da4w-2k 09-07 09:48:49.096  1272  1311 I ExecuTorchOnDevice: matrix turn 0: prompt=934 prefillMs=4710 generated=126 decodeMs=6960 prefillTokS=198.3 decodeTokS=18.1 rssMb=1819
+Qwen3-1.7B-8da4w-2k 09-07 09:48:59.980  1272  1311 I ExecuTorchOnDevice: matrix turn 1: prompt=934 prefillMs=4556 generated=115 decodeMs=6320 prefillTokS=205.0 decodeTokS=18.2 rssMb=1821
+Qwen3-1.7B-8da4w-2k 09-07 09:49:12.265  1272  1311 I ExecuTorchOnDevice: matrix turn 2: prompt=934 prefillMs=4829 generated=123 decodeMs=7453 prefillTokS=193.4 decodeTokS=16.5 rssMb=1823
+Qwen3-1.7B-8da4w-32k 09-07 09:50:09.646  1561  1586 I ExecuTorchOnDevice: matrix load: window=32768 rssMb=6011
+Qwen3-1.7B-8da4w-32k 09-07 09:50:21.962  1561  1586 I ExecuTorchOnDevice: matrix turn 0: prompt=934 prefillMs=4962 generated=128 decodeMs=7333 prefillTokS=188.2 decodeTokS=17.5 rssMb=5727
+Qwen3-1.7B-8da4w-32k 09-07 09:50:34.702  1561  1586 I ExecuTorchOnDevice: matrix turn 1: prompt=934 prefillMs=5748 generated=106 decodeMs=6981 prefillTokS=162.5 decodeTokS=15.2 rssMb=4430
+Qwen3-1.7B-8da4w-32k 09-07 09:50:47.912  1561  1586 I ExecuTorchOnDevice: matrix turn 2: prompt=934 prefillMs=5177 generated=121 decodeMs=8031 prefillTokS=180.4 decodeTokS=15.1 rssMb=4357

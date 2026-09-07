@@ -15,32 +15,50 @@ Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x
 
 ## The short answer
 
-- **The window does not change what the model says, beyond what the runtime changes on its
-  own.** Between any two windows of LFM2.5-1.2B on the same phone, the raw token streams
-  agree on 12 to 19 of 90 prompts and the parsed tool calls on 84 to 88 of 90. Running the
-  *same file twice* on the same phone gives the same figures: 13 to 15 of 90 raw, 83 to 85
-  of 90 calls. Grades move by one to five prompts per set in both directions between runs of
-  the same file (Qwen3 2k twice on the Poco: GSM8K 20 then 17, IFEval 15 then 18). The
-  ExecuTorch runtime is not deterministic run to run on these phones, and the between-window
-  differences sit inside that band. For the 2.6B, which reasons to the cap, no two runs of
-  anything agree on the raw stream (0 of 90), while the parsed tool calls agree on 84 to 87
-  of 90 and the shown content on 29 to 30.
-- **The window does not change speed.** In the suite's own timings, prefill and decode
-  rates at 32k sit within a few percent of 2k or 4k on every phone for both LFM2.5 sizes
-  (D9400 1.2B: 254 to 262 tok/s prefill and 37.5 to 38.7 tok/s decode across all five
-  windows). The fixed-prompt probe, which is the paired measurement, is in the probe table.
+- **No window effect on answers or tool calls was found that stands out from the runtime's
+  own run-to-run variation.** Between any two windows of LFM2.5-1.2B on the same phone, the
+  raw token streams agree on 12 to 19 of 90 prompts. Running the *same file twice* on the
+  same phone agrees on 13 to 15 of 90. Parsed BFCL tool calls agree on 24 to 28 of 30 between
+  windows and 23 to 25 of 30 between repeats. Grades swing by up to five prompts per set
+  between runs of the *same* file (Qwen3 2k on the Poco: GSM8K 20 then 17, IFEval 15 then
+  18) and by similar amounts between windows in both directions (1.2B GSM8K on the Poco: 17,
+  16, 17, 13, 12 from 2k to 32k; 2.6B GSM8K on the Exynos: 10 at 4k, 18 at 32k). The
+  ExecuTorch runtime is not deterministic run to run on these phones. With one repeat per
+  control cell this is a screen, not a proof: a directional window effect smaller than that
+  variation cannot be excluded, and a stronger test would be three to five counterbalanced
+  runs per export with a predeclared equivalence margin.
+- **Speed is unchanged by the window, on the Poco, where it was measured in a paired way.**
+  The fixed-prompt probe (929-token prompt, 160-token cap, same turn against same turn,
+  files interleaved) puts every LFM2.5-1.2B window within 0.3 to 1.3% of the 2k export on
+  prefill and within 1.1% on decode; the 2.6B within 0.5% on prefill and 2.4% on decode;
+  Qwen3 32k 5.9% slower on prefill and 4.7% on decode than 2k, the one file whose cache
+  (about 7 GB) is large enough to plausibly cost something in itself. Ranges of the per-turn
+  ratios reach 18% for the 1.2B because one pass-one turn of the 2k reference was slow, so
+  the medians are the figures to read. On the cloud phones no paired probe was run; their
+  suite timings differ by up to 19% between windows (Tensor G5 1.2B decode 15.6 at 4k, 12.6
+  at 32k) and are unpaired, over different replies, on phones that throttle within a
+  minute, so they do not support a speed claim either way.
 - **The window costs memory, allocated at load, and for a full-attention model it is
   decisive.** LFM2.5 (8 of 30 or 6 of 16 layers attend) pays 25 to 33 KB per token of
-  window: 400 to 800 MB at 16k, 800 MB to 1.07 GB at 32k. Qwen3-1.7B (all 28 layers attend,
-  8 KV heads of 128) pays 224 KB per token: about 7 GB at 32k. The Qwen3 32k export loaded
-  to 5.7 to 8.5 GB resident and died after three to six prompts on the 12 GB Galaxy S24+,
-  Galaxy S25 Ultra and Poco X8 Pro (the report on disk stops mid-set with no error and no
-  time-box, which is what a process killed for memory leaves behind); only the 16 GB Pixel
-  10 Pro XL finished all 90. Its 2k export ran everywhere. Qwen3 at 32k is not a shippable
-  file on a 12 GB phone; at 2k it is.
-- **So the full sweep was not worth running,** and the reduced design below was enough to
-  show it, with two controls the first design lacked (same-file repeats and a fixed-prompt
-  speed probe) that a methodology review demanded.
+  window: resident after load 1.05 GB at 2k and 1.77 GB at 32k for the 1.2B, 1.98 and 2.94 GB
+  for the 2.6B. Qwen3-1.7B (all 28 layers attend, 8 KV heads of 128) pays 224 KB per token:
+  the 32k export sat at 6.1 to 8.5 GB resident after load. On the Galaxy S25 Ultra and S24+
+  Samsung's Heimdall memory guard killed the test process ("Trigger Global kill before GC,
+  Usage 8.67 GB, Threshold 6 GB", in the pulled logcats) after 7 to 12 prompts; on the
+  12 GB Poco it ended after 6 prompts with the cause not captured; only the 16 GB Pixel 10
+  Pro XL finished all 90. The 2k export ran everywhere. Those cells are marked incomplete in
+  the table and carry no grade or timing.
+- **The 2.6B rows measure a deployed configuration, not the model.** With the start token
+  in place it reads prompts correctly, but its own template makes it reason first and 16 of
+  30 GSM8K and 26 of 30 IFEval replies ran to the 640-token cap without answering. Its
+  GSM8K and IFEval grades and raw identity are cap-censored; its BFCL calls (22 to 25 of
+  30 at every window on every phone), load success, memory and probe speed are usable.
+- **On the original question:** the evidence does not justify launching the full 5 x 5 x 4
+  sweep. What it supports is an adaptive policy: compute the KV cost per window from the
+  architecture, screen the endpoints (smallest and largest window) per model and chip, and
+  add intermediate windows only where the endpoints diverge or fail. That is what this run
+  did, and the intermediate LFM2.5 windows on the Poco added nothing the endpoints had not
+  shown.
 
 ## What was actually run
 
@@ -49,7 +67,7 @@ Tensor G5 and Exynos 2400 in Firebase Test Lab. And whether the full 5 windows x
 | LFM2.5-1.2B | 2k, 4k, 8k, 16k, 32k, full 90 prompts; 16k and 32k run twice | 4k and 32k, full 90 |
 | LFM2.5-2.6B | 2k and 32k, full 90 (8k, 16k dropped: 55 min per file once the BOS fix made it reason to the cap) | 4k and 32k, full 90 |
 | Qwen3-1.7B | 2k and 32k, full 90; 2k run twice | 2k and 32k, full 90 |
-| Speed probe | all twelve files, two interleaved passes, three turns each, cooled and awake | not run |
+| Speed probe | all twelve files, two interleaved passes, three turns each, cooled below 42 C and awake before each load | not run |
 
 Every file was loaded at its own exported window (`context=0`), greedy, thinking off,
 640-token cap (384 for BFCL), the same 90 prompts (30 GSM8K, 30 IFEval, 30 BFCL) and the
@@ -97,9 +115,26 @@ wakes the phone and holds it awake; the thermal service's first "CPU" row is a c
   medians. The Poco was cooled below 42 C before every probe load but not between suite
   files.
 - The 2.6B reasons before answering whatever the eval asks (its chat template pre-opens
-  `<think>`), so at a 640-token cap many of its replies never reach an answer. Its grades are
-  therefore low at every window alike and say nothing about the window and little about the
-  model; they are in the table because the byte-identity and speed columns still count.
+  `<think>`), so at a 640-token cap most of its GSM8K and IFEval replies never reach an
+  answer: those grades and its raw identity are cap-censored (the Capped column counts the
+  replies that hit the cap). Its BFCL calls, load success, memory and probe speed are not.
+- Parsed-call identity is counted over the 30 BFCL prompts only; the other 60 prompts have
+  an empty call list in every run and would inflate it.
+- Cells marked INCOMPLETE are runs whose process ended before its set did, with no error and
+  no time box recorded; they show the last observed resident memory and nothing else.
+
+## Review
+
+Codex reviewed the method twice, before and after the data. Round one asked for same-file
+repeats, a paired speed probe separated from the task eval, honest labels for prefill and
+decode figures, a three-way identity metric, memory after load, and a second architecture;
+all were added. Round two asked that the conclusions be bounded by the observed run
+variability rather than stated as invariance, that parsed-call identity be counted over BFCL
+only, that the Qwen3 32k cells be shown as incomplete with their termination cause qualified,
+that the 2.6B grades be labelled cap-censored, that the two RSS figures be separated, and
+that the verdict on the full sweep be phrased as an adaptive policy rather than a nil
+effect; this note and the renderer follow that. The termination cause was then confirmed
+from the logcats for the two Samsung phones.
 
 ## What is where
 

@@ -1,0 +1,85 @@
+{
+ "suite": "benchmark",
+ "model": "Qwen3-1.7B-8da4w-32k",
+ "engine": "ExecuTorchEngine",
+ "params": "greedy topK=1 seed=7 thinking=false repeatPenalty=default",
+ "prompts_seed": 7,
+ "context_size": 32768,
+ "rss_mb_after_load": 6396,
+ "rss_mb": 6380,
+ "completed": 4,
+ "ok": 4,
+ "errors": 0,
+ "skipped": 0,
+ "budget_exhausted": false,
+ "cases": [
+  {
+   "id": "ifeval-179",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "**Proposal for Financing: *The History of the Internet – A Digital Timeline of Innovation and Influence***\n\nDear [Investor's Name] and the Board of Directors at [Investment Firm or Company],\n\nI am writing to you with the utmost enthusiasm and insight in proposing the financing of a documentary film titled *The History of the Internet – A Digital Timeline of Innovation and Influence*. This film is not merely a celebration of the Internet’s rise, but a comprehensive exploration of its evolution, impact, and legacy. It is a documentary that will captivate, educate, and provoke thought in a generation of digital natives and tech enthusiasts alike.\n\nThe Internet, born in the late 1960s as a decentralized network of computers, has grown into the most transformative invention of the modern age. From the ARPANET project to the birth of the World Wide Web, the Internet has been the backbone of global communication, commerce, and culture. Yet, its journey is not linear—it has been shaped by the innovation of individuals, the policies of governments, and the vision of corporations. *The History of the Internet* is a narrative that spans from the early days of ARPANET to the present, capturing the essence of this revolutionary technology.\n\nThis documentary will not be a dry history lesson. It will be a visual and emotional journey through the key moments in the Internet’s history, from the first message sent over ARPANET to the creation of the first web page. It will follow the arc of the Internet from a small network of computers in the U.S. to a global phenomenon that has redefined how we communicate, work, and live.\n\nThe film will be structured in thematic chapters, each focusing on a pivotal moment in the Internet’s evolution. From the invention of the World Wide Web to the rise of social media and the current age of digital information, the documentary will be a visually rich and intellectually stimulating experience. It will feature interviews with key figures in the Internet industry—architects, engineers, visionaries, and the people who made the Internet a reality.\n\nOne of the most compelling aspects of this film is its ability to bridge the past with the present. It will explore how the Internet’s early days, with their decentralized nature and limited scope, have evolved into the vast and interconnected web of today. The documentary will also highlight the cultural and political impact of the Internet, from its role in the civil rights movement to its impact on global politics and economics.\n\nThe director of this film, [Name], is a visionary and a storyteller with over 20 years of experience in documentary filmmaking. They have previously created award-winning films on topics ranging from the history of cinema to the rise of the digital age. Their ability to translate complex historical and technological concepts into accessible, visually engaging content is unmatched.\n\nThe film will be presented in a documentary format, with a mix of archival footage, interviews, and expert commentary. It will be a 90-minute film, with the potential for a series of documentaries or a feature-length film, depending on the marketability and distribution strategy. The target audience is a broad range of viewers, from casual internet users to tech enthusiasts",
+   "reasoning_chars": 0,
+   "raw": "**Proposal for Financing: *The History of the Internet – A Digital Timeline of Innovation and Influence***\n\nDear [Investor's Name] and the Board of Directors at [Investment Firm or Company],\n\nI am writing to you with the utmost enthusiasm and insight in proposing the financing of a documentary film titled *The History of the Internet – A Digital Timeline of Innovation and Influence*. This film is not merely a celebration of the Internet’s rise, but a comprehensive exploration of its evolution, impact, and legacy. It is a documentary that will captivate, educate, and provoke thought in a generation of digital natives and tech enthusiasts alike.\n\nThe Internet, born in the late 1960s as a decentralized network of computers, has grown into the most transformative invention of the modern age. From the ARPANET project to the birth of the World Wide Web, the Internet has been the backbone of global communication, commerce, and culture. Yet, its journey is not linear—it has been shaped by the innovation of individuals, the policies of governments, and the vision of corporations. *The History of the Internet* is a narrative that spans from the early days of ARPANET to the present, capturing the essence of this revolutionary technology.\n\nThis documentary will not be a dry history lesson. It will be a visual and emotional journey through the key moments in the Internet’s history, from the first message sent over ARPANET to the creation of the first web page. It will follow the arc of the Internet from a small network of computers in the U.S. to a global phenomenon that has redefined how we communicate, work, and live.\n\nThe film will be structured in thematic chapters, each focusing on a pivotal moment in the Internet’s evolution. From the invention of the World Wide Web to the rise of social media and the current age of digital information, the documentary will be a visually rich and intellectually stimulating experience. It will feature interviews with key figures in the Internet industry—architects, engineers, visionaries, and the people who made the Internet a reality.\n\nOne of the most compelling aspects of this film is its ability to bridge the past with the present. It will explore how the Internet’s early days, with their decentralized nature and limited scope, have evolved into the vast and interconnected web of today. The documentary will also highlight the cultural and political impact of the Internet, from its role in the civil rights movement to its impact on global politics and economics.\n\nThe director of this film, [Name], is a visionary and a storyteller with over 20 years of experience in documentary filmmaking. They have previously created award-winning films on topics ranging from the history of cinema to the rise of the digital age. Their ability to translate complex historical and technological concepts into accessible, visually engaging content is unmatched.\n\nThe film will be presented in a documentary format, with a mix of archival footage, interviews, and expert commentary. It will be a 90-minute film, with the potential for a series of documentaries or a feature-length film, depending on the marketability and distribution strategy. The target audience is a broad range of viewers, from casual internet users to tech enthusiasts",
+   "calls": [],
+   "prompt_tokens": 54,
+   "generated_tokens": 639,
+   "prefill_ms": 458,
+   "decode_ms": 32331,
+   "wall_ms": 32891,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-201",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "I woke up to the sound of a distant train. I turned my head and saw the sun rising behind the window. It was a quiet morning, but I felt the weight of the world on my chest. I had a lot to think about.\n\nI had been working for a long time. The days passed in a blur, and the nights were filled with sleepless thoughts. I had always wanted to be someone important, but I felt like I was just a shadow in the corner of a room. My life had been so ordinary, so small.\n\nI opened the door and stepped outside. The air smelled like the countryside. I walked slowly, taking in the fresh scent of the earth. I thought about the people I had left behind. My wife, my children, they all felt so far away.\n\nI paused at the edge of the road. The sun was setting, and the sky turned pink. I looked down at my feet, and I felt a strange sense of peace. I had no grand plans, no big dreams. But I had a place where I could be quiet, where I could just be.\n\nI turned back to the house, and the wind blew through my hair. I had no idea what the future held, but I felt like I was living. I had no grand plans, but I had a home, and I had a heart.\n\nI closed my eyes and let the wind carry me forward.",
+   "reasoning_chars": 0,
+   "raw": "I woke up to the sound of a distant train. I turned my head and saw the sun rising behind the window. It was a quiet morning, but I felt the weight of the world on my chest. I had a lot to think about.\n\nI had been working for a long time. The days passed in a blur, and the nights were filled with sleepless thoughts. I had always wanted to be someone important, but I felt like I was just a shadow in the corner of a room. My life had been so ordinary, so small.\n\nI opened the door and stepped outside. The air smelled like the countryside. I walked slowly, taking in the fresh scent of the earth. I thought about the people I had left behind. My wife, my children, they all felt so far away.\n\nI paused at the edge of the road. The sun was setting, and the sky turned pink. I looked down at my feet, and I felt a strange sense of peace. I had no grand plans, no big dreams. But I had a place where I could be quiet, where I could just be.\n\nI turned back to the house, and the wind blew through my hair. I had no idea what the future held, but I felt like I was living. I had no grand plans, but I had a home, and I had a heart.\n\nI closed my eyes and let the wind carry me forward.",
+   "calls": [],
+   "prompt_tokens": 38,
+   "generated_tokens": 287,
+   "prefill_ms": 213,
+   "decode_ms": 12836,
+   "wall_ms": 13059,
+   "grade": "fail"
+  },
+  {
+   "id": "ifeval-260",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "John Doe  \nRefinery Operator | Chemicals | 5 years  \nFriends with Hanson, skilled in process control and safety.  \n(50 words)",
+   "reasoning_chars": 0,
+   "raw": "John Doe  \nRefinery Operator | Chemicals | 5 years  \nFriends with Hanson, skilled in process control and safety.  \n(50 words)",
+   "calls": [],
+   "prompt_tokens": 61,
+   "generated_tokens": 31,
+   "prefill_ms": 418,
+   "decode_ms": 1121,
+   "wall_ms": 1543,
+   "grade": "pass"
+  },
+  {
+   "id": "ifeval-331",
+   "set": "ifeval",
+   "status": "ok",
+   "content": "I RAN OUT OF SLEEP IN THE LITTLE ROOM  \nWITH NO LIGHT AND NO SOUND OF THE STORM  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING",
+   "reasoning_chars": 0,
+   "raw": "I RAN OUT OF SLEEP IN THE LITTLE ROOM  \nWITH NO LIGHT AND NO SOUND OF THE STORM  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING  \nI HATED THE SENSE OF OTHERS' BREATH  \nAND THE SOUND OF THOSE WHO WERE SLEEPING",
+   "calls": [],
+   "prompt_tokens": 68,
+   "generated_tokens": 153,
+   "prefill_ms": 407,
+   "decode_ms": 6783,
+   "wall_ms": 7203,
+   "grade": "pass"
+  }
+ ],
+ "tally": {
+  "ifeval": {
+   "pass": 2,
+   "fail": 2,
+   "skipped": 0,
+   "error": 0
+  }
+ }
+}

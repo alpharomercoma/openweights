@@ -1,0 +1,997 @@
+{
+  "suite": "benchmark",
+  "model": "Qwen3-1.7B-8da4w-32k",
+  "engine": "ExecuTorchEngine",
+  "params": "greedy topK=1 seed=7 thinking=false repeatPenalty=default",
+  "prompts_seed": 7,
+  "context_size": 32768,
+  "rss_mb_after_load": 8487,
+  "rss_mb": 8590,
+  "completed": 60,
+  "ok": 60,
+  "errors": 0,
+  "skipped": 0,
+  "budget_exhausted": false,
+  "cases": [
+    {
+      "id": "gsm8k-76",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n**Step 1: Calculate the total dog food needed in one year**\n\n- **First 180 days:** 1 cup\/day × 180 days = **180 cups**\n- **Rest of the life:** 2 cups\/day × 365 days = **730 cups**\n\n**Total dog food needed in one year:**\n$$\n180 + 730 = 910 \\text{ cups}\n$$\n\n---\n\n**Step 2: Calculate how many bags of dog food Cecilia will use**\n\n- **One bag contains 110 cups**\n\n$$\n\\text{Number of bags} = \\frac{910}{110}\n$$\n\n$$\n\\text{Number of bags} = 8.2727...\n$$\n\nSince Cecilia can't use a fraction of a bag, she will need **9 bags** of dog food.\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{9}\n$$\n\n#### 9",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n**Step 1: Calculate the total dog food needed in one year**\n\n- **First 180 days:** 1 cup\/day × 180 days = **180 cups**\n- **Rest of the life:** 2 cups\/day × 365 days = **730 cups**\n\n**Total dog food needed in one year:**\n$$\n180 + 730 = 910 \\text{ cups}\n$$\n\n---\n\n**Step 2: Calculate how many bags of dog food Cecilia will use**\n\n- **One bag contains 110 cups**\n\n$$\n\\text{Number of bags} = \\frac{910}{110}\n$$\n\n$$\n\\text{Number of bags} = 8.2727...\n$$\n\nSince Cecilia can't use a fraction of a bag, she will need **9 bags** of dog food.\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{9}\n$$\n\n#### 9",
+      "calls": [],
+      "prompt_tokens": 121,
+      "generated_tokens": 220,
+      "prefill_ms": 971,
+      "decode_ms": 16726,
+      "wall_ms": 17717
+    },
+    {
+      "id": "gsm8k-98",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break the problem into steps.\n\n---\n\n### **Step 1: Understand the problem**\n\n- **Total cars on the motorway:** 30\n- **Cars that drove through the traffic jam in the first 15 minutes:** Let's call this number $ x $\n- **Cars that drove through the traffic jam in the next 15 minutes:** $ x + 20 $ (since 20 more cars drove through in the second 15 minutes)\n- **Cars that took an exit:** 5 cars\n- **Total cars that left the jam:** 5\n- **Total cars that remained in the jam:** 30 - 5 = 25\n\n---\n\n### **Step 2: Set up the equation**\n\nWe know that the total number of cars that drove through the jam in the first 15 minutes and the next 15 minutes is:\n\n$$\nx + (x + 20) = 25\n$$\n\n---\n\n### **Step 3: Solve the equation**\n\n$$\nx + x + 20 = 25 \\\\\n2x + 20 = 25 \\\\\n2x = 5 \\\\\nx = \\frac{5}{2} = 2.5\n$$\n\n---\n\n### **Step 4: Interpret the result**\n\nWe are asked how many cars drove through the traffic jam in the first 15 minutes.\n\nSo the answer is:\n\n$$\n\\boxed{2.5}\n$$\n\n---\n\n### **Final Answer**\n\n#### <final answer>\n$$\n\\boxed{2.5}\n$$",
+      "reasoning_chars": 0,
+      "raw": "Let's break the problem into steps.\n\n---\n\n### **Step 1: Understand the problem**\n\n- **Total cars on the motorway:** 30\n- **Cars that drove through the traffic jam in the first 15 minutes:** Let's call this number $ x $\n- **Cars that drove through the traffic jam in the next 15 minutes:** $ x + 20 $ (since 20 more cars drove through in the second 15 minutes)\n- **Cars that took an exit:** 5 cars\n- **Total cars that left the jam:** 5\n- **Total cars that remained in the jam:** 30 - 5 = 25\n\n---\n\n### **Step 2: Set up the equation**\n\nWe know that the total number of cars that drove through the jam in the first 15 minutes and the next 15 minutes is:\n\n$$\nx + (x + 20) = 25\n$$\n\n---\n\n### **Step 3: Solve the equation**\n\n$$\nx + x + 20 = 25 \\\\\n2x + 20 = 25 \\\\\n2x = 5 \\\\\nx = \\frac{5}{2} = 2.5\n$$\n\n---\n\n### **Step 4: Interpret the result**\n\nWe are asked how many cars drove through the traffic jam in the first 15 minutes.\n\nSo the answer is:\n\n$$\n\\boxed{2.5}\n$$\n\n---\n\n### **Final Answer**\n\n#### <final answer>\n$$\n\\boxed{2.5}\n$$",
+      "calls": [],
+      "prompt_tokens": 130,
+      "generated_tokens": 328,
+      "prefill_ms": 733,
+      "decode_ms": 23823,
+      "wall_ms": 24559
+    },
+    {
+      "id": "gsm8k-118",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n### **Step 1: Understand the initial count**\n\n- **A customs officer at the main port** counted **2 containers**, each with **5 vehicles**.\n- So, the initial number of vehicles is:  \n  $$\n  2 \\text{ containers} \\times 5 \\text{ vehicles per container} = 10 \\text{ vehicles}\n  $$\n\n---\n\n### **Step 2: Total number of vehicles after the second day**\n\n- The total number of vehicles at the port became **30**.\n- This includes the initial 10 vehicles and the vehicles from the second day.\n\n---\n\n### **Step 3: Find the number of vehicles imported on the second day**\n\n- Let $ x $ be the number of containers imported on the second day.\n- Each container has **5 vehicles**.\n- So, the number of vehicles from the second day is:  \n  $$\n  5x\n  $$\n\n- The total number of vehicles is:  \n  $$\n  10 + 5x = 30\n  $$\n\n---\n\n### **Step 4: Solve for $ x $**\n\n$$\n10 + 5x = 30 \\\\\n5x = 20 \\\\\nx = 4\n$$\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{4}\n$$\n\n#### <final_answer> 4",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n### **Step 1: Understand the initial count**\n\n- **A customs officer at the main port** counted **2 containers**, each with **5 vehicles**.\n- So, the initial number of vehicles is:  \n  $$\n  2 \\text{ containers} \\times 5 \\text{ vehicles per container} = 10 \\text{ vehicles}\n  $$\n\n---\n\n### **Step 2: Total number of vehicles after the second day**\n\n- The total number of vehicles at the port became **30**.\n- This includes the initial 10 vehicles and the vehicles from the second day.\n\n---\n\n### **Step 3: Find the number of vehicles imported on the second day**\n\n- Let $ x $ be the number of containers imported on the second day.\n- Each container has **5 vehicles**.\n- So, the number of vehicles from the second day is:  \n  $$\n  5x\n  $$\n\n- The total number of vehicles is:  \n  $$\n  10 + 5x = 30\n  $$\n\n---\n\n### **Step 4: Solve for $ x $**\n\n$$\n10 + 5x = 30 \\\\\n5x = 20 \\\\\nx = 4\n$$\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{4}\n$$\n\n#### <final_answer> 4",
+      "calls": [],
+      "prompt_tokens": 107,
+      "generated_tokens": 294,
+      "prefill_ms": 606,
+      "decode_ms": 20998,
+      "wall_ms": 21606
+    },
+    {
+      "id": "gsm8k-121",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n---\n\n**Step 1: Find how many apples Kael brought.**\n\nMorisette brought **5 apples**.\n\nKael brought **twice the amount of apples** as Morisette.\n\n$$\n\\text{Kael's apples} = 2 \\times 5 = 10\n$$\n\n---\n\n**Step 2: Find how many oranges Kael brought.**\n\nMorisette brought **8 oranges**.\n\nKael brought **half the number of oranges** as Morisette.\n\n$$\n\\text{Kael's oranges} = \\frac{1}{2} \\times 8 = 4\n$$\n\n---\n\n**Step 3: Find the total number of fruits.**\n\nMorisette's total fruits:  \n$$\n5 \\text{ apples} + 8 \\text{ oranges} = 13 \\text{ fruits}\n$$\n\nKael's total fruits:  \n$$\n10 \\text{ apples} + 4 \\text{ oranges} = 14 \\text{ fruits}\n$$\n\n---\n\n**Step 4: Add the total fruits from both.**\n\n$$\n13 + 14 = 27\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{27}\n$$\n\n#### 27",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n---\n\n**Step 1: Find how many apples Kael brought.**\n\nMorisette brought **5 apples**.\n\nKael brought **twice the amount of apples** as Morisette.\n\n$$\n\\text{Kael's apples} = 2 \\times 5 = 10\n$$\n\n---\n\n**Step 2: Find how many oranges Kael brought.**\n\nMorisette brought **8 oranges**.\n\nKael brought **half the number of oranges** as Morisette.\n\n$$\n\\text{Kael's oranges} = \\frac{1}{2} \\times 8 = 4\n$$\n\n---\n\n**Step 3: Find the total number of fruits.**\n\nMorisette's total fruits:  \n$$\n5 \\text{ apples} + 8 \\text{ oranges} = 13 \\text{ fruits}\n$$\n\nKael's total fruits:  \n$$\n10 \\text{ apples} + 4 \\text{ oranges} = 14 \\text{ fruits}\n$$\n\n---\n\n**Step 4: Add the total fruits from both.**\n\n$$\n13 + 14 = 27\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{27}\n$$\n\n#### 27",
+      "calls": [],
+      "prompt_tokens": 87,
+      "generated_tokens": 272,
+      "prefill_ms": 427,
+      "decode_ms": 19509,
+      "wall_ms": 19938
+    },
+    {
+      "id": "gsm8k-126",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n1. Dylan bought **38 chicken sausages**.\n2. He bought **6 more fish sausages** than chicken sausages.\n   - So, fish sausages = chicken sausages + 6\n   - Fish sausages = 38 + 6 = 44\n3. To find the total number of sausages, we add chicken and fish:\n   - Total = chicken + fish = 38 + 44 = 82\n\n#### <number>  \n**82**",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n1. Dylan bought **38 chicken sausages**.\n2. He bought **6 more fish sausages** than chicken sausages.\n   - So, fish sausages = chicken sausages + 6\n   - Fish sausages = 38 + 6 = 44\n3. To find the total number of sausages, we add chicken and fish:\n   - Total = chicken + fish = 38 + 44 = 82\n\n#### <number>  \n**82**",
+      "calls": [],
+      "prompt_tokens": 89,
+      "generated_tokens": 121,
+      "prefill_ms": 494,
+      "decode_ms": 8464,
+      "wall_ms": 8963
+    },
+    {
+      "id": "gsm8k-143",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step:\n\n1. **List of items and their prices:**\n   - Milk: $2\n   - Eggs: $3\n   - Light bulbs: $3\n   - Cups: $3\n   - Roach traps: $4\n\n2. **Calculate total cost before tax:**\n   $$\n   2 + 3 + 3 + 3 + 4 = 15\n   $$\n\n3. **Apply 10% tax on nonfood items:**\n   - Nonfood items: Milk, Eggs, Light bulbs, Cups, Roach traps\n   - These are all nonfood items, so tax applies to them.\n\n   Total nonfood items = $15$\n\n   Tax = $15 \\times 0.10 = 1.5$\n\n4. **Total cost including tax:**\n   $$\n   15 + 1.5 = 16.5\n   $$\n\n#### Final Answer:\n#### <number> 16.5",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step:\n\n1. **List of items and their prices:**\n   - Milk: $2\n   - Eggs: $3\n   - Light bulbs: $3\n   - Cups: $3\n   - Roach traps: $4\n\n2. **Calculate total cost before tax:**\n   $$\n   2 + 3 + 3 + 3 + 4 = 15\n   $$\n\n3. **Apply 10% tax on nonfood items:**\n   - Nonfood items: Milk, Eggs, Light bulbs, Cups, Roach traps\n   - These are all nonfood items, so tax applies to them.\n\n   Total nonfood items = $15$\n\n   Tax = $15 \\times 0.10 = 1.5$\n\n4. **Total cost including tax:**\n   $$\n   15 + 1.5 = 16.5\n   $$\n\n#### Final Answer:\n#### <number> 16.5",
+      "calls": [],
+      "prompt_tokens": 91,
+      "generated_tokens": 216,
+      "prefill_ms": 579,
+      "decode_ms": 16131,
+      "wall_ms": 16715
+    },
+    {
+      "id": "gsm8k-148",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n### **Step 1: Identify the costs**\n- **Adult ticket (Brittany's mom):** $12\n- **Child ticket (Brittany):** $10\n\n---\n\n### **Step 2: Determine the total amount given**\nBrittany's mom gives the cashier **$12 + $10 = $22**.\n\n---\n\n### **Step 3: Determine the change received**\nThe cashier gives Brittany's mom **$8 in change**.\n\n---\n\n### **Step 4: Find the total amount given**\nThe total amount given is:\n$$\n\\$22 - \\$8 = \\$14\n$$\n\n---\n\n### **Final Answer**\n$$\n\\boxed{14}\n$$\n\n#### <number>  \n#### <final answer> 14",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n### **Step 1: Identify the costs**\n- **Adult ticket (Brittany's mom):** $12\n- **Child ticket (Brittany):** $10\n\n---\n\n### **Step 2: Determine the total amount given**\nBrittany's mom gives the cashier **$12 + $10 = $22**.\n\n---\n\n### **Step 3: Determine the change received**\nThe cashier gives Brittany's mom **$8 in change**.\n\n---\n\n### **Step 4: Find the total amount given**\nThe total amount given is:\n$$\n\\$22 - \\$8 = \\$14\n$$\n\n---\n\n### **Final Answer**\n$$\n\\boxed{14}\n$$\n\n#### <number>  \n#### <final answer> 14",
+      "calls": [],
+      "prompt_tokens": 101,
+      "generated_tokens": 173,
+      "prefill_ms": 510,
+      "decode_ms": 12033,
+      "wall_ms": 12544
+    },
+    {
+      "id": "gsm8k-176",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "We are given the following information:\n\n- Total number of people in the race: 240  \n- Number of Japanese: 80  \n- Number of Chinese: $ 240 - 80 = 160 $  \n- Number of boys on the Chinese team: 60  \n- Number of girls on the Chinese team: ?  \n\nWe are to find the number of girls on the Chinese team.\n\n---\n\n**Step 1:**  \nTotal number of Chinese = 160  \nNumber of boys on the Chinese team = 60  \nTherefore, the number of girls on the Chinese team is:\n\n$$\n160 - 60 = 100\n$$\n\n---\n\n**Final Answer:**  \n$$\n\\boxed{100}\n$$\n\n#### <number>  \n#### <final_answer>  \n#### <number> 100",
+      "reasoning_chars": 0,
+      "raw": "We are given the following information:\n\n- Total number of people in the race: 240  \n- Number of Japanese: 80  \n- Number of Chinese: $ 240 - 80 = 160 $  \n- Number of boys on the Chinese team: 60  \n- Number of girls on the Chinese team: ?  \n\nWe are to find the number of girls on the Chinese team.\n\n---\n\n**Step 1:**  \nTotal number of Chinese = 160  \nNumber of boys on the Chinese team = 60  \nTherefore, the number of girls on the Chinese team is:\n\n$$\n160 - 60 = 100\n$$\n\n---\n\n**Final Answer:**  \n$$\n\\boxed{100}\n$$\n\n#### <number>  \n#### <final_answer>  \n#### <number> 100",
+      "calls": [],
+      "prompt_tokens": 79,
+      "generated_tokens": 182,
+      "prefill_ms": 386,
+      "decode_ms": 12647,
+      "wall_ms": 13035
+    },
+    {
+      "id": "gsm8k-185",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n**Step 1:**  \nJenna picked half as many apples as her mom.\n\nLet the number of apples Jenna picked be $ J $.\n\nThen the number of apples her mom picked is $ 2J $ (since Jenna picked half as many as her mom).\n\nWe are given that Jenna's mom picked **20** apples.\n\nSo:\n$$\n2J = 20\n$$\n$$\nJ = 10\n$$\n\n---\n\n**Step 2:**  \nJenna picked **10** apples.\n\nHer mom picked **20** apples.\n\n---\n\n**Step 3:**  \nAdd the number of apples Jenna and her mom picked:\n\n$$\n10 + 20 = 30\n$$\n\n---\n\n**Final Answer:**  \n$$\n\\boxed{30}\n$$\n\n#### 30",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n**Step 1:**  \nJenna picked half as many apples as her mom.\n\nLet the number of apples Jenna picked be $ J $.\n\nThen the number of apples her mom picked is $ 2J $ (since Jenna picked half as many as her mom).\n\nWe are given that Jenna's mom picked **20** apples.\n\nSo:\n$$\n2J = 20\n$$\n$$\nJ = 10\n$$\n\n---\n\n**Step 2:**  \nJenna picked **10** apples.\n\nHer mom picked **20** apples.\n\n---\n\n**Step 3:**  \nAdd the number of apples Jenna and her mom picked:\n\n$$\n10 + 20 = 30\n$$\n\n---\n\n**Final Answer:**  \n$$\n\\boxed{30}\n$$\n\n#### 30",
+      "calls": [],
+      "prompt_tokens": 74,
+      "generated_tokens": 179,
+      "prefill_ms": 414,
+      "decode_ms": 12703,
+      "wall_ms": 13121
+    },
+    {
+      "id": "gsm8k-192",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n---\n\n### **Initial Setup**\n\n- **Tom starts with 50 trees.**\n- **Tom plants 10 trees per year.**\n- **Tom chows down 2 trees per year.**\n- **Trees die at the end of each year:** 30% of the trees die.\n\n---\n\n### **Year-by-Year Analysis**\n\nWe'll track the number of trees at the end of each year, considering planting, chopping, and death.\n\n---\n\n### **Year 1**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 50 + 8 = 58  \n- **30% dies:** 58 × 0.3 = 17.4 → 17.4 trees die  \n- **Trees left:** 58 - 17.4 = **40.6**\n\n---\n\n### **Year 2**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 40.6 + 8 = 48.6  \n- **30% dies:** 48.6 × 0.3 = 14.58 → 14.58 trees die  \n- **Trees left:** 48.6 - 14.58 = **34.02**\n\n---\n\n### **Year 3**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 34.02 + 8 = 42.02  \n- **30% dies:** 42.02 × 0.3 = 12.606 → 12.606 trees die  \n- **Trees left:** 42.02 - 12.606 = **29.414**\n\n---\n\n### **Year 4**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 29.414 + 8 = 37.414  \n- **30% dies:** 37.414 × 0.3 = 11.224 → 11.224 trees die  \n- **Trees left:** 37.414 - 11.224 = **26.19**\n\n---\n\n### **Year 5**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 26.19 + 8 = 3",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n---\n\n### **Initial Setup**\n\n- **Tom starts with 50 trees.**\n- **Tom plants 10 trees per year.**\n- **Tom chows down 2 trees per year.**\n- **Trees die at the end of each year:** 30% of the trees die.\n\n---\n\n### **Year-by-Year Analysis**\n\nWe'll track the number of trees at the end of each year, considering planting, chopping, and death.\n\n---\n\n### **Year 1**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 50 + 8 = 58  \n- **30% dies:** 58 × 0.3 = 17.4 → 17.4 trees die  \n- **Trees left:** 58 - 17.4 = **40.6**\n\n---\n\n### **Year 2**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 40.6 + 8 = 48.6  \n- **30% dies:** 48.6 × 0.3 = 14.58 → 14.58 trees die  \n- **Trees left:** 48.6 - 14.58 = **34.02**\n\n---\n\n### **Year 3**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 34.02 + 8 = 42.02  \n- **30% dies:** 42.02 × 0.3 = 12.606 → 12.606 trees die  \n- **Trees left:** 42.02 - 12.606 = **29.414**\n\n---\n\n### **Year 4**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 29.414 + 8 = 37.414  \n- **30% dies:** 37.414 × 0.3 = 11.224 → 11.224 trees die  \n- **Trees left:** 37.414 - 11.224 = **26.19**\n\n---\n\n### **Year 5**\n\n- **Plants:** 10  \n- **Chops:** 2  \n- **Total added:** 10 - 2 = 8  \n- **Total before death:** 26.19 + 8 = 3",
+      "calls": [],
+      "prompt_tokens": 89,
+      "generated_tokens": 639,
+      "prefill_ms": 632,
+      "decode_ms": 47095,
+      "wall_ms": 47731
+    },
+    {
+      "id": "gsm8k-253",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Bill starts on the 3rd floor.\n\nHe rides the elevator up to the floor that's equal to 4 times his starting floor plus 6.\n\nStep 1: Calculate 4 times Bill's starting floor:\n$$ 4 \\times 3 = 12 $$\n\nStep 2: Add 6 to the result:\n$$ 12 + 6 = 18 $$\n\nSo, Bill is on the 18th floor.\n\n#### 18",
+      "reasoning_chars": 0,
+      "raw": "Bill starts on the 3rd floor.\n\nHe rides the elevator up to the floor that's equal to 4 times his starting floor plus 6.\n\nStep 1: Calculate 4 times Bill's starting floor:\n$$ 4 \\times 3 = 12 $$\n\nStep 2: Add 6 to the result:\n$$ 12 + 6 = 18 $$\n\nSo, Bill is on the 18th floor.\n\n#### 18",
+      "calls": [],
+      "prompt_tokens": 72,
+      "generated_tokens": 97,
+      "prefill_ms": 410,
+      "decode_ms": 6867,
+      "wall_ms": 7279
+    },
+    {
+      "id": "gsm8k-308",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n### **1. Cost of 1 tub of ice cream:**\n- Original price: $13  \n- Current price: $11  \n- **Discount per tub:** $13 - $11 = $2\n\n---\n\n### **2. Cost of 2 tubs of ice cream:**\n- $11 × 2 = $22\n\n---\n\n### **3. Cost of 1 packet of milk:**\n- Original price: Not given  \n- Discount: $0.5  \n- **Original price per packet:** $0.5 + $1 = $1.5\n\n---\n\n### **4. Cost of 4 packets of milk:**\n- $1.5 × 4 = $6\n\n---\n\n### **5. Total cost for 2 tubs and 4 packets:**\n- $22 + $6 = $28\n\n---\n\n### **6. Total original cost without discount:**\n- $13 × 2 + $1.5 × 4 = $26 + $6 = $32\n\n---\n\n### **7. Amount saved:**\n- $32 - $28 = $4\n\n---\n\n### **Final Answer:**\n#### <number> 4",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n### **1. Cost of 1 tub of ice cream:**\n- Original price: $13  \n- Current price: $11  \n- **Discount per tub:** $13 - $11 = $2\n\n---\n\n### **2. Cost of 2 tubs of ice cream:**\n- $11 × 2 = $22\n\n---\n\n### **3. Cost of 1 packet of milk:**\n- Original price: Not given  \n- Discount: $0.5  \n- **Original price per packet:** $0.5 + $1 = $1.5\n\n---\n\n### **4. Cost of 4 packets of milk:**\n- $1.5 × 4 = $6\n\n---\n\n### **5. Total cost for 2 tubs and 4 packets:**\n- $22 + $6 = $28\n\n---\n\n### **6. Total original cost without discount:**\n- $13 × 2 + $1.5 × 4 = $26 + $6 = $32\n\n---\n\n### **7. Amount saved:**\n- $32 - $28 = $4\n\n---\n\n### **Final Answer:**\n#### <number> 4",
+      "calls": [],
+      "prompt_tokens": 88,
+      "generated_tokens": 263,
+      "prefill_ms": 503,
+      "decode_ms": 19244,
+      "wall_ms": 19751
+    },
+    {
+      "id": "gsm8k-439",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break the problem step by step.\n\n---\n\n### **Given:**\n\n- **Wayne's drive time to the theater:** 4 minutes  \n- **Bernadette's drive time from her apartment to the theater:** 4 times Wayne's drive time → $ 4 \\times 4 = 16 $ minutes  \n- **Bernadette wants to arrive 5 minutes before Wayne.**  \n- **Question:** **How much earlier should Bernadette leave than Wayne to get to the theater first?**\n\n---\n\n### **Step 1: Determine Bernadette's total travel time**\n\nBernadette's drive from her apartment to the theater takes 16 minutes.\n\n---\n\n### **Step 2: Determine Wayne's total travel time**\n\nWayne's drive to the theater takes 4 minutes.\n\n---\n\n### **Step 3: Find the difference in arrival times**\n\nLet’s denote:\n- $ t_w = 4 $ minutes (Wayne's drive time)\n- $ t_b = 16 $ minutes (Bernadette's drive time)\n\nTo arrive **first**, Bernadette must arrive **5 minutes before** Wayne. That means:\n\n$$\n\\text{Bernadette's arrival time} = \\text{Wayne's arrival time} - 5 \\text{ minutes}\n$$\n\nSo, Bernadette must leave **5 minutes earlier** than Wayne to arrive 5 minutes before him.\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{5} \\text{ minutes}\n$$\n\n#### <number>  \n**5**",
+      "reasoning_chars": 0,
+      "raw": "Let's break the problem step by step.\n\n---\n\n### **Given:**\n\n- **Wayne's drive time to the theater:** 4 minutes  \n- **Bernadette's drive time from her apartment to the theater:** 4 times Wayne's drive time → $ 4 \\times 4 = 16 $ minutes  \n- **Bernadette wants to arrive 5 minutes before Wayne.**  \n- **Question:** **How much earlier should Bernadette leave than Wayne to get to the theater first?**\n\n---\n\n### **Step 1: Determine Bernadette's total travel time**\n\nBernadette's drive from her apartment to the theater takes 16 minutes.\n\n---\n\n### **Step 2: Determine Wayne's total travel time**\n\nWayne's drive to the theater takes 4 minutes.\n\n---\n\n### **Step 3: Find the difference in arrival times**\n\nLet’s denote:\n- $ t_w = 4 $ minutes (Wayne's drive time)\n- $ t_b = 16 $ minutes (Bernadette's drive time)\n\nTo arrive **first**, Bernadette must arrive **5 minutes before** Wayne. That means:\n\n$$\n\\text{Bernadette's arrival time} = \\text{Wayne's arrival time} - 5 \\text{ minutes}\n$$\n\nSo, Bernadette must leave **5 minutes earlier** than Wayne to arrive 5 minutes before him.\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{5} \\text{ minutes}\n$$\n\n#### <number>  \n**5**",
+      "calls": [],
+      "prompt_tokens": 143,
+      "generated_tokens": 320,
+      "prefill_ms": 727,
+      "decode_ms": 23885,
+      "wall_ms": 24615
+    },
+    {
+      "id": "gsm8k-457",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n**Step 1: Determine how many fairies joined Katelyn after 20 minutes.**\n\nKatelyn saw **50** fairies.\n\nHer friend saw **half as many** as Katelyn saw from the east.\n\nSo, the number of fairies seen by Katelyn from the east is:\n$$\n\\frac{50}{2} = 25\n$$\n\nHer friend saw **25** fairies and joined them.\n\nSo, the total number of fairies that joined is:\n$$\n25\n$$\n\n---\n\n**Step 2: Determine how many fairies flew away after 10 minutes.**\n\nAfter 20 minutes, 30 fairies flew away.\n\nSo, the total number of fairies remaining is:\n$$\n50 - 25 - 30 = 50 - 55 = -5\n$$\n\nBut since we cannot have negative fairies, we interpret this as:\n$$\n\\text{No fairies remain.}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{0}\n$$\n\n#### 0",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n**Step 1: Determine how many fairies joined Katelyn after 20 minutes.**\n\nKatelyn saw **50** fairies.\n\nHer friend saw **half as many** as Katelyn saw from the east.\n\nSo, the number of fairies seen by Katelyn from the east is:\n$$\n\\frac{50}{2} = 25\n$$\n\nHer friend saw **25** fairies and joined them.\n\nSo, the total number of fairies that joined is:\n$$\n25\n$$\n\n---\n\n**Step 2: Determine how many fairies flew away after 10 minutes.**\n\nAfter 20 minutes, 30 fairies flew away.\n\nSo, the total number of fairies remaining is:\n$$\n50 - 25 - 30 = 50 - 55 = -5\n$$\n\nBut since we cannot have negative fairies, we interpret this as:\n$$\n\\text{No fairies remain.}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{0}\n$$\n\n#### 0",
+      "calls": [],
+      "prompt_tokens": 111,
+      "generated_tokens": 241,
+      "prefill_ms": 645,
+      "decode_ms": 17915,
+      "wall_ms": 18562
+    },
+    {
+      "id": "gsm8k-492",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Step 1: Determine the cost of the family-size pizza.  \nThe small pizza costs $8.  \nThe family-size pizza costs 3 times as much as the small pizza:  \n$ 3 \\times 8 = 24 $\n\nStep 2: Add the costs of the small and family-size pizzas.  \nSmall pizza: $8  \nFamily-size pizza: $24  \nTotal cost: $8 + 24 = 32\n\n#### <number>  \n#### 32",
+      "reasoning_chars": 0,
+      "raw": "Step 1: Determine the cost of the family-size pizza.  \nThe small pizza costs $8.  \nThe family-size pizza costs 3 times as much as the small pizza:  \n$ 3 \\times 8 = 24 $\n\nStep 2: Add the costs of the small and family-size pizzas.  \nSmall pizza: $8  \nFamily-size pizza: $24  \nTotal cost: $8 + 24 = 32\n\n#### <number>  \n#### 32",
+      "calls": [],
+      "prompt_tokens": 68,
+      "generated_tokens": 103,
+      "prefill_ms": 384,
+      "decode_ms": 7171,
+      "wall_ms": 7556
+    },
+    {
+      "id": "gsm8k-663",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n**Given:**\n- James delivers **600** newspapers in a day.\n- He delivers **198** newspapers to **District A**.\n- He delivers **209** newspapers to **District C**.\n- We need to find how many newspapers he delivers to **District B**.\n\n---\n\n**Step 1: Set up the equation**\n\nLet the number of newspapers delivered to District B be $ x $.\n\nWe know:\n$$\n198 + x + 209 = 600\n$$\n\n---\n\n**Step 2: Combine like terms**\n\n$$\n198 + 209 + x = 600\n$$\n$$\n407 + x = 600\n$$\n\n---\n\n**Step 3: Solve for $ x $**\n\n$$\nx = 600 - 407\n$$\n$$\nx = 193\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{193}\n$$\n\n#### <number> 193",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n**Given:**\n- James delivers **600** newspapers in a day.\n- He delivers **198** newspapers to **District A**.\n- He delivers **209** newspapers to **District C**.\n- We need to find how many newspapers he delivers to **District B**.\n\n---\n\n**Step 1: Set up the equation**\n\nLet the number of newspapers delivered to District B be $ x $.\n\nWe know:\n$$\n198 + x + 209 = 600\n$$\n\n---\n\n**Step 2: Combine like terms**\n\n$$\n198 + 209 + x = 600\n$$\n$$\n407 + x = 600\n$$\n\n---\n\n**Step 3: Solve for $ x $**\n\n$$\nx = 600 - 407\n$$\n$$\nx = 193\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{193}\n$$\n\n#### <number> 193",
+      "calls": [],
+      "prompt_tokens": 80,
+      "generated_tokens": 229,
+      "prefill_ms": 531,
+      "decode_ms": 17443,
+      "wall_ms": 17977
+    },
+    {
+      "id": "gsm8k-748",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n**Given:**\n\n- Sean has 56 marbles.\n- Carl has **four times** as many marbles as Sean.\n- Sean has **half as many** marbles as Cal.\n\n---\n\n**Step 1: Find how many marbles Carl has.**\n\nCarl has 4 times as many marbles as Sean.\n\n$$\n\\text{Carl's marbles} = 4 \\times 56 = 224\n$$\n\n---\n\n**Step 2: Find how many marbles Cal has.**\n\nSean has half as many marbles as Cal.\n\n$$\n\\text{Sean's marbles} = \\frac{1}{2} \\times \\text{Cal's marbles}\n$$\n\n$$\n56 = \\frac{1}{2} \\times \\text{Cal's marbles}\n$$\n\n$$\n\\text{Cal's marbles} = 56 \\times 2 = 112\n$$\n\n---\n\n**Step 3: Find the total number of marbles Carl and Cal have combined.**\n\n$$\n\\text{Carl and Cal's marbles} = 224 + 112 = 336\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{336}\n$$\n\n#### **336**",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n**Given:**\n\n- Sean has 56 marbles.\n- Carl has **four times** as many marbles as Sean.\n- Sean has **half as many** marbles as Cal.\n\n---\n\n**Step 1: Find how many marbles Carl has.**\n\nCarl has 4 times as many marbles as Sean.\n\n$$\n\\text{Carl's marbles} = 4 \\times 56 = 224\n$$\n\n---\n\n**Step 2: Find how many marbles Cal has.**\n\nSean has half as many marbles as Cal.\n\n$$\n\\text{Sean's marbles} = \\frac{1}{2} \\times \\text{Cal's marbles}\n$$\n\n$$\n56 = \\frac{1}{2} \\times \\text{Cal's marbles}\n$$\n\n$$\n\\text{Cal's marbles} = 56 \\times 2 = 112\n$$\n\n---\n\n**Step 3: Find the total number of marbles Carl and Cal have combined.**\n\n$$\n\\text{Carl and Cal's marbles} = 224 + 112 = 336\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{336}\n$$\n\n#### **336**",
+      "calls": [],
+      "prompt_tokens": 75,
+      "generated_tokens": 281,
+      "prefill_ms": 710,
+      "decode_ms": 24109,
+      "wall_ms": 24821
+    },
+    {
+      "id": "gsm8k-808",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n### **Step 1: Find the total amount of tea drunk**\n\n- **Four students each drank 1.5 quarts of tea:**  \n  $ 4 \\times 1.5 = 6 $ quarts\n\n- **Sixteen students each drank 2 quarts of tea:**  \n  $ 16 \\times 2 = 32 $ quarts\n\n**Total tea drunk:**  \n$ 6 + 32 = 38 $ quarts\n\n---\n\n### **Step 2: Convert quarts to gallons**\n\nWe know that:\n$$ 1 \\text{ quart} = 0.25 \\text{ gallons} $$\n\nSo:\n$$ 38 \\text{ quarts} \\times 0.25 = 9.5 \\text{ gallons} $$\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{9.5} \\text{ gallons}\n$$\n\n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n### **Step 1: Find the total amount of tea drunk**\n\n- **Four students each drank 1.5 quarts of tea:**  \n  $ 4 \\times 1.5 = 6 $ quarts\n\n- **Sixteen students each drank 2 quarts of tea:**  \n  $ 16 \\times 2 = 32 $ quarts\n\n**Total tea drunk:**  \n$ 6 + 32 = 38 $ quarts\n\n---\n\n### **Step 2: Convert quarts to gallons**\n\nWe know that:\n$$ 1 \\text{ quart} = 0.25 \\text{ gallons} $$\n\nSo:\n$$ 38 \\text{ quarts} \\times 0.25 = 9.5 \\text{ gallons} $$\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{9.5} \\text{ gallons}\n$$\n\n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer>  \n#### <number>  \n#### <final_answer",
+      "calls": [],
+      "prompt_tokens": 87,
+      "generated_tokens": 639,
+      "prefill_ms": 628,
+      "decode_ms": 56510,
+      "wall_ms": 57142
+    },
+    {
+      "id": "gsm8k-856",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Mr. Jackson’s class has 27 students. He wants to give each student 2 glue sticks.\n\n1. Total number of glue sticks needed:  \n   $ 27 \\text{ students} \\times 2 \\text{ glue sticks per student} = 54 \\text{ glue sticks} $\n\n2. Glue sticks come in packs of 8.\n\n3. To find how many packs are needed, divide 54 by 8:  \n   $ 54 \\div 8 = 6.75 $\n\n4. Since Mr. Jackson can only buy whole packs and expects to have some extra, he needs to buy 7 packs.\n\n#### <number> 7",
+      "reasoning_chars": 0,
+      "raw": "Mr. Jackson’s class has 27 students. He wants to give each student 2 glue sticks.\n\n1. Total number of glue sticks needed:  \n   $ 27 \\text{ students} \\times 2 \\text{ glue sticks per student} = 54 \\text{ glue sticks} $\n\n2. Glue sticks come in packs of 8.\n\n3. To find how many packs are needed, divide 54 by 8:  \n   $ 54 \\div 8 = 6.75 $\n\n4. Since Mr. Jackson can only buy whole packs and expects to have some extra, he needs to buy 7 packs.\n\n#### <number> 7",
+      "calls": [],
+      "prompt_tokens": 107,
+      "generated_tokens": 144,
+      "prefill_ms": 584,
+      "decode_ms": 10224,
+      "wall_ms": 10810
+    },
+    {
+      "id": "gsm8k-869",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "1. The seller bought 5 phones at $700 each:  \n   $ 5 \\times 700 = 3500 $ dollars.\n\n2. The seller received $4000 in dollar bills.\n\n3. The seller gives back the change:  \n   $ 4000 - 3500 = 500 $ dollars.\n\n#### <number> 500",
+      "reasoning_chars": 0,
+      "raw": "1. The seller bought 5 phones at $700 each:  \n   $ 5 \\times 700 = 3500 $ dollars.\n\n2. The seller received $4000 in dollar bills.\n\n3. The seller gives back the change:  \n   $ 4000 - 3500 = 500 $ dollars.\n\n#### <number> 500",
+      "calls": [],
+      "prompt_tokens": 70,
+      "generated_tokens": 88,
+      "prefill_ms": 378,
+      "decode_ms": 5982,
+      "wall_ms": 6363
+    },
+    {
+      "id": "gsm8k-888",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n**Step 1:** Lani baked 55 cookies.\n\n**Step 2:** She ate 5 five-cookies. That means she ate 5 × 5 = 25 cookies.\n\n**Step 3:** Subtract the number of cookies she ate from the total:\n$$\n55 - 25 = 30 \\text{ cookies left}\n$$\n\n**Step 4:** These 30 cookies are placed equally into 5 jars.\n\n**Step 5:** Divide 30 by 5:\n$$\n30 \\div 5 = 6\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{6}\n$$\n\n#### 6",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n**Step 1:** Lani baked 55 cookies.\n\n**Step 2:** She ate 5 five-cookies. That means she ate 5 × 5 = 25 cookies.\n\n**Step 3:** Subtract the number of cookies she ate from the total:\n$$\n55 - 25 = 30 \\text{ cookies left}\n$$\n\n**Step 4:** These 30 cookies are placed equally into 5 jars.\n\n**Step 5:** Divide 30 by 5:\n$$\n30 \\div 5 = 6\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{6}\n$$\n\n#### 6",
+      "calls": [],
+      "prompt_tokens": 65,
+      "generated_tokens": 150,
+      "prefill_ms": 349,
+      "decode_ms": 11952,
+      "wall_ms": 12308
+    },
+    {
+      "id": "gsm8k-1039",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n---\n\n**Step 1: Determine the dimensions of the comforter**\n\n- The bed measures **6 feet long** and **8 feet wide**.\n- Jim needs **two pieces** of fabric.\n- Each piece is **2 feet longer** and **2 feet wider** than the bed.\n\n---\n\n**Step 2: Calculate the dimensions of one piece of fabric**\n\n- Length: $ 6 + 2 = 8 $ feet\n- Width: $ 8 + 2 = 10 $ feet\n\n---\n\n**Step 3: Calculate the area of one piece of fabric**\n\n- Area = Length × Width\n- $ 8 \\times 10 = 80 $ square feet\n\n---\n\n**Step 4: Calculate the total area for two pieces**\n\n- $ 80 \\times 2 = 160 $ square feet\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{160}\n$$\n\n#### 160",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n---\n\n**Step 1: Determine the dimensions of the comforter**\n\n- The bed measures **6 feet long** and **8 feet wide**.\n- Jim needs **two pieces** of fabric.\n- Each piece is **2 feet longer** and **2 feet wider** than the bed.\n\n---\n\n**Step 2: Calculate the dimensions of one piece of fabric**\n\n- Length: $ 6 + 2 = 8 $ feet\n- Width: $ 8 + 2 = 10 $ feet\n\n---\n\n**Step 3: Calculate the area of one piece of fabric**\n\n- Area = Length × Width\n- $ 8 \\times 10 = 80 $ square feet\n\n---\n\n**Step 4: Calculate the total area for two pieces**\n\n- $ 80 \\times 2 = 160 $ square feet\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{160}\n$$\n\n#### 160",
+      "calls": [],
+      "prompt_tokens": 91,
+      "generated_tokens": 206,
+      "prefill_ms": 531,
+      "decode_ms": 16892,
+      "wall_ms": 17432
+    },
+    {
+      "id": "gsm8k-1097",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break this down step by step.\n\n---\n\n**Given:**\n\n- There were **20 private cars**.\n- There were **12 buses**.\n- Each **bus carried 35 people**.\n- Each **car carried 3 people**.\n\nWe are asked to find **how many people were inside the church**.\n\n---\n\n**Step 1: Find the number of people on the buses**\n\nEach bus carried 35 people, and there were 12 buses.\n\n$$\n\\text{People on buses} = 12 \\times 35 = 420\n$$\n\n---\n\n**Step 2: Find the number of people on the cars**\n\nEach car carried 3 people, and there were 20 cars.\n\n$$\n\\text{People on cars} = 20 \\times 3 = 60\n$$\n\n---\n\n**Step 3: Add the number of people on the buses and cars**\n\n$$\n\\text{Total people} = 420 + 60 = 480\n$$\n\n---\n\n**Step 4: Determine how many people were inside the church**\n\nThe problem says: **\"how many people were inside the church\"**.\n\nWe are told that **after the ceremony**, each bus and each car carried people. That means **all the people on the buses and cars were inside the church**.\n\nSo, the total number of people **inside** the church is:\n\n$$\n\\boxed{480}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{480}\n$$\n\n#### 480",
+      "reasoning_chars": 0,
+      "raw": "Let's break this down step by step.\n\n---\n\n**Given:**\n\n- There were **20 private cars**.\n- There were **12 buses**.\n- Each **bus carried 35 people**.\n- Each **car carried 3 people**.\n\nWe are asked to find **how many people were inside the church**.\n\n---\n\n**Step 1: Find the number of people on the buses**\n\nEach bus carried 35 people, and there were 12 buses.\n\n$$\n\\text{People on buses} = 12 \\times 35 = 420\n$$\n\n---\n\n**Step 2: Find the number of people on the cars**\n\nEach car carried 3 people, and there were 20 cars.\n\n$$\n\\text{People on cars} = 20 \\times 3 = 60\n$$\n\n---\n\n**Step 3: Add the number of people on the buses and cars**\n\n$$\n\\text{Total people} = 420 + 60 = 480\n$$\n\n---\n\n**Step 4: Determine how many people were inside the church**\n\nThe problem says: **\"how many people were inside the church\"**.\n\nWe are told that **after the ceremony**, each bus and each car carried people. That means **all the people on the buses and cars were inside the church**.\n\nSo, the total number of people **inside** the church is:\n\n$$\n\\boxed{480}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{480}\n$$\n\n#### 480",
+      "calls": [],
+      "prompt_tokens": 88,
+      "generated_tokens": 334,
+      "prefill_ms": 732,
+      "decode_ms": 33554,
+      "wall_ms": 34291
+    },
+    {
+      "id": "gsm8k-1128",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n**Given:**\n\n- Liam is 16 years old now.\n- Two years ago, Liam’s age was twice the age of Vince.\n\n---\n\n**Step 1: Find Liam’s age two years ago**\n\nLiam is 16 years old now.  \nSo, two years ago, Liam was:\n\n$$\n16 - 2 = 14 \\text{ years old}\n$$\n\n---\n\n**Step 2: Set up an equation for Vince's age two years ago**\n\nTwo years ago, Liam was 14 years old, and that was twice Vince's age.\n\nSo, Vince's age two years ago was:\n\n$$\n\\frac{14}{2} = 7 \\text{ years old}\n$$\n\n---\n\n**Step 3: Find Vince's current age**\n\nSince Vince was 7 years old two years ago, his current age is:\n\n$$\n7 + 2 = 9 \\text{ years old}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{9}\n$$\n\n#### <number>  \n#### <number>",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n**Given:**\n\n- Liam is 16 years old now.\n- Two years ago, Liam’s age was twice the age of Vince.\n\n---\n\n**Step 1: Find Liam’s age two years ago**\n\nLiam is 16 years old now.  \nSo, two years ago, Liam was:\n\n$$\n16 - 2 = 14 \\text{ years old}\n$$\n\n---\n\n**Step 2: Set up an equation for Vince's age two years ago**\n\nTwo years ago, Liam was 14 years old, and that was twice Vince's age.\n\nSo, Vince's age two years ago was:\n\n$$\n\\frac{14}{2} = 7 \\text{ years old}\n$$\n\n---\n\n**Step 3: Find Vince's current age**\n\nSince Vince was 7 years old two years ago, his current age is:\n\n$$\n7 + 2 = 9 \\text{ years old}\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{9}\n$$\n\n#### <number>  \n#### <number>",
+      "calls": [],
+      "prompt_tokens": 64,
+      "generated_tokens": 230,
+      "prefill_ms": 473,
+      "decode_ms": 22536,
+      "wall_ms": 23018
+    },
+    {
+      "id": "gsm8k-1158",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n---\n\n### **Step 1: Understand the given information**\n\n- **Hortex produces 4200 bottles of carrot juice every day.**\n- **Each bottle covers 20% of 1 person's daily energy demand.**\n- **We need to find how many more bottles Hortex must produce to satisfy 100% of the daily energy needs of 2300 people.**\n\n---\n\n### **Step 2: Find how many bottles are needed to satisfy 100% of the energy needs**\n\n- **Each bottle = 20% of 1 person's energy.**\n- **100% of 1 person's energy = 1 bottle.**\n- **So, 1 person = 1 bottle.**\n\n- **2300 people = 2300 bottles.**\n\n---\n\n### **Step 3: Find how many bottles Hortex currently produces**\n\n- **Hortex produces 4200 bottles every day.**\n\n---\n\n### **Step 4: Find how many more bottles are needed**\n\n- **Total needed = 2300 bottles**\n- **Currently producing = 4200 bottles**\n- **Difference = 2300 bottles - 4200 bottles = -1900 bottles**\n\nThis means Hortex is **short by 1900 bottles** to meet the 100% energy needs of 2300 people.\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{1900}\n$$\n\n#### <final_answer> 1900",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n---\n\n### **Step 1: Understand the given information**\n\n- **Hortex produces 4200 bottles of carrot juice every day.**\n- **Each bottle covers 20% of 1 person's daily energy demand.**\n- **We need to find how many more bottles Hortex must produce to satisfy 100% of the daily energy needs of 2300 people.**\n\n---\n\n### **Step 2: Find how many bottles are needed to satisfy 100% of the energy needs**\n\n- **Each bottle = 20% of 1 person's energy.**\n- **100% of 1 person's energy = 1 bottle.**\n- **So, 1 person = 1 bottle.**\n\n- **2300 people = 2300 bottles.**\n\n---\n\n### **Step 3: Find how many bottles Hortex currently produces**\n\n- **Hortex produces 4200 bottles every day.**\n\n---\n\n### **Step 4: Find how many more bottles are needed**\n\n- **Total needed = 2300 bottles**\n- **Currently producing = 4200 bottles**\n- **Difference = 2300 bottles - 4200 bottles = -1900 bottles**\n\nThis means Hortex is **short by 1900 bottles** to meet the 100% energy needs of 2300 people.\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{1900}\n$$\n\n#### <final_answer> 1900",
+      "calls": [],
+      "prompt_tokens": 111,
+      "generated_tokens": 337,
+      "prefill_ms": 833,
+      "decode_ms": 34866,
+      "wall_ms": 35705
+    },
+    {
+      "id": "gsm8k-1181",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's denote the current age of **Colin** as $ C $ and the current age of **Wendy** as $ W $.\n\n---\n\n### Step 1: Use the first statement\n\n> \"Wendy is five times as old as Colin will be seven years from now.\"\n\nThis means:\n$$\nW = 5(C + 7)\n$$\n\n---\n\n### Step 2: Use the second statement\n\n> \"In 25 years, Colin will be a third as old as Wendy is now.\"\n\nThis means:\n$$\nC + 25 = \\frac{1}{3}W\n$$\n\n---\n\n### Step 3: Substitute $ W = 5(C + 7) $ into the second equation\n\n$$\nC + 25 = \\frac{1}{3} \\cdot 5(C + 7)\n$$\n\nSimplify the right-hand side:\n$$\nC + 25 = \\frac{5}{3}(C + 7)\n$$\n\nMultiply both sides by 3 to eliminate the fraction:\n$$\n3(C + 25) = 5(C + 7)\n$$\n\nExpand both sides:\n$$\n3C + 75 = 5C + 35\n$$\n\nBring like terms to one side:\n$$\n75 - 35 = 5C - 3C\n$$\n$$\n40 = 2C\n$$\n\n---\n\n### Step 4: Solve for $ C $\n\n$$\nC = 20\n$$\n\n---\n\n### Final Answer\n\n$$\n\\boxed{20}\n$$\n\nColin is currently **20** years old.",
+      "reasoning_chars": 0,
+      "raw": "Let's denote the current age of **Colin** as $ C $ and the current age of **Wendy** as $ W $.\n\n---\n\n### Step 1: Use the first statement\n\n> \"Wendy is five times as old as Colin will be seven years from now.\"\n\nThis means:\n$$\nW = 5(C + 7)\n$$\n\n---\n\n### Step 2: Use the second statement\n\n> \"In 25 years, Colin will be a third as old as Wendy is now.\"\n\nThis means:\n$$\nC + 25 = \\frac{1}{3}W\n$$\n\n---\n\n### Step 3: Substitute $ W = 5(C + 7) $ into the second equation\n\n$$\nC + 25 = \\frac{1}{3} \\cdot 5(C + 7)\n$$\n\nSimplify the right-hand side:\n$$\nC + 25 = \\frac{5}{3}(C + 7)\n$$\n\nMultiply both sides by 3 to eliminate the fraction:\n$$\n3(C + 25) = 5(C + 7)\n$$\n\nExpand both sides:\n$$\n3C + 75 = 5C + 35\n$$\n\nBring like terms to one side:\n$$\n75 - 35 = 5C - 3C\n$$\n$$\n40 = 2C\n$$\n\n---\n\n### Step 4: Solve for $ C $\n\n$$\nC = 20\n$$\n\n---\n\n### Final Answer\n\n$$\n\\boxed{20}\n$$\n\nColin is currently **20** years old.",
+      "calls": [],
+      "prompt_tokens": 75,
+      "generated_tokens": 344,
+      "prefill_ms": 520,
+      "decode_ms": 32154,
+      "wall_ms": 32678
+    },
+    {
+      "id": "gsm8k-1193",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's break down the problem step by step.\n\n**Earnings per task:**\n- Laundry: $3.00\n- Cleaning: $1.50\n- Taking trash out: $0.75\n- Emptying dishwasher: $0.50\n\n**Tasks in two weeks:**\n- Laundry: 1 time\n- Cleaning: 1 time\n- Taking trash out: 2 times\n- Emptying dishwasher: 6 times\n\n**Calculating total earnings:**\n\n- Laundry: $3.00 × 1 = $3.00\n- Cleaning: $1.50 × 1 = $1.50\n- Taking trash out: $0.75 × 2 = $1.50\n- Emptying dishwasher: $0.50 × 6 = $3.00\n\n**Total earnings:**\n$3.00 + $1.50 + $1.50 + $3.00 = $8.00\n\n#### <number>  \n#### 8.00",
+      "reasoning_chars": 0,
+      "raw": "Let's break down the problem step by step.\n\n**Earnings per task:**\n- Laundry: $3.00\n- Cleaning: $1.50\n- Taking trash out: $0.75\n- Emptying dishwasher: $0.50\n\n**Tasks in two weeks:**\n- Laundry: 1 time\n- Cleaning: 1 time\n- Taking trash out: 2 times\n- Emptying dishwasher: 6 times\n\n**Calculating total earnings:**\n\n- Laundry: $3.00 × 1 = $3.00\n- Cleaning: $1.50 × 1 = $1.50\n- Taking trash out: $0.75 × 2 = $1.50\n- Emptying dishwasher: $0.50 × 6 = $3.00\n\n**Total earnings:**\n$3.00 + $1.50 + $1.50 + $3.00 = $8.00\n\n#### <number>  \n#### 8.00",
+      "calls": [],
+      "prompt_tokens": 126,
+      "generated_tokens": 225,
+      "prefill_ms": 1046,
+      "decode_ms": 20843,
+      "wall_ms": 21892
+    },
+    {
+      "id": "gsm8k-1199",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve the problem step by step.\n\n---\n\n### **Day 1:**\nFred makes **24 gallons** of root beer.\n\n**Remaining root beer:** 24 gallons\n\n---\n\n### **Day 2:**\nBarbie spills **7 gallons**.\n\n**Remaining root beer:** 24 - 7 = **17 gallons**\n\n---\n\n### **Day 3:**\nRonnie takes **5 gallons**.\n\n**Remaining root beer:** 17 - 5 = **12 gallons**\n\n---\n\n### **Day 4:**\n3 people show up for the party. The root beer is shared **equally**.\n\n**Amount available for the party:** 12 gallons\n\n**Each person gets:** 12 ÷ 3 = **4 gallons**\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{4}\n$$\n\n#### **Answer:** 4 gallons per person.",
+      "reasoning_chars": 0,
+      "raw": "Let's solve the problem step by step.\n\n---\n\n### **Day 1:**\nFred makes **24 gallons** of root beer.\n\n**Remaining root beer:** 24 gallons\n\n---\n\n### **Day 2:**\nBarbie spills **7 gallons**.\n\n**Remaining root beer:** 24 - 7 = **17 gallons**\n\n---\n\n### **Day 3:**\nRonnie takes **5 gallons**.\n\n**Remaining root beer:** 17 - 5 = **12 gallons**\n\n---\n\n### **Day 4:**\n3 people show up for the party. The root beer is shared **equally**.\n\n**Amount available for the party:** 12 gallons\n\n**Each person gets:** 12 ÷ 3 = **4 gallons**\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{4}\n$$\n\n#### **Answer:** 4 gallons per person.",
+      "calls": [],
+      "prompt_tokens": 191,
+      "generated_tokens": 185,
+      "prefill_ms": 1283,
+      "decode_ms": 19183,
+      "wall_ms": 20469
+    },
+    {
+      "id": "gsm8k-1284",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "Let's solve this step by step.\n\n---\n\n### **Step 1: Initial Situation**\n\n- At the end of the first street, **5 children** are chasing the ice cream truck.\n\n---\n\n### **Step 2: Second Street**\n\n- Each child is **joined by another child**.\n- So, each of the 5 children is joined by 1 more child → total children becomes $ 5 + 5 = 10 $.\n\n---\n\n### **Step 3: Third Street**\n\n- Each child in the existing group is **joined by another 2 children**.\n- So, each of the 10 children is joined by 2 more → total children becomes $ 10 + 10 = 20 $.\n\n---\n\n### **Step 4: Children Leave**\n\n- The original 5 children give up and leave the group.\n- So, we subtract the 5 children from the total.\n\n---\n\n### **Final Calculation**\n\n- Total children after third street: 20\n- Children who leave: 5\n- Children now following the truck: $ 20 - 5 = 15 $\n\n---\n\n### **Final Answer**\n\n#### <number> 15",
+      "reasoning_chars": 0,
+      "raw": "Let's solve this step by step.\n\n---\n\n### **Step 1: Initial Situation**\n\n- At the end of the first street, **5 children** are chasing the ice cream truck.\n\n---\n\n### **Step 2: Second Street**\n\n- Each child is **joined by another child**.\n- So, each of the 5 children is joined by 1 more child → total children becomes $ 5 + 5 = 10 $.\n\n---\n\n### **Step 3: Third Street**\n\n- Each child in the existing group is **joined by another 2 children**.\n- So, each of the 10 children is joined by 2 more → total children becomes $ 10 + 10 = 20 $.\n\n---\n\n### **Step 4: Children Leave**\n\n- The original 5 children give up and leave the group.\n- So, we subtract the 5 children from the total.\n\n---\n\n### **Final Calculation**\n\n- Total children after third street: 20\n- Children who leave: 5\n- Children now following the truck: $ 20 - 5 = 15 $\n\n---\n\n### **Final Answer**\n\n#### <number> 15",
+      "calls": [],
+      "prompt_tokens": 130,
+      "generated_tokens": 245,
+      "prefill_ms": 854,
+      "decode_ms": 23722,
+      "wall_ms": 24578
+    },
+    {
+      "id": "gsm8k-1291",
+      "set": "gsm8k",
+      "status": "ok",
+      "content": "We are given the following:\n\n1. **George has 18 pens.**\n2. **Timothy has three times the number of pens that George owns.**\n3. **Sarah has half as many pens as Timothy.**\n\n---\n\n**Step 1: Find the number of pens Timothy has.**\n\nTimothy has 3 times the number of pens that George owns.\n\n$$\n\\text{Timothy's pens} = 3 \\times 18 = 54\n$$\n\n---\n\n**Step 2: Find the number of pens Sarah has.**\n\nSarah has half as many pens as Timothy.\n\n$$\n\\text{Sarah's pens} = \\frac{1}{2} \\times 54 = 27\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{27}\n$$\n\n#### 27",
+      "reasoning_chars": 0,
+      "raw": "We are given the following:\n\n1. **George has 18 pens.**\n2. **Timothy has three times the number of pens that George owns.**\n3. **Sarah has half as many pens as Timothy.**\n\n---\n\n**Step 1: Find the number of pens Timothy has.**\n\nTimothy has 3 times the number of pens that George owns.\n\n$$\n\\text{Timothy's pens} = 3 \\times 18 = 54\n$$\n\n---\n\n**Step 2: Find the number of pens Sarah has.**\n\nSarah has half as many pens as Timothy.\n\n$$\n\\text{Sarah's pens} = \\frac{1}{2} \\times 54 = 27\n$$\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{27}\n$$\n\n#### 27",
+      "calls": [],
+      "prompt_tokens": 71,
+      "generated_tokens": 174,
+      "prefill_ms": 500,
+      "decode_ms": 16626,
+      "wall_ms": 17129
+    },
+    {
+      "id": "bfcl-simple_34",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"travel_itinerary_generator\", \"arguments\": {\"destination\": \"Tokyo\", \"days\": 7, \"daily_budget\": 100, \"exploration_type\": \"nature\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "travel_itinerary_generator",
+          "arguments": "{\"destination\": \"Tokyo\", \"days\": 7, \"daily_budget\": 100, \"exploration_type\": \"nature\"}"
+        }
+      ],
+      "prompt_tokens": 260,
+      "generated_tokens": 45,
+      "prefill_ms": 1769,
+      "decode_ms": 4111,
+      "wall_ms": 5884
+    },
+    {
+      "id": "bfcl-simple_47",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_boiling_melting_points\", \"arguments\": {\"substance\": \"water\", \"sea_level\": 5000}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_boiling_melting_points",
+          "arguments": "{\"substance\": \"water\", \"sea_level\": 5000}"
+        }
+      ],
+      "prompt_tokens": 212,
+      "generated_tokens": 35,
+      "prefill_ms": 1384,
+      "decode_ms": 3337,
+      "wall_ms": 4725
+    },
+    {
+      "id": "bfcl-simple_75",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"elephant_population_estimate\", \"arguments\": {\"current_population\": 35000, \"growth_rate\": 0.015, \"years\": 5}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "elephant_population_estimate",
+          "arguments": "{\"current_population\": 35000, \"growth_rate\": 0.015, \"years\": 5}"
+        }
+      ],
+      "prompt_tokens": 237,
+      "generated_tokens": 43,
+      "prefill_ms": 1740,
+      "decode_ms": 3761,
+      "wall_ms": 5504
+    },
+    {
+      "id": "bfcl-simple_88",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"calculate_BMI\", \"arguments\": {\"weight_kg\": 70, \"height_m\": 1.75}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "calculate_BMI",
+          "arguments": "{\"weight_kg\": 70, \"height_m\": 1.75}"
+        }
+      ],
+      "prompt_tokens": 217,
+      "generated_tokens": 33,
+      "prefill_ms": 1480,
+      "decode_ms": 3395,
+      "wall_ms": 4878
+    },
+    {
+      "id": "bfcl-simple_91",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_restaurant\", \"arguments\": {\"cuisine\": \"sushi\", \"location\": \"Boston\", \"condition\": \"opens on Sundays\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_restaurant",
+          "arguments": "{\"cuisine\": \"sushi\", \"location\": \"Boston\", \"condition\": \"opens on Sundays\"}"
+        }
+      ],
+      "prompt_tokens": 222,
+      "generated_tokens": 36,
+      "prefill_ms": 1749,
+      "decode_ms": 2875,
+      "wall_ms": 4627
+    },
+    {
+      "id": "bfcl-simple_116",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "The probability of drawing a king from a standard deck of 52 cards is calculated by dividing the number of kings (4) by the total number of cards (52).",
+      "reasoning_chars": 0,
+      "raw": "The probability of drawing a king from a standard deck of 52 cards is calculated by dividing the number of kings (4) by the total number of cards (52).\n\n<tool_call>\n{\"name\": \"probabilities.calculate_single\", \"arguments\": {\"total_outcomes\": 52, \"event_outcomes\": 4}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "probabilities.calculate_single",
+          "arguments": "{\"total_outcomes\": 52, \"event_outcomes\": 4}"
+        }
+      ],
+      "prompt_tokens": 228,
+      "generated_tokens": 68,
+      "prefill_ms": 1514,
+      "decode_ms": 6376,
+      "wall_ms": 7892
+    },
+    {
+      "id": "bfcl-simple_131",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"calculate_compound_interest\", \"arguments\": {\"principal\": 10000, \"rate\": 0.05, \"time\": 10, \"n\": 4}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "calculate_compound_interest",
+          "arguments": "{\"principal\": 10000, \"rate\": 0.05, \"time\": 10, \"n\": 4}"
+        }
+      ],
+      "prompt_tokens": 293,
+      "generated_tokens": 47,
+      "prefill_ms": 2100,
+      "decode_ms": 5456,
+      "wall_ms": 7561
+    },
+    {
+      "id": "bfcl-simple_133",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"finance.predict_future_value\", \"arguments\": {\"present_value\": 5000, \"annual_interest_rate\": 5, \"compounding_periods_per_year\": 12, \"time_years\": 3}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "finance.predict_future_value",
+          "arguments": "{\"present_value\": 5000, \"annual_interest_rate\": 5, \"compounding_periods_per_year\": 12, \"time_years\": 3}"
+        }
+      ],
+      "prompt_tokens": 284,
+      "generated_tokens": 51,
+      "prefill_ms": 2000,
+      "decode_ms": 4837,
+      "wall_ms": 6844
+    },
+    {
+      "id": "bfcl-simple_152",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"calculate_mutual_fund_balance\", \"arguments\": {\"investment_amount\": 50000, \"annual_yield\": 0.05, \"years\": 3}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "calculate_mutual_fund_balance",
+          "arguments": "{\"investment_amount\": 50000, \"annual_yield\": 0.05, \"years\": 3}"
+        }
+      ],
+      "prompt_tokens": 251,
+      "generated_tokens": 44,
+      "prefill_ms": 1877,
+      "decode_ms": 4659,
+      "wall_ms": 6539
+    },
+    {
+      "id": "bfcl-simple_168",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"lawsuit_search\", \"arguments\": {\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "lawsuit_search",
+          "arguments": "{\"company\": \"Google\", \"start_date\": \"01-01-2021\", \"location\": \"California\", \"status\": \"ongoing\"}"
+        }
+      ],
+      "prompt_tokens": 280,
+      "generated_tokens": 49,
+      "prefill_ms": 1888,
+      "decode_ms": 4465,
+      "wall_ms": 6356
+    },
+    {
+      "id": "bfcl-simple_174",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "I cannot retrieve information about constitutional law cases in China, as the available tool only supports the United States of America as the default country. Let me know if you'd like information about landmark cases in the United States.",
+      "reasoning_chars": 0,
+      "raw": "I cannot retrieve information about constitutional law cases in China, as the available tool only supports the United States of America as the default country. Let me know if you'd like information about landmark cases in the United States.",
+      "calls": [],
+      "prompt_tokens": 243,
+      "generated_tokens": 43,
+      "prefill_ms": 1643,
+      "decode_ms": 4347,
+      "wall_ms": 5993
+    },
+    {
+      "id": "bfcl-simple_230",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"historic_leader_search\", \"arguments\": {\"location\": \"France\", \"date\": 1510, \"title\": \"King\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "historic_leader_search",
+          "arguments": "{\"location\": \"France\", \"date\": 1510, \"title\": \"King\"}"
+        }
+      ],
+      "prompt_tokens": 211,
+      "generated_tokens": 35,
+      "prefill_ms": 1520,
+      "decode_ms": 3628,
+      "wall_ms": 5152
+    },
+    {
+      "id": "bfcl-simple_256",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"generate_circle_image\", \"arguments\": {\"radius\": 50, \"color\": \"Red\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "generate_circle_image",
+          "arguments": "{\"radius\": 50, \"color\": \"Red\"}"
+        }
+      ],
+      "prompt_tokens": 219,
+      "generated_tokens": 27,
+      "prefill_ms": 1565,
+      "decode_ms": 1944,
+      "wall_ms": 3513
+    },
+    {
+      "id": "bfcl-simple_291",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"music_generator.generate_melody\", \"arguments\": {\"key\": \"C\", \"start_note\": \"C4\", \"length\": 16, \"tempo\": 120}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "music_generator.generate_melody",
+          "arguments": "{\"key\": \"C\", \"start_note\": \"C4\", \"length\": 16, \"tempo\": 120}"
+        }
+      ],
+      "prompt_tokens": 287,
+      "generated_tokens": 47,
+      "prefill_ms": 2053,
+      "decode_ms": 5196,
+      "wall_ms": 7254
+    },
+    {
+      "id": "bfcl-simple_292",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"compose_melody\", \"arguments\": {\"progression\": [\"C\", \"F\", \"G\"], \"measures\": 4, \"instrument\": \"Piano\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "compose_melody",
+          "arguments": "{\"progression\": [\"C\", \"F\", \"G\"], \"measures\": 4, \"instrument\": \"Piano\"}"
+        }
+      ],
+      "prompt_tokens": 235,
+      "generated_tokens": 42,
+      "prefill_ms": 1774,
+      "decode_ms": 4595,
+      "wall_ms": 6372
+    },
+    {
+      "id": "bfcl-simple_304",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"player_stats.getLastGame\", \"arguments\": {\"player_name\": \"LeBron James\", \"team\": \"Boston Celtics\", \"metrics\": [\"Points\", \"Rebounds\"]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "player_stats.getLastGame",
+          "arguments": "{\"player_name\": \"LeBron James\", \"team\": \"Boston Celtics\", \"metrics\": [\"Points\", \"Rebounds\"]}"
+        }
+      ],
+      "prompt_tokens": 245,
+      "generated_tokens": 42,
+      "prefill_ms": 1731,
+      "decode_ms": 3159,
+      "wall_ms": 4894
+    },
+    {
+      "id": "bfcl-simple_323",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"sports_ranking.get_top_player\", \"arguments\": {\"sport\": \"tennis\", \"gender\": \"women\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "sports_ranking.get_top_player",
+          "arguments": "{\"sport\": \"tennis\", \"gender\": \"women\"}"
+        }
+      ],
+      "prompt_tokens": 190,
+      "generated_tokens": 30,
+      "prefill_ms": 1365,
+      "decode_ms": 2771,
+      "wall_ms": 4139
+    },
+    {
+      "id": "bfcl-simple_326",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_team_score\", \"arguments\": {\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_team_score",
+          "arguments": "{\"team_name\": \"Los Angeles Lakers\", \"league\": \"NBA\"}"
+        }
+      ],
+      "prompt_tokens": 237,
+      "generated_tokens": 30,
+      "prefill_ms": 1721,
+      "decode_ms": 3068,
+      "wall_ms": 4792
+    },
+    {
+      "id": "bfcl-simple_334",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"blackjack.check_winner\", \"arguments\": {\"player_cards\": [\"A\", \"10\"], \"dealer_cards\": [\"10\", \"9\"], \"ace_value\": 1}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "blackjack.check_winner",
+          "arguments": "{\"player_cards\": [\"A\", \"10\"], \"dealer_cards\": [\"10\", \"9\"], \"ace_value\": 1}"
+        }
+      ],
+      "prompt_tokens": 259,
+      "generated_tokens": 44,
+      "prefill_ms": 1736,
+      "decode_ms": 4658,
+      "wall_ms": 6397
+    },
+    {
+      "id": "bfcl-simple_379",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"get_current_time\", \"arguments\": {\"location\": \"Sydney\", \"country\": \"Australia\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "get_current_time",
+          "arguments": "{\"location\": \"Sydney\", \"country\": \"Australia\"}"
+        }
+      ],
+      "prompt_tokens": 203,
+      "generated_tokens": 27,
+      "prefill_ms": 1600,
+      "decode_ms": 2544,
+      "wall_ms": 4146
+    },
+    {
+      "id": "bfcl-multiple_23",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"basketball.player_stats.get\", \"arguments\": {\"player_name\": \"LeBron James\", \"stats_fields\": [\"points\", \"assists\", \"minutes\"]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "basketball.player_stats.get",
+          "arguments": "{\"player_name\": \"LeBron James\", \"stats_fields\": [\"points\", \"assists\", \"minutes\"]}"
+        }
+      ],
+      "prompt_tokens": 473,
+      "generated_tokens": 40,
+      "prefill_ms": 3845,
+      "decode_ms": 4533,
+      "wall_ms": 8381
+    },
+    {
+      "id": "bfcl-multiple_33",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"calculate_integral\", \"arguments\": {\"func\": \"3x^2\", \"a\": 1, \"b\": 2}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "calculate_integral",
+          "arguments": "{\"func\": \"3x^2\", \"a\": 1, \"b\": 2}"
+        }
+      ],
+      "prompt_tokens": 326,
+      "generated_tokens": 34,
+      "prefill_ms": 2307,
+      "decode_ms": 3546,
+      "wall_ms": 5856
+    },
+    {
+      "id": "bfcl-multiple_47",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"cosine_similarity.calculate\", \"arguments\": {\"vector1\": [3, 2, 1], \"vector2\": [1, 2, 3]}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "cosine_similarity.calculate",
+          "arguments": "{\"vector1\": [3, 2, 1], \"vector2\": [1, 2, 3]}"
+        }
+      ],
+      "prompt_tokens": 377,
+      "generated_tokens": 42,
+      "prefill_ms": 2727,
+      "decode_ms": 4720,
+      "wall_ms": 7450
+    },
+    {
+      "id": "bfcl-multiple_50",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "{\"name\": \"house_price_forecast\", \"arguments\": {\"location\": \"New York\", \"months\": 1}}",
+      "reasoning_chars": 0,
+      "raw": "{\"name\": \"house_price_forecast\", \"arguments\": {\"location\": \"New York\", \"months\": 1}}",
+      "calls": [],
+      "prompt_tokens": 425,
+      "generated_tokens": 25,
+      "prefill_ms": 3466,
+      "decode_ms": 2829,
+      "wall_ms": 6297
+    },
+    {
+      "id": "bfcl-multiple_52",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"currency_conversion\", \"arguments\": {\"amount\": 100, \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "currency_conversion",
+          "arguments": "{\"amount\": 100, \"from_currency\": \"EUR\", \"to_currency\": \"USD\"}"
+        }
+      ],
+      "prompt_tokens": 307,
+      "generated_tokens": 35,
+      "prefill_ms": 2175,
+      "decode_ms": 3672,
+      "wall_ms": 5850
+    },
+    {
+      "id": "bfcl-multiple_56",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"avg_closing_price\", \"arguments\": {\"company\": \"Apple\", \"days\": 60}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "avg_closing_price",
+          "arguments": "{\"company\": \"Apple\", \"days\": 60}"
+        }
+      ],
+      "prompt_tokens": 449,
+      "generated_tokens": 28,
+      "prefill_ms": 3398,
+      "decode_ms": 3282,
+      "wall_ms": 6683
+    },
+    {
+      "id": "bfcl-multiple_79",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"exhibition_info\", \"arguments\": {\"museum_name\": \"Museum of Modern Art, New York\", \"month\": 1}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "exhibition_info",
+          "arguments": "{\"museum_name\": \"Museum of Modern Art, New York\", \"month\": 1}"
+        }
+      ],
+      "prompt_tokens": 299,
+      "generated_tokens": 35,
+      "prefill_ms": 2121,
+      "decode_ms": 3858,
+      "wall_ms": 5982
+    },
+    {
+      "id": "bfcl-multiple_170",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"soccer_stat.get_player_stats\", \"arguments\": {\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "soccer_stat.get_player_stats",
+          "arguments": "{\"player_name\": \"Cristiano Ronaldo\", \"season\": \"2019-2020\"}"
+        }
+      ],
+      "prompt_tokens": 556,
+      "generated_tokens": 41,
+      "prefill_ms": 4546,
+      "decode_ms": 3285,
+      "wall_ms": 7833
+    },
+    {
+      "id": "bfcl-multiple_177",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"board_game.chess.get_top_players\", \"arguments\": {\"location\": \"New York\", \"minimum_rating\": 2300, \"number_of_players\": 10}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "board_game.chess.get_top_players",
+          "arguments": "{\"location\": \"New York\", \"minimum_rating\": 2300, \"number_of_players\": 10}"
+        }
+      ],
+      "prompt_tokens": 465,
+      "generated_tokens": 44,
+      "prefill_ms": 3594,
+      "decode_ms": 5517,
+      "wall_ms": 9114
+    },
+    {
+      "id": "bfcl-multiple_179",
+      "set": "bfcl",
+      "status": "ok",
+      "content": "",
+      "reasoning_chars": 0,
+      "raw": "<tool_call>\n{\"name\": \"poker_probability.full_house\", \"arguments\": {\"deck_size\": 52, \"hand_size\": 5}}\n<\/tool_call>",
+      "calls": [
+        {
+          "name": "poker_probability.full_house",
+          "arguments": "{\"deck_size\": 52, \"hand_size\": 5}"
+        }
+      ],
+      "prompt_tokens": 475,
+      "generated_tokens": 31,
+      "prefill_ms": 4005,
+      "decode_ms": 2659,
+      "wall_ms": 6667
+    }
+  ]
+}

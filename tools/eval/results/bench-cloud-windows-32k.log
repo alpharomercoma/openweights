@@ -1,0 +1,4 @@
+== 12 matrices to run, 3 at a time
+-> tensor- LFM2.5-1.2B-Instruct-8da4w-32k [gsm8k,bfcl] 04:14
+-> tensor- LFM2.5-1.2B-Instruct-8da4w-32k [ifeval] 04:14
+-> tensor- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 04:14

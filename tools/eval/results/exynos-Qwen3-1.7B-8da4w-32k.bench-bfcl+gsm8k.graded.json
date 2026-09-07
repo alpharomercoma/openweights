@@ -1,0 +1,70 @@
+{
+ "suite": "benchmark",
+ "model": "Qwen3-1.7B-8da4w-32k",
+ "engine": "ExecuTorchEngine",
+ "params": "greedy topK=1 seed=7 thinking=false repeatPenalty=default",
+ "prompts_seed": 7,
+ "context_size": 32768,
+ "rss_mb_after_load": 6519,
+ "rss_mb": 5240,
+ "completed": 3,
+ "ok": 3,
+ "errors": 0,
+ "skipped": 0,
+ "budget_exhausted": false,
+ "cases": [
+  {
+   "id": "gsm8k-76",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "Let's break this down step by step.\n\n---\n\n**Step 1: Calculate the total daily feed for the puppy**\n\n- The puppy needs **1 cup** of dog food **every day** for the first **180 days**.\n- After that, it needs **2 cups** of dog food **every day**.\n\nSo the total daily feed is:\n\n$$\n1 \\text{ cup/day} + 2 \\text{ cups/day} = 3 \\text{ cups/day}\n$$\n\n---\n\n**Step 2: Calculate the total cups of dog food needed in one year**\n\n- There are **365 days** in a year.\n- Total cups needed = $ 3 \\text{ cups/day} \\times 365 \\text{ days} = 1095 \\text{ cups} $\n\n---\n\n**Step 3: Calculate how many bags of dog food Cecilia will use**\n\n- One bag contains **110 cups**.\n- Number of bags needed = $ \\frac{1095}{110} \\approx 9.954 $\n\nSince Cecilia can't use a fraction of a bag, she will need **10 bags** of dog food.\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{10}\n$$\n\n#### 10",
+   "reasoning_chars": 0,
+   "raw": "Let's break this down step by step.\n\n---\n\n**Step 1: Calculate the total daily feed for the puppy**\n\n- The puppy needs **1 cup** of dog food **every day** for the first **180 days**.\n- After that, it needs **2 cups** of dog food **every day**.\n\nSo the total daily feed is:\n\n$$\n1 \\text{ cup/day} + 2 \\text{ cups/day} = 3 \\text{ cups/day}\n$$\n\n---\n\n**Step 2: Calculate the total cups of dog food needed in one year**\n\n- There are **365 days** in a year.\n- Total cups needed = $ 3 \\text{ cups/day} \\times 365 \\text{ days} = 1095 \\text{ cups} $\n\n---\n\n**Step 3: Calculate how many bags of dog food Cecilia will use**\n\n- One bag contains **110 cups**.\n- Number of bags needed = $ \\frac{1095}{110} \\approx 9.954 $\n\nSince Cecilia can't use a fraction of a bag, she will need **10 bags** of dog food.\n\n---\n\n**Final Answer:**\n\n$$\n\\boxed{10}\n$$\n\n#### 10",
+   "calls": [],
+   "prompt_tokens": 121,
+   "generated_tokens": 272,
+   "prefill_ms": 979,
+   "decode_ms": 13856,
+   "wall_ms": 14869,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-98",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "Let's break this down step by step.\n\n---\n\n### **Given:**\n\n- Total cars on the motorway: **30**\n- Some cars drive through in the first 15 minutes.\n- Then, **20** cars exit the traffic jam and do **not** have to drive through.\n- The remaining cars are **not** driving through the traffic jam.\n\n---\n\n### **Step 1: Determine how many cars drove through in the first 15 minutes.**\n\nLet’s call the number of cars that drove through in the first 15 minutes **$ x $**.\n\n- After that, **20** cars exit, so **$ x + 20 $** cars have driven through.\n- The remaining cars are **not** driving through the traffic jam.\n\nSo, the total number of cars that drove through the traffic jam is:\n\n$$\nx + 20\n$$\n\nBut we also know that **30** cars are on the motorway, and **20** of them exited the traffic jam. That means:\n\n$$\nx + 20 = \\text{number of cars that drove through in the first 15 minutes}\n$$\n\nSo, we are told that **20** cars exited the traffic jam, and **$ x + 20 $** cars drove through in the first 15 minutes.\n\nThus:\n\n$$\nx + 20 = 30 - 20 = 10\n$$\n\nWait, that's not correct. Let's rephrase.\n\n---\n\n### **Step 2: Use the total number of cars.**\n\nWe know that:\n\n- **30** cars are on the motorway.\n- **20** cars exit the traffic jam (so they are **not** driving through).\n- The rest, **$ 30 - 20 = 10 $** cars, are still on the motorway and are **driving through** the traffic jam.\n\nSo, the **10** cars that are still on the motorway and are driving through the traffic jam are the ones that **drived through in the first 15 minutes**.\n\nSo, **10** cars drove through in the first 15 minutes.\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{10}\n$$\n\n#### <final answer> 10",
+   "reasoning_chars": 0,
+   "raw": "Let's break this down step by step.\n\n---\n\n### **Given:**\n\n- Total cars on the motorway: **30**\n- Some cars drive through in the first 15 minutes.\n- Then, **20** cars exit the traffic jam and do **not** have to drive through.\n- The remaining cars are **not** driving through the traffic jam.\n\n---\n\n### **Step 1: Determine how many cars drove through in the first 15 minutes.**\n\nLet’s call the number of cars that drove through in the first 15 minutes **$ x $**.\n\n- After that, **20** cars exit, so **$ x + 20 $** cars have driven through.\n- The remaining cars are **not** driving through the traffic jam.\n\nSo, the total number of cars that drove through the traffic jam is:\n\n$$\nx + 20\n$$\n\nBut we also know that **30** cars are on the motorway, and **20** of them exited the traffic jam. That means:\n\n$$\nx + 20 = \\text{number of cars that drove through in the first 15 minutes}\n$$\n\nSo, we are told that **20** cars exited the traffic jam, and **$ x + 20 $** cars drove through in the first 15 minutes.\n\nThus:\n\n$$\nx + 20 = 30 - 20 = 10\n$$\n\nWait, that's not correct. Let's rephrase.\n\n---\n\n### **Step 2: Use the total number of cars.**\n\nWe know that:\n\n- **30** cars are on the motorway.\n- **20** cars exit the traffic jam (so they are **not** driving through).\n- The rest, **$ 30 - 20 = 10 $** cars, are still on the motorway and are **driving through** the traffic jam.\n\nSo, the **10** cars that are still on the motorway and are driving through the traffic jam are the ones that **drived through in the first 15 minutes**.\n\nSo, **10** cars drove through in the first 15 minutes.\n\n---\n\n### **Final Answer:**\n\n$$\n\\boxed{10}\n$$\n\n#### <final answer> 10",
+   "calls": [],
+   "prompt_tokens": 130,
+   "generated_tokens": 487,
+   "prefill_ms": 935,
+   "decode_ms": 25633,
+   "wall_ms": 26572,
+   "grade": "fail"
+  },
+  {
+   "id": "gsm8k-118",
+   "set": "gsm8k",
+   "status": "ok",
+   "content": "Let's break this problem into steps.\n\n---\n\n### **Step 1: Understand the initial situation**\n\n- A customs officer counted **2 containers** of imported vehicles, and each container has **5 vehicles**.\n- So, the number of vehicles at the port on the first day is:\n  $$\n  2 \\text{ containers} \\times 5 \\text{ vehicles/container} = 10 \\text{ vehicles}\n  $$\n\n---\n\n### **Step 2: Total number of vehicles at the port after the second day**\n\n- The total number of vehicles at the port became **30**.\n- That includes the initial 10 vehicles and the vehicles from the second day.\n\n---\n\n### **Step 3: Determine the number of vehicles imported on the second day**\n\n- Let $ x $ be the number of containers imported on the second day.\n- Each container has 5 vehicles.\n- So, the number of vehicles from the second day is:\n  $$\n  5x\n  $$\n\n- The total number of vehicles at the port after the second day is 30:\n  $$\n  10 + 5x = 30\n  $$\n\n---\n\n### **Step 4: Solve for $ x $**\n\n$$\n5x = 30 - 10 = 20\n$$\n$$\nx = \\frac{20}{5} = 4\n$$\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{4}\n$$\n\n#### <number>  \n#### <final answer> 4",
+   "reasoning_chars": 0,
+   "raw": "Let's break this problem into steps.\n\n---\n\n### **Step 1: Understand the initial situation**\n\n- A customs officer counted **2 containers** of imported vehicles, and each container has **5 vehicles**.\n- So, the number of vehicles at the port on the first day is:\n  $$\n  2 \\text{ containers} \\times 5 \\text{ vehicles/container} = 10 \\text{ vehicles}\n  $$\n\n---\n\n### **Step 2: Total number of vehicles at the port after the second day**\n\n- The total number of vehicles at the port became **30**.\n- That includes the initial 10 vehicles and the vehicles from the second day.\n\n---\n\n### **Step 3: Determine the number of vehicles imported on the second day**\n\n- Let $ x $ be the number of containers imported on the second day.\n- Each container has 5 vehicles.\n- So, the number of vehicles from the second day is:\n  $$\n  5x\n  $$\n\n- The total number of vehicles at the port after the second day is 30:\n  $$\n  10 + 5x = 30\n  $$\n\n---\n\n### **Step 4: Solve for $ x $**\n\n$$\n5x = 30 - 10 = 20\n$$\n$$\nx = \\frac{20}{5} = 4\n$$\n\n---\n\n### **Final Answer**\n\n$$\n\\boxed{4}\n$$\n\n#### <number>  \n#### <final answer> 4",
+   "calls": [],
+   "prompt_tokens": 107,
+   "generated_tokens": 322,
+   "prefill_ms": 817,
+   "decode_ms": 20463,
+   "wall_ms": 21293,
+   "grade": "pass"
+  }
+ ],
+ "tally": {
+  "gsm8k": {
+   "pass": 1,
+   "fail": 2,
+   "skipped": 0,
+   "error": 0
+  }
+ }
+}

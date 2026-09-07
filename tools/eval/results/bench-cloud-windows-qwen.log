@@ -1,0 +1,26 @@
+== 12 matrices to run, 3 at a time
+-> tensor- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:27
+-> exynos- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:27
+-> elite- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:27
+ok elite- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:42
+-> tensor- Qwen3-1.7B-8da4w-2k [ifeval] 06:42
+ok exynos- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:46
+-> exynos- Qwen3-1.7B-8da4w-2k [ifeval] 06:46
+ok tensor- Qwen3-1.7B-8da4w-2k [gsm8k,bfcl] 06:48
+-> elite- Qwen3-1.7B-8da4w-2k [ifeval] 06:48
+ok elite- Qwen3-1.7B-8da4w-2k [ifeval] 07:03
+-> tensor- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:03
+ok tensor- Qwen3-1.7B-8da4w-2k [ifeval] 07:03
+-> exynos- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:03
+ok exynos- Qwen3-1.7B-8da4w-2k [ifeval] 07:04
+-> elite- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:04
+ok elite- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:12
+-> tensor- Qwen3-1.7B-8da4w-32k [ifeval] 07:12
+ok exynos- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:12
+-> exynos- Qwen3-1.7B-8da4w-32k [ifeval] 07:12
+ok exynos- Qwen3-1.7B-8da4w-32k [ifeval] 07:20
+-> elite- Qwen3-1.7B-8da4w-32k [ifeval] 07:20
+ok tensor- Qwen3-1.7B-8da4w-32k [gsm8k,bfcl] 07:23
+ok elite- Qwen3-1.7B-8da4w-32k [ifeval] 07:28
+ok tensor- Qwen3-1.7B-8da4w-32k [ifeval] 07:34
+== all matrices returned 07:34

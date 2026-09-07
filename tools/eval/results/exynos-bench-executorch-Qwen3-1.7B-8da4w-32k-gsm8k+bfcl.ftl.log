@@ -1,0 +1,36 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/Qwen3-1.7B-8da4w-32k.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/Qwen3-1.7B-8da4w-32k.tokenizer.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/benchmarks.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/runs/20260907-070355-43053-e2s-bench-executorch-Qwen3-1.7B-8da4w-32k/]
+
+Test [matrix-3319jlyr7xm92] has been created in the Google Cloud.
+Creating individual test executions...
+....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8043395277594635527 ].
+07:08:32 Test is Pending
+07:09:23 Starting attempt 1.
+07:09:23 Test is Running
+07:12:08 Starting attempt 1.
+07:12:08 A non-retryable error occurred.
+07:12:08 Test is Pending
+07:12:20 Starting results processing. Attempt: 1
+07:12:20 Test is Running
+07:12:33 Completed results processing. Time taken = 6 (secs)
+07:12:33 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.8f445f4b10207177/matrices/8043395277594635527 ].
+┌─────────┬────────────────────┬─────────────────────┐
+│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼────────────────────┼─────────────────────┤
+│ [31;1mFailed [39;0m │ e2s-36-en-portrait │ 1 test cases failed │
+└─────────┴────────────────────┴─────────────────────┘

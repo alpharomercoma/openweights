@@ -1,0 +1,26 @@
+== 12 matrices to run, 3 at a time
+-> tensor- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:12
+-> exynos- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:12
+-> elite- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:12
+ok elite- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:45
+-> tensor- LFM2.5-2.6B-8da4w-4k [ifeval] 07:45
+ok exynos- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:52
+-> exynos- LFM2.5-2.6B-8da4w-4k [ifeval] 07:52
+ok tensor- LFM2.5-2.6B-8da4w-4k [gsm8k,bfcl] 07:54
+-> elite- LFM2.5-2.6B-8da4w-4k [ifeval] 07:54
+ok elite- LFM2.5-2.6B-8da4w-4k [ifeval] 08:16
+-> tensor- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 08:16
+ok exynos- LFM2.5-2.6B-8da4w-4k [ifeval] 08:25
+-> exynos- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 08:25
+ok tensor- LFM2.5-2.6B-8da4w-4k [ifeval] 08:26
+-> elite- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 08:26
+ok elite- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 08:53
+-> tensor- LFM2.5-2.6B-8da4w-32k [ifeval] 08:53
+ok tensor- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 08:59
+-> exynos- LFM2.5-2.6B-8da4w-32k [ifeval] 08:59
+ok exynos- LFM2.5-2.6B-8da4w-32k [gsm8k,bfcl] 09:05
+-> elite- LFM2.5-2.6B-8da4w-32k [ifeval] 09:05
+ok tensor- LFM2.5-2.6B-8da4w-32k [ifeval] 09:26
+ok elite- LFM2.5-2.6B-8da4w-32k [ifeval] 09:28
+ok exynos- LFM2.5-2.6B-8da4w-32k [ifeval] 09:32
+== all matrices returned 09:32

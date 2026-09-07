@@ -1,12 +1,18 @@
 # The public site
 
-Three pages, live at **<https://alpharomercoma.github.io/openweights/>**:
+Four pages, live at **<https://alpharomercoma.github.io/openweights/>**:
 
 | Page | URL | What it is for |
 |---|---|---|
 | Privacy policy | <https://alpharomercoma.github.io/openweights/privacy.html> | The URL the Play listing must link to |
 | Landing | <https://alpharomercoma.github.io/openweights/> | Somewhere for that link to sit, and the repository link |
 | Latency chart | <https://alpharomercoma.github.io/openweights/latency.html> | TTFT and TPOT for five models on five chips, llama.cpp against ExecuTorch |
+| Window study | <https://alpharomercoma.github.io/openweights/window.html> | Does the exported ExecuTorch context window matter: the research note and every table it reads |
+
+`window.html` is rendered from `docs/research/executorch-window-matrix.md` (the note) and
+`docs/research/window-matrix.md` (the tables `tools/eval/bench/window_report.py` writes), for
+the same reason the policy is: one copy in the repository, the page a rendering of it. The
+memory chart is drawn from the probe table at build time.
 
 `latency.html` is hand-written and self-contained (`play/site/latency.html`, data inline);
 the build copies it unchanged. Its numbers come from `tools/eval/results/*.graded.json` via
@@ -28,7 +34,7 @@ python3 play/site/build.py build/site
 
 git worktree add --detach /tmp/ghp
 git -C /tmp/ghp checkout gh-pages
-cp build/site/index.html build/site/privacy.html build/site/latency.html /tmp/ghp/
+cp build/site/index.html build/site/privacy.html build/site/latency.html build/site/window.html /tmp/ghp/
 git -C /tmp/ghp commit -am "Update the published policy"
 git -C /tmp/ghp push origin gh-pages
 git worktree remove /tmp/ghp
@@ -45,7 +51,7 @@ there and Play reviewers look at it.
 Pages can serve from `docs/`, and that was the obvious option and the wrong one: `docs/` is
 working notes. The roadmap, the tool-calling research, the context file. All of it is already
 readable in a public repository and none of it wants a URL of its own, a nav entry, or a
-Google result. The `gh-pages` branch holds four files and nothing else.
+Google result. The `gh-pages` branch holds five files and nothing else.
 
 `.nojekyll` is one of them, because without it GitHub runs Jekyll over the branch, which is a
 build nobody asked for and one more thing that can fail between an edit and a live policy.

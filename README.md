@@ -55,8 +55,8 @@ model families whose prompt formats the app implements.
 **Two runtimes, one build.** llama.cpp runs GGUF files;
 [ExecuTorch](https://github.com/pytorch/executorch) runs compiled `.pte` files for eight
 model families. The app routes on the file format, and both ship in the same 28.8 MB
-release bundle. On the phones measured, the compiled LFM2.5 1.2B decoded at about twice
-the rate of its GGUF on the Tensor G5, half again as fast on the Exynos 2400, and reached
+release bundle. On the phones measured, the compiled LFM2.5 1.2B decoded a token in 46 ms
+against 106 for its GGUF on the Tensor G5 and 38 against 59 on the Exynos 2400, and reached
 its first token faster on every chip ([latency](https://alpharomercoma.github.io/openweights/latency.html)).
 
 **Honest about your device, before the download.** The GGUF header is read over HTTP range
@@ -65,7 +65,7 @@ run, before you spend a gigabyte. The same metadata sizes the window the model o
 Compiled models open at the window reported by their export, and Discover shows it.
 
 **A fast first turn.** The instructions and tool definitions are prefilled into the cache
-while you type, snapshotted, and kept on disk. On the reference phone, that took a fresh
+while you type, snapshotted, and kept on disk. On the reference phone, that reduced a fresh
 chat's time to first token from about 18.5 seconds to under one second
 ([measured](docs/research/first-turn-latency.md)).
 
@@ -233,32 +233,10 @@ the raw tables.
 | [Public benchmarks on six phones](docs/research/public-benchmarks.md) · [tables](docs/research/benchmark-matrix.md) | GSM8K, IFEval and BFCL on both runtimes, same prompts, same graders |
 | [Five chips, two runtimes](https://alpharomercoma.github.io/openweights/latency.html) | Time to first token and time per output token, five models, five chips |
 | [Parity on five SoCs](docs/research/parity-five-socs.md) · [tables](docs/research/backend-parity.md) | Do the two runtimes grade the same agentic prompts the same way across silicon? |
-| [The first turn](docs/research/first-turn-latency.md) | Where a 25-second cold first turn went, and how warming removed most of it |
+| [The first turn](docs/research/first-turn-latency.md) | Where a 25-second cold first turn went, 18.5 s of it before the first token, and how warming removed most of it |
 
-More measured notes: [exporting LFM2.5 ourselves](docs/research/executorch-own-exports.md),
-[pictures through ExecuTorch](docs/research/executorch-vision.md),
-[the vision encoder is the image turn](docs/research/vision-encoder-cost.md),
-[why a picture takes fifty seconds](docs/research/image-tokens.md),
-[targeting the MediaTek NPU](docs/research/mediatek-npu.md) and
-[NPU prefill on real conversations](docs/research/npu-prefill-multiturn.md),
-[speculative decoding on a phone](docs/research/speculative-decoding.md),
-[GPU backends on Android](docs/research/gpu-backends.md),
-[the slowdown of late August](docs/research/kv-cache-regression.md),
-[what makes a 1B model call a tool](docs/research/tool-calling.md),
-[the ExecuTorch catalogue](docs/research/executorch-families.md).
-
-Decision records and design notes: [why llama.cpp](docs/research/inference-engines.md),
-[why a second runtime](docs/research/executorch.md),
-[multimodality on a phone](docs/research/multimodality.md),
-[where web search comes from](docs/research/web-search.md),
-[memory recall](docs/research/memory-recall.md),
-[plan mode and recall](docs/research/plan-mode-and-recall.md),
-[runtimes that could generate a picture or a voice](docs/research/generation-runtimes.md),
-[bringing OpenWeights to iOS](docs/research/ios-strategy.md),
-[competitive analysis](docs/research/competitive-analysis.md).
-Review sweeps: [2026-09-02](docs/research/qa-sweep-2026-09-02.md),
-[2026-09-03](docs/research/gemini-review-2026-09-03.md),
-[2026-09-05](docs/research/qa-sweep-2026-09-05.md).
+Every other note, measured or decisional, is indexed with its date and finding in
+[docs/research/README.md](docs/research/README.md).
 
 ## Architecture
 
@@ -287,7 +265,7 @@ test tiers, is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the modules fit, the engine contract, what the ExecuTorch side learned |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | The nine product areas, what is done and why each exists |
 | [docs/CONTEXT.md](docs/CONTEXT.md) | The working log: toolchain, device measurements, dated session notes |
-| [docs/research/](docs/research/) | The measured reports and decision records listed above |
+| [docs/research/README.md](docs/research/README.md) | Every research note with its date, question and finding |
 | [docs/design/visual-language.md](docs/design/visual-language.md) | The design rules every screen follows |
 | [docs/privacy-policy.md](docs/privacy-policy.md) | What stays on the device and what leaves; published at [the policy page](https://alpharomercoma.github.io/openweights/privacy.html) |
 | [docs/play-store.md](docs/play-store.md) · [docs/store-listing.md](docs/store-listing.md) | The release checklist and the listing copy, data safety rows and rating answers |
@@ -297,8 +275,8 @@ test tiers, is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ## Contributing and contact
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Performance
-claims come with before-and-after numbers from a real device, and every network egress is
-named and switchable.
+claims come with before-and-after numbers from a real device, every network egress is named
+in the app, and the three network tools each have a switch.
 
 **Main contributors:** Alpha Romer Coma and Arjhine Ty.
 

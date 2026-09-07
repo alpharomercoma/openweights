@@ -71,6 +71,7 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     var opens: Boolean = true
     var exportedContextLength: Int? = null
     var hasVision: Boolean = false
+    var prefillLength: Int? = null
 
     /** What the tokenizer beside the model does about BOS; true is every publisher export so far. */
     var tokenizerAddsBos: Boolean = true
@@ -88,7 +89,7 @@ class FakeExecuTorchBridge : ExecuTorchBridge {
     override fun exportedContextLength(modelPath: String): Int? = exportedContextLength
 
     override fun probe(modelPath: String): ExportFacts =
-        ExportFacts(exportedContextLength, hasVision)
+        ExportFacts(exportedContextLength, hasVision, prefillLength)
 
     /** The smallest and largest channel value of the last picture, as the encoder saw them. */
     var pixelRange: ClosedFloatingPointRange<Float>? = null

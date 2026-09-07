@@ -86,6 +86,25 @@ class TaskPlanTest {
 
         assertThat(step?.text?.length).isAtMost(TaskPlan.MAX_STEP_CHARS)
         assertThat(step?.text).startsWith("go on and on")
+        // At a word, not in the middle of one.
+        assertThat(step?.text).endsWith("on")
+    }
+
+    @Test
+    fun `emphasis is taken off the steps and a long step is cut at a word`() {
+        val wrote = """
+            1. **What is the LFM2 architecture?** - To understand the technical design of the family
+            2. *Who makes it* and `where`
+            3. snake_case_name stays_whole
+        """.trimIndent()
+
+        val steps = readPlan(wrote)?.steps?.map { it.text }
+
+        assertThat(steps?.get(0)).startsWith("What is the LFM2 architecture? - To understand the")
+        assertThat(steps?.get(0)?.length).isAtMost(TaskPlan.MAX_STEP_CHARS)
+        assertThat(steps?.get(0)).doesNotContain("*")
+        assertThat(steps?.get(1)).isEqualTo("Who makes it and where")
+        assertThat(steps?.get(2)).isEqualTo("snake_case_name stays_whole")
     }
 
     @Test

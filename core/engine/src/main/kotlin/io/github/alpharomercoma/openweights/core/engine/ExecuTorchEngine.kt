@@ -81,6 +81,20 @@ class ExecuTorchEngine(
     private var contextSize: Int = 0
 
     /**
+     * The most characters one call into the runtime may carry, prefill or generate.
+     *
+     * The exporter bounds the token input at `max_seq_len - 1` and the runtime chunks a
+     * long prompt at `max_seq_len`, so a single call of 2048 tokens fails on a 2048/32k
+     * export with "Attempted to resize a bounded tensor with a maximum capacity of 2047
+     * elements to 2048 elements" (Poco X8 Pro, 2026-09-08: every research step's prompt
+     * with the tool prefix was refused, read as a full window, and retried without tools).
+     * Characters are the only measure this engine has before tokenizing, and one token
+     * per character is the worst case, so a bound in characters below the token bound is
+     * safe for any text.
+     */
+    private var callChars: Int = GENERATE_TAIL_CHARS
+
+    /**
      * The text the runtime's KV cache currently holds, prompt and reply together.
      *
      * Kept as text rather than as a token count because that is what can be compared: the
@@ -162,6 +176,7 @@ class ExecuTorchEngine(
         val facts = runCatching { bridge.probe(modelFile.absolutePath) }
             .getOrDefault(ExportFacts(contextLength = null, hasVision = false))
         val exported = facts.contextLength
+        callChars = facts.callChars()
         contextSize = when {
             exported == null -> params.contextLength
             params.contextLength <= 0 -> exported
@@ -221,6 +236,10 @@ class ExecuTorchEngine(
             modelPath = modelFile.absolutePath,
         )
     }
+
+    /** The character bound for one runtime call: see [callChars]. */
+    private fun ExportFacts.callChars(): Int =
+        minOf(GENERATE_TAIL_CHARS, (prefillLength ?: Int.MAX_VALUE) - 1).coerceAtLeast(1)
 
     /** A load refused for a reason the caller can show. */
     private fun refuse(message: String): Nothing = throw LlamaException(message)
@@ -510,12 +529,37 @@ class ExecuTorchEngine(
             fedText.isNotEmpty() &&
             prompt.startsWith(fedText) &&
             prompt.length > fedText.length
-        if (extending) return prompt.substring(fedText.length) to heldTokens
+        if (extending) return feedAhead(prompt.substring(fedText.length), heldTokens)
         bridge.resetContext()
         fedText = ""
         heldTokens = 0
         val fresh = if (pictures.isEmpty()) prompt else feedPictures(prompt, pictures, rendering)
-        return fresh to 0
+        return feedAhead(fresh, 0)
+    }
+
+    /**
+     * Feeds all but the last [callChars] of [fresh] through prefill, in warm pieces, and
+     * returns the tail for generate with the tokens fed ahead added to [held].
+     *
+     * The runtime's own chunking cannot be trusted with a long prompt (see [callChars]),
+     * and its prefill entry cannot be stopped once called, so the pieces are the warm's
+     * and a Stop is read between them. Everything fed stays in the record: the cache is
+     * append-only, so the tail generate extends it exactly as a warmed turn does.
+     */
+    private fun feedAhead(fresh: String, held: Int): Pair<String, Int> {
+        var rest = fresh
+        var reused = held
+        while (rest.length > callChars) {
+            if (cancelRequested) throw StoppedWhileFeeding()
+            val piece = warmPiece(rest, callChars)
+            bridge.prefill(piece)
+            fedText += piece
+            val tokens = (piece.length / WARM_CHARS_PER_TOKEN).coerceAtLeast(1)
+            heldTokens += tokens
+            reused += tokens
+            rest = rest.substring(piece.length)
+        }
+        return rest to reused
     }
 
     /**
@@ -592,7 +636,7 @@ class ExecuTorchEngine(
     }
 
     /** A Stop that landed between pictures, before anything was generated. */
-    private class StoppedWhileFeeding : LlamaException("Stopped while reading the pictures")
+    private class StoppedWhileFeeding : LlamaException("Stopped while feeding the prompt")
 
     private fun List<ChatMessage>.pictures(): List<MessagePart.File> =
         flatMap { message -> message.files.filter { it.kind == MediaKind.IMAGE } }
@@ -684,7 +728,7 @@ class ExecuTorchEngine(
         var warmed = 0
         try {
             while (fresh.isNotEmpty() && !warmStopped) {
-                val piece = warmPiece(fresh)
+                val piece = warmPiece(fresh, callChars)
                 bridge.prefill(piece)
                 fedText += piece
                 val tokens = (piece.length / WARM_CHARS_PER_TOKEN).coerceAtLeast(1)
@@ -712,12 +756,14 @@ class ExecuTorchEngine(
     }
 
     /**
-     * The next piece to feed: at most [WARM_PIECE_CHARS], preferring to end at a line
-     * break, then at a space, so the cut re-tokenizes no more oddly than it must.
+     * The next piece to feed: at most [WARM_PIECE_CHARS] and never more than [limit],
+     * preferring to end at a line break, then at a space, so the cut re-tokenizes no more
+     * oddly than it must.
      */
-    private fun warmPiece(text: String): String {
-        if (text.length <= WARM_PIECE_CHARS) return text
-        val window = text.substring(0, WARM_PIECE_CHARS)
+    private fun warmPiece(text: String, limit: Int): String {
+        val most = minOf(WARM_PIECE_CHARS, limit)
+        if (text.length <= most) return text
+        val window = text.substring(0, most)
         val newline = window.lastIndexOf('\n')
         if (newline > 0) return window.substring(0, newline + 1)
         val space = window.lastIndexOf(' ')
@@ -921,6 +967,13 @@ private class StreamedReply(private val template: PromptTemplate) {
 
 /** One warm piece: about two hundred tokens, which is the interrupt latency in text. */
 private const val WARM_PIECE_CHARS = 800
+
+/**
+ * The most characters handed to one generate call, under the 2047-token input bound of
+ * every export this app ships or publishes even at one token per character. Anything
+ * beyond it is fed ahead in warm pieces. See `callChars`.
+ */
+private const val GENERATE_TAIL_CHARS = 1600
 
 /** Stands in for a picture in the rendered prompt until the picture is fed in its place. */
 private const val PICTURE_MARKER = "\u0000picture\u0000"

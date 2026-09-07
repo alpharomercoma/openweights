@@ -88,11 +88,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -716,6 +719,13 @@ class ChatViewModel @Inject constructor(
      */
     private var restoring: Long? = savedState[LAST_CONVERSATION]
 
+    /**
+     * What to call the conversation the next send opens, when it is not the message itself.
+     * Set by a goal starting on an empty chat, consumed by the send that creates the row,
+     * dropped by a new chat.
+     */
+    private var titleForNextConversation: String? = null
+
     init {
         loadComposerDraft()
         viewModelScope.launch {
@@ -1236,11 +1246,12 @@ class ChatViewModel @Inject constructor(
             // reopening, with the turn generating against it as though it were durable.
             reportingFailure {
                 writer.inOrder {
-                    val title = text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
+                    val title = titleFor(text, staged)
                     val id = conversationId
                         ?: startConversation(title, _uiState.value.modelName)
                             .also {
                                 conversationId = it
+                                titleForNextConversation = null
                                 // A goal or research started on a still-empty chat had no
                                 // conversation to record when it started; this is the first
                                 // moment one exists. See GoalBoard.bindConversation.
@@ -1999,8 +2010,21 @@ class ChatViewModel @Inject constructor(
     /** The question the model is waiting on. See [planning]. */
     val asking: AskBoard get() = turns.asking
 
-    /** What the goal is doing, for the screen to show and the user to stop. */
-    val goal: StateFlow<Goal?> get() = goals.goal
+    /**
+     * What the goal is doing, for the screen to show and the user to stop.
+     *
+     * Only on the conversation it belongs to. The board is restored across a process death
+     * so an interrupted goal comes back halted for a person to review, and reopening its own
+     * conversation keeps it (see [reopen]). But a process swiped away or a phone restarted
+     * loses the saved-state handle that reopens the last chat, and the app then starts on an
+     * empty screen with a strip about a task that chat never asked for (Poco X8 Pro,
+     * 2026-09-08). A goal started on a still-empty chat has no id yet and is shown as before.
+     */
+    val goal: StateFlow<Goal?> = combine(goals.goal, _uiState) { goal, state ->
+        goal?.takeIf {
+            it.conversationId == null || it.conversationId == state.activeConversationId
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun setMode(mode: AgentMode) = _uiState.update { it.copy(mode = mode) }
 
@@ -2048,12 +2072,22 @@ class ChatViewModel @Inject constructor(
         // "did a plan come back" passed on a plan this goal never proposed and could go on to
         // run steps that belonged to the last one.
         turns.planning.clear()
+        // The first turn a goal sends is its planning prompt, and a conversation opened by
+        // that turn was titled with it: the drawer read "Break this into a short numbered
+        // list of…" for every goal and research ever started on a fresh chat. The task is
+        // the title; the prompt is how the model is asked for a plan.
+        if (conversationId == null) titleForNextConversation = task
         goals.start(task, conversationId)
         // Held across the whole goal, including the gaps between steps where the turn's own
         // hold is not in force. Released in work()'s finally, whatever ends it.
         GenerationService.hold(appContext, GenerationService.GOAL, brief.notification)
         goalJob = viewModelScope.launch { work(task, brief) }
     }
+
+    /** What a conversation opened by this send is called: the goal's task, or the message. */
+    private fun titleFor(text: String, staged: List<MessagePart.File>): String =
+        titleForNextConversation
+            ?: text.ifEmpty { staged.firstOrNull()?.describe() ?: "Attachment" }
 
     /** Always allowed, and the only control a goal needs to offer. */
     fun stopGoal() {
@@ -2622,6 +2656,7 @@ class ChatViewModel @Inject constructor(
             // the conversation just left behind. See start().
             offerAskOverride = null
             toolPromptOverride = null
+            titleForNextConversation = null
             turns.planning.clear()
             // The board is one object for the whole app: a goal left over from the chat just
             // left behind would otherwise be on screen here too, its card naming a task this

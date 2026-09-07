@@ -263,6 +263,8 @@
     <string name="remove_command">Remove %1$s command</string>
     <string name="unknown_command">"%1$s" is not a recognised command. Send again to send it as a message.</string>
     <string name="unknown_command_suggestion">Did you mean %1$s?</string>
+    <string name="unknown_command_mode">"%1$s" switches the mode and takes no message. Use it below and the rest of your text stays here to send.</string>
+    <string name="unknown_command_use">Use %1$s</string>
     <string name="generated_at_speed">Generated at %1$d tokens per second</string>
     <string name="generated_at_speed_with_prefill">Prompt read at %1$d tokens per second, generated at %2$d tokens per second</string>
     <string name="choose_a_model_spoken">Choose a model. %1$s</string>

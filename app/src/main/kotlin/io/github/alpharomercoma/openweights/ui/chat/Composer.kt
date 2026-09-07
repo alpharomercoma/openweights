@@ -421,9 +421,14 @@ fun Composer(
                                 // the palette does. Staging it as pending instead built a
                                 // trigger-plus-argument string submit() does not recognise
                                 // for a command that never takes one, and the correction
-                                // reached the model as prose.
+                                // reached the model as prose. What was typed after the
+                                // trigger stays in the field: "/plan how should I…" switches
+                                // the mode and leaves the question ready to send, rather
+                                // than throwing it away with the trigger.
                                 pendingCommandName = null
-                                field.clearText()
+                                field.setTextAndPlaceCursorAtEnd(
+                                    suggestion.argumentAfterNearMiss(draft),
+                                )
                                 onCommand(suggestion)
                             }
                         },
@@ -608,6 +613,13 @@ private fun UnknownCommandNotice(
     onUseSuggestion: (SlashCommand) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // "/plan how should I…" is the trigger spelled right with a message after it, which
+    // the mode commands do not take. Telling that person "/plan is not a recognised command"
+    // and then asking "did you mean /plan?" contradicted itself on the screen (Poco X8 Pro,
+    // 2026-09-08). The notice says what the command is and what the button will do.
+    val exactTrigger = suggestion != null &&
+        !suggestion.takesArgument &&
+        token.equals(suggestion.trigger, ignoreCase = true)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -616,7 +628,11 @@ private fun UnknownCommandNotice(
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(
-            text = stringResource(R.string.unknown_command, token),
+            text = if (exactTrigger) {
+                stringResource(R.string.unknown_command_mode, token)
+            } else {
+                stringResource(R.string.unknown_command, token)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -626,7 +642,13 @@ private fun UnknownCommandNotice(
                 enabled = enabled,
                 contentPadding = PaddingValues(0.dp),
             ) {
-                Text(stringResource(R.string.unknown_command_suggestion, suggestion.trigger))
+                Text(
+                    if (exactTrigger) {
+                        stringResource(R.string.unknown_command_use, suggestion.trigger)
+                    } else {
+                        stringResource(R.string.unknown_command_suggestion, suggestion.trigger)
+                    },
+                )
             }
         }
     }

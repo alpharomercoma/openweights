@@ -81,12 +81,14 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
         val program = Module.load(modelPath, Module.LOAD_MODE_MMAP)
         try {
             val methods = program.getMethods().toSet()
-            val window = WINDOW_METHODS.firstOrNull { it in methods }?.let { name ->
-                program.execute(name).firstOrNull()?.takeIf { it.isInt }?.toInt()?.toInt()
-            }
+            fun read(name: String): Int? = name.takeIf { it in methods }?.let {
+                program.execute(it).firstOrNull()?.takeIf { v -> v.isInt }?.toInt()?.toInt()
+            }?.takeIf { it > 0 }
+            val window = WINDOW_METHODS.firstNotNullOfOrNull(::read)
             return ExportFacts(
-                contextLength = window?.takeIf { it > 0 },
+                contextLength = window,
                 hasVision = VISION_ENCODER_METHOD in methods,
+                prefillLength = read(PREFILL_METHOD),
             )
         } finally {
             program.destroy()
@@ -212,6 +214,9 @@ class NativeExecuTorchBridge : ExecuTorchBridge {
     private companion object {
         /** What exporters call the window, most specific first. */
         val WINDOW_METHODS = listOf("get_max_context_len", "get_max_seq_len")
+
+        /** The most tokens one prefill call may carry; the window itself on older exports. */
+        const val PREFILL_METHOD = "get_max_seq_len"
 
         /** The method a multimodal export carries its image encoder under. */
         const val VISION_ENCODER_METHOD = "vision_encoder"

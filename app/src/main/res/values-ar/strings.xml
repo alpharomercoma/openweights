@@ -209,6 +209,8 @@
     <string name="remove_command">إزالة أمر %1$s</string>
     <string name="unknown_command">"%1$s" ليس أمرًا معروفًا. أرسل مرة أخرى لإرساله كرسالة.</string>
     <string name="unknown_command_suggestion">هل تقصد %1$s؟</string>
+    <string name="unknown_command_mode">"%1$s" يغيّر الوضع ولا يأخذ رسالة. استخدمه أدناه وسيبقى باقي نصك هنا لإرساله.</string>
+    <string name="unknown_command_use">استخدم %1$s</string>
     <string name="generated_at_speed">تم التوليد بسرعة %1$d رمز في الثانية</string>
     <string name="generated_at_speed_with_prefill">تمت قراءة الطلب بسرعة %1$d رمز في الثانية، وتم التوليد بسرعة %2$d رمز في الثانية</string>
     <string name="choose_a_model_spoken">اختيار نموذج. %1$s</string>

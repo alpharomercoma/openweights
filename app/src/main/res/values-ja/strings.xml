@@ -203,6 +203,8 @@
     <string name="remove_command">%1$s コマンドを削除</string>
     <string name="unknown_command">「%1$s」は認識されないコマンドです。もう一度送信するとメッセージとして送信されます。</string>
     <string name="unknown_command_suggestion">%1$s のことですか?</string>
+    <string name="unknown_command_mode">「%1$s」はモードを切り替えるコマンドで、メッセージは付けられません。下で使うと、残りの文はここに残ります。</string>
+    <string name="unknown_command_use">%1$s を使う</string>
     <string name="generated_at_speed">毎秒 %1$d トークンで生成</string>
     <string name="generated_at_speed_with_prefill">プロンプトを毎秒 %1$d トークンで読み込み、毎秒 %2$d トークンで生成</string>
     <string name="choose_a_model_spoken">モデルを選ぶ。%1$s</string>

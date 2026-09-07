@@ -62,6 +62,48 @@ tail, so a reader who scrolled up to check a previous step is brought back for t
 the "jump to latest" threshold is a fifth of the viewport rather than a fixed 700 px, so the
 way back is offered in a short list too.
 
+## Only on its own conversation
+
+The board is one object for the app and is restored across a process death, so an
+interrupted goal comes back halted for a person to look at. Restored onto the wrong screen
+it was noise: an app swiped away or a phone restarted loses the saved-state handle that
+reopens the last chat, and the strip then sat on an empty new chat describing a task that
+chat never asked for (Poco X8 Pro, 2026-09-08). The view model now shows a goal only when
+its conversation is the one on screen, or when it has no conversation yet because it
+started on an empty chat. Reopening the goal's own conversation still shows it.
+
+## What the plan says
+
+Steps are read out of the model's list with markdown emphasis removed and, when they run
+past sixty characters, cut at the last word rather than mid-word: `**What is the LFM2
+architecture?** - To understand the techn` is now `What is the LFM2 architecture? - To
+understand the`. The same text goes back to the model in the status block.
+
+A goal or research started on an empty chat titles the conversation with the task. It used
+to be titled with the first turn the loop sent, which is the planning prompt, so the drawer
+read "Break this into a short numbered list of…" for every one of them.
+
+## Getting into plan mode
+
+`/plan` takes no message, by design and by test: "/plan the trip" is a sentence. But the
+notice for it read "/plan is not a recognised command. Did you mean /plan?", which
+contradicts itself. It now says the command switches the mode and takes no message, the
+button reads "Use /plan", and accepting it switches the mode and leaves the rest of the
+text in the composer to send.
+
+## Why a research step searched and never fetched
+
+Seen while verifying on the phone, and not part of this change: after a search, a fetch of
+an address the model chose asks for approval even in Auto mode. That is the egress rule in
+`AgentRunner` (untrusted text has been read, and the tool sends where the model says), and
+it holds during a goal, so a research step pauses on "Run fetch_url?" until it is tapped.
+The card sits in its usual pinned slot above the composer.
+
+The halts that started this work had a different cause, in the engine: every step's prompt
+with the tool prefix was refused by the ExecuTorch runtime's prefill bound and retried
+without tools, so the model could not search at all. See
+[executorch.md](../research/executorch.md), "Three things only the device said".
+
 ## What did not change
 
 - Steering semantics: bounded to 16 messages of 500 characters, drained at step boundaries,
@@ -78,4 +120,13 @@ way back is offered in a short list too.
 `ChatScreenTest`: a question is answered through the composer; a question during a goal
 routes the composer to the answer and not to steering; a running goal with a five-step plan
 and a generating step keeps the reply on screen, shows the plan, shows the strip, and steers
-from the composer. `CompactLandscapeChatScreenTest` still holds.
+from the composer. `CompactLandscapeChatScreenTest` still holds. `ComposerTest`: a mode
+command with a message after it switches the mode and keeps the message. `TaskPlanTest`:
+emphasis comes off and long steps cut at a word. `ExecuTorchEngineTest`: a long prompt is
+fed ahead in pieces and generate gets only the tail; the piece size follows the export's
+prefill bound.
+
+Verified on the Poco X8 Pro with LFM2.5-2.6B at 32k on 2026-09-08: `/deep-research`
+plans, searches, fetches and reports with the reply, the plan and the strip all on screen;
+steering from the composer, the sheet, Stop and Dismiss all work; a fresh launch no longer
+shows another chat's goal.

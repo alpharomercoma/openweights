@@ -19,7 +19,10 @@ to the recipe's checkpoint format, then exported with:
 
 - 8-bit dynamic activations, 4-bit weights in groups of 32 (the layout KleidiAI's kernels
   take in the XNNPACK runtime), 8-bit embedding table, XNNPACK with extended ops;
-- prefill chunk 2048 tokens (the runner splits longer prompts itself);
+- prefill chunk 2048 tokens. The exporter bounds the token input at 2047 and the runner
+  splits longer prompts at 2048, so the runner's own split fails on any prompt of 2048
+  tokens or more; the app feeds long prompts in pieces itself (see
+  [executorch.md](executorch.md), "Three things only the device said");
 - `max_context_length` 16384 or 32768;
 - the family's own BOS and EOS ids in the metadata (the 2.6B tokenizer differs from the
   1.2B's: 128k vocabulary, BOS 124894, EOS 124900).

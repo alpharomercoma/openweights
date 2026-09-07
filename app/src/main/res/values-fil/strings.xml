@@ -207,6 +207,8 @@
     <string name="remove_command">Alisin ang %1$s command</string>
     <string name="unknown_command">"%1$s" ay hindi kilalang command. Ipadala ulit para ipadala ito bilang mensahe.</string>
     <string name="unknown_command_suggestion">Ibig mo bang sabihin %1$s?</string>
+    <string name="unknown_command_mode">Ang "%1$s" ay nagpapalit ng mode at walang kasamang mensahe. Gamitin ito sa ibaba at mananatili dito ang natitirang teksto para ipadala.</string>
+    <string name="unknown_command_use">Gamitin ang %1$s</string>
     <string name="generated_at_speed">Ginawa sa %1$d na token kada segundo</string>
     <string name="generated_at_speed_with_prefill">Nabasa ang prompt sa %1$d na token kada segundo, ginawa sa %2$d na token kada segundo</string>
     <string name="choose_a_model_spoken">Pumili ng modelo. %1$s</string>

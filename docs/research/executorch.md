@@ -166,6 +166,17 @@ None of these are visible from the API, the documentation, or a test against a f
 - **The stats keys are `prompt_tokens` and `generated_tokens`**, not the `num_`-prefixed
   names. Guessing wrong reported zero tokens for every generation, which the fallback to
   wall-clock timing hid rather than surfaced.
+- **One prefill call may carry `max_seq_len - 1` tokens, and the runner chunks at
+  `max_seq_len`.** The exporter bounds the token input at one less than the sequence
+  length it is given (2047 on every export this app ships or publishes), and the runtime's
+  own chunking of a long prompt hands it pieces of exactly 2048. The failure is "Attempted
+  to resize a bounded tensor with a maximum capacity of 2047 elements to 2048 elements",
+  which the bridge had read as a full window. On the phone (2026-09-08) this made every
+  `/deep-research` step's prompt with the tool prefix, about 2.1k tokens at 4 percent of a
+  32k window, retry without tools, so the model never searched and the goal halted. The
+  engine now feeds all but the last 1600 characters of a turn's fresh text through prefill
+  in pieces and hands generate only the tail; one token per character is the worst case, so
+  a character bound under the token bound holds for any text.
 
 ## Where a model runs is decided at export, not by the app
 

@@ -162,6 +162,29 @@ class ComposerTest {
     }
 
     @Test
+    fun `a mode command with a message after it switches the mode and keeps the message`() {
+        var dispatched: SlashCommand? = null
+        var sent: String? = null
+        show(onCommand = { dispatched = it }, onSend = {
+            sent = it
+            true
+        })
+
+        // The trigger spelled right, with the question the mode is wanted for after it.
+        // "/plan" takes no message by design, and the old notice said it was not a
+        // recognised command and then asked whether /plan was meant.
+        compose.onNodeWithContentDescription("Message")
+            .performTextInput("/plan how should I move a library")
+        compose.onNodeWithContentDescription("Send message").performClick()
+        compose.onNodeWithText("Did you mean ${SlashCommand.PLAN.trigger}?").assertDoesNotExist()
+        compose.onNodeWithText("Use ${SlashCommand.PLAN.trigger}").performClick()
+
+        assert(dispatched == SlashCommand.PLAN) { "expected PLAN to run, got: $dispatched" }
+        assert(sent == null) { "the message is left to send, not sent" }
+        compose.onNodeWithText("how should I move a library").assertExists()
+    }
+
+    @Test
     fun `accepting a suggestion for an argument command keeps the whole question`() {
         show()
 

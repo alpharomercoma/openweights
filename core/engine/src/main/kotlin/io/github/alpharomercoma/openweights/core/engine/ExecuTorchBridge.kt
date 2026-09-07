@@ -51,8 +51,16 @@ data class ExecuTorchOutcome(
  * @property hasVision whether it carries a `vision_encoder` method, which is how the
  * multimodal export layout announces itself: pictures go through that method into the
  * decoder as embeddings, in place of text.
+ * @property prefillLength the most tokens one prefill call may carry (`get_max_seq_len`),
+ * when the export states it apart from the window. The exporter bounds the token input at
+ * one less than this, and the runtime chunks a long prompt at exactly this, so a single
+ * call of that many tokens fails; the engine keeps every call under it.
  */
-data class ExportFacts(val contextLength: Int?, val hasVision: Boolean)
+data class ExportFacts(
+    val contextLength: Int?,
+    val hasVision: Boolean,
+    val prefillLength: Int? = null,
+)
 
 interface ExecuTorchBridge {
 

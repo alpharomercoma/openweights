@@ -43,6 +43,7 @@ import java.io.File
  * tool calls out, and refusing to load when it cannot do those things correctly. The parts
  * that genuinely need a phone are the `.pte` opening and the arithmetic inside it.
  */
+@Suppress("LargeClass") // One fixture holds every runtime contract this engine keeps.
 class ExecuTorchEngineTest {
 
     @get:Rule
@@ -757,6 +758,43 @@ class ExecuTorchEngineTest {
         assertThat(bridge.prompts.last()).doesNotContain("Rule 0:")
     }
 
+    /**
+     * The exporter bounds one prefill at `max_seq_len - 1` tokens and the runtime chunks
+     * at `max_seq_len`, so a generate call carrying a whole long prompt fails on the
+     * phone. The engine feeds the head in pieces and hands generate only a short tail.
+     */
+    @Test
+    fun `a long prompt is fed ahead in pieces and generate gets only the tail`() = runTest {
+        engine.load(installed(MODEL), PARAMS)
+        val essay = buildString { repeat(400) { append("word").append(it).append(' ') } }
+        bridge.reply = "Noted."
+
+        engine.chat(listOf(user(essay)), NO_THINKING).completed()
+
+        assertThat(bridge.prefills).isNotEmpty()
+        bridge.prefills.forEach { assertThat(it.length).isAtMost(1600) }
+        assertThat(bridge.prompts.last().length).isAtMost(1600)
+        // Nothing lost and nothing doubled between the pieces and the tail.
+        val fed = bridge.prefills.joinToString("") + bridge.prompts.last()
+        assertThat(fed).contains("word0 ")
+        assertThat(fed).contains("word399 ")
+        assertThat(fed.indexOf("word200 ")).isEqualTo(fed.lastIndexOf("word200 "))
+    }
+
+    /** An export that states a small prefill bound gets pieces under it. */
+    @Test
+    fun `the piece size follows the export's prefill bound`() = runTest {
+        bridge.prefillLength = 128
+        engine.load(installed(MODEL), PARAMS)
+        val essay = buildString { repeat(200) { append("word").append(it).append(' ') } }
+        bridge.reply = "Noted."
+
+        engine.chat(listOf(user(essay)), NO_THINKING).completed()
+
+        bridge.prefills.forEach { assertThat(it.length).isAtMost(127) }
+        assertThat(bridge.prompts.last().length).isAtMost(127)
+    }
+
     @Test
     fun `a warm equal to what is held reads nothing`() = runTest {
         engine.load(installed(MODEL), PARAMS)
@@ -828,14 +866,17 @@ class ExecuTorchEngineTest {
         assertThat(warm).isNull()
         assertThat(bridge.contextResets).isGreaterThan(resets)
 
-        // The next turn starts over from nothing, which is slow and correct.
+        // The next turn starts over from nothing, which is slow and correct: the rules go
+        // in again, ahead of generate in pieces because the prompt is long.
         bridge.failsDuringPrefill = null
         bridge.reply = "Hello."
+        val piecesBefore = bridge.prefills.size
         engine.chat(
             listOf(head, ChatMessage.text(ChatRole.USER, "hi")),
             NO_THINKING,
         ).toList()
-        assertThat(bridge.prompts.last()).contains("Rule 0:")
+        val fed = bridge.prefills.drop(piecesBefore).joinToString("") + bridge.prompts.last()
+        assertThat(fed).contains("Rule 0:")
     }
 
     private fun installed(name: String): File {

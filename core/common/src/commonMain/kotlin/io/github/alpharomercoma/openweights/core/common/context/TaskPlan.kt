@@ -100,18 +100,41 @@ fun readPlan(text: String): TaskPlan? {
     return if (steps.size < MINIMUM_STEPS) null else TaskPlan(steps)
 }
 
-/** A line that opens with a number or a bullet, with the marker taken off. */
+/**
+ * A line that opens with a number or a bullet, with the marker and any emphasis taken off,
+ * cut at a word when it runs past a line.
+ *
+ * Models write their steps as `**Question?** - why`, and the asterisks reached the screen
+ * as asterisks; a step cut at a character count ended mid-word ("To understand the techn")
+ * on every card and in the status block the model reads back. Emphasis carries nothing a
+ * checklist needs, and a cut at the last space before the limit reads as a phrase.
+ */
 private fun String.asStep(): TaskStep? {
     val line = trim()
-    val body = STEP_MARKER.find(line)?.let { line.removeRange(it.range) }?.trim()
-    return body?.takeIf { it.isNotEmpty() }
-        ?.take(TaskPlan.MAX_STEP_CHARS)
+    val body = STEP_MARKER.find(line)?.let { line.removeRange(it.range) }
+        ?.replace(EMPHASIS, "")
         ?.trim()
-        ?.let(::TaskStep)
+        ?: return null
+    if (body.isEmpty()) return null
+    return TaskStep(body.cutAtWord(TaskPlan.MAX_STEP_CHARS))
+}
+
+/** The text within [limit], ending at a word boundary where one is not too far back. */
+private fun String.cutAtWord(limit: Int): String {
+    if (length <= limit) return this
+    val window = substring(0, limit)
+    val space = window.lastIndexOf(' ')
+    val cut = if (space >= limit / 2) window.substring(0, space) else window
+    return cut.trimEnd(' ', ',', ';', ':', '-')
 }
 
 /** `1.`, `1)`, `-`, `*`, and `Step 1:`, which between them is what they write. */
 private val STEP_MARKER = Regex("""^(?:step\s*)?(?:\d+[.):]|[-*•])\s*""", RegexOption.IGNORE_CASE)
+
+/** Markdown emphasis and code marks: `**`, `__`, `*`, `_` at a word edge, and backticks. */
+private val EMPHASIS = Regex(
+    """\*\*|__|`|(?<![\p{L}\p{N}])[*_](?=\S)|(?<=\S)[*_](?![\p{L}\p{N}])""",
+)
 
 /** One step is an answer with a number in front of it. */
 private const val MINIMUM_STEPS = 2

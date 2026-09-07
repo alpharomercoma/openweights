@@ -149,6 +149,7 @@ footer a{color:var(--ink2)}
     <h2>Qwen3-1.7B at 32k against the 6 GB rule</h2>
     <p>Resident memory (RSS) of the test process right after the 32k export loaded, on each phone, with the phone's RAM. The dashed line is the 6 GB threshold the killed runs' logs reported; that threshold is measured in PSS at kill time, a different measure from the bars, so the bars show which phones were near it, not the moment they crossed it. Three of four processes were stopped within the first dozen prompts.</p>
     <p class="scrollhint">The chart scrolls sideways on a narrow screen.</p><div class="chart"><svg id="kill" viewBox="0 0 960 250" role="group" aria-label="Resident memory after load of Qwen3 32k on four phones against a 6 GB kill threshold"></svg></div>
+    <div class="legend"><span class="k"><i class="dash" style="border-color:var(--warn)"></i>6 GB, the PSS threshold Samsung Heimdall and MIUI reported when they stopped the process</span><span class="k"><i class="bar" style="background:var(--ink2);height:2px;border-radius:0"></i>The phone's RAM</span></div>
   </section>
 </div>
 
@@ -296,7 +297,7 @@ function drawKill(){
   o.push(`<rect class="pt" x="${x0}" y="${y(rw.rss/1000)}" width="${bw}" height="${y(0)-y(rw.rss/1000)}" fill="${col}" opacity="${killed?.9:.6}" data-t="${esc(t)}"/>`);
   o.push(`<text x="${x0+bw/2}" y="${y(rw.rss/1000)-6}" text-anchor="middle" font-size="11" fill="${ink}" class="mono">${(rw.rss/1000).toFixed(1)} GB</text>`);
   o.push(`<text x="${x0+bw/2}" y="${H-M.b+16}" text-anchor="middle" font-size="11.5" fill="${ink2}">${c.name}</text><text x="${x0+bw/2}" y="${H-M.b+30}" text-anchor="middle" font-size="10.5" fill="${killed?warn:ink3}">${killed?`killed after ${rw.prompts} prompts`:"finished 90 prompts"}</text>`);});
- o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(6)}" y2="${y(6)}" stroke="${warn}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${M.l+4}" y="${y(6)+14}" font-size="11" fill="${warn}">6 GB: the PSS threshold Samsung Heimdall and MIUI reported when they stopped the process</text>`);
+ o.push(`<line x1="${M.l}" x2="${W-M.r}" y1="${y(6)}" y2="${y(6)}" stroke="${warn}" stroke-dasharray="5 4" stroke-width="1.5"/>`);
  s.innerHTML=o.join("");wire(s);
 }
 

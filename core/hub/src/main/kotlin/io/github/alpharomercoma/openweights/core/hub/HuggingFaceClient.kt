@@ -54,6 +54,12 @@ data class HubModel(
      * any other way would cost a request per row.
      */
     val runtimes: Set<HubRuntime> = setOf(HubRuntime.LLAMA_CPP),
+    /**
+     * True for a shortlist row whose weights were modified after training, such as the
+     * refusal-removed variants. Shown under their own heading, after the recommendation,
+     * so being findable in the app and being recommended by it stay two different things.
+     */
+    val modified: Boolean = false,
 ) {
     /** True when this repository ships weights compiled ahead of time for ExecuTorch. */
     val isCompiled: Boolean get() = HubRuntime.EXECUTORCH in runtimes
@@ -436,10 +442,13 @@ class HuggingFaceClient @Inject constructor(
      * handful of requests and they are the first screen anybody sees.
      */
     suspend fun recommended(): List<HubModel> = coroutineScope {
-        RECOMMENDED
-            .map { id -> async { runCatching { modelById(id) }.getOrNull() } }
-            .awaitAll()
-            .filterNotNull()
+        val recommended = RECOMMENDED.map { id ->
+            async { runCatching { modelById(id) }.getOrNull() }
+        }
+        val modified = EXPERIMENTAL.map { id ->
+            async { runCatching { modelById(id).copy(modified = true) }.getOrNull() }
+        }
+        (recommended + modified).awaitAll().filterNotNull()
     }
 
     private suspend fun modelById(repoId: String): HubModel =
@@ -746,17 +755,29 @@ class HuggingFaceClient @Inject constructor(
 val RECOMMENDED = listOf(
     // Our own exports first (the experimentalmachines organisation), both at a 32k window:
     // the family that measured best here, compiled for the runtime that measured fastest,
-    // with sixteen times the window of the publisher exports they replace. The heretic
-    // pair are the same two models with refusal behaviour removed, the same recipe.
+    // with sixteen times the window of the publisher exports they replace.
     "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
     "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
-    "experimentalmachines/LFM2.5-1.2B-Instruct-heretic",
-    "experimentalmachines/LFM2.5-2.6B-heretic",
     // The family with eyes, from Liquid AI's own GGUF repository: ships its mmproj
     // projector beside the weights, which the app pairs automatically.
     "LiquidAI/LFM2.5-VL-1.6B-GGUF",
     // The generalist from another family, so the list is not one publisher's opinion.
     "unsloth/Qwen3-1.7B-GGUF",
+)
+
+/**
+ * Shortlist rows that are findable but not recommended: the same two exports with refusal
+ * behaviour removed, the same recipe.
+ *
+ * Kept apart from [RECOMMENDED] on purpose. The app runs any model a person chooses, and
+ * these are published so they can be chosen; but "the app can find it" and "the app
+ * recommends it" are different statements, and a model whose refusals were edited out is
+ * not what a first-time user should be handed as the default. They come after the
+ * recommendation, under their own heading, marked [HubModel.modified].
+ */
+val EXPERIMENTAL = listOf(
+    "experimentalmachines/LFM2.5-1.2B-Instruct-heretic",
+    "experimentalmachines/LFM2.5-2.6B-heretic",
 )
 
 /**

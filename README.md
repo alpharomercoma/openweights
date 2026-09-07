@@ -95,7 +95,7 @@ model search and downloads, and the three network tools. The
 | Fit before download | Comfortable, tight, will not run, or no room to download, from the GGUF header read remotely and your phone's memory. Compiled files get a size-based estimate and show their exported window where the publisher states it. |
 | Downloads | Resumable over range requests, verified with a rolling SHA-256, run in a foreground service so leaving the app does not end them, with a "Ready to use" notification that opens the model. |
 | Vision projectors | A GGUF's `mmproj` projector is paired with the weights automatically. |
-| Recommended | Six rows: our four ExecuTorch exports of LFM2.5 at a 32k window, Liquid AI's LFM2.5-VL 1.6B, and Qwen3 1.7B. The reasoning is in the code beside the list. |
+| Recommended | Four rows: our two ExecuTorch exports of LFM2.5 at a 32k window, Liquid AI's LFM2.5-VL 1.6B, and Qwen3 1.7B. Below them, under an "Experimental / modified" heading, the two refusal-removed LFM2.5 variants: findable, not recommended. The reasoning is in the code beside the list. |
 
 ### Two runtimes, one build
 

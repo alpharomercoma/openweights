@@ -87,6 +87,8 @@
     <string name="week">Esta semana</string>
     <string name="by_model">Por modelo</string>
     <string name="recommended">Recomendado</string>
+    <string name="discover_experimental">Experimentales / modificados</string>
+    <string name="discover_experimental_note">Modelos a los que se les quitó el comportamiento de rechazo. No forman parte de la recomendación. Aparecen porque la app ejecuta cualquier modelo que elijas.</string>
     <string name="official">Oficial</string>
     <string name="filters">Filtros</string>
     <string name="filters_count">Filtros %1$d</string>

@@ -88,6 +88,8 @@
     <string name="week">Ngayong linggo</string>
     <string name="by_model">Ayon sa modelo</string>
     <string name="recommended">Inirerekomenda</string>
+    <string name="discover_experimental">Eksperimental / binago</string>
+    <string name="discover_experimental_note">Mga model na tinanggal ang pagtangging sumagot. Hindi bahagi ng rekomendasyon. Nakalista dahil pinapatakbo ng app ang anumang model na piliin mo.</string>
     <string name="official">Opisyal</string>
     <string name="filters">Mga filter</string>
     <string name="filters_count">Mga filter %1$d</string>

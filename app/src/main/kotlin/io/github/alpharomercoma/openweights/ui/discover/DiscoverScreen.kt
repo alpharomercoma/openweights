@@ -266,13 +266,21 @@ fun DiscoverScreen(
                 }
 
                 itemsIndexed(state.results, key = { _, model -> model.id }) { index, model ->
+                    // The shortlist has two groups: the recommendation, then the modified
+                    // models under their own heading. Each group is its own rounded card,
+                    // so a row's corners follow the group and not the whole list.
+                    val results = state.results
+                    val opensGroup = index == 0 || results[index - 1].modified != model.modified
+                    val closesGroup = index == results.lastIndex ||
+                        results[index + 1].modified != model.modified
+                    if (opensGroup && model.modified) ExperimentalHeading()
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(resultShape(index, state.results.lastIndex))
+                            .clip(resultShape(opensGroup, closesGroup))
                             .background(MaterialTheme.colorScheme.surfaceContainer),
                     ) {
-                        if (index > 0) {
+                        if (!opensGroup) {
                             HorizontalDivider(
                                 thickness = Dp.Hairline,
                                 color = MaterialTheme.colorScheme.outlineVariant,
@@ -329,12 +337,36 @@ private fun LoadMoreEffect(
  * Each row is its own lazy item, so the container cannot be one shape around all of them;
  * the corners belong to the first and last rows instead. A single result gets all four.
  */
-private fun resultShape(index: Int, last: Int) = RoundedCornerShape(
-    topStart = if (index == 0) Radius.md else 0.dp,
-    topEnd = if (index == 0) Radius.md else 0.dp,
-    bottomStart = if (index == last) Radius.md else 0.dp,
-    bottomEnd = if (index == last) Radius.md else 0.dp,
+private fun resultShape(first: Boolean, last: Boolean) = RoundedCornerShape(
+    topStart = if (first) Radius.md else 0.dp,
+    topEnd = if (first) Radius.md else 0.dp,
+    bottomStart = if (last) Radius.md else 0.dp,
+    bottomEnd = if (last) Radius.md else 0.dp,
 )
+
+/**
+ * The heading over the shortlist's modified models, with the one sentence that says why
+ * they are here and not above: findable is not recommended.
+ */
+@Composable
+private fun ExperimentalHeading() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 20.dp, bottom = 8.dp, start = 4.dp, end = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.discover_experimental),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text = stringResource(R.string.discover_experimental_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 /** What to say when the Hub has nothing, which on a narrow filter is most of the time. */
 @Composable

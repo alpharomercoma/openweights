@@ -26,6 +26,13 @@ package io.github.alpharomercoma.openweights.core.common.model
  *   not a single number, because hybrid architectures vary it per layer: LFM2 runs
  *   convolution in most blocks and attention in only a third of them, so treating it as
  *   uniform overstates the KV cache by roughly three times.
+ * @param keyLength width of one key head as the header states it
+ *   (`<arch>.attention.key_length`), or zero when the header leaves it out. It is not
+ *   always the embedding width over the head count: Qwen3 0.6B writes 128 against an
+ *   embedding of 1024 over 16 heads, and Qwen3 4B writes 128 against 2560 over 32. The
+ *   cache is sized by the stated width, so deriving it halved the estimate for the one
+ *   and cut it by a third for the other.
+ * @param valueLength the same for a value head (`<arch>.attention.value_length`).
  */
 data class GgufMetadata(
     val architecture: String,
@@ -36,12 +43,21 @@ data class GgufMetadata(
     val trainingContextLength: Int,
     val fileType: GgufFileType,
     val name: String?,
+    val keyLength: Int = 0,
+    val valueLength: Int = 0,
 ) {
     /**
-     * Width of one attention head. GGUF may state it directly; otherwise it is the
-     * embedding width divided across the heads.
+     * Width of one key head: what the header states, or the embedding width divided
+     * across the heads where it states nothing, which is the shape of most models.
      */
     val headDimension: Int
+        get() = keyLength.takeIf { it > 0 } ?: derivedHeadDimension
+
+    /** Width of one value head, falling back the same way. */
+    val valueDimension: Int
+        get() = valueLength.takeIf { it > 0 } ?: headDimension
+
+    private val derivedHeadDimension: Int
         get() = if (headCount > 0) embeddingLength / headCount else 0
 
     /** Total key/value heads across every block: what the KV cache is actually sized by. */
@@ -61,12 +77,13 @@ data class GgufMetadata(
     /**
      * Bytes the KV cache occupies at [contextLength].
      *
-     * Keys and values are each stored per head per token, at 16 bits by default.
+     * One key row and one value row per KV head per token, each element 16 bits by
+     * default: `heads x (key width + value width) x tokens x 2`. The two widths are added
+     * rather than doubled because a header may state them separately.
      */
     fun kvCacheBytes(contextLength: Int): Long = saturatedProduct(
-        2L,
         totalKeyValueHeads.toLong(),
-        headDimension.toLong(),
+        (headDimension.toLong() + valueDimension.toLong()),
         contextLength.toLong(),
         KV_ELEMENT_BYTES.toLong(),
     )

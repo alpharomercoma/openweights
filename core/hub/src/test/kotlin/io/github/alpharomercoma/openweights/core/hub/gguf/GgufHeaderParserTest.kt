@@ -82,6 +82,47 @@ class GgufHeaderParserTest {
     }
 
     @Test
+    fun `a stated key length sizes the cache, not the embedding over the heads`() = runTest {
+        // Qwen3 0.6B as its own header writes it: 1024 wide, 16 heads, and a key of 128,
+        // which is twice what dividing gives. Read from the published Q8_0 file on
+        // 2026-09-09. The cache is sized by the stated width, so the estimate was half.
+        val header = GgufBuilder()
+            .string("general.architecture", "qwen3")
+            .uint32("qwen3.block_count", 28)
+            .uint32("qwen3.embedding_length", 1024)
+            .uint32("qwen3.attention.head_count", 16)
+            .uint32("qwen3.attention.head_count_kv", 8)
+            .uint32("qwen3.attention.key_length", 128)
+            .uint32("qwen3.attention.value_length", 128)
+            .uint32("qwen3.context_length", 40_960)
+            .build()
+
+        val metadata = GgufHeaderParser(header.asSource()).parse()
+
+        assertThat(metadata.headDimension).isEqualTo(128)
+        assertThat(metadata.valueDimension).isEqualTo(128)
+        // 28 layers x 8 heads x (128 + 128) x 2 bytes, per token.
+        assertThat(metadata.kvCacheBytes(contextLength = 1)).isEqualTo(114_688L)
+    }
+
+    @Test
+    fun `a header without a key length still derives the head width`() = runTest {
+        val header = GgufBuilder()
+            .string("general.architecture", "lfm2")
+            .uint32("lfm2.block_count", 16)
+            .uint32("lfm2.embedding_length", 2048)
+            .uint32("lfm2.attention.head_count", 32)
+            .uint32("lfm2.attention.head_count_kv", 8)
+            .build()
+
+        val metadata = GgufHeaderParser(header.asSource()).parse()
+
+        assertThat(metadata.keyLength).isEqualTo(0)
+        assertThat(metadata.headDimension).isEqualTo(64)
+        assertThat(metadata.valueDimension).isEqualTo(64)
+    }
+
+    @Test
     fun `expands a single kv head count across every block`() = runTest {
         val header = GgufBuilder()
             .string("general.architecture", "llama")

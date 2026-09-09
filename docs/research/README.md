@@ -38,6 +38,7 @@ it found. Dates are the last substantive change. Three reports also have publish
 | [memory-recall.md](memory-recall.md) | 2026-09-05 | A linear scan over a small memory rather than a vector index |
 | [engine-settings.md](engine-settings.md) | 2026-09-05 | Which of a competitor's nineteen settings belong on the sheet: none |
 | [capabilities-ia.md](capabilities-ia.md) | 2026-08-10 | Tools, skills and MCP are three different things on this platform |
+| [loops-and-kv-cache.md](loops-and-kv-cache.md) | 2026-09-09 | Where the four agent loops live in the app (the canvas has no grader; hill climbing stays on the development side), and the KV formula corrected: Qwen3's stated key length is not the embedding over the heads, which had halved the 0.6B's cache estimate |
 | [plan-mode-and-recall.md](plan-mode-and-recall.md) | 2026-09-05 | Plan mode must plan, not answer; recall and search credulity fixes |
 | [date-in-the-prompt.md](date-in-the-prompt.md) | 2026-09-05 | Why a greeting got answered about the date |
 | [generation-runtimes.md](generation-runtimes.md) | 2026-09-01 | No runtime publishes a reproducible on-phone image-generation measurement; not offered |

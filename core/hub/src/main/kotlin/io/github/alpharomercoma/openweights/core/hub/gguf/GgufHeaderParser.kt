@@ -92,6 +92,10 @@ class GgufHeaderParser(
             ).filter { it > 0 }.minOrNull() ?: 0,
             fileType = GgufFileType.fromId(values.int(KEY_FILE_TYPE) ?: -1),
             name = values[KEY_NAME] as? String,
+            // Written by the converter only when a head is not the embedding width over
+            // the head count. Qwen3 is the shipped family that needs it; zero means derive.
+            keyLength = values.int("$arch.attention.key_length") ?: 0,
+            valueLength = values.int("$arch.attention.value_length") ?: 0,
         )
     }
 

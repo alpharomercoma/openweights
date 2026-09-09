@@ -95,6 +95,21 @@ class ExecuTorchEngine(
     private var callChars: Int = GENERATE_TAIL_CHARS
 
     /**
+     * What this turn fed through prefill before generate: pieces of the prompt too long
+     * for one call (see [feedAhead]), by characters and by the wall clock.
+     *
+     * Kept so the turn's stats can say what the turn cost. The runtime's own figures cover
+     * the generate call alone, and a turn whose head went in as pieces used to report only
+     * its tail: the prefill rate of the last four hundred tokens, and the two thousand
+     * before them counted as cached, which they were not. Zeroed at the start of every turn.
+     */
+    private var fedAheadChars: Int = 0
+    private var fedAheadMs: Long = 0L
+
+    /** The text the turn's generate call was given, whose token count the runtime reports. */
+    private var tailChars: Int = 0
+
+    /**
      * The text the runtime's KV cache currently holds, prompt and reply together.
      *
      * Kept as text rather than as a token count because that is what can be compared: the
@@ -279,6 +294,8 @@ class ExecuTorchEngine(
             params.thinking,
         )
         val started = System.currentTimeMillis()
+        fedAheadChars = 0
+        fedAheadMs = 0L
         val (fresh, reused) = openTurn(prompt, pictures, rendering, started) ?: return
 
         // What the runtime already holds, and whether this turn extends it.
@@ -326,6 +343,7 @@ class ExecuTorchEngine(
         // is wiped when the token loop starts; the flag is the only record left. The
         // callback reads it on the first token and re-issues the stop. It is cleared at
         // the start of the turn instead, before anything a Stop could be aimed at.
+        tailChars = fresh.length
         val outcome = try {
             bridge.generate(fresh, budget) { fragment ->
                 if (firstTokenAt == 0L) firstTokenAt = System.currentTimeMillis()
@@ -364,7 +382,8 @@ class ExecuTorchEngine(
         // turn to start over, which is slow and correct.
         if (reply.endedCleanly && pictures.isEmpty()) {
             fedText = prompt + reply.answer
-            heldTokens = reused + outcome.promptTokens + outcome.generatedTokens
+            heldTokens = reused + fedAheadTokens(outcome) + outcome.promptTokens +
+                outcome.generatedTokens
         } else if (reply.endedCleanly) {
             // Held, but not extendable: the runtime counts the picture's positions in its
             // prompt figure, so the meter is right even though the text record is empty.
@@ -548,18 +567,20 @@ class ExecuTorchEngine(
      */
     private fun feedAhead(fresh: String, held: Int): Pair<String, Int> {
         var rest = fresh
-        var reused = held
         while (rest.length > callChars) {
             if (cancelRequested) throw StoppedWhileFeeding()
             val piece = warmPiece(rest, callChars)
+            val before = System.currentTimeMillis()
             bridge.prefill(piece)
+            fedAheadMs += System.currentTimeMillis() - before
+            fedAheadChars += piece.length
             fedText += piece
-            val tokens = (piece.length / WARM_CHARS_PER_TOKEN).coerceAtLeast(1)
-            heldTokens += tokens
-            reused += tokens
+            heldTokens += (piece.length / WARM_CHARS_PER_TOKEN).coerceAtLeast(1)
             rest = rest.substring(piece.length)
         }
-        return rest to reused
+        // The pieces are this turn's work, not the cache's: they are reported as prompt
+        // tokens by [statsFor], so what is returned as reused is only what was held before.
+        return rest to held
     }
 
     /**
@@ -794,11 +815,34 @@ class ExecuTorchEngine(
     }
 
     /**
-     * Time to first token is the prefill, and the rest is the decode.
+     * The turn's cost, from the runtime's figures for the generate call plus what this
+     * engine fed ahead of it.
      *
-     * llama.cpp reports both from inside, having actually measured them. Here they are
-     * split at the first fragment reaching us, which is the same boundary observed from
-     * one step further out — and is exactly the wait the user feels.
+     * The runtime measures the generate call from inside: `prompt_eval_end_ms` less
+     * `inference_start_ms` is its prefill, `inference_end_ms` less `prompt_eval_end_ms`
+     * its decode, and both are what it actually spent. Two corrections are this side's.
+     *
+     * The first token is the prefill's. The runner samples one token at the end of the
+     * prompt and hands it to the callback before its decode loop starts, and
+     * `generated_tokens` counts only the loop's steps, so the reply the reader saw is one
+     * token longer than the runtime's count. Reported as the reader saw it, and that also
+     * makes the decode rate exact: [GenerationStats.decodeTokensPerSecond] divides the
+     * tokens after the first by the decode time, and the loop's steps are exactly those.
+     * Without the correction a thirty-token reply read as twenty-nine at three per cent
+     * under its real rate, and the same reply on llama.cpp, which counts its first token,
+     * did not, so the two runtimes disagreed about identical work.
+     *
+     * The pieces fed ahead are prompt, not cache. A prompt longer than one call may carry
+     * goes in as prefill pieces first (see [feedAhead]), and the runtime's figures know
+     * nothing of them. Their time is measured around each call. Their token count is not
+     * measured, because the Java binding exposes no tokenizer, so it is the piece text at
+     * the rate the generate call reported for the tail it did count, which is the same
+     * text in the same template, or four characters a token when there was no tail. The
+     * one estimate in these stats, and named as one; the alternative was two thousand
+     * tokens of prefill reported as a cache hit.
+     *
+     * Time to first token is wall clock from the start of the turn to the first fragment,
+     * pieces included, because that is the wait the user felt.
      */
     private fun statsFor(
         outcome: ExecuTorchOutcome,
@@ -809,17 +853,20 @@ class ExecuTorchEngine(
     ): GenerationStats {
         val finished = System.currentTimeMillis()
         val timeToFirst = if (firstTokenAt > 0) firstTokenAt - started else finished - started
+        val fedAhead = fedAheadTokens(outcome)
         return GenerationStats(
-            promptTokens = outcome.promptTokens,
-            generatedTokens = outcome.generatedTokens,
-            prefillMs = outcome.prefillMs.takeIf { it > 0 } ?: timeToFirst,
+            promptTokens = outcome.promptTokens + fedAhead,
+            generatedTokens = outcome.generatedTokens + if (firstTokenAt > 0) 1 else 0,
+            // The runtime's prefill covers the generate call; the pieces before it were
+            // timed here. When the runtime reported nothing, the wait to the first token is
+            // the whole prefill, pieces and all.
+            prefillMs = outcome.prefillMs.takeIf { it > 0 }?.plus(fedAheadMs) ?: timeToFirst,
             decodeMs = outcome.decodeMs.takeIf { it > 0 } ?: (finished - started - timeToFirst),
             timeToFirstTokenMs = timeToFirst,
             contextUsed = heldTokens,
             contextSize = contextSize,
-            // What the runtime kept rather than what it re-read. It reports the tokens
-            // it was *given*, which on an extending turn is only the new text, so the rest
-            // of the conversation is the difference between that and the window in use.
+            // What the runtime kept rather than what it re-read: what was held before this
+            // turn began. The pieces fed this turn are in promptTokens above, not here.
             // Zero on a turn that started from nothing, which is the honest answer there.
             cachedTokens = reused,
             // The opener can carry a thinking block the reply continues from — Qwen3
@@ -832,6 +879,21 @@ class ExecuTorchEngine(
             // here, which is the opposite of what it sounds like.
             thinkingPrefilled = prompt.endsWith(THINK_CLOSE + "\n\n"),
         )
+    }
+
+    /**
+     * How many tokens this turn's fed-ahead pieces came to, at the rate the generate
+     * call measured for its own tail. See [statsFor] for why this is the one estimate.
+     */
+    private fun fedAheadTokens(outcome: ExecuTorchOutcome): Int {
+        if (fedAheadChars == 0) return 0
+        val tail = tailChars
+        val charsPerToken = if (tail > 0 && outcome.promptTokens > 0) {
+            tail.toDouble() / outcome.promptTokens
+        } else {
+            WARM_CHARS_PER_TOKEN.toDouble()
+        }
+        return (fedAheadChars / charsPerToken).toInt().coerceAtLeast(1)
     }
 
     /**

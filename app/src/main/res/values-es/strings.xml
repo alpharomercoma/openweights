@@ -135,6 +135,7 @@
     <string name="watch_ends_in"> · termina en %1$s</string>
     <string name="watch_ends_now"> · deteniéndose</string>
     <string name="watch_notification_progress">Comprobación %1$d de %2$d · siguiente</string>
+    <string name="watch_notification_checking">Comprobación %1$d de %2$d · comprobando ahora</string>
     <string name="watch_notification_progress_last">Comprobación %1$d de %2$d</string>
     <string name="watch_notification_ended">Se detuvo por su cuenta tras %1$d comprobaciones</string>
     <string name="watch_notification_failed">Detenido: tres comprobaciones seguidas fallaron. Abre la app para ver el último error.</string>

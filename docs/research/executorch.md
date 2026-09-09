@@ -177,6 +177,18 @@ None of these are visible from the API, the documentation, or a test against a f
   engine now feeds all but the last 1600 characters of a turn's fresh text through prefill
   in pieces and hands generate only the tail; one token per character is the worst case, so
   a character bound under the token bound holds for any text.
+- **The runtime's `generated_tokens` leaves out the first token, and its figures cover the
+  generate call alone.** `TextLLMRunner` samples one token at the end of the prompt and
+  hands it to the callback before the decode loop begins; `generated_tokens` counts the
+  loop's steps, so the reply the reader saw is one longer, and the loop's steps are exactly
+  the tokens after the first. The engine adds the one back, which also makes the decode rate
+  (tokens after the first over decode time) exact, where before it ran about three per cent
+  under and disagreed with llama.cpp on identical work. The pieces fed ahead (previous
+  bullet) are invisible to those figures: on the phone a two-thousand-token head fed that
+  way was reported as 85 percent cached and the prefill rate of its four-hundred-token tail.
+  The engine now times each piece and reports its tokens as prompt, at the rate the runtime
+  measured for the tail, since the Java binding has no tokenizer. That is the one estimated
+  number in the stats, and it is named as one in `GenerationStats`.
 
 ## Where a model runs is decided at export, not by the app
 

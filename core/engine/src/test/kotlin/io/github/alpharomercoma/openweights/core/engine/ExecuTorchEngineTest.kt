@@ -768,8 +768,12 @@ class ExecuTorchEngineTest {
         engine.load(installed(MODEL), PARAMS)
         val essay = buildString { repeat(400) { append("word").append(it).append(' ') } }
         bridge.reply = "Noted."
+        // What the runtime reports is the tail alone: the pieces went in by prefill, which
+        // reports nothing. Four hundred tokens for the tail, at whatever the tail's length is.
+        bridge.outcome =
+            ExecuTorchOutcome(StopReason.END_OF_TURN, promptTokens = 400, generatedTokens = 2)
 
-        engine.chat(listOf(user(essay)), NO_THINKING).completed()
+        val done = engine.chat(listOf(user(essay)), NO_THINKING).completed()
 
         assertThat(bridge.prefills).isNotEmpty()
         bridge.prefills.forEach { assertThat(it.length).isAtMost(1600) }
@@ -779,6 +783,41 @@ class ExecuTorchEngineTest {
         assertThat(fed).contains("word0 ")
         assertThat(fed).contains("word399 ")
         assertThat(fed.indexOf("word200 ")).isEqualTo(fed.lastIndexOf("word200 "))
+
+        // The pieces are this turn's prompt, at the tail's measured rate, and not a cache
+        // hit. On the phone a two-thousand-token head fed this way read as 85% cached and
+        // the prefill rate of the tail alone.
+        val pieces = bridge.prefills.sumOf { it.length }
+        val tailRate = bridge.prompts.last().length.toDouble() / 400
+        assertThat(done.stats.promptTokens).isEqualTo(400 + (pieces / tailRate).toInt())
+        assertThat(done.stats.cachedTokens).isEqualTo(0)
+        assertThat(done.stats.cacheHitRate).isEqualTo(0.0)
+    }
+
+    @Test
+    fun `the first token is the prefill's and is counted with the reply`() = runTest {
+        // The runner samples the first token at the end of the prompt and reports only its
+        // decode loop's steps as generated, so the reply the reader saw is one longer than
+        // the runtime's count, and the loop's steps are exactly the tokens after the first,
+        // which is what the decode rate divides by.
+        bridge.reply = "Hello there.<|im_end|>"
+        bridge.outcome = ExecuTorchOutcome(
+            StopReason.END_OF_TURN,
+            promptTokens = 40,
+            generatedTokens = 3,
+            prefillMs = 200,
+            decodeMs = 300,
+        )
+        engine.load(installed(MODEL), PARAMS)
+
+        val done = engine.chat(listOf(user("Hi")), NO_THINKING).completed()
+
+        assertThat(done.stats.generatedTokens).isEqualTo(4)
+        assertThat(done.stats.decodeTokensPerSecond).isEqualTo(10.0)
+        assertThat(done.stats.prefillTokensPerSecond).isEqualTo(200.0)
+        // The committed position is the runtime's: the prompt, and the tokens its loop fed
+        // back, which the last sampled one never was.
+        assertThat(done.stats.contextUsed).isEqualTo(43)
     }
 
     /** An export that states a small prefill bound gets pieces under it. */

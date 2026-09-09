@@ -200,6 +200,13 @@ class WatchScheduler @Inject constructor(
                         // refuses early ticks so the backstop cannot double-run a fast
                         // watch, and the ticker's own tick must never read as early to
                         // its own deadline, whatever a coarse timer or a test clock says.
+                        // The countdown comes off before the check runs. The system draws
+                        // it from the deadline and does not stop at zero: past the
+                        // deadline it counts on, with a minus sign, for as long as the
+                        // check takes, which on a small model is half a minute of the
+                        // notification saying the app is late. The check running is
+                        // what the line should say while it runs.
+                        if (current != null) showChecking(current)
                         live = current != null &&
                             current.state == WatchState.ACTIVE &&
                             tickOnce(
@@ -298,6 +305,28 @@ class WatchScheduler @Inject constructor(
             // zero, which reads as a stopwatch of how late the app is. A check that is owed
             // says so in words instead.
             countdownTo = due.takeIf { it > now },
+        )
+    }
+
+    /**
+     * The same notification while a check is running: which check, and no countdown.
+     *
+     * The count is the check about to run, so the line moves from "next check" with a
+     * countdown to "checking now" with the next number, and then back to a countdown from
+     * [showProgress] once the record has moved.
+     */
+    private fun showChecking(watch: Watch) {
+        if (!watch.needsForegroundService || !watch.isActive) return
+        GenerationService.relabel(
+            context = appContext,
+            holder = holderFor(watch.id),
+            label = watchNotificationLabel(watch),
+            detail = appContext.getString(
+                R.string.watch_notification_checking,
+                watch.runs + 1,
+                Watch.MAX_RUNS,
+            ),
+            countdownTo = null,
         )
     }
 

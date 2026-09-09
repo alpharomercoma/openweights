@@ -46,7 +46,13 @@ enum class StopReason {
     ERROR,
 }
 
-/** Measured throughput for one generation. Nothing here is estimated. */
+/**
+ * Measured throughput for one generation.
+ *
+ * Measured, with one named exception: the ExecuTorch engine cannot count the tokens of a
+ * prompt piece it fed ahead of the generate call, and reports them at the rate the runtime
+ * measured for the rest of the same prompt. See `ExecuTorchEngine.statsFor`.
+ */
 data class GenerationStats(
     val promptTokens: Int,
     val generatedTokens: Int,

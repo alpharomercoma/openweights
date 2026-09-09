@@ -136,6 +136,7 @@
     <string name="watch_ends_in"> · %1$s 後に終了</string>
     <string name="watch_ends_now"> · 終了中</string>
     <string name="watch_notification_progress">%2$d 回中 %1$d 回目 · 次の確認</string>
+    <string name="watch_notification_checking">%2$d 回中 %1$d 回目 · 確認中</string>
     <string name="watch_notification_progress_last">%2$d 回中 %1$d 回目</string>
     <string name="watch_notification_ended">%1$d 回の確認を終えて自動的に停止しました</string>
     <string name="watch_notification_failed">停止しました: 3回連続で確認に失敗しました。アプリで最後のエラーを確認してください。</string>

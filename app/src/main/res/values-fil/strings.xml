@@ -136,6 +136,7 @@
     <string name="watch_ends_in"> · titigil sa %1$s</string>
     <string name="watch_ends_now"> · humihinto</string>
     <string name="watch_notification_progress">Pagsusuri %1$d ng %2$d · susunod</string>
+    <string name="watch_notification_checking">Pagsusuri %1$d ng %2$d · sinusuri ngayon</string>
     <string name="watch_notification_progress_last">Pagsusuri %1$d ng %2$d</string>
     <string name="watch_notification_ended">Kusang tumigil pagkatapos ng %1$d na pagsusuri</string>
     <string name="watch_notification_failed">Huminto: tatlong sunod-sunod na pagsusuri ang nabigo. Buksan ang app para makita ang huling error.</string>

@@ -150,6 +150,7 @@
     <string name="watch_ends_in"> · stops in %1$s</string>
     <string name="watch_ends_now"> · stopping</string>
     <string name="watch_notification_progress">Check %1$d of %2$d · next check</string>
+    <string name="watch_notification_checking">Check %1$d of %2$d · checking now</string>
     <string name="watch_notification_progress_last">Check %1$d of %2$d</string>
     <string name="watch_notification_ended">Stopped on its own after %1$d checks</string>
     <string name="watch_notification_failed">Stopped: three checks in a row failed. Open the app to see the last error.</string>

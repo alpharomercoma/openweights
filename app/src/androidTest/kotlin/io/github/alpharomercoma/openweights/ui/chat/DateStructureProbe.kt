@@ -22,6 +22,7 @@ import io.github.alpharomercoma.openweights.core.common.model.ChatMessage
 import io.github.alpharomercoma.openweights.core.common.model.ChatRole
 import io.github.alpharomercoma.openweights.core.common.model.ModelLoadParams
 import io.github.alpharomercoma.openweights.core.common.model.parseAssistantReply
+import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
 import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import kotlinx.coroutines.flow.toList
@@ -105,6 +106,85 @@ class DateStructureProbe {
                 }
             }
         }
+    }
+
+    /**
+     * The same question with every tool off, which is what a fresh install now sends.
+     *
+     * A different pass entirely: with no tool in the prompt there is no deciding pass, so
+     * the reply is written by the answering sampler, at the user's temperature, without
+     * the reasoning cap. Everything in [compareTheShapes] was measured greedy under the
+     * tool catalogue, and none of it says what this pass does with the date.
+     *
+     * Three arms. The shipped exchange; the date as one line at the end of the
+     * instructions, which lost with tools on because the tool block pushed it far from the
+     * question, an argument that does not apply when there is no tool block; and no date,
+     * the floor. The date question is asked of each, and with no tool to reach for, a
+     * shape that loses it answers with a made-up day.
+     */
+    @Test
+    fun compareTheShapesWithoutTools() = runBlocking<Unit> {
+        val present = ToolChoiceBenchmark.MODELS.filter { it.value.isFile }
+        assumeTrue("no models under ${ToolChoiceBenchmark.BENCH.path}", present.isNotEmpty())
+
+        val day = PromptDay.pinned
+        fun user(text: String) = ChatMessage.text(ChatRole.USER, text)
+        val bareHead = ChatUiState(preferences = ModelPreferences()).prefixMessages()
+        val datedHead = bareHead.map { message ->
+            ChatMessage.text(message.role, message.text + "\n\nToday is $day.")
+        }
+        val arms = listOf(
+            Triple("exchange", bareHead, PromptDay.exchange()),
+            Triple("system_line", datedHead, emptyList()),
+            Triple("nodate", bareHead, emptyList()),
+        )
+
+        for ((model, file) in present) {
+            LlamaCppEngine().use { engine ->
+                engine.load(file, ModelLoadParams(contextLength = ToolChoiceBenchmark.CONTEXT))
+                for ((name, head, before) in arms) {
+                    var bled = 0
+                    for (prompt in DateBleedOnDeviceTest.SMALLTALK) {
+                        val said = answerWithoutTools(engine, head + before + user(prompt))
+                        if (mentionsTheDate(said, day.year)) {
+                            bled++
+                            Log.i(
+                                TAG,
+                                "  BLEED notools $model/$name/$prompt: " +
+                                    said.replace('\n', ' ').take(110),
+                            )
+                        }
+                    }
+                    val asked = answerWithoutTools(
+                        engine,
+                        head + before + user("What is today's date?"),
+                    )
+                    Log.i(
+                        TAG,
+                        "RESULT notools $model $name: bleed=$bled/" +
+                            "${DateBleedOnDeviceTest.SMALLTALK.size} dateOK=${"$day" in asked} " +
+                            asked.replace('\n', ' ').take(70),
+                    )
+                }
+            }
+        }
+    }
+
+    /** One turn on the pass that writes the reply when no tool is on: the user's sampler. */
+    private suspend fun answerWithoutTools(
+        engine: LlamaCppEngine,
+        messages: List<ChatMessage>,
+    ): String {
+        engine.resetContext()
+        val completed = engine.chat(
+            messages,
+            ToolChoiceBenchmark.SHIPPED.copy(
+                maxTokens = ToolChoiceBenchmark.BUDGET,
+                seed = ToolChoiceBenchmark.SEED,
+            ),
+            tools = emptyList(),
+        ).toList().filterIsInstance<GenerationEvent.Completed>().single()
+        return parseAssistantReply(completed.content).answer
     }
 
     private class Said(val text: String, val calls: List<String>)

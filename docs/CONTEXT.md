@@ -3,7 +3,7 @@
 > Living state file. Update at every milestone so no information is lost across sessions
 > or context compaction. Newest facts win; keep it accurate rather than exhaustive.
 
-Last updated: 2026-09-07. The dated sections below run from 2026-08-10; newer facts are in
+Last updated: 2026-09-09. The dated sections below run from 2026-08-10; newer facts are in
 the research notes under `research/`, and the accurate summary of the app as shipped is the
 top-level `README.md` and `ARCHITECTURE.md`.
 
@@ -230,6 +230,35 @@ llama.cpp submodule). Focus on correctness, concurrency, resource leaks, code sm
 
 The first pass found ten real bugs, including one that silently disabled compaction
 entirely. Self-review did not catch it because the code read exactly as intended.
+
+### The harness around the agents (2026-09-09)
+
+`npx harness-score` graded the repository 61 of 108, level L1, with two dimensions at
+zero: no context file an agent reads first, and no hook. The rules did exist, in the
+maintainer's agent's private memory and in this file, where Codex, Gemini and a fresh
+session cannot see them. Codex, Mistral Vibe and Gemini were each given the sixteen
+failing checks and asked which were worth doing here; their verdicts and the decision are
+in the session notes, and the outcome is:
+
+- `AGENTS.md` at the root (with `CLAUDE.md` importing it) carries the rules that are not
+  visible in the code: secrets, one Gradle at a time, measure before changing a default,
+  prompt bytes as cache keys, module boundaries, the prose rule, the push command.
+- `tools/hooks/guard.py`, wired as a Claude Code PreToolUse hook in `.claude/settings.json`,
+  denies staging the keystore files or an env file, a literal Hugging Face token in a
+  command, a force push to main, and a second Gradle while one runs. It judges one simple
+  command at a time, because the first version fired on `.git/hooks/pre-commit` inside an
+  `ls` and on `.env` inside a heredoc. `guard_test.py` holds 27 cases. The Gradle rule
+  looks for `GradleWrapperMain`, not `gradlew`: the wrapper script execs into the JVM.
+- `lefthook.yml` runs ktlint on staged Kotlin only, through `tools/hooks/ktlint-staged.sh`,
+  which fetches the release the Gradle plugin pins (1.5.0; Homebrew's is 1.8.0 and would
+  disagree). Two files lint in 1.7 s. The evidence for this one was six commits in three
+  weeks that existed only to satisfy ktlint after CI had gone red.
+- One skill, `.claude/skills/phone-deploy`, for the procedure that lived only in memory.
+
+Refused, and left costing points: subagent definitions, command files that would duplicate
+`tools/review`, a post-edit lint hook that would start Gradle after every file change, and
+a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
+level L4. The remaining five failures are the refused ones.
 
 ## What inspecting a model costs
 

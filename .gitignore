@@ -39,3 +39,13 @@ build-ios-sim/
 tools/eval/results/*bench*.logcat
 /play/videos/
 play/graphics/__pycache__/
+
+# Env files never existed here (the Hugging Face token stays in the shell), but an agent
+# that writes one must not be able to stage it.
+.env
+.env.*
+!.env.example
+
+# Claude Code's per-agent worktrees and per-machine settings; settings.json is shared.
+.claude/worktrees/
+.claude/settings.local.json

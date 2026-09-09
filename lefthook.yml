@@ -1,0 +1,12 @@
+# Pre-commit checks, the earliest feedback there is. Installed into .git/hooks by
+# `lefthook install` (brew install lefthook); CONTRIBUTING.md says so.
+#
+# Only ktlint, and only on the staged Kotlin files: six commits in three weeks existed to
+# satisfy ktlint after CI had gone red, and the check takes a second here. detekt and the
+# tests stay in CI, because through Gradle they cost half a minute to start and would
+# collide with a build already running.
+pre-commit:
+  commands:
+    ktlint:
+      glob: "*.{kt,kts}"
+      run: tools/hooks/ktlint-staged.sh {staged_files}

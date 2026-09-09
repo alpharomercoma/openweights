@@ -40,6 +40,16 @@ exact commands, including the workarounds for devices that block `adb install`.
 ./gradlew ktlintCheck detekt test
 ```
 
+A pre-commit hook runs ktlint on the staged Kotlin files in about a second, without Gradle,
+so a formatting slip is caught before CI sees it. Install it once:
+
+```sh
+brew install lefthook && lefthook install
+```
+
+The hook fetches the same ktlint release the Gradle plugin pins, so the two never disagree.
+If you use an AI coding agent, `AGENTS.md` at the root is the file it should read first.
+
 A few things reviewers will look for:
 
 - **Keep modules honest.** `:core:*` modules do not know about the UI. If a change makes a

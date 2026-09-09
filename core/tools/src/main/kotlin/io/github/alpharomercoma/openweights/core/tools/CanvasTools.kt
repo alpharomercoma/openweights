@@ -33,6 +33,7 @@ import javax.inject.Singleton
 class ShowWebsiteTool @Inject constructor(
     private val workspace: Workspace,
     private val board: CanvasBoard,
+    private val grader: CanvasGrader,
 ) : Tool {
     override val definition = ToolDefinition(
         name = "show_website",
@@ -80,15 +81,20 @@ class ShowWebsiteTool @Inject constructor(
                     "$path is a folder with no index.html in it. Point at the HTML file.",
                 )
             board.show(CanvasKind.SITE, index.path, path)
-            return ToolExecution("Showing ${index.path}. Saves under $path update it live.")
+            return graded(index.path, "Showing ${index.path}. Saves under $path update it live.")
         }
         val root = path.substringBeforeLast('/', "")
         board.show(CanvasKind.SITE, path, root)
-        return ToolExecution(
+        return graded(
+            path,
             "Showing $path to the user. Further saves under " +
                 (root.ifEmpty { "the folder" }) + " update the page live.",
         )
     }
+
+    /** The first look is graded like every save after it: what the browser said comes back. */
+    private suspend fun graded(entry: String, text: String): ToolExecution =
+        ToolExecution(grader.verdict(entry)?.let { "$text\n$it" } ?: text)
 }
 
 /**

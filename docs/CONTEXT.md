@@ -260,6 +260,35 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### The canvas grader, and the census that shaped it (2026-09-10)
+
+The canvas had an agent loop and no verification loop: the WebView's errors went to a
+console nobody read. Before building one, `CanvasErrorCensus` (core/engine androidTest)
+measured how often a page a small model builds raises an error: ten asks, two models,
+sixteen pages built, and at load not one script error. What went wrong was quieter: LFM2.5
+cut a page off at `<div id=`, wrote a stub with "(full HTML code from above)" in it, and
+did not build four of ten; Qwen3 built all ten, left the quiz without a script, and
+reached for a stock photo the app will not fetch. The table is in
+`docs/research/loops-and-kv-cache.md`.
+
+So `CanvasGrader` (core/tools) grades what was found. After a save under the site on
+screen, and after `show_website`, it appends to the tool result: a page whose last four
+hundred characters hold no `</body>` or `</html>` "looks cut off"; a host the page reached
+for is named with the rule that nothing leaves the phone; and script errors and missing
+files come back by file and line from a hidden WebView (`WebViewPageChecker`) loading the
+page over the canvas's own server. Sites only. Two things only the device test found:
+every WebView load asks for `favicon.ico`, whose 404 had every clean page graded as
+missing a file; and a missing stylesheet arrives twice, as the request and as the console's
+MIME complaint. `CanvasGraderOnDeviceTest` needs a shared folder; granting one from a
+shell is Tools screen, Choose a folder, the picker's "Use this folder", Allow, all by
+`input tap` from `uiautomator dump` bounds.
+
+Two traps in the census itself, kept so the next one skips them: the test app cannot
+create directories under /data/local/tmp (mkdirs fails silently, the first write throws),
+so pages go under its own files and come out with `run-as ... tar`; and with thinking on,
+Qwen3 spent twenty-seven minutes on one page while the phone swapped 4.6 GB, so the census
+runs thinking off, as the public benchmarks did. `-e models a.gguf,b.gguf` narrows a rerun.
+
 ## What inspecting a model costs
 
 Reading a GGUF header over HTTP range requests, measured against the real Hub:

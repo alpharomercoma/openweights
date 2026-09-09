@@ -290,6 +290,7 @@ class WriteFileTool @Inject constructor(
     private val workspace: Workspace,
     private val artifacts: SessionArtifacts,
     private val canvas: CanvasBoard,
+    private val grader: CanvasGrader,
 ) : Tool {
     override val definition = ToolDefinition(
         name = "write_file",
@@ -394,7 +395,10 @@ class WriteFileTool @Inject constructor(
             // The canvas is watching: a save under what it shows repaints the screen.
             canvas.changed(path)
         }
-        return written
+        // And reads what the browser said about it, so the model hears what the user
+        // would otherwise be the only one to see. Nothing to hear about a write that failed.
+        val verdict = if (written.successful) grader.verdict(path, content) else null
+        return if (verdict == null) written else written.copy(text = written.text + "\n" + verdict)
     }
 }
 

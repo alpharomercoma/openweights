@@ -34,6 +34,7 @@ import io.github.alpharomercoma.openweights.core.engine.LlamaCppEngine
 import io.github.alpharomercoma.openweights.core.sandbox.Sandbox
 import io.github.alpharomercoma.openweights.core.tools.CallFormat
 import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
+import io.github.alpharomercoma.openweights.core.tools.CanvasGrader
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
@@ -451,7 +452,7 @@ class ToolChoiceBenchmark {
                 FetchUrlTool(client, Reachability { true }, workspace, SessionArtifacts()),
                 SearchFilesTool(workspace),
                 ReadFileTool(workspace),
-                WriteFileTool(workspace, SessionArtifacts(), CanvasBoard()),
+                WriteFileTool(workspace, SessionArtifacts(), CanvasBoard(), CanvasGrader.none()),
                 RunScriptTool(Sandbox(context), workspace),
             ).filter { it.isAvailable },
         )

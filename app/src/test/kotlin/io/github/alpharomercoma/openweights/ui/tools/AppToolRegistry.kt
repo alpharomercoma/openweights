@@ -23,6 +23,7 @@ import io.github.alpharomercoma.openweights.core.tools.AdvanceTool
 import io.github.alpharomercoma.openweights.core.tools.AskBoard
 import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
+import io.github.alpharomercoma.openweights.core.tools.CanvasGrader
 import io.github.alpharomercoma.openweights.core.tools.DeleteFileTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.ForgetMemoryTool
@@ -92,9 +93,9 @@ internal object AppToolRegistry {
             fetch = FetchUrlTool(client, reachability, workspace, artifacts),
             searchFiles = SearchFilesTool(workspace),
             readFile = ReadFileTool(workspace),
-            writeFile = WriteFileTool(workspace, artifacts, board),
+            writeFile = WriteFileTool(workspace, artifacts, board, CanvasGrader.none()),
             deleteFile = DeleteFileTool(workspace, artifacts),
-            showWebsite = ShowWebsiteTool(workspace, board),
+            showWebsite = ShowWebsiteTool(workspace, board, CanvasGrader.none()),
             showDocument = ShowDocumentTool(workspace, board),
             showSlides = ShowSlidesTool(workspace, board),
             runScript = RunScriptTool(Sandbox(context), workspace),

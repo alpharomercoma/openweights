@@ -27,6 +27,7 @@ import io.github.alpharomercoma.openweights.core.tools.AskUserTool
 import io.github.alpharomercoma.openweights.core.tools.DeleteFileTool
 import io.github.alpharomercoma.openweights.core.tools.FetchUrlTool
 import io.github.alpharomercoma.openweights.core.tools.ForgetMemoryTool
+import io.github.alpharomercoma.openweights.core.tools.PageChecker
 import io.github.alpharomercoma.openweights.core.tools.Reachability
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.ReadMemoryTool
@@ -42,6 +43,7 @@ import io.github.alpharomercoma.openweights.core.tools.UpdateMemoryTool
 import io.github.alpharomercoma.openweights.core.tools.WatchTool
 import io.github.alpharomercoma.openweights.core.tools.Watches
 import io.github.alpharomercoma.openweights.core.tools.WebSearchTool
+import io.github.alpharomercoma.openweights.core.tools.WebViewPageChecker
 import io.github.alpharomercoma.openweights.core.tools.WriteFileTool
 import javax.inject.Singleton
 
@@ -52,6 +54,15 @@ abstract class ReachabilityModule {
     @Binds
     @Singleton
     abstract fun reachability(real: AndroidReachability): Reachability
+}
+
+/** Binds the hidden WebView that grades a canvas page behind the interface the grader asks. */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class PageCheckerModule {
+    @Binds
+    @Singleton
+    abstract fun pageChecker(real: WebViewPageChecker): PageChecker
 }
 
 @Module

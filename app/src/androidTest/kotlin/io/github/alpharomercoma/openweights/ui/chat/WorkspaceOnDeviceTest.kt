@@ -23,6 +23,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import io.github.alpharomercoma.openweights.core.common.model.ToolCall
 import io.github.alpharomercoma.openweights.core.tools.CanvasBoard
+import io.github.alpharomercoma.openweights.core.tools.CanvasGrader
 import io.github.alpharomercoma.openweights.core.tools.ReadFileTool
 import io.github.alpharomercoma.openweights.core.tools.SearchFilesTool
 import io.github.alpharomercoma.openweights.core.tools.SessionArtifacts
@@ -58,7 +59,8 @@ import org.junit.runner.RunWith
 class WorkspaceOnDeviceTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val workspace = Workspace(context, WorkspaceGrant(context))
-    private val write = WriteFileTool(workspace, SessionArtifacts(), CanvasBoard())
+    private val write =
+        WriteFileTool(workspace, SessionArtifacts(), CanvasBoard(), CanvasGrader.none())
     private val read = ReadFileTool(workspace)
     private val find = SearchFilesTool(workspace)
 

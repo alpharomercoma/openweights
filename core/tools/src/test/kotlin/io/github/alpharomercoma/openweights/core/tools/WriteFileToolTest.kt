@@ -39,7 +39,8 @@ class WriteFileToolTest {
         context,
         WorkspaceGrant(context).also { it.remember(FakeDocumentsProvider.TREE) },
     )
-    private val tool = WriteFileTool(workspace, SessionArtifacts(), CanvasBoard())
+    private val tool =
+        WriteFileTool(workspace, SessionArtifacts(), CanvasBoard(), CanvasGrader.none())
 
     private suspend fun write(arguments: String): ToolExecution =
         tool.execute(ToolCall(id = "1", name = "write_file", argumentsJson = arguments))

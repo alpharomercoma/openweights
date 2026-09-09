@@ -100,11 +100,40 @@ any of them, in any run.
 every arm, including "what changed in android 16", which the control case exists for and
 which Qwen3 called on every time. The app's instructions open with "You already know the
 answer to most questions", tuned so that a model does not search what it knows; on this
-model that reads as never. That is a routing measurement of its own and the next one to
-run: the same instructions against a version that names the cases a model must search
-(what changed, what is current), over questions that do not match the name detector, on
-both runtimes, measuring call rate and grounded correctness. Both reviewers asked for it
-and neither wanted it folded into this change.
+model that reads as never. That is a routing measurement of its own, and it was run next
+(`CurrentFactsSuiteOnDeviceTest`): ten questions whose answer lives after any training cut
+(what changed in Android 16, the latest Kotlin, the price of bitcoin now, the next iPhone
+event, today's news, the current ExecuTorch version, whether Python 3.14 is out, the
+weather in Manila, what LangChain released this month, whether Sony has announced the
+PlayStation 6), none of them name-shaped, and six settled ones the model must answer itself
+(the capital of Peru, a translation, 17 times 23, a limerick, how a hash map works, who wrote
+Pride and Prejudice). Two wordings: the instructions as they ship, and the same with one
+sentence added after "information that changed after your training" that names those cases
+("Whether something is out yet, what changed in a product, what the current version, price,
+date or weather is, and what the news says are all things that changed after your training:
+call web_search for those before answering, every time, and never answer them from memory").
+
+| Model | Instructions | Called on the ten current questions | Correct where a key word can say | Mean s | Over-called on the six settled | Settled correct |
+|---|---|---|---|---|---|---|
+| LFM2.5 1.2B ExecuTorch | shipped | 0 of 10 | 5 of 8 | 4.0 | 0 of 6 | 5 of 6 |
+| LFM2.5 1.2B ExecuTorch | with the sentence | 0 of 10 | 3 of 8 | 4.0 | 0 of 6 | 5 of 6 |
+| LFM2.5 1.2B Q4_K_M | shipped | 5 of 10 | 7 of 8 | 8.8 | 0 of 6 | 6 of 6 |
+| LFM2.5 1.2B Q4_K_M | with the sentence | 7 of 10 | 7 of 8 | 14.6 | 0 of 6 | 6 of 6 |
+| Qwen3 1.7B Q8 | shipped | 8 of 10 | 8 of 8 | 17.4 | 0 of 6 | 6 of 6 |
+| Qwen3 1.7B Q8 | with the sentence | 7 of 10 | 7 of 8 | 18.0 | 0 of 6 | 6 of 6 |
+
+Three things in that table. The sentence does not ship: it moves the compiled model not at
+all, buys the GGUF two calls at six seconds a question, and buys Qwen3 nothing. That is the
+fourth routing wording measured in this codebase and the fourth that did not move routing.
+Nothing over-calls on the settled six under either wording, on any model. And the one
+finding that is new: on questions that do not name anybody, the same LFM2.5 1.2B as a
+Q4_K_M GGUF on llama.cpp calls on its own half the time, and the compiled export never
+does, under identical instructions on the same phone. On name-shaped questions both were
+zero, which is why the earlier sentence in this note says "the model, not the runtime"; on
+these it is the runtime, or the export's 8da4w quantisation, or the way the compiled path
+renders the tool block, and only a token-level comparison of the rendered prompts and a
+forced-call probe can say which. That is the measurement still owed, and it is a runtime
+question, not a wording one.
 
 **The shape of LFM2.5's answers.** With the results in front of it, LFM2.5 opened ten of
 sixteen replies with "Here's a concise summary based on the web search:", listed "what
@@ -157,5 +186,7 @@ the price of "who is the president of the philippines" keeping its office.
 - `core/tools/.../WebTools.kt`: `WebSearchFraming`, the three wordings measured; `DIRECT`
   ships.
 - `app/src/androidTest/.../WhoIsSuiteOnDeviceTest.kt`: the suite; `-e arms`, `-e models`.
+- `app/src/androidTest/.../CurrentFactsSuiteOnDeviceTest.kt`: the routing suite on
+  current-facts questions; `-e arms shipped,explicit`.
 - `core/engine/src/androidTest/.../WhoIsProbe.kt`: the raw-reply probe.
 - Tests: `TurnRepairsTest`, `NamedSubjectTest`, `TurnRunnerTest`.

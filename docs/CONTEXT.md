@@ -287,10 +287,17 @@ recitals from 21 of 48 replies to 14, and ships as `WebSearchFraming.DIRECT`. Th
 (pronouns, possessives anywhere, expressions), the failed-search fallback, and the Tools
 screen sentence saying the search happens. Full tables: `docs/research/who-is-questions.md`.
 
-Not this fix, and the next measurement: LFM2.5 1.2B made zero tool calls of its own in 96
-rows under the shipped instructions, "what changed in android 16" included, on both
-runtimes. Qwen3 called every time. The instructions' "you already know the answer to most
-questions" reads as "never" on this model.
+Then the routing measurement that suite pointed at (`CurrentFactsSuiteOnDeviceTest`): ten
+current-facts questions that name nobody, six settled ones, the shipped instructions
+against the same with a sentence naming the must-search cases. The sentence does not
+ship: the compiled LFM2.5 calls 0 of 10 under either wording, the GGUF goes from 5 to 7
+of 10 at six seconds more a question, Qwen3 from 8 to 7; nothing over-calls on the
+settled six. Fourth routing wording measured here, fourth that moved nothing. The new
+fact is the runtime: on these questions the Q4_K_M GGUF of the same model calls on its own
+half the time and the compiled export never does, same phone, same instructions. Whether
+that is the 8da4w export, the compiled path's rendering of the tool block, or something
+else is a token-level comparison of the rendered prompts plus a forced-call probe, and it
+is the measurement still owed.
 
 ### The canvas grader, and the census that shaped it (2026-09-10)
 

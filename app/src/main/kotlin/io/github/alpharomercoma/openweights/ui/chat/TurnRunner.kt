@@ -949,67 +949,79 @@ class TurnRunner @Inject constructor(
             mode: AgentMode,
             listener: TurnListener,
         ): Boolean {
-            if (!honoursIntent || appSearched || webSearched || proseOnly) return false
-            // Nothing of the user's own leaves the phone on the app's initiative: "what is
-            // my wifi password" answered with "I don't have that information" is a lament
-            // by shape and a private question by any reading. The model may still call.
-            if (mode == AgentMode.PLAN || ABOUT_THE_USER.containsMatchIn(asked)) return false
-            if (active.find(NamedSubject.TOOL) == null ||
-                !withTools ||
-                asked.isBlank()
-            ) {
-                return false
-            }
+            val intent = searchIntent(pass, mode) ?: return false
+            appSearched = true
+            Log.i("OpenWeights", "search intent $intent without a call: the app searches")
+            return appSearch(searchQuery(asked, conversation), mode, listener)
+        }
+
+        /**
+         * What kind of decision to search this pass states, or null for none. See
+         * [honourIntent] for the four kinds and the guards.
+         */
+        private fun searchIntent(pass: Pass, mode: AgentMode): String? {
+            if (!mayAppSearch(mode)) return null
             val spoken = pass.spoken()
             // A question to the user ("Should I look that up?") and a negated announcement
             // ("Don't let me look that up") are neither a decision to search.
-            if (spoken.trimEnd().endsWith("?") || NEGATED.containsMatchIn(spoken)) return false
-            // An announcement is a decision only when it names the search and nothing
-            // else, or names nothing and says it will look something up: "either
-            // web_search or lookup_place would do" is the model weighing options, and
-            // "I will read_file the notes, then web_search" is an errand of two steps.
-            // Both keep the push that hands the names back.
-            val named = active.all.map { it.definition.name }
-                .filter { spoken.contains(it, ignoreCase = true) }
-            // The whole reply when it is short, or its last sentence: "there is no direct
-            // information in my current knowledge base about that. I will perform a web
-            // search to find relevant details" ends on the decision.
-            val closing = spoken.trim().substringAfterLast(". ")
-            val announced = !pass.raw.containsToolMarkup() &&
-                named.all { it == NamedSubject.TOOL } &&
-                (
-                    (
-                        spoken.length <= ANNOUNCEMENT_CHARS &&
-                            ANNOUNCED_LOOKUP.containsMatchIn(
-                                spoken,
-                            )
-                        ) ||
-                        (
-                            closing.length <= ANNOUNCEMENT_CHARS &&
-                                ANNOUNCED_LOOKUP.containsMatchIn(closing)
-                            )
-                    )
+            if (spoken.trimEnd().endsWith("?") || NEGATED.containsMatchIn(spoken)) return null
             // A claim about "the search" where the user pasted material is the model
             // reading that material ("the search reveals no evidence", of a police report
             // in the conversation), not a search it never made.
             val pasted = conversation.any {
-                it.role == ChatRole.USER &&
-                    it.text.length > GROUNDING_MAX_CHARS
+                it.role == ChatRole.USER && it.text.length > GROUNDING_MAX_CHARS
             }
-            val intent = when {
-                announced -> "announced"
+            val fitting = CapabilityDenial.fitting(spoken, asked).firstOrNull()
+            return when {
+                pass.announcesSearch(spoken) -> "announced"
                 !pasted && spoken.claimsSearch(asked) -> "claimed"
                 CapabilityDenial.lamentsUnknown(spoken) -> "lamented"
-                CapabilityDenial.denies(spoken) &&
-                    CapabilityDenial.fitting(
-                        spoken,
-                        asked,
-                    ).firstOrNull() == NamedSubject.TOOL -> "denied"
-                else -> return false
+                CapabilityDenial.denies(spoken) && fitting == NamedSubject.TOOL -> "denied"
+                else -> null
             }
-            appSearched = true
-            Log.i("OpenWeights", "search intent $intent without a call: the app searches")
-            val query = searchQuery(asked, conversation)
+        }
+
+        /**
+         * Whether the app may search on this turn's behalf at all: once, with the search
+         * on offer, outside plan mode, and never about the user's own things. "what is my
+         * wifi password" answered with "I don't have that information" is a lament by
+         * shape and a private question by any reading; the model may still call.
+         */
+        private fun mayAppSearch(mode: AgentMode): Boolean {
+            val allowed = honoursIntent && !appSearched && !webSearched && !proseOnly
+            val offered = withTools && active.find(NamedSubject.TOOL) != null && asked.isNotBlank()
+            val private = mode == AgentMode.PLAN || ABOUT_THE_USER.containsMatchIn(asked)
+            return allowed && offered && !private
+        }
+
+        /**
+         * Whether this pass announces a search and nothing else.
+         *
+         * A decision only when it names the search and no other tool, or names nothing and
+         * says it will look something up: "either web_search or lookup_place would do" is
+         * the model weighing options, and "I will read_file the notes, then web_search" is
+         * an errand of two steps. Both keep the push that hands the names back. Judged on
+         * the whole reply when it is short, or on its last sentence: "there is no direct
+         * information in my current knowledge base about that. I will perform a web search
+         * to find relevant details" ends on the decision.
+         */
+        private fun Pass.announcesSearch(spoken: String): Boolean {
+            if (raw.containsToolMarkup()) return false
+            val named = active.all.map { it.definition.name }
+                .filter { spoken.contains(it, ignoreCase = true) }
+            if (named.any { it != NamedSubject.TOOL }) return false
+            val closing = spoken.trim().substringAfterLast(". ")
+            return listOf(spoken, closing).any {
+                it.length <= ANNOUNCEMENT_CHARS && ANNOUNCED_LOOKUP.containsMatchIn(it)
+            }
+        }
+
+        /** The search itself, through the same step a model-made call takes. */
+        private suspend fun appSearch(
+            query: String,
+            mode: AgentMode,
+            listener: TurnListener,
+        ): Boolean {
             val arguments = org.json.JSONObject().put("query", query).toString()
             val call =
                 ToolCall(id = APP_SEARCH_ID, name = NamedSubject.TOOL, argumentsJson = arguments)
@@ -1022,7 +1034,7 @@ class TurnRunner @Inject constructor(
             // Only a search that ran and succeeded is evidence. A declined call has no
             // step, and a failed one (offline, rate limited) comes back as a Ran step with
             // its failure text, which handed to the model as results would read as "the
-            // web has nothing on this". Either way the pushes below get their turn.
+            // web has nothing on this". Either way the pushes get their turn.
             val succeeded = steps.any { it is AgentStep.Ran && it.successful }
             webSearched = webSearched || steps.any { it is AgentStep.Ran }
             if (!succeeded || results.isEmpty()) return false
@@ -1044,8 +1056,11 @@ class TurnRunner @Inject constructor(
          * names that do. One round trip, and it does not count against the tool budget,
          * because nothing was run and nothing was read.
          */
-        private suspend fun repair(pass: Pass, mode: AgentMode, listener: TurnListener): Boolean {
-            if (honourIntent(pass, mode, listener)) return true
+        private suspend fun repair(pass: Pass, mode: AgentMode, listener: TurnListener): Boolean =
+            honourIntent(pass, mode, listener) || push(pass, mode)
+
+        /** The one push a turn: the tool names handed back, or the denial answered. */
+        private fun push(pass: Pass, mode: AgentMode): Boolean {
             if (repaired) return false
             // Denials are classified before announcement salvage: a short denial that
             // happens to name a real tool ("I can't write code; I only have web_search")
@@ -1600,8 +1615,9 @@ private fun String.invitesRepair(tools: ToolRegistry): Boolean {
     // person and about to act, and only where a lookup tool is on offer to act with.
     // Not a question to the user ("Should I look that up?") and not an announcement
     // withdrawn in the same breath ("Don't let me look that up; you already know").
-    if (spoken.trimEnd().endsWith("?") || NEGATED.containsMatchIn(spoken)) return false
-    return ANNOUNCED_LOOKUP.containsMatchIn(spoken) &&
+    val withdrawn = spoken.trimEnd().endsWith("?") || NEGATED.containsMatchIn(spoken)
+    return !withdrawn &&
+        ANNOUNCED_LOOKUP.containsMatchIn(spoken) &&
         tools.all.any { it.definition.name in LOOKUP_TOOLS }
 }
 
@@ -1678,7 +1694,8 @@ private val CLAIMED_SEARCH = Regex(
         "(the |my )(web )?search (results? )?" +
         "(indicates?|shows?|confirms?|suggests?|reveals?|returned)|" +
         "i (searched|have searched) (the web|online|for)|i looked (it|this|that) up|" +
-        "(found|confirmed|retrieved|verified) (this|it|that)?( information)? ?(through|via|from|by|using|with) a (web |online )?search)\\b",
+        "(found|confirmed|retrieved|verified) (this|it|that)?( information)? ?" +
+        "(through|via|from|by|using|with) a (web |online )?search)\\b",
     RegexOption.IGNORE_CASE,
 )
 
@@ -1701,14 +1718,16 @@ internal fun searchQuery(asked: String, conversation: List<ChatMessage>): String
         val asking = QUERY_ASKING.find(clause)?.groupValues?.get(1)?.trim()
         query =
             (
-                asking?.takeIf { it.length >= 8 }
-                    ?: clause.takeIf { it.length <= QUERY_MAX_CHARS * 2 }
+                asking?.takeIf { it.length >= QUERY_MIN_CHARS }
+                    ?: clause.takeIf { it.length <= QUERY_CLAUSE_CHARS }
                     ?: query
                 )
                 .unwrapped()
-                .take(QUERY_MAX_CHARS * 2)
+                .take(QUERY_CLAUSE_CHARS)
     }
-    if (QUERY_PRONOUN_ONLY.containsMatchIn(query) && query.count { it == ' ' } < 6) {
+    if (QUERY_PRONOUN_ONLY.containsMatchIn(query) &&
+        query.count { it == ' ' } < QUERY_SHORT_WORDS
+    ) {
         val earlier = conversation.dropLast(1).lastOrNull {
             it.role == ChatRole.USER
         }?.text.orEmpty()
@@ -1721,7 +1740,7 @@ internal fun searchQuery(asked: String, conversation: List<ChatMessage>): String
 /** The wrapping off, one layer at a time: "so, could you please check who ..." is three. */
 private fun String.unwrapped(): String {
     var text = trim()
-    repeat(3) { text = text.replace(QUERY_LEAD, "").trim() }
+    repeat(QUERY_WRAP_LAYERS) { text = text.replace(QUERY_LEAD, "").trim() }
     return text.replace(QUERY_TAIL, "").trim().trimEnd('?', '.', '!', ':').trim()
 }
 
@@ -1747,6 +1766,10 @@ private val QUERY_PRONOUN_ONLY =
     )
 private const val QUERY_EARLIER_CHARS = 120
 private const val QUERY_MAX_CHARS = 120
+private const val QUERY_CLAUSE_CHARS = QUERY_MAX_CHARS * 2
+private const val QUERY_MIN_CHARS = 8
+private const val QUERY_SHORT_WORDS = 6
+private const val QUERY_WRAP_LAYERS = 3
 
 /**
  * The longest question worth restating at the tail of the prompt.

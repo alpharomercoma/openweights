@@ -130,10 +130,17 @@ finding that is new: on questions that do not name anybody, the same LFM2.5 1.2B
 Q4_K_M GGUF on llama.cpp calls on its own half the time, and the compiled export never
 does, under identical instructions on the same phone. On name-shaped questions both were
 zero, which is why the earlier sentence in this note says "the model, not the runtime"; on
-these it is the runtime, or the export's 8da4w quantisation, or the way the compiled path
-renders the tool block, and only a token-level comparison of the rendered prompts and a
-forced-call probe can say which. That is the measurement still owed, and it is a runtime
-question, not a wording one.
+these it is the runtime side. The rendering was checked first, because it was the cheapest
+suspect: the compiled path renders the prompt itself (`Lfm25Prompt`) rather than through
+the file's template, and its output was put beside the chat template LFM2.5 ships with on
+Hugging Face. They match: the tools go inside the system turn as `List of tools: [...]`
+with the same `{"type": "function", "function": {...}}` shape, the turns carry the same
+`<|im_start|>` and `<|im_end|>` markers, the BOS is written into the text, and the
+runtime's tokenizer encodes those literals to their special ids. So the tool block the
+compiled model reads is the one the GGUF reads. What is left is the export itself, the
+8da4w quantisation of the weights, and that is a model-artefact question: a forced-call
+probe on the export against the same probe on the GGUF, and if they differ, another
+export at a gentler quantisation. Still owed, and out of this note's scope.
 
 **The shape of LFM2.5's answers.** With the results in front of it, LFM2.5 opened ten of
 sixteen replies with "Here's a concise summary based on the web search:", listed "what

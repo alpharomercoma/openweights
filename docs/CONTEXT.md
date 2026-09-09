@@ -294,10 +294,12 @@ ship: the compiled LFM2.5 calls 0 of 10 under either wording, the GGUF goes from
 of 10 at six seconds more a question, Qwen3 from 8 to 7; nothing over-calls on the
 settled six. Fourth routing wording measured here, fourth that moved nothing. The new
 fact is the runtime: on these questions the Q4_K_M GGUF of the same model calls on its own
-half the time and the compiled export never does, same phone, same instructions. Whether
-that is the 8da4w export, the compiled path's rendering of the tool block, or something
-else is a token-level comparison of the rendered prompts plus a forced-call probe, and it
-is the measurement still owed.
+half the time and the compiled export never does, same phone, same instructions. The
+compiled path's own rendering (`Lfm25Prompt`) was put beside the chat template LFM2.5
+ships with and matches it, tool block, markers and BOS, and the runtime encodes those
+literals to their special ids, so the residual is the export's 8da4w quantisation: a
+forced-call probe on the export against the GGUF, then a gentler export if they differ.
+Still owed.
 
 ### The canvas grader, and the census that shaped it (2026-09-10)
 

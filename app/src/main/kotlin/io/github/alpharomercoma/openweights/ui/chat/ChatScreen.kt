@@ -944,10 +944,8 @@ private fun ChatSheets(
             // opened without its projector reads nothing, and offering it an image budget
             // would be a control over a capability it does not have.
             readsImages = state.mediaSupport.vision,
-            onSave = {
-                onSavePreferences(it)
-                onDismissParameters()
-            },
+            // Saved as edited; the sheet stays where it is.
+            onSave = onSavePreferences,
             onReset = {
                 onResetPreferences()
                 onDismissParameters()

@@ -67,7 +67,6 @@ import io.github.alpharomercoma.openweights.core.common.model.ReasoningEffort
 import io.github.alpharomercoma.openweights.core.common.model.Tunable
 import io.github.alpharomercoma.openweights.core.data.ComputeTarget
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
-import io.github.alpharomercoma.openweights.core.designsystem.component.AccentButton
 import io.github.alpharomercoma.openweights.core.designsystem.component.Caption
 import io.github.alpharomercoma.openweights.core.designsystem.component.Metric
 import io.github.alpharomercoma.openweights.core.designsystem.component.StepSlider
@@ -135,6 +134,12 @@ fun ParameterSheet(
     onDismiss: () -> Unit,
 ) {
     var draft by remember(preferences) { mutableStateOf(preferences) }
+    // Every edit is the saved value: there is no Save. A slider moved is a slider saved,
+    // and the sheet stays open so the next edit is one tap away.
+    val commit: (ModelPreferences) -> Unit = { next ->
+        draft = next
+        onSave(next)
+    }
     // Not rememberSaveable: the sheet is dismissed on rotation with everything else in it,
     // and a disclosure that survives its own container would only reopen on a sheet whose
     // draft had already gone back to the saved values.
@@ -171,7 +176,7 @@ fun ParameterSheet(
             if (supportsThinking && outputModality.accepts(Tunable.THINKING)) {
                 ThinkingSetting(
                     draft = draft,
-                    onChange = { draft = it },
+                    onChange = { commit(it) },
                 )
             }
 
@@ -187,7 +192,7 @@ fun ParameterSheet(
                     AnswerLength.entries.forEachIndexed { index, length ->
                         SegmentedButton(
                             selected = draft.answerLength == length.name,
-                            onClick = { draft = draft.copy(answerLength = length.name) },
+                            onClick = { commit(draft.copy(answerLength = length.name)) },
                             shape = SegmentedButtonDefaults.itemShape(
                                 index,
                                 AnswerLength.entries.size,
@@ -212,7 +217,7 @@ fun ParameterSheet(
             ) {
                 StepSlider(
                     value = draft.temperature,
-                    onValueChange = { draft = draft.copy(temperature = it) },
+                    onValueChange = { commit(draft.copy(temperature = it)) },
                     valueRange = 0f..MAX_TEMPERATURE,
                     steps = 0,
                 )
@@ -242,7 +247,7 @@ fun ParameterSheet(
             ) {
                 StepSlider(
                     value = (draft.contextLength.takeIf { it > 0 } ?: loadedContext).toFloat(),
-                    onValueChange = { draft = draft.copy(contextLength = it.roundToInt()) },
+                    onValueChange = { commit(draft.copy(contextLength = it.roundToInt())) },
                     // Up to what this model is actually running with rather than a constant.
                     // The constant was 32768, and automatic now opens LFM2.5 at 128000, so the
                     // sheet read "128000 tokens" beside a thumb pinned at the end of a shorter
@@ -272,9 +277,8 @@ fun ParameterSheet(
                     StepSlider(
                         value = stops.indexOf(draft.imageTokens).coerceAtLeast(0).toFloat(),
                         onValueChange = {
-                            draft = draft.copy(
-                                imageTokens = stops[it.roundToInt().coerceIn(0, stops.lastIndex)],
-                            )
+                            val stop = it.roundToInt().coerceIn(0, stops.lastIndex)
+                            commit(draft.copy(imageTokens = stops[stop]))
                         },
                         valueRange = 0f..stops.lastIndex.toFloat(),
                         steps = stops.size - 2,
@@ -293,7 +297,7 @@ fun ParameterSheet(
                 val highest = ModelPreferences.MAX_COMPACT_AT_PERCENT.toFloat()
                 StepSlider(
                     value = draft.compactAtPercent.toFloat(),
-                    onValueChange = { draft = draft.copy(compactAtPercent = it.roundToInt()) },
+                    onValueChange = { commit(draft.copy(compactAtPercent = it.roundToInt())) },
                     valueRange = lowest..highest,
                     steps = 0,
                 )
@@ -312,7 +316,7 @@ fun ParameterSheet(
                     )
                     OutlinedTextField(
                         value = draft.systemPrompt,
-                        onValueChange = { draft = draft.copy(systemPrompt = it) },
+                        onValueChange = { commit(draft.copy(systemPrompt = it)) },
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         placeholder = { Text(stringResource(R.string.optional)) },
                         minLines = 2,
@@ -340,7 +344,7 @@ fun ParameterSheet(
                 ) {
                     StepSlider(
                         value = draft.topP,
-                        onValueChange = { draft = draft.copy(topP = it) },
+                        onValueChange = { commit(draft.copy(topP = it)) },
                         valueRange = MIN_TOP_P..1f,
                         steps = 0,
                     )
@@ -354,7 +358,7 @@ fun ParameterSheet(
                 ) {
                     StepSlider(
                         value = draft.topK.toFloat(),
-                        onValueChange = { draft = draft.copy(topK = it.roundToInt()) },
+                        onValueChange = { commit(draft.copy(topK = it.roundToInt())) },
                         valueRange = 0f..MAX_TOP_K,
                         steps = 0,
                     )
@@ -369,7 +373,7 @@ fun ParameterSheet(
                 ) {
                     StepSlider(
                         value = draft.repeatPenalty,
-                        onValueChange = { draft = draft.copy(repeatPenalty = it) },
+                        onValueChange = { commit(draft.copy(repeatPenalty = it)) },
                         valueRange = MIN_REPEAT_PENALTY..MAX_REPEAT_PENALTY,
                         steps = 0,
                     )
@@ -419,7 +423,7 @@ fun ParameterSheet(
                         TargetRow(
                             targets = prefillTargets,
                             selected = draft.prefillTarget,
-                            onSelect = { draft = draft.copy(prefillTarget = it) },
+                            onSelect = { commit(draft.copy(prefillTarget = it)) },
                         )
                     }
 
@@ -441,7 +445,7 @@ fun ParameterSheet(
                         TargetRow(
                             targets = decodeTargets,
                             selected = draft.decodeTarget,
-                            onSelect = { draft = draft.copy(decodeTarget = it) },
+                            onSelect = { commit(draft.copy(decodeTarget = it)) },
                         )
                     }
                 }
@@ -458,7 +462,7 @@ fun ParameterSheet(
                         )
                         OutlinedTextField(
                             value = draft.toolPrompt,
-                            onValueChange = { draft = draft.copy(toolPrompt = it) },
+                            onValueChange = { commit(draft.copy(toolPrompt = it)) },
                             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                             placeholder = { Text(stringResource(R.string.nothing_about_tools)) },
                             minLines = 3,
@@ -468,8 +472,10 @@ fun ParameterSheet(
                         )
                         TextButton(
                             onClick = {
-                                draft = draft.copy(
-                                    toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT,
+                                commit(
+                                    draft.copy(
+                                        toolPrompt = ModelPreferences.DEFAULT_TOOL_PROMPT,
+                                    ),
                                 )
                             },
                         ) {
@@ -479,10 +485,7 @@ fun ParameterSheet(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AccentButton(onClick = { onSave(draft) }) { Text(stringResource(R.string.save)) }
-                TextButton(onClick = onReset) { Text(stringResource(R.string.reset_defaults)) }
-            }
+            TextButton(onClick = onReset) { Text(stringResource(R.string.reset_defaults)) }
         }
     }
 }

@@ -18,11 +18,14 @@ package io.github.alpharomercoma.openweights.ui.chat
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import io.github.alpharomercoma.openweights.core.common.model.OutputModality
 import io.github.alpharomercoma.openweights.core.data.ModelPreferences
 import io.github.alpharomercoma.openweights.core.designsystem.theme.OpenWeightsTheme
@@ -121,19 +124,24 @@ class ParameterSheetTest {
     }
 
     @Test
-    fun `the sheet edits a draft and only commits it on save`() {
-        // The sheet holds a draft rather than writing through on every slider movement,
-        // which is what makes Reset meaningful and what stops a half-dragged value being
-        // saved for a model. Nothing should reach the caller until Save.
+    fun `every edit is saved as it is made, and there is no Save button`() {
+        // Asked for on 2026-09-10: a value changed on the sheet is the value the model
+        // runs with, without a second tap. Opening the sheet saves nothing; the first
+        // edit does; and the sheet stays open for the next one.
         var saved: ModelPreferences? = null
         showSheet(onSave = { saved = it })
 
         compose.onNodeWithText("Context length").assertIsDisplayed()
         assert(saved == null) { "opening the sheet must not save anything, got $saved" }
+        compose.onAllNodesWithText("Save").assertCountEquals(0)
 
-        compose.onNodeWithText("Save").performScrollTo().performClick()
+        // The first text field on the sheet is the system prompt.
+        compose.onAllNodes(hasSetTextAction()).onFirst().performTextInput("Be brief.")
 
-        assert(saved != null) { "Save must reach the caller" }
+        assert(saved != null) { "an edit must reach the caller without a Save button" }
+        assert(saved?.systemPrompt?.contains("Be brief.") == true) {
+            "the edit that was made is the one saved, got ${saved?.systemPrompt?.take(40)}"
+        }
     }
 
     @Test

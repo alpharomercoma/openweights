@@ -242,8 +242,8 @@ What actually leaves the device:
 | Search terms typed into Discover | On search | App activity, or search history |
 | Repository and file identifiers | On open and download | App activity |
 | The Hugging Face access token, if the user set one | Every Hub request, as an `Authorization` header | Credentials |
-| **What the model decides to search for** | Whenever it uses `web_search`, which is on by default | App activity, and treat it as user content |
-| **A page address the model chose, and the request for it** | Whenever it uses `fetch_url`, which is on by default | App activity |
+| **What the model decides to search for** | Whenever it uses `web_search`, the one tool on by default | App activity, and treat it as user content |
+| **A page address the model chose, and the request for it** | Whenever it uses `fetch_url`, once the user has switched it on | App activity |
 | **Text out of a file in the shared folder** | Only if the user approves a search or fetch after `read_file` has run in the same turn, or has typed `/yolo` | **Files and docs**, and treat it as user content |
 | Standard request metadata, including IP | Every request above | Handled by the recipient |
 
@@ -433,11 +433,12 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
 - **No crash reporting**, by choice. A crash on a device we do not own is invisible to us
   unless a user opens an issue. The pre-launch report partly covers this, which is why
   `mapping.txt` has to go up with the bundle.
-- **The web tools are on by default, and the default mode runs them without asking.**
-  `web_search` and `fetch_url` both ship switched on, in `ToolSwitches`, for the reason
-  documented there: a tool that ships off is a feature nobody finds. There was once a
-  one-time prompt before the first thing either tool ever sent, so that discovery and
-  consent were the same event; it is gone, deliberately, per the note at
+- **Web search is on by default, and the default mode runs it without asking.**
+  `web_search` is the one tool that ships switched on; everything else, `fetch_url`
+  included, starts off and is switched on from the Tools screen (`Tool.defaultsOn`
+  says why). There was once a one-time prompt before the first thing the web tools ever
+  sent, so that discovery and consent were the same event; it is gone, deliberately, per
+  the note at
   `AgentRunner.allowed`. An agent that stops to ask whether it may search is not an agent,
   and the call is not hidden afterwards: it is a row in the reply that used it, naming the
   tool and what it was given, in the same conversation the user is already reading. Turning

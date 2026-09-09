@@ -322,6 +322,8 @@ abstract class ChatFixture {
 
     /** Something for a scripted call to land on. What it returns does not matter here. */
     object StubTool : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         override val definition = ToolDefinition(
             name = "web_search",
             description = "Search the web.",

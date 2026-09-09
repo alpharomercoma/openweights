@@ -99,6 +99,12 @@ an address the model chose asks for approval even in Auto mode. That is the egre
 it holds during a goal, so a research step pauses on "Run fetch_url?" until it is tapped.
 The card sits in its usual pinned slot above the composer.
 
+Since 2026-09-09 there is a plainer reason a fresh install's research never fetches:
+`fetch_url` starts switched off, like every tool but `web_search` (see `Tool.defaultsOn`).
+A research step then works from search results alone until the person turns page fetching
+on in the Tools tab. The planner is told which tools the execution turn will have, so its
+steps are written for what is on.
+
 The halts that started this work had a different cause, in the engine: every step's prompt
 with the tool prefix was refused by the ExecuTorch runtime's prefill bound and retried
 without tools, so the model could not search at all. See

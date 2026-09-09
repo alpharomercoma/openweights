@@ -140,10 +140,9 @@ class ToolCatalogueTest {
         // are added, so it is asserted rather than trusted.
         //
         // "Every install" means on by default as well as able to run, with nothing shared
-        // yet: the memory tools are available the moment their switch is on, but no install
-        // ships with it on, and the file tools describe themselves only once a folder is.
-        // Measured first, before [tools] takes the grant; measured after, it would count
-        // the file tools too, and trip the ceiling by a thousand tokens rather than pass.
+        // yet, and since 2026-09-09 that is web search alone: every other tool starts off
+        // and is switched on from the Tools screen. Measured first, before [tools] takes
+        // the grant, so what is counted is what a fresh install's first turn carries.
         val shipped = tokens(
             AppToolRegistry.build(context).all.filter { it.isAvailable && it.defaultsOn },
         )
@@ -172,34 +171,19 @@ class ToolCatalogueTest {
         /**
          * What the tools every install has cost to describe, with room to edit.
          *
-         * Was 378 tokens for web_search, fetch_url and run_script, ceiling 448. Now about
-         * 445, and the ceiling moved with it rather than the descriptions being shaved to
-         * fit, because the growth is the point rather than an accident.
+         * About 196 tokens, for web search alone, and the ceiling is 256. Until 2026-09-09
+         * every user-facing tool shipped on, and this number was 775 against a ceiling of
+         * 832: the story of how it got there is in the history of this file, and the short
+         * form is that each addition was paid for consciously and the count still crept up
+         * on a two-thousand-token window. Turning the default round made the first turn of
+         * a fresh chat about six hundred tokens cheaper and gave a small model one tool to
+         * choose, which it does better than choosing among sixteen.
          *
-         * What bought it: each description gained a clause saying what the tool is not for,
-         * and each tool with a required argument gained one saying to ask when it is
-         * missing. On the app's own eight tools that took the score from 36/48 to 40/48,
-         * and no-call detection from 5/12 to 9/12. Seven settled questions, including who
-         * wrote Pride and Prejudice, stopped reaching for the network. On a 2048 token
-         * window the extra 67 tokens is about three per cent of it, which is the right
-         * trade for a model that was otherwise searching the web to check things it had
-         * already answered correctly.
-         *
-         * The property this ceiling exists for is unchanged: the margin absorbs a copy
-         * edit, and another default tool, which costs 40 to 90 tokens, still trips it.
-         *
-         * 512 became 576 when fetch_url gained save_to: a page larger than the context
-         * window can now land in a file for the sandbox to work through, which is the
-         * capability that makes fetch-then-parse a loop instead of a dead end. About 25
-         * tokens after trimming, paid consciously.
-         *
-         * 576 became 832 when the measurement moved onto the registry the app builds, and
-         * found two default tools the hand-kept list had never counted: show_pictures and
-         * watch had been on by default on every install for weeks, about three hundred
-         * tokens between them, without this number knowing. Measured at 775 the day it
-         * moved. The catalogue did not grow; the count caught up with it.
+         * The property this ceiling exists for is unchanged: the margin absorbs a copy edit
+         * of the one description, and a second default tool, which costs 40 to 90 tokens,
+         * still trips it. A tool that wants to ship on has to come here and say so.
          */
-        const val DEFAULT_CEILING = 832
+        const val DEFAULT_CEILING = 256
 
         /**
          * And what all of them cost, once a folder has been shared: was 672 tokens, now

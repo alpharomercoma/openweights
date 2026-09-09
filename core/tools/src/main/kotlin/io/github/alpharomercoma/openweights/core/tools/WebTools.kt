@@ -85,6 +85,9 @@ class WebSearchTool @Inject constructor(
 ) : Tool {
     override val parallelSafe: Boolean = true
 
+    /** The one tool a fresh install has on. See [Tool.defaultsOn]. */
+    override val defaultsOn: Boolean = true
+
     /**
      * One step of several, not the whole errand: search is how a page is *found*, and the
      * page still has to be opened. With this false, a research step got exactly two

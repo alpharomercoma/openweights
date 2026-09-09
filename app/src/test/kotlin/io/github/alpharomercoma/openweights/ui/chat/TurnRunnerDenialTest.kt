@@ -248,6 +248,8 @@ class TurnRunnerDenialTest {
 
     /** A tool that records what it was asked rather than reaching anything. */
     private class RecordingTool(name: String) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         val calls = mutableListOf<ToolCall>()
 
         override val definition = ToolDefinition(

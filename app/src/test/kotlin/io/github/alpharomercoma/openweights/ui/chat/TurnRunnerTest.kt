@@ -872,6 +872,8 @@ class TurnRunnerTest {
 
     /** A tool that records what it was asked rather than reaching anything. */
     private class RecordingTool(name: String) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         val calls = mutableListOf<ToolCall>()
 
         /** What it hands back, so a test can make it longer than the context allows. */
@@ -900,6 +902,8 @@ class TurnRunnerTest {
      * recovered from what the user typed, so there is nothing to salvage.
      */
     private class SilentTool(name: String, override val isAvailable: Boolean = true) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         override val definition = ToolDefinition(
             name = name,
             description = "Reads a file.",

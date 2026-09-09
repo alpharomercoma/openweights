@@ -46,11 +46,11 @@ import javax.inject.Inject
  *
  * ### Off unless asked
  *
- * [defaultsOn] is false for both halves, and they are the only tools that set it.
- * Everything else reads what the turn already reaches. This one carries something out of
- * one conversation and into every future one, which is a decision about the app's memory
- * of a person rather than about one question, and not the sort of thing to switch on
- * quietly on their behalf.
+ * [defaultsOn] is false for both halves, said explicitly even though that is now what
+ * every tool but search starts as, because this one would stay off if the default ever
+ * moved back. It carries something out of one conversation and into every future one,
+ * which is a decision about the app's memory of a person rather than about one question,
+ * and not the sort of thing to switch on quietly on their behalf.
  */
 class SaveMemoryTool @Inject constructor(private val memory: Memory) : Tool {
     override val definition = ToolDefinition(

@@ -114,6 +114,8 @@ class TurnRunnerOverflowTest {
         File(models, "model.pte").apply { writeText("not a real model") }
 
     private class RecordingTool(name: String) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         val calls = mutableListOf<ToolCall>()
 
         override val definition = ToolDefinition(

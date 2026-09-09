@@ -235,13 +235,20 @@ interface Tool {
     /**
      * Whether this tool is on for somebody who has never opened the Tools screen.
      *
-     * True for everything that only reads what the turn already reaches: a search the user
-     * asked for, a file in a folder they chose. False for anything that carries something
-     * out of one conversation and into another, because that is a decision about the app's
-     * memory of them rather than about one question, and it is not the sort of thing to
-     * switch on quietly on somebody's behalf.
+     * False for everything but web search. A fresh install answers from the model and can
+     * look something up; anything more than that is switched on by the person, on the
+     * Tools screen, one row at a time. It used to be the other way round, everything on
+     * unless a tool said otherwise, and the argument was that a tool shipped off is a
+     * feature nobody finds. The cost was the other half of the same fact: the first turn
+     * of every chat carried the description of sixteen tools the person had never asked
+     * for, and a small model chose among them worse than it chose among one. Search is
+     * the one that earns its place on day one, because "look it up" is the request a
+     * local model cannot otherwise meet.
+     *
+     * A tool with no row on the Tools screen has no switch to be off, so the plan-mode
+     * machinery that [isUserFacing] keeps off the screen is on wherever its mode offers it.
      */
-    val defaultsOn: Boolean get() = true
+    val defaultsOn: Boolean get() = !isUserFacing
 
     /**
      * Whether running this sends what it is given to somebody else.

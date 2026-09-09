@@ -55,6 +55,8 @@ class TurnRepairsTest {
     private val models: File = Files.createTempDirectory("openweights-repairs").toFile()
     private val engine = FakeInferenceEngine().apply { supportsTools = true }
     private val search = object : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         override val definition = ToolDefinition(
             name = "web_search",
             description = "Search the web.",

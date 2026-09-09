@@ -124,7 +124,8 @@ model search and downloads, and the three network tools. The
 ### The agent
 
 The registry holds eighteen tools, sixteen of them user-facing. Three use the internet, sit
-under a heading that says so, and have individual switches.
+under a heading that says so, and have individual switches. A fresh install has one switch
+on, `web_search`; the rest are off until you turn them on.
 
 | Tool | What it does | Uses the internet |
 |---|---|---|
@@ -135,7 +136,7 @@ under a heading that says so, and have individual switches.
 | `show_website`, `show_document`, `show_slides` | Render a saved page, Markdown document or slide deck live on the Canvas | No |
 | `run_script` | Runs JavaScript in an isolated-process sandbox with no network or file system | No |
 | `watch` | Re-checks something on a schedule; always asks before it is created | No |
-| `read_memory`, `save_memory`, `update_memory`, `forget_memory` | Short facts kept across conversations, off by default; one switch for reading, one for the three writers | No |
+| `read_memory`, `save_memory`, `update_memory`, `forget_memory` | Short facts kept across conversations; one switch for reading, one for the three writers | No |
 | `advance`, `ask_user` | Tick a plan step; ask you a question with options (not shown on the Tools screen) | No |
 
 **Modes**, set per turn with a slash command:

@@ -212,6 +212,8 @@ class TurnBudgetTest {
 
     /** A tool whose results are steps towards an answer rather than the answer. */
     private class ChainingTool(name: String) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         val calls = mutableListOf<ToolCall>()
 
         override val definition = ToolDefinition(
@@ -230,6 +232,8 @@ class TurnBudgetTest {
 
     /** A tool that records what it was asked rather than reaching anything. */
     private class RecordingTool(name: String) : Tool {
+        // A fake stands in for a tool the person switched on.
+        override val defaultsOn: Boolean = true
         val calls = mutableListOf<ToolCall>()
 
         override val definition = ToolDefinition(

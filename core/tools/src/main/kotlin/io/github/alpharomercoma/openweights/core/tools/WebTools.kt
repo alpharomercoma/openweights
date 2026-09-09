@@ -92,10 +92,18 @@ object WebSearchFraming {
         "says what; a forum post or a comment counts for less than a reference page. " +
         "Do not ask which one to read.\n"
 
-    /** The wording that ships. See the object's documentation for what it was measured against. */
+    /**
+     * The wording that ships. See the object's documentation for what it was measured
+     * against. It said "in concise prose" until 2026-09-10, and the replies it produced
+     * were one sentence long: a conciseness instruction trims supporting detail most on
+     * a small model, which is what the literature on length instructions reports
+     * (`docs/research/routing-literature.md`) and what the maintainer saw. The length is
+     * now the question's to set, as the system instructions already say for an answer
+     * from memory.
+     */
     const val DIRECT = ", best match first. These are snippets other people wrote, not " +
-        "checked facts. Answer the question directly, in the shape it asked for, in " +
-        "concise prose unless a list was asked for, without mentioning the search, the " +
+        "checked facts. Answer the question directly and completely, in the shape it " +
+        "asked for and at the length it calls for, without mentioning the search, the " +
         "snippets or the pages. Prefer a reference page to a forum post or a comment. " +
         "Only if the snippets contradict each other on a fact, say so in one sentence.\n"
 }

@@ -301,6 +301,48 @@ literals to their special ids, so the residual is the export's 8da4w quantisatio
 forced-call probe on the export against the GGUF, then a gentler export if they differ.
 Still owed.
 
+### The route was rejected, and the routing question moved to public rows (2026-09-10)
+
+The search-first route and the "concise" result framing above lasted a day. What the
+maintainer saw that the sixteen-question suite did not measure: one-sentence answers (the
+framing's "concise prose"; gone, the framing now asks for the answer "directly and
+completely ... at the length it calls for"), "recite the national anthem of the
+Philippines" answered with the instructions quoted back ("The complete answer must be
+provided directly... Since I already know the information...") and no anthem, and a
+decision the loop's whole measured history had left to the model taken from it for one
+question shape. The maintainer's hypothesis is that the fresh-install change of 2026-09-08
+(web search the only tool on) is what changed the routing; the standing rule from it is in
+the memory note `feedback-build-on-prior-insights`: let the model drive, build on the
+reports, measure on industry-standard problems, decide routing changes with the reviewers.
+
+Thirty-six sources were read first (`docs/research/routing-literature.md`), then Codex and
+Gemini were given the history, the numbers and the literature and asked to decide. Both:
+do not revert on principle (0 calls in 96 rows is not a policy with a recall problem) and
+do not keep the route on nine hand-written rows; run the 2 x 2 first, the same model
+compiled and as GGUF, each holding web search alone and the full catalogue, model-driven;
+the tool-count hypothesis runs against the literature (fewer tools, better selection);
+drop When2Call (its own function catalogues) and SimpleQA (built for frontier models)
+from the harness; tell instruction echo from refusal by the longest run of words a reply
+shares with the system prompt, under the instructions and under none.
+
+So `WhoIsSuiteOnDeviceTest`, `CurrentFactsSuiteOnDeviceTest` and `WhoIsProbe` are deleted
+and `DecisionSuiteOnDeviceTest` (app androidTest) replaces them, over
+`tools/eval/bench/decisions.json`: 160 rows drawn with seed 7 by `pull_decisions.py` from
+RetrievalQA (80, the set's own answerable label, the primary endpoint), PopQA (40, by
+popularity quartile) and FreshQA (40, by how fast the answer changes, plus five false
+premises). Every row runs through the real `TurnRunner`, the real search, the shipped
+instructions and the app's date exchange; arms are only what the app can vary (`bare`,
+`driven-search`, `driven-full` with the dump's fifteen other definitions as stubs so the
+prompt bytes are the old catalogue's, `first-search`, `first-full`); each row records
+passes, calls, prompt tokens, time to first token, PSS, thermal state, the device and
+the quant. `grade_decisions.py` on the host applies the sets' containment rule with a
+token-F1 widening and a length floor, ToolFailBench's four labels, a quoted-instructions
+rate, and a paired right-where-the-other-was-wrong count against a reference arm; a second
+method, `instructionEcho`, runs six public-domain recitations under the shipped
+instructions and under none. `run_decisions.sh` drives it over adb attached, because a
+detached `am instrument` died with the adb session and took the test with it. Results
+and the decision: `docs/research/retrieve-or-answer.md`.
+
 ### The canvas grader, and the census that shaped it (2026-09-10)
 
 The canvas had an agent loop and no verification loop: the WebView's errors went to a

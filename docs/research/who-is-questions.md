@@ -197,3 +197,44 @@ the price of "who is the president of the philippines" keeping its office.
   current-facts questions; `-e arms shipped,explicit`.
 - `core/engine/src/androidTest/.../WhoIsProbe.kt`: the raw-reply probe.
 - Tests: `TurnRepairsTest`, `NamedSubjectTest`, `TurnRunnerTest`.
+
+## Rejected the same day, and what replaces the measurement
+
+The maintainer rejected what shipped above, on three counts that the tables here did not
+measure: the replies had become one sentence long (the framing's "concise prose" did that,
+and it is gone: `WebSearchFraming.DIRECT` now says "directly and completely, in the shape it
+asked for and at the length it calls for"); a turn that named nothing ("recite the national
+anthem of the Philippines") came back as the instructions quoted at the user, "The complete
+answer must be provided directly... Since I already know the information...", with no
+anthem and no search; and the route takes the decision away from the model for one
+question shape, where the loop's history (`tool-calling.md`, `plan-mode-and-recall.md`,
+`eval/routing_matrix.py`) is a model-driven loop with mechanical repairs that measured well
+with the whole catalogue in the prompt. The sixteen questions above were written here,
+several of them the maintainer's own examples, and the suite was tuned on them.
+
+What the maintainer asked for instead: let the model decide and fix the under-calling
+where it is; measure on industry-standard problems, sampled reproducibly, through the
+real loop, across models, quants, runtimes, devices and tool sets; and test the
+hypothesis that the fresh-install change of 2026-09-08 (web search the only tool on,
+fifteen descriptions gone from the prompt) is what changed the routing. Two reviewers
+(Codex gpt-5.6-sol, Gemini 3.8 Flash) were given the whole history, the numbers above and
+the literature (`routing-literature.md`) and asked to decide. Both said the same thing:
+do not revert on principle, because 0 calls in 96 rows is not a policy with a recall
+problem, and do not keep the route on nine hand-written rows either; run the 2 x 2 first,
+the same model compiled and as GGUF, each holding web search alone and the full catalogue,
+model-driven, on public rows; keep the route only if the model-driven loop lands within a
+few points of it on call recall and accuracy without more fabrication. Both named the
+tool-count hypothesis as the opposite of what the literature predicts (fewer tools, better
+selection), and both cut When2Call and SimpleQA from the harness as measuring something
+else. Codex added the one measurement that tells instruction echo from a refusal: the
+longest run of words a reply shares with the system prompt, under the shipped instructions
+and under none.
+
+So the three suites named in the file list above are deleted, and `DecisionSuiteOnDeviceTest`
+replaces them over `tools/eval/bench/decisions.json`: 160 rows sampled with seed 7 from
+RetrievalQA (80, the set's own answerable label), PopQA (40, by popularity quartile) and
+FreshQA (40, by how fast the answer changes, plus five false premises), graded on the host
+by `grade_decisions.py` with the sets' own containment rule, a token-F1 widening and a
+length floor, and ToolFailBench's four failure labels. Arms: `bare`, `driven-search`,
+`driven-full`, `first-search`, `first-full`. The results and the decision are in
+`retrieve-or-answer.md` once the phone has finished.

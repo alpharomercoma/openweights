@@ -1,0 +1,2939 @@
+{
+ "seed": 7,
+ "sources": {
+  "retrievalqa": "https://raw.githubusercontent.com/hyintell/RetrievalQA/main/data/retrievalqa.jsonl",
+  "popqa": "https://huggingface.co/datasets/akariasai/PopQA/resolve/main/test.tsv",
+  "freshqa": "https://docs.google.com/spreadsheets/d/1_8mi-yuK30mvoDJu1KQXD6ODem7MKMcIgVAwDSzJkjM/export?format=csv"
+ },
+ "popqa_quartile_cuts": [
+  236,
+  977,
+  5765
+ ],
+ "counts": {
+  "retrievalqa": 80,
+  "popqa": 40,
+  "freshqa": 40
+ },
+ "rows": [
+  {
+   "id": "retrievalqa-popqa_1036039",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Zec Petawaga?",
+   "answers": [
+    "Canada",
+    "Dominion of Canada",
+    "British North America",
+    "CAN",
+    "CA",
+    "ca",
+    "can",
+    "Can."
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_1188843",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is Hanover the capital of?",
+   "answers": [
+    "Lower Saxony",
+    "Niedersachsen",
+    "NDS",
+    "DE-NI",
+    "Kingdom of Hanover",
+    "Königreich Hannover",
+    "Hanover",
+    "Hannover",
+    "Principality of Calenberg"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_1259497",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is the capital of Quebec?",
+   "answers": [
+    "Quebec City",
+    "Quebec",
+    "Ville de Québec",
+    "Québec",
+    "City of Québec",
+    "City of Quebec",
+    "Ville de Quebec",
+    "3rd Summit of the Americas"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_1430021",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Ločenice?",
+   "answers": [
+    "Czech Republic",
+    "CZR",
+    "cz",
+    "Česko",
+    "Česká republika",
+    "ČR",
+    "cze",
+    "CZE",
+    "Czechia"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_1722403",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is Rome the capital of?",
+   "answers": [
+    "Lazio",
+    "Province of Rome",
+    "provincia di Roma",
+    "Papal States",
+    "Papal State",
+    "Church State",
+    "State of the Church",
+    "Stato della Chiesa",
+    "Status Ecclesiae",
+    "Ecclesiastical States",
+    "Roman Republic",
+    "res publica",
+    "Rome",
+    "Roman Empire",
+    "Imperium Romanum",
+    "Romanum imperium",
+    "imperium romanum",
+    "Senatus Populusque Romanus",
+    "Italy",
+    "Italia",
+    "Italian Republic",
+    "IT",
+    "🇮🇹",
+    "ITA"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_2717363",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Faculty of Engineering (LTH), Lund University?",
+   "answers": [
+    "Sweden",
+    "Kingdom of Sweden",
+    "SE",
+    "se",
+    "SWE",
+    "🇸🇪"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_2871596",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is Columbia the capital of?",
+   "answers": [
+    "South Carolina",
+    "SC",
+    "State of South Carolina",
+    "South Carolina, United States",
+    "S. C.",
+    "S.C.",
+    "Palmetto State"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_315906",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is Jerusalem the capital of?",
+   "answers": [
+    "Jerusalem District",
+    "Mandatory Palestine",
+    "British Mandate for Palestine",
+    "Palestine",
+    "British Palestine",
+    "Mandate Palestine",
+    "State of Palestine",
+    "🇵🇸",
+    "Palestinian state",
+    "Palestine",
+    "Palestinian National Authority",
+    "Palestinian Authority",
+    "Judah",
+    "Kingdom of Judah",
+    "Kingdom of Judea",
+    "Southern Kingdom",
+    "Kingdom Of Judah",
+    "Kingdom of Jerusalem",
+    "Latin Kingdom of Jerusalem",
+    "Jerusalem",
+    "Israel",
+    "State of Israel",
+    "il",
+    "🇮🇱",
+    "Holy Land",
+    "the Jewish state",
+    "ISR"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_3169042",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What sport does 2009 Atlantic Coast Conference Baseball Tournament play?",
+   "answers": [
+    "baseball",
+    "America's pastime",
+    "⚾"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_3229412",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Călmuș River?",
+   "answers": [
+    "Romania",
+    "Roumania",
+    "Rumania",
+    "România",
+    "ro",
+    "🇷🇴"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_331903",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What genre is Inna?",
+   "answers": [
+    "dance-pop",
+    "dance pop",
+    "dance music",
+    "club music",
+    "Dance",
+    "pop music",
+    "pop",
+    "Pop",
+    "electronic dance music",
+    "EDM",
+    "club music",
+    "dance music",
+    "dance"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_3391136",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Asahi Station?",
+   "answers": [
+    "Japan",
+    "State of Japan",
+    "Land of the Rising Sun",
+    "Nihon",
+    "Nippon",
+    "JP",
+    "Nippon-koku",
+    "Nihon-koku",
+    "JA",
+    "JPN",
+    "jp",
+    "JAP",
+    "Ja",
+    "Jap"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4489981",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Home?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4498593",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Ara?",
+   "answers": [
+    "India",
+    "Bharat",
+    "Hindustan",
+    "Bharatvarsh",
+    "in",
+    "IN",
+    "Republic of India",
+    "🇮🇳",
+    "IND",
+    "Aryavratt"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4589572",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Katmai National Park and Preserve?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4745759",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Malay?",
+   "answers": [
+    "Philippines",
+    "Republic of the Philippines",
+    "PH",
+    "ph",
+    "the Philippines",
+    "Philippine Islands",
+    "PHL",
+    "RP",
+    "🇵🇭",
+    "PHI",
+    "Pinas"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4977081",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Villers-sous-Foucarmont?",
+   "answers": [
+    "France",
+    "fr",
+    "FR",
+    "République française",
+    "La France",
+    "Republic of France",
+    "French Republic",
+    "FRA",
+    "the Hexagon"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5204915",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Monitor House?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5310436",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Northland Communications?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5973973",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Tholuvankadu?",
+   "answers": [
+    "India",
+    "Bharat",
+    "Hindustan",
+    "Bharatvarsh",
+    "in",
+    "IN",
+    "Republic of India",
+    "🇮🇳",
+    "IND",
+    "Aryavratt"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_6152824",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is Weed?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_623029",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is the religion of Hillsdale Free Will Baptist College?",
+   "answers": [
+    "Free Will Baptist"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_6468445",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what country is USS Constitution?",
+   "answers": [
+    "United States of America",
+    "the United States of America",
+    "America",
+    "U.S.A.",
+    "USA",
+    "U.S.",
+    "US",
+    "the US",
+    "the USA",
+    "US of A",
+    "the United States",
+    "U. S. A.",
+    "U. S.",
+    "the States",
+    "the U.S.",
+    "'Merica",
+    "U.S",
+    "United States",
+    "'Murica"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_6533853",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What genre is Jason Moran?",
+   "answers": [
+    "jazz",
+    "jazz music",
+    "jass",
+    "jas",
+    "jaz",
+    "Jazz"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_907670",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What is the capital of Province of Cremona?",
+   "answers": [
+    "Cremona"
+   ],
+   "need": false,
+   "stratum": "popqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_jp_1527",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "\"What \"\"kissing\"\" disease, common among teenagers, can cause swollen lymph nodes and fatigue?\"",
+   "answers": [
+    "Pfeiffers disease",
+    "pfeiffer s disease",
+    "EBV infectious mononucleosis",
+    "Infectious mononucleosis",
+    "Mononucleosis",
+    "infectous nucleosis",
+    "mononucleosis",
+    "gland fever",
+    "Pfeiffer's disease",
+    "Infectous nucleosis",
+    "glandular fever",
+    "Infectious mononucleosis (Glandular Fever)",
+    "Antibodies, heterophile",
+    "Gland fever",
+    "Mononucleosis infectiosa",
+    "Kissing disease",
+    "Epstein barr virus mononucleosis",
+    "mononucleosis infectiosa",
+    "Glandular fever",
+    "The kissing disease",
+    "ebv infectious mononucleosis",
+    "kissing disease",
+    "epstein barr virus mononucleosis",
+    "infectious mononucleosis glandular fever",
+    "pfeiffers disease",
+    "Glandular Fever",
+    "infectious mononucleosis",
+    "antibodies heterophile",
+    "Infectious Mononucleosis"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_odql_3814",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "In which race did Zola Budd and Mary Decker famously collide at the 1984 Olympics?",
+   "answers": [
+    "distance:m",
+    "3000 distance",
+    "three thousand distance",
+    "three thousand  distance",
+    "3000 metres",
+    "3000"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_odql_7986",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "What is the common name for the perennial-flowering houseplant, 'Saintpaulia'?",
+   "answers": [
+    "saintpaulia ionantha",
+    "violeta africana",
+    "african violets",
+    "African Violets",
+    "African violets",
+    "African violet",
+    "Saintpaulia",
+    "saintpaulia",
+    "Violeta africana",
+    "African Violet",
+    "african violet",
+    "AFRICAN VIOLET",
+    "Saintpaulia ionantha"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_1752",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "In what film would you have seen a sword fight on the Cliffs of Insanity?",
+   "answers": [
+    "prince humperdink",
+    "indigo montoya",
+    "Princess Bride",
+    "Green speckled recluse",
+    "vizzini princess bride",
+    "florin city",
+    "Fire swamp",
+    "rodents of unusual size",
+    "princess buttercup",
+    "count rugen",
+    "Miracle Max",
+    "Lightning sands",
+    "Tyrone Rugen",
+    "fezzik",
+    "Count Tyrone Rugen",
+    "Princess Buttercup",
+    "princess bride",
+    "Prince Humperdink",
+    "buttercup s baby",
+    "miracle max",
+    "Rodents of unusual size",
+    "The princess bride",
+    "Princess bride",
+    "Fezzik",
+    "Vizzini (The Princess Bride)",
+    "Florin city",
+    "tyrone rugen",
+    "lightning sands",
+    "Indigo Montoya",
+    "Prince Humperdinck",
+    "prince humperdinck",
+    "R-O-U-S",
+    "Indigo montoya",
+    "fire swamp",
+    "kermit shog",
+    "Count Rugen",
+    "Buttercup's baby",
+    "The brute squad",
+    "count tyrone rugen",
+    "The Princess Bride",
+    "cliffs of insanity",
+    "Cliffs of Insanity",
+    "The Cliffs of Insanity",
+    "Kermit Shog",
+    "r o u s",
+    "green speckled recluse",
+    "brute squad"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_2316",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Skeletal, Smooth, and Cardiac are all types of what?",
+   "answers": [
+    "Muscular branches",
+    "muscular tissue",
+    "muscle proteins",
+    "Branchialis",
+    "Muscle",
+    "Characteristics of muscle",
+    "muscle types",
+    "Muscle mass",
+    "Muscular diseases",
+    "muscular force",
+    "Panniculus carnosis",
+    "muscular diseases",
+    "Lean muscle",
+    "gross anatomy of muscles",
+    "neoplasms muscle tissue",
+    "musculo",
+    "muscular",
+    "myotube",
+    "strongest muscle in human body",
+    "Muscular",
+    "Musculature",
+    "Muscle strength",
+    "characteristics of muscle",
+    "muscle",
+    "Muscle loss",
+    "panniculus carnosis",
+    "branchialis",
+    "Strongest muscle in human body",
+    "human muscle",
+    "Muscle proteins",
+    "Muscle types",
+    "Muscle protein",
+    "Human muscle",
+    "muscular branches",
+    "muscle mass",
+    "Myo-",
+    "Muscular force",
+    "Myotube",
+    "muscle loss",
+    "lean muscle",
+    "musculature",
+    "muscles",
+    "muscle protein",
+    "Gross anatomy of muscles",
+    "Neoplasms, muscle tissue",
+    "Muscles",
+    "Musculo",
+    "Muscular tissue",
+    "muscle strength",
+    "myo"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_3452",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Named for its chairman, The Warren Commission published its final report on Sept 27, 1965. What event was it seated to investigate?",
+   "answers": [
+    "Assassination of United States President John F. Kennedy",
+    "killing of jfk",
+    "Assassination of John F. Kennedy",
+    "john f kennedy s assassination",
+    "assassination of john fitzgerald kennedy",
+    "Assassination of john f. kennedy",
+    "JFK's Assassination",
+    "Assassination of John Fitzgerald Kennedy",
+    "November 22, 1963",
+    "j f k assassination",
+    "dealey plaza shootings",
+    "john f kennedy assassination archive 4",
+    "Murder of John F. Kennedy",
+    "Death of John F. Kennedy",
+    "John F. Kennedy assassination",
+    "Assassination of John Kennedy",
+    "John f. kennedy assassination",
+    "murder of john f kennedy",
+    "Assassination of John F Kennedy",
+    "Emmett Hudson",
+    "Murder of JFK",
+    "back and to left",
+    "kennedy assasination",
+    "Assassination of President Kennedy",
+    "Kennedy Assassination",
+    "Jfk assassination",
+    "J.F.K. Assassination",
+    "jfk shooting",
+    "assassination of kennedy",
+    "assassanation of john f kennedy",
+    "murder of jfk",
+    "Assassination of President John F. Kennedy",
+    "JFK shooting",
+    "Kennedy assassination theories",
+    "John F. Kennedy assassination/Archive 4",
+    "faye chism",
+    "President Kennedy's assassination",
+    "John f kennedy assassination",
+    "John F Kennedy assassination",
+    "John F. Kennedy Assassination",
+    "kennedy assassination",
+    "Kennedy assassination",
+    "JFK assasination",
+    "jfk murder",
+    "assassination of united states president john f kennedy",
+    "john fitzgerald kennedy s assassination",
+    "Assassination of jfk",
+    "emmett hudson",
+    "Shooting of John F. Kennedy",
+    "assassination of jfk",
+    "jfk assassination",
+    "J.F.K assassination",
+    "assassination of president john f kennedy",
+    "John F.Kennedy assassination",
+    "The Kennedy assassination",
+    "jfk blown away",
+    "john f kennedy assassination",
+    "clark panel",
+    "John Fitzgerald Kennedy's assassination",
+    "Faye Chism",
+    "Kennedy's assassination",
+    "JFK murder",
+    "assassination of john f kennedy",
+    "shooting of john f kennedy",
+    "death of jfk",
+    "kennedy s assassination",
+    "assassination information bureau",
+    "JFK assassination",
+    "assassination of john kennedy",
+    "president kennedy s assassination",
+    "jfk s assassination",
+    "Kennedy assasination",
+    "Assassination of john f kennedy",
+    "november 22 1963",
+    "assassination of president kennedy",
+    "Kennedy Assasination",
+    "Killing of JFK",
+    "Clark Panel",
+    "The Assassination of JFK",
+    "JFK Assassination",
+    "Shooting of JFK",
+    "John F. Kennedy's assassination",
+    "Back and to the left",
+    "shooting of jfk",
+    "John F kennedy assassination",
+    "Assassination of Kennedy",
+    "kennedy assassination theories",
+    "Dealey Plaza shootings",
+    "Assassination of JFK",
+    "Death of JFK",
+    "JFK blown away",
+    "Assassination Information Bureau",
+    "death of john f kennedy",
+    "jfk assasination",
+    "Assassanation of John F. Kennedy"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_4031",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "If I purchase a gross of something, how many individual items do I end up with?",
+   "answers": [
+    "one hundred and forty-four",
+    "one hundred and forty four",
+    "144"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_4147",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "How long do NFL football teams have to get a play off (the play clock)?",
+   "answers": [
+    "40 seconds",
+    "forty  time",
+    "40 time",
+    "forty time",
+    "time:seconds",
+    "40"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_16693",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "When was the first road speed limit set in the UK for powered vehicles?",
+   "answers": [
+    "1861",
+    "one thousand, eight hundred and sixty-one",
+    "one thousand eight hundred and sixty one"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_7018",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "In 1968, what telephone number was established as the national emergency number for the United States?",
+   "answers": [
+    "911",
+    "nine hundred and eleven"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_7648",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "\"Sheep are aged by their teeth and are referred to by the number of permanent incisors that have erupted. About how old is an \"\"eight-tooth\"\" or full-mouth sheep, which is also referred to as 'aged'?\"",
+   "answers": [
+    "2",
+    "2 to 4 years",
+    "time:years",
+    "4"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_8577",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "The Sagrada Famlia in Barcelona, which began construction in 1882, was consecrated and declared a basilica by the Pope in what year?",
+   "answers": [
+    "2010",
+    "two thousand and ten"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_sfq_15794",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "What is Canada's most populous province?",
+   "answers": [
+    "climate of ontario",
+    "Ontario Canada",
+    "Ontario (Canada)",
+    "on canada",
+    "ca on",
+    "ontario",
+    "Ontarian",
+    "Climate of Ontario",
+    "ontarian",
+    "Ontairo",
+    "CA-ON",
+    "ontario canada",
+    "Ontario (canada)",
+    "Ontario, Canada",
+    "canada ontario",
+    "Canada Ontario",
+    "Ontario",
+    "ontairo",
+    "ON, Canada",
+    "province of ontario",
+    "Province of Ontario"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_sfq_6943",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Which is the highest prime number less than 100?",
+   "answers": [
+    "ninety-seven",
+    "ninety seven",
+    "97"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_sfq_7181",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "What is the medical name for the breastbone?",
+   "answers": [
+    "sternebra",
+    "Breast bones",
+    "manubrium of sternum",
+    "Breastbone",
+    "breast bone",
+    "sternum",
+    "sternums",
+    "Corpus sterni",
+    "Sternebrae",
+    "manubrium",
+    "ossification of sternum",
+    "corpus sterni",
+    "body of sternum",
+    "Breast bone",
+    "sternebrae",
+    "Human breast bone",
+    "Sternebra",
+    "Manubrium sterni",
+    "Body of the sternum",
+    "human sternum",
+    "sternal plates",
+    "manubrium sterni",
+    "Breastbones",
+    "Ossification of sternum",
+    "Sternal",
+    "Human breastbone",
+    "Manubrium of sternum",
+    "Manubrium of Sternum",
+    "sternal",
+    "Human sternum",
+    "breast bones",
+    "Sternal plates",
+    "Manubrium",
+    "Sternums",
+    "human breast bone",
+    "breastbones",
+    "human breastbone",
+    "STERNUM",
+    "Sternal line",
+    "Sternum",
+    "sternal line",
+    "Body of sternum",
+    "breastbone"
+   ],
+   "need": false,
+   "stratum": "triviaqa/answerable",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_1056000",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what city was Izaskun Zubizarreta Gerendiain born?",
+   "answers": [
+    "Oiartzun"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_251876",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what city was John Keating born?",
+   "answers": [
+    "Hobart",
+    "Hobart Town",
+    "Hobarton",
+    "Hobart, Tasmania",
+    "Hobart, Tas."
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_3927677",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what city was Doc Parker born?",
+   "answers": [
+    "Theresa",
+    "Theresa, New York"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_4034856",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of Empire?",
+   "answers": [
+    "H. Beam Piper",
+    "Henry Beam Piper",
+    "Horace Beam Piper",
+    "Herbert Beam Piper"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_475186",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of Memory?",
+   "answers": [
+    "Poul Anderson",
+    "Poul William Anderson",
+    "Winston P. Sanders",
+    "A. A. Craig",
+    "Michael Karageorge",
+    "Petronius Arbiter Kingsley",
+    "P. A. Kingsley"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5562162",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of Responsibility?",
+   "answers": [
+    "Nigel Cox"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5775180",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of Skyscraper?",
+   "answers": [
+    "David Auburn"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5908270",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What genre is The Angel?",
+   "answers": [
+    "horror film",
+    "horror movie"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5909751",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of The Ball?",
+   "answers": [
+    "James Shirley"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5913758",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "What genre is The Box?",
+   "answers": [
+    "experimental music",
+    "Experimental"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5937083",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who was the director of The Last Word?",
+   "answers": [
+    "Binka Zhelyazkova"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5965159",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who is the author of The Wizard in Wonderland?",
+   "answers": [
+    "Jean Ure"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_5988419",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Three Loves in Rio?",
+   "answers": [
+    "Carlos Hugo Christensen"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-popqa_6113871",
+   "set": "retrievalqa",
+   "source": "popqa",
+   "question": "In what city was Vitaliy Sobko born?",
+   "answers": [
+    "Kharkiv",
+    "Kharkov",
+    "Chárkiv",
+    "Harkov",
+    "Khar'kov",
+    "Kharkoff"
+   ],
+   "need": true,
+   "stratum": "popqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_bt_3406",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Which radio broadcaster was known as the Man In Black",
+   "answers": [
+    "Valentine Dyall",
+    "valentine dyall"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_odql_14010",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Motor Racing. Which team has announced that they are to withdraw from Formula One racing at the end of the year?",
+   "answers": [
+    "bmw z2",
+    "BMW Z2",
+    ".bmw",
+    "Bayerische Motoren Werke GmbH",
+    "bmw",
+    "bmw motorcycle clubs",
+    "bmw automobile",
+    "Bmw",
+    "BMW AG",
+    "Motoren Werke AG",
+    "BMW (company)",
+    "BMW V-Series",
+    "bavarian motor works",
+    "motoren werke ag",
+    "b m w g",
+    "Bayerische Motoren werke",
+    "BMW",
+    "bmw motorcyc le clubs",
+    "BMW motorcycle clubs",
+    "bayerische motoren werke gmbh",
+    "bmw model designations",
+    "Bayerische Motoren Werke AG",
+    "BMW motorcyc le clubs",
+    "B.M.W. A.G.",
+    "BMW Group",
+    "bayerische motoren werke ag",
+    "bayer motoren werke",
+    "bmw korea",
+    "bayerische motorenwerke",
+    "BMW Korea",
+    "Bayerische Motorenwerke",
+    "B. M. W.",
+    "bmw group",
+    "BMW V Series",
+    "Bayerische Motoren Werke Ag",
+    "Bayrische Motoren Werke",
+    "BMW (automobile)",
+    "ConnectedDrive",
+    "bmw company",
+    "bmw v series",
+    "B M W",
+    "B.M.W",
+    "bayrische motoren werke",
+    "BMW model designations",
+    "Bayer Motoren Werke",
+    "connecteddrive",
+    "b m w",
+    "Bavarian Motor Works",
+    "bmw ag",
+    "Bayerische Motoren Werke",
+    "bayerische motoren werke",
+    "B.M.W."
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_odql_3340",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "What holiday is particularly associated with Morris Dancing?",
+   "answers": [
+    "whitsun",
+    "Whitsun",
+    "Whit Sunday",
+    "Whitsuntide",
+    "whit sunday",
+    "whitsunday",
+    "WHITSUNTIDE",
+    "Whitsunday",
+    "whit week",
+    "Whit Week",
+    "whitsuntide"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qf_1776",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Who won the gold medal for the men's super heavyweight boxing?",
+   "answers": [
+    "Anthony Joshua",
+    "anthony joshua"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qg_1729",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Ford recently announced that they were shutting down production of another of their marques. Active for the last 81 years, what brand is being discontinued?",
+   "answers": [
+    "Mercury (disambiguation)",
+    "merdcury",
+    "Murcury",
+    "Merdcury",
+    "mercury disambiguation",
+    "Mercury",
+    "murcury",
+    "mercury",
+    "mercury album",
+    "Mercury (album)"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_10032",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "What was the name of two tyrants who ruled Syracuse in the 2nd century BC?",
+   "answers": [
+    "Dionisios",
+    "dionysius disambiguation",
+    "Dionysius (disambiguation)",
+    "Dionysius",
+    "dionisios",
+    "dionysios",
+    "Dionysios",
+    "dionisis",
+    "dionysius",
+    "Dionisis"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_qw_10892",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "Oil from oil wells was first used for what?",
+   "answers": [
+    "evaporate brine to produce salt",
+    "Evaporate brine to produce salt"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-triviaqa_sfq_13211",
+   "set": "retrievalqa",
+   "source": "triviaqa",
+   "question": "White Gem is a variety of which vegetable?",
+   "answers": [
+    "parsnip botany",
+    "pastinaca sativa",
+    "Parsnips",
+    "Parsnip (botany)",
+    "Parsnip",
+    "PARSNIP",
+    "Pastinaca sativa",
+    "parsnip",
+    "parsnips"
+   ],
+   "need": true,
+   "stratum": "triviaqa/retrieve",
+   "stale_risk": false
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231006_21",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "What is the minimum annual income required for a family of four to be considered middle class in Delaware in 2023, according to the study?",
+   "answers": [
+    "$67,830"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231020_10",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "President Joe Biden made an extraordinary wartime visit this week to which country?",
+   "answers": [
+    "Israel"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231027_15",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "What is the name of the hurricane that slammed into Acapulco, Mexico, this week?",
+   "answers": [
+    "Otis"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231103_13",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "Which type of products were removed from Target, Rite Aid, and CVS this week due to bacterial concerns?",
+   "answers": [
+    "Eye drops"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231117_9",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "Who became the UK's sixth health secretary since the 2019 elections?",
+   "answers": [
+    "Victoria Atkins"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231222_2",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "Gun violence continued to plague communities across the US. Which state suffered the deadliest mass shooting in 2023?",
+   "answers": [
+    "Maine"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20231222_22",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "Which Salesianum School senior won the 215-pound title in the 30th edition of the Beast of the East wrestling tournament held on Sunday at the Carpenter Center?",
+   "answers": [
+    "James Miller"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-realtimeqa_20240105_10",
+   "set": "retrievalqa",
+   "source": "realtimeqa",
+   "question": "Two planes collided on a runway this week, causing a massive fireball. Where did the incident occur?",
+   "answers": [
+    "Japan"
+   ],
+   "need": true,
+   "stratum": "realtimeqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-freshqa_384",
+   "set": "retrievalqa",
+   "source": "freshqa",
+   "question": "What is the current best-selling children's book on Amazon?",
+   "answers": [
+    "Little Blue Truck's Valentine",
+    "Little Blue Truck's Valentine by Alice Schertle"
+   ],
+   "need": true,
+   "stratum": "freshqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-freshqa_406",
+   "set": "retrievalqa",
+   "source": "freshqa",
+   "question": "On what date in North America did the most recent Microsoft's Patch Tuesday come out?",
+   "answers": [
+    "Jan 9, 2024",
+    "January 9, 2024",
+    "9 Jan 2024",
+    "9 January 2024",
+    "01/09/2024",
+    "01-09-2024",
+    "9/1/2024",
+    "9-1-2024",
+    "2024/01/09",
+    "2024-01-09"
+   ],
+   "need": true,
+   "stratum": "freshqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-freshqa_417",
+   "set": "retrievalqa",
+   "source": "freshqa",
+   "question": "Who won the latest NBA championship?",
+   "answers": [
+    "Denver Nuggets"
+   ],
+   "need": true,
+   "stratum": "freshqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-freshqa_449",
+   "set": "retrievalqa",
+   "source": "freshqa",
+   "question": "What season is it in the northern hemisphere?",
+   "answers": [
+    "winter"
+   ],
+   "need": true,
+   "stratum": "freshqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-freshqa_484",
+   "set": "retrievalqa",
+   "source": "freshqa",
+   "question": "How old is the latest American Nobel laureate in Physics?",
+   "answers": [
+    "81 years old",
+    "81",
+    "eighty-one"
+   ],
+   "need": true,
+   "stratum": "freshqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-toolqa_easy-agenda-0047",
+   "set": "retrievalqa",
+   "source": "toolqa",
+   "question": "What time did Phillip attend Creative writing workshop on 2022/06/28?",
+   "answers": [
+    "6:00 PM",
+    "18:00"
+   ],
+   "need": true,
+   "stratum": "toolqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-toolqa_easy-agenda-0058",
+   "set": "retrievalqa",
+   "source": "toolqa",
+   "question": "How long did Daniel attend Dance Class on 2022/06/24?",
+   "answers": [
+    "1:00:00"
+   ],
+   "need": true,
+   "stratum": "toolqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-toolqa_easy-agenda-0074",
+   "set": "retrievalqa",
+   "source": "toolqa",
+   "question": "What time did Georgina attend Pet grooming session on 2022/04/18?",
+   "answers": [
+    "1:00 PM",
+    "13:00"
+   ],
+   "need": true,
+   "stratum": "toolqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-toolqa_easy-agenda-0084",
+   "set": "retrievalqa",
+   "source": "toolqa",
+   "question": "What did Ava do from 12:00 PM to 4:00 PM on 2022/06/16?",
+   "answers": [
+    "Cooking competition"
+   ],
+   "need": true,
+   "stratum": "toolqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "retrievalqa-toolqa_easy-agenda-0090",
+   "set": "retrievalqa",
+   "source": "toolqa",
+   "question": "Where did Intermediate Spanish lesson that Alice attended take place on 2022/05/20?",
+   "answers": [
+    "Instituto Cervantes"
+   ],
+   "need": true,
+   "stratum": "toolqa/retrieve",
+   "stale_risk": true
+  },
+  {
+   "id": "popqa-1066872",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is The Amazing Catfish?",
+   "answers": [
+    "comedy-drama",
+    "dramedy",
+    "comedic drama",
+    "tragicomedy",
+    "seriocomedy",
+    "comedy drama",
+    "dramatic comedy",
+    "Comedy-drama, dramedy"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 144,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1263354",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Get Well Soon?",
+   "answers": [
+    "Jean Becker"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 197,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2436208",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Family Tree?",
+   "answers": [
+    "Jacques Martineau",
+    "Olivier Ducastel"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 145,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2748982",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "In what city was Bob Warlick born?",
+   "answers": [
+    "Hickory",
+    "Hickory, North Carolina"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 80,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-3149447",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of 1982?",
+   "answers": [
+    "Jian Ghomeshi"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 225,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4249573",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Glass?",
+   "answers": [
+    "Chris Kennedy"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 138,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4538912",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "In what city was Ian Rutherford born?",
+   "answers": [
+    "Dunedin",
+    "Dunedin, NZ",
+    "Dunedin, New Zealand",
+    "Dunedin City"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 112,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5799945",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the composer of Play?",
+   "answers": [
+    "Karlheinz Stockhausen",
+    "Karl-Heinz Stockhausen",
+    "Karlheinz Stockhausen"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 113,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5924263",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is The Ethos Effect?",
+   "answers": [
+    "science fiction",
+    "SF",
+    "scifi",
+    "sci Fi",
+    "sci-Fi",
+    "science-fiction",
+    "sci fi",
+    "sciencefiction"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 122,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-6071488",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "In what country is Autopista AP-2?",
+   "answers": [
+    "Spain",
+    "España",
+    "Kingdom of Spain",
+    "ES",
+    "ESP"
+   ],
+   "need": true,
+   "stratum": "popqa/q1",
+   "s_pop": 226,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-118580",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the composer of Christen, ätzet diesen Tag, BWV 63?",
+   "answers": [
+    "Johann Sebastian Bach",
+    "Bach",
+    "J.S. Bach",
+    "J. S. Bach",
+    "J S Bach"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 326,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2590251",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the producer of Black and White?",
+   "answers": [
+    "Nik Powell"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 905,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2848601",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "In what city was Valdemar III of Denmark born?",
+   "answers": [
+    "Denmark",
+    "DK",
+    "Danmark",
+    "DNK",
+    "DEK",
+    "dk",
+    "Denmark proper",
+    "metropolitan Denmark",
+    "🇩🇰",
+    "DEN",
+    "TAN",
+    "Realm of Denmark",
+    "Kingdom of Denmark"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 615,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-3524795",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Bleak House?",
+   "answers": [
+    "Charles Dickens",
+    "Dickens",
+    "C.Dickens",
+    "Charles John Huffam Dickens",
+    "Boz"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 254,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-3822627",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of Daddy?",
+   "answers": [
+    "Danielle Steel",
+    "Danielle Fernandes Dominique Schülein-Steel",
+    "Danielle Fernandes Dominique Schuelein-Steel"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 357,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4089763",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Berlin?",
+   "answers": [
+    "Yuli Raizman",
+    "Yuli Yakovlevich Raizman"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 355,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4969956",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of Line?",
+   "answers": [
+    "Israel Horovitz"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 372,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5345448",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Open Fire?",
+   "answers": [
+    "Paul Greengrass"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 239,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5932045",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of The History of Joseph Smith by His Mother?",
+   "answers": [
+    "Lucy Mack Smith"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 245,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5945338",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is The Off Season?",
+   "answers": [
+    "horror film",
+    "horror movie"
+   ],
+   "need": true,
+   "stratum": "popqa/q2",
+   "s_pop": 318,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-311488",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Hell of the Living Dead?",
+   "answers": [
+    "Bruno Mattei",
+    "Stephan Oblowsky"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 2502,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-442894",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of The Secret Life of Plants?",
+   "answers": [
+    "Peter Tompkins"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 2295,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1028422",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What is Frederick the capital of?",
+   "answers": [
+    "Tillman County",
+    "Tillman County, Oklahoma"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 1228,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1580098",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Possessed?",
+   "answers": [
+    "Clarence Brown",
+    "Clarence Leon Brown"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 1056,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1816281",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the director of Normal?",
+   "answers": [
+    "Carl Bessai"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 3636,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2075682",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is Satanic Slaughter?",
+   "answers": [
+    "black metal",
+    "Black Metal"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 2576,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2180364",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the composer of Monster?",
+   "answers": [
+    "Lady Gaga",
+    "Stefani Joanne Angelina Germanotta",
+    "Jo Calderone",
+    "Stefani Germanotta"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 1167,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2313979",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Extraterrestrial?",
+   "answers": [
+    "Nacho Vigalondo",
+    "Ignacio Vigalondo Palacios"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 1043,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4394540",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for Last Night?",
+   "answers": [
+    "Don McKellar"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 2557,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4623097",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What is the capital of Craighead County?",
+   "answers": [
+    "Lake City",
+    "Lake City, Arkansas",
+    "Jonesboro",
+    "Jonesboro, Arkansas"
+   ],
+   "need": null,
+   "stratum": "popqa/q3",
+   "s_pop": 1488,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-54968",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What is the religion of Carl Linnaeus?",
+   "answers": [
+    "Church of Sweden",
+    "Svenska kyrkan"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 87289,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-361831",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the composer of Gran Torino?",
+   "answers": [
+    "Michael Stevens",
+    "Kyle Eastwood",
+    "Kyle Eastwood"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 51441,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1503483",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the screenwriter for The Blackcoat's Daughter?",
+   "answers": [
+    "Oz Perkins"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 21424,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-1551849",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the producer of The Possession?",
+   "answers": [
+    "Sam Raimi",
+    "Samuel Marshall Raimi"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 33463,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2122418",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who is the author of Today?",
+   "answers": [
+    "Billy Corgan",
+    "Billy Burke",
+    "Corgan",
+    "Johnny Goat",
+    "William Patrick Corgan"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 5796,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-2897554",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "Who was the producer of Parker?",
+   "answers": [
+    "Leslie Alexander",
+    "Taylor Hackford",
+    "Taylor Edwin Hackford"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 19134,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-3122618",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is Carrie?",
+   "answers": [
+    "film adaptation",
+    "based upon",
+    "adapted for the screen",
+    "cinematic adaptation",
+    "horror film",
+    "horror movie"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 80170,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-4633294",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is Inside Out?",
+   "answers": [
+    "adventure film",
+    "adventure movie",
+    "adventure",
+    "comedy-drama",
+    "dramedy",
+    "comedic drama",
+    "tragicomedy",
+    "seriocomedy",
+    "comedy drama",
+    "dramatic comedy",
+    "Comedy-drama, dramedy"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 74976,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-5982670",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What genre is Is This It?",
+   "answers": [
+    "rock music",
+    "rock and roll",
+    "rock",
+    "Rock"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 20756,
+   "stale_risk": false
+  },
+  {
+   "id": "popqa-6471075",
+   "set": "popqa",
+   "source": "popqa",
+   "question": "What is the religion of Muhammad?",
+   "answers": [
+    "Hanif",
+    "Islam",
+    "Islamic religion",
+    "Mohammedanism",
+    "Muslim religion",
+    "al-’islām",
+    "religion of the Muslims"
+   ],
+   "need": false,
+   "stratum": "popqa/q4",
+   "s_pop": 415010,
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-372",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "According to the WHO’s latest reported 28-day figures, which country had the second-highest number of COVID-19 cases?",
+   "answers": [
+    "Greece"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-377",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the latest highest-grossing movie of the week at the Box office?",
+   "answers": [
+    "The Super Mario Galaxy Movie"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-385",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What's the most popular film on Letterboxd this week?",
+   "answers": [
+    "The Drama",
+    "The Drama (2026) directed by Kristoffer Borgli"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-392",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the most recent country that President Donald Trump visited during his second presidency?",
+   "answers": [
+    "Switzerland"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-398",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When did this year's Passover start?",
+   "answers": [
+    "April 1",
+    "Apr 1, 2026",
+    "April 1, 2026",
+    "1 Apr 2026",
+    "1 April 2026",
+    "04/1/2026",
+    "04-1-2026",
+    "1/04/2026",
+    "1-04-2026",
+    "2026/04/1"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-407",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When was this year's Ramadan?",
+   "answers": [
+    "Feb 18, 2026 – Mar 19, 2026",
+    "February 18, 2026 – March 19, 2026",
+    "Feb 18, 2026 – Mar 19, 2026",
+    "February 18, 2026 – March 19, 2026"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-415",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the title of Stephen King's most recent novel?",
+   "answers": [
+    "The End Times"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-417",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When is the next U.S. federal holiday?",
+   "answers": [
+    "Memorial Day",
+    "May 25, 2026",
+    "May 25, 2026",
+    "25 May 2026",
+    "25 May 2026",
+    "05/25/2026",
+    "05-25-2026",
+    "25/05/2026",
+    "25-05-2026",
+    "2026/05/25"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-422",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who is the starting running back for the San Francisco 49ers?",
+   "answers": [
+    "Christian McCaffrey"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-430",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who is the latest MotoGP World Riders' Champion?",
+   "answers": [
+    "Marc Márquez",
+    "Marc Márquez Alentà"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-432",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who won the most recent Time Magazine's Athlete of the Year?",
+   "answers": [
+    "A'ja Wilson"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-436",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When did the latest NFL season begin?",
+   "answers": [
+    "Sep 4, 2025",
+    "September 4, 2025",
+    "4 Sep 2025",
+    "4 September 2025",
+    "09/4/2025",
+    "09-4-2025",
+    "4/09/2025",
+    "4-09-2025",
+    "2025/09/4",
+    "2025-09-4"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-447",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "The longest winning streak in the last season of the Premier League consisted of how many matches?",
+   "answers": [
+    "6",
+    "6 matches"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-454",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "How much does the new Apple HomePod cost?",
+   "answers": [
+    "$299"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2023",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-456",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the youngest age eligible for COVID-19 vaccination in the United States?",
+   "answers": [
+    "6 months"
+   ],
+   "need": true,
+   "stratum": "freshqa/fast-changing",
+   "false_premise": false,
+   "effective_year": "2022",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-134",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the best-selling video game franchise of all time?",
+   "answers": [
+    "Mario"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-140",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Which is the oldest still-running university in the world?",
+   "answers": [
+    "University of Bologna"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-145",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "The longest unbeaten streak of all time in the Premier League is how many matches?",
+   "answers": [
+    "49",
+    "forty-nine",
+    "49 matches",
+    "49 matches by Arsenal FC"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-155",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What country became the latest country to adopt the Euro?",
+   "answers": [
+    "Bulgaria"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2026",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-174",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What's the latest major version of the .NET?",
+   "answers": [
+    ".NET 10"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2025",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-175",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "How many asteroids have been discovered before impacting Earth?",
+   "answers": [
+    "11",
+    "eleven"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2024",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-181",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the most recent outbreak declared as a public health emergency of international concern by WHO?",
+   "answers": [
+    "Clade I mpox"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2024",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-187",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When is the next leap year?",
+   "answers": [
+    "2028"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2024",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-194",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the most recently released Studio Ghibli film?",
+   "answers": [
+    "The Boy and the Heron"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2023",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-218",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who is the most recent female recipient of the Fields Medal?",
+   "answers": [
+    "Maryna Viazovska"
+   ],
+   "need": null,
+   "stratum": "freshqa/slow-changing",
+   "false_premise": false,
+   "effective_year": "2022",
+   "stale_risk": true
+  },
+  {
+   "id": "freshqa-262",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "In Greek mythology, what is the name of Menelaus' wife?",
+   "answers": [
+    "Helen of Troy",
+    "Helen",
+    "Helena",
+    "Helen of Sparta"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-274",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "On what date was Lunar New Year 2023?",
+   "answers": [
+    "Jan 22, 2023",
+    "January 22, 2023",
+    "22 Jan 2023",
+    "22 January 2023",
+    "01/22/2023",
+    "01-22-2023",
+    "22/01/2023",
+    "22-01-2023",
+    "2023/01/22",
+    "2023-01-22"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-280",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Which team won the 2021 FIFA Club World Cup?",
+   "answers": [
+    "Chelsea",
+    "Chelsea Football Club",
+    "Chelsea F.C."
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-290",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "How many years did the Hundred Years' War last?",
+   "answers": [
+    "116 years",
+    "116",
+    "116 years, 4 months, 3 weeks and 4 days",
+    "116 years, 4 months, and 3 weeks",
+    "116 years and 4 months"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-293",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who was the first football player to score one hundred international goals?",
+   "answers": [
+    "Ali Daei"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-298",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When did Blackpink make their debut?",
+   "answers": [
+    "2016",
+    "Aug 8, 2016",
+    "August 8, 2016",
+    "8 Aug 2016",
+    "8 August 2016",
+    "08/8/2016",
+    "08-8-2016",
+    "8/08/2016",
+    "8-08-2016",
+    "2016/08/8"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-300",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "What is the heaviest reptile in the world?",
+   "answers": [
+    "saltwater crocodile",
+    "crocodylus porosus"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-315",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Who is Elrond's father in J. R. R. Tolkien's Middle Earth stories?",
+   "answers": [
+    "Eärendil",
+    "Earendil",
+    "Eärendil the Blessed",
+    "Bright Eärendil"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-332",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When was the Day of Eight Billion?",
+   "answers": [
+    "Nov 15, 2022",
+    "November 15, 2022",
+    "15 Nov 2022",
+    "15 November 2022",
+    "11/15/2022",
+    "11-15-2022",
+    "15/11/2022",
+    "15-11-2022",
+    "2022/11/15",
+    "2022-11-15"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-335",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Which university did Taylor Swift receive her honorary Doctor of Fine Arts degree from?",
+   "answers": [
+    "New York University"
+   ],
+   "need": false,
+   "stratum": "freshqa/never-changing",
+   "false_premise": false,
+   "effective_year": "2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-10",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When was Dartmouth Law School founded?",
+   "answers": [
+    "Dartmouth College does not have a graduate school for law."
+   ],
+   "need": null,
+   "stratum": "freshqa/false-premise",
+   "false_premise": true,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-19",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When was COVID-19 declared endemic by the World Health Organization?",
+   "answers": [
+    "The World Health Organization has not declared COVID-19 as endemic."
+   ],
+   "need": null,
+   "stratum": "freshqa/false-premise",
+   "false_premise": true,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-22",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "Which vaccine completely eradicated COVID-19 worldwide?",
+   "answers": [
+    "No vaccine has eradicated COVID-19 worldwide."
+   ],
+   "need": null,
+   "stratum": "freshqa/false-premise",
+   "false_premise": true,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-29",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "When did King Charles strip Prince Harry's title as the Duke of Sussex?",
+   "answers": [
+    "It has not been legally stripped."
+   ],
+   "need": null,
+   "stratum": "freshqa/false-premise",
+   "false_premise": true,
+   "effective_year": "before 2022",
+   "stale_risk": false
+  },
+  {
+   "id": "freshqa-97",
+   "set": "freshqa",
+   "source": "freshqa",
+   "question": "In January 2023, the NHC revised the fatality data of Hurricane Katrina, increasing the reported death toll from 1,800 to what number?",
+   "answers": [
+    "The reported death toll decreased to 1,392"
+   ],
+   "need": null,
+   "stratum": "freshqa/false-premise",
+   "false_premise": true,
+   "effective_year": "2023",
+   "stale_risk": false
+  }
+ ]
+}

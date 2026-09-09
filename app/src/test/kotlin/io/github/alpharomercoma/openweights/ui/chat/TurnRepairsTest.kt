@@ -97,7 +97,8 @@ class TurnRepairsTest {
         // that is a lie with a citation. The claim is the decision; the app makes it true
         // and the answer is written from what the search actually returned.
         engine.scripted += ScriptedPass(
-            "Based on my search, Killua Zoldyck is a character in Naruto who fights Sasuke.",
+            "Based on my search, Killua Zoldyck is a character in Naruto who fights Sasuke. " +
+                "Let me know if you'd like more details!",
         )
         engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
 

@@ -108,7 +108,7 @@ def grade_row(row):
 
 def load(directory):
     runs = {}
-    for path in sorted(Path(directory).glob("decisions-*.jsonl")):
+    for path in sorted(Path(directory).glob("*decisions-*.jsonl")):
         header, rows = None, []
         for line in path.read_text().splitlines():
             if not line.strip():
@@ -125,7 +125,10 @@ def load(directory):
         by_id = {}
         for r in rows:
             by_id[r["id"]] = r
-        runs[(header["model"], header["arm"])] = (header, list(by_id.values()))
+        # The phone is the file's prefix (tensor-, exynos-, elite-, or none for the Poco),
+        # and the header says which chip that was.
+        header["phone"] = path.name.split("decisions-")[0].rstrip("-") or "poco"
+        runs[(header["phone"], header["model"], header["arm"])] = (header, list(by_id.values()))
     return runs
 
 
@@ -145,6 +148,7 @@ def summarize(header, rows):
     graded = [(r, x) for r, x in zip(rows, g) if x["correct"] is not None and not r.get("stale_risk")]
     stale = [(r, x) for r, x in zip(rows, g) if x["correct"] is not None and r.get("stale_risk")]
     return {
+        "phone": header["phone"], "soc": header.get("soc", ""),
         "model": header["model"], "arm": header["arm"], "runtime": header["runtime"],
         "quant": header["quant"], "tools": len(header["tools"]), "n": len(rows),
         "recall": pct(sum(x["searched"] for _, x in need), len(need)),
@@ -169,7 +173,7 @@ def summarize(header, rows):
 
 
 COLUMNS = [
-    ("model", "Model"), ("arm", "Arm"), ("tools", "Tools"), ("n", "Rows"),
+    ("phone", "Phone"), ("model", "Model"), ("arm", "Arm"), ("tools", "Tools"), ("n", "Rows"),
     ("recall", "Searched when needed"), ("model_recall", "Model called itself"),
     ("unnecessary", "Searched when not"), ("correct", "Correct"),
     ("correct_need", "Correct, needed"), ("correct_known", "Correct, known"),
@@ -189,25 +193,25 @@ def table(summaries):
 
 def strata(summaries_rows):
     """Per stratum, correct and searched, one line per model x arm."""
-    out = ["", "| Model | Arm | Stratum | Rows | Searched | Correct |", "|---|---|---|---|---|---|"]
-    for (model, arm), (header, rows) in summaries_rows.items():
+    out = ["", "| Phone | Model | Arm | Stratum | Rows | Searched | Correct |", "|---|---|---|---|---|---|---|"]
+    for (phone, model, arm), (header, rows) in summaries_rows.items():
         by = collections.defaultdict(list)
         for r in rows:
             by[r["stratum"]].append(grade_row(r))
         for stratum, g in sorted(by.items()):
             graded = [x for x in g if x["correct"] is not None]
-            out.append(f"| {model} | {arm} | {stratum} | {len(g)} | {pct(sum(x['searched'] for x in g), len(g))} | "
+            out.append(f"| {phone} | {model} | {arm} | {stratum} | {len(g)} | {pct(sum(x['searched'] for x in g), len(g))} | "
                        f"{pct(sum(x['correct'] for x in graded), len(graded))} |")
     return "\n".join(out)
 
 
 def paired(summaries, against):
     out = ["", f"Paired against `{against}` on the rows both answered: right where the other was wrong.", "",
-           "| Model | Arm | Both right | Only this arm | Only the other | Both wrong |", "|---|---|---|---|---|---|"]
+           "| Phone | Model | Arm | Both right | Only this arm | Only the other | Both wrong |", "|---|---|---|---|---|---|---|"]
     by_model = collections.defaultdict(dict)
     for s in summaries:
-        by_model[s["model"]][s["arm"]] = s["graded"]
-    for model, arms in by_model.items():
+        by_model[(s["phone"], s["model"])][s["arm"]] = s["graded"]
+    for (phone, model), arms in by_model.items():
         base = arms.get(against)
         if not base:
             continue
@@ -219,7 +223,7 @@ def paired(summaries, against):
             b = sum(1 for i in ids if graded[i]["correct"] and not base[i]["correct"])
             c = sum(1 for i in ids if not graded[i]["correct"] and base[i]["correct"])
             d = len(ids) - a - b - c
-            out.append(f"| {model} | {arm} | {a} | {b} | {c} | {d} |")
+            out.append(f"| {phone} | {model} | {arm} | {a} | {b} | {c} | {d} |")
     return "\n".join(out)
 
 
@@ -232,7 +236,7 @@ def echo(directory):
     for path in paths:
         rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
         system = None
-        header = Path(directory).glob("decisions-*.jsonl")
+        header = Path(directory).glob("*decisions-*.jsonl")
         for h in header:
             first = h.read_text().splitlines()[0]
             obj = json.loads(first)

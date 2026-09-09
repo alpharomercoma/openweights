@@ -143,6 +143,8 @@
     <string name="watch_failed">Stopped itself after %1$d failed checks</string>
     <string name="watch_every">Every %1$d minutes</string>
     <string name="watch_with_notification">, with a notification while it runs</string>
+    <string name="watch_exact_alarm_needed">The phone will not wake for a check under fifteen minutes until alarms and reminders are allowed for OpenWeights. Until then a check runs only when the phone happens to be awake.</string>
+    <string name="watch_exact_alarm_allow">Allow alarms and reminders</string>
     <string name="watch_expired">Finished on its own after %1$d checks</string>
     <string name="watch_progress"> · check %1$d of %2$d</string>
     <string name="watch_next_in"> · next in %1$s</string>

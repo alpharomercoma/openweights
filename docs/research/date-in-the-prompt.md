@@ -181,7 +181,24 @@ the app now puts the day first in the instructions when no tool is on and keeps 
 exchange when one is (`prefixMessages`, `withConversationDay`). The cost the head
 placement was moved away from, a re-read of the head at midnight, is a hundred tokens
 here rather than two thousand. Ranked on the host; `DateStructureProbe` gained a no-tools
-arm to decide it on the phone, which was unreachable the day this was measured.
+arm to decide it on the phone.
+
+The phone agreed later the same day (Poco, llama.cpp, the shipped reply sampler, sixteen
+greetings once each, `DateStructureProbe#compareTheShapesWithoutTools`):
+
+| shape, no tools    | LFM2 1.2B | Llama 3.2 3B | Qwen2.5 1.5B |
+| ---                | ---:      | ---:         | ---:         |
+| the old exchange   | 1/16      | 3/16         | 0/16         |
+| day last           | 4/16      | 3/16         | 3/16         |
+| **day first**      | **0/16**  | **0/16**     | 2/16         |
+| no date            | 0/16      | 0/16         | 0/16         |
+
+Day first is the floor on the two models that ship. Qwen is the one dissent, two bleeds
+against the exchange's none; it is not a default model. Every shape carrying the date
+answered "what is the date" correctly on every model (the probe's strict yes marks only
+the ISO form; the rest said "September 9, 2026"), and the no-date shape made one up on
+all three. One run per greeting on the phone against eight seeds on the host, so the small
+counts are the ranking, not the rate.
 
 ## Rules this leaves behind
 

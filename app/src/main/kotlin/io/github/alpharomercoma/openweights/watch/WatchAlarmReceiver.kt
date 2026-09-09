@@ -19,22 +19,17 @@ package io.github.alpharomercoma.openweights.watch
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 /**
  * The alarm's landing: hands the wake-up to [AlarmTickWait], which resumes the ticker.
  *
  * Nothing runs here. The receiver's hold on the CPU ends the moment `onReceive` returns,
  * and the check is a model turn; [AlarmTickWait.awake] takes its own wake lock for that.
+ * Not injected: the waiters are kept process-wide, so there is nothing to inject.
  */
-@AndroidEntryPoint
 class WatchAlarmReceiver : BroadcastReceiver() {
-    @Inject
-    lateinit var wait: AlarmTickWait
-
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmTickWait.ACTION_TICK) return
-        wait.fire(intent.getIntExtra(AlarmTickWait.EXTRA_CODE, -1))
+        AlarmTickWait.fire(intent.getIntExtra(AlarmTickWait.EXTRA_CODE, -1))
     }
 }

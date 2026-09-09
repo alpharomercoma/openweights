@@ -16,6 +16,11 @@
 
 package io.github.alpharomercoma.openweights.ui.watch
 
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,9 +55,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.content.getSystemService
 import io.github.alpharomercoma.openweights.R
 import io.github.alpharomercoma.openweights.core.common.context.Watch
 import io.github.alpharomercoma.openweights.core.common.context.WatchState
@@ -119,6 +126,9 @@ fun WatchScreen(
                 delay(SECOND_MS)
             }
         }
+        // Re-read on every tick of the screen's clock, so coming back from the settings
+        // page with the switch flipped takes the notice down within the second.
+        val wakesOnTime = exactAlarmsAllowed(now)
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
@@ -137,6 +147,9 @@ fun WatchScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
+            }
+            if (!wakesOnTime && watches.any { it.isActive && it.needsForegroundService }) {
+                item { ExactAlarmNotice() }
             }
 
             items(watches, key = { it.id }) { watch ->
@@ -189,6 +202,60 @@ private fun WatchRow(watch: Watch, now: Long, onStop: () -> Unit, onForget: () -
                 TextButton(onClick = onStop) { Text(stringResource(R.string.stop)) }
             }
             TextButton(onClick = onForget) { Text(stringResource(R.string.remove)) }
+        }
+    }
+}
+
+/**
+ * Whether the system will wake the phone at the moment a fast watch asks for.
+ *
+ * From Android 14 the answer starts as no for an app that is not an alarm clock, and only
+ * the person can change it, on a settings page. Without it a watch under fifteen minutes
+ * sleeps on an inexact alarm, which Doze batches and which HyperOS was measured holding for
+ * days, so the watch ticks whenever the phone happens to wake rather than when asked.
+ *
+ * [tick] is unused except to be read: the caller passes its clock so this is re-evaluated
+ * each second the screen is up rather than once per composition.
+ */
+@Composable
+private fun exactAlarmsAllowed(@Suppress("UNUSED_PARAMETER") tick: Long): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+    val alarms = LocalContext.current.getSystemService<AlarmManager>() ?: return true
+    return alarms.canScheduleExactAlarms()
+}
+
+/**
+ * The notice that the phone will not wake for a fast watch, and the one button that fixes it.
+ *
+ * A settings page rather than a dialog, because that is the only door Android offers for
+ * this permission. Shown only while a fast watch is active, since a person with no such
+ * watch has nothing to grant.
+ */
+@Composable
+private fun ExactAlarmNotice() {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.watch_exact_alarm_needed),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        TextButton(
+            onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.fromParts("package", context.packageName, null),
+                        ),
+                    )
+                }
+            },
+        ) {
+            Text(stringResource(R.string.watch_exact_alarm_allow))
         }
     }
 }

@@ -128,6 +128,8 @@
     <string name="watch_failed">Se detuvo sola tras %1$d comprobaciones fallidas</string>
     <string name="watch_every">Cada %1$d minutos</string>
     <string name="watch_with_notification">, con una notificación mientras se ejecuta</string>
+    <string name="watch_exact_alarm_needed">El teléfono no se despertará para una comprobación de menos de quince minutos hasta que se permitan alarmas y recordatorios para OpenWeights. Hasta entonces, una comprobación solo se ejecuta cuando el teléfono está despierto por casualidad.</string>
+    <string name="watch_exact_alarm_allow">Permitir alarmas y recordatorios</string>
     <string name="watch_expired">Terminó por su cuenta tras %1$d comprobaciones</string>
     <string name="watch_progress"> · comprobación %1$d de %2$d</string>
     <string name="watch_next_in"> · siguiente en %1$s</string>

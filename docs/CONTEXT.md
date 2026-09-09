@@ -3069,11 +3069,25 @@ pocket spends most of a five-minute period asleep, so the delay fired only once 
 been awake for five minutes in total, an hour or more of wall time, while the notification's
 countdown, drawn from the wall clock, ran past zero into negative numbers. That was "the
 monitor is broken". The ticker now sleeps on an `RTC_WAKEUP` alarm for the recorded deadline
-(`AlarmTickWait`), exact where the system still allows it and "while idle" otherwise, and
-holds a partial wake lock through the check so the phone does not go back to sleep between
-the first token and the last. Doze still batches inexact alarms into its maintenance
-windows, so a five-minute watch on a phone left alone ticks every ten or fifteen; the tick is
-stamped with when it ran and the next deadline set from there, so the countdown says so.
+(`AlarmTickWait`), a clock alarm where the person has allowed alarms and reminders and a
+"while idle" alarm otherwise, and holds a partial wake lock through the check so the phone
+does not go back to sleep between the first token and the last.
+
+Measured on the Poco (HyperOS on Android 16) the same evening with `WatchSleepProbe`, a
+two-minute delay against a two-minute alarm, screen off from the host:
+
+| wait                                    | returned          | phone asleep meanwhile |
+| ---                                     | ---:              | ---:                   |
+| coroutine delay                         | 26 min late       | 16 of 28 min           |
+| inexact while-idle alarm, no permission | never fired       | held for three days    |
+| clock alarm, permission granted         | 27 ms late        | yes, woke for it       |
+
+The inexact alarm sat in the alarm manager under a Xiaomi policy named `power_pending`
+that deferred it by 2d23h; the delay only returned when something thawed the frozen
+process. So the watch screen now shows a notice while a fast watch is active and exact
+alarms are not allowed, with the one button that opens the system page for it. Without the
+grant, a fast watch ticks whenever the phone happens to be awake, and the countdown says
+what the alarm manager will do rather than what was asked.
 
 ### The race, which was real
 

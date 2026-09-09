@@ -58,7 +58,7 @@ class AlarmTickWaitTest {
 
         // What the receiver does when the alarm lands.
         val code = shadowOf(alarm.operation).savedIntent.getIntExtra(AlarmTickWait.EXTRA_CODE, -1)
-        wait.fire(code)
+        AlarmTickWait.fire(code)
 
         assertThat(tick.await()).isEqualTo("ticked")
     }

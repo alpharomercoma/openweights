@@ -463,6 +463,11 @@ notes. What is left is the part that needs a person, a key, or a graphics tool.
   so nobody ever chose, and a phone running the standard build showed compiled models on
   the Hub screen that it could not download. The flavour dimension is gone; every build
   carries both runtimes.
+- **A fast Watch on a phone without the alarms-and-reminders grant ticks only when the
+  phone is awake.** Android 14+ denies exact alarms by default to an app that is not an
+  alarm clock, and the inexact kind is Doze's to batch and the vendor's to hold (HyperOS
+  held one three days). The watch screen shows the notice and the button; nothing else
+  in the app can grant it.
 - **A fast Watch restored on a background process start can run unprotected.**
   `OpenWeightsApplication.onCreate` calls `watches.sync()` on every process start
   (`OpenWeightsApplication.kt`), including one the system triggered in the background rather

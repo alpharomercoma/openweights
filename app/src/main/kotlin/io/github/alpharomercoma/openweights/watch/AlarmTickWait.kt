@@ -52,10 +52,6 @@ import kotlin.coroutines.resume
 class AlarmTickWait @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
 ) : TickWait {
-    /** Whoever is waiting, by the alarm's request code, so the receiver can wake them. */
-    private val waiting = mutableMapOf<Int, CancellableContinuation<Unit>>()
-    private val codes = AtomicInteger()
-
     override suspend fun <T> awake(dueAt: Long, periodMs: Long, block: suspend () -> T): T {
         val remaining = dueAt - System.currentTimeMillis()
         if (remaining > 0) {
@@ -97,7 +93,13 @@ class AlarmTickWait @Inject constructor(
         }
         runCatching {
             if (canBeExact(alarms)) {
-                alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueAt, pending)
+                // A clock alarm, not merely an exact one. Exact-while-idle is still Doze's
+                // to batch and the vendor's to hold: on HyperOS an inexact alarm from an
+                // app outside the battery whitelist sat under a "power_pending" policy that
+                // deferred it three days, and the phone's own clock alarms are the only
+                // kind it delivers on time. The person asked to be woken at this moment;
+                // this is the API for that, and the alarm icon it shows is honest.
+                alarms.setAlarmClock(AlarmManager.AlarmClockInfo(dueAt, null), pending)
             } else {
                 alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, dueAt, pending)
             }
@@ -108,16 +110,27 @@ class AlarmTickWait @Inject constructor(
         }
     }
 
-    /** Wakes the waiter an alarm was set for. Called by [WatchAlarmReceiver]. */
-    fun fire(code: Int) {
-        val cont = synchronized(waiting) { waiting.remove(code) } ?: return
-        if (cont.isActive) cont.resume(Unit)
-    }
-
     private fun canBeExact(alarms: AlarmManager): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()
 
     companion object {
+        /**
+         * Whoever is waiting, by the alarm's request code, so the receiver can wake them.
+         *
+         * Process-wide rather than per instance, because the receiver is the system's to
+         * construct and holds no reference to the instance that set the alarm. One registry
+         * means any instance's alarm wakes its own waiter, including one a probe built by
+         * hand outside the graph.
+         */
+        private val waiting = mutableMapOf<Int, CancellableContinuation<Unit>>()
+        private val codes = AtomicInteger()
+
+        /** Wakes the waiter an alarm was set for. Called by [WatchAlarmReceiver]. */
+        fun fire(code: Int) {
+            val cont = synchronized(waiting) { waiting.remove(code) } ?: return
+            if (cont.isActive) cont.resume(Unit)
+        }
+
         const val ACTION_TICK = "io.github.alpharomercoma.openweights.watch.TICK"
         const val EXTRA_CODE = "code"
         private const val WAKE_LOCK_TAG = "OpenWeights:watch"

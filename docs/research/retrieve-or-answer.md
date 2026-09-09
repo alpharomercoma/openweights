@@ -59,11 +59,15 @@ Italy. Here's a quick summary based on web search results"). And when it announc
 perform a web search to find the latest information...") and the loop hands the tool names
 back, it announces again, and the second announcement is what the user reads.
 
-The full catalogue (`driven-full`, first 34 rows) did not restore calling: five calls on
-answerable rows, none on rows that needed one, a median of 15.8 s a row against 3.7 and a
-time to first token of 12.7 s on 2,400 prompt tokens. All four reviewers read that the
-same way: the fresh-install change of 2026-09-08 did not cause the under-calling, and the
-literature predicts the direction (fewer tools, better selection). The full table is below.
+The full catalogue (`driven-full`) was read too early. Its first 34 rows, which are the
+sample's answerable rows, showed five calls and none needed, at a median of 15.8 s a row
+against 3.7, and all four reviewers read that as the fresh-install change of 2026-09-08
+not being the cause. The full 160 rows say otherwise on the calling and the same on the
+price: with sixteen definitions in the prompt the compiled model calls on 47 of 75 rows
+that need it, and on 27% of those that do not, at 14.9 s a turn with the first token at
+9.9 s, and scores 29% against 30 with the search alone. The catalogue does move the
+decision; what it moves it with is 2,400 tokens of prompt every turn. The table below has
+the rest.
 
 Two side measurements. The echo probe (six public-domain recitations, three models, the
 shipped instructions and none, no tools) found no reply quoting the instructions in

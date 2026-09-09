@@ -88,32 +88,25 @@ class TurnRunnerTest {
     }
 
     @Test
-    fun `a tool announced in prose buys a pass to call it properly`() = runBlocking<Unit> {
-        // Offered a tool and announcing it is a decision the model failed to write as a call.
-        // The app used to build the call itself, from the tool and the question. Measured
-        // across two device runs and six models, that never once improved a score and cost
-        // one twice, because what it caught was models mentioning a tool inside an answer
-        // they had already finished rather than models announcing one.
-        //
-        // So the names go back and the model gets a pass to try again, which is the same
-        // recovery without the app inventing arguments nobody asked for.
-        engine.scripted += ScriptedPass("Let me web_search that.")
-        engine.scripted += ScriptedPass(
-            "Looking.",
-            toolCalls = listOf(
-                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"ada"}"""),
-            ),
-        )
-        engine.scripted += ScriptedPass("Here is the answer.")
+    fun `a tool announced in prose is run by the app on the question as asked`() =
+        runBlocking<Unit> {
+            // Offered a tool and announcing it is a decision the model failed to write as a call.
+            // Until 2026-09-10 the names went back and the model got a pass to try again; the
+            // app building the call itself had been measured earlier across six models and
+            // never improved a score, because what that draft caught was tools mentioned
+            // inside finished answers. The announcement shape is what is caught now, and on
+            // 160 public rows the compiled LFM2.5 1.2B answered the push by announcing again
+            // every time, so the decision it said is carried out: one search, on the question
+            // as asked, and the model writes the answer from the results.
+            engine.scripted += ScriptedPass("Let me web_search that.")
+            engine.scripted += ScriptedPass("Here is the answer.")
 
-        run(withTools = true)
+            run(withTools = true)
 
-        val repair = engine.prompts[1].last()
-        assertThat(repair.role).isEqualTo(ChatRole.USER)
-        assertThat(repair.text).contains("web_search")
-        // And the pass bought a real call, which is the only reason to spend one.
-        assertThat(search.calls).hasSize(1)
-    }
+            assertThat(engine.prompts).hasSize(2)
+            assertThat(search.calls).hasSize(1)
+            assertThat(engine.prompts[1].none { it.text.contains("Let me web_search") }).isTrue()
+        }
 
     @Test
     fun `a model whose template drops tools is given them in the conversation`() =

@@ -120,7 +120,12 @@ def load(directory):
                 rows.append(obj)
         if header is None or not rows:
             continue
-        runs[(header["model"], header["arm"])] = (header, rows)
+        # A lab chunk rerun after a failed matrix appends its rows again; the last
+        # answer to each id is the one kept.
+        by_id = {}
+        for r in rows:
+            by_id[r["id"]] = r
+        runs[(header["model"], header["arm"])] = (header, list(by_id.values()))
     return runs
 
 
@@ -223,7 +228,7 @@ def echo(directory):
     if not paths:
         return ""
     out = ["", "Instruction echo: the longest run of words a recitation shares with the shipped instructions.", "",
-           "| Model | Prompt | Instructions | Chars | Longest shared run | Quotes instructions |", "|---|---|---|---|---|---|"]
+           "| Model | Prompt | Instructions | Tools | Calls | Chars | Longest shared run | Quotes instructions |", "|---|---|---|---|---|---|---|---|"]
     for path in paths:
         rows = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
         system = None
@@ -236,7 +241,8 @@ def echo(directory):
                 break
         for r in rows:
             run = longest_shared_run(r["answer"], system) if system else "n/a"
-            out.append(f"| {r['model']} | {r['id']} | {r['instructions']} | {r['chars']} | {run} | {bool(META.search(r['answer']))} |")
+            out.append(f"| {r['model']} | {r['id']} | {r['instructions']} | {r.get('tools', False)} | {len(r.get('calls', []))} | "
+                       f"{r['chars']} | {run} | {bool(META.search(r['answer']))} |")
     return "\n".join(out)
 
 

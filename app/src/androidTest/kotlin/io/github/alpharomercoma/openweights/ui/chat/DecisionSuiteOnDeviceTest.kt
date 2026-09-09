@@ -79,8 +79,8 @@ import java.security.MessageDigest
  * - `driven-full`: the model decides, holding the whole catalogue as every measurement
  *   before 2026-09-08 ran (fifteen stubs beside the real search, from the dump's own
  *   definitions, so the prompt bytes are the ones that catalogue produced).
- * - `first-search`, `first-full`: the app's search-before-the-first-pass route for a
- *   question that names somebody, over the same two tool sets.
+ * - `intent-search`, `intent-full`: the same, with the search the app makes when the
+ *   model announced one, claimed one or lamented and called nothing (`honoursIntent`).
  *
  * `driven-search` against `driven-full` on the same model is the maintainer's hypothesis
  * that the tool-list change caused the under-calling; the same pair on the compiled and
@@ -94,7 +94,7 @@ import java.security.MessageDigest
  *
  * ```
  * adb shell am instrument -w -r -e class io.github.alpharomercoma.openweights.ui.chat.DecisionSuiteOnDeviceTest#decisions \
- *   [-e models a.pte,b.gguf] [-e arms driven-search,driven-full] [-e sets retrievalqa,popqa] [-e rows 40] \
+ *   [-e models a.pte,b.gguf] [-e arms driven-search,driven-full] [-e sets retrievalqa,popqa] [-e from 40] [-e rows 40] \
  *   io.github.alpharomercoma.openweights.debug.test/androidx.test.runner.AndroidJUnitRunner
  * ```
  */
@@ -116,6 +116,9 @@ class DecisionSuiteOnDeviceTest {
         val arms = arguments.getString("arms")?.split(',')?.map { it.trim() } ?: ARMS
         val sets = arguments.getString("sets")?.split(',')?.map { it.trim() }?.toSet()
         val limit = arguments.getString("rows")?.toIntOrNull() ?: Int.MAX_VALUE
+        // A lab phone gets forty-five minutes a run, so the rows are cut into chunks:
+        // `from` skips the first N of the filtered rows and `rows` caps what follows.
+        val from = arguments.getString("from")?.toIntOrNull() ?: 0
         val models = wanted.map { EVAL_DIR.resolve(it) }.filter { it.isFile }
         val dump = EVAL_DIR.resolve("prompt_dump.json")
         val bench = EVAL_DIR.resolve("decisions.json")
@@ -127,7 +130,7 @@ class DecisionSuiteOnDeviceTest {
         val system = prompt.getString("system")
         val rows = JSONObject(bench.readText()).getJSONArray("rows").let { array ->
             (0 until array.length()).map { array.getJSONObject(it) }
-        }.filter { sets == null || it.getString("set") in sets }.take(limit)
+        }.filter { sets == null || it.getString("set") in sets }.drop(from).take(limit)
 
         val search = WebSearchTool(
             OkHttpClient(),
@@ -167,8 +170,11 @@ class DecisionSuiteOnDeviceTest {
                         AskBoard(),
                     )
                         .apply {
-                            notesSubject = true
-                            searchesForSubject = arm.startsWith("first-")
+                            // `driven-*` is the loop as it shipped until 2026-09-10 (note
+                            // and pushes only); `intent-*` adds the search the app makes
+                            // when the model says it will search, says it did, or says
+                            // it does not know, and calls nothing.
+                            honoursIntent = arm.startsWith("intent-")
                         }
                     val withTools = arm != "bare"
                     header(
@@ -241,8 +247,8 @@ class DecisionSuiteOnDeviceTest {
      * which reproduces distinctive phrases from the system prompt and stops when the
      * prompt is empty; or a refusal to reproduce a text, which produces refusal language
      * under either prompt. Six public-domain recitations, each under the shipped
-     * instructions and under no instructions, no tools; the grader measures the longest
-     * run of words each reply shares with the instructions.
+     * instructions and under none, each with the search on offer and without; the grader
+     * measures the longest run of words each reply shares with the instructions.
      */
     @Test
     fun instructionEcho(): Unit = runBlocking {
@@ -256,61 +262,83 @@ class DecisionSuiteOnDeviceTest {
         )
         val system = JSONObject(dump.readText()).getString("system")
         val results = resultsDir()
+        val search = WebSearchTool(
+            OkHttpClient(),
+            SearchSettings(app, SecretSealer.Unavailable),
+            AndroidReachability(app),
+        )
         for (model in models) {
             val engine = engineFor(model)
             try {
                 engine.load(model, ModelLoadParams(contextLength = CONTEXT))
                 val out = results.resolve("echo-${model.nameWithoutExtension}.jsonl")
-                val runner =
-                    TurnRunner(
-                        engine,
-                        ToolRegistry(emptyList()),
-                        ToolSwitches(own),
-                        PlanBoard(),
-                        AskBoard(),
-                    )
+                val runner = TurnRunner(
+                    engine,
+                    ToolRegistry(listOf(search)),
+                    ToolSwitches(own),
+                    PlanBoard(),
+                    AskBoard(),
+                )
+                    .apply { honoursIntent = false }
                 for ((id, question) in RECITATIONS) {
+                    // With and without the instructions, and with and without the search on
+                    // offer: the first run of this probe, instructions only, found no echo in
+                    // thirty-six replies, and the screenshot that started it had web search
+                    // switched on, so the tool block in the prompt is the other suspect.
                     for (instructions in listOf("shipped", "none")) {
-                        val listener = Recording()
-                        val started = System.currentTimeMillis()
-                        val conversation = buildList {
-                            if (instructions ==
-                                "shipped"
-                            ) {
-                                add(ChatMessage.text(ChatRole.SYSTEM, system))
+                        for (withTools in listOf(false, true)) {
+                            val listener = Recording()
+                            val started = System.currentTimeMillis()
+                            val conversation = buildList {
+                                if (instructions ==
+                                    "shipped"
+                                ) {
+                                    add(ChatMessage.text(ChatRole.SYSTEM, system))
+                                }
+                                addAll(PromptDay.exchange())
+                                add(ChatMessage.text(ChatRole.USER, question))
                             }
-                            addAll(PromptDay.exchange())
-                            add(ChatMessage.text(ChatRole.USER, question))
-                        }
-                        val raw = runCatching {
-                            runner.run(
-                                conversation,
-                                PARAMS,
-                                AgentMode.AUTO,
-                                withTools = false,
-                                ToolNotes(),
-                                listener,
-                                question = question,
+                            val raw = runCatching {
+                                runner.run(
+                                    conversation,
+                                    PARAMS,
+                                    AgentMode.AUTO,
+                                    withTools,
+                                    ToolNotes(),
+                                    listener,
+                                    question = question,
+                                )
+                            }.getOrElse { "ERROR ${it.javaClass.simpleName}: ${it.message}" }
+                            val answer = parseAssistantReply(raw).answer.trim()
+                            val calls = listener.steps.filterIsInstance<AgentStep.Ran>().map {
+                                it.call.name
+                            }
+                            out.appendText(
+                                JSONObject()
+                                    .put(
+                                        "id",
+                                        id,
+                                    ).put("instructions", instructions).put("tools", withTools)
+                                    .put("question", question)
+                                    .put("model", model.name).put("runtime", engine.runtimeName())
+                                    .put("ms", System.currentTimeMillis() - started)
+                                    .put(
+                                        "passes",
+                                        listener.passes.size,
+                                    ).put("calls", JSONArray(calls))
+                                    .put(
+                                        "chars",
+                                        answer.length,
+                                    ).put("answer", answer).put("raw", raw)
+                                    .put("system_sha1", sha1(system))
+                                    .toString() + "\n",
                             )
-                        }.getOrElse { "ERROR ${it.javaClass.simpleName}: ${it.message}" }
-                        val answer = parseAssistantReply(raw).answer.trim()
-                        out.appendText(
-                            JSONObject()
-                                .put(
-                                    "id",
-                                    id,
-                                ).put("instructions", instructions).put("question", question)
-                                .put("model", model.name).put("runtime", engine.runtimeName())
-                                .put("ms", System.currentTimeMillis() - started)
-                                .put("chars", answer.length).put("answer", answer).put("raw", raw)
-                                .put("system_sha1", sha1(system))
-                                .toString() + "\n",
-                        )
-                        Log.i(
-                            TAG,
-                            "ECHO model=${model.name} id=$id instructions=$instructions chars=${answer.length}",
-                        )
-                        engine.resetContext()
+                            Log.i(
+                                TAG,
+                                "ECHO model=${model.name} id=$id instructions=$instructions tools=$withTools calls=${calls.size} chars=${answer.length}",
+                            )
+                            engine.resetContext()
+                        }
                     }
                 }
             } finally {
@@ -504,7 +532,7 @@ class DecisionSuiteOnDeviceTest {
         const val TAG = "DecisionSuite"
         const val CONTEXT = 4096
         const val RESULT_CHARS = 1500
-        const val HOST_SEARCH_ID = "named-subject"
+        const val HOST_SEARCH_ID = "app-search"
         val EVAL_DIR = File("/data/local/tmp/openweights/eval")
 
         val MODELS = listOf(
@@ -513,8 +541,8 @@ class DecisionSuiteOnDeviceTest {
             "Qwen3-1.7B-Q8_0.gguf",
         )
 
-        // The 2 x 2 the reviewers asked for first, then the route, then the baseline.
-        val ARMS = listOf("driven-search", "driven-full", "first-search", "bare")
+        // The 2 x 2 the reviewers asked for first, then the fix, then the baseline.
+        val ARMS = listOf("driven-search", "driven-full", "intent-search", "intent-full", "bare")
 
         // Greedy and thinking off, as the routing work and the public benchmarks ran.
         val PARAMS =

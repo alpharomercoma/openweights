@@ -68,34 +68,76 @@ class TurnRepairsTest {
     }
 
     @Test
-    fun `a who-is question is searched by the app before the model writes a word`() =
+    fun `a search the model announces and does not make is made by the app`() = runBlocking<Unit> {
+        // The phone, 2026-09-10: the compiled LFM2.5 1.2B announced a search on "who
+        // is alpha romer coma" three turns running and never wrote the call, before
+        // and after the push that hands the tool names back. The decision was made
+        // and said; the app carries it out, on the question as asked, and the model
+        // answers next pass with the results in front of it.
+        engine.scripted += ScriptedPass("Let me look up who that is using a web search.")
+        engine.scripted += ScriptedPass("Killua Zoldyck is a character from Hunter x Hunter.")
+
+        val reply = answering("who is killua zoldyck", withTools = true)
+
+        assertThat(engine.prompts).hasSize(2)
+        val prompt = engine.prompts[1]
+        assertThat(prompt.last().role).isEqualTo(ChatRole.TOOL)
+        assertThat(prompt.last().text).contains("Hunter x Hunter")
+        // The asking turn is the app's one neutral line; the announcement is gone.
+        val asking = prompt.last { it.role == ChatRole.ASSISTANT }
+        assertThat(asking.text).isEqualTo("Searching the web for: who is killua zoldyck")
+        assertThat(prompt.none { it.text.contains("Let me look up") }).isTrue()
+        assertThat(reply).contains("Hunter x Hunter")
+    }
+
+    @Test
+    fun `a search the model claims to have made is made real`() = runBlocking<Unit> {
+        // One reply in five on 160 public rows, from the same model: "Based on my search,
+        // the screenwriter was Miguel Aznar", with no search made. Shown as the answer,
+        // that is a lie with a citation. The claim is the decision; the app makes it true
+        // and the answer is written from what the search actually returned.
+        engine.scripted += ScriptedPass(
+            "Based on my search, Killua Zoldyck is a character in Naruto who fights Sasuke.",
+        )
+        engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
+
+        val reply = answering("who is killua zoldyck", withTools = true)
+
+        assertThat(engine.prompts).hasSize(2)
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+        assertThat(engine.prompts[1].none { it.text.contains("Naruto") }).isTrue()
+        assertThat(reply).contains("Hunter x Hunter")
+    }
+
+    @Test
+    fun `a lament about not knowing somebody is searched, not pushed`() = runBlocking<Unit> {
+        engine.scripted += ScriptedPass("I don't have enough information about Killua Zoldyck.")
+        engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
+
+        val reply = answering("who is killua zoldyck", withTools = true)
+
+        assertThat(engine.prompts).hasSize(2)
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+        assertThat(reply).contains("Hunter x Hunter")
+    }
+
+    @Test
+    fun `the app searches once a turn, and a model that announces twice is shown its second`() =
         runBlocking<Unit> {
-            // The phone, 2026-09-10: LFM2.5 1.2B on ExecuTorch made no call in sixteen
-            // passes on "who is alpha romer coma", with the note, without it, and after the
-            // push, and what it wrote instead was a biography of somebody else. So the app
-            // searches first: one pass, with the results already in the prompt.
-            engine.scripted += ScriptedPass("Killua Zoldyck is a character from Hunter x Hunter.")
+            // One allowance, like every repair: a model handed real results that announces
+            // again is going to announce a third time, and the phone should not pay to
+            // find out.
+            engine.scripted += ScriptedPass("Let me look up who that is.")
+            engine.scripted += ScriptedPass("I'll search for that now.")
 
             val reply = answering("who is killua zoldyck", withTools = true)
 
-            assertThat(engine.prompts).hasSize(1)
-            val prompt = engine.prompts.single()
-            assertThat(prompt.last().role).isEqualTo(ChatRole.TOOL)
-            assertThat(prompt.last().text).contains("Hunter x Hunter")
-            // The asking turn is the app's one neutral line, not anything the model wrote.
-            val asking = prompt.last { it.role == ChatRole.ASSISTANT }
-            assertThat(asking.text).isEqualTo("Searching the web for killua zoldyck.")
-            // And the note that asked the model to search is not on a question already searched.
-            assertThat(
-                prompt.first {
-                    it.role == ChatRole.USER
-                }.text,
-            ).doesNotContain("names killua")
-            assertThat(reply).contains("Hunter x Hunter")
+            assertThat(engine.prompts).hasSize(2)
+            assertThat(reply).isEqualTo("I'll search for that now.")
         }
 
     @Test
-    fun `the app searches once, and not for a question that names nobody`() = runBlocking<Unit> {
+    fun `the app searches nothing for an answer that answers`() = runBlocking<Unit> {
         engine.scripted += ScriptedPass("It is four.")
 
         val reply = answering("what is 2 + 2", withTools = true)
@@ -106,25 +148,11 @@ class TurnRepairsTest {
     }
 
     @Test
-    fun `a model that would have called reads the results instead, one pass not two`() =
-        runBlocking<Unit> {
-            // Qwen3 called web_search itself on ten of ten named questions, at two passes a
-            // turn and twenty to thirty seconds each on the phone. With the search made
-            // first it answers in one.
-            engine.scripted += ScriptedPass("Killua is from Hunter x Hunter.")
-
-            answering("who is killua", withTools = true)
-
-            assertThat(engine.prompts).hasSize(1)
-            assertThat(engine.prompts.single().count { it.role == ChatRole.TOOL }).isEqualTo(1)
-        }
-
-    @Test
-    fun `a search that fails puts the note back and the model answers as before`() =
+    fun `a search that fails falls through to the push, and the model answers as before`() =
         runBlocking<Unit> {
             // Offline, or rate limited: the tool ran and did not get there. Its failure
-            // text is not evidence, so it is not handed to the model as results; the note
-            // goes on the question instead, and the loop is the one that shipped before.
+            // text is not evidence, so it is not handed to the model as results; the
+            // announcement takes the push it always took.
             val failing = object : Tool {
                 override val defaultsOn: Boolean = true
                 override val definition = search.definition
@@ -134,15 +162,118 @@ class TurnRepairsTest {
                 override suspend fun execute(call: ToolCall): ToolExecution =
                     ToolExecution.failure("The device may be offline.")
             }
+            engine.scripted += ScriptedPass("Let me look up who that is.")
             engine.scripted += ScriptedPass("Killua is a character in Naruto.")
 
             answering("who is killua", withTools = true, tool = failing)
 
-            assertThat(engine.prompts).hasSize(1)
-            val prompt = engine.prompts.single()
-            assertThat(prompt.none { it.role == ChatRole.TOOL }).isTrue()
-            assertThat(prompt.last { it.role == ChatRole.USER }.text).contains("names killua")
+            assertThat(engine.prompts).hasSize(2)
+            assertThat(engine.prompts[1].none { it.role == ChatRole.TOOL }).isTrue()
+            assertThat(engine.prompts[1].last().text).contains("web_search")
         }
+
+    @Test
+    fun `a claim after a real search is the model reading its results, not a second search`() =
+        runBlocking<Unit> {
+            engine.scripted += ScriptedPass(
+                "Looking.",
+                toolCalls = listOf(
+                    ToolCall(
+                        id = "1",
+                        name = "web_search",
+                        argumentsJson = """{"query":"killua"}""",
+                    ),
+                ),
+            )
+            engine.scripted +=
+                ScriptedPass("Based on the search results, Killua is from Hunter x Hunter.")
+
+            val reply = answering("who is killua zoldyck", withTools = true)
+
+            assertThat(engine.prompts).hasSize(2)
+            assertThat(reply).contains("Based on the search results")
+        }
+
+    @Test
+    fun `answers that talk about searching without claiming one are left standing`() =
+        runBlocking<Unit> {
+            // The false positives two reviewers found against a looser matcher: an answer
+            // about search engines, a summary of somebody else's search, a question to the
+            // user, a withdrawn announcement, and a question about research.
+            val cases = listOf(
+                "how does elasticsearch rank pages" to
+                    "Elasticsearch scores documents with BM25. The search results are ordered by score.",
+                "summarise what the police found in this report: " + "x".repeat(500) to
+                    "The search reveals no evidence of foul play, according to the report.",
+                "who is killua" to "Should I look that up for you?",
+                "who is killua" to
+                    "Don't let me look that up; you already know he is from Hunter x Hunter.",
+                "what did this research conclude" to
+                    "Based on the search strategy described, the review excluded preprints.",
+            )
+            for ((question, answer) in cases) {
+                engine.scripted.clear()
+                engine.prompts.clear()
+                engine.scripted += ScriptedPass(answer)
+
+                val reply = answering(question, withTools = true)
+
+                assertThat(engine.prompts).hasSize(1)
+                assertThat(reply).isEqualTo(answer)
+            }
+        }
+
+    @Test
+    fun `nothing of the user's own is searched on the app's initiative`() = runBlocking<Unit> {
+        engine.scripted += ScriptedPass("I don't have that information.")
+
+        val reply = answering("what is my wifi password", withTools = true)
+
+        assertThat(engine.prompts.flatten().none { it.role == ChatRole.TOOL }).isTrue()
+        assertThat(reply).isNotEmpty()
+    }
+
+    @Test
+    fun `the query is the question with its wrapping taken off`() {
+        val none = emptyList<ChatMessage>()
+        assertThat(
+            searchQuery("Can you quickly check who directed The Last Word for me please?", none),
+        )
+            .isEqualTo("who directed The Last Word")
+        assertThat(searchQuery("who is killua zoldyck?", none)).isEqualTo("who is killua zoldyck")
+        // A pronoun-only follow-up carries the previous question's subject.
+        val earlier = listOf(
+            ChatMessage.text(ChatRole.USER, "Who founded Anthropic?"),
+            ChatMessage.text(ChatRole.ASSISTANT, "Dario Amodei and others."),
+            ChatMessage.text(ChatRole.USER, "Where did he work before?"),
+        )
+        assertThat(searchQuery("Where did he work before?", earlier))
+            .isEqualTo("Who founded Anthropic Where did he work before")
+        // A long message keeps its last question and nothing sent is longer than a search box takes.
+        val long = "I'm preparing a quiz for my class tomorrow and I want to be sure about the " +
+            "details of a few films before I print the sheets, so could you please tell me " +
+            "who directed The Last Word?"
+        assertThat(searchQuery(long, none)).isEqualTo("who directed The Last Word")
+    }
+
+    @Test
+    fun `with the switch off, the announcement takes the push it used to`() = runBlocking<Unit> {
+        // The baseline arm of the on-device decision suite, so what the app's search buys
+        // can be priced against the same model on the same phone.
+        engine.scripted += ScriptedPass("Let me look up who that is.")
+        engine.scripted += ScriptedPass(
+            "Looking.",
+            toolCalls = listOf(
+                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
+            ),
+        )
+        engine.scripted += ScriptedPass("Here is the answer.")
+
+        answering("who is killua", withTools = true, honours = false)
+
+        assertThat(engine.prompts[1].last().text).contains("web_search")
+        assertThat(engine.prompts).hasSize(3)
+    }
 
     @Test
     fun `a tool announced by its spoken name is still an announcement`() = runBlocking<Unit> {
@@ -153,22 +284,13 @@ class TurnRepairsTest {
             "Let me look up information about alpha romer coma using a web search so I can " +
                 "provide an accurate answer.",
         )
-        engine.scripted += ScriptedPass(
-            "Looking.",
-            toolCalls = listOf(
-                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"alpha"}"""),
-            ),
-        )
         engine.scripted += ScriptedPass("Alpha Romer Coma is a developer.")
 
         val reply = answering("what changed in android 16", withTools = true)
 
-        // A pass was spent handing the names back, the call it bought ran, and the answer
-        // the user sees is the one written after it.
-        val repair = engine.prompts[1].last()
-        assertThat(repair.role).isEqualTo(ChatRole.USER)
-        assertThat(repair.text).contains("web_search")
-        assertThat(engine.prompts).hasSize(3)
+        // Recognised as the decision it is, and carried out.
+        assertThat(engine.prompts).hasSize(2)
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
         assertThat(reply).contains("developer")
     }
 
@@ -179,18 +301,12 @@ class TurnRepairsTest {
             // web_search is on offer; the test is first person and forward-looking, so
             // "I looked it up" and "you could look it up" are not this.
             engine.scripted += ScriptedPass("Let me look up who that is.")
-            engine.scripted += ScriptedPass(
-                "Looking.",
-                toolCalls = listOf(
-                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"x"}"""),
-                ),
-            )
             engine.scripted += ScriptedPass("Here is the answer.")
 
             answering("what changed in android 16", withTools = true)
 
-            assertThat(engine.prompts[1].last().text).contains("web_search")
-            assertThat(engine.prompts).hasSize(3)
+            assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+            assertThat(engine.prompts).hasSize(2)
         }
 
     @Test
@@ -219,31 +335,21 @@ class TurnRepairsTest {
     }
 
     @Test
-    fun `a second announcement after the repair is shown, not repaired again`() =
+    fun `a finished answer that says it looked something up is a claim, and is made true`() =
         runBlocking<Unit> {
-            // One allowance a turn, like every repair: a model that announces twice is
-            // going to announce a third time, and the phone should not pay to find out.
-            engine.scripted += ScriptedPass("Let me look up who that is.")
-            engine.scripted += ScriptedPass("I'll search for that now.")
-
-            val reply = answering("what changed in android 16", withTools = true)
-
-            assertThat(engine.prompts).hasSize(2)
-            assertThat(reply).isEqualTo("I'll search for that now.")
-        }
-
-    @Test
-    fun `a finished answer that says it looked something up is not an announcement`() =
-        runBlocking<Unit> {
+            // Not an announcement: past tense, nothing to hand back. But no search ran,
+            // so "I looked it up" reports a search that never happened, and the app
+            // makes it one rather than show the claim.
             engine.scripted += ScriptedPass(
                 "I looked it up: Alpha Romer Coma is a developer who publishes open-source " +
                     "Android work. You could look up the repository for the full history.",
             )
+            engine.scripted += ScriptedPass("Alpha Romer Coma is a developer of OpenWeights.")
 
             val reply = answering("what changed in android 16", withTools = true)
 
-            assertThat(engine.prompts).hasSize(1)
-            assertThat(reply).contains("developer")
+            assertThat(engine.prompts).hasSize(2)
+            assertThat(reply).contains("OpenWeights")
         }
 
     @Test
@@ -311,8 +417,7 @@ class TurnRepairsTest {
     fun `a question naming somebody carries a note to look the name up`() = runBlocking {
         engine.scripted += ScriptedPass("Killua is a character in Naruto.")
 
-        // With the app's own search off, which is the loop as it shipped until 2026-09-10.
-        answering("Who is Killua?", withTools = true, searchesFirst = false)
+        answering("Who is Killua?", withTools = true)
 
         val sent = engine.prompts.single().last { it.role == ChatRole.USER }.text
         assertThat(sent).startsWith("Who is Killua?")
@@ -362,7 +467,7 @@ class TurnRepairsTest {
         question: String,
         withTools: Boolean,
         mode: AgentMode = AgentMode.AUTO,
-        searchesFirst: Boolean = true,
+        honours: Boolean = true,
         tool: Tool = search,
     ): String {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
@@ -374,7 +479,7 @@ class TurnRepairsTest {
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = plans,
             asks = asks,
-        ).apply { searchesForSubject = searchesFirst }
+        ).apply { honoursIntent = honours }
         return runner.run(
             conversation = listOf(ChatMessage.text(ChatRole.USER, question)),
             params = SamplerParams(),

@@ -185,7 +185,7 @@
     <string name="model_attachment_unsupported">Este modelo no puede leer %1$s. Puede leer %2$s.</string>
     <string name="model_delete_loaded">%1$s está cargado. Descárgalo del selector y luego elimínalo.</string>
     <string name="model_delete_failed">No se pudo eliminar %1$s. Inténtalo de nuevo.</string>
-    <string name="tool_search_name">Buscar en la web</string><string name="tool_search_detail">Busca información reciente o desconocida. Una pregunta que nombra a alguien se busca antes de responder, y la búsqueda se muestra.</string>
+    <string name="tool_search_name">Buscar en la web</string><string name="tool_search_detail">Busca información reciente o desconocida. Cuando el modelo dice que va a buscar algo y no lo hace, la app realiza esa búsqueda y la muestra.</string>
     <string name="tool_page_name">Abrir una página</string><string name="tool_page_detail">Lee el texto de una página pública.</string>
     <string name="tool_find_file_name">Buscar un archivo</string><string name="tool_find_file_detail">Busca en la carpeta compartida.</string>
     <string name="tool_read_file_name">Leer un archivo</string><string name="tool_read_file_detail">Abre un archivo de esa carpeta.</string>

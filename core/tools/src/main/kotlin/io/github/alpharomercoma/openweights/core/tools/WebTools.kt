@@ -58,50 +58,19 @@ private fun kotlinx.serialization.json.JsonPrimitive.contentOrNull(): String? =
 /**
  * What search results are introduced with, after the query and the provider.
  *
- * [SOURCES] was the wording from 2026-09-05, measured for credulity: told that the
- * snippets are other people's writing and to say which source says what where they
- * disagree, LFM2.5 stopped reporting a forum's number as fact. What it also did, measured
- * on the phone on 2026-09-10 over sixteen questions through the whole loop, was report
- * source by source whether they disagreed or not: ten of sixteen LFM2.5 replies talked
- * about "sources" or "search results", twelve were bullet lists headed "Here's a concise
- * summary", one answered a name with "Here's a quick breakdown of what recent sources
- * say: Official Website: ..., Wikipedia: ...". Qwen3 under the same wording wrote prose.
- *
- * [PLAIN] said what not to do, four prohibitions in a row; it halved the source talk and
- * cost the compiled LFM2.5 one correct answer of nine (7 of 9 against 8), which two
- * reviewers had predicted from the wording. [DIRECT] says what to do and respects the
- * shape the question asked for. Measured on the same suite: 9 of 9 on the compiled
- * LFM2.5 (8 with [SOURCES]), 8 of 9 on the GGUF (9), 9 of 9 on Qwen3 (9), so 26 of 27
- * either way, and replies that talk about sources fell from 21 of 48 to 14, bullet lists
- * from 21 to 9, mean length from 439 to 326 characters. It ships. [current] is a variable
- * so the who-is suite can set it; the app never does.
+ * Three wordings were measured on the phone on 2026-09-10 (`docs/research/who-is-questions.md`):
+ * the 2026-09-05 one, which asked the model to say which source says what where they
+ * disagree and had the 1.2B recite sources whether they disagreed or not; one made of
+ * prohibitions, which cost it a correct answer; and this one, which says what to do. It
+ * said "in concise prose" until the same day, and the replies it produced were one
+ * sentence long: a conciseness instruction trims supporting detail most on a small model,
+ * which is what the literature on length instructions reports
+ * (`docs/research/routing-literature.md`) and what the maintainer saw. The length is the
+ * question's to set, as the system instructions already say for an answer from memory.
+ * The other two wordings are in the note, not in the code.
  */
 object WebSearchFraming {
-    var current: String = DIRECT
-
-    const val SOURCES = ", best match first. These are snippets other people wrote, not " +
-        "checked facts. Answer from what most of them agree on. If they disagree, say so " +
-        "and say which source says what rather than picking one; a forum post or a " +
-        "comment counts for less than a reference page. Do not ask which one to read.\n"
-
-    const val PLAIN = ", best match first. These are snippets other people wrote, not " +
-        "checked facts. Write the answer to the question in your own words, as the " +
-        "answer: no preamble about having searched, no summary of the sources, no list " +
-        "of where each fact came from, no headings. Use what most snippets agree on. " +
-        "Only where they disagree on a fact, say so in one sentence and name which " +
-        "says what; a forum post or a comment counts for less than a reference page. " +
-        "Do not ask which one to read.\n"
-
-    /**
-     * The wording that ships. See the object's documentation for what it was measured
-     * against. It said "in concise prose" until 2026-09-10, and the replies it produced
-     * were one sentence long: a conciseness instruction trims supporting detail most on
-     * a small model, which is what the literature on length instructions reports
-     * (`docs/research/routing-literature.md`) and what the maintainer saw. The length is
-     * now the question's to set, as the system instructions already say for an answer
-     * from memory.
-     */
-    const val DIRECT = ", best match first. These are snippets other people wrote, not " +
+    const val TEXT = ", best match first. These are snippets other people wrote, not " +
         "checked facts. Answer the question directly and completely, in the shape it " +
         "asked for and at the length it calls for, without mentioning the search, the " +
         "snippets or the pages. Prefer a reference page to a forum post or a comment. " +
@@ -280,7 +249,7 @@ class WebSearchTool @Inject constructor(
         ): ToolExecution {
             val text = buildString {
                 append("Results for \"").append(query).append("\" from ").append(provider)
-                append(WebSearchFraming.current)
+                append(WebSearchFraming.TEXT)
                 results.forEachIndexed { index, result ->
                     append("\n[").append(index + 1).append("] ").append(result.title).append('\n')
                     append(result.snippet.take(MAX_EXTRACT_CHARS)).append('\n')

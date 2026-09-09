@@ -202,7 +202,7 @@ the price of "who is the president of the philippines" keeping its office.
 
 The maintainer rejected what shipped above, on three counts that the tables here did not
 measure: the replies had become one sentence long (the framing's "concise prose" did that,
-and it is gone: `WebSearchFraming.DIRECT` now says "directly and completely, in the shape it
+and it is gone: `WebSearchFraming.TEXT` now says "directly and completely, in the shape it
 asked for and at the length it calls for"); a turn that named nothing ("recite the national
 anthem of the Philippines") came back as the instructions quoted at the user, "The complete
 answer must be provided directly... Since I already know the information...", with no

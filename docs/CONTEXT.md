@@ -283,7 +283,7 @@ first pass (the model then defended its own fabricated biography over the result
 result framing made of prohibitions (halves the "Here's a summary of what sources say"
 shape, costs a correct answer). A positive framing ("answer the question directly, in the
 shape it asked for ... without mentioning the search") kept 26 of 27 and cut the source
-recitals from 21 of 48 replies to 14, and ships as `WebSearchFraming.DIRECT`. Three rounds of Codex and Gemini review shaped the detector's guards
+recitals from 21 of 48 replies to 14, and shipped as `WebSearchFraming.DIRECT` (now the single `TEXT`, without "concise"). Three rounds of Codex and Gemini review shaped the detector's guards
 (pronouns, possessives anywhere, expressions), the failed-search fallback, and the Tools
 screen sentence saying the search happens. Full tables: `docs/research/who-is-questions.md`.
 

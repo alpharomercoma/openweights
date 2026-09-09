@@ -3063,6 +3063,18 @@ The second is the honest trade rather than a workaround: the user asked to be wo
 than the system wakes anyone, and the notification is what pays for it and what they cancel
 it from. A scheduled job is registered alongside as a backstop for a process that dies.
 
+Alive is not awake (2026-09-09). The ticker first slept with a coroutine `delay`, which
+counts on the monotonic clock, and Android stops that clock in deep sleep. A phone in a
+pocket spends most of a five-minute period asleep, so the delay fired only once the CPU had
+been awake for five minutes in total, an hour or more of wall time, while the notification's
+countdown, drawn from the wall clock, ran past zero into negative numbers. That was "the
+monitor is broken". The ticker now sleeps on an `RTC_WAKEUP` alarm for the recorded deadline
+(`AlarmTickWait`), exact where the system still allows it and "while idle" otherwise, and
+holds a partial wake lock through the check so the phone does not go back to sleep between
+the first token and the last. Doze still batches inexact alarms into its maintenance
+windows, so a five-minute watch on a phone left alone ticks every ten or fifteen; the tick is
+stamped with when it ran and the next deadline set from there, so the countdown says so.
+
 ### The race, which was real
 
 The engine holds one model and one KV cache, so two turns at once is not slow, it is wrong:

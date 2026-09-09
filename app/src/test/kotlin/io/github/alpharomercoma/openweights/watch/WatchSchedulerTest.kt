@@ -138,6 +138,14 @@ class WatchSchedulerTest {
         watches = watches,
         runner = javax.inject.Provider { runner },
         scope = scope,
+        // A plain delay on the test's virtual clock. The alarm the app uses is the fix for a
+        // clock that stops in deep sleep, which a TestScope's clock never does.
+        wait = object : TickWait {
+            override suspend fun <T> awake(dueAt: Long, periodMs: Long, block: suspend () -> T): T {
+                kotlinx.coroutines.delay(periodMs)
+                return block()
+            }
+        },
     )
 
     /**

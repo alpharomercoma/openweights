@@ -91,6 +91,9 @@ one found. Now:
 - A tick ahead of its deadline does nothing, which stops the WorkManager backstop
   double-running fast watches; the in-process ticker stamps its ticks with the
   deadline it slept toward, so a coarse timer cannot make its own tick look early.
+- The ticker sleeps on a wake-up alarm and holds a wake lock through the check
+  (2026-09-09). Its `delay` had stopped counting whenever the phone slept, so a
+  screen-off watch did not tick and its countdown ran negative.
 
 Known remaining gaps, deliberate: no manual watch creation (the model's `watch`
 tool is the only door), no per-watch model choice, no quiet hours, and the

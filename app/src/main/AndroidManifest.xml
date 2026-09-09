@@ -29,6 +29,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!--
+        A watch under fifteen minutes sleeps on an alarm and holds the CPU through its check.
+        A coroutine delay stops counting while the phone is in deep sleep, so without these
+        a screen-off watch never ticked and its countdown ran into negative numbers. Exact
+        alarms are used only where the system still allows them; see AlarmTickWait.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
          RECORD_AUDIO makes Play assume the app requires a microphone, which would hide it
          from every device without one. Dictation is one optional way to enter text, so the
          app runs perfectly well on a device that cannot record.
@@ -124,6 +133,10 @@
              asked for, once or on a schedule they set, has to be allowed to finish when
              they put the phone down.
         -->
+        <receiver
+            android:name=".watch.WatchAlarmReceiver"
+            android:exported="false" />
+
         <service
             android:name=".runtime.GenerationService"
             android:exported="false"

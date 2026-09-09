@@ -34,7 +34,6 @@ import io.github.alpharomercoma.openweights.runtime.GenerationService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -57,7 +56,9 @@ import javax.inject.Singleton
  * So a watch at fifteen minutes or more is scheduled work and nothing is held open. A watch
  * under fifteen runs on a ticker inside the process, and the process is kept alive by the
  * same foreground service a goal uses, because a cached process is frozen and a frozen ticker
- * does not tick. That has a visible notification attached, which is the honest trade: the
+ * does not tick. Alive is not awake, though: the ticker sleeps on an alarm rather than a
+ * `delay`, because a sleeping phone stops the clock a `delay` counts on (see [TickWait]).
+ * That has a visible notification attached, which is the honest trade: the
  * user asked to be woken sooner than the system wakes anyone, and the notification is what
  * pays for it and what they cancel it from.
  *
@@ -83,6 +84,11 @@ class WatchScheduler @Inject constructor(
      * virtual time instead of a real one. See [io.github.alpharomercoma.openweights.di.ApplicationScope].
      */
     @ApplicationScope private val scope: CoroutineScope,
+    /**
+     * How the ticker sleeps between ticks. An alarm in the app, a `delay` in a test; see
+     * [TickWait] for why a `delay` is not enough on a phone.
+     */
+    private val wait: TickWait,
 ) {
     /** The in-process tickers, by watch id. Only the ones too fast for WorkManager. */
     private val tickers = mutableMapOf<Long, Job>()
@@ -191,33 +197,42 @@ class WatchScheduler @Inject constructor(
                     watches.byId(watch.id)?.let(::showProgress)
                     var live = true
                     while (isActive && live) {
-                        delay(period)
-                        val current = watches.byId(watch.id)
-                        // Short-circuit order is the contract: a watch that is gone or
-                        // paused must end the loop without ticking at all.
-                        // The tick is stamped with the deadline this loop just slept
-                        // toward when the wall clock has not reached it — the runner now
-                        // refuses early ticks so the backstop cannot double-run a fast
-                        // watch, and the ticker's own tick must never read as early to
-                        // its own deadline, whatever a coarse timer or a test clock says.
-                        // The countdown comes off before the check runs. The system draws
-                        // it from the deadline and does not stop at zero: past the
-                        // deadline it counts on, with a minus sign, for as long as the
-                        // check takes, which on a small model is half a minute of the
-                        // notification saying the app is late. The check running is
-                        // what the line should say while it runs.
-                        if (current != null) showChecking(current)
-                        live = current != null &&
-                            current.state == WatchState.ACTIVE &&
-                            tickOnce(
-                                watch.id,
-                                maxOf(System.currentTimeMillis(), current.dueAt),
-                            )
-                        // After the tick rather than before it: the counter has just moved
-                        // and the next deadline is a period from now. Read back rather than
-                        // computed here, because a tick that was skipped did not move
-                        // either, and the notification should say what happened.
-                        if (live) watches.byId(watch.id)?.let(::showProgress)
+                        // The deadline slept toward is the recorded one, the same number
+                        // the notification is counting down to, so the alarm and the
+                        // countdown cannot disagree. Read fresh each round: a tick moves
+                        // it a period on from when the tick ran, not from when it was due.
+                        val dueAt = watches.byId(watch.id)?.dueAt
+                            ?: (System.currentTimeMillis() + period)
+                        live = wait.awake(dueAt, period) {
+                            val current = watches.byId(watch.id)
+                            // Short-circuit order is the contract: a watch that is gone or
+                            // paused must end the loop without ticking at all.
+                            // The tick is stamped with the deadline this loop just slept
+                            // toward when the wall clock has not reached it — the runner
+                            // refuses early ticks so the backstop cannot double-run a fast
+                            // watch, and the ticker's own tick must never read as early to
+                            // its own deadline, whatever a coarse timer or a test clock says.
+                            // The countdown comes off before the check runs. The system draws
+                            // it from the deadline and does not stop at zero: past the
+                            // deadline it counts on, with a minus sign, for as long as the
+                            // check takes, which on a small model is half a minute of the
+                            // notification saying the app is late. The check running is
+                            // what the line should say while it runs.
+                            if (current != null) showChecking(current)
+                            val keep = current != null &&
+                                current.state == WatchState.ACTIVE &&
+                                tickOnce(
+                                    watch.id,
+                                    maxOf(System.currentTimeMillis(), current.dueAt),
+                                )
+                            // After the tick rather than before it: the counter has just
+                            // moved and the next deadline is a period from now. Read back
+                            // rather than computed here, because a tick that was skipped
+                            // did not move either, and the notification should say what
+                            // happened.
+                            if (keep) watches.byId(watch.id)?.let(::showProgress)
+                            keep
+                        }
                     }
                 } finally {
                     // The map entry only if this coroutine is still the one registered.

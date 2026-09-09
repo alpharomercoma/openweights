@@ -32,6 +32,11 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object WatchModule {
+    /** The ticker sleeps on an alarm in the app. Tests hand [WatchScheduler] a `delay`. */
+    @Provides
+    @Singleton
+    fun tickWait(alarms: AlarmTickWait): TickWait = alarms
+
     @Provides
     @Singleton
     fun watches(

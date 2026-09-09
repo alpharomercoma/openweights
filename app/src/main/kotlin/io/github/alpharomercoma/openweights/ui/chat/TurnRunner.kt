@@ -971,12 +971,16 @@ class TurnRunner @Inject constructor(
             val pasted = conversation.any {
                 it.role == ChatRole.USER && it.text.length > GROUNDING_MAX_CHARS
             }
+            // A denial is classified before an announcement, as the pushes do: "I don't
+            // have a tool for writing code; I can only use web_search" names the search
+            // and is a refusal to write, and the app searching for a poem would be the
+            // haiku-became-a-web-search failure the denial repair exists to prevent.
             val fitting = CapabilityDenial.fitting(spoken, asked).firstOrNull()
             return when {
+                CapabilityDenial.denies(spoken) -> "denied".takeIf { fitting == NamedSubject.TOOL }
                 pass.announcesSearch(spoken) -> "announced"
                 !pasted && spoken.claimsSearch(asked) -> "claimed"
                 CapabilityDenial.lamentsUnknown(spoken) -> "lamented"
-                CapabilityDenial.denies(spoken) && fitting == NamedSubject.TOOL -> "denied"
                 else -> null
             }
         }

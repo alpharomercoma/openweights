@@ -64,29 +64,47 @@ class TurnRunnerDenialTest {
     }
 
     @Test
-    fun `a lookup denial buys a pass that keeps the tools`() = runBlocking<Unit> {
-        // Verbatim from the routing suite: shown a working search tool, the model
-        // denies having one. The pushed pass is the one the user used to type "go" for.
+    fun `a lookup denial is the decision to search, and the app makes it`() = runBlocking<Unit> {
+        // Verbatim from the routing suite: shown a working search tool, the model denies
+        // having one. Until 2026-09-10 the pushed pass was the one the user used to type
+        // "go" for; the compiled export answered that push by denying again, so the
+        // denial is read as what it names (a lookup) and the app runs it.
         engine.scripted += ScriptedPass(
             "I’m sorry, but I don’t have access to the latest information about that.",
-        )
-        engine.scripted += ScriptedPass(
-            "Searching.",
-            toolCalls = listOf(
-                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"q"}"""),
-            ),
         )
         engine.scripted += ScriptedPass("Here is the answer.")
 
         run()
 
-        val push = engine.prompts[1].last()
-        assertThat(push.role).isEqualTo(ChatRole.USER)
-        assertThat(push.text).contains("web_search")
-        // The retry kept the tools on the table, and the push bought a real call.
-        assertThat(engine.offered[1]).isNotEmpty()
+        assertThat(engine.prompts).hasSize(2)
         assertThat(search.calls).hasSize(1)
+        assertThat(engine.prompts[1].none { it.text.contains("I don’t have access") }).isTrue()
     }
+
+    @Test
+    fun `with the app's search off, a lookup denial buys the pass it used to`() =
+        runBlocking<Unit> {
+            // The baseline arm of the on-device suite.
+            engine.scripted += ScriptedPass(
+                "I’m sorry, but I don’t have access to the latest information about that.",
+            )
+            engine.scripted += ScriptedPass(
+                "Searching.",
+                toolCalls = listOf(
+                    ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"q"}"""),
+                ),
+            )
+            engine.scripted += ScriptedPass("Here is the answer.")
+
+            run(honours = false)
+
+            val push = engine.prompts[1].last()
+            assertThat(push.role).isEqualTo(ChatRole.USER)
+            assertThat(push.text).contains("web_search")
+            // The retry kept the tools on the table, and the push bought a real call.
+            assertThat(engine.offered[1]).isNotEmpty()
+            assertThat(search.calls).hasSize(1)
+        }
 
     @Test
     fun `a denial about writing buys a pass with the tools withheld`() = runBlocking<Unit> {
@@ -192,25 +210,17 @@ class TurnRunnerDenialTest {
     }
 
     @Test
-    fun `a knowledge lament buys the same pass a capability denial does`() = runBlocking<Unit> {
+    fun `a knowledge lament is searched by the app, like a lookup denial`() = runBlocking<Unit> {
         // The Alpha Romer Coma shape: no capability noun, so denies() cannot see it,
         // and the whole answer is a shrug a working web_search disproves.
         engine.scripted += ScriptedPass(
             "I don't have enough information about Alpha Romer Coma to answer that.",
         )
-        engine.scripted += ScriptedPass(
-            "Searching.",
-            toolCalls = listOf(
-                ToolCall(id = "1", name = "web_search", argumentsJson = """{"query":"q"}"""),
-            ),
-        )
         engine.scripted += ScriptedPass("Here is who that is.")
 
         run()
 
-        val push = engine.prompts[1].last()
-        assertThat(push.role).isEqualTo(ChatRole.USER)
-        assertThat(push.text).contains("web_search")
+        assertThat(engine.prompts).hasSize(2)
         assertThat(search.calls).hasSize(1)
     }
 
@@ -224,7 +234,7 @@ class TurnRunnerDenialTest {
         assertThat(search.calls).isEmpty()
     }
 
-    private suspend fun run(mode: AgentMode = AgentMode.AUTO) {
+    private suspend fun run(mode: AgentMode = AgentMode.AUTO, honours: Boolean = true) {
         engine.load(modelFile(), ModelLoadParams(contextLength = 4096))
         val runner = TurnRunner(
             engine = engine,
@@ -232,7 +242,7 @@ class TurnRunnerDenialTest {
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = PlanBoard(),
             asks = AskBoard(),
-        )
+        ).apply { honoursIntent = honours }
         runner.run(
             conversation = listOf(ChatMessage.text(ChatRole.USER, "Who is Ada Lovelace?")),
             params = SamplerParams(),

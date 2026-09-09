@@ -301,6 +301,31 @@ literals to their special ids, so the residual is the export's 8da4w quantisatio
 forced-call probe on the export against the GGUF, then a gentler export if they differ.
 Still owed.
 
+### The search the model decides on and does not make is made by the app (2026-09-10)
+
+The first arm of the standard-set suite settled the question the route had been written
+around before the other arms finished: the compiled LFM2.5 1.2B, holding web search and
+the model-driven loop, searched 3 of the 75 rows that needed it, wrote "Based on my
+search, the screenwriter was Miguel Aznar" without a search in 32 replies of 160, and
+answered the push that hands the tool names back by announcing again. The full catalogue
+did not restore calling; it over-called on answerable rows at 12.7 s of first-token
+latency (2,400 prompt tokens), which all four reviewers read as the fresh-install
+hypothesis failing. Token rarity as a tail detector: AUROC 0.52 on 3,000 PopQA rows.
+
+So `TurnRunner.honourIntent`: when a pass makes no call and says it will search, says it
+did, laments missing knowledge, or denies a capability the search would supply, the app
+runs web_search on the question as asked, drops the pass from the prompt, appends
+"Searching the web for: <query>" and the result, and the model answers next pass. The
+model decides, in words; the app carries it out; a model that writes the call never
+reaches it. Once a turn, through the agent step (approval, visible), never after a
+search already ran, never on a question about the user's own things, never in plan mode,
+not on a question to the user or a withdrawn announcement, not when the question is about
+searching or the conversation holds pasted material. The query loses its wrapping, a
+pronoun-only follow-up carries the previous question, a long message is cut to its last
+question. Four reviewers attacked the matchers and their cases are tests. The framing
+constant is one wording now, the note switch is gone, and the Tools screen says what the
+app does in five locales. Numbers: `docs/research/retrieve-or-answer.md`.
+
 ### The route was rejected, and the routing question moved to public rows (2026-09-10)
 
 The search-first route and the "concise" result framing above lasted a day. What the

@@ -65,8 +65,16 @@ object NamedSubject {
             ?.trim()
             ?.trimEnd('.', '?', '!')
             ?: return null
-        if (subject.lowercase() in STOP_WORDS) return null
-        return subject
+        // A pronoun alone, or a subject that opens on a pronoun or a possessive ("who is my
+        // mother", "tell me about your day"), is the user's own world, not a name to look
+        // up. The second half was found by review on 2026-09-10, once the app began making
+        // the search itself: before that the note told the model to search "my mother", and
+        // the model declined.
+        val words = subject.split(' ').map { it.lowercase() }
+        // And a possessive anywhere in it: "who is John Doe my doctor" is the user's
+        // world too, and "John Doe my doctor" is not a query to send anywhere.
+        val personal = words.first() in STOP_WORDS || words.any { it in POSSESSIVES }
+        return subject.takeIf { it.lowercase() !in STOP_WORDS && !personal }
     }
 
     /**
@@ -104,7 +112,12 @@ object NamedSubject {
         "i", "me", "you", "he", "she", "it", "we", "they", "this", "that", "these", "those",
         "him", "her", "them", "us", "who", "what", "someone", "anyone", "everyone", "nobody",
         "there", "here", "the", "a", "an", "my", "your", "our", "their", "his", "its",
+        "yourself", "myself", "himself", "herself", "itself", "ourselves", "themselves",
+        "something", "anything", "everything", "nothing", "mine", "yours", "ours", "theirs",
     )
+
+    /** A possessive anywhere in a subject makes it the user's, wherever it sits. */
+    private val POSSESSIVES = setOf("my", "your", "our", "their", "his", "her", "its")
 
     /**
      * Longer than this and it is not a question naming a thing, whatever it opens with.

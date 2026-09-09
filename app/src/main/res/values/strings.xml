@@ -201,7 +201,7 @@
     <string name="model_delete_loaded">%1$s is loaded right now. Unload it from the model picker, then delete it.</string>
     <string name="model_delete_failed">%1$s could not be deleted. Try again.</string>
     <string name="tool_search_name">Search the web</string>
-    <string name="tool_search_detail">Looks up anything recent, or anything it does not know.</string>
+    <string name="tool_search_detail">Looks up anything recent, or anything it does not know. A question that names somebody is searched before the reply, and the search is shown.</string>
     <string name="tool_page_name">Open a page</string>
     <string name="tool_page_detail">Reads the text of one public page.</string>
     <string name="tool_find_file_name">Find a file</string>

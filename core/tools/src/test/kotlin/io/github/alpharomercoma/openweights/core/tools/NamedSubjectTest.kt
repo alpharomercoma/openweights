@@ -34,6 +34,32 @@ class NamedSubjectTest {
     }
 
     @Test
+    fun `the user's own world is not a name to look up`() {
+        // Found by review on 2026-09-10, once the app began making the search itself: the
+        // note used to tell the model to search "my mother", and the model declined; the
+        // app would not have.
+        assertThat(NamedSubject.of("who is my mother")).isNull()
+        assertThat(NamedSubject.of("Who is your favourite author?")).isNull()
+        assertThat(NamedSubject.of("tell me about yourself")).isNull()
+        assertThat(NamedSubject.of("tell me about your day")).isNull()
+        assertThat(NamedSubject.of("who is she")).isNull()
+        assertThat(NamedSubject.of("who is 2 + 2")).isNull()
+        assertThat(NamedSubject.of("tell me about everything")).isNull()
+        // A possessive anywhere, not only in front: found by the third review.
+        assertThat(NamedSubject.of("who is John Doe my doctor")).isNull()
+        assertThat(NamedSubject.of("who is the president of her country")).isNull()
+    }
+
+    @Test
+    fun `an article is taken by the question shape, not by the stop list`() {
+        // "The Weeknd" loses its article to the shape's optional "the", which is the
+        // price of "who is the president of the philippines" keeping its office.
+        assertThat(NamedSubject.of("Who is The Weeknd?")).isEqualTo("Weeknd")
+        assertThat(NamedSubject.of("who is the president of the philippines"))
+            .isEqualTo("president of the philippines")
+    }
+
+    @Test
     fun `a famous person is a subject too, and the search is the accepted price`() {
         assertThat(NamedSubject.of("Who is Albert Einstein?")).isEqualTo("Albert Einstein")
         assertThat(NamedSubject.of("Who was Ada Lovelace?")).isEqualTo("Ada Lovelace")

@@ -70,7 +70,7 @@ class ChatWarmTest : ChatFixture() {
         runTest(dispatcher) {
             loadModel()
             engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
-            viewModel.send("Who is Ada Lovelace?")
+            viewModel.send("What did Ada Lovelace write?")
             settle(steps = FOLD_SETTLE_STEPS)
 
             engine.warmCalls.clear()
@@ -97,7 +97,7 @@ class ChatWarmTest : ChatFixture() {
         runTest(dispatcher) {
             loadModel()
             engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
-            viewModel.send("Who is Ada Lovelace?")
+            viewModel.send("What did Ada Lovelace write?")
             settle(steps = FOLD_SETTLE_STEPS)
             engine.scripted += ScriptedPass("She was born in 1815.")
             viewModel.send("When was she born?")

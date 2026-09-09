@@ -145,6 +145,8 @@ class TurnRunnerTest {
             // asked about, and the model should not be left to guess which one is current from
             // position alone.
             engine.scripted += ScriptedPass("Arjhine Ty is a developer.")
+            // A "who is" answered in prose earns the app's own search and a second pass.
+            engine.scripted += ScriptedPass("Arjhine Ty is a developer, per the search.")
             val staleNotes = ToolNotes(
                 listOf(
                     ToolNote(call = "fetch_url(alpharomer.com)", result = "Alpha Romer Coma..."),
@@ -162,7 +164,7 @@ class TurnRunnerTest {
                 question = "who is arjhine ty?",
             )
 
-            val sent = engine.prompts.single().last()
+            val sent = engine.prompts.first().last { it.role == ChatRole.USER }
             // The restated question names the actual subject of this turn...
             assertThat(sent.text).contains("This turn's question: \"who is arjhine ty?\"")
             // ...and it is the last thing in the message, past the stale notes, which is the
@@ -197,7 +199,12 @@ class TurnRunnerTest {
         run(withTools = true, notes = priorNotes, question = "who is arjhine ty?")
 
         val firstPass = engine.prompts[0]
-        assertThat(firstPass.last().text).contains("This turn's question")
+        // The last user message: the app's own search for the name follows it in the prompt.
+        assertThat(
+            firstPass.last {
+                it.role == ChatRole.USER
+            }.text,
+        ).contains("This turn's question")
 
         // The second pass begins with the first, byte for byte -- the definition of a
         // prompt the cache can extend -- and the block is not restated after the results.
@@ -219,10 +226,11 @@ class TurnRunnerTest {
             // adding the block there is prefill spent on every turn there is to fix a problem
             // that can only happen on some of them.
             engine.scripted += ScriptedPass("An answer.")
+            engine.scripted += ScriptedPass("An answer, after the app's search.")
 
             run(withTools = true, question = "who is arjhine ty?")
 
-            assertThat(engine.prompts.single().last().text).doesNotContain("This turn's question")
+            assertThat(engine.prompts.first().last().text).doesNotContain("This turn's question")
         }
 
     @Test

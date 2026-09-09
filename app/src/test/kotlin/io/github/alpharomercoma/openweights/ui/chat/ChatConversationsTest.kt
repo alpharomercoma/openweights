@@ -206,7 +206,7 @@ class ChatConversationsTest : ChatFixture() {
                 ),
             )
             engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
-            viewModel.send("Who is Ada Lovelace?")
+            viewModel.send("What did Ada Lovelace write?")
             settle(steps = FOLD_SETTLE_STEPS)
             val id = requireNotNull(viewModel.uiState.value.activeConversationId)
 
@@ -774,7 +774,7 @@ class ChatConversationsTest : ChatFixture() {
                 ),
             )
             engine.scripted += ScriptedPass("Ada Lovelace wrote the first algorithm.")
-            viewModel.send("Who is Ada Lovelace?")
+            viewModel.send("What did Ada Lovelace write?")
             settle(steps = FOLD_SETTLE_STEPS)
             assertThat(viewModel.uiState.value.toolNotes.render()).contains("Ada Lovelace")
 

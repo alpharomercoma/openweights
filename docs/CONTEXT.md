@@ -260,6 +260,38 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### "Who is X" is searched before the model speaks (2026-09-10)
+
+"who is alpha romer coma" on the compiled LFM2.5 1.2B, web search on, came back three
+times as "Let me look up information about alpha romer coma using a web search so I can
+provide an accurate answer." and no search. Two layers: the announcement salvage matched
+the tool's name with its underscore and "a web search" walked past it (fixed by shape);
+and under it, the model does not call. `WhoIsProbe` put the app's own instructions to the
+export sixteen ways, with the "(This question names X...)" note, without, and after the
+denial push: zero calls. The host measurement of 2026-09-05 (ten of ten with the note) was
+llama.cpp on a GGUF; the compiled export does not act on the request.
+
+Shipped: for a question that names a subject, with web search on, the loop makes the
+search itself before the first pass and hands the model the results ("Searching the web
+for X." plus the tool result), one pass, no note. Measured through the real loop on the
+phone, sixteen questions, three models (`WhoIsSuiteOnDeviceTest`): the compiled model went
+from 4 of 9 named questions right to 8 of 9 at 8.3 s a question (6.0 before), the GGUF
+from 5 to 9 of 9, Qwen3 stayed 9 of 9 and dropped from 24 s to 19 s because it no longer
+spends a pass asking; the app made no search on any of the six questions that must not be
+searched. Two designs measured on the way were rejected: the search made after a wasted
+first pass (the model then defended its own fabricated biography over the results) and a
+result framing made of prohibitions (halves the "Here's a summary of what sources say"
+shape, costs a correct answer). A positive framing ("answer the question directly, in the
+shape it asked for ... without mentioning the search") kept 26 of 27 and cut the source
+recitals from 21 of 48 replies to 14, and ships as `WebSearchFraming.DIRECT`. Three rounds of Codex and Gemini review shaped the detector's guards
+(pronouns, possessives anywhere, expressions), the failed-search fallback, and the Tools
+screen sentence saying the search happens. Full tables: `docs/research/who-is-questions.md`.
+
+Not this fix, and the next measurement: LFM2.5 1.2B made zero tool calls of its own in 96
+rows under the shipped instructions, "what changed in android 16" included, on both
+runtimes. Qwen3 called every time. The instructions' "you already know the answer to most
+questions" reads as "never" on this model.
+
 ### The canvas grader, and the census that shaped it (2026-09-10)
 
 The canvas had an agent loop and no verification loop: the WebView's errors went to a

@@ -1669,9 +1669,18 @@ private val ABOUT_SEARCHING =
 /** A question about the user's own things, which the app never sends anywhere by itself. */
 private val ABOUT_THE_USER = Regex("\\b(my|mine|our|ours|myself)\\b", RegexOption.IGNORE_CASE)
 
-/** "Don't let me look that up", "no need to search": an announcement withdrawn in the same breath. */
+/**
+ * "Don't let me look that up", "no need to search": an announcement withdrawn in the same
+ * breath. Also an offer ("I can look it up if you want") and introspection ("let me search
+ * my memory", "I looked it up in my notes"), which Mistral produced against the matchers:
+ * the first is the user's decision, the second is not a search.
+ */
 private val NEGATED = Regex(
-    "\\b(don't|do not|never|not|no need to|without)\\b(?:\\s+\\w+){0,3}\\s+(let me|search|look)\\b",
+    "\\b(don't|do not|never|not|no need to|without)\\b(?:\\s+\\w+){0,3}\\s+" +
+        "(let me|search|look)\\b|" +
+        "\\bif you('d| would)? (want|like|wish|prefer)\\b|" +
+        "\\b(search|look(ed)?( it| this| that)? up|check(ed)?)( in| through)? my " +
+        "(memory|notes|knowledge|mind|records)\\b",
     RegexOption.IGNORE_CASE,
 )
 

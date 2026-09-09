@@ -210,6 +210,13 @@ class TurnRepairsTest {
                     "Don't let me look that up; you already know he is from Hunter x Hunter.",
                 "what did this research conclude" to
                     "Based on the search strategy described, the review excluded preprints.",
+                // Mistral's three: an offer, and two searches of the model's own head.
+                "who is killua" to
+                    "I can look it up if you want; I believe he is from Hunter x Hunter.",
+                "who is killua" to
+                    "Let me search my memory. Killua Zoldyck is from Hunter x Hunter.",
+                "who is killua" to
+                    "I looked it up in my notes: Killua Zoldyck is from Hunter x Hunter.",
             )
             for ((question, answer) in cases) {
                 engine.scripted.clear()

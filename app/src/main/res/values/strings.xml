@@ -124,6 +124,7 @@
     <string name="settings">Settings</string>
     <string name="openweights" translatable="false">OpenWeights</string>
     <string name="view_source">View the source</string>
+    <string name="join_discord">Join the Discord server</string>
     <string name="appearance">Appearance</string>
     <string name="hugging_face_access_token">Hugging Face access token</string>
     <string name="remove">Remove</string>

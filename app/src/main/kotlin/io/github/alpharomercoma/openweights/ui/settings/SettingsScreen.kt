@@ -188,14 +188,22 @@ private fun AboutSection() {
             textAlign = TextAlign.Center,
         )
         Metric("${BuildConfig.VERSION_NAME} · Apache License 2.0")
-        TextButton(onClick = {
-            links.openUri(SOURCE_URL)
-        }) { Text(stringResource(R.string.view_source)) }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = { links.openUri(SOURCE_URL) }) {
+                Text(stringResource(R.string.view_source))
+            }
+            TextButton(onClick = { links.openUri(DISCORD_URL) }) {
+                Text(stringResource(R.string.join_discord))
+            }
+        }
     }
 }
 
 /** The claim above it is only worth making if this is one tap away. */
 private const val SOURCE_URL = "https://github.com/alpharomercoma/openweights"
+
+/** Where the people building and using this talk; beside the source, for the same reason. */
+private const val DISCORD_URL = "https://discord.gg/rAwu3MU5j3"
 
 /**
  * Light, dark, or whatever the phone is doing.

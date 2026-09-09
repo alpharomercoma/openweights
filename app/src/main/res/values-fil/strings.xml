@@ -109,7 +109,7 @@
     <string name="models">Mga modelo</string>
     <string name="delete">Tanggalin</string>
     <string name="settings">Mga setting</string>
-    <string name="view_source">Tingnan ang source</string>
+    <string name="view_source">Tingnan ang source</string><string name="join_discord">Sumali sa Discord server</string>
     <string name="appearance">Hitsura</string>
     <string name="hugging_face_access_token">Hugging Face access token</string>
     <string name="remove">Alisin</string>

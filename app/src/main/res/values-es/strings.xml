@@ -108,7 +108,7 @@
     <string name="models">Modelos</string>
     <string name="delete">Eliminar</string>
     <string name="settings">Ajustes</string>
-    <string name="view_source">Ver el código fuente</string>
+    <string name="view_source">Ver el código fuente</string><string name="join_discord">Unirse al servidor de Discord</string>
     <string name="appearance">Apariencia</string>
     <string name="hugging_face_access_token">Token de acceso de Hugging Face</string>
     <string name="remove">Quitar</string>

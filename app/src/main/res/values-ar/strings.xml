@@ -114,7 +114,7 @@
     <string name="models">النماذج</string>
     <string name="delete">حذف</string>
     <string name="settings">الإعدادات</string>
-    <string name="view_source">عرض الكود المصدري</string>
+    <string name="view_source">عرض الكود المصدري</string><string name="join_discord">انضم إلى خادم Discord</string>
     <string name="appearance">المظهر</string>
     <string name="hugging_face_access_token">رمز الوصول إلى Hugging Face</string>
     <string name="remove">إزالة</string>

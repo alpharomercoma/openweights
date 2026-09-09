@@ -109,7 +109,7 @@
     <string name="models">モデル</string>
     <string name="delete">削除</string>
     <string name="settings">設定</string>
-    <string name="view_source">ソースを見る</string>
+    <string name="view_source">ソースを見る</string><string name="join_discord">Discordサーバーに参加</string>
     <string name="appearance">外観</string>
     <string name="hugging_face_access_token">Hugging Faceのアクセストークン</string>
     <string name="remove">削除</string>

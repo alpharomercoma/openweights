@@ -74,6 +74,7 @@ class EngineMessagesTest {
     fun `the date is acknowledged with a promise to leave it alone`() {
         val state = ChatUiState(
             transcript = listOf(TranscriptEntry(id = 0, role = ChatRole.USER, text = "hi")),
+            toolsAvailable = true,
         )
 
         val messages = state.engineMessages()
@@ -159,8 +160,35 @@ class EngineMessagesTest {
     }
 
     @Test
+    fun `with no tool on the day opens the instructions and there is no exchange`() {
+        // The exchange was measured under the tool catalogue, on the greedy pass. With no
+        // tool in the prompt the reply is written at the user's temperature and the
+        // exchange, now the nearest thing said, is what greetings get answered about: 57 of
+        // 128 on LFM2.5-1.2B against 4 of 128 with the day first in the instructions. See
+        // withConversationDay.
+        val state = ChatUiState(
+            transcript = transcript(1),
+            mode = AgentMode.AUTO,
+            toolsAvailable = false,
+        )
+
+        val messages = state.engineMessages()
+        val system = messages.single { it.role == ChatRole.SYSTEM }
+
+        assertThat(system.text).startsWith("Today is ${PromptDay.pinned}.")
+        assertThat(messages.filter { it.role == ChatRole.USER }.map { it.text })
+            .doesNotContain("Today is ${PromptDay.pinned}.")
+        assertThat(messages.none { it.text == PromptDay.DATE_ACK }).isTrue()
+        // And with a tool on, the head is byte-stable across days and the exchange carries it.
+        val withTools = state.copy(toolsAvailable = true).engineMessages()
+        assertThat(withTools.single { it.role == ChatRole.SYSTEM }.text).doesNotContain("Today is")
+        assertThat(withTools.any { it.text == PromptDay.DATE_ACK }).isTrue()
+    }
+
+    @Test
     fun `without compaction every turn is sent`() {
-        val state = ChatUiState(transcript = transcript(4))
+        // With a tool on, so the day rides as the exchange this test counts.
+        val state = ChatUiState(transcript = transcript(4), toolsAvailable = true)
 
         // Four turns, the four-message exchange every conversation opens with, and the
         // one instruction every conversation opens with: how long an answer should be.
@@ -447,7 +475,12 @@ class EngineMessagesTest {
         // A turn of its own would be a second user message in a row, which is the wall the
         // compaction summary already hit: the templates that enforce alternation refuse to
         // render it rather than ignoring it.
-        val state = ChatUiState(transcript = transcript(1), toolNotes = notes())
+        val state = ChatUiState(
+            transcript = transcript(1),
+            toolNotes = notes(),
+            // Notes come from tools, so a tool is on and the day rides as the exchange.
+            toolsAvailable = true,
+        )
 
         val messages = state.engineMessages()
 

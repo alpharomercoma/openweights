@@ -116,11 +116,12 @@ class DateStructureProbe {
      * the reasoning cap. Everything in [compareTheShapes] was measured greedy under the
      * tool catalogue, and none of it says what this pass does with the date.
      *
-     * Three arms. The shipped exchange; the date as one line at the end of the
-     * instructions, which lost with tools on because the tool block pushed it far from the
-     * question, an argument that does not apply when there is no tool block; and no date,
-     * the floor. The date question is asked of each, and with no tool to reach for, a
-     * shape that loses it answers with a made-up day.
+     * Four arms. What ships since 2026-09-09, the day first in the instructions, which
+     * `eval/date_notools_eval.py` ranked at 4 of 128 on the host; the exchange that ships
+     * with tools on, 57 of 128 there; the day last in the instructions, 96 of 128; and no
+     * date, the floor at 2. The date question is asked of each, and with no tool to reach
+     * for, a shape that loses it answers with a made-up day. The host ranked these; this
+     * decides.
      */
     @Test
     fun compareTheShapesWithoutTools() = runBlocking<Unit> {
@@ -129,13 +130,18 @@ class DateStructureProbe {
 
         val day = PromptDay.pinned
         fun user(text: String) = ChatMessage.text(ChatRole.USER, text)
-        val bareHead = ChatUiState(preferences = ModelPreferences()).prefixMessages()
-        val datedHead = bareHead.map { message ->
+        // What the app now sends with nothing on: the day first in the instructions.
+        val shipped = ChatUiState(preferences = ModelPreferences()).prefixMessages()
+        val bareHead = shipped.map { message ->
+            ChatMessage.text(message.role, message.text.removePrefix("Today is $day.\n\n"))
+        }
+        val dayLast = bareHead.map { message ->
             ChatMessage.text(message.role, message.text + "\n\nToday is $day.")
         }
         val arms = listOf(
+            Triple("system_start", shipped, emptyList()),
             Triple("exchange", bareHead, PromptDay.exchange()),
-            Triple("system_line", datedHead, emptyList()),
+            Triple("system_end", dayLast, emptyList()),
             Triple("nodate", bareHead, emptyList()),
         )
 

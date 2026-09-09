@@ -3882,12 +3882,18 @@ private const val MARKDOWN_STYLE: String =
  * function is the guarantee, not a tidiness.
  */
 internal fun ChatUiState.prefixMessages(toolPromptOverride: String? = null): List<ChatMessage> {
-    // Deliberately no date here. The instructions are the root of the KV cache and the
-    // template renders the whole tool block behind them, so a date in this position went
-    // stale at every midnight and cost the warm snapshot, the disk store and a full
-    // background re-read of the head, daily. It rides on the conversation's first user
-    // turn instead — see [withConversationDay].
+    // The date is here only when no tool is on, and first. With tools on it rides on the
+    // conversation's first user turn instead (see [withConversationDay]): the instructions
+    // are the root of the KV cache and the template renders the whole tool block behind
+    // them, so a date here went stale at every midnight and cost the warm snapshot, the
+    // disk store and a full background re-read of the head, daily, and it sat too far from
+    // the question, behind the tool block, to be recalled. Neither holds with nothing
+    // switched on: the head is two paragraphs, a day's re-read is a hundred tokens, and
+    // nothing stands between the fact and the question. What does hold there is the
+    // measurement in [withConversationDay]: the exchange, with no tool block to outweigh
+    // it, is the nearest thing said and greetings get answered about the date.
     val instructions = listOfNotNull(
+        "Today is ${PromptDay.pinned}.".takeUnless { toolsAvailable },
         AnswerLength.fromName(preferences.answerLength).instruction,
         MARKDOWN_STYLE,
         preferences.systemPrompt.takeIf { it.isNotBlank() },
@@ -3955,7 +3961,7 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         val dated = if (record.messages.any { it.role == ChatRole.USER }) {
             prompt
         } else {
-            prompt.withConversationDay()
+            prompt.withConversationDay(toolsAvailable)
         }
         return dated.withToolNotes(toolNotes)
     }
@@ -3965,7 +3971,7 @@ internal fun ChatUiState.engineMessages(toolPromptOverride: String? = null): Lis
         ?: transcript
 
     return (system + recap(compaction) + remaining.map { it.toChatMessage() })
-        .asExchange().withConversationDay().withToolNotes(toolNotes)
+        .asExchange().withConversationDay(toolsAvailable).withToolNotes(toolNotes)
 }
 
 /**
@@ -4033,8 +4039,25 @@ private fun recap(compaction: Compaction?): List<ChatMessage> {
  * behind it and folds carry it naturally. The day itself stays pinned per conversation
  * ([PromptDay]) so an open chat's bytes never shift at midnight. The wording, and what it
  * was measured against, is [PromptDay.exchange]'s.
+ *
+ * Only with a tool on. Everything above was measured on the pass that writes the reply
+ * when tools are on: greedy, under the tool catalogue. With nothing switched on there is
+ * no such pass, the answering sampler writes the reply at the user's temperature, and the
+ * exchange turns out to be the bug it was meant to fix. Measured 2026-09-09 on LFM2.5-1.2B
+ * QAD-Q4_0 with no tool in the prompt, sixteen greetings over eight seeds
+ * (`eval/date_notools_eval.py`): the shipped exchange answered about the date on 57 of
+ * 128; the date as the first line of the instructions on 4 of 128, against a floor of 2
+ * with no date at all, and it still answered "what is today's date?" greedily and on five
+ * seeds of eight. The head placement lost with tools on because the tool block pushed the
+ * fact far from the question; with no tool block that argument has no force, and the head
+ * is where the date goes. Ranked on the host, to be confirmed on the phone
+ * (`DateStructureProbe.compareTheShapesWithoutTools`).
+ *
+ * @param toolsAvailable whether any tool is in the prompt. When not, [prefixMessages]
+ *   has already put the day at the head of the instructions and nothing is inserted.
  */
-private fun List<ChatMessage>.withConversationDay(): List<ChatMessage> {
+private fun List<ChatMessage>.withConversationDay(toolsAvailable: Boolean): List<ChatMessage> {
+    if (!toolsAvailable) return this
     val at = indexOfFirst { it.role == ChatRole.USER }
     if (at < 0) return this
     return subList(0, at) + PromptDay.exchange() + subList(at, size)

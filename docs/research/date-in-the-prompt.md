@@ -157,6 +157,32 @@ pass that writes this reply caps thinking at `TOOL_PASS_REASONING_BUDGET`, 128 t
 phone the same question is answered in one line. It is the clearest case for why the device
 is the arbiter for a thinking model.
 
+## With no tool on, the exchange is the bug
+
+*2026-09-09.* Everything above was measured on the pass that writes the reply when tools
+are on: greedy, under the tool catalogue. A fresh install now has one tool on and a person
+who turns it off, or is offline, sends a prompt with no tool in it, and that turn has no
+deciding pass: the answering sampler writes the reply at the user's temperature. Measured
+on the host (`eval/date_notools_eval.py`, LFM2.5-1.2B QAD-Q4_0, sixteen greetings over
+eight seeds, the app's two-paragraph no-tool head):
+
+| shape, no tools               | bleed   | date answered (greedy, seeded) |
+| ---                           | ---:    | ---                            |
+| the shipped exchange          | 57/128  | yes, 7/8                       |
+| day last in the instructions  | 96/128  | no, 0/8                        |
+| **day first in the instructions** | **4/128** | **yes, 5/8**               |
+| no date                       | 2/128   | no (made up October 2023)      |
+
+The exchange lost for the reason the whole file gives: it is the nearest thing said, and
+with no tool block there is nothing to outweigh it and no greedy pass to hold the line.
+The head placement lost before because the tool block pushed the fact far from the
+question; with no tool block the fact is two paragraphs from the question and first. So
+the app now puts the day first in the instructions when no tool is on and keeps the
+exchange when one is (`prefixMessages`, `withConversationDay`). The cost the head
+placement was moved away from, a re-read of the head at midnight, is a hundred tokens
+here rather than two thousand. Ranked on the host; `DateStructureProbe` gained a no-tools
+arm to decide it on the phone, which was unreachable the day this was measured.
+
 ## Rules this leaves behind
 
 - **Name the pass.** Any measurement of a reply states which of the two samplers wrote it,

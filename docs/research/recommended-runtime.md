@@ -132,8 +132,24 @@ Kept, because each was measured on the GGUF rows or costs them nothing:
   result is +15/-6 at p = 0.08 on one phone, and it costs 15 unnecessary searches and
   3.8 s of median turn. It stays because it is the one measured mechanism that moves the
   rows the maintainer's priority names, the confidently wrong ones, and because the
-  held-out check is cheap: the same suite drawn with seed 8 (six rows in common with seed
-  7) runs on the Poco tonight, both arms, and the result is appended below.
+  held-out check is cheap. It ran the same night: the same three sets drawn with seed 8
+  (`pull_decisions.py --seed 8`, 160 rows, six in common with seed 7), Q4_K_M GGUF on the
+  Poco, unplugged at 43 to 28% battery, both arms on the build of this note, results in
+  `tools/eval/results/decisions/held-*`:
+
+  | Seed 8, 160 rows | searched when needed | searched when not | correct | correct, needed | median s |
+  |---|---|---|---|---|---|
+  | intent-search | 57% (43/75) | 25% (15/60) | 45% (53/117) | 29% (12/42) | 8.3 |
+  | doubt-search | 68% (51/75) | 40% (24/60) | 48% (56/117) | 33% (14/42) | 13.2 |
+
+  Paired on the rows both answered, the gate is right where the rule alone was wrong on 5
+  and wrong where it was right on 1. That is the same direction and the same shape as the
+  seed-7 run (+15/-6): a small gain on the rows that needed a search, bought with fifteen
+  more searches on rows that did not and five seconds of median turn. Two runs of 160 on
+  one phone, both with fewer than ten discordant pairs in the second, is a replication of
+  the direction and not yet a measurement of the size. The gate stays, and the caveat
+  stays with it. On these rows the GGUF also narrated a search it had not made twice in
+  160 under each arm, so "never" in the earlier paragraph reads "0 of 640 on seed 7".
 - **The confidence gate.** It is the GGUF's measured gain and it runs only on llama.cpp.
 
 ## What the recommendation does not yet say on the screen
@@ -151,6 +167,7 @@ mark the graded file on the fit card, or filter the recommended row to it.
 - A paired grade of the 2.6B's compiled export against its GGUF on the decision suite, the
   measurement this reversal of that row does not have.
 
+- A third held-out draw, and a second phone, before the gate's size is quoted as a number.
 - The llama.cpp columns of the matrix are the Q4_K_M and Q8_0 files of 2026-09-03. The
   QAD Q4_0 file with the vendor microkernels, the one that closes the prefill gap on the
   Dimensity 9400, has never been run through the matrix on the other five chips, nor through

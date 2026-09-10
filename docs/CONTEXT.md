@@ -274,8 +274,12 @@ modified. Kept: the fresh-install default, the search framing every 160-row run 
 intent rule, the apostrophe normalisation, the gate. Changed on review (Codex, Gemini): the
 narration cut now fires only on a stream that carries no token probabilities, which is the
 compiled runtime read as a capability, because an early stop with no arm-scale measurement
-does not belong on the runtime that never produced the shape it cuts. Priority as set:
-stability, quality, then speed. Note: `docs/research/recommended-runtime.md`.
+does not belong on the runtime that never produced the shape it cuts. The gate's cutoff
+had been chosen on the rows it was then graded on, so a held-out draw (seed 8) ran the same
+night on the GGUF: doubt-search 48% correct and 33% on the needed rows against the intent
+rule's 45% and 29%, paired +5/-1, at 15 more unnecessary searches and 5 s of median turn;
+the direction replicates, the size is not yet a number. Priority as set: stability,
+quality, then speed. Note: `docs/research/recommended-runtime.md`.
 
 ### The narration is cut at its first sentence (2026-09-10, night)
 

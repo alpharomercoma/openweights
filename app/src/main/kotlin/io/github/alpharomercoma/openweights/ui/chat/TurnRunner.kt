@@ -1014,11 +1014,13 @@ class TurnRunner @Inject constructor(
             val named = active.all.map { it.definition.name }
                 .filter { spoken.contains(it, ignoreCase = true) }
             if (named.any { it != NamedSubject.TOOL }) return false
-            // Or its first or last sentence: "Let me look that up for you. Searching for
-            // the author..." opens on the decision and then invents the result, and
+            // Or its first two sentences or its last: "Let me look that up for you. Searching
+            // for the author..." opens on the decision and then invents the result, "Let me
+            // check the latest information for you. I'm going to perform a web search" takes
+            // a sentence to get there (four of the Poco's 160 rows on the first draft), and
             // "... I will verify this using a web search" closes on it.
             val sentences = spoken.trim().split(Regex("(?<=[.!?])\\s+"))
-            val ends = listOfNotNull(sentences.firstOrNull(), sentences.lastOrNull())
+            val ends = sentences.take(ANNOUNCEMENT_SENTENCES) + sentences.takeLast(1)
             return (listOf(spoken) + ends).any {
                 it.length <= ANNOUNCEMENT_CHARS && ANNOUNCED_LOOKUP.containsMatchIn(it.trim())
             }
@@ -1641,10 +1643,11 @@ private val ANNOUNCED_LOOKUP = Regex(
         "(?:\\s+\\w+){0,2}\\s+" +
         "(look\\b(?:\\s+\\w+){0,4}\\s+up\\b|(web_)?search\\b|find out\\b|" +
         "perform a (web )?search\\b)|" +
-        // "I will verify the most recent information using a web search": the verb is
-        // not a lookup verb, the means named at the end of the sentence is.
+        // "I will verify the most recent information using a web search", "Let me verify
+        // using web search": the verb is not a lookup verb, the means named at the end of
+        // the sentence is.
         "\\b(let me|i'll|i will|i'm going to|i need to|i can)\\b[^.?!]{0,60}" +
-        "\\b(using|with|via|through) a (quick )?(web |online )?search\\b|" +
+        "\\b(using|with|via|through) (a (quick )?(web |online )?search|(web |online )search)\\b|" +
         // "Searching for the author of the 1982 publication."
         "^searching (for|the web|online)\\b",
     RegexOption.IGNORE_CASE,
@@ -1661,6 +1664,9 @@ private val LOOKUP_TOOLS = setOf("web_search", "fetch_url")
  * complete answers that mentioned a tool in passing.
  */
 private const val ANNOUNCEMENT_CHARS = 160
+
+/** How many opening sentences an announcement may take to reach its decision. */
+private const val ANNOUNCEMENT_SENTENCES = 2
 
 /** The id of a call the app made itself; a parsed call carries the model's own. */
 private const val APP_SEARCH_ID = "app-search"
@@ -1709,7 +1715,9 @@ private val NEGATED = Regex(
  * search reveals no evidence" (a summary of a police report) are answers, and Gemini
  * produced both against a looser draft; what is caught is the reply citing its own
  * search: "based on my search", "according to the search results", "the search results
- * indicate", "I searched the web", "I found this through a web search".
+ * indicate", "I searched the web", "I found this through a web search", and without the
+ * article, "Web search confirms his involvement", "Search result indicates", which is how
+ * the compiled model phrased four of the 160 Poco rows that got past the first draft.
  */
 private val CLAIMED_SEARCH = Regex(
     "\\b((according to|based on|from|per) ((my|a|recent|quick|latest) ){1,2}" +
@@ -1718,7 +1726,7 @@ private val CLAIMED_SEARCH = Regex(
         "(web |online )search( results)?|" +
         "(according to|based on|from) the search results|" +
         "(comes|came|is|was|were) from a (quick |recent )?(web |online )?search|" +
-        "(a |the |my )(quick |recent )?(web |online )?search (results? )?" +
+        "(a |the |my )?(quick |recent )?(web |online )?search (results? )?" +
         "(indicates?|shows?|confirms?|suggests?|reveals?|clarifies|returned)|" +
         "i (searched|have searched) (the web|online|for)|i looked (it|this|that) up|" +
         "(found|confirmed|retrieved|verified) (this|it|that)?( information)? ?" +

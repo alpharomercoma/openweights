@@ -122,6 +122,10 @@ class TurnRepairsTest {
                 "If you mean a recording, a quick web search clarifies that it is X Japan's.",
                 "Let me look that up for you. Searching for the author of the 1982 publication. It is Adams.",
                 "The champion is Jenson. I will verify the most recent information using a web search.",
+                "Let me check the latest for you. I'm going to perform a web search to find it. It is Adams.",
+                "There are films titled Glass. Let me verify using web search. The director is Shyamalan.",
+                "The director of Possessed is Tim Burton. Web search confirms his involvement.",
+                "The author of Today is Raymond Chandler. Search result indicates his association.",
             )
             for (claim in claims) {
                 engine.scripted.clear()

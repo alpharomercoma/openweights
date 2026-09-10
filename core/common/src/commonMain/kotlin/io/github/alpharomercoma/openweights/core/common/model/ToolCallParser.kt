@@ -121,35 +121,61 @@ object ToolCallParser {
      * Worth its own branch because the failure was silent and expensive: the tags parsed
      * as neither JSON nor prose, so the call never ran and the markup was shown to the
      * user as the model's answer.
+     *
+     * Every envelope, and every `<function>` inside one, for the reason [parseTaggedJson]
+     * gives: a model asked for two things calls twice in one reply, and reading one of
+     * them runs half the errand. The JSON side was fixed for exactly that and this one
+     * was left reading a single call — in the shape Qwen3.5's own template teaches, where
+     * the model has no way to write JSON instead. A phone running Qwen asked to do two
+     * things therefore did one, and read from the outside as a model that under-calls
+     * rather than as a parser that stopped early.
      */
     private fun parseTaggedXml(raw: String): ParsedToolCalls? {
-        val start = raw.indexOf(JSON_START)
-        if (start < 0) return null
-        val end = raw.indexOf(JSON_END, start)
-        if (end < 0) return null
+        val calls = mutableListOf<ToolCall>()
+        val text = StringBuilder()
+        var cursor = 0
+        var start = raw.indexOf(JSON_START)
+        while (start >= 0) {
+            val end = raw.indexOf(JSON_END, start)
+            if (end < 0) break
+            val body = raw.substring(start + JSON_START.length, end)
 
-        val body = raw.substring(start + JSON_START.length, end)
-        val name = FUNCTION_TAG.find(body)?.groupValues?.get(1)?.trim() ?: return null
-
-        val arguments = PARAMETER_TAG.findAll(body).mapNotNull { match ->
-            val key = match.groupValues[1].trim()
-            // Trimmed because the value is usually on its own line between the tags, and a
-            // URL with a newline in it is not a URL.
-            val value = match.groupValues[2].trim()
-            if (key.isEmpty()) null else "\"$key\": ${value.asJsonString()}"
-        }.toList()
-
-        val text = (raw.take(start) + raw.substring(end + JSON_END.length)).trim()
-        return ParsedToolCalls(
-            text,
-            listOf(
-                ToolCall(
-                    id = name,
-                    name = name,
-                    argumentsJson = "{${arguments.joinToString(", ")}}",
-                ),
-            ),
-        )
+            val openings = FUNCTION_TAG.findAll(body).toList()
+            if (openings.isEmpty()) {
+                // A `<tool_call>` wrapping JSON is [parseTaggedJson]'s business. Leaving it
+                // in `text` is what lets that branch claim it, so the other shape survives
+                // whatever order the two are tried in.
+                text.append(raw, cursor, end + JSON_END.length)
+            } else {
+                text.append(raw, cursor, start)
+                openings.forEachIndexed { index, opening ->
+                    // This function's parameters run to wherever the next one opens, which
+                    // is what keeps a reply that omits `</function>` readable rather than
+                    // silently dropping every parameter after the first tag.
+                    val from = opening.range.last + 1
+                    val to = openings.getOrNull(index + 1)?.range?.first ?: body.length
+                    val name = opening.groupValues[1].trim()
+                    val arguments = PARAMETER_TAG.findAll(body.substring(from, to)).mapNotNull { match ->
+                        val key = match.groupValues[1].trim()
+                        // Trimmed because the value is usually on its own line between the tags, and a
+                        // URL with a newline in it is not a URL.
+                        val value = match.groupValues[2].trim()
+                        if (key.isEmpty()) null else "\"$key\": ${value.asJsonString()}"
+                    }.toList()
+                    calls +=
+                        ToolCall(
+                            id = "$name-${calls.size}",
+                            name = name,
+                            argumentsJson = "{${arguments.joinToString(", ")}}",
+                        )
+                }
+            }
+            cursor = end + JSON_END.length
+            start = raw.indexOf(JSON_START, cursor)
+        }
+        if (calls.isEmpty()) return null
+        text.append(raw, cursor, raw.length)
+        return ParsedToolCalls(text.toString().trim(), calls)
     }
 
     /** `name(arg='value', count=2)` to a call with JSON arguments. */

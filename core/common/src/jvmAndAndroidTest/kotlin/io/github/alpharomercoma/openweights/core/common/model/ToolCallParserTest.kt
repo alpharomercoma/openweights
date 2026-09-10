@@ -217,4 +217,59 @@ class ToolCallParserTest {
 
         assertThat(ToolCallParser.parse(raw).calls).isEmpty()
     }
+
+    @Test
+    fun `two xml envelopes in one reply are two calls`() {
+        // The JSON form covers this in `two envelopes in one reply are two calls`; the XML
+        // form did not, and a Qwen3.5 asked for two things answers in the shape its own
+        // template taught it. Reading only the first ran half the errand.
+        val raw = """
+            <tool_call>
+            <function=web_search>
+            <parameter=query>
+            Manila weather
+            </parameter>
+            </function>
+            </tool_call>
+            <tool_call>
+            <function=get_weather>
+            <parameter=city>
+            Manila
+            </parameter>
+            </function>
+            </tool_call>
+        """.trimIndent()
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.map { it.name })
+            .containsExactly("web_search", "get_weather")
+            .inOrder()
+    }
+
+    @Test
+    fun `two functions in one xml envelope are two calls`() {
+        // The LFM arm already reads several calls out of one envelope. The XML arm should
+        // not depend on the model choosing one envelope per call.
+        val raw = """
+            <tool_call>
+            <function=web_search>
+            <parameter=query>
+            Manila weather
+            </parameter>
+            </function>
+            <function=get_weather>
+            <parameter=city>
+            Manila
+            </parameter>
+            </function>
+            </tool_call>
+        """.trimIndent()
+
+        val parsed = ToolCallParser.parse(raw)
+
+        assertThat(parsed.calls.map { it.name })
+            .containsExactly("web_search", "get_weather")
+            .inOrder()
+    }
 }

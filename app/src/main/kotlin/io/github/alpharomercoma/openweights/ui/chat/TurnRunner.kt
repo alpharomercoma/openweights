@@ -1014,9 +1014,13 @@ class TurnRunner @Inject constructor(
             val named = active.all.map { it.definition.name }
                 .filter { spoken.contains(it, ignoreCase = true) }
             if (named.any { it != NamedSubject.TOOL }) return false
-            val closing = spoken.trim().substringAfterLast(". ")
-            return listOf(spoken, closing).any {
-                it.length <= ANNOUNCEMENT_CHARS && ANNOUNCED_LOOKUP.containsMatchIn(it)
+            // Or its first or last sentence: "Let me look that up for you. Searching for
+            // the author..." opens on the decision and then invents the result, and
+            // "... I will verify this using a web search" closes on it.
+            val sentences = spoken.trim().split(Regex("(?<=[.!?])\\s+"))
+            val ends = listOfNotNull(sentences.firstOrNull(), sentences.lastOrNull())
+            return (listOf(spoken) + ends).any {
+                it.length <= ANNOUNCEMENT_CHARS && ANNOUNCED_LOOKUP.containsMatchIn(it.trim())
             }
         }
 
@@ -1635,7 +1639,14 @@ private fun String.invitesRepair(tools: ToolRegistry): Boolean {
 private val ANNOUNCED_LOOKUP = Regex(
     "\\b(let me|i'll|i will|i'm going to|i am going to|i need to|i can|i'd be happy to)\\b" +
         "(?:\\s+\\w+){0,2}\\s+" +
-        "(look\\b(?:\\s+\\w+){0,4}\\s+up\\b|(web_)?search\\b|find out\\b|perform a (web )?search\\b)",
+        "(look\\b(?:\\s+\\w+){0,4}\\s+up\\b|(web_)?search\\b|find out\\b|" +
+        "perform a (web )?search\\b)|" +
+        // "I will verify the most recent information using a web search": the verb is
+        // not a lookup verb, the means named at the end of the sentence is.
+        "\\b(let me|i'll|i will|i'm going to|i need to|i can)\\b[^.?!]{0,60}" +
+        "\\b(using|with|via|through) a (quick )?(web |online )?search\\b|" +
+        // "Searching for the author of the 1982 publication."
+        "^searching (for|the web|online)\\b",
     RegexOption.IGNORE_CASE,
 )
 
@@ -1701,15 +1712,14 @@ private val NEGATED = Regex(
  * indicate", "I searched the web", "I found this through a web search".
  */
 private val CLAIMED_SEARCH = Regex(
-    "\\b(based on (the |my |a |recent )?(web |online )search( results)?|" +
-        "based on (my|a|recent) search( results)?|" +
-        "based on the search results|" +
-        "according to (the |my |a )?(web |online )search( results)?|" +
-        "according to (my|a) search( results)?|" +
-        "according to the search results|" +
-        "(from|per) (my|the) (web )?search results|from my (web )?search|" +
-        "(the |my )(web )?search (results? )?" +
-        "(indicates?|shows?|confirms?|suggests?|reveals?|returned)|" +
+    "\\b((according to|based on|from|per) ((my|a|recent|quick|latest) ){1,2}" +
+        "(web |online )?search( results)?|" +
+        "(according to|based on|from) (the )?((recent|quick|latest) )?" +
+        "(web |online )search( results)?|" +
+        "(according to|based on|from) the search results|" +
+        "(comes|came|is|was|were) from a (quick |recent )?(web |online )?search|" +
+        "(a |the |my )(quick |recent )?(web |online )?search (results? )?" +
+        "(indicates?|shows?|confirms?|suggests?|reveals?|clarifies|returned)|" +
         "i (searched|have searched) (the web|online|for)|i looked (it|this|that) up|" +
         "(found|confirmed|retrieved|verified) (this|it|that)?( information)? ?" +
         "(through|via|from|by|using|with) a (web |online )?search)\\b",

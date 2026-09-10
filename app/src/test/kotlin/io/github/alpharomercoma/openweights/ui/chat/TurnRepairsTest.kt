@@ -111,6 +111,32 @@ class TurnRepairsTest {
     }
 
     @Test
+    fun `the phrasings the phone used for a search it never made are all claims`() =
+        runBlocking<Unit> {
+            // Verbatim shapes from the Poco's rows, each shown with no search made.
+            val claims = listOf(
+                "Hanover is the capital of Germany. According to recent web search results, it is large.",
+                "Ontario is the most populous. This conclusion comes from a web search showing trends.",
+                "The director is Stephen Morgan. This information comes from a web search confirming it.",
+                "Based on my recent web search, the director of Berlin is not a recognized figure.",
+                "If you mean a recording, a quick web search clarifies that it is X Japan's.",
+                "Let me look that up for you. Searching for the author of the 1982 publication. It is Adams.",
+                "The champion is Jenson. I will verify the most recent information using a web search.",
+            )
+            for (claim in claims) {
+                engine.scripted.clear()
+                engine.prompts.clear()
+                engine.scripted += ScriptedPass(claim)
+                engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
+
+                answering("who is killua zoldyck", withTools = true)
+
+                assertThat(engine.prompts).hasSize(2)
+                assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+            }
+        }
+
+    @Test
     fun `a lament about not knowing somebody is searched, not pushed`() = runBlocking<Unit> {
         engine.scripted += ScriptedPass("I don't have enough information about Killua Zoldyck.")
         engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")

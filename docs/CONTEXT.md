@@ -281,7 +281,9 @@ rule's 45% and 29%, paired +5/-1, at 15 more unnecessary searches and 5 s of med
 the direction replicates, the size is not yet a number. Priority as set: stability,
 quality, then speed. Codex's principal user risk, that a recommended row is a repository
 of eight files and only Q4_K_M carries the grades: `GRADED` now names the measured file,
-Discover lists it first and its card says "Measured". Note:
+Discover lists it first and its card says "Measured". The QAD-Q4_0 file then ran the
+suite (seed 7): level with the Q4_K_M (41% = 41%, with the gate 46% against 45%, paired
++8/-1), so it is not a worse download, only an ungraded one on the public sets. Note:
 `docs/research/recommended-runtime.md`.
 
 ### The narration is cut at its first sentence (2026-09-10, night)

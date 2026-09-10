@@ -167,6 +167,14 @@ and say nothing.
 
 ## What is still owed
 
+- **The QAD-Q4_0 file on the decision suite, done the same night** (seed 7, Poco, unplugged
+  at 25 to 14% battery, `tools/eval/results/decisions/qad-*`). It is level with the Q4_K_M
+  on what the suite measures: intent-search 41% correct against 41%, 10% against 12% on the
+  rows that needed a search, recall 60% against 47%, fabricated 0 against 0; with the gate
+  46% against 45%, 17% against 24% on the needed rows, paired +8/-1 against +15/-6. Same
+  answers, a different set of rows won. So the QAD file is not a worse download, and the
+  gate replicates on a third file; what it still lacks is the GSM8K, IFEval and BFCL grades
+  the Q4_K_M holds, so the Q4_K_M stays the file the card marks as measured.
 - A paired grade of the 2.6B's compiled export against its GGUF on the decision suite, the
   measurement this reversal of that row does not have.
 

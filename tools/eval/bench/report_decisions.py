@@ -9,12 +9,12 @@ phone, with the columns the decision is read on. Prints Markdown; the note paste
 import argparse, json
 from pathlib import Path
 
-ARMS = ["bare", "driven-search", "intent-search", "first-search", "driven-full", "intent-full"]
+ARMS = ["bare", "driven-search", "intent-search", "doubt-search", "first-search", "driven-full", "intent-full"]
 MODELS = {"LFM2.5-1.2B-Instruct-8da4w-32k.pte": "LFM2.5 1.2B compiled (8da4w)",
           "LFM2.5-1.2B-Instruct-Q4_K_M.gguf": "LFM2.5 1.2B Q4_K_M",
           "Qwen3-1.7B-Q8_0.gguf": "Qwen3 1.7B Q8_0"}
 PHONES = {"poco": "Dimensity 9400", "tensor": "Tensor G5", "exynos": "Exynos 2400", "elite": "8 Elite",
-          "five": "Dimensity 9400, five results"}
+          "five": "Dimensity 9400, five results", "min3": "Dimensity 9400, three-token gate"}
 COLS = [("recall", "Searched when needed"), ("unnecessary", "Searched when not"),
         ("correct", "Correct"), ("correct_need", "Correct, needed"), ("correct_known", "Correct, known"),
         ("fabricated", "Fabricated search"), ("findable", "Answer in results"),

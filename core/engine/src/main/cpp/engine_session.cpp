@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <chrono>
 #include <cstdio>
@@ -2410,6 +2411,31 @@ void Session::save_warm_file(const char * path, const std::vector<llama_token> &
     LOGI("kv: warm state saved: %zu tokens, %zu KB", tokens.size(), state.size() / 1024);
 }
 
+/**
+ * The log-probability the model itself assigned to `token` at the position just decoded.
+ *
+ * A log-softmax over the raw logits, which is one pass over the vocabulary per token: a
+ * few tens of microseconds against the milliseconds a token costs to produce. The raw
+ * logits, not the sampler's view, because the question is what the model believed, not
+ * what temperature or a grammar left it to choose from.
+ */
+static float sampled_logprob(const llama_vocab * vocab, llama_context * ctx, llama_token token) {
+    const float * logits = llama_get_logits_ith(ctx, -1);
+    const int n = llama_vocab_n_tokens(vocab);
+    if (logits == nullptr || token < 0 || token >= n) {
+        return NAN;
+    }
+    float peak = logits[0];
+    for (int i = 1; i < n; ++i) {
+        peak = std::max(peak, logits[i]);
+    }
+    double sum = 0.0;
+    for (int i = 0; i < n; ++i) {
+        sum += std::exp(static_cast<double>(logits[i] - peak));
+    }
+    return logits[token] - peak - static_cast<float>(std::log(sum));
+}
+
 StopReason Session::generate(
     const std::vector<ChatMessage> & messages,
     const std::vector<ToolDefinition> & tools,
@@ -2649,13 +2675,16 @@ StopReason Session::generate(
             safe_reply += close;
             in_thinking = false;
             LOGI("reasoning: closed the block at the budget of %d", sampler_config.reasoning_budget);
-            if (!on_token(close.c_str())) {
+            if (!on_token(close.c_str(), NAN)) {
                 reason = StopReason::CANCELLED;
                 break;
             }
         }
 
         llama_token token;
+        // The model's log-probability for the token it chose, read off the raw logits
+        // before the sampler chain shaped them; only a freshly sampled token has one.
+        float token_logprob = NAN;
         // Whether `token` is already in the cache (an accepted draft token) or still has
         // to be decoded into it (everything else).
         bool already_committed = false;
@@ -2668,6 +2697,7 @@ StopReason Session::generate(
             has_pending_token = false;
         } else {
             token = llama_sampler_sample(sampler, ctx_, -1);
+            token_logprob = sampled_logprob(vocab, ctx_, token);
         }
         if (llama_vocab_is_eog(vocab, token)) {
             reason = StopReason::END_OF_TURN;
@@ -2725,7 +2755,7 @@ StopReason Session::generate(
             const std::string emit = pending.substr(0, complete);
             pending.erase(0, complete);
             safe_reply += emit;
-            if (!on_token(emit.c_str())) {
+            if (!on_token(emit.c_str(), in_thinking ? NAN : token_logprob)) {
                 reason = StopReason::CANCELLED;
                 break;
             }

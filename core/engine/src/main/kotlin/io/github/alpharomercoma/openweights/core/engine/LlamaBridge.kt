@@ -25,9 +25,13 @@ package io.github.alpharomercoma.openweights.core.engine
  */
 @Suppress("TooManyFunctions")
 internal class LlamaBridge {
-    /** Receives each generated fragment. Returning false stops generation. */
+    /**
+     * Receives each generated fragment with the model's log-probability for it, NaN where
+     * the native side has none (a drafted token, a thinking token, a tag it wrote itself).
+     * Returning false stops generation.
+     */
     internal fun interface TokenSink {
-        fun onToken(text: String): Boolean
+        fun onToken(text: String, logprob: Float): Boolean
     }
 
     /**

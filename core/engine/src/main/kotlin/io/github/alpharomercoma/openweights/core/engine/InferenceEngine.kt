@@ -143,8 +143,14 @@ private const val MILLIS_PER_SECOND = 1000.0
 
 /** What the engine emits while producing a reply. */
 sealed interface GenerationEvent {
-    /** A fragment of the reply. Fragments are not necessarily whole words. */
-    data class Token(val text: String) : GenerationEvent
+    /**
+     * A fragment of the reply. Fragments are not necessarily whole words.
+     *
+     * [logprob] is the model's own log-probability for the token behind the fragment, where
+     * the engine can read it (llama.cpp can, the ExecuTorch runner exposes no logits), and
+     * null otherwise. The loop reads the first few as the model's confidence in its answer.
+     */
+    data class Token(val text: String, val logprob: Float? = null) : GenerationEvent
 
     /**
      * Terminal event carrying why generation stopped, how fast it ran, and the reply as

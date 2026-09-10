@@ -55,6 +55,8 @@ data class ScriptedPass(
     val content: String = text,
     val toolCalls: List<ToolCall> = emptyList(),
     val reason: StopReason = StopReason.END_OF_TURN,
+    /** The model's log-probability for the reply's tokens, as llama.cpp would report it. */
+    val logprob: Float? = null,
 )
 
 /**
@@ -243,7 +245,7 @@ class FakeInferenceEngine : InferenceEngine {
         if (!hold) {
             val pass = scripted.removeFirstOrNull() ?: ScriptedPass(REPLY)
             return flow {
-                emit(GenerationEvent.Token(pass.text))
+                emit(GenerationEvent.Token(pass.text, pass.logprob))
                 emit(
                     GenerationEvent.Completed(
                         reason = pass.reason,

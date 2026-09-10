@@ -644,7 +644,7 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
     sampler.reasoning_budget = reasoning_budget;
 
     jclass sink_class = env->GetObjectClass(token_sink);
-    jmethodID on_token = env->GetMethodID(sink_class, "onToken", "(Ljava/lang/String;)Z");
+    jmethodID on_token = env->GetMethodID(sink_class, "onToken", "(Ljava/lang/String;F)Z");
     if (on_token == nullptr) {
         throw_engine_exception(env, "TokenSink.onToken not found");
         return nullptr;
@@ -668,9 +668,10 @@ Java_io_github_alpharomercoma_openweights_core_engine_LlamaBridge_nativeGenerate
 
     const StopReason reason = session->generate(
         messages, tools, sampler, thinking,
-        [&](const char * piece) -> bool {
+        [&](const char * piece, float logprob) -> bool {
             jstring text = to_jstring(env, piece);
-            const jboolean keep_going = env->CallBooleanMethod(token_sink, on_token, text);
+            const jboolean keep_going = env->CallBooleanMethod(
+                token_sink, on_token, text, static_cast<jfloat>(logprob));
             env->DeleteLocalRef(text);
             // A Kotlin-side exception must stop generation immediately.
             if (env->ExceptionCheck() == JNI_TRUE) {

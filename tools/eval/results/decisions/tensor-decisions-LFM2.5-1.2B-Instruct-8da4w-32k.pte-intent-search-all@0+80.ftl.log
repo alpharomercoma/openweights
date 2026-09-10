@@ -21,3 +21,14 @@ Test results will be streamed to [ https://console.firebase.google.com/project/a
 15:11:32 Test is Running
 15:24:15 Done. Test time = 646 (secs)
 15:24:15 Starting results processing. Attempt: 1
+15:24:28 Completed results processing. Time taken = 10 (secs)
+15:24:28 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.9724488f91bc783d/matrices/5557665790069623667 ].
+┌─────────┬────────────────────────┬─────────────────────┐
+│ OUTCOME │    TEST_AXIS_VALUE     │     TEST_DETAILS    │
+├─────────┼────────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ mustang-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────────┴─────────────────────┘

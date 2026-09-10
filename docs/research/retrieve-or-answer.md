@@ -32,6 +32,7 @@ app can vary:
 | `driven-full` | web_search and the fifteen other definitions from the prompt dump, as stubs | the same, over the catalogue every measurement before 2026-09-08 carried |
 | `first-search` | web_search | the rejected route, for the record |
 | `intent-search`, `intent-full` | as above | the model decides, and what it decides in words is carried out (below) |
+| `doubt-search` | web_search | the intent rule, and the search the app makes when the model's own token probabilities put its answer in doubt (`honoursDoubt`) |
 
 `grade_decisions.py` on the host: recall (searched when the row needed it), unnecessary
 searches, correctness by the sets' own containment rule widened to a token F1 of 0.5 and
@@ -121,8 +122,9 @@ rows whose label says the weights cannot answer; "when not" is the rate on the 6
 label says they can; "correct" is on the 117 rows whose answer is time-stable; "answer in
 results" is how often the gold alias was in the snippets a search brought back, and
 "correct when findable" what the model did when it was. The Dimensity rows ran the
-build of each arm's day; the lab rows for the intent arms were rerun on the final matchers
-after Test Lab's fifty-executions-a-day quota reset. One Dimensity `intent-full` row carries
+build of each arm's day; the lab rows for the compiled model's intent arm were rerun on
+the final matchers after Test Lab's fifty-executions-a-day quota reset, and the lab was
+stopped there by decision: the full-catalogue and doubt arms are Dimensity-only. One Dimensity `intent-full` row carries
 a latency of 6,818 s, the two hours the phone spent suspended (below); it is kept, and the
 medians do not feel it. Regenerate with `grade_decisions.py` then `report_decisions.py`.
 
@@ -134,10 +136,9 @@ medians do not feel it. Regenerate with `grade_decisions.py` then `report_decisi
 | LFM2.5 1.2B compiled (8da4w) | driven-search | Tensor G5 | 1% (1/75) | 0% (0/60) | 32% (38/117) | 7% (3/42) | 57% (34/60) | 22% (35/160) | 0% (0/1) | n/a | 4.4 | 2187.5 | 170.0 |
 | LFM2.5 1.2B compiled (8da4w) | driven-search | Exynos 2400 | 1% (1/75) | 0% (0/60) | 34% (40/117) | 14% (6/42) | 57% (34/60) | 21% (33/160) | 0% (0/1) | n/a | 4.3 | 2927.0 | 176.5 |
 | LFM2.5 1.2B compiled (8da4w) | driven-search | 8 Elite | 4% (3/75) | 0% (0/60) | 30% (35/117) | 7% (3/42) | 53% (32/60) | 20% (32/160) | 33% (1/3) | 100% (1/1) | 3.4 | 2535.5 | 164.5 |
-| LFM2.5 1.2B compiled (8da4w) | intent-search | Dimensity 9400 | 31% (23/75) | 15% (9/60) | 35% (41/117) | 5% (2/42) | 63% (38/60) | 2% (4/160) | 28% (11/39) | 73% (8/11) | 3.4 | 2152.5 | 174.0 |
-| LFM2.5 1.2B compiled (8da4w) | intent-search | Tensor G5 | 27% (20/75) | 12% (7/60) | 38% (44/117) | 10% (4/42) | 65% (39/60) | 4% (7/160) | 26% (9/34) | 89% (8/9) | 5.1 | 2558.5 | 180.0 |
-| LFM2.5 1.2B compiled (8da4w) | intent-search | Exynos 2400 | 27% (20/75) | 13% (8/60) | 39% (46/117) | 14% (6/42) | 65% (39/60) | 3% (5/160) | 25% (8/32) | 100% (8/8) | 4.3 | 2906.5 | 175.5 |
-| LFM2.5 1.2B compiled (8da4w) | intent-search | 8 Elite | 37% (28/75) | 12% (7/60) | 38% (44/117) | 10% (4/42) | 65% (39/60) | 2% (3/160) | 31% (13/42) | 77% (10/13) | 3.4 | 2483.5 | 170.0 |
+| LFM2.5 1.2B compiled (8da4w) | intent-search | Tensor G5 | 33% (25/75) | 13% (8/60) | 37% (43/117) | 5% (2/42) | 67% (40/60) | 1% (1/160) | 29% (12/41) | 75% (9/12) | 5.7 | 3170.5 | 192.0 |
+| LFM2.5 1.2B compiled (8da4w) | intent-search | Exynos 2400 | 29% (22/75) | 12% (7/60) | 38% (45/117) | 12% (5/42) | 65% (39/60) | 2% (4/160) | 37% (13/35) | 69% (9/13) | 4.4 | 2938.0 | 205.5 |
+| LFM2.5 1.2B compiled (8da4w) | intent-search | 8 Elite | 37% (28/75) | 13% (8/60) | 38% (44/117) | 10% (4/42) | 65% (39/60) | 2% (4/160) | 35% (15/43) | 73% (11/15) | 3.5 | 2496.0 | 183.5 |
 | LFM2.5 1.2B compiled (8da4w) | intent-search | Dimensity 9400, five results | 36% (27/75) | 17% (10/60) | 38% (45/117) | 12% (5/42) | 65% (39/60) | 1% (2/160) | 25% (11/44) | 91% (10/11) | 3.2 | 1983.0 | 200.0 |
 | LFM2.5 1.2B compiled (8da4w) | first-search | Dimensity 9400 | 31% (23/75) | 20% (12/60) | 41% (48/117) | 10% (4/42) | 72% (43/60) | 2% (4/160) | 32% (14/44) | 79% (11/14) | 3.4 | 2032.0 | 148.5 |
 | LFM2.5 1.2B compiled (8da4w) | driven-full | Dimensity 9400 | 47% (35/75) | 27% (16/60) | 29% (34/117) | 5% (2/42) | 52% (31/60) | 6% (10/160) | 35% (23/66) | 65% (15/23) | 14.9 | 9918.5 | 138.5 |
@@ -150,7 +151,9 @@ medians do not feel it. Regenerate with `grade_decisions.py` then `report_decisi
 | LFM2.5 1.2B Q4_K_M | intent-search | Dimensity 9400 | 47% (35/75) | 25% (15/60) | 41% (48/117) | 12% (5/42) | 70% (42/60) | 0% (0/160) | 27% (17/62) | 88% (15/17) | 5.3 | 3429.0 | 159.0 |
 | LFM2.5 1.2B Q4_K_M | intent-search | Tensor G5 | 47% (35/75) | 25% (15/60) | 41% (48/117) | 10% (4/42) | 72% (43/60) | 0% (0/160) | 29% (18/63) | 83% (15/18) | 8.3 | 4435.0 | 152.5 |
 | LFM2.5 1.2B Q4_K_M | intent-search | Exynos 2400 | 45% (34/75) | 25% (15/60) | 41% (48/117) | 10% (4/42) | 72% (43/60) | 0% (0/160) | 30% (18/61) | 83% (15/18) | 8.3 | 6076.5 | 151.0 |
-| LFM2.5 1.2B Q4_K_M | intent-search | 8 Elite | 45% (34/75) | 27% (16/60) | 41% (48/117) | 10% (4/42) | 72% (43/60) | 0% (0/160) | 34% (21/62) | 81% (17/21) | 6.5 | 3847.0 | 153.0 |
+| LFM2.5 1.2B Q4_K_M | intent-search | 8 Elite | 45% (34/75) | 25% (15/60) | 42% (49/117) | 10% (4/42) | 73% (44/60) | 0% (0/160) | 30% (18/61) | 89% (16/18) | 5.4 | 3611.0 | 150.0 |
+| LFM2.5 1.2B Q4_K_M | doubt-search | Dimensity 9400 | 61% (46/75) | 40% (24/60) | 45% (53/117) | 24% (10/42) | 70% (42/60) | 0% (0/160) | 35% (31/88) | 81% (25/31) | 9.1 | 3646.5 | 167.5 |
+| LFM2.5 1.2B Q4_K_M | doubt-search | Dimensity 9400, three-token gate, not shipped | 55% (41/75) | 40% (24/60) | 44% (51/117) | 12% (5/42) | 75% (45/60) | 0% (0/160) | 38% (31/81) | 81% (25/31) | 14.1 | 5467.0 | 171.0 |
 | LFM2.5 1.2B Q4_K_M | first-search | Dimensity 9400 | 44% (33/75) | 25% (15/60) | 41% (48/117) | 12% (5/42) | 70% (42/60) | 0% (0/160) | 30% (18/60) | 83% (15/18) | 5.5 | 3547.0 | 118.0 |
 | LFM2.5 1.2B Q4_K_M | driven-full | Dimensity 9400 | 59% (44/75) | 25% (15/60) | 34% (40/117) | 7% (3/42) | 60% (36/60) | 2% (4/160) | 32% (24/75) | 88% (21/24) | 29.6 | 24044.0 | 138.0 |
 | LFM2.5 1.2B Q4_K_M | intent-full | Dimensity 9400 | 72% (54/75) | 33% (20/60) | 39% (46/117) | 17% (7/42) | 63% (38/60) | 2% (3/160) | 40% (37/92) | 81% (30/37) | 32.9 | 25085.5 | 99.0 |
@@ -164,6 +167,7 @@ medians do not feel it. Regenerate with `grade_decisions.py` then `report_decisi
 | Qwen3 1.7B Q8_0 | intent-search | Tensor G5 | 37% (28/75) | 20% (12/60) | 41% (48/117) | 12% (5/42) | 70% (42/60) | 1% (1/160) | 31% (15/49) | 73% (11/15) | 19.1 | 10099.0 | 188.0 |
 | Qwen3 1.7B Q8_0 | intent-search | Exynos 2400 | 36% (27/75) | 20% (12/60) | 39% (46/117) | 10% (4/42) | 68% (41/60) | 1% (2/160) | 31% (15/48) | 67% (10/15) | 16.6 | 10920.0 | 186.5 |
 | Qwen3 1.7B Q8_0 | intent-search | 8 Elite | 37% (28/75) | 20% (12/60) | 39% (46/117) | 12% (5/42) | 67% (40/60) | 2% (3/160) | 31% (15/49) | 73% (11/15) | 6.5 | 3214.5 | 195.0 |
+| Qwen3 1.7B Q8_0 | doubt-search | Dimensity 9400 | 39% (29/75) | 22% (13/60) | 39% (46/117) | 12% (5/42) | 65% (39/60) | 0% (0/160) | 21% (11/52) | 82% (9/11) | 10.8 | 6894.0 | 212.0 |
 | Qwen3 1.7B Q8_0 | first-search | Dimensity 9400 | 35% (26/75) | 20% (12/60) | 40% (47/117) | 12% (5/42) | 67% (40/60) | 0% (0/160) | 30% (14/47) | 79% (11/14) | 9.0 | 5935.0 | 189.5 |
 
 What the table says, in the order the questions were asked:
@@ -288,6 +292,84 @@ search framing, not a sentence quoted from it.
 - **The instrumentation outlives a wireless-debugging drop.** Adb went away at 12:24 with
   the driver attached; the test kept writing rows on the phone and had finished two arms
   by the time the port was found again. Rows are on the phone, not on the adb session.
+
+## The doubt the text never shows: the model's own token probabilities
+
+Forty-two rows the compiled model, and thirty-odd the GGUF, needed to search and answered
+wrongly with nothing in the text to act on. The one signal such an answer still carries is
+the probability the model gave its own tokens. FLARE (2023) retrieves when a generated
+token's probability falls under a line; TARG (arXiv 2511.09803, 2026) decodes a short
+no-context draft, scores its logits, and gates retrieval on the score at a chosen budget,
+on 7B and 8B models only. Whether a 1B to 2B quantised model on a phone carries the same
+signal was the open question, and it was answered offline first: `confidence.py` runs the
+160 rows through a local llama-server with the phone's system prompt, greedy, and keeps
+every token's log-probability (results under `tools/eval/results/confidence/`).
+
+| Statistic over the first 20 reply tokens | LFM2.5 1.2B Q4_K_M, AUROC for a wrong answer | Qwen3 1.7B Q8_0 |
+|---|---|---|
+| Least likely token's probability | 0.78 | 0.70 |
+| Mean of the three least likely | 0.80 | 0.70 |
+| Mean log-probability | 0.78 | 0.69 |
+| Smallest top-1 minus top-2 margin | 0.73 | 0.71 |
+
+The signal is there, and stronger on the model that needs it. What does not exist is a
+scale shared by models: the Q8_0 1.7B is more confident everywhere, so a mean
+log-probability that sends the least sure 40% of one model's answers to search sends none
+of the other's. A rolling per-model quantile was drafted and dropped on review (Codex: it
+budgets a search rate, not an error rate, and drifts with whatever the user asks; Gemini:
+sixty-four easy turns poison it). A probability of a single token is the scale that
+transfers: "one of the model's first twenty tokens had less than a one-in-five chance"
+means the same thing whichever model said it.
+
+| Cutoff on the least likely opening token | LFM: sent / wrong / right | Qwen3: sent / wrong / right |
+|---|---|---|
+| 0.1 | 31 / 31 / 0 | 5 / 5 / 0 |
+| 0.2 | 58 / 54 / 4 | 29 / 28 / 1 |
+| 0.3 | 88 / 79 / 9 | 48 / 45 / 3 |
+| 0.4 | 126 / 102 / 24 | 65 / 57 / 8 |
+
+And where a cutoff fires for nothing: 48 asks that need no search, twelve each of writing,
+code, device-style instructions and text work, through the same models. At 0.2 the LFM
+fires on 5 (three poems, a bug fix, an email) and Qwen3 on 2 (two naming asks); at 0.3 on
+16 and 9. So the line is 0.2, and the rule is `TurnRunner.honourDoubt`: a pass with no tool call
+whose least likely opening token fell under a one-in-five chance is dropped, the app
+searches the question, and the model answers again from the results, through the same
+path and guards as the intent rule (search on offer, none yet this turn, not plan mode,
+not the user's own things, not a question back, not a long reply, nothing pasted). The
+mean of the three least likely tokens, which both reviewers preferred so that one rare
+surname or code identifier cannot decide alone, was measured beside it, offline (41 sent
+and 39 wrong on the LFM at 0.25, 7 and 7 on Qwen3, 3 and 1 false fires on the 48) and on
+the phone (below). llama.cpp gives the loop
+each token's log-probability from the raw logits at the sampled id; the ExecuTorch runner
+exposes no logits, so the compiled model carries no confidence and the rule never fires
+for it, which is the honest state of that runtime rather than a design.
+
+On the phone, search offered, 160 rows, paired against the intent arm on the same rows:
+
+| Model | Arm | Searched when needed | Searched when not | Correct | Correct, needed | Correct, known | App searches, right after | Right where the intent arm was wrong / the reverse | Median s |
+|---|---|---|---|---|---|---|---|---|---|
+| LFM2.5 1.2B Q4_K_M | intent-search | 47% | 25% | 41% | 12% | 70% | 12, 4 | | 5.3 |
+| LFM2.5 1.2B Q4_K_M | doubt-search, least likely token < 0.2 (shipped) | 61% | 40% | 45% | 24% | 70% | 38, 17 | 15 / 6 (McNemar p = 0.08) | 9.1 |
+| LFM2.5 1.2B Q4_K_M | doubt-search, three least likely < 0.25 | 55% | 40% | 44% | 12% | 75% | 31, 14 | 10 / 2 (p = 0.04) | 8.2 |
+| Qwen3 1.7B Q8_0 | intent-search | 29% | 20% | 39% | 12% | 67% | 4, 2 | | 9.2 |
+| Qwen3 1.7B Q8_0 | doubt-search, least likely token < 0.2 | 29% | 22% | 39% | 12% | 65% | 9, 4 | 2 / 3 | 10.8 |
+
+The single-token gate added 26 searches on the LFM beyond the intent rule's: 11 on rows
+labelled as needing one (none right before, 4 after), 9 on rows labelled answerable (2
+right before, 6 after), 6 on fresh rows (none before, 3 after); only 4 landed on a row the
+bare model had right, and 2 of those stayed right. The six rows it lost were searches the
+model made itself in both arms, with different results the second time. The three-token
+gate makes seven fewer searches and against the single-token run is 6 to 7 on the same
+questions, a tie overall; but the searches it saves are on rows that needed one (15 against
+20, ending right 3 times against 7), and on those rows it gets 10 right to the single
+token's 14 and the intent arm's 8. A tie bought by skipping the rows the rule exists for is
+not the cheaper one, so the single token shipped and the other is one constant away.
+Correctness on the rows that needed a search goes from 12% to 24%, the first movement that
+column has shown on the GGUF. On Qwen3 the gate fired nine times against four and changed nothing, which is
+what a cutoff should do to a model that is sure. The price is the searches: a gated row on
+the LFM takes about 12 s against 4.7 without, and the median turn goes from 5.3 s to 8 or
+9 because 81 or 88 rows searched instead of 62. The three-token run's timings were taken
+while the phone was in use and are quoted as such.
 
 ## What is not fixed, and said so
 

@@ -54,6 +54,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.exp
 
 /** What the screen needs to be told while a turn runs. */
 interface TurnListener {
@@ -118,6 +119,17 @@ class TurnRunner @Inject constructor(
      */
     @VisibleForTesting
     internal var honoursIntent: Boolean = true
+
+    /**
+     * Whether a pass the model was unsure of is searched for it. See `honourDoubt`; off
+     * in the decision suite's other arms for the same reason as [honoursIntent].
+     */
+    @VisibleForTesting
+    internal var honoursDoubt: Boolean = true
+
+    /** The last answering pass's draft confidence, for the decision suite's rows. */
+    @VisibleForTesting
+    internal var lastConfidence: Float? = null
 
     /**
      * The plan the app is holding, for the screen to show and the user to tick.
@@ -1067,7 +1079,72 @@ class TurnRunner @Inject constructor(
          * because nothing was run and nothing was read.
          */
         private suspend fun repair(pass: Pass, mode: AgentMode, listener: TurnListener): Boolean =
-            honourIntent(pass, mode, listener) || push(pass, mode)
+            honourIntent(pass, mode, listener) ||
+                honourDoubt(pass, mode, listener) ||
+                push(pass, mode)
+
+        /**
+         * A pass the model was unsure of is searched for it.
+         *
+         * The one signal a confidently wrong answer gives is not in its text: on 160 public
+         * rows the compiled LFM2.5 1.2B answered 42 it needed to search wrongly with nothing
+         * to match on. What it does give is the probability it assigned its own tokens.
+         * Measured offline on the same rows and system prompt (2026-09-10, llama.cpp,
+         * greedy, `docs/research/retrieve-or-answer.md`): the least likely of the first
+         * twenty reply tokens separates a wrong bare answer from a right one at AUROC 0.78
+         * on LFM2.5 1.2B Q4_K_M and 0.70 on Qwen3 1.7B Q8_0, and one cutoff serves both,
+         * which no mean or quantile did (the Q8_0 1.7B is more confident everywhere, so a
+         * mean log-probability that sends 40% of one model's answers sends none of the
+         * other's). Below [DOUBT_PROBABILITY] the LFM sends 58 rows, 54 of them wrong, and
+         * Qwen3 29, 28 of them wrong; a model that is sure sends nothing, so plain traffic
+         * pays nothing. Forty-eight asks that need no search (poems, code, device
+         * instructions, text work) through the same cutoff: it fires for nothing on 5 and
+         * 2 of them. The mean of the three least likely tokens under 0.25, which both
+         * reviewers preferred so that one rare surname cannot decide alone, was run on the
+         * phone too: a tie overall (6 rows to 7) at a fifth fewer searches, bought by
+         * skipping rows that needed one (10 right against 14), so the single token stays
+         * and the other is one constant away. TARG (arXiv 2511.09803) is the prior art: a
+         * short
+         * no-context draft, an uncertainty score from its logits, a cutoff; FLARE the
+         * older one, retrieval when a token's probability falls under a line.
+         *
+         * Same guards and same path as [honourIntent]: only where web_search is on offer,
+         * never after a search this turn, never in plan mode or on the user's own things,
+         * not for a reply that asks the user something, and not for a long reply, which is
+         * an explanation or a piece of writing whose low token probabilities are its
+         * nature rather than a sign it is wrong. The pass is dropped and the model answers
+         * again from the results. The compiled runtime exposes no logits, so its passes
+         * carry no confidence and this never fires for it.
+         */
+        private suspend fun honourDoubt(
+            pass: Pass,
+            mode: AgentMode,
+            listener: TurnListener,
+        ): Boolean {
+            val confidence = pass.confidence?.also { lastConfidence = it } ?: return false
+            if (!doubtable(pass, mode, confidence)) return false
+            appSearched = true
+            Log.i(
+                "OpenWeights",
+                "search doubted: an opening token had probability %.2f".format(exp(confidence)),
+            )
+            return appSearch(searchQuery(asked, conversation), mode, listener)
+        }
+
+        private fun doubtable(pass: Pass, mode: AgentMode, confidence: Float): Boolean {
+            val spoken = pass.spoken()
+            val pasted = conversation.any {
+                it.role == ChatRole.USER && it.text.length > GROUNDING_MAX_CHARS
+            }
+            return honoursDoubt &&
+                exp(confidence) < DOUBT_PROBABILITY &&
+                pass.event.toolCalls.isEmpty() &&
+                !pass.raw.containsToolMarkup() &&
+                mayAppSearch(mode) &&
+                !spoken.trimEnd().endsWith("?") &&
+                spoken.length <= DOUBT_MAX_CHARS &&
+                !pasted
+        }
 
         /** The one push a turn: the tool names handed back, or the denial answered. */
         private fun push(pass: Pass, mode: AgentMode): Boolean {
@@ -1223,7 +1300,15 @@ class TurnRunner @Inject constructor(
         return (model.contextSize - model.contextUsed).coerceAtLeast(0)
     }
 
-    internal class Pass(val raw: String, val event: GenerationEvent.Completed)
+    internal class Pass(
+        val raw: String,
+        val event: GenerationEvent.Completed,
+        /**
+         * The mean log-probability of the [DRAFT_LOWEST] least likely of the first
+         * [DRAFT_TOKENS] tokens, where the engine gave any.
+         */
+        val confidence: Float? = null,
+    )
 
     /**
      * What to say to a model whose call could not be read.
@@ -1260,6 +1345,10 @@ class TurnRunner @Inject constructor(
     ): Pass? {
         val reply = StringBuilder()
         var completed: GenerationEvent.Completed? = null
+        // The model's confidence in its opening, read from the tokens as they arrive: the
+        // few least likely of the first tokens, so one rare name does not decide alone.
+        val draftLowest = ArrayList<Float>(DRAFT_LOWEST + 1)
+        var draftCount = 0
         // Where the reply had reached when it was last judged, so the check runs once every
         // few hundred characters rather than once per token. Sliding a window over the whole
         // reply on every token would be quadratic in the length of the answer, which is a
@@ -1278,6 +1367,12 @@ class TurnRunner @Inject constructor(
             when (event) {
                 is GenerationEvent.Token -> {
                     reply.append(event.text)
+                    event.logprob?.takeIf { draftCount < DRAFT_TOKENS }?.let {
+                        draftLowest.add(it)
+                        draftLowest.sort()
+                        if (draftLowest.size > DRAFT_LOWEST) draftLowest.removeAt(DRAFT_LOWEST)
+                        draftCount++
+                    }
                     publishRaw(reply.toString())
                     listener.onText(reply.toString())
                     if (reply.length - checkedAt >= Degeneration.CHECK_EVERY) {
@@ -1315,9 +1410,37 @@ class TurnRunner @Inject constructor(
                 }
             }
         }
-        return completed?.let { Pass(reply.toString(), it) }
+        return completed?.let {
+            val confidence = if (draftCount > 0) draftLowest.average().toFloat() else null
+            Pass(reply.toString(), it, confidence)
+        }
     }
 }
+
+/** How many opening tokens the loop reads the model's confidence from. TARG's k. */
+private const val DRAFT_TOKENS = 20
+
+/**
+ * How many of the least likely of those are averaged into the confidence. One: the least
+ * likely token alone. Three, at a cutoff of 0.25, tied it on the phone with a fifth fewer
+ * searches and four fewer right answers on the rows that needed one (`honourDoubt`).
+ */
+private const val DRAFT_LOWEST = 1
+
+/**
+ * The probability under which an opening token is a doubt. One in five: the tables in
+ * `honourDoubt`. At 0.3 the cutoff catches 79 and 45 wrong answers on the two models but
+ * fires on a third of the asks that need no search; at 0.2 it catches 54 and 28, sends 4
+ * and 1 right answers to search, and fires on 5 and 2 of forty-eight such asks.
+ */
+private const val DOUBT_PROBABILITY = 0.2
+
+/**
+ * The longest reply a doubt is acted on. About a hundred and twenty tokens: two short
+ * paragraphs. Factual answers on the public rows run 140 to 190 characters; what runs past
+ * this is explanation or writing, and the question asked for its length.
+ */
+private const val DOUBT_MAX_CHARS = 600
 
 /**
  * The model stopped answering and started echoing, so the turn was cut short.

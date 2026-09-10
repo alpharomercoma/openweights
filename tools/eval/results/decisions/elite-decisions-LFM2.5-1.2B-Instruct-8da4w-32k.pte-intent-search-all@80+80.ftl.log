@@ -12,3 +12,27 @@ Raw results will be stored in your GCS bucket at [https://console.developers.goo
 
 Test [matrix-204452u2p8s89] has been created in the Google Cloud.
 Creating individual test executions...
+.........................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.47cce811fa71fc03/matrices/4835448000400693079 ].
+15:25:16 Test is Pending
+15:26:19 Starting attempt 1.
+15:26:19 Test is Running
+15:37:01 Infrastructure error occurred.
+15:37:01 Test is Pending
+15:37:50 Starting attempt 2.
+15:37:50 Test is Running
+15:47:31 Starting attempt 2.
+15:47:31 Test is Pending
+15:47:55 Starting results processing. Attempt: 1
+15:47:55 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.47cce811fa71fc03/matrices/4835448000400693079 ].
+┌─────────┬─────────────────────┬─────────────────────┐
+│ OUTCOME │   TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼─────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ pa3q-36-en-portrait │ 1 test cases passed │
+└─────────┴─────────────────────┴─────────────────────┘

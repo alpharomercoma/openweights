@@ -7,27 +7,16 @@ Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/androidTest/debug
 Uploading [gs://openweights-eval-models/prompt_dump.json] to Firebase Test Lab...
 Uploading [gs://openweights-eval-models/decisions.json] to Firebase Test Lab...
 Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-Q4_K_M.gguf] to Firebase Test Lab...
-Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/decisions/20260910-061018-95103-e2s/]
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/decisions/20260910-160159-18991-e2s/]
 
-Test [matrix-u8f82cx4kt5na] has been created in the Google Cloud.
+Test [matrix-1ga2gmirbfk43] has been created in the Google Cloud.
 Creating individual test executions...
-.........................................................................................................................................................................................................................................................................................................................done.
+.............................................................................................................................................................................................................................................................................................................done.
 Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
 
-Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.66e4b27d94a09eb6/matrices/5326559622951406504 ].
-06:14:37 Test is Pending
-06:15:28 Starting attempt 1.
-06:15:28 Test is Running
-06:32:42 Done. Test time = 950 (secs)
-06:32:42 Starting results processing. Attempt: 1
-06:32:56 Completed results processing. Time taken = 8 (secs)
-06:32:56 Test is Finished
-
-Instrumentation testing complete.
-
-More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.66e4b27d94a09eb6/matrices/5326559622951406504 ].
-┌─────────┬────────────────────┬─────────────────────┐
-│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
-├─────────┼────────────────────┼─────────────────────┤
-│ [32mPassed [39;0m │ e2s-36-en-portrait │ 1 test cases passed │
-└─────────┴────────────────────┴─────────────────────┘
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.66e4b27d94a09eb6/matrices/9178369247304076739 ].
+16:06:27 Test is Pending
+16:06:52 Starting attempt 1.
+16:06:52 Infrastructure error occurred.
+16:06:52 Test is Running
+ERROR: (gcloud.firebase.test.android.run) Firebase Test Lab infrastructure failure: Internal System Error 3

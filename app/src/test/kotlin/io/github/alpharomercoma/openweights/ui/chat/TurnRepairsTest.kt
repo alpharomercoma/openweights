@@ -141,6 +141,48 @@ class TurnRepairsTest {
         }
 
     @Test
+    fun `an answer the model doubts is searched`() = runBlocking<Unit> {
+        // The text has nothing to match on; one of its opening tokens had an 8% chance.
+        engine.scripted += ScriptedPass(UNSURE_ANSWER, logprob = UNSURE)
+        engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
+
+        val reply = answering("who is killua zoldyck", withTools = true)
+
+        assertThat(engine.prompts).hasSize(2)
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+        assertThat(reply).contains("Hunter x Hunter")
+    }
+
+    @Test
+    fun `an answer the model is sure of stands`() = runBlocking<Unit> {
+        engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.", logprob = SURE)
+
+        answering("who is killua zoldyck", withTools = true)
+
+        assertThat(engine.prompts).hasSize(1)
+    }
+
+    @Test
+    fun `with the doubt search off an unsure answer stands`() = runBlocking<Unit> {
+        engine.scripted += ScriptedPass(UNSURE_ANSWER, logprob = UNSURE)
+
+        val reply = answering("who is killua zoldyck", withTools = true, doubts = false)
+
+        assertThat(engine.prompts).hasSize(1)
+        assertThat(reply).contains("footballer")
+    }
+
+    @Test
+    fun `a pass with no probabilities, as the compiled runtime gives, is taken at its word`() =
+        runBlocking<Unit> {
+            engine.scripted += ScriptedPass(UNSURE_ANSWER)
+
+            answering("who is killua zoldyck", withTools = true)
+
+            assertThat(engine.prompts).hasSize(1)
+        }
+
+    @Test
     fun `a lament about not knowing somebody is searched, not pushed`() = runBlocking<Unit> {
         engine.scripted += ScriptedPass("I don't have enough information about Killua Zoldyck.")
         engine.scripted += ScriptedPass("Killua Zoldyck is from Hunter x Hunter.")
@@ -507,6 +549,7 @@ class TurnRepairsTest {
         mode: AgentMode = AgentMode.AUTO,
         honours: Boolean = true,
         tool: Tool = search,
+        doubts: Boolean = true,
     ): String {
         engine.load(modelFile(), ModelLoadParams(contextLength = CONTEXT))
         val plans = PlanBoard()
@@ -517,7 +560,10 @@ class TurnRepairsTest {
             switches = ToolSwitches(ApplicationProvider.getApplicationContext()),
             plans = plans,
             asks = asks,
-        ).apply { honoursIntent = honours }
+        ).apply {
+            honoursIntent = honours
+            honoursDoubt = doubts
+        }
         return runner.run(
             conversation = listOf(ChatMessage.text(ChatRole.USER, question)),
             params = SamplerParams(),
@@ -545,3 +591,8 @@ class TurnRepairsTest {
         const val CONTEXT = 4096
     }
 }
+
+/** Log-probabilities of an opening token the model was sure of (90%) and not (8%). */
+private const val SURE = -0.1f
+private const val UNSURE = -2.5f
+private const val UNSURE_ANSWER = "Killua Zoldyck is a Japanese footballer."

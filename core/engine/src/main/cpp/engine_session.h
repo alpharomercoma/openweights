@@ -187,8 +187,15 @@ struct WarmStats {
  */
 class Session {
 public:
-    /** Emitted for each decoded token; return false to stop generation early. */
-    using TokenCallback = std::function<bool(const char * piece)>;
+    /**
+     * Emitted for each decoded token; return false to stop generation early.
+     *
+     * `logprob` is the model's own log-probability for the token it just chose, before any
+     * sampler shaping, and NaN where there is none to give: a token accepted from a draft,
+     * a token inside a thinking block, or a closing tag the session wrote itself. The loop
+     * reads the first few of these as the model's confidence in its answer.
+     */
+    using TokenCallback = std::function<bool(const char * piece, float logprob)>;
 
     ~Session();
 

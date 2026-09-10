@@ -172,9 +172,9 @@ class LlamaCppEngine internal constructor(
             toolSchemas = tools.map { it.parametersJson }.toTypedArray(),
             enableThinking = params.thinking,
             reasoningEffort = params.reasoningEffort.wireName,
-            sink = { text ->
+            sink = { text, logprob ->
                 // trySend fails once the collector is gone, which stops generation.
-                trySend(GenerationEvent.Token(text)).isSuccess
+                trySend(GenerationEvent.Token(text, logprob.takeIf { !it.isNaN() })).isSuccess
             },
             replySink = { content, reasoning, calls ->
                 // llama.cpp knows several tool formats; where it recognises none, the

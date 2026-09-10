@@ -260,6 +260,34 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### The doubt the text never shows: search gated by the model's own token probabilities (2026-09-10)
+
+The confidently wrong answers the intent rule cannot see carry one signal: the probability
+the model gave its own tokens. Measured offline first (`tools/eval/bench/confidence.py`, a
+local llama-server with the phone's system prompt, the same 160 rows): the least likely of
+the first twenty reply tokens separates a wrong bare answer from a right one at AUROC 0.78
+on LFM2.5 1.2B Q4_K_M and 0.70 on Qwen3 1.7B Q8_0. No mean or quantile transfers between
+models (the 1.7B Q8_0 is more confident everywhere), a single token's probability does:
+under one in five, the LFM sends 58 answers to search of which 54 are wrong, Qwen3 29 of
+which 28 are wrong, and 48 asks that need no search trip it 5 and 2 times. Codex and
+Gemini reviewed a rolling per-model quantile and killed it (a search budget, not an error
+rate; poisoned by whatever the user asks); the cutoff replaced it. The llama.cpp engine now
+hands the loop each sampled token's log-probability; `TurnRunner.honourDoubt` drops a pass
+whose opening token fell under the line and searches the question through the intent
+rule's path and guards. ExecuTorch exposes no logits, so the compiled model is untouched.
+
+On the Poco, paired against the intent arm: the LFM GGUF goes from 41% to 45% correct and
+from 12% to 24% on rows that needed a search, right where the other was wrong on 15 rows
+against 6 (p = 0.08), nothing lost on rows it knew; 26 added searches, 13 of them ending
+right, 4 on rows the bare model already had; the median turn 5.3 s to 9.1 because a gated
+row costs about 12 s. A second run with the mean of the three least likely tokens under
+0.25, the reviewers' preferred statistic, tied it overall (6 to 7 on the same rows) at
+seven fewer searches, but the searches it saved were on rows that needed one (10 right
+there against 14), so the single token shipped and the other is one constant away. Qwen3 is unmoved, 39% to 39%, 2 against 3, which is what a cutoff should do
+to a model that is sure. The Test Lab sweep was stopped by decision after the compiled
+model's intent rerun; the full-catalogue and doubt arms are Dimensity-only.
+Note: `docs/research/retrieve-or-answer.md`.
+
 ### The rule measured to the end: catalogue, engines, depth, and the day's traps (2026-09-10)
 
 The intent rule's remaining arms landed. With the full sixteen-tool catalogue in the prompt

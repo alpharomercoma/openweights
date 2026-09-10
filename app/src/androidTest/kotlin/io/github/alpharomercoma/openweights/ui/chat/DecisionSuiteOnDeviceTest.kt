@@ -174,7 +174,10 @@ class DecisionSuiteOnDeviceTest {
                             // and pushes only); `intent-*` adds the search the app makes
                             // when the model says it will search, says it did, or says
                             // it does not know, and calls nothing.
-                            honoursIntent = arm.startsWith("intent-")
+                            honoursIntent = arm.startsWith("intent-") || arm.startsWith("doubt-")
+                            // `doubt-*` adds the search the app makes when the model's own
+                            // token probabilities put an answer among its least confident.
+                            honoursDoubt = arm.startsWith("doubt-")
                         }
                     val withTools = arm != "bare"
                     header(
@@ -216,6 +219,7 @@ class DecisionSuiteOnDeviceTest {
                                 ms,
                                 listener,
                                 pssBefore,
+                                runner.lastConfidence,
                             )
                         out.appendText(record.toString() + "\n")
                         Log.i(
@@ -279,7 +283,10 @@ class DecisionSuiteOnDeviceTest {
                     PlanBoard(),
                     AskBoard(),
                 )
-                    .apply { honoursIntent = false }
+                    .apply {
+                        honoursIntent = false
+                        honoursDoubt = false
+                    }
                 for ((id, question) in RECITATIONS) {
                     // With and without the instructions, and with and without the search on
                     // offer: the first run of this probe, instructions only, found no echo in
@@ -416,6 +423,7 @@ class DecisionSuiteOnDeviceTest {
         ms: Long,
         listener: Recording,
         pssBefore: Long,
+        confidence: Float?,
     ): JSONObject {
         val answer = parseAssistantReply(raw).answer.trim()
         val ran = listener.steps.filterIsInstance<AgentStep.Ran>()
@@ -456,6 +464,7 @@ class DecisionSuiteOnDeviceTest {
             .put("model", model.name).put("arm", arm).put("tool_count", toolCount)
             .put("ms", ms).put("chars", answer.length)
             .put("passes", passes).put("calls", calls).put("declined", JSONArray(skipped))
+            .put("confidence", confidence ?: JSONObject.NULL)
             .put("answer", answer).put("raw", raw)
             .put("pss_kb_before", pssBefore).put("pss_kb_after", Debug.getPss())
             .put("thermal", power?.currentThermalStatus ?: -1)

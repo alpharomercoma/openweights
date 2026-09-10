@@ -93,6 +93,7 @@
     <string name="recommended">Recommended</string>
     <string name="discover_experimental">Experimental / modified</string>
     <string name="discover_experimental_note">Models with their refusal behaviour removed. Not part of the recommendation. Listed because the app runs any model you choose.</string>
+    <string name="discover_measured_file">Measured: the file the recommendation was scored on</string>
     <string name="official">Official</string>
     <string name="filters">Filters</string>
     <string name="filters_count">Filters %1$d</string>

@@ -158,9 +158,12 @@ A shortlist row is a repository, and each of these lists eight GGUF files sorted
 Only the Q4_K_M carries the grades above; the QAD-Q4_0 is a distinct checkpoint (Liquid's
 quantisation-aware one) that has only been timed, and the plain Q4_0 and the larger quants
 have neither. A person who opens the row and takes the smallest file takes one the numbers
-here do not cover, and nothing on the file row says so. Codex named this the principal
-user-facing risk of the change, and it is the one product change this note asks for next:
-mark the graded file on the fit card, or filter the recommended row to it.
+here do not cover, and nothing on the file row said so. Codex named this the principal
+user-facing risk of the change. Done the same night: `GRADED` in `core:hub` names the
+measured file for each recommended repository, the Discover detail lists it first whatever
+its size, and its card carries "Measured: the file the recommendation was scored on".
+Qwen3 1.7B's Q8_0 is marked the same way; the 2.6B and the VL row have no graded file
+and say nothing.
 
 ## What is still owed
 

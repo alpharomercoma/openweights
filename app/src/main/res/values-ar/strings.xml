@@ -95,6 +95,7 @@
     <string name="recommended">موصى به</string>
     <string name="discover_experimental">تجريبية / معدّلة</string>
     <string name="discover_experimental_note">نماذج أُزيل منها سلوك الرفض. ليست جزءًا من التوصية. مدرجة لأن التطبيق يشغّل أي نموذج تختاره.</string>
+    <string name="discover_measured_file">مُقاس: الملف الذي قُيّمت التوصية عليه</string>
     <string name="official">رسمي</string>
     <string name="filters">عوامل التصفية</string>
     <string name="filters_count">عوامل التصفية %1$d</string>

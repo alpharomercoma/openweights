@@ -101,18 +101,7 @@ fun FitCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = inspected.file.path.substringAfterLast('/'),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Metric(formatBytes(inspected.file.sizeBytes))
-                // Stated, not offered. A compiled model's processor was decided when it
-                // was exported — the file holds delegate identifiers and loading resolves
-                // those exact ones — so this is a fact about the download rather than
-                // something the user can change afterwards.
-                inspected.compiledFor?.let { Caption(stringResource(it)) }
-            }
+            FileTitle(inspected, modifier = Modifier.weight(1f))
 
             when {
                 inspected.isDownloaded -> Caption(stringResource(R.string.on_this_device))
@@ -325,6 +314,26 @@ private fun Int.asTokens(): String {
 }
 
 private const val THOUSAND = 1_000
+
+/** The file's name, size and the two standing facts about it that no fit changes. */
+@Composable
+private fun FileTitle(inspected: InspectedFile, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = inspected.file.path.substringAfterLast('/'),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Metric(formatBytes(inspected.file.sizeBytes))
+        // Stated, not offered. A compiled model's processor was decided when it was
+        // exported, the file holds delegate identifiers and loading resolves those exact
+        // ones, so this is a fact about the download rather than something the user can
+        // change afterwards.
+        inspected.compiledFor?.let { Caption(stringResource(it)) }
+        // Which file the recommendation was measured on. The other quantisations in the
+        // same repository have no grades behind them (see GRADED).
+        if (inspected.graded) Caption(stringResource(R.string.discover_measured_file))
+    }
+}
 
 @Preview(showBackground = true, backgroundColor = 0xFF0D0E10)
 @Composable

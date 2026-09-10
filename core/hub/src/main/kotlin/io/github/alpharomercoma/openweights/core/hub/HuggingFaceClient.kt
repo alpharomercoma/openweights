@@ -799,6 +799,23 @@ val RECOMMENDED = listOf(
 )
 
 /**
+ * The one file in each recommended repository that the recommendation's numbers were
+ * measured on.
+ *
+ * A row is a repository, and a GGUF repository lists eight quantisations sorted by size.
+ * Every grade behind the row (`docs/research/recommended-runtime.md`) was earned by one of
+ * them, and a person who opens the row and takes the smallest file takes one the numbers
+ * do not cover: Liquid's QAD-Q4_0 is a distinct checkpoint that has only been timed, and
+ * the plain Q4_0 has neither. Codex named that the principal user-facing risk of the
+ * 2026-09-10 reversal, so the card says which file was measured and lists it first. A
+ * repository with no entry here has no such file, and its cards say nothing.
+ */
+val GRADED: Map<String, String> = mapOf(
+    "LiquidAI/LFM2.5-1.2B-Instruct-GGUF" to "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+    "unsloth/Qwen3-1.7B-GGUF" to "Qwen3-1.7B-Q8_0.gguf",
+)
+
+/**
  * Shortlist rows that are findable but not recommended: the two LFM2.5 models as compiled
  * exports with refusal behaviour removed, the same 8da4w 32k recipe as the exports the
  * recommendation carried between 2026-09-07 and 2026-09-10.

@@ -279,7 +279,10 @@ had been chosen on the rows it was then graded on, so a held-out draw (seed 8) r
 night on the GGUF: doubt-search 48% correct and 33% on the needed rows against the intent
 rule's 45% and 29%, paired +5/-1, at 15 more unnecessary searches and 5 s of median turn;
 the direction replicates, the size is not yet a number. Priority as set: stability,
-quality, then speed. Note: `docs/research/recommended-runtime.md`.
+quality, then speed. Codex's principal user risk, that a recommended row is a repository
+of eight files and only Q4_K_M carries the grades: `GRADED` now names the measured file,
+Discover lists it first and its card says "Measured". Note:
+`docs/research/recommended-runtime.md`.
 
 ### The narration is cut at its first sentence (2026-09-10, night)
 

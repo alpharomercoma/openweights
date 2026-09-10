@@ -90,6 +90,7 @@
     <string name="recommended">おすすめ</string>
     <string name="discover_experimental">実験的 / 改変済み</string>
     <string name="discover_experimental_note">拒否動作を取り除いたモデルです。推奨には含まれません。アプリはどのモデルでも実行できるため掲載しています。</string>
+    <string name="discover_measured_file">計測済み: 推奨の評価に使ったファイル</string>
     <string name="official">公式</string>
     <string name="filters">絞り込み</string>
     <string name="filters_count">絞り込み %1$d</string>

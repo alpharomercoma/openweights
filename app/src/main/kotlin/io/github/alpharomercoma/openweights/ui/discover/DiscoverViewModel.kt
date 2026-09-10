@@ -35,6 +35,7 @@ import io.github.alpharomercoma.openweights.core.device.MemoryBandwidth
 import io.github.alpharomercoma.openweights.core.device.ThroughputCalibration
 import io.github.alpharomercoma.openweights.core.engine.EngineArchitectures
 import io.github.alpharomercoma.openweights.core.engine.ExecuTorchSupport
+import io.github.alpharomercoma.openweights.core.hub.GRADED
 import io.github.alpharomercoma.openweights.core.hub.HubFile
 import io.github.alpharomercoma.openweights.core.hub.HubModel
 import io.github.alpharomercoma.openweights.core.hub.HubModelDetail
@@ -67,6 +68,8 @@ import javax.inject.Inject
 /** One downloadable file with everything known about how it would run here. */
 data class InspectedFile(
     val file: HubFile,
+    /** True for the file the repository's recommendation was measured on; see [GRADED]. */
+    val graded: Boolean = false,
     val metadata: GgufMetadata? = null,
     val fit: FitReport? = null,
     val isInspecting: Boolean = false,
@@ -486,6 +489,10 @@ class DiscoverViewModel @Inject constructor(
                         .takeIf { it.isNotEmpty() && compiled.isEmpty() }
                         ?.let { withheldReason(repoId, detail) }
 
+                    // The measured file leads the GGUF list, whatever its size, so the
+                    // recommendation points at one download (see GRADED).
+                    val graded = GRADED[repoId]
+                    val ggufs = detail.files.sortedByDescending { it.path == graded }
                     _uiState.update { state ->
                         state.copy(
                             detail = detail,
@@ -503,9 +510,10 @@ class DiscoverViewModel @Inject constructor(
                                     isDownloaded = ExecuTorchFileName
                                         .modelNameFor(repoId, file.path) in downloaded,
                                 )
-                            } + detail.files.map { file ->
+                            } + ggufs.map { file ->
                                 InspectedFile(
                                     file = file,
+                                    graded = file.path == graded,
                                     isDownloaded = file.path.substringAfterLast('/') in downloaded,
                                 )
                             },

@@ -260,6 +260,37 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### The rule measured to the end: catalogue, engines, depth, and the day's traps (2026-09-10)
+
+The intent rule's remaining arms landed. With the full sixteen-tool catalogue in the prompt
+the compiled LFM2.5 1.2B searches 60 of 75 needed rows and 40% of the answerable ones, and
+scores 40%, its best, 19% on the rows that needed a search (paired +19/-8 against the
+catalogue alone), at 16.2 s a turn and 11.1 s to the first token; the GGUF reaches 72%
+recall and 39% at 32.9 s. So the catalogue makes the model call, the rule makes the calls
+count, and the tool prefix is the whole price. On the same phone the rejected route scores
+41% to the rule's 35%, seven rows of 117, inside the run-to-run spread; the rule stays
+because it is the model's decision. The matchers were widened once more (d2e4763b,
+announcement within two sentences, claim without an article), replayed over 4,781 no-call
+replies before shipping: twelve more fires, five fabrications, seven offers, nothing
+correct lost; four fabrications of 160 remain.
+
+Search itself was measured rather than argued about. On the 75 rows that need a search,
+DuckDuckGo puts the answer in the top three snippets 32% of the time, Yahoo 36%, both at
+ten 43%, merged 47%; Google's feature-phone door shut after eighteen queries and
+Startpage answered nothing. Five results instead of three, on the phone with the stored
+setting cleared: 38% against 35%, paired 9 to 8, a wash, so the default stays. Rate limits
+are not the phones' problem: ten fall-throughs in 1,327 searches. The half of the needed
+rows no snippet reaches needs the page, not another engine. The echo probe with the tool
+block: 0 of 72 replies quote the instructions; the compiled model's recitations halve in
+length with tools present (six a cell, recorded, not acted on).
+
+What the runs cost to learn: an unplugged phone with its screen off suspends the CPU and
+froze a search for two hours (the run script keeps the screen awake now); a stored
+`result_count` of 3 silently beat the five-result build (delete the key to measure a
+default); the harness recorded 1,500 characters of a result and clipped the fourth hit
+(8,000 now); and the instrumentation outlives an adb drop, which finished two arms
+unattended. Tables and prose: `docs/research/retrieve-or-answer.md`.
+
 ### "Who is X" is searched before the model speaks (2026-09-10)
 
 "who is alpha romer coma" on the compiled LFM2.5 1.2B, web search on, came back three

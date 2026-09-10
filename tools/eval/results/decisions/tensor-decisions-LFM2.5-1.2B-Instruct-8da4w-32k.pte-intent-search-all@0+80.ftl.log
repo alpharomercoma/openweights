@@ -1,0 +1,23 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/debug/app-debug.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/prompt_dump.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/decisions.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-32k.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-32k.tokenizer.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/decisions/20260910-150544-14992-mustang/]
+
+Test [matrix-31q0123sby6qq] has been created in the Google Cloud.
+Creating individual test executions...
+...............................................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.9724488f91bc783d/matrices/5557665790069623667 ].
+15:10:29 Test is Pending
+15:11:32 Starting attempt 1.
+15:11:32 Test is Running
+15:24:15 Done. Test time = 646 (secs)
+15:24:15 Starting results processing. Attempt: 1

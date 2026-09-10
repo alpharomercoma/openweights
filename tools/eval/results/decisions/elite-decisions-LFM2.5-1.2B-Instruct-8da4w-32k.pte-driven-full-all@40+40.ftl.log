@@ -1,0 +1,27 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/debug/app-debug.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/prompt_dump.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/decisions.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-32k.pte] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/LFM2.5-1.2B-Instruct-8da4w-32k.tokenizer.json] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/decisions/20260910-073402-1838-pa3q/]
+
+Test [matrix-3bk1jn73mi1gw] has been created in the Google Cloud.
+Creating individual test executions...
+..............................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.47cce811fa71fc03/matrices/7290375638543730722 ].
+07:38:44 Test is Pending
+07:39:35 Starting attempt 1.
+07:39:35 Test is Running
+
+
+Cancelling test [matrix-3bk1jn73mi1gw]...
+
+
+Test matrix has been cancelled.

@@ -1,0 +1,33 @@
+
+Have questions, feedback, or issues? Get support by visiting:
+  https://firebase.google.com/support/
+
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/debug/app-debug.apk] to Firebase Test Lab...
+Uploading [/Users/alpha/mobile-inference/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/prompt_dump.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/decisions.json] to Firebase Test Lab...
+Uploading [gs://openweights-eval-models/Qwen3-1.7B-Q8_0.gguf] to Firebase Test Lab...
+Raw results will be stored in your GCS bucket at [https://console.developers.google.com/storage/browser/openweights-eval-models/decisions/20260910-051430-91786-e2s/]
+
+Test [matrix-2rply53wpl2vp] has been created in the Google Cloud.
+Creating individual test executions...
+..............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................done.
+Firebase Test Lab will execute your instrumentation test on 1 device(s). More devices may be added later if flaky test attempts are specified.
+
+Test results will be streamed to [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.66e4b27d94a09eb6/matrices/4677252316870071982 ].
+05:20:22 Test is Pending
+05:21:13 Starting attempt 1.
+05:21:13 Test is Running
+05:52:33 Done. Test time = 1778 (secs)
+05:52:33 Starting results processing. Attempt: 1
+05:52:47 Completed results processing. Time taken = 6 (secs)
+05:52:47 Test is Finished
+
+Instrumentation testing complete.
+
+More details are available at [ https://console.firebase.google.com/project/angelic-sight-504306-f5/testlab/histories/bh.66e4b27d94a09eb6/matrices/4677252316870071982 ].
+┌─────────┬────────────────────┬─────────────────────┐
+│ OUTCOME │  TEST_AXIS_VALUE   │     TEST_DETAILS    │
+├─────────┼────────────────────┼─────────────────────┤
+│ [32mPassed [39;0m │ e2s-36-en-portrait │ 1 test cases passed │
+└─────────┴────────────────────┴─────────────────────┘

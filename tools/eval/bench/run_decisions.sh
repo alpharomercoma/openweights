@@ -8,9 +8,14 @@
 #     ECHO=1                runs the instruction-echo probe instead of the decisions
 #
 # The instrumentation runs attached (-w) from a shell this script keeps open: started
-# detached, the am client died with the adb session and the system then killed the test
-# with it (measured 2026-09-10). A wireless-debugging drop takes the run with it, and the
-# rows already written are kept, so a rerun resumes where it stopped.
+# detached with nohup, the am client died with the adb session before the test began
+# (measured 2026-09-10). Once running, the test outlives an adb drop: the same day the
+# wireless port went away mid-arm and the phone finished two arms on its own. Rows are
+# written as they land, so a rerun resumes where the file stops.
+#
+# An unplugged phone with its screen off suspends its CPU, timeouts included: a search
+# froze for two hours that way. The screen is woken at the start and kept awake for the
+# length of the run; on the charger neither is needed.
 set -eu
 SERIAL=${1:-}
 ADB="adb ${SERIAL:+-s $SERIAL}"
@@ -29,6 +34,16 @@ METHOD=${METHOD:-decisions}
 
 # A dozing phone throttles instrumentation two to five times; awake and unlocked for the run.
 $ADB shell "settings put system screen_off_timeout 2147483647; input keyevent KEYCODE_WAKEUP; wm dismiss-keyguard" >/dev/null 2>&1 || true
+# And kept that way: the ROM relocks after a wake, and an unplugged phone then suspends.
+(
+  while kill -0 $$ 2>/dev/null; do
+    $ADB shell dumpsys power 2>/dev/null | grep -q "mWakefulness=Awake" ||
+      $ADB shell "input keyevent KEYCODE_WAKEUP; sleep 1; wm dismiss-keyguard" >/dev/null 2>&1
+    sleep 30
+  done
+) &
+AWAKE=$!
+trap 'kill $AWAKE 2>/dev/null' EXIT
 $ADB push "$HERE/decisions.json" "$EVAL/decisions.json" >/dev/null
 if [ -n "${INSTALL:-}" ]; then
   $ADB push "$APP" /data/local/tmp/app.apk >/dev/null && $ADB shell pm install -r -t --user 0 /data/local/tmp/app.apk

@@ -531,7 +531,11 @@ class DecisionSuiteOnDeviceTest {
     private companion object {
         const val TAG = "DecisionSuite"
         const val CONTEXT = 4096
-        const val RESULT_CHARS = 1500
+
+        // Whole search results, so the grader's "answer in results" counts every hit the
+        // model saw: at 1,500 the fourth and fifth of five hits were cut from the record
+        // (measured 2026-09-10, the five-result run), and findability read low.
+        const val RESULT_CHARS = 8000
         const val HOST_SEARCH_ID = "app-search"
         val EVAL_DIR = File("/data/local/tmp/openweights/eval")
 

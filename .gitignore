@@ -49,3 +49,9 @@ play/graphics/__pycache__/
 # Claude Code's per-agent worktrees and per-machine settings; settings.json is shared.
 .claude/worktrees/
 .claude/settings.local.json
+
+# Device logcat captures beside eval results: hundreds of megabytes a day, never read twice
+tools/eval/results/**/*.logcat
+
+# Python bytecode from the eval scripts
+__pycache__/

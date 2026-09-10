@@ -42,8 +42,13 @@ CANNOT = re.compile(
     r"not (sure|aware|able to)|unable to)\b", re.I)
 
 
+def plain(text):
+    """The model's typographic apostrophes and quotes as the ASCII ones the patterns spell."""
+    return text.replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"')
+
+
 def normalize(text):
-    text = text.lower()
+    text = plain(text).lower()
     text = "".join(c for c in text if c not in string.punctuation)
     text = ARTICLES.sub(" ", text)
     return " ".join(text.split())
@@ -83,7 +88,7 @@ def searched(row):
 def grade_row(row):
     aliases = list(row["answers"])
     ran = searched(row)
-    answer = row["answer"]
+    answer = plain(row["answer"])
     ok = correct(answer, aliases) if aliases else None
     in_results = any(
         normalize(a) in normalize(c.get("result", "")) for a in aliases for c in row["calls"] if c["name"] == "web_search"

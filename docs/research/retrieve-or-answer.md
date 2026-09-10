@@ -371,6 +371,38 @@ the LFM takes about 12 s against 4.7 without, and the median turn goes from 5.3 
 9 because 81 or 88 rows searched instead of 62. The three-token run's timings were taken
 while the phone was in use and are quoted as such.
 
+## Two recordings, and what they cost the matchers
+
+At 18:43 the maintainer recorded the compiled model on "who is alpha Romer coma" and "who
+is Charlie kirk". On the first it wrote "I’ll search for the latest information... After
+reviewing recent sources, there is no widely recognized public figure" and the loop let it
+stand; on the second the loop caught the fabrication and searched, and the answer from the
+results was "a person named Charlie Kirk exists, primarily associated with a personal
+website". Three causes, each fixed and replayed:
+
+- **The apostrophe.** The model writes U+2019, every matcher spelled `i'll` straight, and
+  the announcement walked past all of them. Of the 5,462 no-call replies the four phones
+  had produced, 705 carry the character and twelve are announcements the rule should have
+  carried out. `plainQuotes()` (core:tools) now turns typographic apostrophes and quotes
+  into the ASCII ones before any classifier, the grader included, reads a reply or a
+  question. `CapabilityDenial` already did this for itself, which is why the lament branch
+  worked and the announcement branch did not.
+- **"After reviewing recent sources."** A claim shape the matcher did not know; six phone
+  rows used it ("after checking the relevant sources, I can confirm", "recent sources
+  suggest"). Added, with the two shapes in the phone-phrasings test.
+- **An empty first hit.** DuckDuckGo's first result for the second question is "Official
+  site" with a two-word snippet, the second the Wikipedia line with his dates. The 1.2B
+  reads the list as best match first and answered from the empty one. A hit whose snippet
+  is under forty characters now goes to the end of the list, order otherwise kept: a rule
+  about empty evidence, not about a question.
+
+The compiled model's search arm again on the fixed build, same phone, same rows: correct
+46 of 117 against 41, fabricated search talk 3 against 4, 42 app searches against 39,
+right where the old run was wrong on 8 rows against 4 (p = 0.39). Within noise, nothing
+worse, and the two recorded failures cannot recur in that form: the first now searches
+(DuckDuckGo's top three for the name are the maintainer's site, LinkedIn and About page),
+the second reads the Wikipedia line first.
+
 ## What is not fixed, and said so
 
 Forty-two rows of one hundred and sixty the compiled model needed to search and answered

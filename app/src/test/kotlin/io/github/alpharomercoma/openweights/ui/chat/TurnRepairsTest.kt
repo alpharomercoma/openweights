@@ -126,6 +126,8 @@ class TurnRepairsTest {
                 "There are films titled Glass. Let me verify using web search. The director is Shyamalan.",
                 "The director of Possessed is Tim Burton. Web search confirms his involvement.",
                 "The author of Today is Raymond Chandler. Search result indicates his association.",
+                "After checking recent sources, the record is held by a woman named Ni.",
+                "I\u2019ll search for the latest information about it. There is no such figure.",
             )
             for (claim in claims) {
                 engine.scripted.clear()

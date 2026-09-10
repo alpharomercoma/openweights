@@ -250,7 +250,7 @@ class WebSearchTool @Inject constructor(
             val text = buildString {
                 append("Results for \"").append(query).append("\" from ").append(provider)
                 append(WebSearchFraming.TEXT)
-                results.forEachIndexed { index, result ->
+                results.richFirst().forEachIndexed { index, result ->
                     append("\n[").append(index + 1).append("] ").append(result.title).append('\n')
                     append(result.snippet.take(MAX_EXTRACT_CHARS)).append('\n')
                     append(result.url).append('\n')
@@ -282,6 +282,19 @@ class WebSearchTool @Inject constructor(
          * inside the smallest one the app will open.
          */
         const val MAX_EXTRACT_CHARS = 900
+
+        /**
+         * A snippet shorter than this says nothing the title did not. "Official site |
+         * Charlie Kirk" came first for "who is Charlie Kirk" on 2026-09-10, ahead of the
+         * Wikipedia line with his dates, and the compiled 1.2B answered from it: "a person
+         * named Charlie Kirk exists, primarily associated with a personal website". The
+         * model reads the list as best match first, so a hit with nothing in it goes last.
+         */
+        const val THIN_SNIPPET_CHARS = 40
+
+        /** The same hits with the ones that carry no snippet moved to the end, order kept otherwise. */
+        fun List<SearchHit>.richFirst(): List<SearchHit> =
+            sortedBy { it.snippet.trim().length < THIN_SNIPPET_CHARS }
     }
 }
 

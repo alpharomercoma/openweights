@@ -124,7 +124,7 @@ object CapabilityDenial {
     }
 
     /** Lowercased with curly apostrophes straightened, which is how this model writes. */
-    private fun String.head(): String = take(HEAD_CHARS).lowercase().replace('’', '\'')
+    private fun String.head(): String = take(HEAD_CHARS).lowercase().plainQuotes()
 
     private val DENIAL = Regex(
         "\\b(don't|do not|doesn't|does not|can't|cannot|unable to|not able to|no way to)\\b",

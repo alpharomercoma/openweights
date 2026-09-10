@@ -48,6 +48,7 @@ import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolPrompting
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import io.github.alpharomercoma.openweights.core.tools.plainQuotes
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import java.io.File
@@ -595,7 +596,7 @@ class TurnRunner @Inject constructor(
             // none (the goal runner, the watch).
             question.ifBlank {
                 conversation.lastOrNull { it.role == ChatRole.USER }?.text.orEmpty()
-            },
+            }.plainQuotes(),
         ).run(params, mode, listener)
     }
 
@@ -1734,7 +1735,7 @@ private const val PLAN_REPAIR =
  */
 private fun String.invitesRepair(tools: ToolRegistry): Boolean {
     if (containsToolMarkup()) return true
-    val spoken = withoutReasoning().withoutToolMarkup().trim()
+    val spoken = withoutReasoning().withoutToolMarkup().trim().plainQuotes()
     if (spoken.length > ANNOUNCEMENT_CHARS) return false
     if (tools.all.any { spoken.contains(it.definition.name, ignoreCase = true) }) return true
     // Or the name said the way people say it, or not said at all. Seen on the phone,
@@ -1852,6 +1853,12 @@ private val CLAIMED_SEARCH = Regex(
         "(a |the |my )?(quick |recent )?(web |online )?search (results? )?" +
         "(indicates?|shows?|confirms?|suggests?|reveals?|clarifies|returned)|" +
         "i (searched|have searched) (the web|online|for)|i looked (it|this|that) up|" +
+        // "After checking recent sources, the record is held by ..." (six phone rows).
+        "(after|upon|having) (reviewing|checking|consulting|examining) " +
+        "(the |recent |available |relevant |latest |online )*" +
+        "(sources|results|information|data|references)|" +
+        "(recent|reliable|multiple|available|online) sources " +
+        "(confirm|indicate|show|suggest|report)|" +
         "(found|confirmed|retrieved|verified) (this|it|that)?( information)? ?" +
         "(through|via|from|by|using|with) a (web |online )?search)\\b",
     RegexOption.IGNORE_CASE,
@@ -2022,7 +2029,7 @@ private class ToolBudget(headroomTokens: Int?) {
  * the call in it.
  */
 private fun TurnRunner.Pass.spoken(): String =
-    event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.trim()
+    event.content.ifBlank { raw.withoutReasoning().withoutToolMarkup() }.trim().plainQuotes()
 
 /**
  * The reply without its thinking.

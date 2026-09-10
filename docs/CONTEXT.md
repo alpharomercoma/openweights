@@ -260,6 +260,22 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### The apostrophe that hid the announcements (2026-09-10, evening)
+
+Two screen recordings on the compiled model: "I’ll search for the latest information...
+After reviewing recent sources, there is no widely recognized public figure" stood as an
+answer, and a caught fabrication about Charlie Kirk came back from the search as "a person
+named Charlie Kirk exists, primarily associated with a personal website". The model writes
+U+2019 and every matcher spelled the contraction straight: 705 of the phones' 5,462 no-call
+replies carry the character, twelve of them announcements the rule owed a search.
+`plainQuotes()` now normalises every reply and question before any classifier reads it,
+the grader too; "after checking recent sources" is a claim shape; and a search hit whose
+snippet is under forty characters goes last, because the first hit for that name was
+"Official site" with two words and the Wikipedia line was second. Rerun on the same rows:
+46 of 117 correct against 41, 8 rows to 4 paired, fabrications 3 against 4. The lesson for
+every matcher in this codebase: read the reply through `plainQuotes()` first, and test
+the phrase with the apostrophe the model actually types.
+
 ### The doubt the text never shows: search gated by the model's own token probabilities (2026-09-10)
 
 The confidently wrong answers the intent rule cannot see carry one signal: the probability

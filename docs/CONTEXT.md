@@ -260,6 +260,17 @@ Refused, and left costing points: subagent definitions, command files that would
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
 
+### The narration is cut at its first sentence (2026-09-10, night)
+
+"Why is LFM generating from memory, then searching, then generating?" Because the compiled
+model cannot call a tool, so it narrates one ("I'm fetching the latest information ... from
+the web now ... Here's what I found using a web search:") and invents the findings, and
+the loop judged a reply only after the pass ended. `ReplyWatch` now judges the first three
+sentences as they complete and cuts the pass the moment one says a search is happening and
+names no other tool; the app searches and the model answers once, from the results. Also
+found: "I'm fetching ... from the web" matched no announcement shape, so it is one now.
+On the phone the cut fires at 67 and 138 characters. Note: `docs/research/retrieve-or-answer.md`.
+
 ### The apostrophe that hid the announcements (2026-09-10, evening)
 
 Two screen recordings on the compiled model: "I’ll search for the latest information...

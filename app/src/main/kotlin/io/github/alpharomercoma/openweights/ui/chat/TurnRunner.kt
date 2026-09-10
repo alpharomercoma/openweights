@@ -30,6 +30,7 @@ import io.github.alpharomercoma.openweights.core.common.model.containsToolMarkup
 import io.github.alpharomercoma.openweights.core.common.model.withoutToolMarkup
 import io.github.alpharomercoma.openweights.core.engine.ContextWindowExceededException
 import io.github.alpharomercoma.openweights.core.engine.GenerationEvent
+import io.github.alpharomercoma.openweights.core.engine.GenerationStats
 import io.github.alpharomercoma.openweights.core.engine.InferenceEngine
 import io.github.alpharomercoma.openweights.core.engine.StopReason
 import io.github.alpharomercoma.openweights.core.engine.WarmResult
@@ -750,6 +751,7 @@ class TurnRunner @Inject constructor(
                         active,
                         renderTools,
                         listener,
+                        cutShort = { partial -> narratesSearch(partial, mode) },
                     ) { lastRaw = it }
                 } catch (overflow: ContextWindowExceededException) {
                     if (!withdrawToolsFor(overflow)) throw overflow
@@ -957,6 +959,38 @@ class TurnRunner @Inject constructor(
          * hybrid pays as one re-read of that prefix, a few hundred tokens on a fresh
          * chat; the alternative was a wrong answer.
          */
+        /**
+         * Whether a reply still being written has already said it is searching, so the
+         * search can be made now instead of after the model has invented its results.
+         *
+         * Recorded 2026-09-10 19:45 on the compiled LFM2.5 1.2B: "I'm fetching the latest
+         * information about Gojo Satoru from the web now. Once I have the results, I'll
+         * provide a clear summary. Here's what I found using a web search:" and then three
+         * invented bullets over six seconds, before the loop caught the claim, searched, and
+         * had the model answer again. The narration is the decision; the bullets are the
+         * cost of waiting for the pass to end. Judged on the reply's first sentences as they
+         * complete, with the guards [searchIntent] applies at the end of a pass, and only
+         * where the announcement names web_search or nothing: a model that says "let me
+         * check your calendar" is about to call something else, and is left to it. Cutting
+         * a pass that would have gone on to call web_search itself changes nothing, since
+         * the app makes the same search.
+         */
+        private fun narratesSearch(partial: String, mode: AgentMode): Boolean {
+            val thinking = partial.contains("<think") && !partial.contains("</think>")
+            val spoken = partial.withoutReasoning().withoutToolMarkup().trim().plainQuotes()
+            val named = active.all.map { it.definition.name }
+                .filter { spoken.contains(it, ignoreCase = true) }
+            val plain = !thinking &&
+                !partial.containsToolMarkup() &&
+                !spoken.trimEnd().endsWith("?") &&
+                !NEGATED.containsMatchIn(spoken) &&
+                named.all { it == NamedSubject.TOOL }
+            return honoursIntent &&
+                mayAppSearch(mode) &&
+                plain &&
+                (ANNOUNCED_LOOKUP.containsMatchIn(spoken) || spoken.claimsSearch(asked))
+        }
+
         private suspend fun honourIntent(
             pass: Pass,
             mode: AgentMode,
@@ -1309,6 +1343,8 @@ class TurnRunner @Inject constructor(
          * [DRAFT_TOKENS] tokens, where the engine gave any.
          */
         val confidence: Float? = null,
+        /** Whether the loop stopped the model early because it had already announced a search. */
+        val cut: Boolean = false,
     )
 
     /**
@@ -1342,20 +1378,59 @@ class TurnRunner @Inject constructor(
         active: ToolRegistry,
         offerTools: Boolean,
         listener: TurnListener,
+        cutShort: (String) -> Boolean = { false },
         publishRaw: (String) -> Unit,
     ): Pass? {
         val reply = StringBuilder()
         var completed: GenerationEvent.Completed? = null
-        // The model's confidence in its opening, read from the tokens as they arrive: the
-        // few least likely of the first tokens, so one rare name does not decide alone.
-        val draftLowest = ArrayList<Float>(DRAFT_LOWEST + 1)
-        var draftCount = 0
-        // Where the reply had reached when it was last judged, so the check runs once every
-        // few hundred characters rather than once per token. Sliding a window over the whole
-        // reply on every token would be quadratic in the length of the answer, which is a
-        // worse tax than the failure it looks for.
-        var checkedAt = 0
+        val draft = DraftConfidence()
+        val watch = ReplyWatch(cutShort)
 
+        val cut = try {
+            streamEvents(messages, params, active, offerTools) { event ->
+                when (event) {
+                    is GenerationEvent.Token -> {
+                        reply.append(event.text)
+                        draft.note(event.logprob)
+                        publishRaw(reply.toString())
+                        listener.onText(reply.toString())
+                        watch.judge(reply)
+                    }
+
+                    is GenerationEvent.Completed -> {
+                        // Counts only. Every "why did it not search" question is answered by
+                        // whether tools were offered and how many calls came back, and the
+                        // reply itself is the user's conversation, which is never logged.
+                        Log.i(
+                            "OpenWeights",
+                            "pass offered=$offerTools calls=${event.toolCalls.size}",
+                        )
+                        listener.onPass(event, reply.toString())
+                        completed = event
+                    }
+                }
+            }
+            false
+        } catch (short: CutShort) {
+            Log.i("OpenWeights", "narrated search cut ${short.message}")
+            completed = GenerationEvent.Completed(
+                reason = StopReason.END_OF_TURN,
+                stats = GenerationStats(0, 0, 0, 0, 0, 0, 0),
+            )
+            true
+        }
+        return completed?.let {
+            Pass(reply.toString(), it, draft.value(), cut)
+        }
+    }
+
+    private suspend fun streamEvents(
+        messages: List<ChatMessage>,
+        params: SamplerParams,
+        active: ToolRegistry,
+        offerTools: Boolean,
+        onEvent: (GenerationEvent) -> Unit,
+    ) {
         engine.chat(
             messages = messages,
             params = params,
@@ -1364,59 +1439,66 @@ class TurnRunner @Inject constructor(
             // budget is made to answer from what it collected rather than asking again and
             // leaving the user with tool syntax and no reply.
             tools = if (offerTools) active.definitions else emptyList(),
-        ).collect { event ->
-            when (event) {
-                is GenerationEvent.Token -> {
-                    reply.append(event.text)
-                    event.logprob?.takeIf { draftCount < DRAFT_TOKENS }?.let {
-                        draftLowest.add(it)
-                        draftLowest.sort()
-                        if (draftLowest.size > DRAFT_LOWEST) draftLowest.removeAt(DRAFT_LOWEST)
-                        draftCount++
-                    }
-                    publishRaw(reply.toString())
-                    listener.onText(reply.toString())
-                    if (reply.length - checkedAt >= Degeneration.CHECK_EVERY) {
-                        checkedAt = reply.length
-                        if (Degeneration.dominates(reply.toString())) {
-                            // Thrown out of the turn rather than swallowed here, and that is
-                            // the difference between ending the turn and corrupting it. The
-                            // caller records a finished reply from the last *completed*
-                            // pass, which on a tool turn is the one that said "let me look
-                            // that up"; returning normally from the middle of a later pass
-                            // would store that as the answer and then store the repeated
-                            // text as a second reply to the same question. Raised, it takes
-                            // the path a failed decode already takes: one row holding what
-                            // was actually produced, the cache reset because what it holds
-                            // is half a reply, and a sentence on screen saying so.
-                            Log.w(
-                                "OpenWeights",
-                                "stopped a reply repeating itself at ${reply.length} chars",
-                            )
-                            throw RepeatingReply()
-                        }
-                    }
-                }
+        ).collect(onEvent)
+    }
+}
 
-                is GenerationEvent.Completed -> {
-                    // Counts only. Every "why did it not search" question is answered by
-                    // whether tools were offered and how many calls came back, and the
-                    // reply itself is the user's conversation, which is never logged.
-                    Log.i(
-                        "OpenWeights",
-                        "pass offered=$offerTools calls=${event.toolCalls.size}",
-                    )
-                    listener.onPass(event, reply.toString())
-                    completed = event
-                }
+/** The model's confidence in its opening, read from the tokens as they arrive. */
+private class DraftConfidence {
+    private val lowest = ArrayList<Float>(DRAFT_LOWEST + 1)
+    private var count = 0
+
+    fun note(logprob: Float?) {
+        val lp = logprob?.takeIf { count < DRAFT_TOKENS } ?: return
+        lowest.add(lp)
+        lowest.sort()
+        if (lowest.size > DRAFT_LOWEST) lowest.removeAt(DRAFT_LOWEST)
+        count++
+    }
+
+    /** The mean of the [DRAFT_LOWEST] least likely opening tokens, or null where none had a probability. */
+    fun value(): Float? = if (count > 0) lowest.average().toFloat() else null
+}
+
+/**
+ * Reads a reply as it grows for the two things that end a pass early: a narrated search
+ * in its opening sentences, and a reply repeating itself.
+ */
+private class ReplyWatch(private val cutShort: (String) -> Boolean) {
+    private var judged = 0
+    private var checkedAt = 0
+
+    fun judge(reply: StringBuilder) {
+        if (judged < NARRATION_SENTENCES && reply.length <= NARRATION_CHARS) {
+            val ended = SENTENCE_END.findAll(reply).count()
+            if (ended > judged) {
+                judged = ended
+                if (cutShort(reply.toString())) throw CutShort(reply.length)
             }
         }
-        return completed?.let {
-            val confidence = if (draftCount > 0) draftLowest.average().toFloat() else null
-            Pass(reply.toString(), it, confidence)
+        if (reply.length - checkedAt >= Degeneration.CHECK_EVERY) {
+            checkedAt = reply.length
+            if (Degeneration.dominates(reply.toString())) {
+                Log.w("OpenWeights", "stopped a reply repeating itself at ${reply.length} chars")
+                throw RepeatingReply()
+            }
         }
     }
 }
+
+/** Raised inside a pass to stop the model once it has said it is searching. */
+private class CutShort(chars: Int) : RuntimeException("after $chars chars")
+
+/** Where one sentence of a reply ends and the next may begin. */
+private val SENTENCE_END = Regex("[.!?](\\s|$)")
+
+/**
+ * How many opening sentences are judged for a narrated search, and how long they may be.
+ * Three: the recorded reply reached its claim on the third ("I'm fetching ... Once I have
+ * the results ... Here's what I found using a web search:").
+ */
+private const val NARRATION_SENTENCES = 3
+private const val NARRATION_CHARS = 320
 
 /** How many opening tokens the loop reads the model's confidence from. TARG's k. */
 private const val DRAFT_TOKENS = 20
@@ -1772,6 +1854,9 @@ private val ANNOUNCED_LOOKUP = Regex(
         // the sentence is.
         "\\b(let me|i'll|i will|i'm going to|i need to|i can)\\b[^.?!]{0,60}" +
         "\\b(using|with|via|through) (a (quick )?(web |online )?search|(web |online )search)\\b|" +
+        // "I'm fetching the latest information about Gojo Satoru from the web now."
+        "\\b(i'm|i am|i'll|i will) (fetching|retrieving|gathering|pulling|getting)\\b" +
+        "[^.?!]{0,60}\\b(from the (web|internet)|online|the web)\\b|" +
         // "Searching for the author of the 1982 publication."
         "^searching (for|the web|online)\\b",
     RegexOption.IGNORE_CASE,

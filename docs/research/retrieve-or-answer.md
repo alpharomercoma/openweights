@@ -403,6 +403,29 @@ worse, and the two recorded failures cannot recur in that form: the first now se
 (DuckDuckGo's top three for the name are the maintainer's site, LinkedIn and About page),
 the second reads the Wikipedia line first.
 
+## The narration is cut at its first sentence
+
+Recorded at 19:45 on the compiled model, "who is gojo satoru": "I'm fetching the latest
+information about Gojo Satoru from the web now. Once I have the results, I'll provide a
+clear summary. Here's what I found using a web search:" and three invented bullets over
+six seconds; then the loop caught the claim on the last sentence, dropped the pass,
+searched, and had the model answer again, 23 s in all. The rule had been judging a reply
+only once the pass ended, so the model was allowed to finish inventing before the search it
+had announced was made.
+
+`ReplyWatch` now judges the reply's first three sentences as each one completes, through
+the same guards `searchIntent` applies at the end of a pass. The moment a sentence says a
+search is happening and names no other tool, the pass is cut: the engine's token loop stops
+when its collector leaves, the app makes the search, and the model writes its answer once
+from the results. A reply that names another tool is left to call it; a reply with tool
+markup or an open thinking block is never cut. The recorded sentence itself, "I'm
+fetching ... from the web now", matched no announcement shape at all until tonight, so
+even the end-of-pass rule only caught that reply at its third sentence; "fetching",
+"retrieving", "gathering" with "from the web" are a shape now, and three sentences are
+judged rather than two. On the phone the cut fires at 67 and 138 characters and the row
+ends in one pass; the full-arm measurement waits for the phone to be idle, since the run
+that was to carry it was killed with a dozen other processes by the ROM at row nine.
+
 ## What is not fixed, and said so
 
 Forty-two rows of one hundred and sixty the compiled model needed to search and answered

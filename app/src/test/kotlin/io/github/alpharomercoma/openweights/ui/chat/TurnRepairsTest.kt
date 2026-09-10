@@ -36,6 +36,8 @@ import io.github.alpharomercoma.openweights.core.tools.ToolExecution
 import io.github.alpharomercoma.openweights.core.tools.ToolNotes
 import io.github.alpharomercoma.openweights.core.tools.ToolRegistry
 import io.github.alpharomercoma.openweights.core.tools.ToolSwitches
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -128,6 +130,7 @@ class TurnRepairsTest {
                 "The author of Today is Raymond Chandler. Search result indicates his association.",
                 "After checking recent sources, the record is held by a woman named Ni.",
                 "I\u2019ll search for the latest information about it. There is no such figure.",
+                "I'm fetching the latest information about Gojo from the web now. He is a sorcerer.",
             )
             for (claim in claims) {
                 engine.scripted.clear()
@@ -141,6 +144,34 @@ class TurnRepairsTest {
                 assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
             }
         }
+
+    @Test
+    fun `a narrated search is cut at its first sentence and made`() = runBlocking<Unit> {
+        // The phone, 2026-09-10 19:45: "I'm fetching the latest information about Gojo
+        // Satoru from the web now. Once I have the results ... Here's what I found using a
+        // web search:" and three invented bullets. The first sentence is the decision.
+        engine.hold = true
+        val reply = async { answering("who is killua zoldyck", withTools = true) }
+        awaitUntil { engine.prompts.size == 1 }
+        engine.emit("I'm fetching the latest information about Killua from the web now. ")
+        engine.emit("Once I have the results, I'll invent them.")
+        awaitUntil { engine.prompts.size == 2 }
+        engine.emit("Killua Zoldyck is from Hunter x Hunter.")
+        engine.finish("Killua Zoldyck is from Hunter x Hunter.")
+
+        assertThat(reply.await()).contains("Hunter x Hunter")
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+        // The invented bullets were never written: the second prompt carries no trace of them.
+        assertThat(engine.prompts[1].joinToString { it.text }).doesNotContain("invent")
+    }
+
+    private suspend fun awaitUntil(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (!condition()) {
+            check(System.currentTimeMillis() < deadline) { "the fake engine never got there" }
+            delay(WAIT_STEP_MS)
+        }
+    }
 
     @Test
     fun `an answer the model doubts is searched`() = runBlocking<Unit> {
@@ -595,6 +626,8 @@ class TurnRepairsTest {
 }
 
 /** Log-probabilities of an opening token the model was sure of (90%) and not (8%). */
+private const val WAIT_MS = 5_000L
+private const val WAIT_STEP_MS = 5L
 private const val SURE = -0.1f
 private const val UNSURE = -2.5f
 private const val UNSURE_ANSWER = "Killua Zoldyck is a Japanese footballer."

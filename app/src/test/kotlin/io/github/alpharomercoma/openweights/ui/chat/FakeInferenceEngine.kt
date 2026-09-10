@@ -264,9 +264,9 @@ class FakeInferenceEngine : InferenceEngine {
         }
     }
 
-    /** Pushes one piece into a held generation. */
-    fun emit(text: String) {
-        events.trySend(GenerationEvent.Token(text))
+    /** Pushes one piece into a held generation, with the probability the engine gave it if any. */
+    fun emit(text: String, logprob: Float? = null) {
+        events.trySend(GenerationEvent.Token(text, logprob))
     }
 
     /**

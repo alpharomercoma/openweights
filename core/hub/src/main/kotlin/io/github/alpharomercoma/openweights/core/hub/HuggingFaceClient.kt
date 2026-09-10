@@ -678,8 +678,39 @@ class HuggingFaceClient @Inject constructor(
  * file is the same weights at the same quality and up to twice the speed; the 8B-A1B and the
  * VL 3B stay a search away rather than a default; and the Qwen3 compiled row is gone because
  * its full-attention cache costs 224 KB a token, which at any useful window is a kill on a
- * 12 GB phone. What follows is the history of how the earlier list was chosen, kept because
- * the measurements still stand:
+ * 12 GB phone.
+ *
+ * **Reversed on 2026-09-10: the two LFM2.5 rows are GGUF again**
+ * (`docs/research/recommended-runtime.md`). The reset above rested on "the same weights at
+ * the same quality", and the tables already on file said otherwise once they were read as a
+ * whole. Across the five phones of `public-benchmarks.md` the 8da4w export of LFM2.5 1.2B
+ * scores 13.0 against the Q4_K_M GGUF's 19.6 of 30 on GSM8K, 15.6 against 21.6 on IFEval and
+ * 22.4 against 26.0 on BFCL; on the 160-row decision suite (`retrieve-or-answer.md`) the
+ * compiled 1.2B calls the one tool a fresh install has on in 1 to 4 of 75 rows that needed
+ * it and writes "based on my search" without one in 32 to 35 of 160, where the GGUF calls
+ * it on 33 to 34 and fabricated one on 0 of 640 replies over four phones; across the five families the
+ * compiled runtime's grades differ between phones on 31.5% of cases against 13.3% (for
+ * LFM2.5 alone the five-phone spread is 4 against 1 on GSM8K, 2 against 3 on IFEval and 3
+ * against 0 on BFCL), and the window matrix saw one compiled file swing up to five of
+ * thirty between two runs on one phone; and the runtime returns no logits, so the
+ * confidence gate that was observed to lift the GGUF from 41% to 45% correct on one phone
+ * (paired +15/-6, p = 0.08, cutoff chosen on the same rows; the held-out run is in the
+ * note) cannot fire on it. Every one of those grades is the 1.2B's: the 2.6B's export was
+ * never graded against its GGUF, and its row goes back with the 1.2B provisionally, on the
+ * maintainer's decision and on what the runtime cannot do for it, no logits for the gate
+ * and no budget on its thinking, which llama.cpp closes at a token count. The loop repairs
+ * of 2026-09-10 (the intent rule, the apostrophe, the narration cut) were built for the
+ * compiled 1.2B's shape of failure; the GGUF still under-calls (33 of 75), it just never
+ * narrates. The speed is real and it is the cost of this decision: 1.7 to 2.6x the GGUF's
+ * prefill on every chip, and faster decode on all six, 22 against 9 tok/s on the Tensor G5,
+ * 26 against 17 on the Exynos 2400, 55 against 37 on the 8 Elite (Q4_K_M, 2026-09-03); only
+ * on the Dimensity 9400 has the newer QAD Q4_0 file been timed, and there it prefills level
+ * (324 against 341 tok/s) and decodes faster (54 against 41). A recommendation that is
+ * faster and wrong is not one, so the compiled exports are a search away and the
+ * refusal-removed compiled pair stay listed below as modified. Each row is a repository of
+ * eight GGUF files; only Q4_K_M carries the grades above, and the fit card does not yet say
+ * so. What follows is the history of how the earlier list was chosen, kept because the
+ * measurements still stand:
  *
  * - **LFM2.5 1.2B Instruct** leads, as the smallest thing here that still behaves like the
  *   2.6B rather than like a 0.6B. Same family, same conversion by the same publisher, and
@@ -753,11 +784,13 @@ class HuggingFaceClient @Inject constructor(
  * missing repeat penalty. A fast model that does not finish is not a recommendation.
  */
 val RECOMMENDED = listOf(
-    // Our own exports first (the experimentalmachines organisation), both at a 32k window:
-    // the family that measured best here, compiled for the runtime that measured fastest,
-    // with sixteen times the window of the publisher exports they replace.
-    "experimentalmachines/LFM2.5-1.2B-Instruct-ExecuTorch-XNNPACK-32k",
-    "experimentalmachines/LFM2.5-2.6B-ExecuTorch-XNNPACK-32k",
+    // Liquid AI's own GGUF repositories. Each lists eight files; the Q4_K_M is the file the
+    // decision suite and the public benchmarks graded, and the QAD-Q4_0 is a distinct
+    // checkpoint (Liquid's quantisation-aware one) that has only been timed: 324 tok/s
+    // prefill and 54 tok/s decode for the 1.2B on a Dimensity 9400. Its grades, and a paired
+    // grade for the 2.6B against its compiled export, are the measurements still owed.
+    "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
+    "LiquidAI/LFM2.5-2.6B-GGUF",
     // The family with eyes, from Liquid AI's own GGUF repository: ships its mmproj
     // projector beside the weights, which the app pairs automatically.
     "LiquidAI/LFM2.5-VL-1.6B-GGUF",
@@ -766,8 +799,9 @@ val RECOMMENDED = listOf(
 )
 
 /**
- * Shortlist rows that are findable but not recommended: the same two exports with refusal
- * behaviour removed, the same recipe.
+ * Shortlist rows that are findable but not recommended: the two LFM2.5 models as compiled
+ * exports with refusal behaviour removed, the same 8da4w 32k recipe as the exports the
+ * recommendation carried between 2026-09-07 and 2026-09-10.
  *
  * Kept apart from [RECOMMENDED] on purpose. The app runs any model a person chooses, and
  * these are published so they can be chosen; but "the app can find it" and "the app

@@ -1392,6 +1392,7 @@ class TurnRunner @Inject constructor(
                     is GenerationEvent.Token -> {
                         reply.append(event.text)
                         draft.note(event.logprob)
+                        watch.note(event.logprob)
                         publishRaw(reply.toString())
                         listener.onText(reply.toString())
                         watch.judge(reply)
@@ -1463,13 +1464,27 @@ private class DraftConfidence {
 /**
  * Reads a reply as it grows for the two things that end a pass early: a narrated search
  * in its opening sentences, and a reply repeating itself.
+ *
+ * The narration cut is spent only on a stream that carries no token probabilities. It was
+ * built for the compiled runtime, which hands the loop text and nothing else, so a narrated
+ * search is the only signal the loop will ever get there and waiting for the pass to end
+ * costs six seconds of invented findings. Where the stream carries probabilities the doubt
+ * gate reads them and the end-of-pass intent rule still catches a narration, and an early
+ * stop that has no arm-scale measurement behind it is not added to a runtime whose replies
+ * never showed the shape it cuts (0 of 640 on four phones, 2026-09-10). Read from the
+ * tokens rather than from an engine name: it is the runtime's capability that decides.
  */
 private class ReplyWatch(private val cutShort: (String) -> Boolean) {
     private var judged = 0
     private var checkedAt = 0
+    private var confident = false
+
+    fun note(logprob: Float?) {
+        if (logprob != null) confident = true
+    }
 
     fun judge(reply: StringBuilder) {
-        if (judged < NARRATION_SENTENCES && reply.length <= NARRATION_CHARS) {
+        if (!confident && judged < NARRATION_SENTENCES && reply.length <= NARRATION_CHARS) {
             val ended = SENTENCE_END.findAll(reply).count()
             if (ended > judged) {
                 judged = ended

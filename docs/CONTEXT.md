@@ -3,7 +3,7 @@
 > Living state file. Update at every milestone so no information is lost across sessions
 > or context compaction. Newest facts win; keep it accurate rather than exhaustive.
 
-Last updated: 2026-09-09. The dated sections below run from 2026-08-10; newer facts are in
+Last updated: 2026-09-10. The dated sections below run from 2026-08-10; newer facts are in
 the research notes under `research/`, and the accurate summary of the app as shipped is the
 top-level `README.md` and `ARCHITECTURE.md`.
 
@@ -259,6 +259,23 @@ Refused, and left costing points: subagent definitions, command files that would
 `tools/review`, a post-edit lint hook that would start Gradle after every file change, and
 a repository MCP config where a user-level one is the safer shape. Score after: 95 of 108,
 level L4. The remaining five failures are the refused ones.
+
+### The shortlist recommends the GGUF again (2026-09-10, night)
+
+The whole benchmark matrix read at once, at the maintainer's request, instead of the one
+speed row the 2026-09-07 reset quoted: the 8da4w export of LFM2.5 1.2B trails the Q4_K_M
+GGUF by six of thirty on GSM8K and IFEval and by 3.6 on BFCL over five phones, calls the one
+tool a fresh install has on in 1 to 4 of 75 rows that need it (the GGUF: 33 to 34), narrates
+a search it never made in one reply of five (the GGUF: none of 640), and the runtime returns
+no logits for the confidence gate. `RECOMMENDED` points at Liquid AI's GGUF repositories
+again, the 1.2B on its scores and the 2.6B with it provisionally, since its compiled export
+was never graded against its GGUF; the refusal-removed compiled pair stay listed as
+modified. Kept: the fresh-install default, the search framing every 160-row run used, the
+intent rule, the apostrophe normalisation, the gate. Changed on review (Codex, Gemini): the
+narration cut now fires only on a stream that carries no token probabilities, which is the
+compiled runtime read as a capability, because an early stop with no arm-scale measurement
+does not belong on the runtime that never produced the shape it cuts. Priority as set:
+stability, quality, then speed. Note: `docs/research/recommended-runtime.md`.
 
 ### The narration is cut at its first sentence (2026-09-10, night)
 

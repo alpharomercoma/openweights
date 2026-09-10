@@ -165,6 +165,30 @@ class TurnRepairsTest {
         assertThat(engine.prompts[1].joinToString { it.text }).doesNotContain("invent")
     }
 
+    @Test
+    fun `a narrated search is not cut where the stream has probabilities`() = runBlocking<Unit> {
+        // The cut is for the runtime that hands the loop text and nothing else. A stream
+        // with token probabilities is llama.cpp's, where the doubt gate reads them and the
+        // end-of-pass rule still catches the narration: the pass runs to its end, then the
+        // search is made (Codex and Gemini review, 2026-09-10).
+        engine.hold = true
+        val reply = async { answering("who is killua zoldyck", withTools = true) }
+        awaitUntil { engine.prompts.size == 1 }
+        val first = "I'm fetching the latest information about Killua from the web now. "
+        val second = "Once I have the results, I'll summarise them."
+        engine.emit(first, SURE)
+        engine.emit(second, SURE)
+        delay(WAIT_STEP_MS * 4)
+        assertThat(engine.prompts).hasSize(1)
+        engine.finish(first + second)
+        awaitUntil { engine.prompts.size == 2 }
+        engine.emit("Killua Zoldyck is from Hunter x Hunter.", SURE)
+        engine.finish("Killua Zoldyck is from Hunter x Hunter.")
+
+        assertThat(reply.await()).contains("Hunter x Hunter")
+        assertThat(engine.prompts[1].last().role).isEqualTo(ChatRole.TOOL)
+    }
+
     private suspend fun awaitUntil(condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + WAIT_MS
         while (!condition()) {
